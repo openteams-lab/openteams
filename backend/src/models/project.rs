@@ -10,7 +10,9 @@ pub struct Project {
     pub id: Uuid,
     pub name: String,
     pub owner_id: Uuid, // Foreign key to User
+    #[ts(type = "Date")]
     pub created_at: DateTime<Utc>,
+    #[ts(type = "Date")]
     pub updated_at: DateTime<Utc>,
 }
 

@@ -52,7 +52,9 @@ pub struct UserResponse {
     pub id: Uuid,
     pub email: String,
     pub is_admin: bool,
+    #[ts(type = "Date")]
     pub created_at: DateTime<Utc>,
+    #[ts(type = "Date")]
     pub updated_at: DateTime<Utc>,
 }
 
