@@ -23,7 +23,6 @@ export interface Project {
 
 export interface CreateProject {
   name: string
-  owner_id: string
 }
 
 export interface UpdateProject {

@@ -11,6 +11,7 @@ use uuid::Uuid;
 use chrono::Utc;
 
 use crate::models::{ApiResponse, project::{Project, CreateProject, UpdateProject}};
+use crate::auth::AuthUser;
 
 pub async fn get_projects(Extension(pool): Extension<PgPool>) -> Result<ResponseJson<ApiResponse<Vec<Project>>>, StatusCode> {
     match sqlx::query_as!(
@@ -58,18 +59,21 @@ pub async fn get_project(
 }
 
 pub async fn create_project(
+    auth: AuthUser,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<CreateProject>
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
     let id = Uuid::new_v4();
     let now = Utc::now();
 
+    tracing::debug!("Creating project '{}' for user {}", payload.name, auth.user_id);
+
     match sqlx::query_as!(
         Project,
         "INSERT INTO projects (id, name, owner_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, owner_id, created_at, updated_at",
         id,
         payload.name,
-        payload.owner_id,
+        auth.user_id,
         now,
         now
     )

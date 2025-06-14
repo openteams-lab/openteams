@@ -50,7 +50,9 @@ async fn main() -> anyhow::Result<()> {
     // Load environment variables from .env file
     dotenvy::dotenv().ok();
 
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env().add_directive("bloop_backend=debug".parse()?))
+        .init();
 
     // Database connection
     let database_url =

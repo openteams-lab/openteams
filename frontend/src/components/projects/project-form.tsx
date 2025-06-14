@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Project, CreateProject, UpdateProject } from 'shared/types'
 import { AlertCircle } from 'lucide-react'
+import { makeAuthenticatedRequest } from '@/lib/auth'
 
 interface ProjectFormProps {
   open: boolean
@@ -29,9 +30,8 @@ export function ProjectForm({ open, onClose, onSuccess, project }: ProjectFormPr
     try {
       if (isEditing) {
         const updateData: UpdateProject = { name }
-        const response = await fetch(`/api/projects/${project.id}`, {
+        const response = await makeAuthenticatedRequest(`/api/projects/${project.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updateData),
         })
         
@@ -39,14 +39,11 @@ export function ProjectForm({ open, onClose, onSuccess, project }: ProjectFormPr
           throw new Error('Failed to update project')
         }
       } else {
-        // For now, using a placeholder owner_id - this should come from auth
         const createData: CreateProject = { 
-          name, 
-          owner_id: '00000000-0000-0000-0000-000000000000' 
+          name
         }
-        const response = await fetch('/api/projects', {
+        const response = await makeAuthenticatedRequest('/api/projects', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(createData),
         })
         

@@ -15,7 +15,6 @@ pub struct Project {
 #[derive(Debug, Deserialize)]
 pub struct CreateProject {
     pub name: String,
-    pub owner_id: Uuid,
 }
 
 #[derive(Debug, Deserialize)]
