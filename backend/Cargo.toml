@@ -2,6 +2,11 @@
 name = "bloop-backend"
 version = "0.1.0"
 edition = "2021"
+default-run = "bloop-backend"
+
+[lib]
+name = "bloop_backend"
+path = "src/lib.rs"
 
 [dependencies]
 tokio = { workspace = true }
@@ -19,3 +24,7 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 dotenvy = "0.15"
 bcrypt = "0.15"
 jsonwebtoken = "9.2"
+ts-rs = { version = "9.0", features = ["uuid-impl", "chrono-impl"] }
+
+[build-dependencies]
+ts-rs = { version = "9.0", features = ["uuid-impl", "chrono-impl"] }

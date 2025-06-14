@@ -8,7 +8,8 @@
     "frontend:build": "cd frontend && npm run build",
     "backend:dev": "cargo watch -x 'run --manifest-path backend/Cargo.toml'",
     "backend:build": "cargo build --release --manifest-path backend/Cargo.toml",
-    "backend:run": "cargo run --manifest-path backend/Cargo.toml"
+    "backend:run": "cargo run --manifest-path backend/Cargo.toml",
+    "generate-types": "cd backend && cargo run --bin generate_types"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

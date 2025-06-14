@@ -34,14 +34,14 @@ export function UserForm({ open, onClose, onSuccess, user }: UserFormProps) {
     try {
       if (isEditing) {
         const updateData: UpdateUser = { 
-          email: email !== user.email ? email : undefined,
-          password: password ? password : undefined,
-          is_admin: canEditAdminStatus && isAdmin !== user.is_admin ? isAdmin : undefined
+          email: email !== user.email ? email : null,
+          password: password ? password : null,
+          is_admin: canEditAdminStatus && isAdmin !== user.is_admin ? isAdmin : null
         }
         
-        // Remove undefined values
+        // Remove null values
         Object.keys(updateData).forEach(key => {
-          if (updateData[key as keyof UpdateUser] === undefined) {
+          if (updateData[key as keyof UpdateUser] === null) {
             delete updateData[key as keyof UpdateUser]
           }
         })

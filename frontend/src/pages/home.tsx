@@ -16,20 +16,7 @@ export function HomePage() {
   
   const currentUser = authStorage.getUser()
 
-  const fetchHello = async () => {
-    setLoading(true)
-    try {
-      const response = await makeAuthenticatedRequest('/api/hello?name=Bloop')
-      const data = await response.json()
-      setMessage(data.message)
-      setMessageType('success')
-    } catch (error) {
-      setMessage('Error connecting to backend')
-      setMessageType('error')
-    } finally {
-      setLoading(false)
-    }
-  }
+
 
   const checkHealth = async () => {
     setLoading(true)
@@ -89,33 +76,7 @@ export function HomePage() {
 
           {/* Feature Cards */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-            <Card className="group hover:shadow-lg transition-all duration-200 border-muted/50 hover:border-muted">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="rounded-lg bg-primary/10 p-2 mr-3 group-hover:bg-primary/20 transition-colors">
-                      <Heart className="h-5 w-5 text-primary" />
-                    </div>
-                    <CardTitle className="text-lg">API Test</CardTitle>
-                  </div>
-                  <Badge variant="secondary" className="text-xs">Test</Badge>
-                </div>
-                <CardDescription>
-                  Test the connection between frontend and backend
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  onClick={fetchHello} 
-                  disabled={loading}
-                  className="w-full group-hover:shadow-sm transition-shadow"
-                  size="sm"
-                >
-                  <Heart className="mr-2 h-4 w-4" />
-                  {loading ? 'Testing...' : 'Say Hello'}
-                </Button>
-              </CardContent>
-            </Card>
+
 
             <Card className="group hover:shadow-lg transition-all duration-200 border-muted/50 hover:border-muted">
               <CardHeader className="pb-4">
@@ -172,7 +133,7 @@ export function HomePage() {
             </Card>
 
             {currentUser?.is_admin && (
-              <Card className="group hover:shadow-lg transition-all duration-200 border-muted/50 hover:border-muted lg:col-span-2">
+              <Card className="group hover:shadow-lg transition-all duration-200 border-muted/50 hover:border-muted">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">

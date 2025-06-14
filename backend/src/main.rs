@@ -1,11 +1,10 @@
 use axum::{
-    extract::{Extension, Query},
+    extract::Extension,
     response::Json as ResponseJson,
     routing::{get, post},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::postgres::PgPoolOptions;
 use std::env;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber;
@@ -18,22 +17,7 @@ use auth::hash_password;
 use models::ApiResponse;
 use routes::{health, projects, users};
 
-#[derive(Debug, Deserialize)]
-struct HelloQuery {
-    name: Option<String>,
-}
 
-#[derive(Debug, Serialize)]
-struct HelloResponse {
-    message: String,
-}
-
-async fn hello_handler(Query(params): Query<HelloQuery>) -> ResponseJson<HelloResponse> {
-    let name = params.name.unwrap_or_else(|| "World".to_string());
-    ResponseJson(HelloResponse {
-        message: format!("Hello, {}!", name),
-    })
-}
 
 async fn echo_handler(
     Json(payload): Json<serde_json::Value>,
@@ -71,7 +55,6 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(|| async { "Bloop API" }))
         .route("/health", get(health::health_check))
-        .route("/hello", get(hello_handler))
         .route("/echo", post(echo_handler))
         .merge(projects::projects_router())
         .merge(users::users_router())
