@@ -1,37 +1,53 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { ApiResponse } from 'shared/types'
-import { authStorage, makeAuthenticatedRequest } from '@/lib/auth'
-import { Heart, Activity, FolderOpen, Users, CheckCircle, AlertCircle, Zap, Shield, Code } from 'lucide-react'
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ApiResponse } from "shared/types";
+import { authStorage, makeAuthenticatedRequest } from "@/lib/auth";
+import {
+  Heart,
+  Activity,
+  FolderOpen,
+  Users,
+  CheckCircle,
+  AlertCircle,
+  Zap,
+  Shield,
+  Code,
+} from "lucide-react";
 
 export function HomePage() {
-  const [message, setMessage] = useState<string>('')
-  const [messageType, setMessageType] = useState<'success' | 'error'>('success')
-  const [loading, setLoading] = useState(false)
-  
-  const currentUser = authStorage.getUser()
+  const [message, setMessage] = useState<string>("");
+  const [messageType, setMessageType] = useState<"success" | "error">(
+    "success"
+  );
+  const [loading, setLoading] = useState(false);
 
-
+  const currentUser = authStorage.getUser();
 
   const checkHealth = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const response = await makeAuthenticatedRequest('/api/health')
-      const data: ApiResponse<string> = await response.json()
-      setMessage(data.message || 'Health check completed')
-      setMessageType('success')
+      const response = await makeAuthenticatedRequest("/api/health");
+      const data: ApiResponse<string> = await response.json();
+      setMessage(data.message || "Health check completed");
+      setMessageType("success");
     } catch (error) {
-      setMessage('Backend health check failed')
-      setMessageType('error')
+      setMessage("Backend health check failed");
+      setMessageType("error");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
@@ -54,30 +70,10 @@ export function HomePage() {
             <h1 className="text-4xl font-bold tracking-tight mb-4 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
               Welcome to Bloop
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-              A modern full-stack monorepo built with Rust backend and React frontend.
-              Get started by exploring our features below.
-            </p>
-            <div className="flex items-center justify-center gap-4">
-              <Badge variant="outline" className="text-xs">
-                <Shield className="mr-1 h-3 w-3" />
-                Secure
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                <Code className="mr-1 h-3 w-3" />
-                Type-Safe
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                <Activity className="mr-1 h-3 w-3" />
-                Real-time
-              </Badge>
-            </div>
           </div>
 
           {/* Feature Cards */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-
-
             <Card className="group hover:shadow-lg transition-all duration-200 border-muted/50 hover:border-muted">
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
@@ -87,22 +83,24 @@ export function HomePage() {
                     </div>
                     <CardTitle className="text-lg">Health Check</CardTitle>
                   </div>
-                  <Badge variant="secondary" className="text-xs">Monitor</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    Monitor
+                  </Badge>
                 </div>
                 <CardDescription>
                   Monitor the health status of your backend services
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button 
-                  onClick={checkHealth} 
-                  variant="outline" 
+                <Button
+                  onClick={checkHealth}
+                  variant="outline"
                   disabled={loading}
                   className="w-full group-hover:shadow-sm transition-shadow"
                   size="sm"
                 >
                   <Activity className="mr-2 h-4 w-4" />
-                  {loading ? 'Checking...' : 'Check Health'}
+                  {loading ? "Checking..." : "Check Health"}
                 </Button>
               </CardContent>
             </Card>
@@ -116,14 +114,20 @@ export function HomePage() {
                     </div>
                     <CardTitle className="text-lg">Projects</CardTitle>
                   </div>
-                  <Badge variant="secondary" className="text-xs">CRUD</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    CRUD
+                  </Badge>
                 </div>
                 <CardDescription>
                   Manage your projects with full CRUD operations
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button asChild className="w-full group-hover:shadow-sm transition-shadow" size="sm">
+                <Button
+                  asChild
+                  className="w-full group-hover:shadow-sm transition-shadow"
+                  size="sm"
+                >
                   <Link to="/projects">
                     <FolderOpen className="mr-2 h-4 w-4" />
                     View Projects
@@ -156,7 +160,11 @@ export function HomePage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Button asChild className="group-hover:shadow-sm transition-shadow" size="sm">
+                  <Button
+                    asChild
+                    className="group-hover:shadow-sm transition-shadow"
+                    size="sm"
+                  >
                     <Link to="/users">
                       <Users className="mr-2 h-4 w-4" />
                       Manage Users
@@ -170,8 +178,11 @@ export function HomePage() {
           {/* Status Alert */}
           {message && (
             <div className="max-w-2xl mx-auto mb-8">
-              <Alert variant={messageType === 'error' ? 'destructive' : 'default'} className="border-muted/50">
-                {messageType === 'error' ? (
+              <Alert
+                variant={messageType === "error" ? "destructive" : "default"}
+                className="border-muted/50"
+              >
+                {messageType === "error" ? (
                   <AlertCircle className="h-4 w-4" />
                 ) : (
                   <CheckCircle className="h-4 w-4" />
@@ -182,22 +193,8 @@ export function HomePage() {
               </Alert>
             </div>
           )}
-
-          {/* Footer */}
-          <Separator className="my-12 max-w-2xl mx-auto" />
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground mb-2">
-              Built with ❤️ using modern technologies
-            </p>
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="outline" className="text-xs">Rust</Badge>
-              <Badge variant="outline" className="text-xs">React</Badge>
-              <Badge variant="outline" className="text-xs">TypeScript</Badge>
-              <Badge variant="outline" className="text-xs">Tailwind CSS</Badge>
-            </div>
-          </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
