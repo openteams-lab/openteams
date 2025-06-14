@@ -14,7 +14,7 @@ mod routes;
 
 use auth::hash_password;
 use models::ApiResponse;
-use routes::{health, projects, users};
+use routes::{health, projects, tasks, users};
 
 
 
@@ -56,6 +56,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/health", get(health::health_check))
         .route("/echo", post(echo_handler))
         .merge(projects::projects_router())
+        .merge(tasks::tasks_router())
         .merge(users::users_router())
         .layer(Extension(pool))
         .layer(CorsLayer::permissive());

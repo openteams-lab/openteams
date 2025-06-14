@@ -4,6 +4,7 @@ import { LoginForm } from '@/components/auth/login-form'
 import { Navbar } from '@/components/layout/navbar'
 import { HomePage } from '@/pages/home'
 import { Projects } from '@/pages/projects'
+import { ProjectTasks } from '@/pages/project-tasks'
 import { Users } from '@/pages/users'
 import { isAuthenticated } from '@/lib/auth'
 
@@ -36,6 +37,7 @@ function AppContent() {
           <Route path="/" element={<HomePage />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:projectId" element={<Projects />} />
+          <Route path="/projects/:projectId/tasks" element={<ProjectTasks />} />
           <Route path="/users" element={<Users />} />
         </Routes>
       </div>

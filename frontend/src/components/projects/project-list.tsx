@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Project, ApiResponse } from 'shared/types'
 import { ProjectForm } from './project-form'
-import { Plus, Edit, Trash2, Calendar, AlertCircle, Loader2 } from 'lucide-react'
+import { Plus, Edit, Trash2, Calendar, AlertCircle, Loader2, CheckSquare } from 'lucide-react'
 
 export function ProjectList() {
+  const navigate = useNavigate()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -118,7 +120,12 @@ export function ProjectList() {
             <Card key={project.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <CardTitle className="text-lg">{project.name}</CardTitle>
+                  <CardTitle 
+                    className="text-lg cursor-pointer hover:text-primary"
+                    onClick={() => navigate(`/projects/${project.id}`)}
+                  >
+                    {project.name}
+                  </CardTitle>
                   <Badge variant="secondary" className="ml-2">
                     Active
                   </Badge>
@@ -130,6 +137,14 @@ export function ProjectList() {
               </CardHeader>
               <CardContent>
                 <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => navigate(`/projects/${project.id}/tasks`)}
+                    className="h-8"
+                  >
+                    <CheckSquare className="mr-1 h-3 w-3" />
+                    Tasks
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

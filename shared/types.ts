@@ -5,15 +5,23 @@ type ApiResponse<T> = { success: boolean, data: T | null, message: string | null
 
 type CreateProject = { name: string, };
 
+type Project = { id: string, name: string, owner_id: string, created_at: Date, updated_at: Date, };
+
+type UpdateProject = { name: string | null, };
+
+type CreateTask = { project_id: string, title: string, description: string | null, };
+
+type Task = { id: string, project_id: string, title: string, description: string | null, status: TaskStatus, created_at: string, updated_at: string, };
+
+type TaskStatus = "Todo" | "InProgress" | "Done" | "Cancelled";
+
+type UpdateTask = { title: string | null, description: string | null, status: TaskStatus | null, };
+
 type CreateUser = { email: string, password: string, is_admin: boolean | null, };
 
 type LoginRequest = { email: string, password: string, };
 
 type LoginResponse = { user: User, token: string, };
-
-type Project = { id: string, name: string, owner_id: string, created_at: Date, updated_at: Date, };
-
-type UpdateProject = { name: string | null, };
 
 type UpdateUser = { email: string | null, password: string | null, is_admin: boolean | null, };
 

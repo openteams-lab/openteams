@@ -48,16 +48,28 @@ fn main() {
 {}
 
 {}
+
+{}
+
+{}
+
+{}
+
+{}
 "#,
         bloop_backend::models::ApiResponse::<()>::decl(),
-        bloop_backend::models::CreateProject::decl(),
-        bloop_backend::models::CreateUser::decl(),
-        bloop_backend::models::LoginRequest::decl(),
-        bloop_backend::models::LoginResponse::decl(),
-        bloop_backend::models::Project::decl(),
-        bloop_backend::models::UpdateProject::decl(),
-        bloop_backend::models::UpdateUser::decl(),
-        bloop_backend::models::UserResponse::decl(),
+        bloop_backend::models::project::CreateProject::decl(),
+        bloop_backend::models::project::Project::decl(),
+        bloop_backend::models::project::UpdateProject::decl(),
+        bloop_backend::models::task::CreateTask::decl(),
+        bloop_backend::models::task::Task::decl(),
+        bloop_backend::models::task::TaskStatus::decl(),
+        bloop_backend::models::task::UpdateTask::decl(),
+        bloop_backend::models::user::CreateUser::decl(),
+        bloop_backend::models::user::LoginRequest::decl(),
+        bloop_backend::models::user::LoginResponse::decl(),
+        bloop_backend::models::user::UpdateUser::decl(),
+        bloop_backend::models::user::UserResponse::decl(),
     );
 
     std::fs::write(shared_path.join("types.ts"), consolidated_content).unwrap();

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Project, ApiResponse } from 'shared/types'
 import { ProjectForm } from './project-form'
-import { ArrowLeft, Edit, Trash2, Calendar, Clock, User, AlertCircle, Loader2 } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, Calendar, Clock, User, AlertCircle, Loader2, CheckSquare } from 'lucide-react'
 
 interface ProjectDetailProps {
   projectId: string
@@ -13,6 +14,7 @@ interface ProjectDetailProps {
 }
 
 export function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
+  const navigate = useNavigate()
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
@@ -111,6 +113,10 @@ export function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button onClick={() => navigate(`/projects/${projectId}/tasks`)}>
+            <CheckSquare className="mr-2 h-4 w-4" />
+            View Tasks
+          </Button>
           <Button variant="outline" onClick={() => setShowEditForm(true)}>
             <Edit className="mr-2 h-4 w-4" />
             Edit
