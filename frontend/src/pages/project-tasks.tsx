@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import { 
   Dialog, 
   DialogContent, 
@@ -27,6 +26,14 @@ import {
 } from '@/components/ui/select'
 import { ArrowLeft, Plus, MoreHorizontal, Trash2, Edit } from 'lucide-react'
 import { getAuthHeaders } from '@/lib/auth'
+import { 
+  KanbanProvider, 
+  KanbanBoard, 
+  KanbanHeader, 
+  KanbanCards, 
+  KanbanCard,
+  type DragEndEvent 
+} from '@/components/ui/shadcn-io/kanban'
 
 interface Task {
   id: string
@@ -52,18 +59,20 @@ interface ApiResponse<T> {
   message: string | null
 }
 
-const statusColors = {
-  Todo: 'bg-slate-100 text-slate-800',
-  InProgress: 'bg-blue-100 text-blue-800',
-  Done: 'bg-green-100 text-green-800',
-  Cancelled: 'bg-red-100 text-red-800'
-}
+
 
 const statusLabels = {
   Todo: 'To Do',
   InProgress: 'In Progress',
   Done: 'Done',
   Cancelled: 'Cancelled'
+}
+
+const statusBoardColors = {
+  Todo: '#64748b',
+  InProgress: '#3b82f6',
+  Done: '#22c55e',
+  Cancelled: '#ef4444'
 }
 
 export function ProjectTasks() {
@@ -219,6 +228,68 @@ export function ProjectTasks() {
     setIsEditDialogOpen(true)
   }
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    
+    if (!over || !active.data.current) return
+    
+    const taskId = active.id as string
+    const newStatus = over.id as Task['status']
+    const task = tasks.find(t => t.id === taskId)
+    
+    if (!task || task.status === newStatus) return
+
+    // Optimistically update the UI immediately
+    const previousStatus = task.status
+    setTasks(prev => prev.map(t => 
+      t.id === taskId ? { ...t, status: newStatus } : t
+    ))
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: task.title,
+          description: task.description,
+          status: newStatus
+        })
+      })
+
+      if (!response.ok) {
+        // Revert the optimistic update if the API call failed
+        setTasks(prev => prev.map(t => 
+          t.id === taskId ? { ...t, status: previousStatus } : t
+        ))
+        setError('Failed to update task status')
+      }
+    } catch (err) {
+      // Revert the optimistic update if the API call failed
+      setTasks(prev => prev.map(t => 
+        t.id === taskId ? { ...t, status: previousStatus } : t
+      ))
+      setError('Failed to update task status')
+    }
+  }
+
+  const groupTasksByStatus = () => {
+    const groups: Record<Task['status'], Task[]> = {
+      Todo: [],
+      InProgress: [],
+      Done: [],
+      Cancelled: []
+    }
+    
+    tasks.forEach(task => {
+      groups[task.status].push(task)
+    })
+    
+    return groups
+  }
+
   if (loading) {
     return <div className="text-center py-8">Loading tasks...</div>
   }
@@ -295,7 +366,7 @@ export function ProjectTasks() {
         </DialogContent>
       </Dialog>
 
-      {/* Tasks Grid */}
+      {/* Tasks View */}
       {tasks.length === 0 ? (
         <Card>
           <CardContent className="text-center py-8">
@@ -310,52 +381,81 @@ export function ProjectTasks() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {tasks.map((task) => (
-            <Card key={task.id} className="relative">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">{task.title}</CardTitle>
-                    <Badge 
-                      className={`mt-2 ${statusColors[task.status]}`}
-                      variant="secondary"
-                    >
-                      {statusLabels[task.status]}
-                    </Badge>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEditDialog(task)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => deleteTask(task.id)}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              {task.description && (
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    {task.description}
-                  </p>
-                </CardContent>
-              )}
-            </Card>
+        <KanbanProvider onDragEnd={handleDragEnd}>
+          {Object.entries(groupTasksByStatus()).map(([status, statusTasks]) => (
+            <KanbanBoard key={status} id={status as Task['status']}>
+              <KanbanHeader
+                name={statusLabels[status as Task['status']]}
+                color={statusBoardColors[status as Task['status']]}
+              />
+              <KanbanCards>
+                {statusTasks.map((task, index) => (
+                  <KanbanCard
+                    key={task.id}
+                    id={task.id}
+                    name={task.title}
+                    index={index}
+                    parent={status}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div 
+                          className="flex-1 cursor-pointer pr-2" 
+                          onClick={() => openEditDialog(task)}
+                        >
+                          <h4 className="font-medium text-sm">
+                            {task.title}
+                          </h4>
+                        </div>
+                        <div 
+                          className="flex-shrink-0"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 w-8 p-0 hover:bg-gray-100"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditDialog(task)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => deleteTask(task.id)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                      {task.description && (
+                        <div 
+                          className="cursor-pointer" 
+                          onClick={() => openEditDialog(task)}
+                        >
+                          <p className="text-xs text-muted-foreground">
+                            {task.description}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </KanbanCard>
+                ))}
+              </KanbanCards>
+            </KanbanBoard>
           ))}
-        </div>
+        </KanbanProvider>
       )}
 
       {/* Edit Task Dialog */}
