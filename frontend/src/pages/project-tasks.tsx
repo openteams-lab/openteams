@@ -34,13 +34,14 @@ import {
   KanbanCard,
   type DragEndEvent 
 } from '@/components/ui/shadcn-io/kanban'
+import type { TaskStatus } from '../../../shared/types'
 
 interface Task {
   id: string
   project_id: string
   title: string
   description: string | null
-  status: 'Todo' | 'InProgress' | 'Done' | 'Cancelled'
+  status: TaskStatus
   created_at: string
   updated_at: string
 }
@@ -61,18 +62,23 @@ interface ApiResponse<T> {
 
 
 
-const statusLabels = {
-  Todo: 'To Do',
-  InProgress: 'In Progress',
-  Done: 'Done',
-  Cancelled: 'Cancelled'
+// All possible task statuses from shared types
+const allTaskStatuses: TaskStatus[] = ['todo', 'inprogress', 'inreview', 'done', 'cancelled']
+
+const statusLabels: Record<TaskStatus, string> = {
+  todo: 'To Do',
+  inprogress: 'In Progress',
+  inreview: 'In Review',
+  done: 'Done',
+  cancelled: 'Cancelled'
 }
 
-const statusBoardColors = {
-  Todo: '#64748b',
-  InProgress: '#3b82f6',
-  Done: '#22c55e',
-  Cancelled: '#ef4444'
+const statusBoardColors: Record<TaskStatus, string> = {
+  todo: '#64748b',
+  inprogress: '#3b82f6',
+  inreview: '#f59e0b',
+  done: '#22c55e',
+  cancelled: '#ef4444'
 }
 
 export function ProjectTasks() {
@@ -91,7 +97,7 @@ export function ProjectTasks() {
   const [newTaskDescription, setNewTaskDescription] = useState('')
   const [editTaskTitle, setEditTaskTitle] = useState('')
   const [editTaskDescription, setEditTaskDescription] = useState('')
-  const [editTaskStatus, setEditTaskStatus] = useState<Task['status']>('Todo')
+  const [editTaskStatus, setEditTaskStatus] = useState<Task['status']>('todo')
 
   useEffect(() => {
     if (projectId) {
@@ -276,15 +282,22 @@ export function ProjectTasks() {
   }
 
   const groupTasksByStatus = () => {
-    const groups: Record<Task['status'], Task[]> = {
-      Todo: [],
-      InProgress: [],
-      Done: [],
-      Cancelled: []
-    }
+    const groups: Record<TaskStatus, Task[]> = {} as Record<TaskStatus, Task[]>
+    
+    // Initialize groups for all possible statuses
+    allTaskStatuses.forEach(status => {
+      groups[status] = []
+    })
     
     tasks.forEach(task => {
-      groups[task.status].push(task)
+      // Convert old capitalized status to lowercase if needed
+      const normalizedStatus = task.status.toLowerCase() as TaskStatus
+      if (groups[normalizedStatus]) {
+        groups[normalizedStatus].push(task)
+      } else {
+        // Default to todo if status doesn't match any expected value
+        groups['todo'].push(task)
+      }
     })
     
     return groups
@@ -494,10 +507,11 @@ export function ProjectTasks() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Todo">To Do</SelectItem>
-                  <SelectItem value="InProgress">In Progress</SelectItem>
-                  <SelectItem value="Done">Done</SelectItem>
-                  <SelectItem value="Cancelled">Cancelled</SelectItem>
+                  <SelectItem value="todo">To Do</SelectItem>
+                  <SelectItem value="inprogress">In Progress</SelectItem>
+                  <SelectItem value="inreview">In Review</SelectItem>
+                  <SelectItem value="done">Done</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>

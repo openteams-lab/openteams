@@ -6,10 +6,12 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Type, Serialize, Deserialize, PartialEq, TS)]
 #[sqlx(type_name = "task_status", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 #[ts(export)]
 pub enum TaskStatus {
     Todo,
     InProgress,
+    InReview,
     Done,
     Cancelled,
 }

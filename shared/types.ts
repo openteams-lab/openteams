@@ -13,7 +13,7 @@ type CreateTask = { project_id: string, title: string, description: string | nul
 
 type Task = { id: string, project_id: string, title: string, description: string | null, status: TaskStatus, created_at: string, updated_at: string, };
 
-type TaskStatus = "Todo" | "InProgress" | "Done" | "Cancelled";
+type TaskStatus = "todo" | "inprogress" | "inreview" | "done" | "cancelled";
 
 type UpdateTask = { title: string | null, description: string | null, status: TaskStatus | null, };
 
