@@ -2,39 +2,14 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle
-} from '@/components/ui/dialog'
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select'
-import { ArrowLeft, Plus, MoreHorizontal, Trash2, Edit } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 import { makeAuthenticatedRequest } from '@/lib/auth'
-import { 
-  KanbanProvider, 
-  KanbanBoard, 
-  KanbanHeader, 
-  KanbanCards, 
-  KanbanCard,
-  type DragEndEvent 
-} from '@/components/ui/shadcn-io/kanban'
+import { TaskCreateDialog } from '@/components/tasks/TaskCreateDialog'
+import { TaskEditDialog } from '@/components/tasks/TaskEditDialog'
+import { TaskDetailsDialog } from '@/components/tasks/TaskDetailsDialog'
+import { TaskKanbanBoard } from '@/components/tasks/TaskKanbanBoard'
 import type { TaskStatus } from 'shared/types'
+import type { DragEndEvent } from '@/components/ui/shadcn-io/kanban'
 
 interface Task {
   id: string
@@ -62,24 +37,7 @@ interface ApiResponse<T> {
 
 
 
-// All possible task statuses from shared types
-const allTaskStatuses: TaskStatus[] = ['todo', 'inprogress', 'inreview', 'done', 'cancelled']
 
-const statusLabels: Record<TaskStatus, string> = {
-  todo: 'To Do',
-  inprogress: 'In Progress',
-  inreview: 'In Review',
-  done: 'Done',
-  cancelled: 'Cancelled'
-}
-
-const statusBoardColors: Record<TaskStatus, string> = {
-  todo: '#64748b',
-  inprogress: '#3b82f6',
-  inreview: '#f59e0b',
-  done: '#22c55e',
-  cancelled: '#ef4444'
-}
 
 export function ProjectTasks() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -91,13 +49,9 @@ export function ProjectTasks() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [isTaskDetailsDialogOpen, setIsTaskDetailsDialogOpen] = useState(false)
 
-  // Form states
-  const [newTaskTitle, setNewTaskTitle] = useState('')
-  const [newTaskDescription, setNewTaskDescription] = useState('')
-  const [editTaskTitle, setEditTaskTitle] = useState('')
-  const [editTaskDescription, setEditTaskDescription] = useState('')
-  const [editTaskStatus, setEditTaskStatus] = useState<Task['status']>('todo')
 
   useEffect(() => {
     if (projectId) {
@@ -144,24 +98,19 @@ export function ProjectTasks() {
     }
   }
 
-  const createTask = async () => {
-    if (!newTaskTitle.trim()) return
-
+  const handleCreateTask = async (title: string, description: string) => {
     try {
       const response = await makeAuthenticatedRequest(`/api/projects/${projectId}/tasks`, {
         method: 'POST',
         body: JSON.stringify({
           project_id: projectId,
-          title: newTaskTitle,
-          description: newTaskDescription || null
+          title,
+          description: description || null
         })
       })
 
       if (response.ok) {
         await fetchTasks()
-        setNewTaskTitle('')
-        setNewTaskDescription('')
-        setIsCreateDialogOpen(false)
       } else {
         setError('Failed to create task')
       }
@@ -170,23 +119,22 @@ export function ProjectTasks() {
     }
   }
 
-  const updateTask = async () => {
-    if (!editingTask || !editTaskTitle.trim()) return
+  const handleUpdateTask = async (title: string, description: string, status: TaskStatus) => {
+    if (!editingTask) return
 
     try {
       const response = await makeAuthenticatedRequest(`/api/projects/${projectId}/tasks/${editingTask.id}`, {
         method: 'PUT',
         body: JSON.stringify({
-          title: editTaskTitle,
-          description: editTaskDescription || null,
-          status: editTaskStatus
+          title,
+          description: description || null,
+          status
         })
       })
 
       if (response.ok) {
         await fetchTasks()
         setEditingTask(null)
-        setIsEditDialogOpen(false)
       } else {
         setError('Failed to update task')
       }
@@ -195,7 +143,7 @@ export function ProjectTasks() {
     }
   }
 
-  const deleteTask = async (taskId: string) => {
+  const handleDeleteTask = async (taskId: string) => {
     if (!confirm('Are you sure you want to delete this task?')) return
 
     try {
@@ -213,12 +161,14 @@ export function ProjectTasks() {
     }
   }
 
-  const openEditDialog = (task: Task) => {
+  const handleEditTask = (task: Task) => {
     setEditingTask(task)
-    setEditTaskTitle(task.title)
-    setEditTaskDescription(task.description || '')
-    setEditTaskStatus(task.status)
     setIsEditDialogOpen(true)
+  }
+
+  const handleViewTaskDetails = (task: Task) => {
+    setSelectedTask(task)
+    setIsTaskDetailsDialogOpen(true)
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -264,27 +214,7 @@ export function ProjectTasks() {
     }
   }
 
-  const groupTasksByStatus = () => {
-    const groups: Record<TaskStatus, Task[]> = {} as Record<TaskStatus, Task[]>
-    
-    // Initialize groups for all possible statuses
-    allTaskStatuses.forEach(status => {
-      groups[status] = []
-    })
-    
-    tasks.forEach(task => {
-      // Convert old capitalized status to lowercase if needed
-      const normalizedStatus = task.status.toLowerCase() as TaskStatus
-      if (groups[normalizedStatus]) {
-        groups[normalizedStatus].push(task)
-      } else {
-        // Default to todo if status doesn't match any expected value
-        groups['todo'].push(task)
-      }
-    })
-    
-    return groups
-  }
+
 
   if (loading) {
     return <div className="text-center py-8">Loading tasks...</div>
@@ -324,43 +254,11 @@ export function ProjectTasks() {
         </Button>
       </div>
 
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Task</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  placeholder="Enter task title"
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={newTaskDescription}
-                  onChange={(e) => setNewTaskDescription(e.target.value)}
-                  placeholder="Enter task description (optional)"
-                  rows={3}
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsCreateDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={createTask}>Create Task</Button>
-              </div>
-            </div>
-        </DialogContent>
-      </Dialog>
+      <TaskCreateDialog
+        isOpen={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onCreateTask={handleCreateTask}
+      />
 
       {/* Tasks View */}
       {tasks.length === 0 ? (
@@ -377,139 +275,29 @@ export function ProjectTasks() {
           </CardContent>
         </Card>
       ) : (
-        <KanbanProvider onDragEnd={handleDragEnd}>
-          {Object.entries(groupTasksByStatus()).map(([status, statusTasks]) => (
-            <KanbanBoard key={status} id={status as Task['status']}>
-              <KanbanHeader
-                name={statusLabels[status as Task['status']]}
-                color={statusBoardColors[status as Task['status']]}
-              />
-              <KanbanCards>
-                {statusTasks.map((task, index) => (
-                  <KanbanCard
-                    key={task.id}
-                    id={task.id}
-                    name={task.title}
-                    index={index}
-                    parent={status}
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div 
-                          className="flex-1 cursor-pointer pr-2" 
-                          onClick={() => openEditDialog(task)}
-                        >
-                          <h4 className="font-medium text-sm">
-                            {task.title}
-                          </h4>
-                        </div>
-                        <div 
-                          className="flex-shrink-0"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 w-8 p-0 hover:bg-gray-100"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openEditDialog(task)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => deleteTask(task.id)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                      {task.description && (
-                        <div 
-                          className="cursor-pointer" 
-                          onClick={() => openEditDialog(task)}
-                        >
-                          <p className="text-xs text-muted-foreground">
-                            {task.description}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </KanbanCard>
-                ))}
-              </KanbanCards>
-            </KanbanBoard>
-          ))}
-        </KanbanProvider>
+        <TaskKanbanBoard
+          tasks={tasks}
+          onDragEnd={handleDragEnd}
+          onEditTask={handleEditTask}
+          onDeleteTask={handleDeleteTask}
+          onViewTaskDetails={handleViewTaskDetails}
+        />
       )}
 
-      {/* Edit Task Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Task</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-title">Title</Label>
-              <Input
-                id="edit-title"
-                value={editTaskTitle}
-                onChange={(e) => setEditTaskTitle(e.target.value)}
-                placeholder="Enter task title"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={editTaskDescription}
-                onChange={(e) => setEditTaskDescription(e.target.value)}
-                placeholder="Enter task description (optional)"
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-status">Status</Label>
-              <Select
-                value={editTaskStatus}
-                onValueChange={(value) => setEditTaskStatus(value as Task['status'])}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todo">To Do</SelectItem>
-                  <SelectItem value="inprogress">In Progress</SelectItem>
-                  <SelectItem value="inreview">In Review</SelectItem>
-                  <SelectItem value="done">Done</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsEditDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={updateTask}>Update Task</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TaskEditDialog
+        isOpen={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        task={editingTask}
+        onUpdateTask={handleUpdateTask}
+      />
+
+      <TaskDetailsDialog
+        isOpen={isTaskDetailsDialogOpen}
+        onOpenChange={setIsTaskDetailsDialogOpen}
+        task={selectedTask}
+        projectId={projectId!}
+        onError={setError}
+      />
     </div>
   )
 }

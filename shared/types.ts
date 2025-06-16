@@ -3,11 +3,11 @@
 
 export type ApiResponse<T> = { success: boolean, data: T | null, message: string | null, };
 
-export type CreateProject = { name: string, };
+export type CreateProject = { name: string, git_repo_path: string, use_existing_repo: boolean, };
 
-export type Project = { id: string, name: string, owner_id: string, created_at: Date, updated_at: Date, };
+export type Project = { id: string, name: string, git_repo_path: string, owner_id: string, created_at: Date, updated_at: Date, };
 
-export type UpdateProject = { name: string | null, };
+export type UpdateProject = { name: string | null, git_repo_path: string | null, };
 
 export type CreateTask = { project_id: string, title: string, description: string | null, };
 
@@ -16,6 +16,18 @@ export type TaskStatus = "todo" | "inprogress" | "inreview" | "done" | "cancelle
 export type Task = { id: string, project_id: string, title: string, description: string | null, status: TaskStatus, created_at: string, updated_at: string, };
 
 export type UpdateTask = { title: string | null, description: string | null, status: TaskStatus | null, };
+
+export type TaskAttemptStatus = "init" | "inprogress" | "paused";
+
+export type TaskAttempt = { id: string, task_id: string, worktree_path: string, base_commit: string | null, merge_commit: string | null, created_at: string, updated_at: string, };
+
+export type CreateTaskAttempt = { task_id: string, worktree_path: string, base_commit: string | null, merge_commit: string | null, };
+
+export type UpdateTaskAttempt = { worktree_path: string | null, base_commit: string | null, merge_commit: string | null, };
+
+export type TaskAttemptActivity = { id: string, task_attempt_id: string, status: TaskAttemptStatus, note: string | null, created_at: string, };
+
+export type CreateTaskAttemptActivity = { task_attempt_id: string, status: TaskAttemptStatus | null, note: string | null, };
 
 export type CreateUser = { email: string, password: string, is_admin: boolean | null, };
 
@@ -26,3 +38,5 @@ export type LoginResponse = { user: User, token: string, };
 export type UpdateUser = { email: string | null, password: string | null, is_admin: boolean | null, };
 
 export type User = { id: string, email: string, is_admin: boolean, created_at: Date, updated_at: Date, };
+
+export type DirectoryEntry = { name: string, path: string, is_directory: boolean, is_git_repo: boolean, };

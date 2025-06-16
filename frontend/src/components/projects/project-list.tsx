@@ -7,7 +7,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Project, ApiResponse } from 'shared/types'
 import { ProjectForm } from './project-form'
 import { makeAuthenticatedRequest } from '@/lib/auth'
-import { Plus, Edit, Trash2, Calendar, AlertCircle, Loader2, CheckSquare } from 'lucide-react'
+import { Plus, Edit, Trash2, Calendar, AlertCircle, Loader2, MoreHorizontal, ExternalLink } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 export function ProjectList() {
   const navigate = useNavigate()
@@ -118,54 +124,64 @@ export function ProjectList() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
-            <Card key={project.id} className="hover:shadow-md transition-shadow">
+            <Card 
+              key={project.id} 
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => navigate(`/projects/${project.id}/tasks`)}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <CardTitle 
-                    className="text-lg cursor-pointer hover:text-primary"
-                    onClick={() => navigate(`/projects/${project.id}`)}
-                  >
+                  <CardTitle className="text-lg">
                     {project.name}
                   </CardTitle>
-                  <Badge variant="secondary" className="ml-2">
-                    Active
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">
+                      Active
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/projects/${project.id}`)
+                        }}>
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          View Project
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation()
+                          handleEdit(project)
+                        }}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(project.id, project.name)
+                          }}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
                 <CardDescription className="flex items-center">
                   <Calendar className="mr-1 h-3 w-3" />
                   Created {new Date(project.created_at).toLocaleDateString()}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => navigate(`/projects/${project.id}/tasks`)}
-                    className="h-8"
-                  >
-                    <CheckSquare className="mr-1 h-3 w-3" />
-                    Tasks
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(project)}
-                    className="h-8"
-                  >
-                    <Edit className="mr-1 h-3 w-3" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(project.id, project.name)}
-                    className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="mr-1 h-3 w-3" />
-                    Delete
-                  </Button>
-                </div>
-              </CardContent>
             </Card>
           ))}
         </div>

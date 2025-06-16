@@ -25,6 +25,7 @@ dotenvy = "0.15"
 bcrypt = "0.15"
 jsonwebtoken = "9.2"
 ts-rs = { version = "9.0", features = ["uuid-impl", "chrono-impl"] }
+dirs = "5.0"
 
 [build-dependencies]
 ts-rs = { version = "9.0", features = ["uuid-impl", "chrono-impl"] }

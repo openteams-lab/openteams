@@ -19,7 +19,7 @@ pub async fn get_projects(
 ) -> Result<ResponseJson<ApiResponse<Vec<Project>>>, StatusCode> {
     match sqlx::query_as!(
         Project,
-        "SELECT id, name, owner_id, created_at, updated_at FROM projects ORDER BY created_at DESC"
+        "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects ORDER BY created_at DESC"
     )
     .fetch_all(&pool)
     .await
@@ -43,7 +43,7 @@ pub async fn get_project(
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
     match sqlx::query_as!(
         Project,
-        "SELECT id, name, owner_id, created_at, updated_at FROM projects WHERE id = $1",
+        "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects WHERE id = $1",
         id
     )
     .fetch_optional(&pool)
@@ -72,11 +72,110 @@ pub async fn create_project(
 
     tracing::debug!("Creating project '{}' for user {}", payload.name, auth.user_id);
 
+    // Check if git repo path is already used by another project
+    let existing_project = sqlx::query!(
+        "SELECT id FROM projects WHERE git_repo_path = $1",
+        payload.git_repo_path
+    )
+    .fetch_optional(&pool)
+    .await;
+
+    match existing_project {
+        Ok(Some(_)) => {
+            return Ok(ResponseJson(ApiResponse {
+                success: false,
+                data: None,
+                message: Some("A project with this git repository path already exists".to_string()),
+            }));
+        }
+        Ok(None) => {
+            // Path is available, continue
+        }
+        Err(e) => {
+            tracing::error!("Failed to check for existing git repo path: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // Validate and setup git repository
+    let path = std::path::Path::new(&payload.git_repo_path);
+    
+    if payload.use_existing_repo {
+        // For existing repos, validate that the path exists and is a git repository
+        if !path.exists() {
+            return Ok(ResponseJson(ApiResponse {
+                success: false,
+                data: None,
+                message: Some("The specified path does not exist".to_string()),
+            }));
+        }
+
+        if !path.is_dir() {
+            return Ok(ResponseJson(ApiResponse {
+                success: false,
+                data: None,
+                message: Some("The specified path is not a directory".to_string()),
+            }));
+        }
+
+        if !path.join(".git").exists() {
+            return Ok(ResponseJson(ApiResponse {
+                success: false,
+                data: None,
+                message: Some("The specified directory is not a git repository".to_string()),
+            }));
+        }
+    } else {
+        // For new repos, create directory and initialize git
+        
+        // Create directory if it doesn't exist
+        if !path.exists() {
+            if let Err(e) = std::fs::create_dir_all(path) {
+                tracing::error!("Failed to create directory: {}", e);
+                return Ok(ResponseJson(ApiResponse {
+                    success: false,
+                    data: None,
+                    message: Some(format!("Failed to create directory: {}", e)),
+                }));
+            }
+        }
+
+        // Check if it's already a git repo, if not initialize it
+        if !path.join(".git").exists() {
+            match std::process::Command::new("git")
+                .arg("init")
+                .current_dir(path)
+                .output()
+            {
+                Ok(output) => {
+                    if !output.status.success() {
+                        let error_msg = String::from_utf8_lossy(&output.stderr);
+                        tracing::error!("Git init failed: {}", error_msg);
+                        return Ok(ResponseJson(ApiResponse {
+                            success: false,
+                            data: None,
+                            message: Some(format!("Git init failed: {}", error_msg)),
+                        }));
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to run git init: {}", e);
+                    return Ok(ResponseJson(ApiResponse {
+                        success: false,
+                        data: None,
+                        message: Some(format!("Failed to run git init: {}", e)),
+                    }));
+                }
+            }
+        }
+    }
+
     match sqlx::query_as!(
         Project,
-        "INSERT INTO projects (id, name, owner_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, owner_id, created_at, updated_at",
+        "INSERT INTO projects (id, name, git_repo_path, owner_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
         id,
         payload.name,
+        payload.git_repo_path,
         auth.user_id,
         now,
         now
@@ -106,7 +205,7 @@ pub async fn update_project(
     // Check if project exists first
     let existing_project = sqlx::query_as!(
         Project,
-        "SELECT id, name, owner_id, created_at, updated_at FROM projects WHERE id = $1",
+        "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects WHERE id = $1",
         id
     )
     .fetch_optional(&pool)
@@ -121,14 +220,46 @@ pub async fn update_project(
         }
     };
 
-    // Use existing name if not provided in update
+    // If git_repo_path is being changed, check if the new path is already used by another project
+    if let Some(new_git_repo_path) = &payload.git_repo_path {
+        if new_git_repo_path != &existing_project.git_repo_path {
+            let duplicate_project = sqlx::query!(
+                "SELECT id FROM projects WHERE git_repo_path = $1 AND id != $2",
+                new_git_repo_path,
+                id
+            )
+            .fetch_optional(&pool)
+            .await;
+
+            match duplicate_project {
+                Ok(Some(_)) => {
+                    return Ok(ResponseJson(ApiResponse {
+                        success: false,
+                        data: None,
+                        message: Some("A project with this git repository path already exists".to_string()),
+                    }));
+                }
+                Ok(None) => {
+                    // Path is available, continue
+                }
+                Err(e) => {
+                    tracing::error!("Failed to check for existing git repo path: {}", e);
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+    }
+
+    // Use existing values if not provided in update
     let name = payload.name.unwrap_or(existing_project.name);
+    let git_repo_path = payload.git_repo_path.unwrap_or(existing_project.git_repo_path.clone());
 
     match sqlx::query_as!(
         Project,
-        "UPDATE projects SET name = $2, updated_at = $3 WHERE id = $1 RETURNING id, name, owner_id, created_at, updated_at",
+        "UPDATE projects SET name = $2, git_repo_path = $3, updated_at = $4 WHERE id = $1 RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
         id,
         name,
+        git_repo_path,
         now
     )
     .fetch_one(&pool)
@@ -208,15 +339,16 @@ mod tests {
         .unwrap()
     }
 
-    async fn create_test_project(pool: &PgPool, name: &str, owner_id: Uuid) -> Project {
+    async fn create_test_project(pool: &PgPool, name: &str, git_repo_path: &str, owner_id: Uuid) -> Project {
         let id = Uuid::new_v4();
         let now = Utc::now();
 
         sqlx::query_as!(
             Project,
-            "INSERT INTO projects (id, name, owner_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, owner_id, created_at, updated_at",
+            "INSERT INTO projects (id, name, git_repo_path, owner_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
             id,
             name,
+            git_repo_path,
             owner_id,
             now,
             now
@@ -231,9 +363,9 @@ mod tests {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         
         // Create multiple projects
-        create_test_project(&pool, "Project 1", user.id).await;
-        create_test_project(&pool, "Project 2", user.id).await;
-        create_test_project(&pool, "Project 3", user.id).await;
+        create_test_project(&pool, "Project 1", "/tmp/test1", user.id).await;
+        create_test_project(&pool, "Project 2", "/tmp/test2", user.id).await;
+        create_test_project(&pool, "Project 3", "/tmp/test3", user.id).await;
 
         let auth = AuthUser {
             user_id: user.id,
@@ -272,7 +404,7 @@ mod tests {
     #[sqlx::test]
     async fn test_get_project_success(pool: PgPool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
-        let project = create_test_project(&pool, "Test Project", user.id).await;
+        let project = create_test_project(&pool, "Test Project", "/tmp/test", user.id).await;
 
         let auth = AuthUser {
             user_id: user.id,
@@ -320,6 +452,7 @@ mod tests {
 
         let create_request = CreateProject {
             name: "New Project".to_string(),
+            git_repo_path: "/tmp/new-project".to_string(),
         };
 
         let result = create_project(auth.clone(), Extension(pool), Json(create_request)).await;
@@ -346,6 +479,7 @@ mod tests {
 
         let create_request = CreateProject {
             name: "Admin Project".to_string(),
+            git_repo_path: "/tmp/admin-project".to_string(),
         };
 
         let result = create_project(auth.clone(), Extension(pool), Json(create_request)).await;
@@ -362,10 +496,11 @@ mod tests {
     #[sqlx::test]
     async fn test_update_project_success(pool: PgPool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
-        let project = create_test_project(&pool, "Original Name", user.id).await;
+        let project = create_test_project(&pool, "Original Name", "/tmp/original", user.id).await;
 
         let update_request = UpdateProject {
             name: Some("Updated Name".to_string()),
+            git_repo_path: None,
         };
 
         let result = update_project(Path(project.id), Extension(pool), Json(update_request)).await;
@@ -383,11 +518,12 @@ mod tests {
     #[sqlx::test]
     async fn test_update_project_partial(pool: PgPool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
-        let project = create_test_project(&pool, "Original Name", user.id).await;
+        let project = create_test_project(&pool, "Original Name", "/tmp/original", user.id).await;
 
         // Update with no changes (None for name should keep existing name)
         let update_request = UpdateProject {
             name: None,
+            git_repo_path: None,
         };
 
         let result = update_project(Path(project.id), Extension(pool), Json(update_request)).await;
@@ -407,6 +543,7 @@ mod tests {
 
         let update_request = UpdateProject {
             name: Some("Updated Name".to_string()),
+            git_repo_path: None,
         };
 
         let result = update_project(Path(nonexistent_project_id), Extension(pool), Json(update_request)).await;
@@ -417,7 +554,7 @@ mod tests {
     #[sqlx::test]
     async fn test_delete_project_success(pool: PgPool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
-        let project = create_test_project(&pool, "Project to Delete", user.id).await;
+        let project = create_test_project(&pool, "Project to Delete", "/tmp/to-delete", user.id).await;
 
         let result = delete_project(Path(project.id), Extension(pool)).await;
         assert!(result.is_ok());
@@ -441,7 +578,7 @@ mod tests {
         use crate::models::task::{Task, TaskStatus};
         
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
-        let project = create_test_project(&pool, "Project with Tasks", user.id).await;
+        let project = create_test_project(&pool, "Project with Tasks", "/tmp/with-tasks", user.id).await;
         
         // Create a task in the project
         let task_id = Uuid::new_v4();
@@ -490,8 +627,8 @@ mod tests {
         let user1 = create_test_user(&pool, "user1@example.com", "password123", false).await;
         let user2 = create_test_user(&pool, "user2@example.com", "password123", false).await;
         
-        let project1 = create_test_project(&pool, "User 1 Project", user1.id).await;
-        let project2 = create_test_project(&pool, "User 2 Project", user2.id).await;
+        let project1 = create_test_project(&pool, "User 1 Project", "/tmp/user1", user1.id).await;
+        let project2 = create_test_project(&pool, "User 2 Project", "/tmp/user2", user2.id).await;
 
         // Verify project ownership
         assert_eq!(project1.owner_id, user1.id);

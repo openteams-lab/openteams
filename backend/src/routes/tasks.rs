@@ -10,7 +10,12 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use chrono::Utc;
 
-use crate::models::{ApiResponse, task::{Task, CreateTask, UpdateTask, TaskStatus}};
+use crate::models::{
+    ApiResponse, 
+    task::{Task, CreateTask, UpdateTask, TaskStatus},
+    task_attempt::{TaskAttempt, CreateTaskAttempt, UpdateTaskAttempt, TaskAttemptStatus},
+    task_attempt_activity::{TaskAttemptActivity, CreateTaskAttemptActivity}
+};
 use crate::auth::AuthUser;
 
 pub async fn get_project_tasks(
@@ -217,12 +222,246 @@ pub async fn delete_task(
     }
 }
 
+// Task Attempts endpoints
+pub async fn get_task_attempts(
+    _auth: AuthUser,
+    Path((project_id, task_id)): Path<(Uuid, Uuid)>,
+    Extension(pool): Extension<PgPool>
+) -> Result<ResponseJson<ApiResponse<Vec<TaskAttempt>>>, StatusCode> {
+    // Verify task exists in project first
+    let task_exists = sqlx::query!(
+        "SELECT id FROM tasks WHERE id = $1 AND project_id = $2", 
+        task_id, 
+        project_id
+    )
+    .fetch_optional(&pool)
+    .await;
+    
+    match task_exists {
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check task existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(Some(_)) => {}
+    }
+
+    match sqlx::query_as!(
+        TaskAttempt,
+        r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, created_at, updated_at 
+           FROM task_attempts 
+           WHERE task_id = $1 
+           ORDER BY created_at DESC"#,
+        task_id
+    )
+    .fetch_all(&pool)
+    .await
+    {
+        Ok(attempts) => Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: Some(attempts),
+            message: None,
+        })),
+        Err(e) => {
+            tracing::error!("Failed to fetch task attempts for task {}: {}", task_id, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+pub async fn get_task_attempt_activities(
+    _auth: AuthUser,
+    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
+    Extension(pool): Extension<PgPool>
+) -> Result<ResponseJson<ApiResponse<Vec<TaskAttemptActivity>>>, StatusCode> {
+    // Verify task attempt exists and belongs to the correct task
+    let attempt_exists = sqlx::query!(
+        "SELECT ta.id FROM task_attempts ta 
+         JOIN tasks t ON ta.task_id = t.id 
+         WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3",
+        attempt_id,
+        task_id,
+        project_id
+    )
+    .fetch_optional(&pool)
+    .await;
+    
+    match attempt_exists {
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check task attempt existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(Some(_)) => {}
+    }
+
+    match sqlx::query_as!(
+        TaskAttemptActivity,
+        r#"SELECT id, task_attempt_id, status as "status!: TaskAttemptStatus", note, created_at 
+           FROM task_attempt_activities 
+           WHERE task_attempt_id = $1 
+           ORDER BY created_at DESC"#,
+        attempt_id
+    )
+    .fetch_all(&pool)
+    .await
+    {
+        Ok(activities) => Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: Some(activities),
+            message: None,
+        })),
+        Err(e) => {
+            tracing::error!("Failed to fetch task attempt activities for attempt {}: {}", attempt_id, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+pub async fn create_task_attempt(
+    _auth: AuthUser,
+    Path((project_id, task_id)): Path<(Uuid, Uuid)>,
+    Extension(pool): Extension<PgPool>,
+    Json(mut payload): Json<CreateTaskAttempt>
+) -> Result<ResponseJson<ApiResponse<TaskAttempt>>, StatusCode> {
+    // Verify task exists in project first
+    let task_exists = sqlx::query!(
+        "SELECT id FROM tasks WHERE id = $1 AND project_id = $2", 
+        task_id, 
+        project_id
+    )
+    .fetch_optional(&pool)
+    .await;
+    
+    match task_exists {
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check task existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(Some(_)) => {}
+    }
+
+    let id = Uuid::new_v4();
+    let now = Utc::now();
+    
+    // Ensure the task_id in the payload matches the path parameter
+    payload.task_id = task_id;
+
+    match sqlx::query_as!(
+        TaskAttempt,
+        r#"INSERT INTO task_attempts (id, task_id, worktree_path, base_commit, merge_commit, created_at, updated_at) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7) 
+           RETURNING id, task_id, worktree_path, base_commit, merge_commit, created_at, updated_at"#,
+        id,
+        payload.task_id,
+        payload.worktree_path,
+        payload.base_commit,
+        payload.merge_commit,
+        now,
+        now
+    )
+    .fetch_one(&pool)
+    .await
+    {
+        Ok(attempt) => {
+            // Create initial activity record
+            let activity_id = Uuid::new_v4();
+            let _ = sqlx::query!(
+                r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note, created_at) 
+                   VALUES ($1, $2, $3, $4, $5)"#,
+                activity_id,
+                attempt.id,
+                TaskAttemptStatus::Init as TaskAttemptStatus,
+                Option::<String>::None,
+                now
+            )
+            .execute(&pool)
+            .await;
+
+            Ok(ResponseJson(ApiResponse {
+                success: true,
+                data: Some(attempt),
+                message: Some("Task attempt created successfully".to_string()),
+            }))
+        }
+        Err(e) => {
+            tracing::error!("Failed to create task attempt: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+pub async fn create_task_attempt_activity(
+    _auth: AuthUser,
+    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
+    Extension(pool): Extension<PgPool>,
+    Json(mut payload): Json<CreateTaskAttemptActivity>
+) -> Result<ResponseJson<ApiResponse<TaskAttemptActivity>>, StatusCode> {
+    // Verify task attempt exists and belongs to the correct task
+    let attempt_exists = sqlx::query!(
+        "SELECT ta.id FROM task_attempts ta 
+         JOIN tasks t ON ta.task_id = t.id 
+         WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3",
+        attempt_id,
+        task_id,
+        project_id
+    )
+    .fetch_optional(&pool)
+    .await;
+    
+    match attempt_exists {
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check task attempt existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(Some(_)) => {}
+    }
+
+    let id = Uuid::new_v4();
+    let now = Utc::now();
+    
+    // Ensure the task_attempt_id in the payload matches the path parameter
+    payload.task_attempt_id = attempt_id;
+    
+    // Default to Init status if not provided
+    let status = payload.status.unwrap_or(TaskAttemptStatus::Init);
+
+    match sqlx::query_as!(
+        TaskAttemptActivity,
+        r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note, created_at) 
+           VALUES ($1, $2, $3, $4, $5) 
+           RETURNING id, task_attempt_id, status as "status!: TaskAttemptStatus", note, created_at"#,
+        id,
+        payload.task_attempt_id,
+        status as TaskAttemptStatus,
+        payload.note,
+        now
+    )
+    .fetch_one(&pool)
+    .await
+    {
+        Ok(activity) => Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: Some(activity),
+            message: Some("Task attempt activity created successfully".to_string()),
+        })),
+        Err(e) => {
+            tracing::error!("Failed to create task attempt activity: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 pub fn tasks_router() -> Router {
     use axum::routing::{post, put, delete};
     
     Router::new()
         .route("/projects/:project_id/tasks", get(get_project_tasks).post(create_task))
         .route("/projects/:project_id/tasks/:task_id", get(get_task).put(update_task).delete(delete_task))
+        .route("/projects/:project_id/tasks/:task_id/attempts", get(get_task_attempts).post(create_task_attempt))
+        .route("/projects/:project_id/tasks/:task_id/attempts/:attempt_id/activities", get(get_task_attempt_activities).post(create_task_attempt_activity))
 }
 
 #[cfg(test)]

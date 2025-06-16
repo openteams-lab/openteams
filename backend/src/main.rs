@@ -15,7 +15,7 @@ mod routes;
 
 use auth::{auth_middleware, hash_password};
 use models::ApiResponse;
-use routes::{health, projects, tasks, users};
+use routes::{health, projects, tasks, users, filesystem};
 
 async fn echo_handler(
     Json(payload): Json<serde_json::Value>,
@@ -67,6 +67,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(projects::projects_router())
         .merge(tasks::tasks_router())
         .merge(users::protected_users_router())
+        .merge(filesystem::filesystem_router())
         .layer(Extension(pool.clone()))
         .layer(middleware::from_fn(auth_middleware));
 
