@@ -58,6 +58,18 @@ impl Task {
         .await
     }
 
+    pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Task,
+            r#"SELECT id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at 
+               FROM tasks 
+               WHERE id = $1"#,
+            id
+        )
+        .fetch_optional(pool)
+        .await
+    }
+
     pub async fn find_by_id_and_project_id(pool: &PgPool, id: Uuid, project_id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Task,

@@ -26,6 +26,7 @@ bcrypt = "0.15"
 jsonwebtoken = "9.2"
 ts-rs = { version = "9.0", features = ["uuid-impl", "chrono-impl"] }
 dirs = "5.0"
+git2 = "0.18"
 
 [build-dependencies]
 ts-rs = { version = "9.0", features = ["uuid-impl", "chrono-impl"] }

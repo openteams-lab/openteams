@@ -3,6 +3,44 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type, PgPool};
 use ts_rs::TS;
 use uuid::Uuid;
+use git2::{Repository, Error as GitError};
+use std::path::Path;
+
+use super::task::Task;
+use super::project::Project;
+
+#[derive(Debug)]
+pub enum TaskAttemptError {
+    Database(sqlx::Error),
+    Git(GitError),
+    TaskNotFound,
+    ProjectNotFound,
+}
+
+impl std::fmt::Display for TaskAttemptError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TaskAttemptError::Database(e) => write!(f, "Database error: {}", e),
+            TaskAttemptError::Git(e) => write!(f, "Git error: {}", e),
+            TaskAttemptError::TaskNotFound => write!(f, "Task not found"),
+            TaskAttemptError::ProjectNotFound => write!(f, "Project not found"),
+        }
+    }
+}
+
+impl std::error::Error for TaskAttemptError {}
+
+impl From<sqlx::Error> for TaskAttemptError {
+    fn from(err: sqlx::Error) -> Self {
+        TaskAttemptError::Database(err)
+    }
+}
+
+impl From<GitError> for TaskAttemptError {
+    fn from(err: GitError) -> Self {
+        TaskAttemptError::Git(err)
+    }
+}
 
 #[derive(Debug, Clone, Type, Serialize, Deserialize, PartialEq, TS)]
 #[sqlx(type_name = "task_attempt_status", rename_all = "lowercase")]
@@ -57,10 +95,34 @@ impl TaskAttempt {
         .await
     }
 
-    pub async fn create(pool: &PgPool, data: &CreateTaskAttempt, attempt_id: Uuid) -> Result<Self, sqlx::Error> {
+    pub async fn create(pool: &PgPool, data: &CreateTaskAttempt, attempt_id: Uuid) -> Result<Self, TaskAttemptError> {
         let now = Utc::now();
 
-        sqlx::query_as!(
+        // First, get the task to get the project_id
+        let task = Task::find_by_id(pool, data.task_id)
+            .await?
+            .ok_or(TaskAttemptError::TaskNotFound)?;
+
+        // Then get the project using the project_id
+        let project = Project::find_by_id(pool, task.project_id)
+            .await?
+            .ok_or(TaskAttemptError::ProjectNotFound)?;
+
+        // Create the worktree using git2
+        let repo = Repository::open(&project.git_repo_path)?;
+        let worktree_path = Path::new(&data.worktree_path);
+        
+        // Create the worktree directory if it doesn't exist
+        if let Some(parent) = worktree_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| TaskAttemptError::Git(GitError::from_str(&e.to_string())))?;
+        }
+
+        // Create the worktree at the specified path
+        let branch_name = format!("attempt-{}", attempt_id);
+        repo.worktree(&branch_name, worktree_path, None)?;
+
+        // Insert the record into the database
+        let task_attempt = sqlx::query_as!(
             TaskAttempt,
             r#"INSERT INTO task_attempts (id, task_id, worktree_path, base_commit, merge_commit, created_at, updated_at) 
                VALUES ($1, $2, $3, $4, $5, $6, $7) 
@@ -74,7 +136,9 @@ impl TaskAttempt {
             now
         )
         .fetch_one(pool)
-        .await
+        .await?;
+
+        Ok(task_attempt)
     }
 
     pub async fn exists_for_task(pool: &PgPool, attempt_id: Uuid, task_id: Uuid, project_id: Uuid) -> Result<bool, sqlx::Error> {

@@ -68,3 +68,8 @@ When working on any task that involves changes to the backend and the frontend, 
 # Testing your work
 
 Try to build the Typescript project after any frontend changes `npm run build`
+
+# Backend data models
+
+SQLX queries should be located in backend/src/models/\*
+Use getters and setters instead of raw SQL queries where possible.
