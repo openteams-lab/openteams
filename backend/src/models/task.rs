@@ -84,40 +84,33 @@ impl Task {
     }
 
     pub async fn create(pool: &PgPool, data: &CreateTask, task_id: Uuid) -> Result<Self, sqlx::Error> {
-        let now = Utc::now();
-
         sqlx::query_as!(
             Task,
-            r#"INSERT INTO tasks (id, project_id, title, description, status, created_at, updated_at) 
-               VALUES ($1, $2, $3, $4, $5, $6, $7) 
+            r#"INSERT INTO tasks (id, project_id, title, description, status) 
+               VALUES ($1, $2, $3, $4, $5) 
                RETURNING id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at"#,
             task_id,
             data.project_id,
             data.title,
             data.description,
-            TaskStatus::Todo as TaskStatus,
-            now,
-            now
+            TaskStatus::Todo as TaskStatus
         )
         .fetch_one(pool)
         .await
     }
 
     pub async fn update(pool: &PgPool, id: Uuid, project_id: Uuid, title: String, description: Option<String>, status: TaskStatus) -> Result<Self, sqlx::Error> {
-        let now = Utc::now();
-
         sqlx::query_as!(
             Task,
             r#"UPDATE tasks 
-               SET title = $3, description = $4, status = $5, updated_at = $6 
+               SET title = $3, description = $4, status = $5 
                WHERE id = $1 AND project_id = $2 
                RETURNING id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at"#,
             id,
             project_id,
             title,
             description,
-            status as TaskStatus,
-            now
+            status as TaskStatus
         )
         .fetch_one(pool)
         .await

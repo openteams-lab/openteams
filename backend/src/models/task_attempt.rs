@@ -96,8 +96,6 @@ impl TaskAttempt {
     }
 
     pub async fn create(pool: &PgPool, data: &CreateTaskAttempt, attempt_id: Uuid) -> Result<Self, TaskAttemptError> {
-        let now = Utc::now();
-
         // First, get the task to get the project_id
         let task = Task::find_by_id(pool, data.task_id)
             .await?
@@ -124,16 +122,14 @@ impl TaskAttempt {
         // Insert the record into the database
         let task_attempt = sqlx::query_as!(
             TaskAttempt,
-            r#"INSERT INTO task_attempts (id, task_id, worktree_path, base_commit, merge_commit, created_at, updated_at) 
-               VALUES ($1, $2, $3, $4, $5, $6, $7) 
+            r#"INSERT INTO task_attempts (id, task_id, worktree_path, base_commit, merge_commit) 
+               VALUES ($1, $2, $3, $4, $5) 
                RETURNING id, task_id, worktree_path, base_commit, merge_commit, created_at, updated_at"#,
             attempt_id,
             data.task_id,
             data.worktree_path,
             data.base_commit,
-            data.merge_commit,
-            now,
-            now
+            data.merge_commit
         )
         .fetch_one(pool)
         .await?;

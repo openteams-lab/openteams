@@ -74,32 +74,25 @@ impl Project {
     }
 
     pub async fn create(pool: &PgPool, data: &CreateProject, owner_id: Uuid, project_id: Uuid) -> Result<Self, sqlx::Error> {
-        let now = Utc::now();
-
         sqlx::query_as!(
             Project,
-            "INSERT INTO projects (id, name, git_repo_path, owner_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
+            "INSERT INTO projects (id, name, git_repo_path, owner_id) VALUES ($1, $2, $3, $4) RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
             project_id,
             data.name,
             data.git_repo_path,
-            owner_id,
-            now,
-            now
+            owner_id
         )
         .fetch_one(pool)
         .await
     }
 
     pub async fn update(pool: &PgPool, id: Uuid, name: String, git_repo_path: String) -> Result<Self, sqlx::Error> {
-        let now = Utc::now();
-
         sqlx::query_as!(
             Project,
-            "UPDATE projects SET name = $2, git_repo_path = $3, updated_at = $4 WHERE id = $1 RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
+            "UPDATE projects SET name = $2, git_repo_path = $3 WHERE id = $1 RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
             id,
             name,
-            git_repo_path,
-            now
+            git_repo_path
         )
         .fetch_one(pool)
         .await

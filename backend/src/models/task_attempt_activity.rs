@@ -39,34 +39,28 @@ impl TaskAttemptActivity {
     }
 
     pub async fn create(pool: &PgPool, data: &CreateTaskAttemptActivity, activity_id: Uuid, status: TaskAttemptStatus) -> Result<Self, sqlx::Error> {
-        let now = Utc::now();
-
         sqlx::query_as!(
             TaskAttemptActivity,
-            r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note, created_at) 
-               VALUES ($1, $2, $3, $4, $5) 
+            r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note) 
+               VALUES ($1, $2, $3, $4) 
                RETURNING id, task_attempt_id, status as "status!: TaskAttemptStatus", note, created_at"#,
             activity_id,
             data.task_attempt_id,
             status as TaskAttemptStatus,
-            data.note,
-            now
+            data.note
         )
         .fetch_one(pool)
         .await
     }
 
     pub async fn create_initial(pool: &PgPool, attempt_id: Uuid, activity_id: Uuid) -> Result<(), sqlx::Error> {
-        let now = Utc::now();
-
         sqlx::query!(
-            r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note, created_at) 
-               VALUES ($1, $2, $3, $4, $5)"#,
+            r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note) 
+               VALUES ($1, $2, $3, $4)"#,
             activity_id,
             attempt_id,
             TaskAttemptStatus::Init as TaskAttemptStatus,
-            Option::<String>::None,
-            now
+            Option::<String>::None
         )
         .execute(pool)
         .await?;

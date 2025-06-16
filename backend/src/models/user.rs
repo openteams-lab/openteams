@@ -101,34 +101,28 @@ impl User {
     }
 
     pub async fn create(pool: &PgPool, data: &CreateUser, password_hash: String, user_id: Uuid) -> Result<Self, sqlx::Error> {
-        let now = Utc::now();
         let is_admin = data.is_admin.unwrap_or(false);
 
         sqlx::query_as!(
             User,
-            "INSERT INTO users (id, email, password_hash, is_admin, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, password_hash, is_admin, created_at, updated_at",
+            "INSERT INTO users (id, email, password_hash, is_admin) VALUES ($1, $2, $3, $4) RETURNING id, email, password_hash, is_admin, created_at, updated_at",
             user_id,
             data.email,
             password_hash,
-            is_admin,
-            now,
-            now
+            is_admin
         )
         .fetch_one(pool)
         .await
     }
 
     pub async fn update(pool: &PgPool, id: Uuid, email: String, password_hash: String, is_admin: bool) -> Result<Self, sqlx::Error> {
-        let now = Utc::now();
-
         sqlx::query_as!(
             User,
-            "UPDATE users SET email = $2, password_hash = $3, is_admin = $4, updated_at = $5 WHERE id = $1 RETURNING id, email, password_hash, is_admin, created_at, updated_at",
+            "UPDATE users SET email = $2, password_hash = $3, is_admin = $4 WHERE id = $1 RETURNING id, email, password_hash, is_admin, created_at, updated_at",
             id,
             email,
             password_hash,
-            is_admin,
-            now
+            is_admin
         )
         .fetch_one(pool)
         .await
