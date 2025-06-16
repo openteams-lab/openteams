@@ -7,6 +7,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 import { makeAuthenticatedRequest } from '@/lib/auth'
 import type { TaskStatus, TaskAttempt, TaskAttemptActivity } from 'shared/types'
 
@@ -48,6 +49,7 @@ export function TaskDetailsDialog({ isOpen, onOpenChange, task, projectId, onErr
   const [selectedAttempt, setSelectedAttempt] = useState<TaskAttempt | null>(null)
   const [attemptActivities, setAttemptActivities] = useState<TaskAttemptActivity[]>([])
   const [activitiesLoading, setActivitiesLoading] = useState(false)
+  const [creatingAttempt, setCreatingAttempt] = useState(false)
 
   useEffect(() => {
     if (isOpen && task) {
@@ -102,6 +104,42 @@ export function TaskDetailsDialog({ isOpen, onOpenChange, task, projectId, onErr
     fetchAttemptActivities(attempt.id)
   }
 
+  const createNewAttempt = async () => {
+    if (!task) return
+    
+    try {
+      setCreatingAttempt(true)
+      const worktreePath = `/tmp/task-${task.id}-attempt-${Date.now()}`
+      
+      const response = await makeAuthenticatedRequest(
+        `/api/projects/${projectId}/tasks/${task.id}/attempts`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            task_id: task.id,
+            worktree_path: worktreePath,
+            base_commit: null,
+            merge_commit: null,
+          }),
+        }
+      )
+      
+      if (response.ok) {
+        // Refresh the attempts list
+        await fetchTaskAttempts(task.id)
+      } else {
+        onError('Failed to create task attempt')
+      }
+    } catch (err) {
+      onError('Failed to create task attempt')
+    } finally {
+      setCreatingAttempt(false)
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -134,7 +172,16 @@ export function TaskDetailsDialog({ isOpen, onOpenChange, task, projectId, onErr
 
           {/* Task Attempts */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Task Attempts</h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Task Attempts</h3>
+              <Button 
+                onClick={createNewAttempt}
+                disabled={creatingAttempt}
+                size="sm"
+              >
+                {creatingAttempt ? 'Creating...' : 'Create New Attempt'}
+              </Button>
+            </div>
             {taskAttemptsLoading ? (
               <div className="text-center py-4">Loading attempts...</div>
             ) : taskAttempts.length === 0 ? (
