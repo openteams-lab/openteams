@@ -134,4 +134,48 @@ impl User {
             .await?;
         Ok(result.rows_affected())
     }
+
+    pub async fn create_or_update_admin(pool: &PgPool, email: &str, password_hash: &str) -> Result<(), sqlx::Error> {
+        use chrono::Utc;
+        
+        // Check if admin already exists
+        let existing_admin = sqlx::query!(
+            "SELECT id, password_hash FROM users WHERE email = $1",
+            email
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(admin) = existing_admin {
+            // Update existing admin password
+            let now = Utc::now();
+            sqlx::query!(
+                "UPDATE users SET password_hash = $2, is_admin = $3, updated_at = $4 WHERE id = $1",
+                admin.id,
+                password_hash,
+                true,
+                now
+            )
+            .execute(pool)
+            .await?;
+
+            tracing::info!("Updated admin account");
+        } else {
+            // Create new admin account
+            let id = Uuid::new_v4();
+            sqlx::query!(
+                "INSERT INTO users (id, email, password_hash, is_admin) VALUES ($1, $2, $3, $4)",
+                id,
+                email,
+                password_hash,
+                true
+            )
+            .execute(pool)
+            .await?;
+
+            tracing::info!("Created admin account: {}", email);
+        }
+
+        Ok(())
+    }
 }
