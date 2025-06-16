@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, project_id, title, description, status as \"status!: TaskStatus\", created_at, updated_at \n           FROM tasks \n           WHERE project_id = $1 \n           ORDER BY created_at DESC",
+  "query": "SELECT id, project_id, title, description, status as \"status!: TaskStatus\", created_at, updated_at \n               FROM tasks \n               WHERE id = $1 AND project_id = $2",
   "describe": {
     "columns": [
       {
@@ -54,6 +54,7 @@
     ],
     "parameters": {
       "Left": [
+        "Uuid",
         "Uuid"
       ]
     },
@@ -67,5 +68,5 @@
       false
     ]
   },
-  "hash": "2d134000c4bfb65ca088a1463146262e25ed053855e6cba5f72adc05d1ed9e85"
+  "hash": "f4d24cec6142ffb70bf1008235921035d310c452da78128420c93707485c0d7f"
 }

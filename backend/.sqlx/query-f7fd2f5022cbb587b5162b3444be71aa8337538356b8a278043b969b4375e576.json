@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO task_attempt_activities (id, task_attempt_id, status, note) \n               VALUES ($1, $2, $3, $4)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "task_attempt_status",
+            "kind": {
+              "Enum": [
+                "init",
+                "inprogress",
+                "paused"
+              ]
+            }
+          }
+        },
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f7fd2f5022cbb587b5162b3444be71aa8337538356b8a278043b969b4375e576"
+}

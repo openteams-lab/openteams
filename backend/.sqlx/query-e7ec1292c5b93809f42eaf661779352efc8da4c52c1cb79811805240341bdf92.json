@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE users SET email = $2, password_hash = $3, is_admin = $4, updated_at = $5 WHERE id = $1 RETURNING id, email, password_hash, is_admin, created_at, updated_at",
+  "query": "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects ORDER BY created_at DESC",
   "describe": {
     "columns": [
       {
@@ -10,18 +10,18 @@
       },
       {
         "ordinal": 1,
-        "name": "email",
+        "name": "name",
         "type_info": "Varchar"
       },
       {
         "ordinal": 2,
-        "name": "password_hash",
+        "name": "git_repo_path",
         "type_info": "Varchar"
       },
       {
         "ordinal": 3,
-        "name": "is_admin",
-        "type_info": "Bool"
+        "name": "owner_id",
+        "type_info": "Uuid"
       },
       {
         "ordinal": 4,
@@ -35,13 +35,7 @@
       }
     ],
     "parameters": {
-      "Left": [
-        "Uuid",
-        "Varchar",
-        "Varchar",
-        "Bool",
-        "Timestamptz"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
@@ -52,5 +46,5 @@
       false
     ]
   },
-  "hash": "1fbd0dbbc876ac609d7fe7462a816fe3ab68b1d8711b4099daae54530d1703b1"
+  "hash": "e7ec1292c5b93809f42eaf661779352efc8da4c52c1cb79811805240341bdf92"
 }

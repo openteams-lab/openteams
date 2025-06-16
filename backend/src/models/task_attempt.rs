@@ -64,6 +64,8 @@ pub struct TaskAttempt {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(skip)]
     pub executor_config: Option<serde_json::Value>, // JSON field for ExecutorConfig
+    pub stdout: Option<String>,
+    pub stderr: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -90,7 +92,7 @@ impl TaskAttempt {
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             TaskAttempt,
-            r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, executor_config, created_at, updated_at 
+            r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, executor_config, stdout, stderr, created_at, updated_at 
                FROM task_attempts 
                WHERE id = $1"#,
             id
@@ -102,7 +104,7 @@ impl TaskAttempt {
     pub async fn find_by_task_id(pool: &PgPool, task_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             TaskAttempt,
-            r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, executor_config, created_at, updated_at 
+            r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, executor_config, stdout, stderr, created_at, updated_at 
                FROM task_attempts 
                WHERE task_id = $1 
                ORDER BY created_at DESC"#,
@@ -145,15 +147,17 @@ impl TaskAttempt {
         // Insert the record into the database
         let task_attempt = sqlx::query_as!(
             TaskAttempt,
-            r#"INSERT INTO task_attempts (id, task_id, worktree_path, base_commit, merge_commit, executor_config) 
-               VALUES ($1, $2, $3, $4, $5, $6) 
-               RETURNING id, task_id, worktree_path, base_commit, merge_commit, executor_config, created_at, updated_at"#,
+            r#"INSERT INTO task_attempts (id, task_id, worktree_path, base_commit, merge_commit, executor_config, stdout, stderr) 
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+               RETURNING id, task_id, worktree_path, base_commit, merge_commit, executor_config, stdout, stderr, created_at, updated_at"#,
             attempt_id,
             data.task_id,
             data.worktree_path,
             data.base_commit,
             data.merge_commit,
-            executor_config_json
+            executor_config_json,
+            None::<String>, // stdout
+            None::<String>  // stderr
         )
         .fetch_one(pool)
         .await?;

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ta.id FROM task_attempts ta \n             JOIN tasks t ON ta.task_id = t.id \n             WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "84df316d94c83b9189ab76a41521bf6bc60ea6ae530f00cf544ac87c120f50c2"
+}

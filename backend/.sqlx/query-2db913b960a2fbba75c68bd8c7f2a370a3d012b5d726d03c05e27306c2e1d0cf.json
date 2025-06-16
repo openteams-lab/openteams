@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO projects (id, name, owner_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, owner_id, created_at, updated_at",
+  "query": "INSERT INTO users (id, email, password_hash, is_admin) VALUES ($1, $2, $3, $4) RETURNING id, email, password_hash, is_admin, created_at, updated_at",
   "describe": {
     "columns": [
       {
@@ -10,21 +10,26 @@
       },
       {
         "ordinal": 1,
-        "name": "name",
+        "name": "email",
         "type_info": "Varchar"
       },
       {
         "ordinal": 2,
-        "name": "owner_id",
-        "type_info": "Uuid"
+        "name": "password_hash",
+        "type_info": "Varchar"
       },
       {
         "ordinal": 3,
+        "name": "is_admin",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -33,9 +38,8 @@
       "Left": [
         "Uuid",
         "Varchar",
-        "Uuid",
-        "Timestamptz",
-        "Timestamptz"
+        "Varchar",
+        "Bool"
       ]
     },
     "nullable": [
@@ -43,8 +47,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "c9cb2594edb93c9cc75f0fc952c48fed263c536a1bf3b2e177e4a74cd3b4b30f"
+  "hash": "2db913b960a2fbba75c68bd8c7f2a370a3d012b5d726d03c05e27306c2e1d0cf"
 }

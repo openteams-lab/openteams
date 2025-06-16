@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE projects SET name = $2, updated_at = $3 WHERE id = $1 RETURNING id, name, owner_id, created_at, updated_at",
+  "query": "UPDATE projects SET name = $2, git_repo_path = $3 WHERE id = $1 RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
   "describe": {
     "columns": [
       {
@@ -15,16 +15,21 @@
       },
       {
         "ordinal": 2,
+        "name": "git_repo_path",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
         "name": "owner_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -33,7 +38,7 @@
       "Left": [
         "Uuid",
         "Varchar",
-        "Timestamptz"
+        "Varchar"
       ]
     },
     "nullable": [
@@ -41,8 +46,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "e6d8bb56195fb3c6a297c69bd69053cebfc486acd6368de53945adf31ffc707f"
+  "hash": "f945f1d2ffb4458739c4e98c6dc35c215b5bc3ce1d59d5dd4948b032ab461cd9"
 }

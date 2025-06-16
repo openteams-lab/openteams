@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, name, owner_id, created_at, updated_at FROM projects WHERE id = $1",
+  "query": "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -15,16 +15,21 @@
       },
       {
         "ordinal": 2,
+        "name": "git_repo_path",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
         "name": "owner_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -39,8 +44,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "77d49aa68ae8cb1a44cb28582ebb7e817058b704a173ca6122e93a5eb829ff62"
+  "hash": "cb377c76e9e7271d620e6e380fdf8b24da4ba3dcc7f481a884ad0a2746aea252"
 }

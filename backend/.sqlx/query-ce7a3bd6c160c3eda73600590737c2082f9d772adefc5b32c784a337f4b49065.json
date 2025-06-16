@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, project_id, title, description, status as \"status!: TaskStatus\", created_at, updated_at \n           FROM tasks \n           WHERE id = $1 AND project_id = $2",
+  "query": "UPDATE tasks \n               SET title = $3, description = $4, status = $5 \n               WHERE id = $1 AND project_id = $2 \n               RETURNING id, project_id, title, description, status as \"status!: TaskStatus\", created_at, updated_at",
   "describe": {
     "columns": [
       {
@@ -55,7 +55,23 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid"
+        "Uuid",
+        "Varchar",
+        "Text",
+        {
+          "Custom": {
+            "name": "task_status",
+            "kind": {
+              "Enum": [
+                "todo",
+                "inprogress",
+                "done",
+                "cancelled",
+                "inreview"
+              ]
+            }
+          }
+        }
       ]
     },
     "nullable": [
@@ -68,5 +84,5 @@
       false
     ]
   },
-  "hash": "d181fee1b69314810a3a9d4590a5f9e8df741ec19b58372c812137474b16891b"
+  "hash": "ce7a3bd6c160c3eda73600590737c2082f9d772adefc5b32c784a337f4b49065"
 }

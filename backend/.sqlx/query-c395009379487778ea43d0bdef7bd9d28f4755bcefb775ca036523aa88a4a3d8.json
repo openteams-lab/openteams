@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE tasks \n           SET title = $3, description = $4, status = $5, updated_at = $6 \n           WHERE id = $1 AND project_id = $2 \n           RETURNING id, project_id, title, description, status as \"status!: TaskStatus\", created_at, updated_at",
+  "query": "INSERT INTO tasks (id, project_id, title, description, status) \n               VALUES ($1, $2, $3, $4, $5) \n               RETURNING id, project_id, title, description, status as \"status!: TaskStatus\", created_at, updated_at",
   "describe": {
     "columns": [
       {
@@ -71,8 +71,7 @@
               ]
             }
           }
-        },
-        "Timestamptz"
+        }
       ]
     },
     "nullable": [
@@ -85,5 +84,5 @@
       false
     ]
   },
-  "hash": "ce48496b80a462d440deb60661ac0a22b6ac18de38fcc772ef0f4fe2b44fa289"
+  "hash": "c395009379487778ea43d0bdef7bd9d28f4755bcefb775ca036523aa88a4a3d8"
 }

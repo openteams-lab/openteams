@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, name, owner_id, created_at, updated_at FROM projects ORDER BY created_at DESC",
+  "query": "UPDATE users SET email = $2, password_hash = $3, is_admin = $4 WHERE id = $1 RETURNING id, email, password_hash, is_admin, created_at, updated_at",
   "describe": {
     "columns": [
       {
@@ -10,29 +10,40 @@
       },
       {
         "ordinal": 1,
-        "name": "name",
+        "name": "email",
         "type_info": "Varchar"
       },
       {
         "ordinal": 2,
-        "name": "owner_id",
-        "type_info": "Uuid"
+        "name": "password_hash",
+        "type_info": "Varchar"
       },
       {
         "ordinal": 3,
+        "name": "is_admin",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Bool"
+      ]
     },
     "nullable": [
+      false,
       false,
       false,
       false,
@@ -40,5 +51,5 @@
       false
     ]
   },
-  "hash": "fe9803c8acc05d6642190955801b86c73aef2e2d3ed3bf86d12a2ec2ee97f60c"
+  "hash": "2b199ed09a8fa6e04e948afbab2400ffe768abc754434331108edfdf54a9fca7"
 }

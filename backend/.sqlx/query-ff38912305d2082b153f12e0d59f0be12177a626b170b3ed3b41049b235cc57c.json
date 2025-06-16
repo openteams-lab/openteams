@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO tasks (id, project_id, title, description, status, created_at, updated_at) \n           VALUES ($1, $2, $3, $4, $5, $6, $7) \n           RETURNING id, project_id, title, description, status as \"status!: TaskStatus\", created_at, updated_at",
+  "query": "SELECT id, project_id, title, description, status as \"status!: TaskStatus\", created_at, updated_at \n               FROM tasks \n               WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -54,26 +54,7 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Uuid",
-        "Varchar",
-        "Text",
-        {
-          "Custom": {
-            "name": "task_status",
-            "kind": {
-              "Enum": [
-                "todo",
-                "inprogress",
-                "done",
-                "cancelled",
-                "inreview"
-              ]
-            }
-          }
-        },
-        "Timestamptz",
-        "Timestamptz"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -86,5 +67,5 @@
       false
     ]
   },
-  "hash": "c293c87bbe20976357fd8fb433351ea8998828df6e1e30f7ae5f9984d0d05f8b"
+  "hash": "ff38912305d2082b153f12e0d59f0be12177a626b170b3ed3b41049b235cc57c"
 }
