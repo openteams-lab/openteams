@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{FromRow, PgPool};
 use ts_rs::TS;
 use uuid::Uuid;
 
@@ -30,4 +30,92 @@ pub struct CreateProject {
 pub struct UpdateProject {
     pub name: Option<String>,
     pub git_repo_path: Option<String>,
+}
+
+impl Project {
+    pub async fn find_all(pool: &PgPool) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Project,
+            "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects ORDER BY created_at DESC"
+        )
+        .fetch_all(pool)
+        .await
+    }
+
+    pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Project,
+            "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects WHERE id = $1",
+            id
+        )
+        .fetch_optional(pool)
+        .await
+    }
+
+    pub async fn find_by_git_repo_path(pool: &PgPool, git_repo_path: &str) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Project,
+            "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects WHERE git_repo_path = $1",
+            git_repo_path
+        )
+        .fetch_optional(pool)
+        .await
+    }
+
+    pub async fn find_by_git_repo_path_excluding_id(pool: &PgPool, git_repo_path: &str, exclude_id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Project,
+            "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects WHERE git_repo_path = $1 AND id != $2",
+            git_repo_path,
+            exclude_id
+        )
+        .fetch_optional(pool)
+        .await
+    }
+
+    pub async fn create(pool: &PgPool, data: &CreateProject, owner_id: Uuid, project_id: Uuid) -> Result<Self, sqlx::Error> {
+        let now = Utc::now();
+
+        sqlx::query_as!(
+            Project,
+            "INSERT INTO projects (id, name, git_repo_path, owner_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
+            project_id,
+            data.name,
+            data.git_repo_path,
+            owner_id,
+            now,
+            now
+        )
+        .fetch_one(pool)
+        .await
+    }
+
+    pub async fn update(pool: &PgPool, id: Uuid, name: String, git_repo_path: String) -> Result<Self, sqlx::Error> {
+        let now = Utc::now();
+
+        sqlx::query_as!(
+            Project,
+            "UPDATE projects SET name = $2, git_repo_path = $3, updated_at = $4 WHERE id = $1 RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
+            id,
+            name,
+            git_repo_path,
+            now
+        )
+        .fetch_one(pool)
+        .await
+    }
+
+    pub async fn delete(pool: &PgPool, id: Uuid) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query!("DELETE FROM projects WHERE id = $1", id)
+            .execute(pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn exists(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query!("SELECT id FROM projects WHERE id = $1", id)
+            .fetch_optional(pool)
+            .await?;
+        Ok(result.is_some())
+    }
 }

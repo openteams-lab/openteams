@@ -8,22 +8,15 @@ use axum::{
 };
 use sqlx::PgPool;
 use uuid::Uuid;
-use chrono::Utc;
 
 use crate::models::{ApiResponse, project::{Project, CreateProject, UpdateProject}};
 use crate::auth::AuthUser;
 
 pub async fn get_projects(
-    auth: AuthUser,
+    _auth: AuthUser,
     Extension(pool): Extension<PgPool>
 ) -> Result<ResponseJson<ApiResponse<Vec<Project>>>, StatusCode> {
-    match sqlx::query_as!(
-        Project,
-        "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects ORDER BY created_at DESC"
-    )
-    .fetch_all(&pool)
-    .await
-    {
+    match Project::find_all(&pool).await {
         Ok(projects) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(projects),
@@ -37,18 +30,11 @@ pub async fn get_projects(
 }
 
 pub async fn get_project(
-    auth: AuthUser,
+    _auth: AuthUser,
     Path(id): Path<Uuid>,
     Extension(pool): Extension<PgPool>
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
-    match sqlx::query_as!(
-        Project,
-        "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects WHERE id = $1",
-        id
-    )
-    .fetch_optional(&pool)
-    .await
-    {
+    match Project::find_by_id(&pool, id).await {
         Ok(Some(project)) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(project),
@@ -68,19 +54,11 @@ pub async fn create_project(
     Json(payload): Json<CreateProject>
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
     let id = Uuid::new_v4();
-    let now = Utc::now();
 
     tracing::debug!("Creating project '{}' for user {}", payload.name, auth.user_id);
 
     // Check if git repo path is already used by another project
-    let existing_project = sqlx::query!(
-        "SELECT id FROM projects WHERE git_repo_path = $1",
-        payload.git_repo_path
-    )
-    .fetch_optional(&pool)
-    .await;
-
-    match existing_project {
+    match Project::find_by_git_repo_path(&pool, &payload.git_repo_path).await {
         Ok(Some(_)) => {
             return Ok(ResponseJson(ApiResponse {
                 success: false,
@@ -170,19 +148,7 @@ pub async fn create_project(
         }
     }
 
-    match sqlx::query_as!(
-        Project,
-        "INSERT INTO projects (id, name, git_repo_path, owner_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
-        id,
-        payload.name,
-        payload.git_repo_path,
-        auth.user_id,
-        now,
-        now
-    )
-    .fetch_one(&pool)
-    .await
-    {
+    match Project::create(&pool, &payload, auth.user_id, id).await {
         Ok(project) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(project),
@@ -200,18 +166,8 @@ pub async fn update_project(
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<UpdateProject>
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
-    let now = Utc::now();
-
     // Check if project exists first
-    let existing_project = sqlx::query_as!(
-        Project,
-        "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects WHERE id = $1",
-        id
-    )
-    .fetch_optional(&pool)
-    .await;
-
-    let existing_project = match existing_project {
+    let existing_project = match Project::find_by_id(&pool, id).await {
         Ok(Some(project)) => project,
         Ok(None) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
@@ -223,15 +179,7 @@ pub async fn update_project(
     // If git_repo_path is being changed, check if the new path is already used by another project
     if let Some(new_git_repo_path) = &payload.git_repo_path {
         if new_git_repo_path != &existing_project.git_repo_path {
-            let duplicate_project = sqlx::query!(
-                "SELECT id FROM projects WHERE git_repo_path = $1 AND id != $2",
-                new_git_repo_path,
-                id
-            )
-            .fetch_optional(&pool)
-            .await;
-
-            match duplicate_project {
+            match Project::find_by_git_repo_path_excluding_id(&pool, new_git_repo_path, id).await {
                 Ok(Some(_)) => {
                     return Ok(ResponseJson(ApiResponse {
                         success: false,
@@ -254,17 +202,7 @@ pub async fn update_project(
     let name = payload.name.unwrap_or(existing_project.name);
     let git_repo_path = payload.git_repo_path.unwrap_or(existing_project.git_repo_path.clone());
 
-    match sqlx::query_as!(
-        Project,
-        "UPDATE projects SET name = $2, git_repo_path = $3, updated_at = $4 WHERE id = $1 RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
-        id,
-        name,
-        git_repo_path,
-        now
-    )
-    .fetch_one(&pool)
-    .await
-    {
+    match Project::update(&pool, id, name, git_repo_path).await {
         Ok(project) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(project),
@@ -281,12 +219,9 @@ pub async fn delete_project(
     Path(id): Path<Uuid>,
     Extension(pool): Extension<PgPool>
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
-    match sqlx::query!("DELETE FROM projects WHERE id = $1", id)
-        .execute(&pool)
-        .await
-    {
-        Ok(result) => {
-            if result.rows_affected() == 0 {
+    match Project::delete(&pool, id).await {
+        Ok(rows_affected) => {
+            if rows_affected == 0 {
                 Err(StatusCode::NOT_FOUND)
             } else {
                 Ok(ResponseJson(ApiResponse {
@@ -453,6 +388,7 @@ mod tests {
         let create_request = CreateProject {
             name: "New Project".to_string(),
             git_repo_path: "/tmp/new-project".to_string(),
+            use_existing_repo: false,
         };
 
         let result = create_project(auth.clone(), Extension(pool), Json(create_request)).await;
@@ -480,6 +416,7 @@ mod tests {
         let create_request = CreateProject {
             name: "Admin Project".to_string(),
             git_repo_path: "/tmp/admin-project".to_string(),
+            use_existing_repo: false,
         };
 
         let result = create_project(auth.clone(), Extension(pool), Json(create_request)).await;

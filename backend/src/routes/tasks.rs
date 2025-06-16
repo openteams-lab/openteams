@@ -8,32 +8,22 @@ use axum::{
 };
 use sqlx::PgPool;
 use uuid::Uuid;
-use chrono::Utc;
 
 use crate::models::{
     ApiResponse, 
-    task::{Task, CreateTask, UpdateTask, TaskStatus},
-    task_attempt::{TaskAttempt, CreateTaskAttempt, UpdateTaskAttempt, TaskAttemptStatus},
+    project::Project,
+    task::{Task, CreateTask, UpdateTask},
+    task_attempt::{TaskAttempt, CreateTaskAttempt, TaskAttemptStatus},
     task_attempt_activity::{TaskAttemptActivity, CreateTaskAttemptActivity}
 };
 use crate::auth::AuthUser;
 
 pub async fn get_project_tasks(
-    auth: AuthUser,
+    _auth: AuthUser,
     Path(project_id): Path<Uuid>,
     Extension(pool): Extension<PgPool>
 ) -> Result<ResponseJson<ApiResponse<Vec<Task>>>, StatusCode> {
-    match sqlx::query_as!(
-        Task,
-        r#"SELECT id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at 
-           FROM tasks 
-           WHERE project_id = $1 
-           ORDER BY created_at DESC"#,
-        project_id
-    )
-    .fetch_all(&pool)
-    .await
-    {
+    match Task::find_by_project_id(&pool, project_id).await {
         Ok(tasks) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(tasks),
@@ -47,21 +37,11 @@ pub async fn get_project_tasks(
 }
 
 pub async fn get_task(
-    auth: AuthUser,
+    _auth: AuthUser,
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
     Extension(pool): Extension<PgPool>
 ) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
-    match sqlx::query_as!(
-        Task,
-        r#"SELECT id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at 
-           FROM tasks 
-           WHERE id = $1 AND project_id = $2"#,
-        task_id,
-        project_id
-    )
-    .fetch_optional(&pool)
-    .await
-    {
+    match Task::find_by_id_and_project_id(&pool, task_id, project_id).await {
         Ok(Some(task)) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(task),
@@ -82,43 +62,23 @@ pub async fn create_task(
     Json(mut payload): Json<CreateTask>
 ) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
     let id = Uuid::new_v4();
-    let now = Utc::now();
     
     // Ensure the project_id in the payload matches the path parameter
     payload.project_id = project_id;
     
     // Verify project exists first
-    let project_exists = sqlx::query!("SELECT id FROM projects WHERE id = $1", project_id)
-        .fetch_optional(&pool)
-        .await;
-        
-    match project_exists {
-        Ok(None) => return Err(StatusCode::NOT_FOUND),
+    match Project::exists(&pool, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check project existence: {}", e);
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
-        Ok(Some(_)) => {}
+        Ok(true) => {}
     }
 
     tracing::debug!("Creating task '{}' in project {} for user {}", payload.title, project_id, auth.user_id);
 
-    match sqlx::query_as!(
-        Task,
-        r#"INSERT INTO tasks (id, project_id, title, description, status, created_at, updated_at) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7) 
-           RETURNING id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at"#,
-        id,
-        payload.project_id,
-        payload.title,
-        payload.description,
-        TaskStatus::Todo as TaskStatus,
-        now,
-        now
-    )
-    .fetch_one(&pool)
-    .await
-    {
+    match Task::create(&pool, &payload, id).await {
         Ok(task) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(task),
@@ -136,21 +96,8 @@ pub async fn update_task(
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<UpdateTask>
 ) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
-    let now = Utc::now();
-
     // Check if task exists in the specified project
-    let existing_task = sqlx::query_as!(
-        Task,
-        r#"SELECT id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at 
-           FROM tasks 
-           WHERE id = $1 AND project_id = $2"#,
-        task_id,
-        project_id
-    )
-    .fetch_optional(&pool)
-    .await;
-
-    let existing_task = match existing_task {
+    let existing_task = match Task::find_by_id_and_project_id(&pool, task_id, project_id).await {
         Ok(Some(task)) => task,
         Ok(None) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
@@ -164,22 +111,7 @@ pub async fn update_task(
     let description = payload.description.or(existing_task.description);
     let status = payload.status.unwrap_or(existing_task.status);
 
-    match sqlx::query_as!(
-        Task,
-        r#"UPDATE tasks 
-           SET title = $3, description = $4, status = $5, updated_at = $6 
-           WHERE id = $1 AND project_id = $2 
-           RETURNING id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at"#,
-        task_id,
-        project_id,
-        title,
-        description,
-        status as TaskStatus,
-        now
-    )
-    .fetch_one(&pool)
-    .await
-    {
+    match Task::update(&pool, task_id, project_id, title, description, status).await {
         Ok(task) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(task),
@@ -196,16 +128,9 @@ pub async fn delete_task(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
     Extension(pool): Extension<PgPool>
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
-    match sqlx::query!(
-        "DELETE FROM tasks WHERE id = $1 AND project_id = $2", 
-        task_id, 
-        project_id
-    )
-    .execute(&pool)
-    .await
-    {
-        Ok(result) => {
-            if result.rows_affected() == 0 {
+    match Task::delete(&pool, task_id, project_id).await {
+        Ok(rows_affected) => {
+            if rows_affected == 0 {
                 Err(StatusCode::NOT_FOUND)
             } else {
                 Ok(ResponseJson(ApiResponse {
@@ -229,34 +154,16 @@ pub async fn get_task_attempts(
     Extension(pool): Extension<PgPool>
 ) -> Result<ResponseJson<ApiResponse<Vec<TaskAttempt>>>, StatusCode> {
     // Verify task exists in project first
-    let task_exists = sqlx::query!(
-        "SELECT id FROM tasks WHERE id = $1 AND project_id = $2", 
-        task_id, 
-        project_id
-    )
-    .fetch_optional(&pool)
-    .await;
-    
-    match task_exists {
-        Ok(None) => return Err(StatusCode::NOT_FOUND),
+    match Task::exists(&pool, task_id, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task existence: {}", e);
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
-        Ok(Some(_)) => {}
+        Ok(true) => {}
     }
 
-    match sqlx::query_as!(
-        TaskAttempt,
-        r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, created_at, updated_at 
-           FROM task_attempts 
-           WHERE task_id = $1 
-           ORDER BY created_at DESC"#,
-        task_id
-    )
-    .fetch_all(&pool)
-    .await
-    {
+    match TaskAttempt::find_by_task_id(&pool, task_id).await {
         Ok(attempts) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(attempts),
@@ -275,37 +182,16 @@ pub async fn get_task_attempt_activities(
     Extension(pool): Extension<PgPool>
 ) -> Result<ResponseJson<ApiResponse<Vec<TaskAttemptActivity>>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    let attempt_exists = sqlx::query!(
-        "SELECT ta.id FROM task_attempts ta 
-         JOIN tasks t ON ta.task_id = t.id 
-         WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3",
-        attempt_id,
-        task_id,
-        project_id
-    )
-    .fetch_optional(&pool)
-    .await;
-    
-    match attempt_exists {
-        Ok(None) => return Err(StatusCode::NOT_FOUND),
+    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
-        Ok(Some(_)) => {}
+        Ok(true) => {}
     }
 
-    match sqlx::query_as!(
-        TaskAttemptActivity,
-        r#"SELECT id, task_attempt_id, status as "status!: TaskAttemptStatus", note, created_at 
-           FROM task_attempt_activities 
-           WHERE task_attempt_id = $1 
-           ORDER BY created_at DESC"#,
-        attempt_id
-    )
-    .fetch_all(&pool)
-    .await
-    {
+    match TaskAttemptActivity::find_by_attempt_id(&pool, attempt_id).await {
         Ok(activities) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(activities),
@@ -325,59 +211,25 @@ pub async fn create_task_attempt(
     Json(mut payload): Json<CreateTaskAttempt>
 ) -> Result<ResponseJson<ApiResponse<TaskAttempt>>, StatusCode> {
     // Verify task exists in project first
-    let task_exists = sqlx::query!(
-        "SELECT id FROM tasks WHERE id = $1 AND project_id = $2", 
-        task_id, 
-        project_id
-    )
-    .fetch_optional(&pool)
-    .await;
-    
-    match task_exists {
-        Ok(None) => return Err(StatusCode::NOT_FOUND),
+    match Task::exists(&pool, task_id, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task existence: {}", e);
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
-        Ok(Some(_)) => {}
+        Ok(true) => {}
     }
 
     let id = Uuid::new_v4();
-    let now = Utc::now();
     
     // Ensure the task_id in the payload matches the path parameter
     payload.task_id = task_id;
 
-    match sqlx::query_as!(
-        TaskAttempt,
-        r#"INSERT INTO task_attempts (id, task_id, worktree_path, base_commit, merge_commit, created_at, updated_at) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7) 
-           RETURNING id, task_id, worktree_path, base_commit, merge_commit, created_at, updated_at"#,
-        id,
-        payload.task_id,
-        payload.worktree_path,
-        payload.base_commit,
-        payload.merge_commit,
-        now,
-        now
-    )
-    .fetch_one(&pool)
-    .await
-    {
+    match TaskAttempt::create(&pool, &payload, id).await {
         Ok(attempt) => {
             // Create initial activity record
             let activity_id = Uuid::new_v4();
-            let _ = sqlx::query!(
-                r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note, created_at) 
-                   VALUES ($1, $2, $3, $4, $5)"#,
-                activity_id,
-                attempt.id,
-                TaskAttemptStatus::Init as TaskAttemptStatus,
-                Option::<String>::None,
-                now
-            )
-            .execute(&pool)
-            .await;
+            let _ = TaskAttemptActivity::create_initial(&pool, attempt.id, activity_id).await;
 
             Ok(ResponseJson(ApiResponse {
                 success: true,
@@ -399,49 +251,24 @@ pub async fn create_task_attempt_activity(
     Json(mut payload): Json<CreateTaskAttemptActivity>
 ) -> Result<ResponseJson<ApiResponse<TaskAttemptActivity>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    let attempt_exists = sqlx::query!(
-        "SELECT ta.id FROM task_attempts ta 
-         JOIN tasks t ON ta.task_id = t.id 
-         WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3",
-        attempt_id,
-        task_id,
-        project_id
-    )
-    .fetch_optional(&pool)
-    .await;
-    
-    match attempt_exists {
-        Ok(None) => return Err(StatusCode::NOT_FOUND),
+    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
-        Ok(Some(_)) => {}
+        Ok(true) => {}
     }
 
     let id = Uuid::new_v4();
-    let now = Utc::now();
     
     // Ensure the task_attempt_id in the payload matches the path parameter
     payload.task_attempt_id = attempt_id;
     
     // Default to Init status if not provided
-    let status = payload.status.unwrap_or(TaskAttemptStatus::Init);
+    let status = payload.status.clone().unwrap_or(TaskAttemptStatus::Init);
 
-    match sqlx::query_as!(
-        TaskAttemptActivity,
-        r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note, created_at) 
-           VALUES ($1, $2, $3, $4, $5) 
-           RETURNING id, task_attempt_id, status as "status!: TaskAttemptStatus", note, created_at"#,
-        id,
-        payload.task_attempt_id,
-        status as TaskAttemptStatus,
-        payload.note,
-        now
-    )
-    .fetch_one(&pool)
-    .await
-    {
+    match TaskAttemptActivity::create(&pool, &payload, id, status).await {
         Ok(activity) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(activity),
@@ -497,12 +324,14 @@ mod tests {
     async fn create_test_project(pool: &PgPool, name: &str, owner_id: Uuid) -> Project {
         let id = Uuid::new_v4();
         let now = Utc::now();
+        let git_repo_path = format!("/tmp/test-repo-{}", id);
 
         sqlx::query_as!(
             Project,
-            "INSERT INTO projects (id, name, owner_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, owner_id, created_at, updated_at",
+            "INSERT INTO projects (id, name, git_repo_path, owner_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
             id,
             name,
+            git_repo_path,
             owner_id,
             now,
             now

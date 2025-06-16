@@ -8,7 +8,6 @@ use axum::{
 };
 use sqlx::PgPool;
 use uuid::Uuid;
-use chrono::Utc;
 
 use crate::models::{ApiResponse, user::{User, CreateUser, UpdateUser, LoginRequest, LoginResponse, UserResponse}};
 use crate::auth::{AuthUser, create_token, hash_password, verify_password};
@@ -17,14 +16,7 @@ pub async fn login(
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<LoginRequest>
 ) -> Result<ResponseJson<ApiResponse<LoginResponse>>, StatusCode> {
-    match sqlx::query_as!(
-        User,
-        "SELECT id, email, password_hash, is_admin, created_at, updated_at FROM users WHERE email = $1",
-        payload.email
-    )
-    .fetch_optional(&pool)
-    .await
-    {
+    match User::find_by_email(&pool, &payload.email).await {
         Ok(Some(user)) => {
             match verify_password(&payload.password, &user.password_hash) {
                 Ok(true) => {
@@ -64,13 +56,7 @@ pub async fn get_users(
     _auth: AuthUser,
     Extension(pool): Extension<PgPool>
 ) -> Result<ResponseJson<ApiResponse<Vec<UserResponse>>>, StatusCode> {
-    match sqlx::query_as!(
-        User,
-        "SELECT id, email, password_hash, is_admin, created_at, updated_at FROM users ORDER BY created_at DESC"
-    )
-    .fetch_all(&pool)
-    .await
-    {
+    match User::find_all(&pool).await {
         Ok(users) => {
             let user_responses: Vec<UserResponse> = users.into_iter().map(|u| u.into()).collect();
             Ok(ResponseJson(ApiResponse {
@@ -96,14 +82,7 @@ pub async fn get_user(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    match sqlx::query_as!(
-        User,
-        "SELECT id, email, password_hash, is_admin, created_at, updated_at FROM users WHERE id = $1",
-        id
-    )
-    .fetch_optional(&pool)
-    .await
-    {
+    match User::find_by_id(&pool, id).await {
         Ok(Some(user)) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(user.into()),
@@ -128,27 +107,13 @@ pub async fn create_user(
     }
 
     let id = Uuid::new_v4();
-    let now = Utc::now();
-    let is_admin = payload.is_admin.unwrap_or(false);
 
     let password_hash = match hash_password(&payload.password) {
         Ok(hash) => hash,
         Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
-    match sqlx::query_as!(
-        User,
-        "INSERT INTO users (id, email, password_hash, is_admin, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, password_hash, is_admin, created_at, updated_at",
-        id,
-        payload.email,
-        password_hash,
-        is_admin,
-        now,
-        now
-    )
-    .fetch_one(&pool)
-    .await
-    {
+    match User::create(&pool, &payload, password_hash, id).await {
         Ok(user) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(user.into()),
@@ -176,17 +141,8 @@ pub async fn update_user(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let now = Utc::now();
-
     // Get existing user
-    let existing_user = match sqlx::query_as!(
-        User,
-        "SELECT id, email, password_hash, is_admin, created_at, updated_at FROM users WHERE id = $1",
-        id
-    )
-    .fetch_optional(&pool)
-    .await
-    {
+    let existing_user = match User::find_by_id(&pool, id).await {
         Ok(Some(user)) => user,
         Ok(None) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
@@ -211,18 +167,7 @@ pub async fn update_user(
         existing_user.password_hash
     };
 
-    match sqlx::query_as!(
-        User,
-        "UPDATE users SET email = $2, password_hash = $3, is_admin = $4, updated_at = $5 WHERE id = $1 RETURNING id, email, password_hash, is_admin, created_at, updated_at",
-        id,
-        email,
-        password_hash,
-        is_admin,
-        now
-    )
-    .fetch_one(&pool)
-    .await
-    {
+    match User::update(&pool, id, email, password_hash, is_admin).await {
         Ok(user) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(user.into()),
@@ -245,12 +190,9 @@ pub async fn delete_user(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    match sqlx::query!("DELETE FROM users WHERE id = $1", id)
-        .execute(&pool)
-        .await
-    {
-        Ok(result) => {
-            if result.rows_affected() == 0 {
+    match User::delete(&pool, id).await {
+        Ok(rows_affected) => {
+            if rows_affected == 0 {
                 Err(StatusCode::NOT_FOUND)
             } else {
                 Ok(ResponseJson(ApiResponse {
@@ -271,14 +213,7 @@ pub async fn get_current_user(
     auth: AuthUser,
     Extension(pool): Extension<PgPool>
 ) -> Result<ResponseJson<ApiResponse<UserResponse>>, StatusCode> {
-    match sqlx::query_as!(
-        User,
-        "SELECT id, email, password_hash, is_admin, created_at, updated_at FROM users WHERE id = $1",
-        auth.user_id
-    )
-    .fetch_optional(&pool)
-    .await
-    {
+    match User::find_by_id(&pool, auth.user_id).await {
         Ok(Some(user)) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(user.into()),
