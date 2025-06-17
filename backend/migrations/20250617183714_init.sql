@@ -14,7 +14,7 @@ PRAGMA foreign_keys = ON;
 -- 2. Tables
 -------------------------------------------------------------------------------
 CREATE TABLE projects (
-    id            TEXT PRIMARY KEY,                       -- supply UUID in app
+    id            TEXT PRIMARY KEY,                       -- UUID as string
     name          TEXT NOT NULL,
     git_repo_path TEXT NOT NULL DEFAULT '' UNIQUE,
     created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
