@@ -37,12 +37,15 @@ impl Executor for ClaudeExecutor {
         // Use Claude CLI to process the task
         let child = Command::new("claude")
             .kill_on_drop(true)
+            .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .current_dir(worktree_path)
             .arg(&prompt)
             .arg("-p")
             .arg("--dangerously-skip-permissions")
+            .arg("--verbose")
+            .arg("--output-format=stream-json")
             .spawn()
             .map_err(ExecutorError::SpawnFailed)?;
 
