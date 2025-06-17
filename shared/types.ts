@@ -44,3 +44,11 @@ export type UpdateUser = { email: string | null, password: string | null, is_adm
 export type User = { id: string, email: string, is_admin: boolean, created_at: Date, updated_at: Date, };
 
 export type DirectoryEntry = { name: string, path: string, is_directory: boolean, is_git_repo: boolean, };
+
+export type DiffChunkType = "Equal" | "Insert" | "Delete";
+
+export type DiffChunk = { chunk_type: DiffChunkType, content: string, };
+
+export type FileDiff = { path: string, chunks: Array<DiffChunk>, };
+
+export type WorktreeDiff = { files: Array<FileDiff>, };

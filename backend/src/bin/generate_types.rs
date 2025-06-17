@@ -73,6 +73,14 @@ export {}
 
 export {}
 
+export {}
+
+export {}
+
+export {}
+
+export {}
+
 export {}"#,
         bloop_backend::models::ApiResponse::<()>::decl(),
         bloop_backend::executor::ExecutorConfig::decl(),
@@ -96,6 +104,10 @@ export {}"#,
         bloop_backend::models::user::UpdateUser::decl(),
         bloop_backend::models::user::UserResponse::decl(),
         bloop_backend::routes::filesystem::DirectoryEntry::decl(),
+        bloop_backend::models::task_attempt::DiffChunkType::decl(),
+        bloop_backend::models::task_attempt::DiffChunk::decl(),
+        bloop_backend::models::task_attempt::FileDiff::decl(),
+        bloop_backend::models::task_attempt::WorktreeDiff::decl(),
     );
 
     std::fs::write(shared_path.join("types.ts"), consolidated_content).unwrap();
