@@ -6,7 +6,7 @@ import { ArrowLeft, Plus } from 'lucide-react'
 import { makeAuthenticatedRequest } from '@/lib/auth'
 import { TaskCreateDialog } from '@/components/tasks/TaskCreateDialog'
 import { TaskEditDialog } from '@/components/tasks/TaskEditDialog'
-import { TaskDetailsDialog } from '@/components/tasks/TaskDetailsDialog'
+
 import { TaskKanbanBoard } from '@/components/tasks/TaskKanbanBoard'
 import type { TaskStatus, TaskWithAttemptStatus } from 'shared/types'
 import type { DragEndEvent } from '@/components/ui/shadcn-io/kanban'
@@ -41,8 +41,7 @@ export function ProjectTasks() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [isTaskDetailsDialogOpen, setIsTaskDetailsDialogOpen] = useState(false)
+
 
 
   useEffect(() => {
@@ -159,8 +158,7 @@ export function ProjectTasks() {
   }
 
   const handleViewTaskDetails = (task: Task) => {
-    setSelectedTask(task)
-    setIsTaskDetailsDialogOpen(true)
+    navigate(`/projects/${projectId}/tasks/${task.id}`)
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -283,13 +281,7 @@ export function ProjectTasks() {
         onUpdateTask={handleUpdateTask}
       />
 
-      <TaskDetailsDialog
-        isOpen={isTaskDetailsDialogOpen}
-        onOpenChange={setIsTaskDetailsDialogOpen}
-        task={selectedTask}
-        projectId={projectId!}
-        onError={setError}
-      />
+
     </div>
   )
 }
