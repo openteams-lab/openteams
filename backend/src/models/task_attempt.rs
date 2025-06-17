@@ -1,13 +1,13 @@
 use chrono::{DateTime, Utc};
+use git2::{Error as GitError, Repository};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, Type, PgPool};
+use sqlx::{FromRow, PgPool, Type};
+use std::path::Path;
 use ts_rs::TS;
 use uuid::Uuid;
-use git2::{Repository, Error as GitError};
-use std::path::Path;
 
-use super::task::Task;
 use super::project::Project;
+use super::task::Task;
 use crate::executor::ExecutorConfig;
 
 #[derive(Debug)]
@@ -113,7 +113,11 @@ impl TaskAttempt {
         .await
     }
 
-    pub async fn create(pool: &PgPool, data: &CreateTaskAttempt, attempt_id: Uuid) -> Result<Self, TaskAttemptError> {
+    pub async fn create(
+        pool: &PgPool,
+        data: &CreateTaskAttempt,
+        attempt_id: Uuid,
+    ) -> Result<Self, TaskAttemptError> {
         // First, get the task to get the project_id
         let task = Task::find_by_id(pool, data.task_id)
             .await?
@@ -127,10 +131,19 @@ impl TaskAttempt {
         // Create the worktree using git2
         let repo = Repository::open(&project.git_repo_path)?;
         let worktree_path = Path::new(&data.worktree_path);
-        
+
+        // Get base commit
+        let base_commmit = {
+            let head = repo.head()?;
+            // Peel it to a commit object and grab its ID
+            let commit = head.peel_to_commit()?;
+            commit.id().to_string()
+        };
+
         // Create the worktree directory if it doesn't exist
         if let Some(parent) = worktree_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| TaskAttemptError::Git(GitError::from_str(&e.to_string())))?;
+            std::fs::create_dir_all(parent)
+                .map_err(|e| TaskAttemptError::Git(GitError::from_str(&e.to_string())))?;
         }
 
         // Create the worktree at the specified path
@@ -146,7 +159,7 @@ impl TaskAttempt {
             attempt_id,
             data.task_id,
             data.worktree_path,
-            data.base_commit,
+            base_commmit,
             data.merge_commit,
             data.executor,
             None::<String>, // stdout
@@ -158,7 +171,12 @@ impl TaskAttempt {
         Ok(task_attempt)
     }
 
-    pub async fn exists_for_task(pool: &PgPool, attempt_id: Uuid, task_id: Uuid, project_id: Uuid) -> Result<bool, sqlx::Error> {
+    pub async fn exists_for_task(
+        pool: &PgPool,
+        attempt_id: Uuid,
+        task_id: Uuid,
+        project_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query!(
             "SELECT ta.id FROM task_attempts ta 
              JOIN tasks t ON ta.task_id = t.id 
@@ -171,7 +189,7 @@ impl TaskAttempt {
         .await?;
         Ok(result.is_some())
     }
-    
+
     /// Get the executor for this task attempt, defaulting to Echo if none is specified
     pub fn get_executor(&self) -> Box<dyn crate::executor::Executor> {
         if let Some(executor_name) = &self.executor {
@@ -220,7 +238,7 @@ impl TaskAttempt {
             .execute(pool)
             .await?;
         }
-        
+
         if let Some(stderr_data) = stderr_append {
             sqlx::query!(
                 "UPDATE task_attempts SET stderr = COALESCE(stderr, '') || $1, updated_at = NOW() WHERE id = $2",
@@ -230,7 +248,7 @@ impl TaskAttempt {
             .execute(pool)
             .await?;
         }
-        
+
         Ok(())
     }
 }
