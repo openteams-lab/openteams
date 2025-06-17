@@ -62,8 +62,7 @@ pub struct TaskAttempt {
     pub base_commit: Option<String>,
     pub merge_commit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[ts(skip)]
-    pub executor_config: Option<serde_json::Value>, // JSON field for ExecutorConfig
+    pub executor: Option<String>, // Name of the executor to use
     pub stdout: Option<String>,
     pub stderr: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -77,7 +76,7 @@ pub struct CreateTaskAttempt {
     pub worktree_path: String,
     pub base_commit: Option<String>,
     pub merge_commit: Option<String>,
-    pub executor_config: Option<ExecutorConfig>,
+    pub executor: Option<String>,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -92,7 +91,7 @@ impl TaskAttempt {
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             TaskAttempt,
-            r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, executor_config, stdout, stderr, created_at, updated_at 
+            r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, executor, stdout, stderr, created_at, updated_at 
                FROM task_attempts 
                WHERE id = $1"#,
             id
@@ -104,7 +103,7 @@ impl TaskAttempt {
     pub async fn find_by_task_id(pool: &PgPool, task_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             TaskAttempt,
-            r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, executor_config, stdout, stderr, created_at, updated_at 
+            r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, executor, stdout, stderr, created_at, updated_at 
                FROM task_attempts 
                WHERE task_id = $1 
                ORDER BY created_at DESC"#,
@@ -138,24 +137,18 @@ impl TaskAttempt {
         let branch_name = format!("attempt-{}", attempt_id);
         repo.worktree(&branch_name, worktree_path, None)?;
 
-        // Serialize executor config to JSON
-        let executor_config_json = data.executor_config.as_ref()
-            .map(|config| serde_json::to_value(config))
-            .transpose()
-            .map_err(|e| TaskAttemptError::Database(sqlx::Error::decode(e)))?;
-
         // Insert the record into the database
         let task_attempt = sqlx::query_as!(
             TaskAttempt,
-            r#"INSERT INTO task_attempts (id, task_id, worktree_path, base_commit, merge_commit, executor_config, stdout, stderr) 
+            r#"INSERT INTO task_attempts (id, task_id, worktree_path, base_commit, merge_commit, executor, stdout, stderr) 
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-               RETURNING id, task_id, worktree_path, base_commit, merge_commit, executor_config, stdout, stderr, created_at, updated_at"#,
+               RETURNING id, task_id, worktree_path, base_commit, merge_commit, executor, stdout, stderr, created_at, updated_at"#,
             attempt_id,
             data.task_id,
             data.worktree_path,
             data.base_commit,
             data.merge_commit,
-            executor_config_json,
+            data.executor,
             None::<String>, // stdout
             None::<String>  // stderr
         )
@@ -181,13 +174,16 @@ impl TaskAttempt {
     
     /// Get the executor for this task attempt, defaulting to Echo if none is specified
     pub fn get_executor(&self) -> Box<dyn crate::executor::Executor> {
-        if let Some(config_json) = &self.executor_config {
-            if let Ok(config) = serde_json::from_value::<ExecutorConfig>(config_json.clone()) {
-                return config.create_executor();
+        if let Some(executor_name) = &self.executor {
+            match executor_name.as_str() {
+                "echo" => ExecutorConfig::Echo.create_executor(),
+                "claude" => ExecutorConfig::Claude.create_executor(),
+                _ => ExecutorConfig::Echo.create_executor(), // Default fallback
             }
+        } else {
+            // Default to echo executor
+            ExecutorConfig::Echo.create_executor()
         }
-        // Default to echo executor
-        ExecutorConfig::Echo.create_executor()
     }
 
     /// Update stdout and stderr for this task attempt
