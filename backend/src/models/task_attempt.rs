@@ -280,6 +280,196 @@ impl TaskAttempt {
         Ok(())
     }
 
+    /// Perform the actual git merge operations (synchronous)
+    fn perform_merge_operation(
+        worktree_path: &str,
+        main_repo_path: &str,
+        attempt_id: Uuid,
+    ) -> Result<String, TaskAttemptError> {
+        // Open the worktree repository
+        let worktree_repo = Repository::open(worktree_path)?;
+
+        // Open the main repository
+        let main_repo = Repository::open(main_repo_path)?;
+
+        // Get the current signature for commits
+        let signature = main_repo.signature()?;
+
+        // First, commit any uncommitted changes in the worktree
+        let mut worktree_index = worktree_repo.index()?;
+        let tree_id = worktree_index.write_tree()?;
+        let _tree = worktree_repo.find_tree(tree_id)?;
+
+        // Get the current HEAD commit in the worktree
+        let head = worktree_repo.head()?;
+        let parent_commit = head.peel_to_commit()?;
+
+        // Check if there are any changes to commit
+        let status = worktree_repo.statuses(None)?;
+        let has_changes = status.iter().any(|entry| {
+            let flags = entry.status();
+            flags.contains(git2::Status::INDEX_NEW)
+                || flags.contains(git2::Status::INDEX_MODIFIED)
+                || flags.contains(git2::Status::INDEX_DELETED)
+                || flags.contains(git2::Status::WT_NEW)
+                || flags.contains(git2::Status::WT_MODIFIED)
+                || flags.contains(git2::Status::WT_DELETED)
+        });
+
+        let mut final_commit = parent_commit.id();
+
+        if has_changes {
+            // Stage all changes
+            let mut worktree_index = worktree_repo.index()?;
+            worktree_index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)?;
+            worktree_index.write()?;
+
+            let tree_id = worktree_index.write_tree()?;
+            let tree = worktree_repo.find_tree(tree_id)?;
+
+            // Create commit for the changes
+            let commit_message = format!("Task attempt {} - Final changes", attempt_id);
+            final_commit = worktree_repo.commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                &commit_message,
+                &tree,
+                &[&parent_commit],
+            )?;
+        }
+
+        // Now we need to merge the worktree branch into the main repository
+        let branch_name = format!("attempt-{}", attempt_id);
+
+        // Get the main branch (usually "main" or "master")
+        let main_branch = main_repo.head()?.shorthand().unwrap_or("main").to_string();
+
+        // Fetch the worktree branch into the main repository
+        let worktree_branch_ref = format!("refs/heads/{}", branch_name);
+        let main_branch_ref = format!("refs/heads/{}", main_branch);
+
+        // Get the final commit from worktree
+        let _final_commit_obj = worktree_repo.find_commit(final_commit)?;
+
+        // Create the branch in main repo pointing to the final commit
+        let branch_oid = main_repo.odb()?.write(
+            git2::ObjectType::Commit,
+            &worktree_repo.odb()?.read(final_commit)?.data(),
+        )?;
+
+        // Create reference in main repo
+        main_repo.reference(
+            &worktree_branch_ref,
+            branch_oid,
+            true,
+            "Import worktree changes",
+        )?;
+
+        // Now merge the branch into main
+        let main_branch_commit = main_repo
+            .reference_to_annotated_commit(&main_repo.find_reference(&main_branch_ref)?)?;
+        let worktree_branch_commit = main_repo
+            .reference_to_annotated_commit(&main_repo.find_reference(&worktree_branch_ref)?)?;
+
+        // Perform the merge
+        let mut merge_opts = git2::MergeOptions::new();
+        merge_opts.file_favor(git2::FileFavor::Theirs); // Prefer worktree changes in conflicts
+
+        let mut checkout_opts = git2::build::CheckoutBuilder::new();
+        checkout_opts.conflict_style_merge(true);
+
+        main_repo.merge(
+            &[&worktree_branch_commit],
+            Some(&mut merge_opts),
+            Some(&mut checkout_opts),
+        )?;
+
+        // Check if merge was successful (no conflicts)
+        let merge_head_path = main_repo.path().join("MERGE_HEAD");
+        if merge_head_path.exists() {
+            // Complete the merge by creating a merge commit
+            let mut index = main_repo.index()?;
+            let tree_id = index.write_tree()?;
+            let tree = main_repo.find_tree(tree_id)?;
+
+            let main_commit = main_repo.find_commit(main_branch_commit.id())?;
+            let worktree_commit = main_repo.find_commit(worktree_branch_commit.id())?;
+
+            let merge_commit_message =
+                format!("Merge task attempt {} into {}", attempt_id, main_branch);
+            let merge_commit_id = main_repo.commit(
+                Some(&main_branch_ref),
+                &signature,
+                &signature,
+                &merge_commit_message,
+                &tree,
+                &[&main_commit, &worktree_commit],
+            )?;
+
+            // Clean up merge state
+            main_repo.cleanup_state()?;
+
+            Ok(merge_commit_id.to_string())
+        } else {
+            // Fast-forward merge completed
+            let head_commit = main_repo.head()?.peel_to_commit()?;
+            let merge_commit_id = head_commit.id();
+
+            Ok(merge_commit_id.to_string())
+        }
+    }
+
+    /// Merge the worktree changes back to the main repository
+    pub async fn merge_changes(
+        pool: &PgPool,
+        attempt_id: Uuid,
+        task_id: Uuid,
+        project_id: Uuid,
+    ) -> Result<String, TaskAttemptError> {
+        // Get the task attempt with validation
+        let attempt = sqlx::query_as!(
+            TaskAttempt,
+            r#"SELECT ta.id, ta.task_id, ta.worktree_path, ta.base_commit, ta.merge_commit, ta.executor, ta.stdout, ta.stderr, ta.created_at, ta.updated_at 
+               FROM task_attempts ta 
+               JOIN tasks t ON ta.task_id = t.id 
+               WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3"#,
+            attempt_id,
+            task_id,
+            project_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or(TaskAttemptError::TaskNotFound)?;
+
+        // Get the task and project
+        let _task = Task::find_by_id(pool, task_id)
+            .await?
+            .ok_or(TaskAttemptError::TaskNotFound)?;
+
+        let project = Project::find_by_id(pool, project_id)
+            .await?
+            .ok_or(TaskAttemptError::ProjectNotFound)?;
+
+        // Perform the git merge operations (synchronous)
+        let merge_commit_id = Self::perform_merge_operation(
+            &attempt.worktree_path,
+            &project.git_repo_path,
+            attempt_id,
+        )?;
+
+        // Update the task attempt with the merge commit
+        sqlx::query!(
+            "UPDATE task_attempts SET merge_commit = $1, updated_at = NOW() WHERE id = $2",
+            merge_commit_id,
+            attempt_id
+        )
+        .execute(pool)
+        .await?;
+
+        Ok(merge_commit_id)
+    }
+
     /// Get the git diff between the base commit and the current worktree state
     pub async fn get_diff(
         pool: &PgPool,

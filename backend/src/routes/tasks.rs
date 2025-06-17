@@ -2,7 +2,7 @@ use axum::{
     extract::{Extension, Path},
     http::StatusCode,
     response::Json as ResponseJson,
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use sqlx::PgPool;
@@ -394,6 +394,34 @@ pub async fn get_task_attempt_diff(
     }
 }
 
+#[axum::debug_handler]
+pub async fn merge_task_attempt(
+    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
+    // Verify task attempt exists and belongs to the correct task
+    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check task attempt existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(true) => {}
+    }
+
+    match TaskAttempt::merge_changes(&pool, attempt_id, task_id, project_id).await {
+        Ok(_merge_commit_id) => Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: None,
+            message: Some("Changes merged successfully".to_string()),
+        })),
+        Err(e) => {
+            tracing::error!("Failed to merge task attempt {}: {}", attempt_id, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 pub fn tasks_router() -> Router {
     use axum::routing::{delete, post, put};
 
@@ -421,6 +449,10 @@ pub fn tasks_router() -> Router {
         .route(
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/diff",
             get(get_task_attempt_diff),
+        )
+        .route(
+            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/merge",
+            post(merge_task_attempt),
         )
 }
 

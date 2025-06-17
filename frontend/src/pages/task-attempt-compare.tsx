@@ -23,6 +23,8 @@ export function TaskAttemptComparePage() {
   const [diff, setDiff] = useState<WorktreeDiff | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [merging, setMerging] = useState(false);
+  const [mergeSuccess, setMergeSuccess] = useState(false);
 
   useEffect(() => {
     if (projectId && taskId && attemptId) {
@@ -58,6 +60,37 @@ export function TaskAttemptComparePage() {
 
   const handleBackClick = () => {
     navigate(`/projects/${projectId}/tasks/${taskId}`);
+  };
+
+  const handleMergeClick = async () => {
+    if (!projectId || !taskId || !attemptId) return;
+
+    try {
+      setMerging(true);
+      const response = await makeAuthenticatedRequest(
+        `/api/projects/${projectId}/tasks/${taskId}/attempts/${attemptId}/merge`,
+        {
+          method: 'POST',
+        }
+      );
+
+      if (response.ok) {
+        const result: ApiResponse<string> = await response.json();
+        if (result.success) {
+          setMergeSuccess(true);
+          // Optionally refetch the diff to show updated state
+          fetchDiff();
+        } else {
+          setError("Failed to merge changes");
+        }
+      } else {
+        setError("Failed to merge changes");
+      }
+    } catch (err) {
+      setError("Failed to merge changes");
+    } finally {
+      setMerging(false);
+    }
   };
 
   const getChunkClassName = (chunkType: DiffChunkType) => {
@@ -123,6 +156,20 @@ export function TaskAttemptComparePage() {
             <FileText className="h-6 w-6" />
             Compare Changes
           </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {mergeSuccess && (
+            <div className="text-green-600 text-sm">
+              Changes merged successfully!
+            </div>
+          )}
+          <Button 
+            onClick={handleMergeClick} 
+            disabled={merging || !diff || diff.files.length === 0}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            {merging ? "Merging..." : "Merge Changes"}
+          </Button>
         </div>
       </div>
 
