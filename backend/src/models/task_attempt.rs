@@ -133,7 +133,7 @@ impl TaskAttempt {
         let worktree_path = Path::new(&data.worktree_path);
 
         // Get base commit
-        let base_commmit = {
+        let base_commit = {
             let head = repo.head()?;
             // Peel it to a commit object and grab its ID
             let commit = head.peel_to_commit()?;
@@ -159,7 +159,7 @@ impl TaskAttempt {
             attempt_id,
             data.task_id,
             data.worktree_path,
-            base_commmit,
+            base_commit,
             data.merge_commit,
             data.executor,
             None::<String>, // stdout
