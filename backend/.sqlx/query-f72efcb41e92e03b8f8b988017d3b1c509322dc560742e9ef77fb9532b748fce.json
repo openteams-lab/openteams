@@ -1,32 +1,19 @@
 {
-  "db_name": "PostgreSQL",
+  "db_name": "SQLite",
   "query": "SELECT DISTINCT ta.id \n               FROM task_attempts ta\n               INNER JOIN (\n                   SELECT task_attempt_id, MAX(created_at) as latest_created_at\n                   FROM task_attempt_activities\n                   GROUP BY task_attempt_id\n               ) latest_activity ON ta.id = latest_activity.task_attempt_id\n               INNER JOIN task_attempt_activities taa ON ta.id = taa.task_attempt_id \n                   AND taa.created_at = latest_activity.latest_created_at\n               WHERE taa.status = $1",
   "describe": {
     "columns": [
       {
-        "ordinal": 0,
         "name": "id",
-        "type_info": "Uuid"
+        "ordinal": 0,
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Left": [
-        {
-          "Custom": {
-            "name": "task_attempt_status",
-            "kind": {
-              "Enum": [
-                "init",
-                "inprogress",
-                "paused"
-              ]
-            }
-          }
-        }
-      ]
+      "Right": 1
     },
     "nullable": [
-      false
+      true
     ]
   },
   "hash": "f72efcb41e92e03b8f8b988017d3b1c509322dc560742e9ef77fb9532b748fce"

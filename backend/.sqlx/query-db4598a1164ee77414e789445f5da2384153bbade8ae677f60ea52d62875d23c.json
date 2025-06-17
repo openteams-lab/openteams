@@ -1,52 +1,39 @@
 {
-  "db_name": "PostgreSQL",
+  "db_name": "SQLite",
   "query": "SELECT id, task_attempt_id, status as \"status!: TaskAttemptStatus\", note, created_at \n               FROM task_attempt_activities \n               WHERE task_attempt_id = $1 \n               ORDER BY created_at DESC",
   "describe": {
     "columns": [
       {
-        "ordinal": 0,
         "name": "id",
-        "type_info": "Uuid"
-      },
-      {
-        "ordinal": 1,
-        "name": "task_attempt_id",
-        "type_info": "Uuid"
-      },
-      {
-        "ordinal": 2,
-        "name": "status!: TaskAttemptStatus",
-        "type_info": {
-          "Custom": {
-            "name": "task_attempt_status",
-            "kind": {
-              "Enum": [
-                "init",
-                "inprogress",
-                "paused"
-              ]
-            }
-          }
-        }
-      },
-      {
-        "ordinal": 3,
-        "name": "note",
+        "ordinal": 0,
         "type_info": "Text"
       },
       {
-        "ordinal": 4,
+        "name": "task_attempt_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "status!: TaskAttemptStatus",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "note",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
         "name": "created_at",
-        "type_info": "Timestamptz"
+        "ordinal": 4,
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Left": [
-        "Uuid"
-      ]
+      "Right": 1
     },
     "nullable": [
-      false,
+      true,
       false,
       false,
       true,

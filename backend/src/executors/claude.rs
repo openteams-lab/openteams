@@ -16,7 +16,7 @@ impl Executor for ClaudeExecutor {
 
     async fn spawn(
         &self,
-        pool: &sqlx::PgPool,
+        pool: &sqlx::SqlitePool,
         task_id: Uuid,
         worktree_path: &str,
     ) -> Result<Child, ExecutorError> {

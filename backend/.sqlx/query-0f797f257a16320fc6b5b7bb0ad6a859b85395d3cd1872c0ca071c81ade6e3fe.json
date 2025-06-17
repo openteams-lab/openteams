@@ -1,21 +1,19 @@
 {
-  "db_name": "PostgreSQL",
+  "db_name": "SQLite",
   "query": "SELECT id FROM projects WHERE id = $1",
   "describe": {
     "columns": [
       {
-        "ordinal": 0,
         "name": "id",
-        "type_info": "Uuid"
+        "ordinal": 0,
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Left": [
-        "Uuid"
-      ]
+      "Right": 1
     },
     "nullable": [
-      false
+      true
     ]
   },
   "hash": "0f797f257a16320fc6b5b7bb0ad6a859b85395d3cd1872c0ca071c81ade6e3fe"

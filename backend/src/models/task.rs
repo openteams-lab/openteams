@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool, Type};
+use sqlx::{FromRow, SqlitePool, Type};
 use ts_rs::TS;
 use uuid::Uuid;
 
@@ -59,12 +59,12 @@ pub struct UpdateTask {
 
 impl Task {
     pub async fn find_by_project_id(
-        pool: &PgPool,
+        pool: &SqlitePool,
         project_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             Task,
-            r#"SELECT id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at 
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM tasks 
                WHERE project_id = $1 
                ORDER BY created_at DESC"#,
@@ -75,18 +75,18 @@ impl Task {
     }
 
     pub async fn find_by_project_id_with_attempt_status(
-        pool: &PgPool,
+        pool: &SqlitePool,
         project_id: Uuid,
     ) -> Result<Vec<TaskWithAttemptStatus>, sqlx::Error> {
         let records = sqlx::query!(
             r#"SELECT 
-                t.id, 
-                t.project_id, 
+                t.id as "id!: Uuid", 
+                t.project_id as "project_id!: Uuid", 
                 t.title, 
                 t.description, 
                 t.status as "status!: TaskStatus", 
-                t.created_at, 
-                t.updated_at,
+                t.created_at as "created_at!: DateTime<Utc>", 
+                t.updated_at as "updated_at!: DateTime<Utc>",
                 CASE WHEN in_progress_attempts.task_id IS NOT NULL THEN true ELSE false END as "has_in_progress_attempt!"
                FROM tasks t
                LEFT JOIN (
@@ -118,17 +118,17 @@ impl Task {
                 status: record.status,
                 created_at: record.created_at,
                 updated_at: record.updated_at,
-                has_in_progress_attempt: record.has_in_progress_attempt,
+                has_in_progress_attempt: record.has_in_progress_attempt != 0,
             })
             .collect();
 
         Ok(tasks)
     }
 
-    pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+    pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Task,
-            r#"SELECT id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at 
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM tasks 
                WHERE id = $1"#,
             id
@@ -138,13 +138,13 @@ impl Task {
     }
 
     pub async fn find_by_id_and_project_id(
-        pool: &PgPool,
+        pool: &SqlitePool,
         id: Uuid,
         project_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Task,
-            r#"SELECT id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at 
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM tasks 
                WHERE id = $1 AND project_id = $2"#,
             id,
@@ -155,7 +155,7 @@ impl Task {
     }
 
     pub async fn create(
-        pool: &PgPool,
+        pool: &SqlitePool,
         data: &CreateTask,
         task_id: Uuid,
     ) -> Result<Self, sqlx::Error> {
@@ -163,7 +163,7 @@ impl Task {
             Task,
             r#"INSERT INTO tasks (id, project_id, title, description, status) 
                VALUES ($1, $2, $3, $4, $5) 
-               RETURNING id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at"#,
+               RETURNING id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
             task_id,
             data.project_id,
             data.title,
@@ -175,30 +175,31 @@ impl Task {
     }
 
     pub async fn update(
-        pool: &PgPool,
+        pool: &SqlitePool,
         id: Uuid,
         project_id: Uuid,
         title: String,
         description: Option<String>,
         status: TaskStatus,
     ) -> Result<Self, sqlx::Error> {
+        let status_value = status as TaskStatus;
         sqlx::query_as!(
             Task,
             r#"UPDATE tasks 
                SET title = $3, description = $4, status = $5 
                WHERE id = $1 AND project_id = $2 
-               RETURNING id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at"#,
+               RETURNING id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
             id,
             project_id,
             title,
             description,
-            status as TaskStatus
+            status_value
         )
         .fetch_one(pool)
         .await
     }
 
-    pub async fn delete(pool: &PgPool, id: Uuid, project_id: Uuid) -> Result<u64, sqlx::Error> {
+    pub async fn delete(pool: &SqlitePool, id: Uuid, project_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query!(
             "DELETE FROM tasks WHERE id = $1 AND project_id = $2",
             id,
@@ -209,7 +210,11 @@ impl Task {
         Ok(result.rows_affected())
     }
 
-    pub async fn exists(pool: &PgPool, id: Uuid, project_id: Uuid) -> Result<bool, sqlx::Error> {
+    pub async fn exists(
+        pool: &SqlitePool,
+        id: Uuid,
+        project_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query!(
             "SELECT id FROM tasks WHERE id = $1 AND project_id = $2",
             id,

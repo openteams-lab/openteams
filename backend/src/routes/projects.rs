@@ -5,7 +5,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::models::{
@@ -14,7 +14,7 @@ use crate::models::{
 };
 
 pub async fn get_projects(
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
 ) -> Result<ResponseJson<ApiResponse<Vec<Project>>>, StatusCode> {
     match Project::find_all(&pool).await {
         Ok(projects) => Ok(ResponseJson(ApiResponse {
@@ -31,7 +31,7 @@ pub async fn get_projects(
 
 pub async fn get_project(
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
     match Project::find_by_id(&pool, id).await {
         Ok(Some(project)) => Ok(ResponseJson(ApiResponse {
@@ -48,7 +48,7 @@ pub async fn get_project(
 }
 
 pub async fn create_project(
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
     Json(payload): Json<CreateProject>,
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
     let id = Uuid::new_v4();
@@ -161,7 +161,7 @@ pub async fn create_project(
 
 pub async fn update_project(
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
     Json(payload): Json<UpdateProject>,
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
     // Check if project exists first
@@ -219,7 +219,7 @@ pub async fn update_project(
 
 pub async fn delete_project(
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     match Project::delete(&pool, id).await {
         Ok(rows_affected) => {
@@ -256,10 +256,15 @@ mod tests {
     use crate::models::project::{CreateProject, UpdateProject};
     use axum::extract::Extension;
     use chrono::Utc;
-    use sqlx::PgPool;
+    use sqlx::SqlitePool;
     use uuid::Uuid;
 
-    async fn create_test_user(pool: &PgPool, email: &str, password: &str, is_admin: bool) -> User {
+    async fn create_test_user(
+        pool: &SqlitePool,
+        email: &str,
+        password: &str,
+        is_admin: bool,
+    ) -> User {
         let id = Uuid::new_v4();
         let now = Utc::now();
         let password_hash = hash_password(password).unwrap();
@@ -280,7 +285,7 @@ mod tests {
     }
 
     async fn create_test_project(
-        pool: &PgPool,
+        pool: &SqlitePool,
         name: &str,
         git_repo_path: &str,
         owner_id: Uuid,
@@ -304,7 +309,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_get_projects_success(pool: PgPool) {
+    async fn test_get_projects_success(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
 
         // Create multiple projects
@@ -328,7 +333,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_get_projects_empty(pool: PgPool) {
+    async fn test_get_projects_empty(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
 
         let auth = AuthUser {
@@ -347,7 +352,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_get_project_success(pool: PgPool) {
+    async fn test_get_project_success(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Test Project", "/tmp/test", user.id).await;
 
@@ -370,7 +375,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_get_project_not_found(pool: PgPool) {
+    async fn test_get_project_not_found(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let nonexistent_project_id = Uuid::new_v4();
 
@@ -386,7 +391,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_create_project_success(pool: PgPool) {
+    async fn test_create_project_success(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
 
         let auth = AuthUser {
@@ -414,7 +419,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_create_project_as_admin(pool: PgPool) {
+    async fn test_create_project_as_admin(pool: SqlitePool) {
         let admin_user = create_test_user(&pool, "admin@example.com", "password123", true).await;
 
         let auth = AuthUser {
@@ -441,7 +446,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_update_project_success(pool: PgPool) {
+    async fn test_update_project_success(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Original Name", "/tmp/original", user.id).await;
 
@@ -463,7 +468,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_update_project_partial(pool: PgPool) {
+    async fn test_update_project_partial(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Original Name", "/tmp/original", user.id).await;
 
@@ -485,7 +490,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_update_project_not_found(pool: PgPool) {
+    async fn test_update_project_not_found(pool: SqlitePool) {
         let nonexistent_project_id = Uuid::new_v4();
 
         let update_request = UpdateProject {
@@ -504,7 +509,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_delete_project_success(pool: PgPool) {
+    async fn test_delete_project_success(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project =
             create_test_project(&pool, "Project to Delete", "/tmp/to-delete", user.id).await;
@@ -518,7 +523,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_delete_project_not_found(pool: PgPool) {
+    async fn test_delete_project_not_found(pool: SqlitePool) {
         let nonexistent_project_id = Uuid::new_v4();
 
         let result = delete_project(Path(nonexistent_project_id), Extension(pool)).await;
@@ -527,7 +532,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_delete_project_cascades_to_tasks(pool: PgPool) {
+    async fn test_delete_project_cascades_to_tasks(pool: SqlitePool) {
         use crate::models::task::{Task, TaskStatus};
 
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
@@ -577,7 +582,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_projects_belong_to_users(pool: PgPool) {
+    async fn test_projects_belong_to_users(pool: SqlitePool) {
         let user1 = create_test_user(&pool, "user1@example.com", "password123", false).await;
         let user2 = create_test_user(&pool, "user2@example.com", "password123", false).await;
 

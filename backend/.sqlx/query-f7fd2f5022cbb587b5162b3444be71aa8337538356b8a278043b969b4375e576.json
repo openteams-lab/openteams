@@ -1,26 +1,10 @@
 {
-  "db_name": "PostgreSQL",
+  "db_name": "SQLite",
   "query": "INSERT INTO task_attempt_activities (id, task_attempt_id, status, note) \n               VALUES ($1, $2, $3, $4)",
   "describe": {
     "columns": [],
     "parameters": {
-      "Left": [
-        "Uuid",
-        "Uuid",
-        {
-          "Custom": {
-            "name": "task_attempt_status",
-            "kind": {
-              "Enum": [
-                "init",
-                "inprogress",
-                "paused"
-              ]
-            }
-          }
-        },
-        "Text"
-      ]
+      "Right": 4
     },
     "nullable": []
   },

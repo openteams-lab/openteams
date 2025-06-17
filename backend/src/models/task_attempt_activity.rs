@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool};
+use sqlx::{FromRow, SqlitePool};
 use ts_rs::TS;
 use uuid::Uuid;
 
@@ -26,12 +26,12 @@ pub struct CreateTaskAttemptActivity {
 
 impl TaskAttemptActivity {
     pub async fn find_by_attempt_id(
-        pool: &PgPool,
+        pool: &SqlitePool,
         attempt_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             TaskAttemptActivity,
-            r#"SELECT id, task_attempt_id, status as "status!: TaskAttemptStatus", note, created_at 
+            r#"SELECT id as "id!: Uuid", task_attempt_id as "task_attempt_id!: Uuid", status as "status!: TaskAttemptStatus", note, created_at as "created_at!: DateTime<Utc>"
                FROM task_attempt_activities 
                WHERE task_attempt_id = $1 
                ORDER BY created_at DESC"#,
@@ -42,19 +42,20 @@ impl TaskAttemptActivity {
     }
 
     pub async fn create(
-        pool: &PgPool,
+        pool: &SqlitePool,
         data: &CreateTaskAttemptActivity,
         activity_id: Uuid,
         status: TaskAttemptStatus,
     ) -> Result<Self, sqlx::Error> {
+        let status_value = status as TaskAttemptStatus;
         sqlx::query_as!(
             TaskAttemptActivity,
             r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note) 
                VALUES ($1, $2, $3, $4) 
-               RETURNING id, task_attempt_id, status as "status!: TaskAttemptStatus", note, created_at"#,
+               RETURNING id as "id!: Uuid", task_attempt_id as "task_attempt_id!: Uuid", status as "status!: TaskAttemptStatus", note, created_at as "created_at!: DateTime<Utc>""#,
             activity_id,
             data.task_attempt_id,
-            status as TaskAttemptStatus,
+            status_value,
             data.note
         )
         .fetch_one(pool)
@@ -62,7 +63,7 @@ impl TaskAttemptActivity {
     }
 
     pub async fn create_initial(
-        pool: &PgPool,
+        pool: &SqlitePool,
         attempt_id: Uuid,
         activity_id: Uuid,
     ) -> Result<(), sqlx::Error> {
@@ -80,10 +81,10 @@ impl TaskAttemptActivity {
     }
 
     pub async fn find_attempts_with_latest_init_status(
-        pool: &PgPool,
+        pool: &SqlitePool,
     ) -> Result<Vec<uuid::Uuid>, sqlx::Error> {
         let records = sqlx::query!(
-            r#"SELECT DISTINCT ta.id 
+            r#"SELECT DISTINCT ta.id as "id!: Uuid"
                FROM task_attempts ta
                INNER JOIN (
                    SELECT task_attempt_id, MAX(created_at) as latest_created_at
@@ -102,10 +103,10 @@ impl TaskAttemptActivity {
     }
 
     pub async fn find_attempts_with_latest_inprogress_status(
-        pool: &PgPool,
+        pool: &SqlitePool,
     ) -> Result<Vec<uuid::Uuid>, sqlx::Error> {
         let records = sqlx::query!(
-            r#"SELECT DISTINCT ta.id 
+            r#"SELECT DISTINCT ta.id as "id!: Uuid"
                FROM task_attempts ta
                INNER JOIN (
                    SELECT task_attempt_id, MAX(created_at) as latest_created_at

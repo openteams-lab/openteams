@@ -20,7 +20,7 @@ pub struct RunningExecution {
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub running_executions: Arc<Mutex<HashMap<Uuid, RunningExecution>>>,
-    pub db_pool: sqlx::PgPool,
+    pub db_pool: sqlx::SqlitePool,
 }
 
 pub async fn execution_monitor(app_state: AppState) {

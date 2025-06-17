@@ -1,23 +1,19 @@
 {
-  "db_name": "PostgreSQL",
+  "db_name": "SQLite",
   "query": "SELECT ta.id FROM task_attempts ta \n             JOIN tasks t ON ta.task_id = t.id \n             WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3",
   "describe": {
     "columns": [
       {
-        "ordinal": 0,
         "name": "id",
-        "type_info": "Uuid"
+        "ordinal": 0,
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Left": [
-        "Uuid",
-        "Uuid",
-        "Uuid"
-      ]
+      "Right": 3
     },
     "nullable": [
-      false
+      true
     ]
   },
   "hash": "84df316d94c83b9189ab76a41521bf6bc60ea6ae530f00cf544ac87c120f50c2"

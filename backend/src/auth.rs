@@ -8,7 +8,7 @@ use axum::{
 };
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -106,7 +106,7 @@ pub async fn auth_middleware(
     // Get database pool from request extensions
     let pool = request
         .extensions()
-        .get::<PgPool>()
+        .get::<SqlitePool>()
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Note: User table removed, skipping database verification

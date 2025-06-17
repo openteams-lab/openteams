@@ -7,7 +7,8 @@ use axum::{
     Json, Router,
 };
 use rust_embed::RustEmbed;
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
+use std::str::FromStr;
 use std::{collections::HashMap, env, sync::Arc};
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
@@ -98,10 +99,24 @@ async fn main() -> anyhow::Result<()> {
     let database_url =
         env::var("DATABASE_URL").expect("DATABASE_URL must be set in environment or .env file");
 
-    let pool = PgPoolOptions::new()
-        .max_connections(10)
-        .connect(&database_url)
-        .await?;
+    // if !Sqlite::database_exists(database_url).await.unwrap_or(false) {
+    //     println!("Creating database {}", DB_URL);
+    //     match Sqlite::create_database(DB_URL).await {
+    //         Ok(_) => println!("Create db success"),
+    //         Err(error) => panic!("error: {}", error),
+    //     }
+    // } else {
+    //     println!("Database already exists");
+    // }
+
+    // let pool = SqlitePoolOptions::new()
+    //     .max_connections(10)
+    //     .connect(&database_url)
+    //     .await?;
+
+    let options = SqliteConnectOptions::from_str(&database_url)?.create_if_missing(true);
+    let pool = SqlitePool::connect_with(options).await?;
+    sqlx::migrate!("./migrations").run(&pool).await?;
 
     // Create app state
     let app_state = AppState {

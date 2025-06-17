@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT ta.id, ta.task_id, ta.worktree_path, ta.base_commit, ta.merge_commit, ta.executor, ta.stdout, ta.stderr, ta.created_at, ta.updated_at \n               FROM task_attempts ta \n               JOIN tasks t ON ta.task_id = t.id \n               WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "task_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "worktree_path",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "base_commit",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "merge_commit",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "executor",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "stdout",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "stderr",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 9,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "741d599c2c88d1bc11958f59be4fb53c0ec4006aac9a08c64a4008b249f642bb"
+}

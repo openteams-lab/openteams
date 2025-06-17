@@ -5,7 +5,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::models::{
@@ -18,7 +18,7 @@ use crate::models::{
 
 pub async fn get_project_tasks(
     Path(project_id): Path<Uuid>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
 ) -> Result<ResponseJson<ApiResponse<Vec<TaskWithAttemptStatus>>>, StatusCode> {
     match Task::find_by_project_id_with_attempt_status(&pool, project_id).await {
         Ok(tasks) => Ok(ResponseJson(ApiResponse {
@@ -35,7 +35,7 @@ pub async fn get_project_tasks(
 
 pub async fn get_task(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
 ) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
     match Task::find_by_id_and_project_id(&pool, task_id, project_id).await {
         Ok(Some(task)) => Ok(ResponseJson(ApiResponse {
@@ -58,7 +58,7 @@ pub async fn get_task(
 
 pub async fn create_task(
     Path(project_id): Path<Uuid>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
     Json(mut payload): Json<CreateTask>,
 ) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
     let id = Uuid::new_v4();
@@ -97,7 +97,7 @@ pub async fn create_task(
 
 pub async fn update_task(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
     Json(payload): Json<UpdateTask>,
 ) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
     // Check if task exists in the specified project
@@ -130,7 +130,7 @@ pub async fn update_task(
 
 pub async fn delete_task(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     match Task::delete(&pool, task_id, project_id).await {
         Ok(rows_affected) => {
@@ -154,7 +154,7 @@ pub async fn delete_task(
 // Task Attempts endpoints
 pub async fn get_task_attempts(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
 ) -> Result<ResponseJson<ApiResponse<Vec<TaskAttempt>>>, StatusCode> {
     // Verify task exists in project first
     match Task::exists(&pool, task_id, project_id).await {
@@ -181,7 +181,7 @@ pub async fn get_task_attempts(
 
 pub async fn get_task_attempt_activities(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
 ) -> Result<ResponseJson<ApiResponse<Vec<TaskAttemptActivity>>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
     match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
@@ -212,7 +212,7 @@ pub async fn get_task_attempt_activities(
 
 pub async fn create_task_attempt(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
     Json(mut payload): Json<CreateTaskAttempt>,
 ) -> Result<ResponseJson<ApiResponse<TaskAttempt>>, StatusCode> {
     // Verify task exists in project first
@@ -251,7 +251,7 @@ pub async fn create_task_attempt(
 
 pub async fn create_task_attempt_activity(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
     Json(mut payload): Json<CreateTaskAttemptActivity>,
 ) -> Result<ResponseJson<ApiResponse<TaskAttemptActivity>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
@@ -287,7 +287,7 @@ pub async fn create_task_attempt_activity(
 
 pub async fn stop_task_attempt(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
     Extension(app_state): Extension<crate::execution_monitor::AppState>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
@@ -368,7 +368,7 @@ pub async fn stop_task_attempt(
 
 pub async fn get_task_attempt_diff(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
 ) -> Result<ResponseJson<ApiResponse<WorktreeDiff>>, StatusCode> {
     match TaskAttempt::get_diff(&pool, attempt_id, task_id, project_id).await {
         Ok(diff) => Ok(ResponseJson(ApiResponse {
@@ -386,7 +386,7 @@ pub async fn get_task_attempt_diff(
 #[axum::debug_handler]
 pub async fn merge_task_attempt(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<PgPool>,
+    Extension(pool): Extension<SqlitePool>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
     match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
@@ -456,10 +456,15 @@ mod tests {
     };
     use axum::extract::Extension;
     use chrono::Utc;
-    use sqlx::PgPool;
+    use sqlx::SqlitePool;
     use uuid::Uuid;
 
-    async fn create_test_user(pool: &PgPool, email: &str, password: &str, is_admin: bool) -> User {
+    async fn create_test_user(
+        pool: &SqlitePool,
+        email: &str,
+        password: &str,
+        is_admin: bool,
+    ) -> User {
         let id = Uuid::new_v4();
         let now = Utc::now();
         let password_hash = hash_password(password).unwrap();
@@ -479,7 +484,7 @@ mod tests {
         .unwrap()
     }
 
-    async fn create_test_project(pool: &PgPool, name: &str, owner_id: Uuid) -> Project {
+    async fn create_test_project(pool: &SqlitePool, name: &str, owner_id: Uuid) -> Project {
         let id = Uuid::new_v4();
         let now = Utc::now();
         let git_repo_path = format!("/tmp/test-repo-{}", id);
@@ -500,7 +505,7 @@ mod tests {
     }
 
     async fn create_test_task(
-        pool: &PgPool,
+        pool: &SqlitePool,
         project_id: Uuid,
         title: &str,
         description: Option<String>,
@@ -526,7 +531,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_get_project_tasks_success(pool: PgPool) {
+    async fn test_get_project_tasks_success(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Test Project", user.id).await;
 
@@ -559,7 +564,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_get_project_tasks_empty_project(pool: PgPool) {
+    async fn test_get_project_tasks_empty_project(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Empty Project", user.id).await;
 
@@ -573,7 +578,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_get_task_success(pool: PgPool) {
+    async fn test_get_task_success(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Test Project", user.id).await;
         let task = create_test_task(
@@ -599,7 +604,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_get_task_not_found(pool: PgPool) {
+    async fn test_get_task_not_found(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Test Project", user.id).await;
         let nonexistent_task_id = Uuid::new_v4();
@@ -610,7 +615,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_get_task_wrong_project(pool: PgPool) {
+    async fn test_get_task_wrong_project(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project1 = create_test_project(&pool, "Project 1", user.id).await;
         let project2 = create_test_project(&pool, "Project 2", user.id).await;
@@ -623,7 +628,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_create_task_success(pool: PgPool) {
+    async fn test_create_task_success(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Test Project", user.id).await;
 
@@ -650,7 +655,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_create_task_project_not_found(pool: PgPool) {
+    async fn test_create_task_project_not_found(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let nonexistent_project_id = Uuid::new_v4();
 
@@ -671,7 +676,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_update_task_success(pool: PgPool) {
+    async fn test_update_task_success(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Test Project", user.id).await;
         let task = create_test_task(
@@ -710,7 +715,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_update_task_partial(pool: PgPool) {
+    async fn test_update_task_partial(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Test Project", user.id).await;
         let task = create_test_task(
@@ -750,7 +755,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_update_task_not_found(pool: PgPool) {
+    async fn test_update_task_not_found(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Test Project", user.id).await;
         let nonexistent_task_id = Uuid::new_v4();
@@ -772,7 +777,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_update_task_wrong_project(pool: PgPool) {
+    async fn test_update_task_wrong_project(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project1 = create_test_project(&pool, "Project 1", user.id).await;
         let project2 = create_test_project(&pool, "Project 2", user.id).await;
@@ -796,7 +801,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_delete_task_success(pool: PgPool) {
+    async fn test_delete_task_success(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Test Project", user.id).await;
         let task =
@@ -811,7 +816,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_delete_task_not_found(pool: PgPool) {
+    async fn test_delete_task_not_found(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project = create_test_project(&pool, "Test Project", user.id).await;
         let nonexistent_task_id = Uuid::new_v4();
@@ -822,7 +827,7 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_delete_task_wrong_project(pool: PgPool) {
+    async fn test_delete_task_wrong_project(pool: SqlitePool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
         let project1 = create_test_project(&pool, "Project 1", user.id).await;
         let project2 = create_test_project(&pool, "Project 2", user.id).await;

@@ -1,65 +1,49 @@
 {
-  "db_name": "PostgreSQL",
+  "db_name": "SQLite",
   "query": "SELECT id, project_id, title, description, status as \"status!: TaskStatus\", created_at, updated_at \n               FROM tasks \n               WHERE id = $1 AND project_id = $2",
   "describe": {
     "columns": [
       {
-        "ordinal": 0,
         "name": "id",
-        "type_info": "Uuid"
-      },
-      {
-        "ordinal": 1,
-        "name": "project_id",
-        "type_info": "Uuid"
-      },
-      {
-        "ordinal": 2,
-        "name": "title",
-        "type_info": "Varchar"
-      },
-      {
-        "ordinal": 3,
-        "name": "description",
+        "ordinal": 0,
         "type_info": "Text"
       },
       {
-        "ordinal": 4,
+        "name": "project_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "title",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "description",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
         "name": "status!: TaskStatus",
-        "type_info": {
-          "Custom": {
-            "name": "task_status",
-            "kind": {
-              "Enum": [
-                "todo",
-                "inprogress",
-                "done",
-                "cancelled",
-                "inreview"
-              ]
-            }
-          }
-        }
+        "ordinal": 4,
+        "type_info": "Text"
       },
       {
-        "ordinal": 5,
         "name": "created_at",
-        "type_info": "Timestamptz"
+        "ordinal": 5,
+        "type_info": "Text"
       },
       {
-        "ordinal": 6,
         "name": "updated_at",
-        "type_info": "Timestamptz"
+        "ordinal": 6,
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Left": [
-        "Uuid",
-        "Uuid"
-      ]
+      "Right": 2
     },
     "nullable": [
-      false,
+      true,
       false,
       false,
       true,

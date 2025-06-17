@@ -49,7 +49,7 @@ pub trait Executor: Send + Sync {
     /// Spawn the command for a given task attempt
     async fn spawn(
         &self,
-        pool: &sqlx::PgPool,
+        pool: &sqlx::SqlitePool,
         task_id: Uuid,
         worktree_path: &str,
     ) -> Result<Child, ExecutorError>;
@@ -57,7 +57,7 @@ pub trait Executor: Send + Sync {
     /// Execute the command and stream output to database in real-time
     async fn execute_streaming(
         &self,
-        pool: &sqlx::PgPool,
+        pool: &sqlx::SqlitePool,
         task_id: Uuid,
         attempt_id: Uuid,
         worktree_path: &str,
@@ -87,7 +87,7 @@ pub trait Executor: Send + Sync {
     /// Execute the command and capture output, then store in database (for backward compatibility)
     async fn execute(
         &self,
-        pool: &sqlx::PgPool,
+        pool: &sqlx::SqlitePool,
         task_id: Uuid,
         attempt_id: Uuid,
         worktree_path: &str,
@@ -170,7 +170,7 @@ impl ExecutorConfig {
 /// Stream output from a child process to the database
 async fn stream_output_to_db(
     output: impl tokio::io::AsyncRead + Unpin,
-    pool: sqlx::PgPool,
+    pool: sqlx::SqlitePool,
     attempt_id: Uuid,
     is_stdout: bool,
 ) {

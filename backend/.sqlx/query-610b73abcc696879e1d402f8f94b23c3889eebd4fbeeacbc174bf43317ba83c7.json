@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "INSERT INTO task_attempt_activities (id, task_attempt_id, status, note) \n               VALUES ($1, $2, $3, $4) \n               RETURNING id, task_attempt_id, status as \"status!: TaskAttemptStatus\", note, created_at",
+  "query": "INSERT INTO projects (id, name, git_repo_path) VALUES ($1, $2, $3) RETURNING id, name, git_repo_path, created_at, updated_at",
   "describe": {
     "columns": [
       {
@@ -9,36 +9,36 @@
         "type_info": "Text"
       },
       {
-        "name": "task_attempt_id",
+        "name": "name",
         "ordinal": 1,
         "type_info": "Text"
       },
       {
-        "name": "status!: TaskAttemptStatus",
+        "name": "git_repo_path",
         "ordinal": 2,
         "type_info": "Text"
       },
       {
-        "name": "note",
+        "name": "created_at",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "created_at",
+        "name": "updated_at",
         "ordinal": 4,
         "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 4
+      "Right": 3
     },
     "nullable": [
       true,
       false,
       false,
-      true,
+      false,
       false
     ]
   },
-  "hash": "d2574d14252ead485e5db4e0eb84afa2fa3e12422f4e6ef6d623b768316e5ef4"
+  "hash": "610b73abcc696879e1d402f8f94b23c3889eebd4fbeeacbc174bf43317ba83c7"
 }

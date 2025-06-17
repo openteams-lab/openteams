@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use git2::{Error as GitError, Repository};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool, Type};
+use sqlx::{FromRow, SqlitePool, Type};
 use std::path::Path;
 use ts_rs::TS;
 use uuid::Uuid;
@@ -116,10 +116,10 @@ pub struct WorktreeDiff {
 }
 
 impl TaskAttempt {
-    pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+    pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             TaskAttempt,
-            r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, executor, stdout, stderr, created_at, updated_at 
+            r#"SELECT id as "id!: Uuid", task_id as "task_id!: Uuid", worktree_path, base_commit, merge_commit, executor, stdout, stderr, created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM task_attempts 
                WHERE id = $1"#,
             id
@@ -128,10 +128,13 @@ impl TaskAttempt {
         .await
     }
 
-    pub async fn find_by_task_id(pool: &PgPool, task_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_task_id(
+        pool: &SqlitePool,
+        task_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             TaskAttempt,
-            r#"SELECT id, task_id, worktree_path, base_commit, merge_commit, executor, stdout, stderr, created_at, updated_at 
+            r#"SELECT id as "id!: Uuid", task_id as "task_id!: Uuid", worktree_path, base_commit, merge_commit, executor, stdout, stderr, created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM task_attempts 
                WHERE task_id = $1 
                ORDER BY created_at DESC"#,
@@ -142,7 +145,7 @@ impl TaskAttempt {
     }
 
     pub async fn create(
-        pool: &PgPool,
+        pool: &SqlitePool,
         data: &CreateTaskAttempt,
         attempt_id: Uuid,
     ) -> Result<Self, TaskAttemptError> {
@@ -179,11 +182,11 @@ impl TaskAttempt {
         repo.worktree(&branch_name, worktree_path, None)?;
 
         // Insert the record into the database
-        let task_attempt = sqlx::query_as!(
+        Ok(sqlx::query_as!(
             TaskAttempt,
             r#"INSERT INTO task_attempts (id, task_id, worktree_path, base_commit, merge_commit, executor, stdout, stderr) 
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-               RETURNING id, task_id, worktree_path, base_commit, merge_commit, executor, stdout, stderr, created_at, updated_at"#,
+               RETURNING id as "id!: Uuid", task_id as "task_id!: Uuid", worktree_path, base_commit, merge_commit, executor, stdout, stderr, created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
             attempt_id,
             data.task_id,
             data.worktree_path,
@@ -194,13 +197,11 @@ impl TaskAttempt {
             None::<String>  // stderr
         )
         .fetch_one(pool)
-        .await?;
-
-        Ok(task_attempt)
+        .await?)
     }
 
     pub async fn exists_for_task(
-        pool: &PgPool,
+        pool: &SqlitePool,
         attempt_id: Uuid,
         task_id: Uuid,
         project_id: Uuid,
@@ -234,13 +235,13 @@ impl TaskAttempt {
 
     /// Update stdout and stderr for this task attempt
     pub async fn update_output(
-        pool: &PgPool,
+        pool: &SqlitePool,
         id: Uuid,
         stdout: Option<&str>,
         stderr: Option<&str>,
     ) -> Result<(), sqlx::Error> {
         sqlx::query!(
-            "UPDATE task_attempts SET stdout = $1, stderr = $2, updated_at = NOW() WHERE id = $3",
+            "UPDATE task_attempts SET stdout = $1, stderr = $2, updated_at = datetime('now') WHERE id = $3",
             stdout,
             stderr,
             id
@@ -252,14 +253,14 @@ impl TaskAttempt {
 
     /// Append to stdout and stderr for this task attempt (for streaming updates)
     pub async fn append_output(
-        pool: &PgPool,
+        pool: &SqlitePool,
         id: Uuid,
         stdout_append: Option<&str>,
         stderr_append: Option<&str>,
     ) -> Result<(), sqlx::Error> {
         if let Some(stdout_data) = stdout_append {
             sqlx::query!(
-                "UPDATE task_attempts SET stdout = COALESCE(stdout, '') || $1, updated_at = NOW() WHERE id = $2",
+                "UPDATE task_attempts SET stdout = COALESCE(stdout, '') || $1, updated_at = datetime('now') WHERE id = $2",
                 stdout_data,
                 id
             )
@@ -269,7 +270,7 @@ impl TaskAttempt {
 
         if let Some(stderr_data) = stderr_append {
             sqlx::query!(
-                "UPDATE task_attempts SET stderr = COALESCE(stderr, '') || $1, updated_at = NOW() WHERE id = $2",
+                "UPDATE task_attempts SET stderr = COALESCE(stderr, '') || $1, updated_at = datetime('now') WHERE id = $2",
                 stderr_data,
                 id
             )
@@ -422,7 +423,7 @@ impl TaskAttempt {
 
     /// Merge the worktree changes back to the main repository
     pub async fn merge_changes(
-        pool: &PgPool,
+        pool: &SqlitePool,
         attempt_id: Uuid,
         task_id: Uuid,
         project_id: Uuid,
@@ -430,7 +431,7 @@ impl TaskAttempt {
         // Get the task attempt with validation
         let attempt = sqlx::query_as!(
             TaskAttempt,
-            r#"SELECT ta.id, ta.task_id, ta.worktree_path, ta.base_commit, ta.merge_commit, ta.executor, ta.stdout, ta.stderr, ta.created_at, ta.updated_at 
+            r#"SELECT ta.id as "id!: Uuid", ta.task_id as "task_id!: Uuid", ta.worktree_path, ta.base_commit, ta.merge_commit, ta.executor, ta.stdout, ta.stderr, ta.created_at as "created_at!: DateTime<Utc>", ta.updated_at as "updated_at!: DateTime<Utc>"
                FROM task_attempts ta 
                JOIN tasks t ON ta.task_id = t.id 
                WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3"#,
@@ -460,7 +461,7 @@ impl TaskAttempt {
 
         // Update the task attempt with the merge commit
         sqlx::query!(
-            "UPDATE task_attempts SET merge_commit = $1, updated_at = NOW() WHERE id = $2",
+            "UPDATE task_attempts SET merge_commit = $1, updated_at = datetime('now') WHERE id = $2",
             merge_commit_id,
             attempt_id
         )
@@ -472,7 +473,7 @@ impl TaskAttempt {
 
     /// Get the git diff between the base commit and the current worktree state
     pub async fn get_diff(
-        pool: &PgPool,
+        pool: &SqlitePool,
         attempt_id: Uuid,
         task_id: Uuid,
         project_id: Uuid,
@@ -480,7 +481,7 @@ impl TaskAttempt {
         // Get the task attempt with validation
         let attempt = sqlx::query_as!(
             TaskAttempt,
-            r#"SELECT ta.id, ta.task_id, ta.worktree_path, ta.base_commit, ta.merge_commit, ta.executor, ta.stdout, ta.stderr, ta.created_at, ta.updated_at 
+            r#"SELECT ta.id as "id!: Uuid", ta.task_id as "task_id!: Uuid", ta.worktree_path, ta.base_commit, ta.merge_commit, ta.executor, ta.stdout, ta.stderr, ta.created_at as "created_at!: DateTime<Utc>", ta.updated_at as "updated_at!: DateTime<Utc>"
                FROM task_attempts ta 
                JOIN tasks t ON ta.task_id = t.id 
                WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3"#,

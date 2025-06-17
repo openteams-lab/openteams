@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT \n                t.id, \n                t.project_id, \n                t.title, \n                t.description, \n                t.status as \"status!: TaskStatus\", \n                t.created_at, \n                t.updated_at,\n                CASE WHEN in_progress_attempts.task_id IS NOT NULL THEN true ELSE false END as \"has_in_progress_attempt!\"\n               FROM tasks t\n               LEFT JOIN (\n                   SELECT DISTINCT ta.task_id \n                   FROM task_attempts ta\n                   INNER JOIN (\n                       SELECT task_attempt_id, MAX(created_at) as latest_created_at\n                       FROM task_attempt_activities\n                       GROUP BY task_attempt_id\n                   ) latest_activity ON ta.id = latest_activity.task_attempt_id\n                   INNER JOIN task_attempt_activities taa ON ta.id = taa.task_attempt_id \n                       AND taa.created_at = latest_activity.latest_created_at\n                   WHERE taa.status = 'inprogress'\n               ) in_progress_attempts ON t.id = in_progress_attempts.task_id\n               WHERE t.project_id = $1 \n               ORDER BY t.created_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "project_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "title",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "description",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "status!: TaskStatus",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "has_in_progress_attempt!",
+        "ordinal": 7,
+        "type_info": "Int"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8449fdb087cce369ac3aaea98cfd676530014b848304d6dcfc705990c71178d5"
+}
