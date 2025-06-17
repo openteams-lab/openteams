@@ -23,7 +23,6 @@ import type {
   TaskStatus,
   TaskAttempt,
   TaskAttemptActivity,
-  ExecutorConfig,
 } from "shared/types";
 
 interface Task {
@@ -74,9 +73,7 @@ export function TaskDetailsDialog({
     TaskAttemptActivity[]
   >([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
-  const [selectedExecutor, setSelectedExecutor] = useState<ExecutorConfig>({
-    type: "echo",
-  });
+  const [selectedExecutor, setSelectedExecutor] = useState<string>("echo");
   const [creatingAttempt, setCreatingAttempt] = useState(false);
 
   // Edit mode state
@@ -110,8 +107,10 @@ export function TaskDetailsDialog({
           setTaskAttempts(result.data);
           // Automatically select the latest attempt if available
           if (result.data.length > 0) {
-            const latestAttempt = result.data.reduce((latest, current) => 
-              new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+            const latestAttempt = result.data.reduce((latest, current) =>
+              new Date(current.created_at) > new Date(latest.created_at)
+                ? current
+                : latest
             );
             setSelectedAttempt(latestAttempt);
             fetchAttemptActivities(latestAttempt.id);
@@ -219,7 +218,7 @@ export function TaskDetailsDialog({
             worktree_path: worktreePath,
             base_commit: null,
             merge_commit: null,
-            executor_config: selectedExecutor,
+            executor: selectedExecutor,
           }),
         }
       );
@@ -499,8 +498,8 @@ export function TaskDetailsDialog({
                                     attempt.created_at
                                   ).toLocaleTimeString()}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
-                                  Executor
+                                <span className="text-xs text-muted-foreground text-left">
+                                  {attempt.executor || "executor"}
                                 </span>
                               </div>
                             </SelectItem>
@@ -518,11 +517,9 @@ export function TaskDetailsDialog({
                     </Label>
                     <div className="flex flex-col gap-2">
                       <Select
-                        value={selectedExecutor.type}
+                        value={selectedExecutor}
                         onValueChange={(value) =>
-                          setSelectedExecutor({
-                            type: value as "echo" | "claude",
-                          })
+                          setSelectedExecutor(value as "echo" | "claude")
                         }
                       >
                         <SelectTrigger>

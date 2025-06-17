@@ -21,9 +21,9 @@ export type UpdateTask = { title: string | null, description: string | null, sta
 
 export type TaskAttemptStatus = "init" | "inprogress" | "paused";
 
-export type TaskAttempt = { id: string, task_id: string, worktree_path: string, base_commit: string | null, merge_commit: string | null, stdout: string | null, stderr: string | null, created_at: string, updated_at: string, };
+export type TaskAttempt = { id: string, task_id: string, worktree_path: string, base_commit: string | null, merge_commit: string | null, executor: string | null, stdout: string | null, stderr: string | null, created_at: string, updated_at: string, };
 
-export type CreateTaskAttempt = { task_id: string, worktree_path: string, base_commit: string | null, merge_commit: string | null, executor_config: ExecutorConfig | null, };
+export type CreateTaskAttempt = { task_id: string, worktree_path: string, base_commit: string | null, merge_commit: string | null, executor: string | null, };
 
 export type UpdateTaskAttempt = { worktree_path: string | null, base_commit: string | null, merge_commit: string | null, };
 
