@@ -90,6 +90,11 @@ export function TaskDetailsDialog({
 
   useEffect(() => {
     if (isOpen && task) {
+      // Reset attempt-related state when switching tasks
+      setSelectedAttempt(null);
+      setAttemptActivities([]);
+      setActivitiesLoading(false);
+      
       fetchTaskAttempts(task.id);
       // Initialize edit state with current task values
       setEditedTitle(task.title);
