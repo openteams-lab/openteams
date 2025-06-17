@@ -108,6 +108,14 @@ export function TaskDetailsDialog({
         const result: ApiResponse<TaskAttempt[]> = await response.json();
         if (result.success && result.data) {
           setTaskAttempts(result.data);
+          // Automatically select the latest attempt if available
+          if (result.data.length > 0) {
+            const latestAttempt = result.data.reduce((latest, current) => 
+              new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+            );
+            setSelectedAttempt(latestAttempt);
+            fetchAttemptActivities(latestAttempt.id);
+          }
         }
       } else {
         onError("Failed to load task attempts");
