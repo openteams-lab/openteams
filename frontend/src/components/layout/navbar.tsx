@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, FolderOpen, Users } from 'lucide-react'
+import { ArrowLeft, FolderOpen } from 'lucide-react'
 
 export function Navbar() {
   const location = useLocation()
@@ -23,16 +23,7 @@ export function Navbar() {
                   Projects
                 </Link>
               </Button>
-              <Button
-                asChild
-                variant={location.pathname === '/users' ? 'default' : 'ghost'}
-                size="sm"
-              >
-                <Link to="/users">
-                  <Users className="mr-2 h-4 w-4" />
-                  Users
-                </Link>
-              </Button>
+
             </div>
           </div>
           <div className="flex items-center space-x-4">
