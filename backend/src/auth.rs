@@ -2,7 +2,7 @@ use axum::{
     async_trait,
     body::Body,
     extract::FromRequestParts,
-    http::{request::Parts, StatusCode, Request},
+    http::{request::Parts, Request, StatusCode},
     middleware::Next,
     response::Response,
 };
@@ -43,9 +43,13 @@ where
     }
 }
 
-pub fn create_token(user_id: Uuid, email: String, is_admin: bool) -> Result<String, jsonwebtoken::errors::Error> {
+pub fn create_token(
+    user_id: Uuid,
+    email: String,
+    is_admin: bool,
+) -> Result<String, jsonwebtoken::errors::Error> {
     let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "your-secret-key".to_string());
-    
+
     let expiration = chrono::Utc::now()
         .checked_add_signed(chrono::Duration::hours(24))
         .expect("valid timestamp")
@@ -79,7 +83,7 @@ pub async fn auth_middleware(
     next: Next,
 ) -> Result<Response, StatusCode> {
     let headers = request.headers();
-    
+
     let auth_header = headers
         .get("authorization")
         .and_then(|value| value.to_str().ok())
@@ -90,7 +94,7 @@ pub async fn auth_middleware(
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "your-secret-key".to_string());
-    
+
     let claims = decode::<Claims>(
         token,
         &DecodingKey::from_secret(jwt_secret.as_ref()),
@@ -106,13 +110,10 @@ pub async fn auth_middleware(
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Verify user exists in database
-    let user_exists = sqlx::query!(
-        "SELECT id FROM users WHERE id = $1",
-        claims.user_id
-    )
-    .fetch_optional(pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let user_exists = sqlx::query!("SELECT id FROM users WHERE id = $1", claims.user_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if user_exists.is_none() {
         return Err(StatusCode::UNAUTHORIZED);

@@ -52,7 +52,10 @@ impl Project {
         .await
     }
 
-    pub async fn find_by_git_repo_path(pool: &PgPool, git_repo_path: &str) -> Result<Option<Self>, sqlx::Error> {
+    pub async fn find_by_git_repo_path(
+        pool: &PgPool,
+        git_repo_path: &str,
+    ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Project,
             "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects WHERE git_repo_path = $1",
@@ -62,7 +65,11 @@ impl Project {
         .await
     }
 
-    pub async fn find_by_git_repo_path_excluding_id(pool: &PgPool, git_repo_path: &str, exclude_id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+    pub async fn find_by_git_repo_path_excluding_id(
+        pool: &PgPool,
+        git_repo_path: &str,
+        exclude_id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Project,
             "SELECT id, name, git_repo_path, owner_id, created_at, updated_at FROM projects WHERE git_repo_path = $1 AND id != $2",
@@ -73,7 +80,12 @@ impl Project {
         .await
     }
 
-    pub async fn create(pool: &PgPool, data: &CreateProject, owner_id: Uuid, project_id: Uuid) -> Result<Self, sqlx::Error> {
+    pub async fn create(
+        pool: &PgPool,
+        data: &CreateProject,
+        owner_id: Uuid,
+        project_id: Uuid,
+    ) -> Result<Self, sqlx::Error> {
         sqlx::query_as!(
             Project,
             "INSERT INTO projects (id, name, git_repo_path, owner_id) VALUES ($1, $2, $3, $4) RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",
@@ -86,7 +98,12 @@ impl Project {
         .await
     }
 
-    pub async fn update(pool: &PgPool, id: Uuid, name: String, git_repo_path: String) -> Result<Self, sqlx::Error> {
+    pub async fn update(
+        pool: &PgPool,
+        id: Uuid,
+        name: String,
+        git_repo_path: String,
+    ) -> Result<Self, sqlx::Error> {
         sqlx::query_as!(
             Project,
             "UPDATE projects SET name = $2, git_repo_path = $3 WHERE id = $1 RETURNING id, name, git_repo_path, owner_id, created_at, updated_at",

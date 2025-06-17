@@ -1,20 +1,22 @@
 use axum::{
-    routing::get,
-    Router,
-    Json,
-    response::Json as ResponseJson,
-    extract::{Path, Extension},
+    extract::{Extension, Path},
     http::StatusCode,
+    response::Json as ResponseJson,
+    routing::get,
+    Json, Router,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::{ApiResponse, project::{Project, CreateProject, UpdateProject}};
 use crate::auth::AuthUser;
+use crate::models::{
+    project::{CreateProject, Project, UpdateProject},
+    ApiResponse,
+};
 
 pub async fn get_projects(
     _auth: AuthUser,
-    Extension(pool): Extension<PgPool>
+    Extension(pool): Extension<PgPool>,
 ) -> Result<ResponseJson<ApiResponse<Vec<Project>>>, StatusCode> {
     match Project::find_all(&pool).await {
         Ok(projects) => Ok(ResponseJson(ApiResponse {
@@ -32,7 +34,7 @@ pub async fn get_projects(
 pub async fn get_project(
     _auth: AuthUser,
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<PgPool>
+    Extension(pool): Extension<PgPool>,
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
     match Project::find_by_id(&pool, id).await {
         Ok(Some(project)) => Ok(ResponseJson(ApiResponse {
@@ -51,11 +53,15 @@ pub async fn get_project(
 pub async fn create_project(
     auth: AuthUser,
     Extension(pool): Extension<PgPool>,
-    Json(payload): Json<CreateProject>
+    Json(payload): Json<CreateProject>,
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
     let id = Uuid::new_v4();
 
-    tracing::debug!("Creating project '{}' for user {}", payload.name, auth.user_id);
+    tracing::debug!(
+        "Creating project '{}' for user {}",
+        payload.name,
+        auth.user_id
+    );
 
     // Check if git repo path is already used by another project
     match Project::find_by_git_repo_path(&pool, &payload.git_repo_path).await {
@@ -77,7 +83,7 @@ pub async fn create_project(
 
     // Validate and setup git repository
     let path = std::path::Path::new(&payload.git_repo_path);
-    
+
     if payload.use_existing_repo {
         // For existing repos, validate that the path exists and is a git repository
         if !path.exists() {
@@ -105,7 +111,7 @@ pub async fn create_project(
         }
     } else {
         // For new repos, create directory and initialize git
-        
+
         // Create directory if it doesn't exist
         if !path.exists() {
             if let Err(e) = std::fs::create_dir_all(path) {
@@ -164,7 +170,7 @@ pub async fn create_project(
 pub async fn update_project(
     Path(id): Path<Uuid>,
     Extension(pool): Extension<PgPool>,
-    Json(payload): Json<UpdateProject>
+    Json(payload): Json<UpdateProject>,
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
     // Check if project exists first
     let existing_project = match Project::find_by_id(&pool, id).await {
@@ -184,7 +190,9 @@ pub async fn update_project(
                     return Ok(ResponseJson(ApiResponse {
                         success: false,
                         data: None,
-                        message: Some("A project with this git repository path already exists".to_string()),
+                        message: Some(
+                            "A project with this git repository path already exists".to_string(),
+                        ),
                     }));
                 }
                 Ok(None) => {
@@ -200,7 +208,9 @@ pub async fn update_project(
 
     // Use existing values if not provided in update
     let name = payload.name.unwrap_or(existing_project.name);
-    let git_repo_path = payload.git_repo_path.unwrap_or(existing_project.git_repo_path.clone());
+    let git_repo_path = payload
+        .git_repo_path
+        .unwrap_or(existing_project.git_repo_path.clone());
 
     match Project::update(&pool, id, name, git_repo_path).await {
         Ok(project) => Ok(ResponseJson(ApiResponse {
@@ -217,7 +227,7 @@ pub async fn update_project(
 
 pub async fn delete_project(
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<PgPool>
+    Extension(pool): Extension<PgPool>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     match Project::delete(&pool, id).await {
         Ok(rows_affected) => {
@@ -241,18 +251,24 @@ pub async fn delete_project(
 pub fn projects_router() -> Router {
     Router::new()
         .route("/projects", get(get_projects).post(create_project))
-        .route("/projects/:id", get(get_project).put(update_project).delete(delete_project))
+        .route(
+            "/projects/:id",
+            get(get_project).put(update_project).delete(delete_project),
+        )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::{hash_password, AuthUser};
+    use crate::models::{
+        project::{CreateProject, UpdateProject},
+        user::User,
+    };
     use axum::extract::Extension;
+    use chrono::Utc;
     use sqlx::PgPool;
     use uuid::Uuid;
-    use chrono::Utc;
-    use crate::models::{user::User, project::{CreateProject, UpdateProject}};
-    use crate::auth::{AuthUser, hash_password};
 
     async fn create_test_user(pool: &PgPool, email: &str, password: &str, is_admin: bool) -> User {
         let id = Uuid::new_v4();
@@ -274,7 +290,12 @@ mod tests {
         .unwrap()
     }
 
-    async fn create_test_project(pool: &PgPool, name: &str, git_repo_path: &str, owner_id: Uuid) -> Project {
+    async fn create_test_project(
+        pool: &PgPool,
+        name: &str,
+        git_repo_path: &str,
+        owner_id: Uuid,
+    ) -> Project {
         let id = Uuid::new_v4();
         let now = Utc::now();
 
@@ -296,7 +317,7 @@ mod tests {
     #[sqlx::test]
     async fn test_get_projects_success(pool: PgPool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
-        
+
         // Create multiple projects
         create_test_project(&pool, "Project 1", "/tmp/test1", user.id).await;
         create_test_project(&pool, "Project 2", "/tmp/test2", user.id).await;
@@ -310,7 +331,7 @@ mod tests {
 
         let result = get_projects(auth, Extension(pool)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -329,7 +350,7 @@ mod tests {
 
         let result = get_projects(auth, Extension(pool)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -349,7 +370,7 @@ mod tests {
 
         let result = get_project(auth, Path(project.id), Extension(pool)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -393,7 +414,7 @@ mod tests {
 
         let result = create_project(auth.clone(), Extension(pool), Json(create_request)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -421,7 +442,7 @@ mod tests {
 
         let result = create_project(auth.clone(), Extension(pool), Json(create_request)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -442,7 +463,7 @@ mod tests {
 
         let result = update_project(Path(project.id), Extension(pool), Json(update_request)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -465,7 +486,7 @@ mod tests {
 
         let result = update_project(Path(project.id), Extension(pool), Json(update_request)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -483,7 +504,12 @@ mod tests {
             git_repo_path: None,
         };
 
-        let result = update_project(Path(nonexistent_project_id), Extension(pool), Json(update_request)).await;
+        let result = update_project(
+            Path(nonexistent_project_id),
+            Extension(pool),
+            Json(update_request),
+        )
+        .await;
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), StatusCode::NOT_FOUND);
     }
@@ -491,11 +517,12 @@ mod tests {
     #[sqlx::test]
     async fn test_delete_project_success(pool: PgPool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
-        let project = create_test_project(&pool, "Project to Delete", "/tmp/to-delete", user.id).await;
+        let project =
+            create_test_project(&pool, "Project to Delete", "/tmp/to-delete", user.id).await;
 
         let result = delete_project(Path(project.id), Extension(pool)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert_eq!(response.message.unwrap(), "Project deleted successfully");
@@ -513,10 +540,11 @@ mod tests {
     #[sqlx::test]
     async fn test_delete_project_cascades_to_tasks(pool: PgPool) {
         use crate::models::task::{Task, TaskStatus};
-        
+
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
-        let project = create_test_project(&pool, "Project with Tasks", "/tmp/with-tasks", user.id).await;
-        
+        let project =
+            create_test_project(&pool, "Project with Tasks", "/tmp/with-tasks", user.id).await;
+
         // Create a task in the project
         let task_id = Uuid::new_v4();
         let now = Utc::now();
@@ -563,7 +591,7 @@ mod tests {
     async fn test_projects_belong_to_users(pool: PgPool) {
         let user1 = create_test_user(&pool, "user1@example.com", "password123", false).await;
         let user2 = create_test_user(&pool, "user2@example.com", "password123", false).await;
-        
+
         let project1 = create_test_project(&pool, "User 1 Project", "/tmp/user1", user1.id).await;
         let project2 = create_test_project(&pool, "User 2 Project", "/tmp/user2", user2.id).await;
 

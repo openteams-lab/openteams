@@ -19,8 +19,8 @@ mod routes;
 
 use auth::{auth_middleware, hash_password};
 use execution_monitor::{execution_monitor, AppState};
-use models::{ApiResponse, user::User};
-use routes::{health, projects, tasks, users, filesystem};
+use models::{user::User, ApiResponse};
+use routes::{filesystem, health, projects, tasks, users};
 
 async fn echo_handler(
     Json(payload): Json<serde_json::Value>,

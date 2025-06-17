@@ -1,18 +1,17 @@
 use axum::{
-    routing::get,
-    Router,
-    Json,
-    response::Json as ResponseJson,
-    extract::{Query, Extension},
+    extract::{Extension, Query},
     http::StatusCode,
+    response::Json as ResponseJson,
+    routing::get,
+    Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 use ts_rs::TS;
 
-use crate::models::ApiResponse;
 use crate::auth::AuthUser;
+use crate::models::ApiResponse;
 
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
@@ -61,25 +60,25 @@ pub async fn list_directory(
     match fs::read_dir(path) {
         Ok(entries) => {
             let mut directory_entries = Vec::new();
-            
+
             for entry in entries {
                 if let Ok(entry) = entry {
                     let path = entry.path();
                     let metadata = entry.metadata().ok();
-                    
+
                     if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
                         // Skip hidden files/directories
                         if name.starts_with('.') && name != ".." {
                             continue;
                         }
-                        
+
                         let is_directory = metadata.map_or(false, |m| m.is_dir());
                         let is_git_repo = if is_directory {
                             path.join(".git").exists()
                         } else {
                             false
                         };
-                        
+
                         directory_entries.push(DirectoryEntry {
                             name: name.to_string(),
                             path: path.to_string_lossy().to_string(),
@@ -89,16 +88,14 @@ pub async fn list_directory(
                     }
                 }
             }
-            
+
             // Sort: directories first, then files, both alphabetically
-            directory_entries.sort_by(|a, b| {
-                match (a.is_directory, b.is_directory) {
-                    (true, false) => std::cmp::Ordering::Less,
-                    (false, true) => std::cmp::Ordering::Greater,
-                    _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                }
+            directory_entries.sort_by(|a, b| match (a.is_directory, b.is_directory) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
             });
-            
+
             Ok(ResponseJson(ApiResponse {
                 success: true,
                 data: Some(directory_entries),
@@ -125,7 +122,7 @@ pub async fn validate_git_path(
 
     // Check if path exists and is a git repo
     let is_valid_git_repo = path.exists() && path.is_dir() && path.join(".git").exists();
-    
+
     Ok(ResponseJson(ApiResponse {
         success: true,
         data: Some(is_valid_git_repo),

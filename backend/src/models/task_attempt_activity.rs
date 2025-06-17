@@ -25,7 +25,10 @@ pub struct CreateTaskAttemptActivity {
 }
 
 impl TaskAttemptActivity {
-    pub async fn find_by_attempt_id(pool: &PgPool, attempt_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_attempt_id(
+        pool: &PgPool,
+        attempt_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             TaskAttemptActivity,
             r#"SELECT id, task_attempt_id, status as "status!: TaskAttemptStatus", note, created_at 
@@ -38,7 +41,12 @@ impl TaskAttemptActivity {
         .await
     }
 
-    pub async fn create(pool: &PgPool, data: &CreateTaskAttemptActivity, activity_id: Uuid, status: TaskAttemptStatus) -> Result<Self, sqlx::Error> {
+    pub async fn create(
+        pool: &PgPool,
+        data: &CreateTaskAttemptActivity,
+        activity_id: Uuid,
+        status: TaskAttemptStatus,
+    ) -> Result<Self, sqlx::Error> {
         sqlx::query_as!(
             TaskAttemptActivity,
             r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note) 
@@ -53,7 +61,11 @@ impl TaskAttemptActivity {
         .await
     }
 
-    pub async fn create_initial(pool: &PgPool, attempt_id: Uuid, activity_id: Uuid) -> Result<(), sqlx::Error> {
+    pub async fn create_initial(
+        pool: &PgPool,
+        attempt_id: Uuid,
+        activity_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note) 
                VALUES ($1, $2, $3, $4)"#,
@@ -67,7 +79,9 @@ impl TaskAttemptActivity {
         Ok(())
     }
 
-    pub async fn find_attempts_with_latest_init_status(pool: &PgPool) -> Result<Vec<uuid::Uuid>, sqlx::Error> {
+    pub async fn find_attempts_with_latest_init_status(
+        pool: &PgPool,
+    ) -> Result<Vec<uuid::Uuid>, sqlx::Error> {
         let records = sqlx::query!(
             r#"SELECT DISTINCT ta.id 
                FROM task_attempts ta
@@ -83,11 +97,13 @@ impl TaskAttemptActivity {
         )
         .fetch_all(pool)
         .await?;
-        
+
         Ok(records.into_iter().map(|r| r.id).collect())
     }
 
-    pub async fn find_attempts_with_latest_inprogress_status(pool: &PgPool) -> Result<Vec<uuid::Uuid>, sqlx::Error> {
+    pub async fn find_attempts_with_latest_inprogress_status(
+        pool: &PgPool,
+    ) -> Result<Vec<uuid::Uuid>, sqlx::Error> {
         let records = sqlx::query!(
             r#"SELECT DISTINCT ta.id 
                FROM task_attempts ta
@@ -103,7 +119,7 @@ impl TaskAttemptActivity {
         )
         .fetch_all(pool)
         .await?;
-        
+
         Ok(records.into_iter().map(|r| r.id).collect())
     }
 }

@@ -100,7 +100,12 @@ impl User {
         .await
     }
 
-    pub async fn create(pool: &PgPool, data: &CreateUser, password_hash: String, user_id: Uuid) -> Result<Self, sqlx::Error> {
+    pub async fn create(
+        pool: &PgPool,
+        data: &CreateUser,
+        password_hash: String,
+        user_id: Uuid,
+    ) -> Result<Self, sqlx::Error> {
         let is_admin = data.is_admin.unwrap_or(false);
 
         sqlx::query_as!(
@@ -115,7 +120,13 @@ impl User {
         .await
     }
 
-    pub async fn update(pool: &PgPool, id: Uuid, email: String, password_hash: String, is_admin: bool) -> Result<Self, sqlx::Error> {
+    pub async fn update(
+        pool: &PgPool,
+        id: Uuid,
+        email: String,
+        password_hash: String,
+        is_admin: bool,
+    ) -> Result<Self, sqlx::Error> {
         sqlx::query_as!(
             User,
             "UPDATE users SET email = $2, password_hash = $3, is_admin = $4 WHERE id = $1 RETURNING id, email, password_hash, is_admin, created_at, updated_at",
@@ -135,9 +146,13 @@ impl User {
         Ok(result.rows_affected())
     }
 
-    pub async fn create_or_update_admin(pool: &PgPool, email: &str, password_hash: &str) -> Result<(), sqlx::Error> {
+    pub async fn create_or_update_admin(
+        pool: &PgPool,
+        email: &str,
+        password_hash: &str,
+    ) -> Result<(), sqlx::Error> {
         use chrono::Utc;
-        
+
         // Check if admin already exists
         let existing_admin = sqlx::query!(
             "SELECT id, password_hash FROM users WHERE email = $1",

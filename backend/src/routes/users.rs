@@ -1,49 +1,45 @@
 use axum::{
-    routing::{get, post},
-    Router,
-    Json,
-    response::Json as ResponseJson,
-    extract::{Path, Extension},
+    extract::{Extension, Path},
     http::StatusCode,
+    response::Json as ResponseJson,
+    routing::{get, post},
+    Json, Router,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::{ApiResponse, user::{User, CreateUser, UpdateUser, LoginRequest, LoginResponse, UserResponse}};
-use crate::auth::{AuthUser, create_token, hash_password, verify_password};
+use crate::auth::{create_token, hash_password, verify_password, AuthUser};
+use crate::models::{
+    user::{CreateUser, LoginRequest, LoginResponse, UpdateUser, User, UserResponse},
+    ApiResponse,
+};
 
 pub async fn login(
     Extension(pool): Extension<PgPool>,
-    Json(payload): Json<LoginRequest>
+    Json(payload): Json<LoginRequest>,
 ) -> Result<ResponseJson<ApiResponse<LoginResponse>>, StatusCode> {
     match User::find_by_email(&pool, &payload.email).await {
-        Ok(Some(user)) => {
-            match verify_password(&payload.password, &user.password_hash) {
-                Ok(true) => {
-                    match create_token(user.id, user.email.clone(), user.is_admin) {
-                        Ok(token) => {
-                            Ok(ResponseJson(ApiResponse {
-                                success: true,
-                                data: Some(LoginResponse {
-                                    user: user.into(),
-                                    token,
-                                }),
-                                message: Some("Login successful".to_string()),
-                            }))
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to create token: {}", e);
-                            Err(StatusCode::INTERNAL_SERVER_ERROR)
-                        }
-                    }
-                }
-                Ok(false) => Err(StatusCode::UNAUTHORIZED),
+        Ok(Some(user)) => match verify_password(&payload.password, &user.password_hash) {
+            Ok(true) => match create_token(user.id, user.email.clone(), user.is_admin) {
+                Ok(token) => Ok(ResponseJson(ApiResponse {
+                    success: true,
+                    data: Some(LoginResponse {
+                        user: user.into(),
+                        token,
+                    }),
+                    message: Some("Login successful".to_string()),
+                })),
                 Err(e) => {
-                    tracing::error!("Password verification error: {}", e);
+                    tracing::error!("Failed to create token: {}", e);
                     Err(StatusCode::INTERNAL_SERVER_ERROR)
                 }
+            },
+            Ok(false) => Err(StatusCode::UNAUTHORIZED),
+            Err(e) => {
+                tracing::error!("Password verification error: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
             }
-        }
+        },
         Ok(None) => Err(StatusCode::UNAUTHORIZED),
         Err(e) => {
             tracing::error!("Failed to fetch user: {}", e);
@@ -54,7 +50,7 @@ pub async fn login(
 
 pub async fn get_users(
     _auth: AuthUser,
-    Extension(pool): Extension<PgPool>
+    Extension(pool): Extension<PgPool>,
 ) -> Result<ResponseJson<ApiResponse<Vec<UserResponse>>>, StatusCode> {
     match User::find_all(&pool).await {
         Ok(users) => {
@@ -75,7 +71,7 @@ pub async fn get_users(
 pub async fn get_user(
     auth: AuthUser,
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<PgPool>
+    Extension(pool): Extension<PgPool>,
 ) -> Result<ResponseJson<ApiResponse<UserResponse>>, StatusCode> {
     // Users can only view their own profile unless they're admin
     if auth.user_id != id && !auth.is_admin {
@@ -99,7 +95,7 @@ pub async fn get_user(
 pub async fn create_user(
     auth: AuthUser,
     Extension(pool): Extension<PgPool>,
-    Json(payload): Json<CreateUser>
+    Json(payload): Json<CreateUser>,
 ) -> Result<ResponseJson<ApiResponse<UserResponse>>, StatusCode> {
     // Only admins can create users
     if !auth.is_admin {
@@ -134,7 +130,7 @@ pub async fn update_user(
     auth: AuthUser,
     Path(id): Path<Uuid>,
     Extension(pool): Extension<PgPool>,
-    Json(payload): Json<UpdateUser>
+    Json(payload): Json<UpdateUser>,
 ) -> Result<ResponseJson<ApiResponse<UserResponse>>, StatusCode> {
     // Users can only update their own profile unless they're admin
     if auth.user_id != id && !auth.is_admin {
@@ -183,7 +179,7 @@ pub async fn update_user(
 pub async fn delete_user(
     auth: AuthUser,
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<PgPool>
+    Extension(pool): Extension<PgPool>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Only admins can delete users, and they can't delete themselves
     if !auth.is_admin || auth.user_id == id {
@@ -211,7 +207,7 @@ pub async fn delete_user(
 
 pub async fn get_current_user(
     auth: AuthUser,
-    Extension(pool): Extension<PgPool>
+    Extension(pool): Extension<PgPool>,
 ) -> Result<ResponseJson<ApiResponse<UserResponse>>, StatusCode> {
     match User::find_by_id(&pool, auth.user_id).await {
         Ok(Some(user)) => Ok(ResponseJson(ApiResponse {
@@ -227,9 +223,7 @@ pub async fn get_current_user(
     }
 }
 
-pub async fn check_auth_status(
-    auth: AuthUser,
-) -> ResponseJson<ApiResponse<serde_json::Value>> {
+pub async fn check_auth_status(auth: AuthUser) -> ResponseJson<ApiResponse<serde_json::Value>> {
     ResponseJson(ApiResponse {
         success: true,
         data: Some(serde_json::json!({
@@ -243,8 +237,7 @@ pub async fn check_auth_status(
 }
 
 pub fn public_users_router() -> Router {
-    Router::new()
-        .route("/auth/login", post(login))
+    Router::new().route("/auth/login", post(login))
 }
 
 pub fn protected_users_router() -> Router {
@@ -252,18 +245,21 @@ pub fn protected_users_router() -> Router {
         .route("/auth/status", get(check_auth_status))
         .route("/auth/me", get(get_current_user))
         .route("/users", get(get_users).post(create_user))
-        .route("/users/:id", get(get_user).put(update_user).delete(delete_user))
+        .route(
+            "/users/:id",
+            get(get_user).put(update_user).delete(delete_user),
+        )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::{hash_password, AuthUser};
+    use crate::models::user::{CreateUser, LoginRequest, UpdateUser};
     use axum::extract::Extension;
+    use chrono::Utc;
     use sqlx::PgPool;
     use uuid::Uuid;
-    use chrono::Utc;
-    use crate::models::user::{LoginRequest, CreateUser, UpdateUser};
-    use crate::auth::{AuthUser, hash_password};
 
     async fn create_test_user(pool: &PgPool, email: &str, password: &str, is_admin: bool) -> User {
         let id = Uuid::new_v4();
@@ -288,7 +284,7 @@ mod tests {
     #[sqlx::test]
     async fn test_login_success(pool: PgPool) {
         let user = create_test_user(&pool, "test@example.com", "password123", false).await;
-        
+
         let login_request = LoginRequest {
             email: "test@example.com".to_string(),
             password: "password123".to_string(),
@@ -296,7 +292,7 @@ mod tests {
 
         let result = login(Extension(pool), Json(login_request)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -306,7 +302,7 @@ mod tests {
     #[sqlx::test]
     async fn test_login_invalid_password(pool: PgPool) {
         create_test_user(&pool, "test@example.com", "password123", false).await;
-        
+
         let login_request = LoginRequest {
             email: "test@example.com".to_string(),
             password: "wrongpassword".to_string(),
@@ -343,7 +339,7 @@ mod tests {
 
         let result = get_users(auth, Extension(pool)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -362,7 +358,7 @@ mod tests {
 
         let result = get_user(auth, Path(user.id), Extension(pool)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -398,7 +394,7 @@ mod tests {
 
         let result = get_user(auth, Path(regular_user.id), Extension(pool)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -423,7 +419,7 @@ mod tests {
 
         let result = create_user(auth, Extension(pool), Json(create_request)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -491,7 +487,7 @@ mod tests {
 
         let result = update_user(auth, Path(user.id), Extension(pool), Json(update_request)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -523,7 +519,8 @@ mod tests {
     #[sqlx::test]
     async fn test_delete_user_as_admin(pool: PgPool) {
         let admin_user = create_test_user(&pool, "admin@example.com", "password123", true).await;
-        let user_to_delete = create_test_user(&pool, "delete@example.com", "password123", false).await;
+        let user_to_delete =
+            create_test_user(&pool, "delete@example.com", "password123", false).await;
 
         let auth = AuthUser {
             user_id: admin_user.id,
@@ -533,7 +530,7 @@ mod tests {
 
         let result = delete_user(auth, Path(user_to_delete.id), Extension(pool)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert_eq!(response.message.unwrap(), "User deleted successfully");
@@ -582,7 +579,7 @@ mod tests {
 
         let result = get_current_user(auth, Extension(pool)).await;
         assert!(result.is_ok());
-        
+
         let response = result.unwrap().0;
         assert!(response.success);
         assert!(response.data.is_some());
@@ -600,7 +597,7 @@ mod tests {
         let response = check_auth_status(auth.clone()).await.0;
         assert!(response.success);
         assert!(response.data.is_some());
-        
+
         let data = response.data.unwrap();
         assert_eq!(data["authenticated"], true);
         assert_eq!(data["user_id"], auth.user_id.to_string());

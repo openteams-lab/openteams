@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, Type, PgPool};
+use sqlx::{FromRow, PgPool, Type};
 use ts_rs::TS;
 use uuid::Uuid;
 
@@ -58,7 +58,10 @@ pub struct UpdateTask {
 }
 
 impl Task {
-    pub async fn find_by_project_id(pool: &PgPool, project_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_project_id(
+        pool: &PgPool,
+        project_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             Task,
             r#"SELECT id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at 
@@ -71,7 +74,10 @@ impl Task {
         .await
     }
 
-    pub async fn find_by_project_id_with_attempt_status(pool: &PgPool, project_id: Uuid) -> Result<Vec<TaskWithAttemptStatus>, sqlx::Error> {
+    pub async fn find_by_project_id_with_attempt_status(
+        pool: &PgPool,
+        project_id: Uuid,
+    ) -> Result<Vec<TaskWithAttemptStatus>, sqlx::Error> {
         let records = sqlx::query!(
             r#"SELECT 
                 t.id, 
@@ -102,16 +108,19 @@ impl Task {
         .fetch_all(pool)
         .await?;
 
-        let tasks = records.into_iter().map(|record| TaskWithAttemptStatus {
-            id: record.id,
-            project_id: record.project_id,
-            title: record.title,
-            description: record.description,
-            status: record.status,
-            created_at: record.created_at,
-            updated_at: record.updated_at,
-            has_in_progress_attempt: record.has_in_progress_attempt,
-        }).collect();
+        let tasks = records
+            .into_iter()
+            .map(|record| TaskWithAttemptStatus {
+                id: record.id,
+                project_id: record.project_id,
+                title: record.title,
+                description: record.description,
+                status: record.status,
+                created_at: record.created_at,
+                updated_at: record.updated_at,
+                has_in_progress_attempt: record.has_in_progress_attempt,
+            })
+            .collect();
 
         Ok(tasks)
     }
@@ -128,7 +137,11 @@ impl Task {
         .await
     }
 
-    pub async fn find_by_id_and_project_id(pool: &PgPool, id: Uuid, project_id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+    pub async fn find_by_id_and_project_id(
+        pool: &PgPool,
+        id: Uuid,
+        project_id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Task,
             r#"SELECT id, project_id, title, description, status as "status!: TaskStatus", created_at, updated_at 
@@ -141,7 +154,11 @@ impl Task {
         .await
     }
 
-    pub async fn create(pool: &PgPool, data: &CreateTask, task_id: Uuid) -> Result<Self, sqlx::Error> {
+    pub async fn create(
+        pool: &PgPool,
+        data: &CreateTask,
+        task_id: Uuid,
+    ) -> Result<Self, sqlx::Error> {
         sqlx::query_as!(
             Task,
             r#"INSERT INTO tasks (id, project_id, title, description, status) 
@@ -157,7 +174,14 @@ impl Task {
         .await
     }
 
-    pub async fn update(pool: &PgPool, id: Uuid, project_id: Uuid, title: String, description: Option<String>, status: TaskStatus) -> Result<Self, sqlx::Error> {
+    pub async fn update(
+        pool: &PgPool,
+        id: Uuid,
+        project_id: Uuid,
+        title: String,
+        description: Option<String>,
+        status: TaskStatus,
+    ) -> Result<Self, sqlx::Error> {
         sqlx::query_as!(
             Task,
             r#"UPDATE tasks 
@@ -176,8 +200,8 @@ impl Task {
 
     pub async fn delete(pool: &PgPool, id: Uuid, project_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query!(
-            "DELETE FROM tasks WHERE id = $1 AND project_id = $2", 
-            id, 
+            "DELETE FROM tasks WHERE id = $1 AND project_id = $2",
+            id,
             project_id
         )
         .execute(pool)
@@ -187,8 +211,8 @@ impl Task {
 
     pub async fn exists(pool: &PgPool, id: Uuid, project_id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query!(
-            "SELECT id FROM tasks WHERE id = $1 AND project_id = $2", 
-            id, 
+            "SELECT id FROM tasks WHERE id = $1 AND project_id = $2",
+            id,
             project_id
         )
         .fetch_optional(pool)
