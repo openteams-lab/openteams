@@ -6,6 +6,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use directories::ProjectDirs;
 use rust_embed::RustEmbed;
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use std::str::FromStr;
@@ -13,7 +14,6 @@ use std::{collections::HashMap, env, sync::Arc};
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 
-mod auth;
 mod execution_monitor;
 mod executor;
 mod executors;
@@ -83,11 +83,6 @@ async fn serve_file(path: &str) -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Load environment variables from .env file
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")?;
-    dotenvy::from_path(format!("{manifest_dir}/.env")).ok();
-    // dotenvy::dotenv().ok();
-
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
@@ -95,24 +90,16 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    // Create asset directory if it doesn't exist
+    if !asset_dir().exists() {
+        std::fs::create_dir_all(asset_dir())?;
+    }
+
     // Database connection
-    let database_url =
-        env::var("DATABASE_URL").expect("DATABASE_URL must be set in environment or .env file");
-
-    // if !Sqlite::database_exists(database_url).await.unwrap_or(false) {
-    //     println!("Creating database {}", DB_URL);
-    //     match Sqlite::create_database(DB_URL).await {
-    //         Ok(_) => println!("Create db success"),
-    //         Err(error) => panic!("error: {}", error),
-    //     }
-    // } else {
-    //     println!("Database already exists");
-    // }
-
-    // let pool = SqlitePoolOptions::new()
-    //     .max_connections(10)
-    //     .connect(&database_url)
-    //     .await?;
+    let database_url = format!(
+        "sqlite://{}",
+        asset_dir().join("db.sqlite").to_string_lossy()
+    );
 
     let options = SqliteConnectOptions::from_str(&database_url)?.create_if_missing(true);
     let pool = SqlitePool::connect_with(options).await?;
@@ -163,4 +150,15 @@ async fn main() -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+fn asset_dir() -> std::path::PathBuf {
+    // (“com”, “YourOrg”, “MyApp”) → tweak to suit your bundle ID
+    let proj = ProjectDirs::from("ai", "bloop", env!("CARGO_PKG_NAME"))
+        .expect("OS didn’t give us a home directory");
+
+    // ✔ macOS → ~/Library/Application Support/MyApp
+    // ✔ Linux → ~/.local/share/myapp   (respects XDG_DATA_HOME)
+    // ✔ Windows → %APPDATA%\Example\MyApp
+    proj.data_dir().to_path_buf()
 }

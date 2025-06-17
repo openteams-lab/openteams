@@ -39,21 +39,11 @@ bloop/
 
 ### Installation
 
-1. Install Postgres
-
-2. Configure .env (see template in backend/.env.example)
-
-3. Install dependencies
+1. Install dependencies
 
 ```bash
 # Install dependencies
 npm install
-```
-
-4. Run SQLX migrations
-
-```bash
-cargo sqlx migrate run
 ```
 
 ### Development

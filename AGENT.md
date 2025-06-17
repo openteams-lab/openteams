@@ -73,5 +73,3 @@ Try to build the Typescript project after any frontend changes `npm run build`
 
 SQLX queries should be located in backend/src/models/\*
 Use getters and setters instead of raw SQL queries where possible.
-
-DATABASE_URL=sqlite:/Users/louisknight-webb/Documents/mission-control.sqlite
