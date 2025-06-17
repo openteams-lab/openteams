@@ -87,6 +87,34 @@ pub struct UpdateTaskAttempt {
     pub merge_commit: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub enum DiffChunkType {
+    Equal,
+    Insert,
+    Delete,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct DiffChunk {
+    pub chunk_type: DiffChunkType,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FileDiff {
+    pub path: String,
+    pub chunks: Vec<DiffChunk>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WorktreeDiff {
+    pub files: Vec<FileDiff>,
+}
+
 impl TaskAttempt {
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
@@ -250,5 +278,111 @@ impl TaskAttempt {
         }
 
         Ok(())
+    }
+
+    /// Get the git diff between the base commit and the current worktree state
+    pub async fn get_diff(
+        pool: &PgPool,
+        attempt_id: Uuid,
+        task_id: Uuid,
+        project_id: Uuid,
+    ) -> Result<WorktreeDiff, TaskAttemptError> {
+        // Get the task attempt with validation
+        let attempt = sqlx::query_as!(
+            TaskAttempt,
+            r#"SELECT ta.id, ta.task_id, ta.worktree_path, ta.base_commit, ta.merge_commit, ta.executor, ta.stdout, ta.stderr, ta.created_at, ta.updated_at 
+               FROM task_attempts ta 
+               JOIN tasks t ON ta.task_id = t.id 
+               WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3"#,
+            attempt_id,
+            task_id,
+            project_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or(TaskAttemptError::TaskNotFound)?;
+
+        // Get the project to access the main repository
+        let _task = Task::find_by_id(pool, task_id)
+            .await?
+            .ok_or(TaskAttemptError::TaskNotFound)?;
+
+        let _project = Project::find_by_id(pool, project_id)
+            .await?
+            .ok_or(TaskAttemptError::ProjectNotFound)?;
+
+        // Open the worktree repository
+        let worktree_repo = Repository::open(&attempt.worktree_path)?;
+
+        // Get the base commit
+        let base_commit_str = attempt
+            .base_commit
+            .ok_or_else(|| TaskAttemptError::Git(GitError::from_str("No base commit found")))?;
+
+        let base_oid =
+            git2::Oid::from_str(&base_commit_str).map_err(|e| TaskAttemptError::Git(e))?;
+
+        let base_commit = worktree_repo.find_commit(base_oid)?;
+        let base_tree = base_commit.tree()?;
+
+        // Get status of all files in the worktree
+        let statuses = worktree_repo.statuses(None)?;
+        let mut files = Vec::new();
+
+        for status_entry in statuses.iter() {
+            if let Some(path_str) = status_entry.path() {
+                let path = std::path::Path::new(path_str);
+                let full_path = std::path::Path::new(&attempt.worktree_path).join(path);
+
+                // Get old content from base commit
+                let old_content = match base_tree.get_path(path) {
+                    Ok(entry) => match entry.to_object(&worktree_repo) {
+                        Ok(obj) => {
+                            if let Some(blob) = obj.as_blob() {
+                                String::from_utf8_lossy(blob.content()).to_string()
+                            } else {
+                                String::new()
+                            }
+                        }
+                        Err(_) => String::new(),
+                    },
+                    Err(_) => String::new(), // File didn't exist in base commit
+                };
+
+                // Get new content from working directory
+                let new_content = std::fs::read_to_string(&full_path).unwrap_or_default();
+
+                // Generate diff chunks using dissimilar
+                if old_content != new_content {
+                    let chunks = dissimilar::diff(&old_content, &new_content);
+                    let mut diff_chunks = Vec::new();
+
+                    for chunk in chunks {
+                        let diff_chunk = match chunk {
+                            dissimilar::Chunk::Equal(text) => DiffChunk {
+                                chunk_type: DiffChunkType::Equal,
+                                content: text.to_string(),
+                            },
+                            dissimilar::Chunk::Delete(text) => DiffChunk {
+                                chunk_type: DiffChunkType::Delete,
+                                content: text.to_string(),
+                            },
+                            dissimilar::Chunk::Insert(text) => DiffChunk {
+                                chunk_type: DiffChunkType::Insert,
+                                content: text.to_string(),
+                            },
+                        };
+                        diff_chunks.push(diff_chunk);
+                    }
+
+                    files.push(FileDiff {
+                        path: path_str.to_string(),
+                        chunks: diff_chunks,
+                    });
+                }
+            }
+        }
+
+        Ok(WorktreeDiff { files })
     }
 }

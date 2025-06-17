@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import { makeAuthenticatedRequest } from "@/lib/auth";
 import type {
   TaskStatus,
@@ -659,6 +659,17 @@ export function TaskDetailsPage() {
                     Actions
                   </Label>
                   <div className="flex flex-col gap-2">
+                    {selectedAttempt && (
+                      <Button
+                        onClick={() => navigate(`/projects/${projectId}/tasks/${taskId}/attempts/${selectedAttempt.id}/compare`)}
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        View Changes
+                      </Button>
+                    )}
                     {isAttemptRunning && (
                       <Button
                         onClick={stopTaskAttempt}

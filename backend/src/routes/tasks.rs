@@ -12,7 +12,7 @@ use crate::auth::AuthUser;
 use crate::models::{
     project::Project,
     task::{CreateTask, Task, TaskWithAttemptStatus, UpdateTask},
-    task_attempt::{CreateTaskAttempt, TaskAttempt, TaskAttemptStatus},
+    task_attempt::{CreateTaskAttempt, TaskAttempt, TaskAttemptStatus, WorktreeDiff},
     task_attempt_activity::{CreateTaskAttemptActivity, TaskAttemptActivity},
     ApiResponse,
 };
@@ -376,6 +376,24 @@ pub async fn stop_task_attempt(
     }))
 }
 
+pub async fn get_task_attempt_diff(
+    _auth: AuthUser,
+    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<ResponseJson<ApiResponse<WorktreeDiff>>, StatusCode> {
+    match TaskAttempt::get_diff(&pool, attempt_id, task_id, project_id).await {
+        Ok(diff) => Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: Some(diff),
+            message: None,
+        })),
+        Err(e) => {
+            tracing::error!("Failed to get diff for task attempt {}: {}", attempt_id, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 pub fn tasks_router() -> Router {
     use axum::routing::{delete, post, put};
 
@@ -399,6 +417,10 @@ pub fn tasks_router() -> Router {
         .route(
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/stop",
             post(stop_task_attempt),
+        )
+        .route(
+            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/diff",
+            get(get_task_attempt_diff),
         )
 }
 
