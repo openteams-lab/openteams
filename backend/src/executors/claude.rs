@@ -26,12 +26,12 @@ impl Executor for ClaudeExecutor {
             .ok_or(ExecutorError::TaskNotFound)?;
 
         let prompt = format!(
-            "Task: {}\n\nDescription: {}\n\nWorking directory: {}",
+            "Task title: {}
+            Task description:{}",
             task.title,
             task.description
                 .as_deref()
-                .unwrap_or("No description provided"),
-            worktree_path
+                .unwrap_or("No description provided")
         );
 
         // Use Claude CLI to process the task
@@ -40,10 +40,9 @@ impl Executor for ClaudeExecutor {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .current_dir(worktree_path)
-            // .arg("--no-color")
-            // .arg("--")
-            // .arg(&prompt)
-            .arg("--help")
+            .arg(&prompt)
+            .arg("-p")
+            .arg("--dangerously-skip-permissions")
             .spawn()
             .map_err(ExecutorError::SpawnFailed)?;
 
