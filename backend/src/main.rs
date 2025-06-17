@@ -1,10 +1,13 @@
 use axum::{
+    body::Body,
     extract::Extension,
+    http::{header, HeaderValue, StatusCode},
     middleware,
-    response::Json as ResponseJson,
+    response::{IntoResponse, Json as ResponseJson, Response},
     routing::{get, post},
     Json, Router,
 };
+use rust_embed::RustEmbed;
 use sqlx::postgres::PgPoolOptions;
 use std::{collections::HashMap, env, sync::Arc};
 use tokio::sync::Mutex;
@@ -22,6 +25,10 @@ use execution_monitor::{execution_monitor, AppState};
 use models::{user::User, ApiResponse};
 use routes::{filesystem, health, projects, tasks, users};
 
+#[derive(RustEmbed)]
+#[folder = "../frontend/dist"]
+struct Assets;
+
 async fn echo_handler(
     Json(payload): Json<serde_json::Value>,
 ) -> ResponseJson<ApiResponse<serde_json::Value>> {
@@ -30,6 +37,49 @@ async fn echo_handler(
         data: Some(payload),
         message: Some("Echo successful".to_string()),
     })
+}
+
+async fn static_handler(uri: axum::extract::Path<String>) -> impl IntoResponse {
+    let path = uri.trim_start_matches('/');
+    serve_file(path).await
+}
+
+async fn index_handler() -> impl IntoResponse {
+    serve_file("index.html").await
+}
+
+async fn serve_file(path: &str) -> impl IntoResponse {
+    let file = Assets::get(path);
+
+    match file {
+        Some(content) => {
+            let mime = mime_guess::from_path(path).first_or_octet_stream();
+
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(
+                    header::CONTENT_TYPE,
+                    HeaderValue::from_str(mime.as_ref()).unwrap(),
+                )
+                .body(Body::from(content.data.into_owned()))
+                .unwrap()
+        }
+        None => {
+            // For SPA routing, serve index.html for unknown routes
+            if let Some(index) = Assets::get("index.html") {
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, HeaderValue::from_static("text/html"))
+                    .body(Body::from(index.data.into_owned()))
+                    .unwrap()
+            } else {
+                Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Body::from("404 Not Found"))
+                    .unwrap()
+            }
+        }
+    }
 }
 
 #[tokio::main]
@@ -74,9 +124,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Public routes (no auth required)
     let public_routes = Router::new()
-        .route("/", get(|| async { "Bloop API" }))
-        .route("/health", get(health::health_check))
-        .route("/echo", post(echo_handler))
+        .route("/api/health", get(health::health_check))
+        .route("/api/echo", post(echo_handler))
         .merge(users::public_users_router());
 
     // Protected routes (auth required)
@@ -91,6 +140,9 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .merge(public_routes)
         .merge(protected_routes)
+        // Static file serving routes
+        .route("/", get(index_handler))
+        .route("/*path", get(static_handler))
         .layer(Extension(pool))
         .layer(Extension(app_state))
         .layer(CorsLayer::permissive());
