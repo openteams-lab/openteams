@@ -156,9 +156,13 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn asset_dir() -> std::path::PathBuf {
-    // (“com”, “YourOrg”, “MyApp”) → tweak to suit your bundle ID
-    let proj = ProjectDirs::from("ai", "bloop", env!("CARGO_PKG_NAME"))
-        .expect("OS didn’t give us a home directory");
+    let proj = if cfg!(debug_assertions) {
+        ProjectDirs::from("ai", "bloop-dev", env!("CARGO_PKG_NAME"))
+            .expect("OS didn’t give us a home directory")
+    } else {
+        ProjectDirs::from("ai", "bloop", env!("CARGO_PKG_NAME"))
+            .expect("OS didn’t give us a home directory")
+    };
 
     // ✔ macOS → ~/Library/Application Support/MyApp
     // ✔ Linux → ~/.local/share/myapp   (respects XDG_DATA_HOME)
