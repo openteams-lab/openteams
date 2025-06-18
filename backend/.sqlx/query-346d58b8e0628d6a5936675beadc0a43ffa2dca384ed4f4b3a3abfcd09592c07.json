@@ -1,12 +1,12 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: Uuid\", name, git_repo_path, created_at as \"created_at!: DateTime<Utc>\", updated_at as \"updated_at!: DateTime<Utc>\" FROM projects WHERE git_repo_path = $1",
+  "query": "SELECT id as \"id!: Uuid\", name, git_repo_path, setup_script, created_at as \"created_at!: DateTime<Utc>\", updated_at as \"updated_at!: DateTime<Utc>\" FROM projects WHERE id = $1",
   "describe": {
     "columns": [
       {
         "name": "id!: Uuid",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Blob"
       },
       {
         "name": "name",
@@ -19,13 +19,18 @@
         "type_info": "Text"
       },
       {
-        "name": "created_at!: DateTime<Utc>",
+        "name": "setup_script",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "updated_at!: DateTime<Utc>",
+        "name": "created_at!: DateTime<Utc>",
         "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 5,
         "type_info": "Text"
       }
     ],
@@ -36,9 +41,10 @@
       true,
       false,
       false,
+      true,
       false,
       false
     ]
   },
-  "hash": "96aade8205a632c862e4dd11118b7b303cbe521c6a42f5a43eda3cf5f8e6ab2c"
+  "hash": "346d58b8e0628d6a5936675beadc0a43ffa2dca384ed4f4b3a3abfcd09592c07"
 }

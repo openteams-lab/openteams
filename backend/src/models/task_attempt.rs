@@ -181,6 +181,41 @@ impl TaskAttempt {
         let branch_name = format!("attempt-{}", attempt_id);
         repo.worktree(&branch_name, worktree_path, None)?;
 
+        // Run setup script if it exists
+        if let Some(setup_script) = &project.setup_script {
+            if !setup_script.trim().is_empty() {
+                tracing::info!("Running setup script for task attempt {}", attempt_id);
+
+                let output = std::process::Command::new("bash")
+                    .arg("-c")
+                    .arg(setup_script)
+                    .current_dir(worktree_path)
+                    .output()
+                    .map_err(|e| {
+                        TaskAttemptError::Git(git2::Error::from_str(&format!(
+                            "Failed to execute setup script: {}",
+                            e
+                        )))
+                    })?;
+
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    tracing::error!("Setup script failed for attempt {}: {}", attempt_id, stderr);
+                    return Err(TaskAttemptError::Git(git2::Error::from_str(&format!(
+                        "Setup script failed: {}",
+                        stderr
+                    ))));
+                }
+
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                tracing::info!(
+                    "Setup script completed for attempt {}: {}",
+                    attempt_id,
+                    stdout
+                );
+            }
+        }
+
         // Insert the record into the database
         Ok(sqlx::query_as!(
             TaskAttempt,

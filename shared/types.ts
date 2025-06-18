@@ -5,11 +5,11 @@ export type ApiResponse<T> = { success: boolean, data: T | null, message: string
 
 export type ExecutorConfig = { "type": "echo" } | { "type": "claude" } | { "type": "amp" };
 
-export type CreateProject = { name: string, git_repo_path: string, use_existing_repo: boolean, };
+export type CreateProject = { name: string, git_repo_path: string, use_existing_repo: boolean, setup_script: string | null, };
 
-export type Project = { id: string, name: string, git_repo_path: string, created_at: Date, updated_at: Date, };
+export type Project = { id: string, name: string, git_repo_path: string, setup_script: string | null, created_at: Date, updated_at: Date, };
 
-export type UpdateProject = { name: string | null, git_repo_path: string | null, };
+export type UpdateProject = { name: string | null, git_repo_path: string | null, setup_script: string | null, };
 
 export type SearchResult = { path: string, is_file: boolean, match_type: SearchMatchType, };
 
