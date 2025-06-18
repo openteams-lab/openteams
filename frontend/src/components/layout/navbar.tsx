@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FolderOpen } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function Navbar() {
   const location = useLocation();
@@ -28,6 +29,7 @@ export function Navbar() {
             </div>
           </div>
           <div className="flex items-center space-x-4">
+            <ThemeToggle />
             {!isHome && (
               <Button asChild variant="ghost">
                 <Link to="/">
