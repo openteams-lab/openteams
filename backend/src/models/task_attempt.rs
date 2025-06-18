@@ -225,6 +225,7 @@ impl TaskAttempt {
             match executor_name.as_str() {
                 "echo" => ExecutorConfig::Echo.create_executor(),
                 "claude" => ExecutorConfig::Claude.create_executor(),
+                "amp" => ExecutorConfig::Amp.create_executor(),
                 _ => ExecutorConfig::Echo.create_executor(), // Default fallback
             }
         } else {

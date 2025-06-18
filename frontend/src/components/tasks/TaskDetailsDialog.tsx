@@ -85,7 +85,9 @@ export function TaskDetailsDialog({
   const [savingTask, setSavingTask] = useState(false);
 
   // Check if the selected attempt is currently running (latest activity is "inprogress")
-  const isAttemptRunning = selectedAttempt && attemptActivities.length > 0 && 
+  const isAttemptRunning =
+    selectedAttempt &&
+    attemptActivities.length > 0 &&
     attemptActivities[0].status === "inprogress";
 
   useEffect(() => {
@@ -94,7 +96,7 @@ export function TaskDetailsDialog({
       setSelectedAttempt(null);
       setAttemptActivities([]);
       setActivitiesLoading(false);
-      
+
       fetchTaskAttempts(task.id);
       // Initialize edit state with current task values
       setEditedTitle(task.title);
@@ -572,15 +574,18 @@ export function TaskDetailsDialog({
                         <Select
                           value={selectedExecutor}
                           onValueChange={(value) =>
-                            setSelectedExecutor(value as "echo" | "claude")
+                            setSelectedExecutor(
+                              value as "echo" | "claude" | "amp"
+                            )
                           }
                         >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="echo">Echo</SelectItem>
                             <SelectItem value="claude">Claude</SelectItem>
+                            <SelectItem value="amp">Amp</SelectItem>
+                            <SelectItem value="echo">Echo</SelectItem>
                           </SelectContent>
                         </Select>
                         <Button

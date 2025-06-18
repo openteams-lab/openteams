@@ -6,12 +6,12 @@ use crate::executor::{Executor, ExecutorError};
 use crate::models::task::Task;
 
 /// An executor that uses Claude CLI to process tasks
-pub struct ClaudeExecutor;
+pub struct AmpExecutor;
 
 #[async_trait]
-impl Executor for ClaudeExecutor {
+impl Executor for AmpExecutor {
     fn executor_type(&self) -> &'static str {
-        "claude"
+        "amp"
     }
 
     async fn spawn(
@@ -25,29 +25,33 @@ impl Executor for ClaudeExecutor {
             .await?
             .ok_or(ExecutorError::TaskNotFound)?;
 
+        use std::process::Stdio;
+        use tokio::{io::AsyncWriteExt, process::Command};
+
         let prompt = format!(
-            "Task title: {}
-            Task description: {}",
+            "Task title: {}\nTask description: {}",
             task.title,
             task.description
                 .as_deref()
                 .unwrap_or("No description provided")
         );
 
-        // Use Claude CLI to process the task
-        let child = Command::new("claude")
+        let mut child = Command::new("npx")
             .kill_on_drop(true)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
+            .stdin(Stdio::piped()) // <-- open a pipe
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .current_dir(worktree_path)
-            .arg(&prompt)
-            .arg("-p")
-            .arg("--dangerously-skip-permissions")
-            .arg("--verbose")
-            .arg("--output-format=stream-json")
+            .arg("@sourcegraph/amp")
+            .arg("--format=jsonl")
             .spawn()
             .map_err(ExecutorError::SpawnFailed)?;
+
+        // feed the prompt in, then close the pipe so `amp` sees EOF
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin.write_all(prompt.as_bytes()).await.unwrap();
+            stdin.shutdown().await.unwrap(); // or `drop(stdin);`
+        }
 
         Ok(child)
     }

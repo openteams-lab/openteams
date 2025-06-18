@@ -185,7 +185,10 @@ export function TaskDetailsPage() {
     }
   };
 
-  const fetchAttemptActivities = async (attemptId: string, isBackgroundUpdate = false) => {
+  const fetchAttemptActivities = async (
+    attemptId: string,
+    isBackgroundUpdate = false
+  ) => {
     if (!task || !projectId) return;
 
     try {
@@ -193,7 +196,7 @@ export function TaskDetailsPage() {
       if (!isBackgroundUpdate) {
         setActivitiesLoading(true);
       }
-      
+
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${task.id}/attempts/${attemptId}/activities`
       );
@@ -221,9 +224,11 @@ export function TaskDetailsPage() {
     fetchAttemptActivities(attempt.id);
   };
 
-
-
-  const handleUpdateTaskFromDialog = async (title: string, description: string, status: TaskStatus) => {
+  const handleUpdateTaskFromDialog = async (
+    title: string,
+    description: string,
+    status: TaskStatus
+  ) => {
     if (!task || !projectId) return;
 
     try {
@@ -588,7 +593,11 @@ export function TaskDetailsPage() {
                   <div className="flex flex-col gap-2">
                     {selectedAttempt && (
                       <Button
-                        onClick={() => navigate(`/projects/${projectId}/tasks/${taskId}/attempts/${selectedAttempt.id}/compare`)}
+                        onClick={() =>
+                          navigate(
+                            `/projects/${projectId}/tasks/${taskId}/attempts/${selectedAttempt.id}/compare`
+                          )
+                        }
                         size="sm"
                         variant="outline"
                         className="w-full"
@@ -615,15 +624,18 @@ export function TaskDetailsPage() {
                       <Select
                         value={selectedExecutor}
                         onValueChange={(value) =>
-                          setSelectedExecutor(value as "echo" | "claude")
+                          setSelectedExecutor(
+                            value as "echo" | "claude" | "amp"
+                          )
                         }
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="echo">Echo</SelectItem>
                           <SelectItem value="claude">Claude</SelectItem>
+                          <SelectItem value="amp">Amp</SelectItem>
+                          <SelectItem value="echo">Echo</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button

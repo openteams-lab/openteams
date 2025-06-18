@@ -5,7 +5,7 @@ use tokio::process::Child;
 use ts_rs::TS;
 use uuid::Uuid;
 
-use crate::executors::{ClaudeExecutor, EchoExecutor};
+use crate::executors::{AmpExecutor, ClaudeExecutor, EchoExecutor};
 
 #[derive(Debug)]
 pub enum ExecutorError {
@@ -146,6 +146,7 @@ pub trait Executor: Send + Sync {
 pub enum ExecutorConfig {
     Echo,
     Claude,
+    Amp,
     // Future executors can be added here
     // Shell { command: String },
     // Docker { image: String, command: String },
@@ -156,13 +157,7 @@ impl ExecutorConfig {
         match self {
             ExecutorConfig::Echo => Box::new(EchoExecutor),
             ExecutorConfig::Claude => Box::new(ClaudeExecutor),
-        }
-    }
-
-    pub fn executor_type(&self) -> &'static str {
-        match self {
-            ExecutorConfig::Echo => "echo",
-            ExecutorConfig::Claude => "claude",
+            ExecutorConfig::Amp => Box::new(AmpExecutor),
         }
     }
 }
