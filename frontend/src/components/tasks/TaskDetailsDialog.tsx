@@ -73,7 +73,7 @@ export function TaskDetailsDialog({
     TaskAttemptActivity[]
   >([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
-  const [selectedExecutor, setSelectedExecutor] = useState<string>("echo");
+  const [selectedExecutor, setSelectedExecutor] = useState<string>("claude");
   const [creatingAttempt, setCreatingAttempt] = useState(false);
   const [stoppingAttempt, setStoppingAttempt] = useState(false);
 
