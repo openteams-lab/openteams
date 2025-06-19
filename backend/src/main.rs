@@ -11,7 +11,7 @@ use rust_embed::RustEmbed;
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use std::str::FromStr;
 use std::{collections::HashMap, env, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tower_http::cors::CorsLayer;
 
 mod execution_monitor;
@@ -19,10 +19,11 @@ mod executor;
 mod executors;
 mod models;
 mod routes;
+mod utils;
 
 use execution_monitor::{execution_monitor, AppState};
-use models::ApiResponse;
-use routes::{filesystem, health, projects, tasks};
+use models::{ApiResponse, Config};
+use routes::{config, filesystem, health, projects, tasks};
 
 #[derive(RustEmbed)]
 #[folder = "../frontend/dist"]
@@ -86,19 +87,24 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().init();
 
     // Create asset directory if it doesn't exist
-    if !asset_dir().exists() {
-        std::fs::create_dir_all(asset_dir())?;
+    if !utils::asset_dir().exists() {
+        std::fs::create_dir_all(utils::asset_dir())?;
     }
 
     // Database connection
     let database_url = format!(
         "sqlite://{}",
-        asset_dir().join("db.sqlite").to_string_lossy()
+        utils::asset_dir().join("db.sqlite").to_string_lossy()
     );
 
     let options = SqliteConnectOptions::from_str(&database_url)?.create_if_missing(true);
     let pool = SqlitePool::connect_with(options).await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
+
+    // Load configuration
+    let config_path = utils::config_path();
+    let config = Config::load(&config_path)?;
+    let config_arc = Arc::new(RwLock::new(config));
 
     // Create app state
     let app_state = AppState {
@@ -124,9 +130,11 @@ async fn main() -> anyhow::Result<()> {
             Router::new()
                 .merge(projects::projects_router())
                 .merge(tasks::tasks_router())
-                .merge(filesystem::filesystem_router()),
+                .merge(filesystem::filesystem_router())
+                .merge(config::config_router()),
         )
-        .layer(Extension(pool.clone()));
+        .layer(Extension(pool.clone()))
+        .layer(Extension(config_arc));
 
     let app = Router::new()
         .merge(public_routes)
@@ -153,19 +161,4 @@ async fn main() -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
-}
-
-fn asset_dir() -> std::path::PathBuf {
-    let proj = if cfg!(debug_assertions) {
-        ProjectDirs::from("ai", "bloop-dev", env!("CARGO_PKG_NAME"))
-            .expect("OS didn’t give us a home directory")
-    } else {
-        ProjectDirs::from("ai", "bloop", env!("CARGO_PKG_NAME"))
-            .expect("OS didn’t give us a home directory")
-    };
-
-    // ✔ macOS → ~/Library/Application Support/MyApp
-    // ✔ Linux → ~/.local/share/myapp   (respects XDG_DATA_HOME)
-    // ✔ Windows → %APPDATA%\Example\MyApp
-    proj.data_dir().to_path_buf()
 }

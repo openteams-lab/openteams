@@ -3,6 +3,10 @@
 
 export type ApiResponse<T> = { success: boolean, data: T | null, message: string | null, };
 
+export type Config = { theme: ThemeMode, executor: ExecutorConfig, };
+
+export type ThemeMode = "light" | "dark" | "system";
+
 export type ExecutorConfig = { "type": "echo" } | { "type": "claude" } | { "type": "amp" };
 
 export type CreateProject = { name: string, git_repo_path: string, use_existing_repo: boolean, setup_script: string | null, };

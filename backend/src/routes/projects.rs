@@ -309,16 +309,19 @@ async fn search_files_in_repo(
     for result in walker {
         let entry = result?;
         let path = entry.path();
-        
+
         // Skip the root directory itself
         if path == repo_path {
             continue;
         }
 
         let relative_path = path.strip_prefix(repo_path)?;
-        
+
         // Skip .git directory and its contents
-        if relative_path.components().any(|component| component.as_os_str() == ".git") {
+        if relative_path
+            .components()
+            .any(|component| component.as_os_str() == ".git")
+        {
             continue;
         }
         let relative_path_str = relative_path.to_string_lossy().to_lowercase();

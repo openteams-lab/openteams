@@ -1,7 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FolderOpen } from "lucide-react";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ArrowLeft, FolderOpen, Settings } from "lucide-react";
 import { Logo } from "@/components/logo";
 
 export function Navbar() {
@@ -27,10 +26,21 @@ export function Navbar() {
                   Projects
                 </Link>
               </Button>
+              <Button
+                asChild
+                variant={
+                  location.pathname === "/settings" ? "default" : "ghost"
+                }
+                size="sm"
+              >
+                <Link to="/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </Link>
+              </Button>
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <ThemeToggle />
             {!isHome && (
               <Button asChild variant="ghost">
                 <Link to="/">

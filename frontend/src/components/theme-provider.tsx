@@ -1,34 +1,45 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-
-type Theme = "dark" | "light" | "system";
+import type { Config, ThemeMode, ApiResponse } from "shared/types";
 
 type ThemeProviderProps = {
   children: React.ReactNode;
-  defaultTheme?: Theme;
-  storageKey?: string;
 };
 
 type ThemeProviderState = {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
+  theme: ThemeMode;
+  setTheme: (theme: ThemeMode) => void;
+  loadThemeFromConfig: () => Promise<void>;
 };
 
 const initialState: ThemeProviderState = {
   theme: "system",
   setTheme: () => null,
+  loadThemeFromConfig: async () => {},
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
-export function ThemeProvider({
-  children,
-  defaultTheme = "system",
-  storageKey = "vibe-kanban-ui-theme",
-  ...props
-}: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  );
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  const [theme, setThemeState] = useState<ThemeMode>("system");
+
+  // Load theme from backend config
+  const loadThemeFromConfig = async () => {
+    try {
+      const response = await fetch("/api/config");
+      const data: ApiResponse<Config> = await response.json();
+      
+      if (data.success && data.data) {
+        setThemeState(data.data.theme);
+      }
+    } catch (err) {
+      console.error("Error loading theme from config:", err);
+    }
+  };
+
+  // Load theme on mount
+  useEffect(() => {
+    loadThemeFromConfig();
+  }, []);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -48,12 +59,14 @@ export function ThemeProvider({
     root.classList.add(theme);
   }, [theme]);
 
+  const setTheme = (newTheme: ThemeMode) => {
+    setThemeState(newTheme);
+  };
+
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme);
-      setTheme(theme);
-    },
+    setTheme,
+    loadThemeFromConfig,
   };
 
   return (

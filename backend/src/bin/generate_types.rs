@@ -64,8 +64,14 @@ export {}
 
 export {}
 
+export {}
+
+export {}
+
 export {}"#,
         vibe_kanban::models::ApiResponse::<()>::decl(),
+        vibe_kanban::models::config::Config::decl(),
+        vibe_kanban::models::config::ThemeMode::decl(),
         vibe_kanban::executor::ExecutorConfig::decl(),
         vibe_kanban::models::project::CreateProject::decl(),
         vibe_kanban::models::project::Project::decl(),

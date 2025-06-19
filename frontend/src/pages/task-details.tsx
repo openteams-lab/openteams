@@ -19,6 +19,8 @@ import type {
   TaskAttempt,
   TaskAttemptActivity,
   TaskAttemptStatus,
+  Config,
+  ApiResponse,
 } from "shared/types";
 
 interface Task {
@@ -31,11 +33,7 @@ interface Task {
   updated_at: string;
 }
 
-interface ApiResponse<T> {
-  success: boolean;
-  data: T | null;
-  message: string | null;
-}
+
 
 const statusLabels: Record<TaskStatus, string> = {
   todo: "To Do",
@@ -123,6 +121,24 @@ export function TaskDetailsPage() {
       fetchTask();
     }
   }, [projectId, taskId]);
+
+  // Load config to get default executor
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const response = await makeRequest("/api/config");
+        if (response.ok) {
+          const result: ApiResponse<Config> = await response.json();
+          if (result.success && result.data) {
+            setSelectedExecutor(result.data.executor.type);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load config:", err);
+      }
+    };
+    loadConfig();
+  }, []);
 
   useEffect(() => {
     if (task) {

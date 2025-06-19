@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ThemeProvider defaultTheme="dark" storageKey="vibe-kanban-ui-theme">
+    <ThemeProvider>
       <ClickToComponent />
       <App />
     </ThemeProvider>

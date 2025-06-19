@@ -4,6 +4,7 @@ import { Projects } from "@/pages/projects";
 import { ProjectTasks } from "@/pages/project-tasks";
 import { TaskDetailsPage } from "@/pages/task-details";
 import { TaskAttemptComparePage } from "@/pages/task-attempt-compare";
+import { Settings } from "@/pages/Settings";
 
 function AppContent() {
   const showNavbar = true;
@@ -25,6 +26,7 @@ function AppContent() {
             path="/projects/:projectId/tasks/:taskId/attempts/:attemptId/compare"
             element={<TaskAttemptComparePage />}
           />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </div>
     </div>
