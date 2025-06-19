@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, FileText, ChevronDown, ChevronUp, RefreshCw, GitBranch } from "lucide-react";
 import { makeRequest } from "@/lib/api";
-import type { WorktreeDiff, DiffChunkType, DiffChunk } from "shared/types";
+import type { WorktreeDiff, DiffChunkType, DiffChunk, BranchStatus } from "shared/types";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -21,15 +21,20 @@ export function TaskAttemptComparePage() {
   const navigate = useNavigate();
 
   const [diff, setDiff] = useState<WorktreeDiff | null>(null);
+  const [branchStatus, setBranchStatus] = useState<BranchStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [branchStatusLoading, setBranchStatusLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [merging, setMerging] = useState(false);
+  const [rebasing, setRebasing] = useState(false);
   const [mergeSuccess, setMergeSuccess] = useState(false);
+  const [rebaseSuccess, setRebaseSuccess] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (projectId && taskId && attemptId) {
       fetchDiff();
+      fetchBranchStatus();
     }
   }, [projectId, taskId, attemptId]);
 
@@ -56,6 +61,32 @@ export function TaskAttemptComparePage() {
       setError("Failed to load diff");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBranchStatus = async () => {
+    if (!projectId || !taskId || !attemptId) return;
+
+    try {
+      setBranchStatusLoading(true);
+      const response = await makeRequest(
+        `/api/projects/${projectId}/tasks/${taskId}/attempts/${attemptId}/branch-status`
+      );
+
+      if (response.ok) {
+        const result: ApiResponse<BranchStatus> = await response.json();
+        if (result.success && result.data) {
+          setBranchStatus(result.data);
+        } else {
+          setError("Failed to load branch status");
+        }
+      } else {
+        setError("Failed to load branch status");
+      }
+    } catch (err) {
+      setError("Failed to load branch status");
+    } finally {
+      setBranchStatusLoading(false);
     }
   };
 
@@ -91,6 +122,38 @@ export function TaskAttemptComparePage() {
       setError("Failed to merge changes");
     } finally {
       setMerging(false);
+    }
+  };
+
+  const handleRebaseClick = async () => {
+    if (!projectId || !taskId || !attemptId) return;
+
+    try {
+      setRebasing(true);
+      const response = await makeRequest(
+        `/api/projects/${projectId}/tasks/${taskId}/attempts/${attemptId}/rebase`,
+        {
+          method: 'POST',
+        }
+      );
+
+      if (response.ok) {
+        const result: ApiResponse<string> = await response.json();
+        if (result.success) {
+          setRebaseSuccess(true);
+          // Refresh both diff and branch status after rebase
+          fetchDiff();
+          fetchBranchStatus();
+        } else {
+          setError(result.message || "Failed to rebase branch");
+        }
+      } else {
+        setError("Failed to rebase branch");
+      }
+    } catch (err) {
+      setError("Failed to rebase branch");
+    } finally {
+      setRebasing(false);
     }
   };
 
@@ -255,7 +318,7 @@ export function TaskAttemptComparePage() {
     });
   };
 
-  if (loading) {
+  if (loading || branchStatusLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -293,19 +356,58 @@ export function TaskAttemptComparePage() {
             Compare Changes
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          {/* Branch Status */}
+          {!branchStatusLoading && branchStatus && (
+            <div className="flex items-center gap-2 text-sm">
+              <GitBranch className="h-4 w-4" />
+              {branchStatus.up_to_date ? (
+                <span className="text-green-600">Up to date</span>
+              ) : branchStatus.is_behind === true ? (
+                <span className="text-orange-600">
+                  {branchStatus.commits_behind} commit{branchStatus.commits_behind !== 1 ? 's' : ''} behind main
+                </span>
+              ) : (
+                <span className="text-blue-600">
+                  {branchStatus.commits_ahead} commit{branchStatus.commits_ahead !== 1 ? 's' : ''} ahead of main
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Success Messages */}
+          {rebaseSuccess && (
+            <div className="text-green-600 text-sm">
+              Branch rebased successfully!
+            </div>
+          )}
           {mergeSuccess && (
             <div className="text-green-600 text-sm">
               Changes merged successfully!
             </div>
           )}
-          <Button 
-            onClick={handleMergeClick} 
-            disabled={merging || !diff || diff.files.length === 0}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            {merging ? "Merging..." : "Merge Changes"}
-          </Button>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            {branchStatus && branchStatus.is_behind === true && (
+              <Button 
+                onClick={handleRebaseClick} 
+                disabled={rebasing || branchStatusLoading}
+                variant="outline"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50"
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${rebasing ? 'animate-spin' : ''}`} />
+                {rebasing ? "Rebasing..." : "Rebase onto Main"}
+              </Button>
+            )}
+            <Button 
+              onClick={handleMergeClick} 
+              disabled={merging || !diff || diff.files.length === 0 || Boolean(branchStatus?.is_behind)}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
+            >
+              {merging ? "Merging..." : "Merge Changes"}
+            </Button>
+          </div>
         </div>
       </div>
 

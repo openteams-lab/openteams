@@ -68,6 +68,8 @@ export {}
 
 export {}
 
+export {}
+
 export {}"#,
         vibe_kanban::models::ApiResponse::<()>::decl(),
         vibe_kanban::models::config::Config::decl(),
@@ -94,6 +96,7 @@ export {}"#,
         vibe_kanban::models::task_attempt::DiffChunk::decl(),
         vibe_kanban::models::task_attempt::FileDiff::decl(),
         vibe_kanban::models::task_attempt::WorktreeDiff::decl(),
+        vibe_kanban::models::task_attempt::BranchStatus::decl(),
     );
 
     std::fs::write(shared_path.join("types.ts"), consolidated_content).unwrap();

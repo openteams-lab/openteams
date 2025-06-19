@@ -50,3 +50,5 @@ export type DiffChunk = { chunk_type: DiffChunkType, content: string, };
 export type FileDiff = { path: string, chunks: Array<DiffChunk>, };
 
 export type WorktreeDiff = { files: Array<FileDiff>, };
+
+export type BranchStatus = { is_behind: boolean, commits_behind: number, commits_ahead: number, up_to_date: boolean, };

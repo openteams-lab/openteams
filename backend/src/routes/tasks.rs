@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::models::{
     project::Project,
     task::{CreateTask, Task, TaskStatus, TaskWithAttemptStatus, UpdateTask},
-    task_attempt::{CreateTaskAttempt, TaskAttempt, TaskAttemptStatus, WorktreeDiff},
+    task_attempt::{BranchStatus, CreateTaskAttempt, TaskAttempt, TaskAttemptStatus, WorktreeDiff},
     task_attempt_activity::{CreateTaskAttemptActivity, TaskAttemptActivity},
     ApiResponse,
 };
@@ -501,8 +501,61 @@ pub async fn open_task_attempt_in_editor(
     }
 }
 
+pub async fn get_task_attempt_branch_status(
+    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
+    Extension(pool): Extension<SqlitePool>,
+) -> Result<ResponseJson<ApiResponse<BranchStatus>>, StatusCode> {
+    match TaskAttempt::get_branch_status(&pool, attempt_id, task_id, project_id).await {
+        Ok(status) => Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: Some(status),
+            message: None,
+        })),
+        Err(e) => {
+            tracing::error!(
+                "Failed to get branch status for task attempt {}: {}",
+                attempt_id,
+                e
+            );
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+#[axum::debug_handler]
+pub async fn rebase_task_attempt(
+    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
+    Extension(pool): Extension<SqlitePool>,
+) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
+    // Verify task attempt exists and belongs to the correct task
+    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check task attempt existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(true) => {}
+    }
+
+    match TaskAttempt::rebase_onto_main(&pool, attempt_id, task_id, project_id).await {
+        Ok(_new_base_commit) => Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: None,
+            message: Some("Branch rebased successfully".to_string()),
+        })),
+        Err(e) => {
+            tracing::error!("Failed to rebase task attempt {}: {}", attempt_id, e);
+            Ok(ResponseJson(ApiResponse {
+                success: false,
+                data: None,
+                message: Some(e.to_string()),
+            }))
+        }
+    }
+}
+
 pub fn tasks_router() -> Router {
-    use axum::routing::{delete, post, put};
+    use axum::routing::post;
 
     Router::new()
         .route(
@@ -532,6 +585,14 @@ pub fn tasks_router() -> Router {
         .route(
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/merge",
             post(merge_task_attempt),
+        )
+        .route(
+            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/branch-status",
+            get(get_task_attempt_branch_status),
+        )
+        .route(
+            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/rebase",
+            post(rebase_task_attempt),
         )
         .route(
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/open-editor",

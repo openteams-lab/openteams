@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tokio::process::{Child, Command};
+use tokio::process::Child;
 use uuid::Uuid;
 
 use crate::executor::{Executor, ExecutorError};

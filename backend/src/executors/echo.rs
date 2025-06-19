@@ -25,7 +25,7 @@ impl Executor for EchoExecutor {
             .await?
             .ok_or(ExecutorError::TaskNotFound)?;
 
-        let message = format!(
+        let _message = format!(
             "Executing task: {} - {}",
             task.title,
             task.description.as_deref().unwrap_or("No description")

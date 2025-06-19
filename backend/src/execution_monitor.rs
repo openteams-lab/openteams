@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use git2::Repository;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -22,6 +23,65 @@ pub struct RunningExecution {
 pub struct AppState {
     pub running_executions: Arc<Mutex<HashMap<Uuid, RunningExecution>>>,
     pub db_pool: sqlx::SqlitePool,
+}
+
+/// Commit any unstaged changes in the worktree after execution completion
+async fn commit_execution_changes(
+    worktree_path: &str,
+    attempt_id: Uuid,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Run git operations in a blocking task since git2 is synchronous
+    let worktree_path = worktree_path.to_string();
+    tokio::task::spawn_blocking(move || {
+        let worktree_repo = Repository::open(&worktree_path)?;
+
+        // Check if there are any changes to commit
+        let status = worktree_repo.statuses(None)?;
+        let has_changes = status.iter().any(|entry| {
+            let flags = entry.status();
+            flags.contains(git2::Status::INDEX_NEW)
+                || flags.contains(git2::Status::INDEX_MODIFIED)
+                || flags.contains(git2::Status::INDEX_DELETED)
+                || flags.contains(git2::Status::WT_NEW)
+                || flags.contains(git2::Status::WT_MODIFIED)
+                || flags.contains(git2::Status::WT_DELETED)
+        });
+
+        if !has_changes {
+            return Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
+        }
+
+        // Get the current signature for commits
+        let signature = worktree_repo.signature()?;
+
+        // Get the current HEAD commit
+        let head = worktree_repo.head()?;
+        let parent_commit = head.peel_to_commit()?;
+
+        // Stage all changes
+        let mut worktree_index = worktree_repo.index()?;
+        worktree_index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)?;
+        worktree_index.write()?;
+
+        let tree_id = worktree_index.write_tree()?;
+        let tree = worktree_repo.find_tree(tree_id)?;
+
+        // Create commit for the changes
+        let commit_message = format!("Task attempt {} - Final changes", attempt_id);
+        worktree_repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            &commit_message,
+            &tree,
+            &[&parent_commit],
+        )?;
+
+        Ok(())
+    })
+    .await??;
+
+    Ok(())
 }
 
 pub async fn execution_monitor(app_state: AppState) {
@@ -155,38 +215,55 @@ pub async fn execution_monitor(app_state: AppState) {
 
             tracing::info!("Execution {} {}{}", execution_id, status_text, exit_text);
 
-            // Create task attempt activity with appropriate completion status
-            let activity_id = Uuid::new_v4();
-            let status = if success {
-                TaskAttemptStatus::ExecutorComplete
-            } else {
-                TaskAttemptStatus::ExecutorFailed
-            };
-            let create_activity = CreateTaskAttemptActivity {
-                task_attempt_id,
-                status: Some(status.clone()),
-                note: Some(format!("Execution completed{}", exit_text)),
-            };
-
-            if let Err(e) = TaskAttemptActivity::create(
-                &app_state.db_pool,
-                &create_activity,
-                activity_id,
-                status,
-            )
-            .await
+            // Get task attempt to access worktree path for committing changes
+            if let Ok(Some(task_attempt)) =
+                TaskAttempt::find_by_id(&app_state.db_pool, task_attempt_id).await
             {
-                tracing::error!("Failed to create paused activity: {}", e);
-            } else {
-                tracing::info!(
-                    "Task attempt {} set to paused after execution completion",
-                    task_attempt_id
-                );
-
-                // Get task attempt and task to access task_id and project_id for status update
-                if let Ok(Some(task_attempt)) =
-                    TaskAttempt::find_by_id(&app_state.db_pool, task_attempt_id).await
+                // Commit any unstaged changes after execution completion
+                if let Err(e) =
+                    commit_execution_changes(&task_attempt.worktree_path, task_attempt_id).await
                 {
+                    tracing::error!(
+                        "Failed to commit execution changes for attempt {}: {}",
+                        task_attempt_id,
+                        e
+                    );
+                } else {
+                    tracing::info!(
+                        "Successfully committed execution changes for attempt {}",
+                        task_attempt_id
+                    );
+                }
+
+                // Create task attempt activity with appropriate completion status
+                let activity_id = Uuid::new_v4();
+                let status = if success {
+                    TaskAttemptStatus::ExecutorComplete
+                } else {
+                    TaskAttemptStatus::ExecutorFailed
+                };
+                let create_activity = CreateTaskAttemptActivity {
+                    task_attempt_id,
+                    status: Some(status.clone()),
+                    note: Some(format!("Execution completed{}", exit_text)),
+                };
+
+                if let Err(e) = TaskAttemptActivity::create(
+                    &app_state.db_pool,
+                    &create_activity,
+                    activity_id,
+                    status,
+                )
+                .await
+                {
+                    tracing::error!("Failed to create paused activity: {}", e);
+                } else {
+                    tracing::info!(
+                        "Task attempt {} set to paused after execution completion",
+                        task_attempt_id
+                    );
+
+                    // Get task to access task_id and project_id for status update
                     if let Ok(Some(task)) =
                         Task::find_by_id(&app_state.db_pool, task_attempt.task_id).await
                     {
@@ -203,6 +280,11 @@ pub async fn execution_monitor(app_state: AppState) {
                         }
                     }
                 }
+            } else {
+                tracing::error!(
+                    "Failed to find task attempt {} for execution completion",
+                    task_attempt_id
+                );
             }
         }
     }

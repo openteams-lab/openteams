@@ -1,5 +1,7 @@
+use anyhow::anyhow;
 use chrono::{DateTime, Utc};
-use git2::{Error as GitError, Repository};
+use git2::build::CheckoutBuilder;
+use git2::{Error as GitError, MergeOptions, RebaseOptions, Repository};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool, Type};
 use std::path::Path;
@@ -16,6 +18,7 @@ pub enum TaskAttemptError {
     Git(GitError),
     TaskNotFound,
     ProjectNotFound,
+    GitOutOfSync(anyhow::Error),
 }
 
 impl std::fmt::Display for TaskAttemptError {
@@ -25,6 +28,7 @@ impl std::fmt::Display for TaskAttemptError {
             TaskAttemptError::Git(e) => write!(f, "Git error: {}", e),
             TaskAttemptError::TaskNotFound => write!(f, "Task not found"),
             TaskAttemptError::ProjectNotFound => write!(f, "Project not found"),
+            TaskAttemptError::GitOutOfSync(e) => write!(f, "Git out of sync: {}", e),
         }
     }
 }
@@ -118,6 +122,15 @@ pub struct FileDiff {
 #[ts(export)]
 pub struct WorktreeDiff {
     pub files: Vec<FileDiff>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct BranchStatus {
+    pub is_behind: bool,
+    pub commits_behind: usize,
+    pub commits_ahead: usize,
+    pub up_to_date: bool,
 }
 
 impl TaskAttempt {
@@ -302,49 +315,10 @@ impl TaskAttempt {
         // Get the current signature for commits
         let signature = main_repo.signature()?;
 
-        // First, commit any uncommitted changes in the worktree
-        let mut worktree_index = worktree_repo.index()?;
-        let tree_id = worktree_index.write_tree()?;
-        let _tree = worktree_repo.find_tree(tree_id)?;
-
-        // Get the current HEAD commit in the worktree
+        // Get the current HEAD commit in the worktree (changes should already be committed by execution monitor)
         let head = worktree_repo.head()?;
         let parent_commit = head.peel_to_commit()?;
-
-        // Check if there are any changes to commit
-        let status = worktree_repo.statuses(None)?;
-        let has_changes = status.iter().any(|entry| {
-            let flags = entry.status();
-            flags.contains(git2::Status::INDEX_NEW)
-                || flags.contains(git2::Status::INDEX_MODIFIED)
-                || flags.contains(git2::Status::INDEX_DELETED)
-                || flags.contains(git2::Status::WT_NEW)
-                || flags.contains(git2::Status::WT_MODIFIED)
-                || flags.contains(git2::Status::WT_DELETED)
-        });
-
-        let mut final_commit = parent_commit.id();
-
-        if has_changes {
-            // Stage all changes
-            let mut worktree_index = worktree_repo.index()?;
-            worktree_index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)?;
-            worktree_index.write()?;
-
-            let tree_id = worktree_index.write_tree()?;
-            let tree = worktree_repo.find_tree(tree_id)?;
-
-            // Create commit for the changes
-            let commit_message = format!("Task attempt {} - Final changes", attempt_id);
-            final_commit = worktree_repo.commit(
-                Some("HEAD"),
-                &signature,
-                &signature,
-                &commit_message,
-                &tree,
-                &[&parent_commit],
-            )?;
-        }
+        let final_commit = parent_commit.id();
 
         // Now we need to merge the worktree branch into the main repository
         let branch_name = format!("attempt-{}", attempt_id);
@@ -642,7 +616,7 @@ impl TaskAttempt {
         Ok(())
     }
 
-    /// Get the git diff between the base commit and the current worktree state
+    /// Get the git diff between the base commit and the current committed worktree state
     pub async fn get_diff(
         pool: &SqlitePool,
         attempt_id: Uuid,
@@ -687,64 +661,267 @@ impl TaskAttempt {
         let base_commit = worktree_repo.find_commit(base_oid)?;
         let base_tree = base_commit.tree()?;
 
-        // Get status of all files in the worktree
-        let statuses = worktree_repo.statuses(None)?;
+        // Get the current HEAD commit in the worktree
+        let head = worktree_repo.head()?;
+        let current_commit = head.peel_to_commit()?;
+        let current_tree = current_commit.tree()?;
+
+        // Create a diff between the base tree and current tree
+        let diff = worktree_repo.diff_tree_to_tree(Some(&base_tree), Some(&current_tree), None)?;
+
         let mut files = Vec::new();
 
-        for status_entry in statuses.iter() {
-            if let Some(path_str) = status_entry.path() {
-                let path = std::path::Path::new(path_str);
-                let full_path = std::path::Path::new(&attempt.worktree_path).join(path);
+        // Process each diff delta (file change)
+        diff.foreach(
+            &mut |delta, _progress| {
+                if let Some(path_str) = delta.new_file().path().and_then(|p| p.to_str()) {
+                    let old_file = delta.old_file();
+                    let new_file = delta.new_file();
 
-                // Get old content from base commit
-                let old_content = match base_tree.get_path(path) {
-                    Ok(entry) => match entry.to_object(&worktree_repo) {
-                        Ok(obj) => {
-                            if let Some(blob) = obj.as_blob() {
-                                String::from_utf8_lossy(blob.content()).to_string()
-                            } else {
-                                String::new()
-                            }
+                    // Get old content
+                    let old_content = if !old_file.id().is_zero() {
+                        match worktree_repo.find_blob(old_file.id()) {
+                            Ok(blob) => String::from_utf8_lossy(blob.content()).to_string(),
+                            Err(_) => String::new(),
                         }
-                        Err(_) => String::new(),
-                    },
-                    Err(_) => String::new(), // File didn't exist in base commit
-                };
+                    } else {
+                        String::new() // File didn't exist in base commit
+                    };
 
-                // Get new content from working directory
-                let new_content = std::fs::read_to_string(&full_path).unwrap_or_default();
+                    // Get new content
+                    let new_content = if !new_file.id().is_zero() {
+                        match worktree_repo.find_blob(new_file.id()) {
+                            Ok(blob) => String::from_utf8_lossy(blob.content()).to_string(),
+                            Err(_) => String::new(),
+                        }
+                    } else {
+                        String::new() // File was deleted
+                    };
 
-                // Generate diff chunks using dissimilar
-                if old_content != new_content {
-                    let chunks = dissimilar::diff(&old_content, &new_content);
-                    let mut diff_chunks = Vec::new();
+                    // Generate diff chunks using dissimilar
+                    if old_content != new_content {
+                        let chunks = dissimilar::diff(&old_content, &new_content);
+                        let mut diff_chunks = Vec::new();
 
-                    for chunk in chunks {
-                        let diff_chunk = match chunk {
-                            dissimilar::Chunk::Equal(text) => DiffChunk {
-                                chunk_type: DiffChunkType::Equal,
-                                content: text.to_string(),
-                            },
-                            dissimilar::Chunk::Delete(text) => DiffChunk {
-                                chunk_type: DiffChunkType::Delete,
-                                content: text.to_string(),
-                            },
-                            dissimilar::Chunk::Insert(text) => DiffChunk {
-                                chunk_type: DiffChunkType::Insert,
-                                content: text.to_string(),
-                            },
-                        };
-                        diff_chunks.push(diff_chunk);
+                        for chunk in chunks {
+                            let diff_chunk = match chunk {
+                                dissimilar::Chunk::Equal(text) => DiffChunk {
+                                    chunk_type: DiffChunkType::Equal,
+                                    content: text.to_string(),
+                                },
+                                dissimilar::Chunk::Delete(text) => DiffChunk {
+                                    chunk_type: DiffChunkType::Delete,
+                                    content: text.to_string(),
+                                },
+                                dissimilar::Chunk::Insert(text) => DiffChunk {
+                                    chunk_type: DiffChunkType::Insert,
+                                    content: text.to_string(),
+                                },
+                            };
+                            diff_chunks.push(diff_chunk);
+                        }
+
+                        files.push(FileDiff {
+                            path: path_str.to_string(),
+                            chunks: diff_chunks,
+                        });
                     }
-
-                    files.push(FileDiff {
-                        path: path_str.to_string(),
-                        chunks: diff_chunks,
-                    });
                 }
+                true // Continue processing
+            },
+            None,
+            None,
+            None,
+        )?;
+
+        Ok(WorktreeDiff { files })
+    }
+
+    /// Get the branch status for this task attempt (ahead/behind main)
+    pub async fn get_branch_status(
+        pool: &SqlitePool,
+        attempt_id: Uuid,
+        task_id: Uuid,
+        project_id: Uuid,
+    ) -> Result<BranchStatus, TaskAttemptError> {
+        // Get the task attempt with validation
+        let attempt = sqlx::query_as!(
+            TaskAttempt,
+            r#"SELECT ta.id as "id!: Uuid", ta.task_id as "task_id!: Uuid", ta.worktree_path, ta.base_commit, ta.merge_commit, ta.executor, ta.stdout, ta.stderr, ta.created_at as "created_at!: DateTime<Utc>", ta.updated_at as "updated_at!: DateTime<Utc>"
+               FROM task_attempts ta 
+               JOIN tasks t ON ta.task_id = t.id 
+               WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3"#,
+            attempt_id,
+            task_id,
+            project_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or(TaskAttemptError::TaskNotFound)?;
+
+        let base_commit = git2::Oid::from_str(&attempt.base_commit.ok_or(
+            TaskAttemptError::GitOutOfSync(anyhow!("Base commit missing")),
+        )?)?;
+
+        // Get the project
+        let project = Project::find_by_id(pool, project_id)
+            .await?
+            .ok_or(TaskAttemptError::ProjectNotFound)?;
+
+        // Open the main repository
+        let main_repo = Repository::open(&project.git_repo_path)?;
+
+        // Open the worktree repository
+        let worktree_repo = Repository::open(&attempt.worktree_path)?;
+
+        // Get the current HEAD of main branch in the main repo
+        let main_head = main_repo.head()?.peel_to_commit()?;
+        let main_oid = main_head.id();
+
+        // Get the current HEAD of the worktree
+        let worktree_head = worktree_repo.head()?.peel_to_commit()?;
+        let worktree_oid = worktree_head.id();
+
+        if main_oid == base_commit {
+            // Branches are at the same commit
+            return Ok(BranchStatus {
+                is_behind: false,
+                commits_behind: 0,
+                commits_ahead: 0,
+                up_to_date: true,
+            });
+        }
+
+        // Count commits ahead/behind
+        let mut revwalk = main_repo.revwalk()?;
+
+        // Count commits behind (main has commits that worktree doesn't)
+        revwalk.push(main_oid)?;
+        revwalk.hide(worktree_oid)?;
+        let commits_behind = revwalk.count();
+
+        // Count commits ahead (worktree has commits that main doesn't)
+        let mut revwalk = main_repo.revwalk()?;
+        revwalk.push(worktree_oid)?;
+        revwalk.hide(main_oid)?;
+        let commits_ahead = revwalk.count();
+
+        Ok(BranchStatus {
+            is_behind: commits_behind > 0,
+            commits_behind,
+            commits_ahead,
+            up_to_date: commits_behind == 0 && commits_ahead == 0,
+        })
+    }
+
+    /// Perform the actual git rebase operations (synchronous)
+    fn perform_rebase_operation(
+        worktree_path: &str,
+        main_repo_path: &str,
+    ) -> Result<String, TaskAttemptError> {
+        // Open both repos
+        let main_repo = Repository::open(main_repo_path)?;
+        let worktree_repo = Repository::open(worktree_path)?;
+
+        // Figure out the new base
+        let main_head = main_repo.head()?.peel_to_commit()?;
+        let main_oid = main_head.id();
+        let new_base = main_oid.to_string();
+
+        // If already up-to-date:
+        let worktree_oid = worktree_repo.head()?.peel_to_commit()?.id();
+        if main_oid == worktree_oid {
+            return Ok(new_base);
+        }
+
+        // Build an in-memory rebase
+        let mut rebase_opts = RebaseOptions::new();
+        rebase_opts
+            .inmemory(true) // never touch the workdir :contentReference[oaicite:0]{index=0}
+            .merge_options(MergeOptions::new()); // defaults are fine here
+
+        // (Optional) tweak checkout so it really refuses to write conflicts:
+        let mut co = CheckoutBuilder::new();
+        co.safe() // safe-mode checkout (won’t overwrite)
+            .conflict_style_merge(false) // don’t write any merge markers :contentReference[oaicite:1]{index=1}
+            .skip_unmerged(true); // skip files with conflicts
+        rebase_opts.checkout_options(co);
+
+        // Prepare the annotated commits
+        let main_annot = worktree_repo.find_annotated_commit(main_oid)?;
+        let wt_annot = worktree_repo.find_annotated_commit(worktree_oid)?;
+
+        // Start the rebase in-memory
+        let mut rebase = worktree_repo.rebase(
+            Some(&wt_annot),   // branch to rebase
+            None,              // upstream (none = simple)
+            Some(&main_annot), // onto
+            Some(&mut rebase_opts),
+        )?;
+
+        // Iterate operations
+        let sig = worktree_repo.signature()?;
+        loop {
+            match rebase.next() {
+                Some(Ok(op)) => {
+                    // apply commit in-memory
+                    let c = worktree_repo.find_commit(op.id())?;
+                    rebase.commit(None, &sig, Some(c.message().map(|s| s).unwrap_or("")))?;
+                }
+                Some(Err(e)) => {
+                    // conflict or other error → abort cleanly
+                    rebase.abort()?;
+                    return Err(TaskAttemptError::Git(e));
+                }
+                None => break,
             }
         }
 
-        Ok(WorktreeDiff { files })
+        // finish (still in-memory, so no tree magic happened)
+        rebase.finish(None)?;
+        Ok(new_base)
+    }
+
+    /// Rebase the worktree branch onto main
+    pub async fn rebase_onto_main(
+        pool: &SqlitePool,
+        attempt_id: Uuid,
+        task_id: Uuid,
+        project_id: Uuid,
+    ) -> Result<String, TaskAttemptError> {
+        // Get the task attempt with validation
+        let attempt = sqlx::query_as!(
+            TaskAttempt,
+            r#"SELECT ta.id as "id!: Uuid", ta.task_id as "task_id!: Uuid", ta.worktree_path, ta.base_commit, ta.merge_commit, ta.executor, ta.stdout, ta.stderr, ta.created_at as "created_at!: DateTime<Utc>", ta.updated_at as "updated_at!: DateTime<Utc>"
+               FROM task_attempts ta 
+               JOIN tasks t ON ta.task_id = t.id 
+               WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3"#,
+            attempt_id,
+            task_id,
+            project_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or(TaskAttemptError::TaskNotFound)?;
+
+        // Get the project
+        let project = Project::find_by_id(pool, project_id)
+            .await?
+            .ok_or(TaskAttemptError::ProjectNotFound)?;
+
+        // Perform the git rebase operations (synchronous)
+        let new_base_commit =
+            Self::perform_rebase_operation(&attempt.worktree_path, &project.git_repo_path)?;
+
+        // Update the base_commit in the database
+        sqlx::query!(
+            "UPDATE task_attempts SET base_commit = ?, updated_at = datetime('now') WHERE id = ?",
+            new_base_commit,
+            attempt_id
+        )
+        .execute(pool)
+        .await?;
+
+        Ok(new_base_commit)
     }
 }

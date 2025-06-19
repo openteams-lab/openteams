@@ -1,9 +1,5 @@
 use axum::{
-    extract::{Extension, Query},
-    http::StatusCode,
-    response::Json as ResponseJson,
-    routing::get,
-    Json, Router,
+    extract::Query, http::StatusCode, response::Json as ResponseJson, routing::get, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::fs;
