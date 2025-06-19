@@ -2,7 +2,7 @@ use axum::{
     extract::{Extension, Path},
     http::StatusCode,
     response::Json as ResponseJson,
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
 use sqlx::SqlitePool;
@@ -213,6 +213,7 @@ pub async fn get_task_attempt_activities(
 pub async fn create_task_attempt(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
     Extension(pool): Extension<SqlitePool>,
+    Extension(app_state): Extension<crate::execution_monitor::AppState>,
     Json(mut payload): Json<CreateTaskAttempt>,
 ) -> Result<ResponseJson<ApiResponse<TaskAttempt>>, StatusCode> {
     // Verify task exists in project first
@@ -235,6 +236,28 @@ pub async fn create_task_attempt(
             // Create initial activity record
             let activity_id = Uuid::new_v4();
             let _ = TaskAttemptActivity::create_initial(&pool, attempt.id, activity_id).await;
+
+            // Start execution asynchronously (don't block the response)
+            let pool_clone = pool.clone();
+            let app_state_clone = app_state.clone();
+            let attempt_id = attempt.id;
+            tokio::spawn(async move {
+                if let Err(e) = TaskAttempt::start_execution(
+                    &pool_clone,
+                    &app_state_clone,
+                    attempt_id,
+                    task_id,
+                    project_id,
+                )
+                .await
+                {
+                    tracing::error!(
+                        "Failed to start execution for task attempt {}: {}",
+                        attempt_id,
+                        e
+                    );
+                }
+            });
 
             Ok(ResponseJson(ApiResponse {
                 success: true,

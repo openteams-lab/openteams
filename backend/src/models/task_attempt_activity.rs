@@ -115,8 +115,32 @@ impl TaskAttemptActivity {
                ) latest_activity ON ta.id = latest_activity.task_attempt_id
                INNER JOIN task_attempt_activities taa ON ta.id = taa.task_attempt_id 
                    AND taa.created_at = latest_activity.latest_created_at
+               WHERE taa.status IN ($1, $2, $3)"#,
+            TaskAttemptStatus::SetupRunning as TaskAttemptStatus,
+            TaskAttemptStatus::ExecutorRunning as TaskAttemptStatus,
+            TaskAttemptStatus::Paused as TaskAttemptStatus
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(records.into_iter().map(|r| r.id).collect())
+    }
+
+    pub async fn find_attempts_with_latest_executor_running_status(
+        pool: &SqlitePool,
+    ) -> Result<Vec<uuid::Uuid>, sqlx::Error> {
+        let records = sqlx::query!(
+            r#"SELECT DISTINCT ta.id as "id!: Uuid"
+               FROM task_attempts ta
+               INNER JOIN (
+                   SELECT task_attempt_id, MAX(created_at) as latest_created_at
+                   FROM task_attempt_activities
+                   GROUP BY task_attempt_id
+               ) latest_activity ON ta.id = latest_activity.task_attempt_id
+               INNER JOIN task_attempt_activities taa ON ta.id = taa.task_attempt_id 
+                   AND taa.created_at = latest_activity.latest_created_at
                WHERE taa.status = $1"#,
-            TaskAttemptStatus::InProgress as TaskAttemptStatus
+            TaskAttemptStatus::ExecutorRunning as TaskAttemptStatus
         )
         .fetch_all(pool)
         .await?;

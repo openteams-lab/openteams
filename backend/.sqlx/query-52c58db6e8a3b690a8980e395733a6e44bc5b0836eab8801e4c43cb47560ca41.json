@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT DISTINCT ta.id as \"id!: Uuid\"\n               FROM task_attempts ta\n               INNER JOIN (\n                   SELECT task_attempt_id, MAX(created_at) as latest_created_at\n                   FROM task_attempt_activities\n                   GROUP BY task_attempt_id\n               ) latest_activity ON ta.id = latest_activity.task_attempt_id\n               INNER JOIN task_attempt_activities taa ON ta.id = taa.task_attempt_id \n                   AND taa.created_at = latest_activity.latest_created_at\n               WHERE taa.status IN ($1, $2, $3)",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "52c58db6e8a3b690a8980e395733a6e44bc5b0836eab8801e4c43cb47560ca41"
+}

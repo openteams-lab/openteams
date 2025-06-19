@@ -49,7 +49,12 @@ impl From<GitError> for TaskAttemptError {
 #[ts(export)]
 pub enum TaskAttemptStatus {
     Init,
-    InProgress,
+    SetupRunning,
+    SetupComplete,
+    SetupFailed,
+    ExecutorRunning,
+    ExecutorComplete,
+    ExecutorFailed,
     Paused,
 }
 
@@ -180,41 +185,6 @@ impl TaskAttempt {
         // Create the worktree at the specified path
         let branch_name = format!("attempt-{}", attempt_id);
         repo.worktree(&branch_name, worktree_path, None)?;
-
-        // Run setup script if it exists
-        if let Some(setup_script) = &project.setup_script {
-            if !setup_script.trim().is_empty() {
-                tracing::info!("Running setup script for task attempt {}", attempt_id);
-
-                let output = std::process::Command::new("bash")
-                    .arg("-c")
-                    .arg(setup_script)
-                    .current_dir(worktree_path)
-                    .output()
-                    .map_err(|e| {
-                        TaskAttemptError::Git(git2::Error::from_str(&format!(
-                            "Failed to execute setup script: {}",
-                            e
-                        )))
-                    })?;
-
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    tracing::error!("Setup script failed for attempt {}: {}", attempt_id, stderr);
-                    return Err(TaskAttemptError::Git(git2::Error::from_str(&format!(
-                        "Setup script failed: {}",
-                        stderr
-                    ))));
-                }
-
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                tracing::info!(
-                    "Setup script completed for attempt {}: {}",
-                    attempt_id,
-                    stdout
-                );
-            }
-        }
 
         // Insert the record into the database
         Ok(sqlx::query_as!(
@@ -505,6 +475,171 @@ impl TaskAttempt {
         .await?;
 
         Ok(merge_commit_id)
+    }
+
+    /// Start the execution flow for a task attempt (setup script + executor)
+    pub async fn start_execution(
+        pool: &SqlitePool,
+        app_state: &crate::execution_monitor::AppState,
+        attempt_id: Uuid,
+        task_id: Uuid,
+        project_id: Uuid,
+    ) -> Result<(), TaskAttemptError> {
+        use crate::models::project::Project;
+        use crate::models::task::{Task, TaskStatus};
+        use crate::models::task_attempt_activity::{
+            CreateTaskAttemptActivity, TaskAttemptActivity,
+        };
+
+        // Get the task attempt, task, and project
+        let task_attempt = TaskAttempt::find_by_id(pool, attempt_id)
+            .await?
+            .ok_or(TaskAttemptError::TaskNotFound)?;
+
+        let _task = Task::find_by_id(pool, task_id)
+            .await?
+            .ok_or(TaskAttemptError::TaskNotFound)?;
+
+        let project = Project::find_by_id(pool, project_id)
+            .await?
+            .ok_or(TaskAttemptError::ProjectNotFound)?;
+
+        // Step 1: Run setup script if it exists
+        if let Some(setup_script) = &project.setup_script {
+            if !setup_script.trim().is_empty() {
+                // Create activity for setup script start
+                let activity_id = Uuid::new_v4();
+                let create_activity = CreateTaskAttemptActivity {
+                    task_attempt_id: attempt_id,
+                    status: Some(TaskAttemptStatus::SetupRunning),
+                    note: Some("Starting setup script".to_string()),
+                };
+
+                TaskAttemptActivity::create(
+                    pool,
+                    &create_activity,
+                    activity_id,
+                    TaskAttemptStatus::SetupRunning,
+                )
+                .await?;
+
+                tracing::info!("Running setup script for task attempt {}", attempt_id);
+
+                let output = tokio::process::Command::new("bash")
+                    .arg("-c")
+                    .arg(setup_script)
+                    .current_dir(&task_attempt.worktree_path)
+                    .output()
+                    .await
+                    .map_err(|e| {
+                        TaskAttemptError::Git(git2::Error::from_str(&format!(
+                            "Failed to execute setup script: {}",
+                            e
+                        )))
+                    })?;
+
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    tracing::error!("Setup script failed for attempt {}: {}", attempt_id, stderr);
+
+                    // Create activity for setup script failure
+                    let activity_id = Uuid::new_v4();
+                    let create_activity = CreateTaskAttemptActivity {
+                        task_attempt_id: attempt_id,
+                        status: Some(TaskAttemptStatus::SetupFailed),
+                        note: Some(format!("Setup script failed: {}", stderr)),
+                    };
+
+                    TaskAttemptActivity::create(
+                        pool,
+                        &create_activity,
+                        activity_id,
+                        TaskAttemptStatus::SetupFailed,
+                    )
+                    .await?;
+
+                    // Update task status to InReview
+                    Task::update_status(pool, task_id, project_id, TaskStatus::InReview).await?;
+
+                    return Err(TaskAttemptError::Git(git2::Error::from_str(&format!(
+                        "Setup script failed: {}",
+                        stderr
+                    ))));
+                }
+
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                tracing::info!(
+                    "Setup script completed for attempt {}: {}",
+                    attempt_id,
+                    stdout
+                );
+
+                // Create activity for setup script completion
+                let activity_id = Uuid::new_v4();
+                let create_activity = CreateTaskAttemptActivity {
+                    task_attempt_id: attempt_id,
+                    status: Some(TaskAttemptStatus::SetupComplete),
+                    note: Some("Setup script completed successfully".to_string()),
+                };
+
+                TaskAttemptActivity::create(
+                    pool,
+                    &create_activity,
+                    activity_id,
+                    TaskAttemptStatus::SetupComplete,
+                )
+                .await?;
+            }
+        }
+
+        // Step 2: Start the executor
+        let executor = task_attempt.get_executor();
+
+        // Create activity for executor start
+        let activity_id = Uuid::new_v4();
+        let create_activity = CreateTaskAttemptActivity {
+            task_attempt_id: attempt_id,
+            status: Some(TaskAttemptStatus::ExecutorRunning),
+            note: Some("Starting executor".to_string()),
+        };
+
+        TaskAttemptActivity::create(
+            pool,
+            &create_activity,
+            activity_id,
+            TaskAttemptStatus::ExecutorRunning,
+        )
+        .await?;
+
+        let child = executor
+            .execute_streaming(pool, task_id, attempt_id, &task_attempt.worktree_path)
+            .await
+            .map_err(|e| TaskAttemptError::Git(git2::Error::from_str(&e.to_string())))?;
+
+        // Add to running executions
+        let execution_id = Uuid::new_v4();
+        {
+            let mut executions = app_state.running_executions.lock().await;
+            executions.insert(
+                execution_id,
+                crate::execution_monitor::RunningExecution {
+                    task_attempt_id: attempt_id,
+                    child,
+                    started_at: chrono::Utc::now(),
+                },
+            );
+        }
+
+        // Update task status to InProgress
+        Task::update_status(pool, task_id, project_id, TaskStatus::InProgress).await?;
+
+        tracing::info!(
+            "Started execution {} for task attempt {}",
+            execution_id,
+            attempt_id
+        );
+
+        Ok(())
     }
 
     /// Get the git diff between the base commit and the current worktree state

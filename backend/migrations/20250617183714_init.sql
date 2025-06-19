@@ -4,6 +4,7 @@ CREATE TABLE projects (
     id            BLOB PRIMARY KEY,
     name          TEXT NOT NULL,
     git_repo_path TEXT NOT NULL DEFAULT '' UNIQUE,
+    setup_script  TEXT DEFAULT '',
     created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -38,8 +39,7 @@ CREATE TABLE task_attempt_activities (
     id              BLOB PRIMARY KEY,
     task_attempt_id BLOB NOT NULL,
     status          TEXT NOT NULL DEFAULT 'init'
-                       CHECK (status IN ('init','inprogress','paused')),
-    note            TEXT,
+                       CHECK (status IN ('init','setuprunning','setupcomplete','setupfailed','executorrunning','executorcomplete','executorfailed','paused')),    note            TEXT,
     created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (task_attempt_id) REFERENCES task_attempts(id) ON DELETE CASCADE
 );

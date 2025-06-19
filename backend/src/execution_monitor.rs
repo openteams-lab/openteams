@@ -30,21 +30,21 @@ pub async fn execution_monitor(app_state: AppState) {
     loop {
         interval.tick().await;
 
-        // Check for orphaned task attempts with latest activity status = InProgress but no running execution
-        let inprogress_attempt_ids =
-            match TaskAttemptActivity::find_attempts_with_latest_inprogress_status(
+        // Check for orphaned task attempts with latest activity status = ExecutorRunning but no running execution
+        let executor_running_attempt_ids =
+            match TaskAttemptActivity::find_attempts_with_latest_executor_running_status(
                 &app_state.db_pool,
             )
             .await
             {
                 Ok(attempts) => attempts,
                 Err(e) => {
-                    tracing::error!("Failed to query inprogress attempts: {}", e);
+                    tracing::error!("Failed to query executor running attempts: {}", e);
                     continue;
                 }
             };
 
-        for attempt_id in inprogress_attempt_ids {
+        for attempt_id in executor_running_attempt_ids {
             // Check if this attempt has a running execution
             let has_running_execution = {
                 let executions = app_state.running_executions.lock().await;
@@ -58,7 +58,7 @@ pub async fn execution_monitor(app_state: AppState) {
                 let activity_id = Uuid::new_v4();
                 let create_activity = CreateTaskAttemptActivity {
                     task_attempt_id: attempt_id,
-                    status: Some(TaskAttemptStatus::Paused),
+                    status: Some(TaskAttemptStatus::ExecutorFailed),
                     note: Some("Execution lost (server restart or crash)".to_string()),
                 };
 
@@ -66,7 +66,7 @@ pub async fn execution_monitor(app_state: AppState) {
                     &app_state.db_pool,
                     &create_activity,
                     activity_id,
-                    TaskAttemptStatus::Paused,
+                    TaskAttemptStatus::ExecutorFailed,
                 )
                 .await
                 {
@@ -101,119 +101,7 @@ pub async fn execution_monitor(app_state: AppState) {
             }
         }
 
-        // Check for task attempts with latest activity status = Init
-        let init_attempt_ids =
-            match TaskAttemptActivity::find_attempts_with_latest_init_status(&app_state.db_pool)
-                .await
-            {
-                Ok(attempts) => attempts,
-                Err(e) => {
-                    tracing::error!("Failed to query init attempts: {}", e);
-                    continue;
-                }
-            };
-
-        for attempt_id in init_attempt_ids {
-            // Check if we already have a running execution for this attempt
-            {
-                let executions = app_state.running_executions.lock().await;
-                if executions
-                    .values()
-                    .any(|exec| exec.task_attempt_id == attempt_id)
-                {
-                    continue;
-                }
-            }
-
-            // Get the task attempt to access the executor
-            let task_attempt = match TaskAttempt::find_by_id(&app_state.db_pool, attempt_id).await {
-                Ok(Some(attempt)) => attempt,
-                Ok(None) => {
-                    tracing::error!("Task attempt {} not found", attempt_id);
-                    continue;
-                }
-                Err(e) => {
-                    tracing::error!("Failed to fetch task attempt {}: {}", attempt_id, e);
-                    continue;
-                }
-            };
-
-            // Get the executor and start streaming execution
-            let executor = task_attempt.get_executor();
-            let child = match executor
-                .execute_streaming(
-                    &app_state.db_pool,
-                    task_attempt.task_id,
-                    attempt_id,
-                    &task_attempt.worktree_path,
-                )
-                .await
-            {
-                Ok(child) => child,
-                Err(e) => {
-                    tracing::error!(
-                        "Failed to start streaming execution for task attempt {}: {}",
-                        attempt_id,
-                        e
-                    );
-                    continue;
-                }
-            };
-
-            // Add to running executions
-            let execution_id = Uuid::new_v4();
-            {
-                let mut executions = app_state.running_executions.lock().await;
-                executions.insert(
-                    execution_id,
-                    RunningExecution {
-                        task_attempt_id: attempt_id,
-                        child,
-                        started_at: Utc::now(),
-                    },
-                );
-            }
-
-            // Update task attempt activity to InProgress
-            let activity_id = Uuid::new_v4();
-            let create_activity = CreateTaskAttemptActivity {
-                task_attempt_id: attempt_id,
-                status: Some(TaskAttemptStatus::InProgress),
-                note: Some("Started execution".to_string()),
-            };
-
-            if let Err(e) = TaskAttemptActivity::create(
-                &app_state.db_pool,
-                &create_activity,
-                activity_id,
-                TaskAttemptStatus::InProgress,
-            )
-            .await
-            {
-                tracing::error!("Failed to create in-progress activity: {}", e);
-            }
-
-            // Update task status to InProgress - get task to access project_id
-            if let Ok(Some(task)) = Task::find_by_id(&app_state.db_pool, task_attempt.task_id).await
-            {
-                if let Err(e) = Task::update_status(
-                    &app_state.db_pool,
-                    task.id,
-                    task.project_id,
-                    TaskStatus::InProgress,
-                )
-                .await
-                {
-                    tracing::error!("Failed to update task status to InProgress: {}", e);
-                }
-            }
-
-            tracing::info!(
-                "Started execution {} for task attempt {}",
-                execution_id,
-                attempt_id
-            );
-        }
+        // Note: Execution starting logic moved to create_task_attempt endpoint
 
         // Check for completed processes
         let mut completed_executions = Vec::new();
@@ -267,11 +155,16 @@ pub async fn execution_monitor(app_state: AppState) {
 
             tracing::info!("Execution {} {}{}", execution_id, status_text, exit_text);
 
-            // Create task attempt activity with Paused status
+            // Create task attempt activity with appropriate completion status
             let activity_id = Uuid::new_v4();
+            let status = if success {
+                TaskAttemptStatus::ExecutorComplete
+            } else {
+                TaskAttemptStatus::ExecutorFailed
+            };
             let create_activity = CreateTaskAttemptActivity {
                 task_attempt_id,
-                status: Some(TaskAttemptStatus::Paused),
+                status: Some(status.clone()),
                 note: Some(format!("Execution completed{}", exit_text)),
             };
 
@@ -279,7 +172,7 @@ pub async fn execution_monitor(app_state: AppState) {
                 &app_state.db_pool,
                 &create_activity,
                 activity_id,
-                TaskAttemptStatus::Paused,
+                status,
             )
             .await
             {

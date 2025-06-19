@@ -18,6 +18,7 @@ import type {
   TaskStatus,
   TaskAttempt,
   TaskAttemptActivity,
+  TaskAttemptStatus,
 } from "shared/types";
 
 interface Task {
@@ -42,6 +43,29 @@ const statusLabels: Record<TaskStatus, string> = {
   inreview: "In Review",
   done: "Done",
   cancelled: "Cancelled",
+};
+
+const getAttemptStatusDisplay = (status: TaskAttemptStatus): { label: string; className: string } => {
+  switch (status) {
+    case "init":
+      return { label: "Init", className: "bg-gray-100 text-gray-800" };
+    case "setuprunning":
+      return { label: "Setup Running", className: "bg-blue-100 text-blue-800" };
+    case "setupcomplete":
+      return { label: "Setup Complete", className: "bg-green-100 text-green-800" };
+    case "setupfailed":
+      return { label: "Setup Failed", className: "bg-red-100 text-red-800" };
+    case "executorrunning":
+      return { label: "Executor Running", className: "bg-blue-100 text-blue-800" };
+    case "executorcomplete":
+      return { label: "Executor Complete", className: "bg-green-100 text-green-800" };
+    case "executorfailed":
+      return { label: "Executor Failed", className: "bg-red-100 text-red-800" };
+    case "paused":
+      return { label: "Paused", className: "bg-yellow-100 text-yellow-800" };
+    default:
+      return { label: "Unknown", className: "bg-gray-100 text-gray-800" };
+  }
 };
 
 export function TaskDetailsPage() {
@@ -70,12 +94,14 @@ export function TaskDetailsPage() {
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
 
-  // Check if the selected attempt is currently running (latest activity is "inprogress" or "init")
+  // Check if the selected attempt is active (not in a final state)
   const isAttemptRunning =
     selectedAttempt &&
     attemptActivities.length > 0 &&
-    (attemptActivities[0].status === "inprogress" ||
-      attemptActivities[0].status === "init");
+    (attemptActivities[0].status === "init" ||
+      attemptActivities[0].status === "setuprunning" ||
+      attemptActivities[0].status === "setupcomplete" ||
+      attemptActivities[0].status === "executorrunning");
 
   // Polling for updates when attempt is running
   useEffect(() => {
@@ -677,18 +703,10 @@ export function TaskDetailsPage() {
                         <div className="flex items-center justify-between">
                           <span
                             className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              activity.status === "init"
-                                ? "bg-gray-100 text-gray-800"
-                                : activity.status === "inprogress"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-yellow-100 text-yellow-800"
+                              getAttemptStatusDisplay(activity.status).className
                             }`}
                           >
-                            {activity.status === "init"
-                              ? "Init"
-                              : activity.status === "inprogress"
-                              ? "In Progress"
-                              : "Paused"}
+                            {getAttemptStatusDisplay(activity.status).label}
                           </span>
                           <p className="text-xs text-muted-foreground">
                             {new Date(activity.created_at).toLocaleString()}
