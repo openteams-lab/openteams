@@ -376,6 +376,9 @@ async fn search_files_in_repo(
             .then_with(|| a.path.cmp(&b.path))
     });
 
+    // Limit to top 10 results
+    results.truncate(10);
+
     Ok(results)
 }
 
