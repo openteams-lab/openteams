@@ -14,7 +14,7 @@ export function Settings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const { setTheme, loadThemeFromConfig } = useTheme();
+  const { setTheme } = useTheme();
 
   // Load initial config
   useEffect(() => {
