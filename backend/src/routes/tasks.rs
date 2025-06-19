@@ -449,6 +449,54 @@ pub async fn merge_task_attempt(
     }
 }
 
+pub async fn open_task_attempt_in_editor(
+    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
+    Extension(pool): Extension<SqlitePool>,
+) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
+    // Verify task attempt exists and belongs to the correct task
+    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check task attempt existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(true) => {}
+    }
+
+    // Get the task attempt to access the worktree path
+    let attempt = match TaskAttempt::find_by_id(&pool, attempt_id).await {
+        Ok(Some(attempt)) => attempt,
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to fetch task attempt {}: {}", attempt_id, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // Open VSCode in the worktree directory
+    match std::process::Command::new("code")
+        .arg(&attempt.worktree_path)
+        .spawn()
+    {
+        Ok(_) => {
+            tracing::info!("Opened VSCode for task attempt {} at path: {}", attempt_id, attempt.worktree_path);
+            Ok(ResponseJson(ApiResponse {
+                success: true,
+                data: None,
+                message: Some("VSCode opened successfully".to_string()),
+            }))
+        }
+        Err(e) => {
+            tracing::error!("Failed to open VSCode for attempt {}: {}", attempt_id, e);
+            Ok(ResponseJson(ApiResponse {
+                success: false,
+                data: None,
+                message: Some(format!("Failed to open VSCode: {}", e)),
+            }))
+        }
+    }
+}
+
 pub fn tasks_router() -> Router {
     use axum::routing::{delete, post, put};
 
@@ -480,6 +528,10 @@ pub fn tasks_router() -> Router {
         .route(
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/merge",
             post(merge_task_attempt),
+        )
+        .route(
+            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/open-editor",
+            post(open_task_attempt_in_editor),
         )
 }
 

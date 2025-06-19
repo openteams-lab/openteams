@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft, FileText, Code } from "lucide-react";
 import { makeRequest } from "@/lib/api";
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
 import type {
@@ -90,6 +90,7 @@ export function TaskDetailsPage() {
   const [selectedExecutor, setSelectedExecutor] = useState<string>("claude");
   const [creatingAttempt, setCreatingAttempt] = useState(false);
   const [stoppingAttempt, setStoppingAttempt] = useState(false);
+  const [openingEditor, setOpeningEditor] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -351,6 +352,36 @@ export function TaskDetailsPage() {
       setError("Failed to stop task attempt");
     } finally {
       setStoppingAttempt(false);
+    }
+  };
+
+  const openTaskAttemptInEditor = async () => {
+    if (!task || !selectedAttempt || !projectId) return;
+
+    try {
+      setOpeningEditor(true);
+      const response = await makeRequest(
+        `/api/projects/${projectId}/tasks/${task.id}/attempts/${selectedAttempt.id}/open-editor`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.ok) {
+        const result: ApiResponse<null> = await response.json();
+        if (!result.success && result.message) {
+          setError(result.message);
+        }
+      } else {
+        setError("Failed to open editor");
+      }
+    } catch (err) {
+      setError("Failed to open editor");
+    } finally {
+      setOpeningEditor(false);
     }
   };
 
@@ -618,19 +649,31 @@ export function TaskDetailsPage() {
                   </Label>
                   <div className="flex flex-col gap-2">
                     {selectedAttempt && (
-                      <Button
-                        onClick={() =>
-                          navigate(
-                            `/projects/${projectId}/tasks/${taskId}/attempts/${selectedAttempt.id}/compare`
-                          )
-                        }
-                        size="sm"
-                        variant="outline"
-                        className="w-full"
-                      >
-                        <FileText className="mr-2 h-4 w-4" />
-                        View Changes
-                      </Button>
+                      <>
+                        <Button
+                          onClick={() =>
+                            navigate(
+                              `/projects/${projectId}/tasks/${taskId}/attempts/${selectedAttempt.id}/compare`
+                            )
+                          }
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          View Changes
+                        </Button>
+                        <Button
+                          onClick={openTaskAttemptInEditor}
+                          disabled={openingEditor}
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                        >
+                          <Code className="mr-2 h-4 w-4" />
+                          {openingEditor ? "Opening..." : "Open in Editor"}
+                        </Button>
+                      </>
                     )}
                     {isAttemptRunning && (
                       <Button
