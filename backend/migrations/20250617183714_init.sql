@@ -5,8 +5,8 @@ CREATE TABLE projects (
     name          TEXT NOT NULL,
     git_repo_path TEXT NOT NULL DEFAULT '' UNIQUE,
     setup_script  TEXT DEFAULT '',
-    created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at    TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
 );
 
 CREATE TABLE tasks (
@@ -16,8 +16,8 @@ CREATE TABLE tasks (
     description TEXT,
     status      TEXT NOT NULL DEFAULT 'todo'
                    CHECK (status IN ('todo','inprogress','done','cancelled','inreview')),
-    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
@@ -30,8 +30,8 @@ CREATE TABLE task_attempts (
     executor      TEXT,
     stdout        TEXT,
     stderr        TEXT,
-    created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
 );
 
@@ -40,6 +40,6 @@ CREATE TABLE task_attempt_activities (
     task_attempt_id BLOB NOT NULL,
     status          TEXT NOT NULL DEFAULT 'init'
                        CHECK (status IN ('init','setuprunning','setupcomplete','setupfailed','executorrunning','executorcomplete','executorfailed','paused')),    note            TEXT,
-    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
     FOREIGN KEY (task_attempt_id) REFERENCES task_attempts(id) ON DELETE CASCADE
 );
