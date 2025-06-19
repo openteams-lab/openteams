@@ -33,7 +33,7 @@ export function TaskCard({ task, index, status, onEdit, onDelete, onViewDetails 
       <div className="space-y-2">
         <div className="flex items-start justify-between">
           <div className="flex-1 pr-2">
-            <h4 className="font-medium text-sm">
+            <h4 className="font-medium text-sm break-words">
               {task.title}
             </h4>
           </div>
@@ -77,7 +77,7 @@ export function TaskCard({ task, index, status, onEdit, onDelete, onViewDetails 
         </div>
         {task.description && (
           <div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground break-words">
               {task.description}
             </p>
           </div>
