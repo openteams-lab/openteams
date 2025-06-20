@@ -110,8 +110,9 @@ export function TaskAttemptComparePage() {
         const result: ApiResponse<string> = await response.json();
         if (result.success) {
           setMergeSuccess(true);
-          // Optionally refetch the diff to show updated state
+          // Refetch both diff and branch status to show updated state
           fetchDiff();
+          fetchBranchStatus();
         } else {
           setError("Failed to merge changes");
         }
