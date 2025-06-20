@@ -87,6 +87,13 @@ pub trait Executor: Send + Sync {
     }
 }
 
+/// Runtime executor types for internal use
+#[derive(Debug, Clone)]
+pub enum ExecutorType {
+    SetupScript(String),
+    CodingAgent(ExecutorConfig),
+}
+
 /// Configuration for different executor types
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "lowercase")]
