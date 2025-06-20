@@ -99,7 +99,7 @@ impl Task {
                    ) latest_activity ON ta.id = latest_activity.task_attempt_id
                    INNER JOIN task_attempt_activities taa ON ta.id = taa.task_attempt_id 
                        AND taa.created_at = latest_activity.latest_created_at
-                   WHERE taa.status = 'inprogress'
+                   WHERE taa.status IN ('setuprunning', 'executorrunning')
                ) in_progress_attempts ON t.id = in_progress_attempts.task_id
                WHERE t.project_id = $1 
                ORDER BY t.created_at DESC"#,
