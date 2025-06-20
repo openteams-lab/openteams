@@ -388,51 +388,8 @@ export function TaskDetailsDialog({
               </CardContent>
             </Card>
 
-            {/* Task Attempt Output */}
-            {selectedAttempt &&
-              (selectedAttempt.stdout || selectedAttempt.stderr) && (
-                <Card className="bg-black">
-                  <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold mb-4 text-green-400">
-                      Execution Output
-                    </h3>
-                    <div className="space-y-4">
-                      {selectedAttempt.stdout && (
-                        <div>
-                          <Label className="text-sm font-medium mb-2 block text-console-success">
-                          STDOUT
-                          </Label>
-                          <div
-                          className="bg-console text-console-success border border-console-success rounded-md p-4 font-mono text-sm max-h-96 overflow-y-auto whitespace-pre-wrap shadow-inner"
-                            style={{
-                              fontFamily:
-                                'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                            }}
-                          >
-                            {selectedAttempt.stdout}
-                          </div>
-                        </div>
-                      )}
-                      {selectedAttempt.stderr && (
-                        <div>
-                          <Label className="text-sm font-medium mb-2 block text-console-error">
-                            STDERR
-                          </Label>
-                          <div
-                            className="bg-console text-console-error border border-console-error rounded-md p-4 font-mono text-sm max-h-96 overflow-y-auto whitespace-pre-wrap shadow-inner"
-                            style={{
-                              fontFamily:
-                                'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                            }}
-                          >
-                            {selectedAttempt.stderr}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+            {/* TODO: Task Attempt Output - migrate to use ExecutionProcess data */}
+            {/* ExecutionProcess stdout/stderr display will be implemented when execution processes are exposed via API */}
           </div>
 
           {/* Sidebar */}

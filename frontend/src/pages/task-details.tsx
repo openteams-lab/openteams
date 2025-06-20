@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, FileText, Code, Monitor, Braces } from "lucide-react";
+import { ArrowLeft, FileText, Code /* , Monitor, Braces */ } from "lucide-react";
 import { makeRequest } from "@/lib/api";
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
 import { useKeyboardShortcuts } from "@/lib/keyboard-shortcuts";
@@ -91,7 +91,7 @@ export function TaskDetailsPage() {
   const [stoppingAttempt, setStoppingAttempt] = useState(false);
   const [openingEditor, setOpeningEditor] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [outputViewMode, setOutputViewMode] = useState<'console' | 'json'>('console');
+  // const [outputViewMode, setOutputViewMode] = useState<'console' | 'json'>('console');
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
 
@@ -416,7 +416,7 @@ export function TaskDetailsPage() {
     navigate(`/projects/${projectId}/tasks`);
   };
 
-  const parseJsonLines = (jsonlText: string) => {
+  /* const parseJsonLines = (jsonlText: string) => {
     const lines = jsonlText.split('\n').filter(line => line.trim());
     const parsedLines: { json: any; error?: string; raw: string }[] = [];
     
@@ -434,7 +434,7 @@ export function TaskDetailsPage() {
     });
     
     return parsedLines;
-  };
+  }; */
 
   if (taskLoading) {
     return (
@@ -526,9 +526,10 @@ export function TaskDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* Task Attempt Output */}
-          {selectedAttempt &&
-            (selectedAttempt.stdout || selectedAttempt.stderr) && (
+          {/* TODO: Task Attempt Output - migrate to use ExecutionProcess data */}
+          {/* ExecutionProcess stdout/stderr display will be implemented when execution processes are exposed via API */}
+          {/* 
+          {selectedAttempt && (
               <Card className="bg-black">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
@@ -675,7 +676,8 @@ export function TaskDetailsPage() {
                   )}
                 </CardContent>
               </Card>
-            )}
+            )
+          */}
         </div>
 
         {/* Sidebar */}

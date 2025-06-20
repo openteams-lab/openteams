@@ -49,6 +49,7 @@ pub trait Executor: Send + Sync {
         pool: &sqlx::SqlitePool,
         task_id: Uuid,
         attempt_id: Uuid,
+        execution_process_id: Uuid,
         worktree_path: &str,
     ) -> Result<Child, ExecutorError> {
         let mut child = self.spawn(pool, task_id, worktree_path).await?;
@@ -67,8 +68,20 @@ pub trait Executor: Send + Sync {
         let pool_clone1 = pool.clone();
         let pool_clone2 = pool.clone();
 
-        tokio::spawn(stream_output_to_db(stdout, pool_clone1, attempt_id, true));
-        tokio::spawn(stream_output_to_db(stderr, pool_clone2, attempt_id, false));
+        tokio::spawn(stream_output_to_db(
+            stdout,
+            pool_clone1,
+            attempt_id,
+            execution_process_id,
+            true,
+        ));
+        tokio::spawn(stream_output_to_db(
+            stderr,
+            pool_clone2,
+            attempt_id,
+            execution_process_id,
+            false,
+        ));
 
         Ok(child)
     }
@@ -102,9 +115,10 @@ async fn stream_output_to_db(
     output: impl tokio::io::AsyncRead + Unpin,
     pool: sqlx::SqlitePool,
     attempt_id: Uuid,
+    execution_process_id: Uuid,
     is_stdout: bool,
 ) {
-    use crate::models::task_attempt::TaskAttempt;
+    use crate::models::execution_process::ExecutionProcess;
 
     let mut reader = BufReader::new(output);
     let mut line = String::new();
@@ -121,9 +135,9 @@ async fn stream_output_to_db(
 
                 // Update database every 1 lines or when we have a significant amount of data
                 if update_counter >= 1 || accumulated_output.len() > 1024 {
-                    if let Err(e) = TaskAttempt::append_output(
+                    if let Err(e) = ExecutionProcess::append_output(
                         &pool,
-                        attempt_id,
+                        execution_process_id,
                         if is_stdout {
                             Some(&accumulated_output)
                         } else {
@@ -162,9 +176,9 @@ async fn stream_output_to_db(
 
     // Flush any remaining output
     if !accumulated_output.is_empty() {
-        if let Err(e) = TaskAttempt::append_output(
+        if let Err(e) = ExecutionProcess::append_output(
             &pool,
-            attempt_id,
+            execution_process_id,
             if is_stdout {
                 Some(&accumulated_output)
             } else {
