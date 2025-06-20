@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use chrono::{DateTime, Utc};
 use git2::build::CheckoutBuilder;
 use git2::{Error as GitError, MergeOptions, Oid, RebaseOptions, Repository};
@@ -690,33 +689,17 @@ impl TaskAttempt {
                         String::new() // File was deleted
                     };
 
-                    // Generate diff chunks using dissimilar
+                    // Generate line-based diff chunks
                     if old_content != new_content {
-                        let chunks = dissimilar::diff(&old_content, &new_content);
-                        let mut diff_chunks = Vec::new();
+                        let diff_chunks =
+                            Self::generate_line_based_diff(&old_content, &new_content);
 
-                        for chunk in chunks {
-                            let diff_chunk = match chunk {
-                                dissimilar::Chunk::Equal(text) => DiffChunk {
-                                    chunk_type: DiffChunkType::Equal,
-                                    content: text.to_string(),
-                                },
-                                dissimilar::Chunk::Delete(text) => DiffChunk {
-                                    chunk_type: DiffChunkType::Delete,
-                                    content: text.to_string(),
-                                },
-                                dissimilar::Chunk::Insert(text) => DiffChunk {
-                                    chunk_type: DiffChunkType::Insert,
-                                    content: text.to_string(),
-                                },
-                            };
-                            diff_chunks.push(diff_chunk);
+                        if !diff_chunks.is_empty() {
+                            files.push(FileDiff {
+                                path: path_str.to_string(),
+                                chunks: diff_chunks,
+                            });
                         }
-
-                        files.push(FileDiff {
-                            path: path_str.to_string(),
-                            chunks: diff_chunks,
-                        });
                     }
                 }
                 true // Continue processing
@@ -727,6 +710,98 @@ impl TaskAttempt {
         )?;
 
         Ok(WorktreeDiff { files })
+    }
+
+    /// Generate line-based diff chunks for better display
+    pub fn generate_line_based_diff(old_content: &str, new_content: &str) -> Vec<DiffChunk> {
+        let old_lines: Vec<&str> = old_content.lines().collect();
+        let new_lines: Vec<&str> = new_content.lines().collect();
+        let mut chunks = Vec::new();
+
+        // Use a simple line-by-line comparison algorithm
+        let mut old_idx = 0;
+        let mut new_idx = 0;
+
+        while old_idx < old_lines.len() || new_idx < new_lines.len() {
+            if old_idx < old_lines.len() && new_idx < new_lines.len() {
+                let old_line = old_lines[old_idx];
+                let new_line = new_lines[new_idx];
+
+                if old_line == new_line {
+                    // Lines are identical
+                    chunks.push(DiffChunk {
+                        chunk_type: DiffChunkType::Equal,
+                        content: format!("{}\n", old_line),
+                    });
+                    old_idx += 1;
+                    new_idx += 1;
+                } else {
+                    // Lines are different - look ahead to see if this is a modification, insertion, or deletion
+                    let mut found_match = false;
+
+                    // Check if the new line appears later in old lines (deletion)
+                    for look_ahead in (old_idx + 1)..std::cmp::min(old_idx + 5, old_lines.len()) {
+                        if old_lines[look_ahead] == new_line {
+                            // Found the new line later in old, so old_line was deleted
+                            chunks.push(DiffChunk {
+                                chunk_type: DiffChunkType::Delete,
+                                content: format!("{}\n", old_line),
+                            });
+                            old_idx += 1;
+                            found_match = true;
+                            break;
+                        }
+                    }
+
+                    if !found_match {
+                        // Check if the old line appears later in new lines (insertion)
+                        for look_ahead in (new_idx + 1)..std::cmp::min(new_idx + 5, new_lines.len())
+                        {
+                            if new_lines[look_ahead] == old_line {
+                                // Found the old line later in new, so new_line was inserted
+                                chunks.push(DiffChunk {
+                                    chunk_type: DiffChunkType::Insert,
+                                    content: format!("{}\n", new_line),
+                                });
+                                new_idx += 1;
+                                found_match = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if !found_match {
+                        // Lines are different - treat as modification (delete old, insert new)
+                        chunks.push(DiffChunk {
+                            chunk_type: DiffChunkType::Delete,
+                            content: format!("{}\n", old_line),
+                        });
+                        chunks.push(DiffChunk {
+                            chunk_type: DiffChunkType::Insert,
+                            content: format!("{}\n", new_line),
+                        });
+                        old_idx += 1;
+                        new_idx += 1;
+                    }
+                }
+            } else if old_idx < old_lines.len() {
+                // Remaining old lines (deletions)
+                chunks.push(DiffChunk {
+                    chunk_type: DiffChunkType::Delete,
+                    content: format!("{}\n", old_lines[old_idx]),
+                });
+                old_idx += 1;
+            } else {
+                // Remaining new lines (insertions)
+                chunks.push(DiffChunk {
+                    chunk_type: DiffChunkType::Insert,
+                    content: format!("{}\n", new_lines[new_idx]),
+                });
+                new_idx += 1;
+            }
+        }
+
+        chunks
     }
 
     /// Get the branch status for this task attempt (ahead/behind main)
@@ -836,7 +911,7 @@ impl TaskAttempt {
         let mut last_oid: Option<Oid> = None;
         while let Some(res) = reb.next() {
             match res {
-                Ok(op) => {
+                Ok(_op) => {
                     let new_oid = reb.commit(None, &sig, None)?;
                     last_oid = Some(new_oid);
                 }
@@ -863,7 +938,7 @@ impl TaskAttempt {
         repo.checkout_head(Some(CheckoutBuilder::new().force()))?;
 
         // 🔟 final check
-        let final_oid = repo.head()?.peel_to_commit()?.id();
+        let _final_oid = repo.head()?.peel_to_commit()?.id();
 
         Ok(main_oid.to_string())
     }
@@ -935,12 +1010,12 @@ impl TaskAttempt {
 
         // Check if file exists and delete it
         if file_full_path.exists() {
-            std::fs::remove_file(&file_full_path)
-                .map_err(|e| TaskAttemptError::Git(GitError::from_str(&format!(
+            std::fs::remove_file(&file_full_path).map_err(|e| {
+                TaskAttemptError::Git(GitError::from_str(&format!(
                     "Failed to delete file {}: {}",
-                    file_path,
-                    e
-                ))))?;
+                    file_path, e
+                )))
+            })?;
 
             debug!("Deleted file: {}", file_path);
         } else {
