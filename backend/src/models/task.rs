@@ -39,6 +39,7 @@ pub struct TaskWithAttemptStatus {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub has_in_progress_attempt: bool,
+    pub has_merged_attempt: bool,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -87,7 +88,8 @@ impl Task {
                 t.status as "status!: TaskStatus", 
                 t.created_at as "created_at!: DateTime<Utc>", 
                 t.updated_at as "updated_at!: DateTime<Utc>",
-                CASE WHEN in_progress_attempts.task_id IS NOT NULL THEN true ELSE false END as "has_in_progress_attempt!"
+                CASE WHEN in_progress_attempts.task_id IS NOT NULL THEN true ELSE false END as "has_in_progress_attempt!",
+                CASE WHEN merged_attempts.task_id IS NOT NULL THEN true ELSE false END as "has_merged_attempt!"
                FROM tasks t
                LEFT JOIN (
                    SELECT DISTINCT ta.task_id 
@@ -101,6 +103,11 @@ impl Task {
                        AND taa.created_at = latest_activity.latest_created_at
                    WHERE taa.status IN ('setuprunning', 'executorrunning')
                ) in_progress_attempts ON t.id = in_progress_attempts.task_id
+               LEFT JOIN (
+                   SELECT DISTINCT ta.task_id 
+                   FROM task_attempts ta
+                   WHERE ta.merge_commit IS NOT NULL
+               ) merged_attempts ON t.id = merged_attempts.task_id
                WHERE t.project_id = $1 
                ORDER BY t.created_at DESC"#,
             project_id
@@ -119,6 +126,7 @@ impl Task {
                 created_at: record.created_at,
                 updated_at: record.updated_at,
                 has_in_progress_attempt: record.has_in_progress_attempt != 0,
+                has_merged_attempt: record.has_merged_attempt != 0,
             })
             .collect();
 
