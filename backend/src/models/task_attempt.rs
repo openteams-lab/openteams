@@ -4,7 +4,7 @@ use git2::{Error as GitError, MergeOptions, Oid, RebaseOptions, Repository};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool, Type};
 use std::path::Path;
-use tracing::error;
+use tracing::{debug, error, info};
 use ts_rs::TS;
 use uuid::Uuid;
 
@@ -691,7 +691,8 @@ impl TaskAttempt {
 
                     // Generate line-based diff chunks
                     if old_content != new_content {
-                        let diff_chunks = Self::generate_line_based_diff(&old_content, &new_content);
+                        let diff_chunks =
+                            Self::generate_line_based_diff(&old_content, &new_content);
 
                         if !diff_chunks.is_empty() {
                             files.push(FileDiff {
@@ -716,16 +717,16 @@ impl TaskAttempt {
         let old_lines: Vec<&str> = old_content.lines().collect();
         let new_lines: Vec<&str> = new_content.lines().collect();
         let mut chunks = Vec::new();
-        
+
         // Use a simple line-by-line comparison algorithm
         let mut old_idx = 0;
         let mut new_idx = 0;
-        
+
         while old_idx < old_lines.len() || new_idx < new_lines.len() {
             if old_idx < old_lines.len() && new_idx < new_lines.len() {
                 let old_line = old_lines[old_idx];
                 let new_line = new_lines[new_idx];
-                
+
                 if old_line == new_line {
                     // Lines are identical
                     chunks.push(DiffChunk {
@@ -737,7 +738,7 @@ impl TaskAttempt {
                 } else {
                     // Lines are different - look ahead to see if this is a modification, insertion, or deletion
                     let mut found_match = false;
-                    
+
                     // Check if the new line appears later in old lines (deletion)
                     for look_ahead in (old_idx + 1)..std::cmp::min(old_idx + 5, old_lines.len()) {
                         if old_lines[look_ahead] == new_line {
@@ -751,10 +752,11 @@ impl TaskAttempt {
                             break;
                         }
                     }
-                    
+
                     if !found_match {
                         // Check if the old line appears later in new lines (insertion)
-                        for look_ahead in (new_idx + 1)..std::cmp::min(new_idx + 5, new_lines.len()) {
+                        for look_ahead in (new_idx + 1)..std::cmp::min(new_idx + 5, new_lines.len())
+                        {
                             if new_lines[look_ahead] == old_line {
                                 // Found the old line later in new, so new_line was inserted
                                 chunks.push(DiffChunk {
@@ -767,7 +769,7 @@ impl TaskAttempt {
                             }
                         }
                     }
-                    
+
                     if !found_match {
                         // Lines are different - treat as modification (delete old, insert new)
                         chunks.push(DiffChunk {
@@ -798,7 +800,7 @@ impl TaskAttempt {
                 new_idx += 1;
             }
         }
-        
+
         chunks
     }
 
@@ -1008,12 +1010,12 @@ impl TaskAttempt {
 
         // Check if file exists and delete it
         if file_full_path.exists() {
-            std::fs::remove_file(&file_full_path)
-                .map_err(|e| TaskAttemptError::Git(GitError::from_str(&format!(
+            std::fs::remove_file(&file_full_path).map_err(|e| {
+                TaskAttemptError::Git(GitError::from_str(&format!(
                     "Failed to delete file {}: {}",
-                    file_path,
-                    e
-                ))))?;
+                    file_path, e
+                )))
+            })?;
 
             debug!("Deleted file: {}", file_path);
         } else {
