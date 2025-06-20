@@ -100,7 +100,7 @@ pub async fn create_task(
 pub async fn create_task_and_start(
     Path(project_id): Path<Uuid>,
     Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::execution_monitor::AppState>,
+    Extension(app_state): Extension<crate::app_state::AppState>,
     Json(mut payload): Json<CreateTask>,
 ) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
     let task_id = Uuid::new_v4();
@@ -310,7 +310,7 @@ pub async fn get_task_attempt_activities(
 pub async fn create_task_attempt(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
     Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::execution_monitor::AppState>,
+    Extension(app_state): Extension<crate::app_state::AppState>,
     Json(mut payload): Json<CreateTaskAttempt>,
 ) -> Result<ResponseJson<ApiResponse<TaskAttempt>>, StatusCode> {
     // Verify task exists in project first
@@ -408,7 +408,7 @@ pub async fn create_task_attempt_activity(
 pub async fn stop_task_attempt(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
     Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::execution_monitor::AppState>,
+    Extension(app_state): Extension<crate::app_state::AppState>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
     match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {

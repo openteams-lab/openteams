@@ -13,6 +13,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 
+mod app_state;
 mod execution_monitor;
 mod executor;
 mod executors;
@@ -20,7 +21,8 @@ mod models;
 mod routes;
 mod utils;
 
-use execution_monitor::{execution_monitor, AppState};
+use app_state::AppState;
+use execution_monitor::execution_monitor;
 use models::{ApiResponse, Config};
 use routes::{config, filesystem, health, projects, tasks};
 

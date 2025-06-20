@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 use super::project::Project;
 use super::task::Task;
+use crate::app_state::ExecutionType;
 use crate::executor::ExecutorConfig;
 
 #[derive(Debug)]
@@ -424,7 +425,7 @@ impl TaskAttempt {
     /// Start the execution flow for a task attempt (setup script + executor)
     pub async fn start_execution(
         pool: &SqlitePool,
-        app_state: &crate::execution_monitor::AppState,
+        app_state: &crate::app_state::AppState,
         attempt_id: Uuid,
         task_id: Uuid,
         project_id: Uuid,
@@ -568,8 +569,9 @@ impl TaskAttempt {
         app_state
             .add_running_execution(
                 execution_id,
-                crate::execution_monitor::RunningExecution {
+                crate::app_state::RunningExecution {
                     task_attempt_id: attempt_id,
+                    execution_type: ExecutionType::CodingAgent,
                     child,
                 },
             )
