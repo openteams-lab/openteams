@@ -456,7 +456,7 @@ impl TaskAttempt {
                 tracing::info!("Running setup script for task attempt {}", attempt_id);
 
                 // Start setup script as streaming process
-                let child = tokio::process::Command::new("bash")
+                let mut child = tokio::process::Command::new("bash")
                     .arg("-c")
                     .arg(setup_script)
                     .current_dir(&task_attempt.worktree_path)
@@ -469,6 +469,35 @@ impl TaskAttempt {
                             e
                         )))
                     })?;
+
+                // Stream stdout and stderr to database
+                if let Some(stdout) = child.stdout.take() {
+                    let pool_clone = pool.clone();
+                    tokio::spawn(async move {
+                        crate::executor::stream_output_to_db(
+                            stdout,
+                            pool_clone,
+                            attempt_id,
+                            setup_process_id,
+                            true,
+                        )
+                        .await;
+                    });
+                }
+
+                if let Some(stderr) = child.stderr.take() {
+                    let pool_clone = pool.clone();
+                    tokio::spawn(async move {
+                        crate::executor::stream_output_to_db(
+                            stderr,
+                            pool_clone,
+                            attempt_id,
+                            setup_process_id,
+                            false,
+                        )
+                        .await;
+                    });
+                }
 
                 // Add setup script to running executions for monitoring
                 app_state

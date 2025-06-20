@@ -111,7 +111,7 @@ impl ExecutorConfig {
 }
 
 /// Stream output from a child process to the database
-async fn stream_output_to_db(
+pub async fn stream_output_to_db(
     output: impl tokio::io::AsyncRead + Unpin,
     pool: sqlx::SqlitePool,
     attempt_id: Uuid,
