@@ -5,8 +5,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
-import type { Config, ThemeMode, ApiResponse } from "shared/types";
+import type { Config, ThemeMode, EditorType, ApiResponse } from "shared/types";
 import { useTheme } from "@/components/theme-provider";
 
 export function Settings() {
@@ -188,6 +189,65 @@ export function Settings() {
                   Choose the default executor for running tasks.
                 </p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Editor</CardTitle>
+              <CardDescription>
+                Configure which editor to open when viewing task attempts.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="editor">Preferred Editor</Label>
+                <Select
+                  value={config.editor.editor_type}
+                  onValueChange={(value: EditorType) => updateConfig({ 
+                    editor: { 
+                      ...config.editor, 
+                      editor_type: value,
+                      custom_command: value === "custom" ? config.editor.custom_command : null
+                    } 
+                  })}
+                >
+                  <SelectTrigger id="editor">
+                    <SelectValue placeholder="Select editor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="vscode">VS Code</SelectItem>
+                    <SelectItem value="cursor">Cursor</SelectItem>
+                    <SelectItem value="windsurf">Windsurf</SelectItem>
+                    <SelectItem value="intellij">IntelliJ IDEA</SelectItem>
+                    <SelectItem value="zed">Zed</SelectItem>
+                    <SelectItem value="custom">Custom Command</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Choose your preferred code editor for opening task attempts.
+                </p>
+              </div>
+              
+              {config.editor.editor_type === "custom" && (
+                <div className="space-y-2">
+                  <Label htmlFor="custom-command">Custom Command</Label>
+                  <Input
+                    id="custom-command"
+                    placeholder="e.g., code, subl, vim"
+                    value={config.editor.custom_command || ""}
+                    onChange={(e) => updateConfig({ 
+                      editor: { 
+                        ...config.editor, 
+                        custom_command: e.target.value || null
+                      } 
+                    })}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Enter the command to run your custom editor. Use spaces for arguments (e.g., "code --wait").
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -10,6 +10,7 @@ pub struct Config {
     pub executor: ExecutorConfig,
     pub disclaimer_acknowledged: bool,
     pub sound_alerts: bool,
+    pub editor: EditorConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -21,6 +22,25 @@ pub enum ThemeMode {
     System,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct EditorConfig {
+    pub editor_type: EditorType,
+    pub custom_command: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "lowercase")]
+pub enum EditorType {
+    VSCode,
+    Cursor,
+    Windsurf,
+    IntelliJ,
+    Zed,
+    Custom,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -28,6 +48,35 @@ impl Default for Config {
             executor: ExecutorConfig::Claude,
             disclaimer_acknowledged: false,
             sound_alerts: true,
+            editor: EditorConfig::default(),
+        }
+    }
+}
+
+impl Default for EditorConfig {
+    fn default() -> Self {
+        Self {
+            editor_type: EditorType::VSCode,
+            custom_command: None,
+        }
+    }
+}
+
+impl EditorConfig {
+    pub fn get_command(&self) -> Vec<String> {
+        match &self.editor_type {
+            EditorType::VSCode => vec!["code".to_string()],
+            EditorType::Cursor => vec!["cursor".to_string()],
+            EditorType::Windsurf => vec!["windsurf".to_string()],
+            EditorType::IntelliJ => vec!["idea".to_string()],
+            EditorType::Zed => vec!["zed".to_string()],
+            EditorType::Custom => {
+                if let Some(custom) = &self.custom_command {
+                    custom.split_whitespace().map(|s| s.to_string()).collect()
+                } else {
+                    vec!["code".to_string()] // fallback to VSCode
+                }
+            }
         }
     }
 }

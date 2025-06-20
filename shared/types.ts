@@ -3,9 +3,13 @@
 
 export type ApiResponse<T> = { success: boolean, data: T | null, message: string | null, };
 
-export type Config = { theme: ThemeMode, executor: ExecutorConfig, disclaimer_acknowledged: boolean, sound_alerts: boolean, };
+export type Config = { theme: ThemeMode, executor: ExecutorConfig, disclaimer_acknowledged: boolean, sound_alerts: boolean, editor: EditorConfig, };
 
 export type ThemeMode = "light" | "dark" | "system";
+
+export type EditorConfig = { editor_type: EditorType, custom_command: string | null, };
+
+export type EditorType = "vscode" | "cursor" | "windsurf" | "intellij" | "zed" | "custom";
 
 export type ExecutorConfig = { "type": "echo" } | { "type": "claude" } | { "type": "amp" };
 
