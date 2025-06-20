@@ -97,6 +97,94 @@ pub async fn create_task(
     }
 }
 
+pub async fn create_task_and_start(
+    Path(project_id): Path<Uuid>,
+    Extension(pool): Extension<SqlitePool>,
+    Extension(app_state): Extension<crate::execution_monitor::AppState>,
+    Json(mut payload): Json<CreateTask>,
+) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
+    let task_id = Uuid::new_v4();
+
+    // Ensure the project_id in the payload matches the path parameter
+    payload.project_id = project_id;
+
+    // Verify project exists first
+    match Project::exists(&pool, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check project existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(true) => {}
+    }
+
+    tracing::debug!(
+        "Creating and starting task '{}' in project {}",
+        payload.title,
+        project_id
+    );
+
+    // Create the task first
+    let task = match Task::create(&pool, &payload, task_id).await {
+        Ok(task) => task,
+        Err(e) => {
+            tracing::error!("Failed to create task: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // Create task attempt
+    let attempt_id = Uuid::new_v4();
+    let worktree_path = format!("/tmp/task-{}-attempt-{}", task_id, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
+    
+    let attempt_payload = CreateTaskAttempt {
+        task_id,
+        worktree_path,
+        merge_commit: None,
+        executor: Some("claude".to_string()), // Default executor
+    };
+
+    match TaskAttempt::create(&pool, &attempt_payload, attempt_id).await {
+        Ok(attempt) => {
+            // Create initial activity record
+            let activity_id = Uuid::new_v4();
+            let _ = TaskAttemptActivity::create_initial(&pool, attempt.id, activity_id).await;
+
+            // Start execution asynchronously (don't block the response)
+            let pool_clone = pool.clone();
+            let app_state_clone = app_state.clone();
+            let attempt_id = attempt.id;
+            tokio::spawn(async move {
+                if let Err(e) = TaskAttempt::start_execution(
+                    &pool_clone,
+                    &app_state_clone,
+                    attempt_id,
+                    task_id,
+                    project_id,
+                )
+                .await
+                {
+                    tracing::error!(
+                        "Failed to start execution for task attempt {}: {}",
+                        attempt_id,
+                        e
+                    );
+                }
+            });
+
+            Ok(ResponseJson(ApiResponse {
+                success: true,
+                data: Some(task),
+                message: Some("Task created and started successfully".to_string()),
+            }))
+        }
+        Err(e) => {
+            tracing::error!("Failed to create task attempt: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 pub async fn update_task(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
     Extension(pool): Extension<SqlitePool>,
@@ -622,6 +710,10 @@ pub fn tasks_router() -> Router {
         .route(
             "/projects/:project_id/tasks",
             get(get_project_tasks).post(create_task),
+        )
+        .route(
+            "/projects/:project_id/tasks/create-and-start",
+            post(create_task_and_start),
         )
         .route(
             "/projects/:project_id/tasks/:task_id",

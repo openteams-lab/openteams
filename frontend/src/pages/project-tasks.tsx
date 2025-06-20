@@ -137,6 +137,27 @@ export function ProjectTasks() {
     }
   };
 
+  const handleCreateAndStartTask = async (title: string, description: string) => {
+    try {
+      const response = await makeRequest(`/api/projects/${projectId}/tasks/create-and-start`, {
+        method: "POST",
+        body: JSON.stringify({
+          project_id: projectId,
+          title,
+          description: description || null,
+        }),
+      });
+
+      if (response.ok) {
+        await fetchTasks();
+      } else {
+        setError("Failed to create and start task");
+      }
+    } catch (err) {
+      setError("Failed to create and start task");
+    }
+  };
+
   const handleUpdateTask = async (
     title: string,
     description: string,
@@ -292,6 +313,7 @@ export function ProjectTasks() {
         task={editingTask}
         projectId={projectId}
         onCreateTask={handleCreateTask}
+        onCreateAndStartTask={handleCreateAndStartTask}
         onUpdateTask={handleUpdateTask}
       />
 
