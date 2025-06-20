@@ -24,6 +24,34 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+    
+    /* Status colors */
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 138.5 76.5% 96.7%;
+    --warning: 32.2 95% 44.1%;
+    --warning-foreground: 26 83.3% 14.1%;
+    --info: 217.2 91.2% 59.8%;
+    --info-foreground: 222.2 84% 4.9%;
+    --neutral: 210 40% 96%;
+    --neutral-foreground: 222.2 84% 4.9%;
+    
+    /* Status indicator colors */
+    --status-init: 210 40% 96%;
+    --status-init-foreground: 222.2 84% 4.9%;
+    --status-running: 217.2 91.2% 59.8%;
+    --status-running-foreground: 222.2 84% 4.9%;
+    --status-complete: 142.1 76.2% 36.3%;
+    --status-complete-foreground: 138.5 76.5% 96.7%;
+    --status-failed: 0 84.2% 60.2%;
+    --status-failed-foreground: 210 40% 98%;
+    --status-paused: 32.2 95% 44.1%;
+    --status-paused-foreground: 26 83.3% 14.1%;
+    
+    /* Console/terminal colors */
+    --console-background: 222.2 84% 4.9%;
+    --console-foreground: 210 40% 98%;
+    --console-success: 138.5 76.5% 47.7%;
+    --console-error: 0 84.2% 60.2%;
   }
 
   .dark {
@@ -46,6 +74,34 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+    
+    /* Status colors */
+    --success: 138.5 76.5% 47.7%;
+    --success-foreground: 138.5 76.5% 96.7%;
+    --warning: 32.2 95% 44.1%;
+    --warning-foreground: 26 83.3% 14.1%;
+    --info: 217.2 91.2% 59.8%;
+    --info-foreground: 222.2 84% 4.9%;
+    --neutral: 217.2 32.6% 17.5%;
+    --neutral-foreground: 210 40% 98%;
+    
+    /* Status indicator colors */
+    --status-init: 217.2 32.6% 17.5%;
+    --status-init-foreground: 210 40% 98%;
+    --status-running: 217.2 91.2% 59.8%;
+    --status-running-foreground: 222.2 84% 4.9%;
+    --status-complete: 138.5 76.5% 47.7%;
+    --status-complete-foreground: 138.5 76.5% 96.7%;
+    --status-failed: 0 62.8% 30.6%;
+    --status-failed-foreground: 210 40% 98%;
+    --status-paused: 32.2 95% 44.1%;
+    --status-paused-foreground: 26 83.3% 14.1%;
+    
+    /* Console/terminal colors */
+    --console-background: 0 0% 0%;
+    --console-foreground: 138.5 76.5% 47.7%;
+    --console-success: 138.5 76.5% 47.7%;
+    --console-error: 0 84.2% 60.2%;
   }
 }
 

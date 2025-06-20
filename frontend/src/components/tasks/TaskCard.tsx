@@ -53,7 +53,7 @@ export function TaskCard({ task, index, status, onEdit, onDelete, onViewDetails 
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="h-6 w-6 p-0 hover:bg-gray-100"
+                    className="h-6 w-6 p-0 hover:bg-muted"
                   >
                     <MoreHorizontal className="h-3 w-3" />
                   </Button>
@@ -65,7 +65,7 @@ export function TaskCard({ task, index, status, onEdit, onDelete, onViewDetails 
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={() => onDelete(task.id)}
-                    className="text-red-600"
+                    className="text-destructive"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete

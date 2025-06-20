@@ -253,7 +253,7 @@ export function ProjectTasks() {
   }
 
   if (error) {
-    return <div className="text-center py-8 text-red-600">{error}</div>;
+    return <div className="text-center py-8 text-destructive">{error}</div>;
   }
 
   return (

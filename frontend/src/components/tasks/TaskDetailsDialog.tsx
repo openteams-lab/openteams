@@ -61,23 +61,23 @@ const statusLabels: Record<TaskStatus, string> = {
 const getAttemptStatusDisplay = (status: TaskAttemptStatus): { label: string; className: string } => {
   switch (status) {
     case "init":
-      return { label: "Init", className: "bg-gray-100 text-gray-800" };
+      return { label: "Init", className: "bg-status-init text-status-init-foreground" };
     case "setuprunning":
-      return { label: "Setup Running", className: "bg-blue-100 text-blue-800" };
+      return { label: "Setup Running", className: "bg-status-running text-status-running-foreground" };
     case "setupcomplete":
-      return { label: "Setup Complete", className: "bg-green-100 text-green-800" };
+      return { label: "Setup Complete", className: "bg-status-complete text-status-complete-foreground" };
     case "setupfailed":
-      return { label: "Setup Failed", className: "bg-red-100 text-red-800" };
+      return { label: "Setup Failed", className: "bg-status-failed text-status-failed-foreground" };
     case "executorrunning":
-      return { label: "Executor Running", className: "bg-blue-100 text-blue-800" };
+      return { label: "Executor Running", className: "bg-status-running text-status-running-foreground" };
     case "executorcomplete":
-      return { label: "Executor Complete", className: "bg-green-100 text-green-800" };
+      return { label: "Executor Complete", className: "bg-status-complete text-status-complete-foreground" };
     case "executorfailed":
-      return { label: "Executor Failed", className: "bg-red-100 text-red-800" };
+      return { label: "Executor Failed", className: "bg-status-failed text-status-failed-foreground" };
     case "paused":
-      return { label: "Paused", className: "bg-yellow-100 text-yellow-800" };
+      return { label: "Paused", className: "bg-status-paused text-status-paused-foreground" };
     default:
-      return { label: "Unknown", className: "bg-gray-100 text-gray-800" };
+      return { label: "Unknown", className: "bg-status-init text-status-init-foreground" };
   }
 };
 
@@ -371,13 +371,13 @@ export function TaskDetailsDialog({
                         placeholder="Enter task description..."
                       />
                     ) : (
-                      <div className="mt-1 p-3 bg-gray-50 rounded-md min-h-[60px]">
+                      <div className="mt-1 p-3 bg-muted rounded-md min-h-[60px]">
                         {task?.description ? (
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                          <p className="text-sm text-foreground whitespace-pre-wrap">
                             {task.description}
                           </p>
                         ) : (
-                          <p className="text-sm text-gray-500 italic">
+                          <p className="text-sm text-muted-foreground italic">
                             No description provided
                           </p>
                         )}
@@ -399,11 +399,11 @@ export function TaskDetailsDialog({
                     <div className="space-y-4">
                       {selectedAttempt.stdout && (
                         <div>
-                          <Label className="text-sm font-medium mb-2 block text-green-400">
-                            STDOUT
+                          <Label className="text-sm font-medium mb-2 block text-console-success">
+                          STDOUT
                           </Label>
                           <div
-                            className="bg-black border border-green-400 rounded-md p-4 font-mono text-sm text-green-400 max-h-96 overflow-y-auto whitespace-pre-wrap shadow-inner"
+                          className="bg-console text-console-success border border-console-success rounded-md p-4 font-mono text-sm max-h-96 overflow-y-auto whitespace-pre-wrap shadow-inner"
                             style={{
                               fontFamily:
                                 'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
@@ -415,13 +415,12 @@ export function TaskDetailsDialog({
                       )}
                       {selectedAttempt.stderr && (
                         <div>
-                          <Label className="text-sm font-medium mb-2 block text-red-400">
+                          <Label className="text-sm font-medium mb-2 block text-console-error">
                             STDERR
                           </Label>
                           <div
-                            className="bg-black border border-red-400 rounded-md p-4 font-mono text-sm text-red-400 max-h-96 overflow-y-auto whitespace-pre-wrap shadow-inner"
+                            className="bg-console text-console-error border border-console-error rounded-md p-4 font-mono text-sm max-h-96 overflow-y-auto whitespace-pre-wrap shadow-inner"
                             style={{
-                              textShadow: "0 0 2px #ff0000",
                               fontFamily:
                                 'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
                             }}
@@ -470,14 +469,14 @@ export function TaskDetailsDialog({
                       <div
                         className={`mt-1 px-2 py-1 rounded-full text-xs font-medium w-fit ${
                           task?.status === "todo"
-                            ? "bg-gray-100 text-gray-800"
+                            ? "bg-neutral text-neutral-foreground"
                             : task?.status === "inprogress"
-                            ? "bg-blue-100 text-blue-800"
+                            ? "bg-info text-info-foreground"
                             : task?.status === "inreview"
-                            ? "bg-yellow-100 text-yellow-800"
+                            ? "bg-warning text-warning-foreground"
                             : task?.status === "done"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
+                            ? "bg-success text-success-foreground"
+                            : "bg-destructive text-destructive-foreground"
                         }`}
                       >
                         {task ? statusLabels[task.status] : ""}
@@ -651,7 +650,7 @@ export function TaskDetailsDialog({
                       {attemptActivities.map((activity) => (
                         <div
                           key={activity.id}
-                          className="border-l-2 border-gray-200 pl-3 pb-2"
+                          className="border-l-2 border-border pl-3 pb-2"
                         >
                           <div className="flex items-center justify-between">
                             <span

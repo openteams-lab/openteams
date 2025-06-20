@@ -29,11 +29,11 @@ const statusLabels: Record<TaskStatus, string> = {
 }
 
 const statusBoardColors: Record<TaskStatus, string> = {
-  todo: '#64748b',
-  inprogress: '#3b82f6',
-  inreview: '#f59e0b',
-  done: '#22c55e',
-  cancelled: '#ef4444'
+  todo: 'hsl(var(--neutral))',
+  inprogress: 'hsl(var(--info))',
+  inreview: 'hsl(var(--warning))',
+  done: 'hsl(var(--success))',
+  cancelled: 'hsl(var(--destructive))'
 }
 
 export function TaskKanbanBoard({ tasks, onDragEnd, onEditTask, onDeleteTask, onViewTaskDetails }: TaskKanbanBoardProps) {

@@ -125,7 +125,7 @@ export function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
           <Button 
             variant="outline" 
             onClick={handleDelete}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            className="text-destructive hover:text-destructive-foreground hover:bg-destructive/10"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Delete

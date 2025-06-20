@@ -51,6 +51,40 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+        neutral: {
+          DEFAULT: "hsl(var(--neutral))",
+          foreground: "hsl(var(--neutral-foreground))",
+        },
+        status: {
+          init: "hsl(var(--status-init))",
+          "init-foreground": "hsl(var(--status-init-foreground))",
+          running: "hsl(var(--status-running))",
+          "running-foreground": "hsl(var(--status-running-foreground))",
+          complete: "hsl(var(--status-complete))",
+          "complete-foreground": "hsl(var(--status-complete-foreground))",
+          failed: "hsl(var(--status-failed))",
+          "failed-foreground": "hsl(var(--status-failed-foreground))",
+          paused: "hsl(var(--status-paused))",
+          "paused-foreground": "hsl(var(--status-paused-foreground))",
+        },
+        console: {
+          DEFAULT: "hsl(var(--console-background))",
+          foreground: "hsl(var(--console-foreground))",
+          success: "hsl(var(--console-success))",
+          error: "hsl(var(--console-error))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

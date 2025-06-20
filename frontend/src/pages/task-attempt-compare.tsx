@@ -168,7 +168,7 @@ export function TaskAttemptComparePage() {
         return `${baseClass} bg-red-50 text-red-800 border-l-2 border-red-400`;
       case 'Equal':
       default:
-        return `${baseClass} text-gray-700`;
+        return `${baseClass} text-muted-foreground`;
     }
   };
 
@@ -323,7 +323,7 @@ export function TaskAttemptComparePage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading diff...</p>
         </div>
       </div>
@@ -334,7 +334,7 @@ export function TaskAttemptComparePage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
+          <p className="text-destructive mb-4">{error}</p>
           <Button onClick={handleBackClick} variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Task
@@ -439,8 +439,8 @@ export function TaskAttemptComparePage() {
             <div className="space-y-6">
               {diff.files.map((file, fileIndex) => (
                 <div key={fileIndex} className="border rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 px-3 py-2 border-b">
-                    <p className="text-sm font-medium text-gray-700 font-mono">
+                  <div className="bg-muted px-3 py-2 border-b">
+                    <p className="text-sm font-medium text-muted-foreground font-mono">
                       {file.path}
                     </p>
                   </div>
