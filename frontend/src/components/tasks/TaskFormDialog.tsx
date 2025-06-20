@@ -34,6 +34,7 @@ interface TaskFormDialogProps {
   task?: Task | null // Optional for create mode
   projectId?: string // For file search functionality
   onCreateTask?: (title: string, description: string) => Promise<void>
+  onCreateAndStartTask?: (title: string, description: string) => Promise<void>
   onUpdateTask?: (title: string, description: string, status: TaskStatus) => Promise<void>
 }
 
@@ -43,12 +44,14 @@ export function TaskFormDialog({
   task, 
   projectId,
   onCreateTask, 
+  onCreateAndStartTask,
   onUpdateTask 
 }: TaskFormDialogProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<TaskStatus>('todo')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmittingAndStart, setIsSubmittingAndStart] = useState(false)
 
   const isEditMode = Boolean(task)
 
@@ -90,6 +93,26 @@ export function TaskFormDialog({
     }
   }
 
+  const handleCreateAndStart = async () => {
+    if (!title.trim()) return
+    
+    setIsSubmittingAndStart(true)
+    try {
+      if (!isEditMode && onCreateAndStartTask) {
+        await onCreateAndStartTask(title, description)
+      }
+      
+      // Reset form on successful creation
+      setTitle('')
+      setDescription('')
+      setStatus('todo')
+      
+      onOpenChange(false)
+    } finally {
+      setIsSubmittingAndStart(false)
+    }
+  }
+
   const handleCancel = () => {
     // Reset form state when canceling
     if (task) {
@@ -118,7 +141,7 @@ export function TaskFormDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter task title"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSubmittingAndStart}
             />
           </div>
           
@@ -129,7 +152,7 @@ export function TaskFormDialog({
               onChange={setDescription}
               placeholder="Enter task description (optional). Type @ to search files."
               rows={3}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSubmittingAndStart}
               projectId={projectId}
             />
           </div>
@@ -140,7 +163,7 @@ export function TaskFormDialog({
               <Select
                 value={status}
                 onValueChange={(value) => setStatus(value as TaskStatus)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isSubmittingAndStart}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -160,19 +183,36 @@ export function TaskFormDialog({
             <Button
               variant="outline"
               onClick={handleCancel}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSubmittingAndStart}
             >
               Cancel
             </Button>
-            <Button 
-              onClick={handleSubmit}
-              disabled={isSubmitting || !title.trim()}
-            >
-              {isSubmitting 
-                ? (isEditMode ? 'Updating...' : 'Creating...') 
-                : (isEditMode ? 'Update Task' : 'Create Task')
-              }
-            </Button>
+            {isEditMode ? (
+              <Button 
+                onClick={handleSubmit}
+                disabled={isSubmitting || !title.trim()}
+              >
+                {isSubmitting ? 'Updating...' : 'Update Task'}
+              </Button>
+            ) : (
+              <>
+                <Button 
+                  variant="outline"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || isSubmittingAndStart || !title.trim()}
+                >
+                  {isSubmitting ? 'Creating...' : 'Create Task'}
+                </Button>
+                {onCreateAndStartTask && (
+                  <Button 
+                    onClick={handleCreateAndStart}
+                    disabled={isSubmitting || isSubmittingAndStart || !title.trim()}
+                  >
+                    {isSubmittingAndStart ? 'Creating & Starting...' : 'Create & Start'}
+                  </Button>
+                )}
+              </>
+            )}
           </div>
         </div>
       </DialogContent>
