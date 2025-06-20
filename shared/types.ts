@@ -31,11 +31,11 @@ export type UpdateTask = { title: string | null, description: string | null, sta
 
 export type TaskAttemptStatus = "init" | "setuprunning" | "setupcomplete" | "setupfailed" | "executorrunning" | "executorcomplete" | "executorfailed" | "paused";
 
-export type TaskAttempt = { id: string, task_id: string, worktree_path: string, base_commit: string | null, merge_commit: string | null, executor: string | null, stdout: string | null, stderr: string | null, created_at: string, updated_at: string, };
+export type TaskAttempt = { id: string, task_id: string, worktree_path: string, merge_commit: string | null, executor: string | null, stdout: string | null, stderr: string | null, created_at: string, updated_at: string, };
 
-export type CreateTaskAttempt = { task_id: string, worktree_path: string, base_commit: string | null, merge_commit: string | null, executor: string | null, };
+export type CreateTaskAttempt = { task_id: string, worktree_path: string, merge_commit: string | null, executor: string | null, };
 
-export type UpdateTaskAttempt = { worktree_path: string | null, base_commit: string | null, merge_commit: string | null, };
+export type UpdateTaskAttempt = { worktree_path: string | null, merge_commit: string | null, };
 
 export type TaskAttemptActivity = { id: string, task_attempt_id: string, status: TaskAttemptStatus, note: string | null, created_at: string, };
 
@@ -51,4 +51,4 @@ export type FileDiff = { path: string, chunks: Array<DiffChunk>, };
 
 export type WorktreeDiff = { files: Array<FileDiff>, };
 
-export type BranchStatus = { is_behind: boolean, commits_behind: number, commits_ahead: number, up_to_date: boolean, };
+export type BranchStatus = { is_behind: boolean, commits_behind: number, commits_ahead: number, up_to_date: boolean, merged: boolean, };

@@ -129,6 +129,7 @@ pub struct BranchStatus {
     pub commits_behind: usize,
     pub commits_ahead: usize,
     pub up_to_date: bool,
+    pub merged: bool,
 }
 
 impl TaskAttempt {
@@ -776,6 +777,7 @@ impl TaskAttempt {
                 commits_behind: 0,
                 commits_ahead: 0,
                 up_to_date: true,
+                merged: attempt.merge_commit.is_some(),
             });
         }
 
@@ -798,6 +800,7 @@ impl TaskAttempt {
             commits_behind,
             commits_ahead,
             up_to_date: commits_behind == 0 && commits_ahead == 0,
+            merged: attempt.merge_commit.is_some(),
         })
     }
 

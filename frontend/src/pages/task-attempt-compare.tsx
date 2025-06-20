@@ -376,7 +376,12 @@ export function TaskAttemptComparePage() {
             </div>
           )}
 
-          {/* Success Messages */}
+          {/* Status Messages */}
+          {branchStatus?.merged && (
+            <div className="text-green-600 text-sm font-medium">
+              ✓ Changes have been merged
+            </div>
+          )}
           {rebaseSuccess && (
             <div className="text-green-600 text-sm">
               Branch rebased successfully!
@@ -390,7 +395,7 @@ export function TaskAttemptComparePage() {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
-            {branchStatus && branchStatus.is_behind === true && (
+            {branchStatus && branchStatus.is_behind === true && !branchStatus.merged && (
               <Button 
                 onClick={handleRebaseClick} 
                 disabled={rebasing || branchStatusLoading}
@@ -401,13 +406,15 @@ export function TaskAttemptComparePage() {
                 {rebasing ? "Rebasing..." : "Rebase onto Main"}
               </Button>
             )}
-            <Button 
-              onClick={handleMergeClick} 
-              disabled={merging || !diff || diff.files.length === 0 || Boolean(branchStatus?.is_behind)}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
-            >
-              {merging ? "Merging..." : "Merge Changes"}
-            </Button>
+            {!branchStatus?.merged && (
+              <Button 
+                onClick={handleMergeClick} 
+                disabled={merging || !diff || diff.files.length === 0 || Boolean(branchStatus?.is_behind)}
+                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
+              >
+                {merging ? "Merging..." : "Merge Changes"}
+              </Button>
+            )}
           </div>
         </div>
       </div>
