@@ -3,7 +3,7 @@
 
 export type ApiResponse<T> = { success: boolean, data: T | null, message: string | null, };
 
-export type Config = { theme: ThemeMode, executor: ExecutorConfig, disclaimer_acknowledged: boolean, };
+export type Config = { theme: ThemeMode, executor: ExecutorConfig, disclaimer_acknowledged: boolean, sound_alerts: boolean, };
 
 export type ThemeMode = "light" | "dark" | "system";
 

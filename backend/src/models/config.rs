@@ -9,6 +9,7 @@ pub struct Config {
     pub theme: ThemeMode,
     pub executor: ExecutorConfig,
     pub disclaimer_acknowledged: bool,
+    pub sound_alerts: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -26,6 +27,7 @@ impl Default for Config {
             theme: ThemeMode::System,
             executor: ExecutorConfig::Claude,
             disclaimer_acknowledged: false,
+            sound_alerts: true,
         }
     }
 }

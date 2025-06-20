@@ -23,6 +23,7 @@ pub struct RunningExecution {
 pub struct AppState {
     pub running_executions: Arc<Mutex<HashMap<Uuid, RunningExecution>>>,
     pub db_pool: sqlx::SqlitePool,
+    pub config: Arc<tokio::sync::RwLock<crate::models::config::Config>>,
 }
 
 /// Commit any unstaged changes in the worktree after execution completion
@@ -82,6 +83,40 @@ async fn commit_execution_changes(
     .await??;
 
     Ok(())
+}
+
+/// Play a system sound notification
+async fn play_sound_notification() {
+    // Use platform-specific sound notification
+    if cfg!(target_os = "macos") {
+        let _ = tokio::process::Command::new("afplay")
+            .arg("/System/Library/Sounds/Glass.aiff")
+            .spawn();
+    } else if cfg!(target_os = "linux") {
+        // Try different Linux notification sounds
+        if let Ok(_) = tokio::process::Command::new("paplay")
+            .arg("/usr/share/sounds/alsa/Front_Left.wav")
+            .spawn()
+        {
+            // Success with paplay
+        } else if let Ok(_) = tokio::process::Command::new("aplay")
+            .arg("/usr/share/sounds/alsa/Front_Left.wav")
+            .spawn()
+        {
+            // Success with aplay
+        } else {
+            // Try system bell as fallback
+            let _ = tokio::process::Command::new("echo")
+                .arg("-e")
+                .arg("\\a")
+                .spawn();
+        }
+    } else if cfg!(target_os = "windows") {
+        let _ = tokio::process::Command::new("powershell")
+            .arg("-c")
+            .arg("[console]::beep(800, 300)")
+            .spawn();
+    }
 }
 
 pub async fn execution_monitor(app_state: AppState) {
@@ -214,6 +249,15 @@ pub async fn execution_monitor(app_state: AppState) {
             };
 
             tracing::info!("Execution {} {}{}", execution_id, status_text, exit_text);
+
+            // Play sound notification if enabled
+            let sound_enabled = {
+                let config = app_state.config.read().await;
+                config.sound_alerts
+            };
+            if sound_enabled {
+                play_sound_notification().await;
+            }
 
             // Get task attempt to access worktree path for committing changes
             if let Ok(Some(task_attempt)) =

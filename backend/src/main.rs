@@ -110,6 +110,7 @@ async fn main() -> anyhow::Result<()> {
     let app_state = AppState {
         running_executions: Arc::new(Mutex::new(HashMap::new())),
         db_pool: pool.clone(),
+        config: config_arc.clone(),
     };
 
     // Start background task to check for init status and spawn processes

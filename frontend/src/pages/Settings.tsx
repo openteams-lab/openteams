@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import type { Config, ThemeMode, ApiResponse } from "shared/types";
 import { useTheme } from "@/components/theme-provider";
@@ -186,6 +187,30 @@ export function Settings() {
                 <p className="text-sm text-muted-foreground">
                   Choose the default executor for running tasks.
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Notifications</CardTitle>
+              <CardDescription>
+                Configure how you receive notifications about task completion.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="sound-alerts"
+                  checked={config.sound_alerts}
+                  onCheckedChange={(checked: boolean) => updateConfig({ sound_alerts: checked })}
+                />
+                <div className="space-y-0.5">
+                  <Label htmlFor="sound-alerts" className="cursor-pointer">Sound Alerts</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Play a sound when task attempts finish running.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
