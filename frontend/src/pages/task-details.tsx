@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, FileText, Code } from "lucide-react";
+import { ArrowLeft, FileText, Code, Monitor, Braces } from "lucide-react";
 import { makeRequest } from "@/lib/api";
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
 import { useKeyboardShortcuts } from "@/lib/keyboard-shortcuts";
@@ -91,6 +91,7 @@ export function TaskDetailsPage() {
   const [stoppingAttempt, setStoppingAttempt] = useState(false);
   const [openingEditor, setOpeningEditor] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [outputViewMode, setOutputViewMode] = useState<'console' | 'json'>('console');
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
 
@@ -415,6 +416,26 @@ export function TaskDetailsPage() {
     navigate(`/projects/${projectId}/tasks`);
   };
 
+  const parseJsonLines = (jsonlText: string) => {
+    const lines = jsonlText.split('\n').filter(line => line.trim());
+    const parsedLines: { json: any; error?: string; raw: string }[] = [];
+    
+    lines.forEach(line => {
+      try {
+        const parsed = JSON.parse(line);
+        parsedLines.push({ json: parsed, raw: line });
+      } catch (error) {
+        parsedLines.push({ 
+          json: null, 
+          error: error instanceof Error ? error.message : 'Parse error',
+          raw: line 
+        });
+      }
+    });
+    
+    return parsedLines;
+  };
+
   if (taskLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -510,43 +531,148 @@ export function TaskDetailsPage() {
             (selectedAttempt.stdout || selectedAttempt.stderr) && (
               <Card className="bg-black">
                 <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold mb-4 text-green-400">
-                    Execution Output
-                  </h3>
-                  <div className="space-y-4">
-                    {selectedAttempt.stdout && (
-                      <div>
-                        <Label className="text-sm font-medium mb-2 block text-console-success">
-                          STDOUT
-                        </Label>
-                        <div
-                          className="bg-console text-console-success border border-console-success rounded-md p-4 font-mono text-sm max-h-96 overflow-y-auto whitespace-pre-wrap shadow-inner"
-                          style={{
-                            fontFamily:
-                              'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                          }}
-                        >
-                          {selectedAttempt.stdout}
-                        </div>
-                      </div>
-                    )}
-                    {selectedAttempt.stderr && (
-                      <div>
-                        <Label className="text-sm font-medium mb-2 block text-console-error">
-                          STDERR
-                        </Label>
-                        <div
-                          className="bg-console text-console-error border border-console-error rounded-md p-4 font-mono text-sm max-h-96 overflow-y-auto whitespace-pre-wrap shadow-inner"
-                          style={{
-                            fontFamily:
-                              'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                          }}
-                        >
-                          {selectedAttempt.stderr}
-                        </div>
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-green-400">
+                      Execution Output
+                    </h3>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => setOutputViewMode('console')}
+                        variant={outputViewMode === 'console' ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-8"
+                      >
+                        <Monitor className="mr-2 h-3 w-3" />
+                        Console
+                      </Button>
+                      <Button
+                        onClick={() => setOutputViewMode('json')}
+                        variant={outputViewMode === 'json' ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-8"
+                      >
+                        <Braces className="mr-2 h-3 w-3" />
+                        JSON
+                      </Button>
+                    </div>
                   </div>
+                  {outputViewMode === 'console' ? (
+                    <div className="space-y-4">
+                      {selectedAttempt.stdout && (
+                        <div>
+                          <Label className="text-sm font-medium mb-2 block text-console-success">
+                            STDOUT
+                          </Label>
+                          <div
+                            className="bg-console text-console-success border border-console-success rounded-md p-4 font-mono text-sm max-h-96 overflow-y-auto whitespace-pre-wrap shadow-inner"
+                            style={{
+                              fontFamily:
+                                'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                            }}
+                          >
+                            {selectedAttempt.stdout}
+                          </div>
+                        </div>
+                      )}
+                      {selectedAttempt.stderr && (
+                        <div>
+                          <Label className="text-sm font-medium mb-2 block text-console-error">
+                            STDERR
+                          </Label>
+                          <div
+                            className="bg-console text-console-error border border-console-error rounded-md p-4 font-mono text-sm max-h-96 overflow-y-auto whitespace-pre-wrap shadow-inner"
+                            style={{
+                              fontFamily:
+                                'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                            }}
+                          >
+                            {selectedAttempt.stderr}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {selectedAttempt.stdout && (
+                        <div>
+                          <Label className="text-sm font-medium mb-2 block text-console-success">
+                            STDOUT (JSON)
+                          </Label>
+                          <div className="max-h-96 overflow-y-auto space-y-3">
+                            {parseJsonLines(selectedAttempt.stdout).map((line, index) => (
+                              <div key={index} className="border border-console-success rounded-md">
+                                {line.error ? (
+                                  <div className="p-3">
+                                    <div className="text-red-400 text-xs mb-2">Parse Error: {line.error}</div>
+                                    <div
+                                      className="bg-console text-console-error font-mono text-sm whitespace-pre-wrap"
+                                      style={{
+                                        fontFamily:
+                                          'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                                      }}
+                                    >
+                                      {line.raw}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="p-3">
+                                    <pre
+                                      className="bg-gray-900 text-console-success font-mono text-sm whitespace-pre-wrap overflow-x-auto"
+                                      style={{
+                                        fontFamily:
+                                          'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                                      }}
+                                    >
+                                      {JSON.stringify(line.json, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedAttempt.stderr && (
+                        <div>
+                          <Label className="text-sm font-medium mb-2 block text-console-error">
+                            STDERR (JSON)
+                          </Label>
+                          <div className="max-h-96 overflow-y-auto space-y-3">
+                            {parseJsonLines(selectedAttempt.stderr).map((line, index) => (
+                              <div key={index} className="border border-console-error rounded-md">
+                                {line.error ? (
+                                  <div className="p-3">
+                                    <div className="text-red-400 text-xs mb-2">Parse Error: {line.error}</div>
+                                    <div
+                                      className="bg-console text-console-error font-mono text-sm whitespace-pre-wrap"
+                                      style={{
+                                        fontFamily:
+                                          'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                                      }}
+                                    >
+                                      {line.raw}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="p-3">
+                                    <pre
+                                      className="bg-gray-900 text-console-error font-mono text-sm whitespace-pre-wrap overflow-x-auto"
+                                      style={{
+                                        fontFamily:
+                                          'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                                      }}
+                                    >
+                                      {JSON.stringify(line.json, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
