@@ -12,9 +12,17 @@ use crate::models::{
     task_attempt_activity::{CreateTaskAttemptActivity, TaskAttemptActivity},
 };
 
+// #[derive(Debug)]
+// pub enum ExecutionType {
+//     SetupScript,
+//     CodingAgent,
+//     DevServer,
+// }
+
 #[derive(Debug)]
 pub struct RunningExecution {
     pub task_attempt_id: Uuid,
+    // pub execution_type: ExecutionType,
     pub child: tokio::process::Child,
     pub started_at: DateTime<Utc>,
 }

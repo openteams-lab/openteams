@@ -88,7 +88,7 @@ impl Task {
                 t.status as "status!: TaskStatus", 
                 t.created_at as "created_at!: DateTime<Utc>", 
                 t.updated_at as "updated_at!: DateTime<Utc>",
-                CASE WHEN in_progress_attempts.task_id IS NOT NULL THEN true ELSE false END as "has_in_progress_attempt!",
+                CASE WHEN in_progress_attempts.task_id IS NOT NULL THEN true ELSE false END as "has_in_progress_attempt!: i64",
                 CASE WHEN merged_attempts.task_id IS NOT NULL THEN true ELSE false END as "has_merged_attempt!"
                FROM tasks t
                LEFT JOIN (
