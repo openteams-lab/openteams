@@ -771,33 +771,92 @@ impl TaskAttempt {
                     }
 
                     if !found_match {
-                        // Lines are different - treat as modification (delete old, insert new)
-                        chunks.push(DiffChunk {
-                            chunk_type: DiffChunkType::Delete,
-                            content: format!("{}\n", old_line),
-                        });
-                        chunks.push(DiffChunk {
-                            chunk_type: DiffChunkType::Insert,
-                            content: format!("{}\n", new_line),
-                        });
-                        old_idx += 1;
-                        new_idx += 1;
+                        // Lines are different - collect consecutive changes to group them
+                        let change_start_old = old_idx;
+                        let change_start_new = new_idx;
+
+                        // Find the end of the change block by looking for the next matching section
+                        let mut next_match_old = old_lines.len();
+                        let mut next_match_new = new_lines.len();
+
+                        // Look for the next sequence of matching lines (at least 2 consecutive matches)
+                        for search_old in (old_idx + 1)..old_lines.len() {
+                            for search_new in (new_idx + 1)..new_lines.len() {
+                                if search_old < old_lines.len() - 1 && search_new < new_lines.len() - 1 {
+                                    // Check for at least 2 consecutive matching lines to confirm this is not a coincidental match
+                                    if old_lines[search_old] == new_lines[search_new] 
+                                        && old_lines[search_old + 1] == new_lines[search_new + 1] {
+                                        next_match_old = search_old;
+                                        next_match_new = search_new;
+                                        break;
+                                    }
+                                } else if search_old == old_lines.len() - 1 && search_new == new_lines.len() - 1 {
+                                    // Last lines match
+                                    if old_lines[search_old] == new_lines[search_new] {
+                                        next_match_old = search_old;
+                                        next_match_new = search_new;
+                                        break;
+                                    }
+                                }
+                            }
+                            if next_match_old < old_lines.len() {
+                                break;
+                            }
+                        }
+
+                        let change_end_old = next_match_old;
+                        let change_end_new = next_match_new;
+
+                        // Create grouped delete chunk if there are lines to delete
+                        if change_end_old > change_start_old {
+                            let delete_content = old_lines[change_start_old..change_end_old]
+                                .iter()
+                                .map(|line| format!("{}\n", line))
+                                .collect::<String>();
+                            chunks.push(DiffChunk {
+                                chunk_type: DiffChunkType::Delete,
+                                content: delete_content,
+                            });
+                        }
+
+                        // Create grouped insert chunk if there are lines to insert
+                        if change_end_new > change_start_new {
+                            let insert_content = new_lines[change_start_new..change_end_new]
+                                .iter()
+                                .map(|line| format!("{}\n", line))
+                                .collect::<String>();
+                            chunks.push(DiffChunk {
+                                chunk_type: DiffChunkType::Insert,
+                                content: insert_content,
+                            });
+                        }
+
+                        old_idx = change_end_old;
+                        new_idx = change_end_new;
                     }
                 }
             } else if old_idx < old_lines.len() {
-                // Remaining old lines (deletions)
+                // Remaining old lines (deletions) - group them together
+                let remaining_content = old_lines[old_idx..]
+                    .iter()
+                    .map(|line| format!("{}\n", line))
+                    .collect::<String>();
                 chunks.push(DiffChunk {
                     chunk_type: DiffChunkType::Delete,
-                    content: format!("{}\n", old_lines[old_idx]),
+                    content: remaining_content,
                 });
-                old_idx += 1;
+                old_idx = old_lines.len();
             } else {
-                // Remaining new lines (insertions)
+                // Remaining new lines (insertions) - group them together
+                let remaining_content = new_lines[new_idx..]
+                    .iter()
+                    .map(|line| format!("{}\n", line))
+                    .collect::<String>();
                 chunks.push(DiffChunk {
                     chunk_type: DiffChunkType::Insert,
-                    content: format!("{}\n", new_lines[new_idx]),
+                    content: remaining_content,
                 });
-                new_idx += 1;
+                new_idx = new_lines.len();
             }
         }
 
