@@ -902,4 +902,77 @@ impl TaskAttempt {
         // No need to update database as we now get base_commit live from git
         Ok(new_base_commit)
     }
+
+    /// Delete a file from the worktree and commit the change
+    pub async fn delete_file(
+        pool: &SqlitePool,
+        attempt_id: Uuid,
+        task_id: Uuid,
+        project_id: Uuid,
+        file_path: &str,
+    ) -> Result<String, TaskAttemptError> {
+        // Get the task attempt with validation
+        let attempt = sqlx::query_as!(
+            TaskAttempt,
+            r#"SELECT ta.id as "id!: Uuid", ta.task_id as "task_id!: Uuid", ta.worktree_path, ta.merge_commit, ta.executor, ta.stdout, ta.stderr, ta.created_at as "created_at!: DateTime<Utc>", ta.updated_at as "updated_at!: DateTime<Utc>"
+               FROM task_attempts ta 
+               JOIN tasks t ON ta.task_id = t.id 
+               WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3"#,
+            attempt_id,
+            task_id,
+            project_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or(TaskAttemptError::TaskNotFound)?;
+
+        // Open the worktree repository
+        let repo = Repository::open(&attempt.worktree_path)?;
+
+        // Get the absolute path to the file within the worktree
+        let worktree_path = Path::new(&attempt.worktree_path);
+        let file_full_path = worktree_path.join(file_path);
+
+        // Check if file exists and delete it
+        if file_full_path.exists() {
+            std::fs::remove_file(&file_full_path)
+                .map_err(|e| TaskAttemptError::Git(GitError::from_str(&format!(
+                    "Failed to delete file {}: {}",
+                    file_path,
+                    e
+                ))))?;
+
+            debug!("Deleted file: {}", file_path);
+        } else {
+            info!("File {} does not exist, skipping deletion", file_path);
+        }
+
+        // Stage the deletion
+        let mut index = repo.index()?;
+        index.remove_path(Path::new(file_path))?;
+        index.write()?;
+
+        // Create a commit for the file deletion
+        let signature = repo.signature()?;
+        let tree_id = index.write_tree()?;
+        let tree = repo.find_tree(tree_id)?;
+
+        // Get the current HEAD commit
+        let head = repo.head()?;
+        let parent_commit = head.peel_to_commit()?;
+
+        let commit_message = format!("Delete file: {}", file_path);
+        let commit_id = repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            &commit_message,
+            &tree,
+            &[&parent_commit],
+        )?;
+
+        info!("File {} deleted and committed: {}", file_path, commit_id);
+
+        Ok(commit_id.to_string())
+    }
 }

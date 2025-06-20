@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText, ChevronDown, ChevronUp, RefreshCw, GitBranch } from "lucide-react";
+import { ArrowLeft, FileText, ChevronDown, ChevronUp, RefreshCw, GitBranch, Trash2 } from "lucide-react";
 import { makeRequest } from "@/lib/api";
 import type { WorktreeDiff, DiffChunkType, DiffChunk, BranchStatus } from "shared/types";
 
@@ -30,6 +30,7 @@ export function TaskAttemptComparePage() {
   const [mergeSuccess, setMergeSuccess] = useState(false);
   const [rebaseSuccess, setRebaseSuccess] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [deletingFiles, setDeletingFiles] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (projectId && taskId && attemptId) {
@@ -319,6 +320,40 @@ export function TaskAttemptComparePage() {
     });
   };
 
+  const handleDeleteFile = async (filePath: string) => {
+    if (!projectId || !taskId || !attemptId) return;
+
+    try {
+      setDeletingFiles(prev => new Set(prev).add(filePath));
+      const response = await makeRequest(
+        `/api/projects/${projectId}/tasks/${taskId}/attempts/${attemptId}/delete-file?file_path=${encodeURIComponent(filePath)}`,
+        {
+          method: 'POST',
+        }
+      );
+
+      if (response.ok) {
+        const result: ApiResponse<null> = await response.json();
+        if (result.success) {
+          // Refresh the diff to show updated state
+          fetchDiff();
+        } else {
+          setError(result.message || "Failed to delete file");
+        }
+      } else {
+        setError("Failed to delete file");
+      }
+    } catch (err) {
+      setError("Failed to delete file");
+    } finally {
+      setDeletingFiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(filePath);
+        return newSet;
+      });
+    }
+  };
+
   if (loading || branchStatusLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -439,10 +474,23 @@ export function TaskAttemptComparePage() {
             <div className="space-y-6">
               {diff.files.map((file, fileIndex) => (
                 <div key={fileIndex} className="border rounded-lg overflow-hidden">
-                  <div className="bg-muted px-3 py-2 border-b">
+                  <div className="bg-muted px-3 py-2 border-b flex items-center justify-between">
                     <p className="text-sm font-medium text-muted-foreground font-mono">
                       {file.path}
                     </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteFile(file.path)}
+                      disabled={deletingFiles.has(file.path)}
+                      className="text-red-600 hover:text-red-800 hover:bg-red-50 h-8 px-3 gap-1"
+                      title={`Delete ${file.path}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="text-xs">
+                        {deletingFiles.has(file.path) ? "Deleting..." : "Delete"}
+                      </span>
+                    </Button>
                   </div>
                   <div className="max-h-[600px] overflow-y-auto">
                     {processFileChunks(file.chunks, fileIndex).map((section, sectionIndex) => {

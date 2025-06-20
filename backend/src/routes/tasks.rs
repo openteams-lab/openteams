@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Extension, Path},
+    extract::{Extension, Path, Query},
     http::StatusCode,
     response::Json as ResponseJson,
     routing::get,
@@ -554,6 +554,44 @@ pub async fn rebase_task_attempt(
     }
 }
 
+#[derive(serde::Deserialize)]
+pub struct DeleteFileQuery {
+    file_path: String,
+}
+
+#[axum::debug_handler]
+pub async fn delete_task_attempt_file(
+    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
+    Query(query): Query<DeleteFileQuery>,
+    Extension(pool): Extension<SqlitePool>,
+) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
+    // Verify task attempt exists and belongs to the correct task
+    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check task attempt existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(true) => {}
+    }
+
+    match TaskAttempt::delete_file(&pool, attempt_id, task_id, project_id, &query.file_path).await {
+        Ok(_commit_id) => Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: None,
+            message: Some(format!("File '{}' deleted successfully", query.file_path)),
+        })),
+        Err(e) => {
+            tracing::error!("Failed to delete file '{}' from task attempt {}: {}", query.file_path, attempt_id, e);
+            Ok(ResponseJson(ApiResponse {
+                success: false,
+                data: None,
+                message: Some(e.to_string()),
+            }))
+        }
+    }
+}
+
 pub fn tasks_router() -> Router {
     use axum::routing::post;
 
@@ -597,6 +635,10 @@ pub fn tasks_router() -> Router {
         .route(
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/open-editor",
             post(open_task_attempt_in_editor),
+        )
+        .route(
+            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/delete-file",
+            post(delete_task_attempt_file),
         )
 }
 
