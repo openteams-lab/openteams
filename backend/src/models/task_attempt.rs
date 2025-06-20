@@ -296,6 +296,7 @@ impl TaskAttempt {
         worktree_path: &str,
         main_repo_path: &str,
         attempt_id: Uuid,
+        task_title: &str,
     ) -> Result<String, TaskAttemptError> {
         // Open the worktree repository
         let worktree_repo = Repository::open(worktree_path)?;
@@ -369,7 +370,7 @@ impl TaskAttempt {
             let worktree_commit = main_repo.find_commit(worktree_branch_commit.id())?;
 
             let merge_commit_message =
-                format!("Merge task attempt {} into {}", attempt_id, main_branch);
+                format!("Merge task: {} into {}", task_title, main_branch);
             let merge_commit_id = main_repo.commit(
                 Some(&main_branch_ref),
                 &signature,
@@ -415,7 +416,7 @@ impl TaskAttempt {
         .ok_or(TaskAttemptError::TaskNotFound)?;
 
         // Get the task and project
-        let _task = Task::find_by_id(pool, task_id)
+        let task = Task::find_by_id(pool, task_id)
             .await?
             .ok_or(TaskAttemptError::TaskNotFound)?;
 
@@ -428,6 +429,7 @@ impl TaskAttempt {
             &attempt.worktree_path,
             &project.git_repo_path,
             attempt_id,
+            &task.title,
         )?;
 
         // Update the task attempt with the merge commit
