@@ -11,7 +11,8 @@
     "backend:build": "cargo build --release --manifest-path backend/Cargo.toml",
     "backend:run": "cargo run --manifest-path backend/Cargo.toml",
     "backend:test": "cargo test --lib",
-    "generate-types": "cd backend && cargo run --bin generate_types"
+    "generate-types": "cd backend && cargo run --bin generate_types",
+    "prepare-db": "./prepare_db.sh"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

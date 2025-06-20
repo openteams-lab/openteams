@@ -11,6 +11,7 @@
 - `cargo check --manifest-path backend/Cargo.toml` - Check backend
 - `cargo test --manifest-path backend/Cargo.toml` - Run backend tests
 - `cd frontend && npm test` - Run frontend tests (if configured)
+- `npm run prepare-db` - Solves compile issues related to SQLX macros
 
 ## Architecture
 
