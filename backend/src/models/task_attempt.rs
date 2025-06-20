@@ -470,6 +470,9 @@ impl TaskAttempt {
             .await?
             .ok_or(TaskAttemptError::ProjectNotFound)?;
 
+        // Update task status to InProgress at the start of execution (during setup)
+        Task::update_status(pool, task_id, project_id, TaskStatus::InProgress).await?;
+
         // Step 1: Run setup script if it exists
         if let Some(setup_script) = &project.setup_script {
             if !setup_script.trim().is_empty() {
@@ -595,9 +598,6 @@ impl TaskAttempt {
                 },
             );
         }
-
-        // Update task status to InProgress
-        Task::update_status(pool, task_id, project_id, TaskStatus::InProgress).await?;
 
         tracing::info!(
             "Started execution {} for task attempt {}",
