@@ -369,8 +369,7 @@ impl TaskAttempt {
             let main_commit = main_repo.find_commit(main_branch_commit.id())?;
             let worktree_commit = main_repo.find_commit(worktree_branch_commit.id())?;
 
-            let merge_commit_message =
-                format!("Merge task: {} into {}", task_title, main_branch);
+            let merge_commit_message = format!("Merge task: {} into {}", task_title, main_branch);
             let merge_commit_id = main_repo.commit(
                 Some(&main_branch_ref),
                 &signature,
@@ -784,15 +783,20 @@ impl TaskAttempt {
                         // Look for the next sequence of matching lines (at least 2 consecutive matches)
                         for search_old in (old_idx + 1)..old_lines.len() {
                             for search_new in (new_idx + 1)..new_lines.len() {
-                                if search_old < old_lines.len() - 1 && search_new < new_lines.len() - 1 {
+                                if search_old < old_lines.len() - 1
+                                    && search_new < new_lines.len() - 1
+                                {
                                     // Check for at least 2 consecutive matching lines to confirm this is not a coincidental match
-                                    if old_lines[search_old] == new_lines[search_new] 
-                                        && old_lines[search_old + 1] == new_lines[search_new + 1] {
+                                    if old_lines[search_old] == new_lines[search_new]
+                                        && old_lines[search_old + 1] == new_lines[search_new + 1]
+                                    {
                                         next_match_old = search_old;
                                         next_match_new = search_new;
                                         break;
                                     }
-                                } else if search_old == old_lines.len() - 1 && search_new == new_lines.len() - 1 {
+                                } else if search_old == old_lines.len() - 1
+                                    && search_new == new_lines.len() - 1
+                                {
                                     // Last lines match
                                     if old_lines[search_old] == new_lines[search_new] {
                                         next_match_old = search_old;

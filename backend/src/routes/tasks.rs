@@ -6,6 +6,8 @@ use axum::{
     Json, Router,
 };
 use sqlx::SqlitePool;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::models::{
@@ -452,6 +454,7 @@ pub async fn merge_task_attempt(
 pub async fn open_task_attempt_in_editor(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
     Extension(pool): Extension<SqlitePool>,
+    Extension(config): Extension<Arc<RwLock<crate::models::config::Config>>>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
     match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
@@ -473,29 +476,44 @@ pub async fn open_task_attempt_in_editor(
         }
     };
 
-    // Open VSCode in the worktree directory
-    match std::process::Command::new("code")
-        .arg(&attempt.worktree_path)
-        .spawn()
-    {
+    // Get editor command from config
+    let editor_command = {
+        let config_guard = config.read().await;
+        config_guard.editor.get_command()
+    };
+
+    // Open editor in the worktree directory
+    let mut cmd = std::process::Command::new(&editor_command[0]);
+    for arg in &editor_command[1..] {
+        cmd.arg(arg);
+    }
+    cmd.arg(&attempt.worktree_path);
+
+    match cmd.spawn() {
         Ok(_) => {
             tracing::info!(
-                "Opened VSCode for task attempt {} at path: {}",
+                "Opened editor ({}) for task attempt {} at path: {}",
+                editor_command.join(" "),
                 attempt_id,
                 attempt.worktree_path
             );
             Ok(ResponseJson(ApiResponse {
                 success: true,
                 data: None,
-                message: Some("VSCode opened successfully".to_string()),
+                message: Some("Editor opened successfully".to_string()),
             }))
         }
         Err(e) => {
-            tracing::error!("Failed to open VSCode for attempt {}: {}", attempt_id, e);
+            tracing::error!(
+                "Failed to open editor ({}) for attempt {}: {}",
+                editor_command.join(" "),
+                attempt_id,
+                e
+            );
             Ok(ResponseJson(ApiResponse {
                 success: false,
                 data: None,
-                message: Some(format!("Failed to open VSCode: {}", e)),
+                message: Some(format!("Failed to open editor: {}", e)),
             }))
         }
     }
@@ -582,7 +600,12 @@ pub async fn delete_task_attempt_file(
             message: Some(format!("File '{}' deleted successfully", query.file_path)),
         })),
         Err(e) => {
-            tracing::error!("Failed to delete file '{}' from task attempt {}: {}", query.file_path, attempt_id, e);
+            tracing::error!(
+                "Failed to delete file '{}' from task attempt {}: {}",
+                query.file_path,
+                attempt_id,
+                e
+            );
             Ok(ResponseJson(ApiResponse {
                 success: false,
                 data: None,
