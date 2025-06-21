@@ -6,8 +6,6 @@ import {
   Clock,
   FileText,
   Code,
-  Maximize2,
-  Minimize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +20,7 @@ import {
 } from "@/components/ui/select";
 
 import { makeRequest } from "@/lib/api";
+import { getTaskPanelClasses, getBackdropClasses } from "@/lib/responsive-config";
 import type {
   TaskStatus,
   TaskAttempt,
@@ -39,8 +38,6 @@ interface TaskDetailsPanelProps {
   projectId: string;
   isOpen: boolean;
   onClose: () => void;
-  viewMode: "overlay" | "sideBySide";
-  onViewModeChange: (mode: "overlay" | "sideBySide") => void;
 }
 
 const statusLabels: Record<TaskStatus, string> = {
@@ -153,8 +150,6 @@ export function TaskDetailsPanel({
   projectId,
   isOpen,
   onClose,
-  viewMode,
-  onViewModeChange,
 }: TaskDetailsPanelProps) {
   const [taskAttempts, setTaskAttempts] = useState<TaskAttempt[]>([]);
   const [selectedAttempt, setSelectedAttempt] = useState<TaskAttempt | null>(
@@ -342,24 +337,15 @@ export function TaskDetailsPanel({
     <>
       {isOpen && (
         <>
-          {/* Backdrop - only in overlay mode */}
-          {viewMode === "overlay" && (
-            <div
-              className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm"
-              onClick={onClose}
-            />
-          )}
+          {/* Backdrop - only on smaller screens (overlay mode) */}
+          <div
+            className={getBackdropClasses()}
+            onClick={onClose}
+          />
 
           {/* Panel */}
           <div
-            className={`
-            ${
-              viewMode === "overlay"
-                ? "fixed inset-y-0 right-0 z-50 w-full sm:w-[800px]"
-                : "w-full sm:w-[800px] h-full relative"
-            } 
-            bg-background border-l shadow-lg overflow-hidden
-          `}
+            className={getTaskPanelClasses()}
           >
             <div className="flex flex-col h-full">
               {/* Header */}
@@ -388,26 +374,6 @@ export function TaskDetailsPanel({
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        onViewModeChange(
-                          viewMode === "overlay" ? "sideBySide" : "overlay"
-                        )
-                      }
-                      title={
-                        viewMode === "overlay"
-                          ? "Switch to side-by-side view"
-                          : "Switch to overlay view"
-                      }
-                    >
-                      {viewMode === "overlay" ? (
-                        <Maximize2 className="h-4 w-4" />
-                      ) : (
-                        <Minimize2 className="h-4 w-4" />
-                      )}
-                    </Button>
                     <Button variant="ghost" size="icon" onClick={onClose}>
                       <X className="h-4 w-4" />
                     </Button>

@@ -6,6 +6,7 @@ import { ArrowLeft, Plus } from "lucide-react";
 import { makeRequest } from "@/lib/api";
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
 import { useKeyboardShortcuts } from "@/lib/keyboard-shortcuts";
+import { getMainContainerClasses, getKanbanSectionClasses } from "@/lib/responsive-config";
 
 import { TaskKanbanBoard } from "@/components/tasks/TaskKanbanBoard";
 import { TaskDetailsPanel } from "@/components/tasks/TaskDetailsPanel";
@@ -41,7 +42,6 @@ export function ProjectTasks() {
   // Panel state
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"overlay" | "sideBySide">("overlay");
 
   // Define task creation handler
   const handleCreateNewTask = () => {
@@ -237,9 +237,7 @@ export function ProjectTasks() {
     setSelectedTask(null);
   };
 
-  const handleViewModeChange = (mode: "overlay" | "sideBySide") => {
-    setViewMode(mode);
-  };
+
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -301,25 +299,11 @@ export function ProjectTasks() {
 
   return (
     <div
-      className={`w-full ${
-        viewMode === "sideBySide" && isPanelOpen ? "flex h-full" : ""
-      }`}
+      className={getMainContainerClasses(isPanelOpen)}
     >
       {/* Left Column - Kanban Section */}
       <div
-        className={`
-        ${
-          viewMode === "sideBySide" && isPanelOpen
-            ? "flex-1 min-w-0 h-full overflow-y-auto"
-            : "w-full"
-        }
-        ${
-          viewMode === "overlay" && isPanelOpen
-            ? "opacity-50 pointer-events-none"
-            : ""
-        }
-        transition-all duration-300
-      `}
+        className={getKanbanSectionClasses(isPanelOpen)}
       >
         <div className="space-y-6 max-w-7xl mx-auto">
           {/* Header */}
@@ -396,8 +380,6 @@ export function ProjectTasks() {
           projectId={projectId!}
           isOpen={isPanelOpen}
           onClose={handleClosePanel}
-          viewMode={viewMode}
-          onViewModeChange={handleViewModeChange}
         />
       )}
     </div>
