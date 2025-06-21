@@ -104,6 +104,15 @@ export function ProjectTasks() {
             if (JSON.stringify(prevTasks) === JSON.stringify(newTasks)) {
               return prevTasks; // Return same reference to prevent re-render
             }
+            
+            // Update selectedTask if it exists and has been modified
+            if (selectedTask) {
+              const updatedSelectedTask = newTasks.find(task => task.id === selectedTask.id);
+              if (updatedSelectedTask && JSON.stringify(selectedTask) !== JSON.stringify(updatedSelectedTask)) {
+                setSelectedTask(updatedSelectedTask);
+              }
+            }
+            
             return newTasks;
           });
         }
@@ -375,6 +384,8 @@ export function ProjectTasks() {
           projectId={projectId!}
           isOpen={isPanelOpen}
           onClose={handleClosePanel}
+          onEditTask={handleEditTask}
+          onDeleteTask={handleDeleteTask}
         />
       )}
     </div>

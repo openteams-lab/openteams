@@ -9,6 +9,8 @@ import {
   ChevronDown,
   ChevronUp,
   Settings2,
+  Edit,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -45,6 +47,8 @@ interface TaskDetailsPanelProps {
   projectId: string;
   isOpen: boolean;
   onClose: () => void;
+  onEditTask?: (task: TaskWithAttemptStatus) => void;
+  onDeleteTask?: (taskId: string) => void;
 }
 
 const statusLabels: Record<TaskStatus, string> = {
@@ -119,6 +123,8 @@ export function TaskDetailsPanel({
   projectId,
   isOpen,
   onClose,
+  onEditTask,
+  onDeleteTask,
 }: TaskDetailsPanelProps) {
   const [taskAttempts, setTaskAttempts] = useState<TaskAttempt[]>([]);
   const [selectedAttempt, setSelectedAttempt] = useState<TaskAttempt | null>(
@@ -350,6 +356,24 @@ export function TaskDetailsPanel({
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
+                    {onEditTask && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onEditTask(task)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {onDeleteTask && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onDeleteTask(task.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" onClick={onClose}>
                       <X className="h-4 w-4" />
                     </Button>
@@ -590,8 +614,14 @@ export function TaskDetailsPanel({
                                   ] && (
                                     <div className="mt-2">
                                       <ExecutionOutputViewer
-                                        executionProcess={executionProcesses[activity.execution_process_id]}
-                                        executor={selectedAttempt?.executor || undefined}
+                                        executionProcess={
+                                          executionProcesses[
+                                            activity.execution_process_id
+                                          ]
+                                        }
+                                        executor={
+                                          selectedAttempt?.executor || undefined
+                                        }
                                       />
                                     </div>
                                   )}
@@ -606,7 +636,7 @@ export function TaskDetailsPanel({
               </div>
 
               {/* Footer */}
-              <div className="border-t p-4">
+              {/* <div className="border-t p-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">
                     Follow-up question
@@ -630,7 +660,7 @@ export function TaskDetailsPanel({
                     Follow-up functionality coming soon
                   </p>
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
         </>
