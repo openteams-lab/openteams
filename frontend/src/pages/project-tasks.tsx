@@ -215,9 +215,7 @@ export function ProjectTasks() {
     setIsTaskDialogOpen(true);
   };
 
-  const handleViewTaskDetails = (task: Task) => {
-    navigate(`/projects/${projectId}/tasks/${task.id}`);
-  };
+
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -336,10 +334,10 @@ export function ProjectTasks() {
       ) : (
         <TaskKanbanBoard
           tasks={tasks}
+          projectId={projectId!}
           onDragEnd={handleDragEnd}
           onEditTask={handleEditTask}
           onDeleteTask={handleDeleteTask}
-          onViewTaskDetails={handleViewTaskDetails}
         />
       )}
 
