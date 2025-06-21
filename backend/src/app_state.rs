@@ -146,4 +146,9 @@ impl AppState {
         let config = self.config.read().await;
         config.sound_alerts
     }
+
+    pub async fn get_push_notifications_enabled(&self) -> bool {
+        let config = self.config.read().await;
+        config.push_notifications
+    }
 }

@@ -4,7 +4,7 @@
 
 export type ApiResponse<T> = { success: boolean, data: T | null, message: string | null, };
 
-export type Config = { theme: ThemeMode, executor: ExecutorConfig, disclaimer_acknowledged: boolean, sound_alerts: boolean, editor: EditorConfig, };
+export type Config = { theme: ThemeMode, executor: ExecutorConfig, disclaimer_acknowledged: boolean, sound_alerts: boolean, push_notifications: boolean, editor: EditorConfig, };
 
 export type ThemeMode = "light" | "dark" | "system";
 

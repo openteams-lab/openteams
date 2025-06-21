@@ -102,6 +102,22 @@ async fn play_sound_notification() {
     }
 }
 
+/// Send a macOS push notification
+async fn send_push_notification(title: &str, message: &str) {
+    if cfg!(target_os = "macos") {
+        let script = format!(
+            r#"display notification "{message}" with title "{title}" sound name "Glass""#,
+            message = message.replace('"', r#"\""#),
+            title = title.replace('"', r#"\""#)
+        );
+        
+        let _ = tokio::process::Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .spawn();
+    }
+}
+
 pub async fn execution_monitor(app_state: AppState) {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
 
@@ -416,6 +432,17 @@ async fn handle_coding_agent_completion(
     // Play sound notification if enabled
     if app_state.get_sound_alerts_enabled().await {
         play_sound_notification().await;
+    }
+
+    // Send push notification if enabled
+    if app_state.get_push_notifications_enabled().await {
+        let notification_title = "Task Complete";
+        let notification_message = if success {
+            "Task execution completed successfully"
+        } else {
+            "Task execution failed"
+        };
+        send_push_notification(notification_title, notification_message).await;
     }
 
     // Get task attempt to access worktree path for committing changes

@@ -237,6 +237,19 @@ export function Settings() {
                   </p>
                 </div>
               </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="push-notifications"
+                  checked={config.push_notifications}
+                  onCheckedChange={(checked: boolean) => updateConfig({ push_notifications: checked })}
+                />
+                <div className="space-y-0.5">
+                  <Label htmlFor="push-notifications" className="cursor-pointer">Push Notifications (macOS)</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Show system notifications when task attempts finish running.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
