@@ -139,6 +139,7 @@ export function TaskDetailsPanel({
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [selectedExecutor, setSelectedExecutor] = useState<string>("claude");
   const [isStopping, setIsStopping] = useState(false);
+  const [expandedOutputs, setExpandedOutputs] = useState<Set<string>>(new Set());
   const { config } = useConfig();
 
   // Available executors
@@ -375,6 +376,18 @@ export function TaskDetailsPanel({
     } finally {
       setIsStopping(false);
     }
+  };
+
+  const toggleOutputExpansion = (processId: string) => {
+    setExpandedOutputs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(processId)) {
+        newSet.delete(processId);
+      } else {
+        newSet.add(processId);
+      }
+      return newSet;
+    });
   };
 
   if (!task) return null;
@@ -673,16 +686,42 @@ export function TaskDetailsPanel({
                                     activity.execution_process_id
                                   ] && (
                                     <div className="mt-2">
-                                      <ExecutionOutputViewer
-                                        executionProcess={
-                                          executionProcesses[
-                                            activity.execution_process_id
-                                          ]
-                                        }
-                                        executor={
-                                          selectedAttempt?.executor || undefined
-                                        }
-                                      />
+                                      <div 
+                                        className={`transition-all duration-200 ${
+                                          expandedOutputs.has(activity.execution_process_id) 
+                                            ? '' 
+                                            : 'max-h-64 overflow-hidden'
+                                        }`}
+                                      >
+                                        <ExecutionOutputViewer
+                                          executionProcess={
+                                            executionProcesses[
+                                              activity.execution_process_id
+                                            ]
+                                          }
+                                          executor={
+                                            selectedAttempt?.executor || undefined
+                                          }
+                                        />
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => toggleOutputExpansion(activity.execution_process_id)}
+                                        className="mt-2 p-0 h-auto text-xs text-muted-foreground hover:text-foreground"
+                                      >
+                                        {expandedOutputs.has(activity.execution_process_id) ? (
+                                          <>
+                                            <ChevronUp className="h-3 w-3 mr-1" />
+                                            Show less
+                                          </>
+                                        ) : (
+                                          <>
+                                            <ChevronDown className="h-3 w-3 mr-1" />
+                                            Show more
+                                          </>
+                                        )}
+                                      </Button>
                                     </div>
                                   )}
                               </div>
