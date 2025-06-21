@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Plus } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import { makeRequest } from "@/lib/api";
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
+import { ProjectForm } from "@/components/projects/project-form";
 import { useKeyboardShortcuts } from "@/lib/keyboard-shortcuts";
 import {
   getMainContainerClasses,
@@ -13,18 +14,10 @@ import {
 
 import { TaskKanbanBoard } from "@/components/tasks/TaskKanbanBoard";
 import { TaskDetailsPanel } from "@/components/tasks/TaskDetailsPanel";
-import type { TaskStatus, TaskWithAttemptStatus } from "shared/types";
+import type { TaskStatus, TaskWithAttemptStatus, Project } from "shared/types";
 import type { DragEndEvent } from "@/components/ui/shadcn-io/kanban";
 
 type Task = TaskWithAttemptStatus;
-
-interface Project {
-  id: string;
-  name: string;
-  owner_id: string;
-  created_at: string;
-  updated_at: string;
-}
 
 interface ApiResponse<T> {
   success: boolean;
@@ -41,6 +34,7 @@ export function ProjectTasks() {
   const [error, setError] = useState<string | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
 
   // Panel state
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -240,6 +234,11 @@ export function ProjectTasks() {
     setSelectedTask(null);
   };
 
+  const handleProjectSettingsSuccess = () => {
+    setIsProjectSettingsOpen(false);
+    fetchProject(); // Refresh project data after settings change
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -303,36 +302,18 @@ export function ProjectTasks() {
       {/* Left Column - Kanban Section */}
       <div className={getKanbanSectionClasses(isPanelOpen)}>
         {/* Header */}
-        {/* <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/projects")}
-                className="flex items-center"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Projects
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold">
-                  {project?.name || "Project"} Tasks
-                </h1>
-                <p className="text-muted-foreground">
-                  Manage tasks for this project
-                </p>
-              </div>
-            </div>
-
-            <Button onClick={handleCreateNewTask}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button>
-          </div> */}
 
         <div className="px-8 my-12 flex flex-row">
-          <div className="w-full">
+          <div className="w-full flex items-center gap-3">
             <h1 className="text-2xl font-bold">{project?.name || "Project"}</h1>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsProjectSettingsOpen(true)}
+              className="h-8 w-8 p-0"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
           </div>
           <Button onClick={handleCreateNewTask}>
             <Plus className="h-4 w-4 mr-2" />
@@ -348,6 +329,13 @@ export function ProjectTasks() {
           onCreateTask={handleCreateTask}
           onCreateAndStartTask={handleCreateAndStartTask}
           onUpdateTask={handleUpdateTask}
+        />
+
+        <ProjectForm
+          open={isProjectSettingsOpen}
+          onClose={() => setIsProjectSettingsOpen(false)}
+          onSuccess={handleProjectSettingsSuccess}
+          project={project}
         />
 
         {/* Tasks View */}
