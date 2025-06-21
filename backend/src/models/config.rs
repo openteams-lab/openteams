@@ -10,6 +10,7 @@ pub struct Config {
     pub executor: ExecutorConfig,
     pub disclaimer_acknowledged: bool,
     pub sound_alerts: bool,
+    pub push_notifications: bool,
     pub editor: EditorConfig,
 }
 
@@ -48,6 +49,7 @@ impl Default for Config {
             executor: ExecutorConfig::Claude,
             disclaimer_acknowledged: false,
             sound_alerts: true,
+            push_notifications: true,
             editor: EditorConfig::default(),
         }
     }
