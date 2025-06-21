@@ -10,7 +10,7 @@ use super::task_attempt::TaskAttemptStatus;
 #[ts(export)]
 pub struct TaskAttemptActivity {
     pub id: Uuid,
-    pub task_attempt_id: Uuid, // Foreign key to TaskAttempt
+    pub execution_process_id: Uuid, // Foreign key to ExecutionProcess
     pub status: TaskAttemptStatus,
     pub note: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -19,23 +19,23 @@ pub struct TaskAttemptActivity {
 #[derive(Debug, Deserialize, TS)]
 #[ts(export)]
 pub struct CreateTaskAttemptActivity {
-    pub task_attempt_id: Uuid,
-    pub status: Option<TaskAttemptStatus>, // Default to Init if not provided
+    pub execution_process_id: Uuid,
+    pub status: Option<TaskAttemptStatus>,
     pub note: Option<String>,
 }
 
 impl TaskAttemptActivity {
-    pub async fn find_by_attempt_id(
+    pub async fn find_by_execution_process_id(
         pool: &SqlitePool,
-        attempt_id: Uuid,
+        execution_process_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             TaskAttemptActivity,
-            r#"SELECT id as "id!: Uuid", task_attempt_id as "task_attempt_id!: Uuid", status as "status!: TaskAttemptStatus", note, created_at as "created_at!: DateTime<Utc>"
+            r#"SELECT id as "id!: Uuid", execution_process_id as "execution_process_id!: Uuid", status as "status!: TaskAttemptStatus", note, created_at as "created_at!: DateTime<Utc>"
                FROM task_attempt_activities 
-               WHERE task_attempt_id = $1 
+               WHERE execution_process_id = $1 
                ORDER BY created_at DESC"#,
-            attempt_id
+            execution_process_id
         )
         .fetch_all(pool)
         .await
@@ -50,11 +50,11 @@ impl TaskAttemptActivity {
         let status_value = status as TaskAttemptStatus;
         sqlx::query_as!(
             TaskAttemptActivity,
-            r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note) 
+            r#"INSERT INTO task_attempt_activities (id, execution_process_id, status, note) 
                VALUES ($1, $2, $3, $4) 
-               RETURNING id as "id!: Uuid", task_attempt_id as "task_attempt_id!: Uuid", status as "status!: TaskAttemptStatus", note, created_at as "created_at!: DateTime<Utc>""#,
+               RETURNING id as "id!: Uuid", execution_process_id as "execution_process_id!: Uuid", status as "status!: TaskAttemptStatus", note, created_at as "created_at!: DateTime<Utc>""#,
             activity_id,
-            data.task_attempt_id,
+            data.execution_process_id,
             status_value,
             data.note
         )
@@ -62,36 +62,18 @@ impl TaskAttemptActivity {
         .await
     }
 
-    pub async fn create_initial(
-        pool: &SqlitePool,
-        attempt_id: Uuid,
-        activity_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            r#"INSERT INTO task_attempt_activities (id, task_attempt_id, status, note) 
-               VALUES ($1, $2, $3, $4)"#,
-            activity_id,
-            attempt_id,
-            TaskAttemptStatus::Init as TaskAttemptStatus,
-            Option::<String>::None
-        )
-        .execute(pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn find_attempts_with_latest_executor_running_status(
+    pub async fn find_processes_with_latest_executor_running_status(
         pool: &SqlitePool,
     ) -> Result<Vec<uuid::Uuid>, sqlx::Error> {
         let records = sqlx::query!(
-            r#"SELECT DISTINCT ta.id as "id!: Uuid"
-               FROM task_attempts ta
+            r#"SELECT DISTINCT ep.id as "id!: Uuid"
+               FROM execution_processes ep
                INNER JOIN (
-                   SELECT task_attempt_id, MAX(created_at) as latest_created_at
+                   SELECT execution_process_id, MAX(created_at) as latest_created_at
                    FROM task_attempt_activities
-                   GROUP BY task_attempt_id
-               ) latest_activity ON ta.id = latest_activity.task_attempt_id
-               INNER JOIN task_attempt_activities taa ON ta.id = taa.task_attempt_id 
+                   GROUP BY execution_process_id
+               ) latest_activity ON ep.id = latest_activity.execution_process_id
+               INNER JOIN task_attempt_activities taa ON ep.id = taa.execution_process_id 
                    AND taa.created_at = latest_activity.latest_created_at
                WHERE taa.status = $1"#,
             TaskAttemptStatus::ExecutorRunning as TaskAttemptStatus

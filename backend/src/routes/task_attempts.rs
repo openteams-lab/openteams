@@ -59,7 +59,40 @@ pub async fn get_task_attempt_activities(
         Ok(true) => {}
     }
 
-    match TaskAttemptActivity::find_by_attempt_id(&pool, attempt_id).await {
+    // Get all execution processes for the task attempt
+    let execution_processes =
+        match ExecutionProcess::find_by_task_attempt_id(&pool, attempt_id).await {
+            Ok(processes) => processes,
+            Err(e) => {
+                tracing::error!(
+                    "Failed to fetch execution processes for attempt {}: {}",
+                    attempt_id,
+                    e
+                );
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        };
+
+    // Get activities for all execution processes
+    let mut all_activities = Vec::new();
+    for process in execution_processes {
+        match TaskAttemptActivity::find_by_execution_process_id(&pool, process.id).await {
+            Ok(mut activities) => all_activities.append(&mut activities),
+            Err(e) => {
+                tracing::error!(
+                    "Failed to fetch activities for execution process {}: {}",
+                    process.id,
+                    e
+                );
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        }
+    }
+
+    // Sort activities by created_at
+    all_activities.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+
+    match Ok::<Vec<TaskAttemptActivity>, sqlx::Error>(all_activities) {
         Ok(activities) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(activities),
@@ -99,10 +132,6 @@ pub async fn create_task_attempt(
 
     match TaskAttempt::create(&pool, &payload, id).await {
         Ok(attempt) => {
-            // Create initial activity record
-            let activity_id = Uuid::new_v4();
-            let _ = TaskAttemptActivity::create_initial(&pool, attempt.id, activity_id).await;
-
             // Start execution asynchronously (don't block the response)
             let pool_clone = pool.clone();
             let app_state_clone = app_state.clone();
@@ -141,7 +170,7 @@ pub async fn create_task_attempt(
 pub async fn create_task_attempt_activity(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
     Extension(pool): Extension<SqlitePool>,
-    Json(mut payload): Json<CreateTaskAttemptActivity>,
+    Json(payload): Json<CreateTaskAttemptActivity>,
 ) -> Result<ResponseJson<ApiResponse<TaskAttemptActivity>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
     match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
@@ -155,11 +184,30 @@ pub async fn create_task_attempt_activity(
 
     let id = Uuid::new_v4();
 
-    // Ensure the task_attempt_id in the payload matches the path parameter
-    payload.task_attempt_id = attempt_id;
+    // Check that execution_process_id is provided in payload
+    if payload.execution_process_id == Uuid::nil() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
 
-    // Default to Init status if not provided
-    let status = payload.status.clone().unwrap_or(TaskAttemptStatus::Init);
+    // Verify the execution process exists and belongs to this task attempt
+    match ExecutionProcess::find_by_id(&pool, payload.execution_process_id).await {
+        Ok(Some(process)) => {
+            if process.task_attempt_id != attempt_id {
+                return Err(StatusCode::BAD_REQUEST);
+            }
+        }
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to verify execution process: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // Default to SetupRunning status if not provided
+    let status = payload
+        .status
+        .clone()
+        .unwrap_or(TaskAttemptStatus::SetupRunning);
 
     match TaskAttemptActivity::create(&pool, &payload, id, status).await {
         Ok(activity) => Ok(ResponseJson(ApiResponse {
@@ -446,8 +494,8 @@ pub async fn stop_execution_process(
     // Create a new activity record to mark as stopped
     let activity_id = Uuid::new_v4();
     let create_activity = CreateTaskAttemptActivity {
-        task_attempt_id: attempt_id,
-        status: Some(TaskAttemptStatus::Paused),
+        execution_process_id: process_id,
+        status: Some(TaskAttemptStatus::ExecutorFailed),
         note: Some(format!(
             "Execution process {:?} ({}) stopped by user",
             process.process_type, process_id
@@ -458,7 +506,7 @@ pub async fn stop_execution_process(
         &pool,
         &create_activity,
         activity_id,
-        TaskAttemptStatus::Paused,
+        TaskAttemptStatus::ExecutorFailed,
     )
     .await
     {

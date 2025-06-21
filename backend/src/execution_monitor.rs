@@ -109,26 +109,44 @@ pub async fn execution_monitor(app_state: AppState) {
         interval.tick().await;
 
         // Check for orphaned task attempts with latest activity status = ExecutorRunning but no running execution
-        let executor_running_attempt_ids =
-            match TaskAttemptActivity::find_attempts_with_latest_executor_running_status(
+        let executor_running_process_ids =
+            match TaskAttemptActivity::find_processes_with_latest_executor_running_status(
                 &app_state.db_pool,
             )
             .await
             {
-                Ok(attempts) => attempts,
+                Ok(processes) => processes,
                 Err(e) => {
                     tracing::error!("Failed to query executor running attempts: {}", e);
                     continue;
                 }
             };
 
-        for attempt_id in executor_running_attempt_ids {
+        for process_id in executor_running_process_ids {
             // Check if this attempt has a running execution
-            if !app_state.has_running_execution(attempt_id).await {
-                // This is an orphaned task attempt - mark it as paused
+            if !app_state.has_running_execution(process_id).await {
+                // Get the execution process to find the task attempt ID
+                let task_attempt_id =
+                    match ExecutionProcess::find_by_id(&app_state.db_pool, process_id).await {
+                        Ok(Some(process)) => process.task_attempt_id,
+                        Ok(None) => {
+                            tracing::error!("Execution process {} not found", process_id);
+                            continue;
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to fetch execution process {}: {}",
+                                process_id,
+                                e
+                            );
+                            continue;
+                        }
+                    };
+
+                // This is an orphaned task attempt - mark it as failed
                 let activity_id = Uuid::new_v4();
                 let create_activity = CreateTaskAttemptActivity {
-                    task_attempt_id: attempt_id,
+                    execution_process_id: process_id,
                     status: Some(TaskAttemptStatus::ExecutorFailed),
                     note: Some("Execution lost (server restart or crash)".to_string()),
                 };
@@ -142,15 +160,15 @@ pub async fn execution_monitor(app_state: AppState) {
                 .await
                 {
                     tracing::error!(
-                        "Failed to create paused activity for orphaned attempt: {}",
+                        "Failed to create failed activity for orphaned process: {}",
                         e
                     );
                 } else {
-                    tracing::info!("Marked orphaned task attempt {} as paused", attempt_id);
+                    tracing::info!("Marked orphaned execution process {} as failed", process_id);
 
                     // Get task attempt and task to access task_id and project_id for status update
                     if let Ok(Some(task_attempt)) =
-                        TaskAttempt::find_by_id(&app_state.db_pool, attempt_id).await
+                        TaskAttempt::find_by_id(&app_state.db_pool, task_attempt_id).await
                     {
                         if let Ok(Some(task)) =
                             Task::find_by_id(&app_state.db_pool, task_attempt.task_id).await
@@ -178,7 +196,7 @@ pub async fn execution_monitor(app_state: AppState) {
         let completed_executions = app_state.get_running_executions_for_monitor().await;
 
         // Handle completed executions
-        for (execution_id, task_attempt_id, success, exit_code) in completed_executions {
+        for (execution_process_id, task_attempt_id, success, exit_code) in completed_executions {
             let status_text = if success {
                 "completed successfully"
             } else {
@@ -190,7 +208,12 @@ pub async fn execution_monitor(app_state: AppState) {
                 String::new()
             };
 
-            tracing::info!("Execution {} {}{}", execution_id, status_text, exit_text);
+            tracing::info!(
+                "Execution {} {}{}",
+                execution_process_id,
+                status_text,
+                exit_text
+            );
 
             // Update the execution process record
             let execution_status = if success {
@@ -201,7 +224,7 @@ pub async fn execution_monitor(app_state: AppState) {
 
             if let Err(e) = ExecutionProcess::update_completion(
                 &app_state.db_pool,
-                execution_id,
+                execution_process_id,
                 execution_status,
                 exit_code,
             )
@@ -209,20 +232,21 @@ pub async fn execution_monitor(app_state: AppState) {
             {
                 tracing::error!(
                     "Failed to update execution process {} completion: {}",
-                    execution_id,
+                    execution_process_id,
                     e
                 );
             }
 
             // Get the execution process to determine next steps
             if let Ok(Some(execution_process)) =
-                ExecutionProcess::find_by_id(&app_state.db_pool, execution_id).await
+                ExecutionProcess::find_by_id(&app_state.db_pool, execution_process_id).await
             {
                 match execution_process.process_type {
                     ExecutionProcessType::SetupScript => {
                         handle_setup_completion(
                             &app_state,
                             task_attempt_id,
+                            execution_process_id,
                             execution_process,
                             success,
                             exit_code,
@@ -233,6 +257,7 @@ pub async fn execution_monitor(app_state: AppState) {
                         handle_coding_agent_completion(
                             &app_state,
                             task_attempt_id,
+                            execution_process_id,
                             execution_process,
                             success,
                             exit_code,
@@ -243,6 +268,7 @@ pub async fn execution_monitor(app_state: AppState) {
                         handle_dev_server_completion(
                             &app_state,
                             task_attempt_id,
+                            execution_process_id,
                             execution_process,
                             success,
                             exit_code,
@@ -253,7 +279,7 @@ pub async fn execution_monitor(app_state: AppState) {
             } else {
                 tracing::error!(
                     "Failed to find execution process {} for completion handling",
-                    execution_id
+                    execution_process_id
                 );
             }
         }
@@ -264,6 +290,7 @@ pub async fn execution_monitor(app_state: AppState) {
 async fn handle_setup_completion(
     app_state: &AppState,
     task_attempt_id: Uuid,
+    execution_process_id: Uuid,
     _execution_process: ExecutionProcess,
     success: bool,
     exit_code: Option<i64>,
@@ -278,7 +305,7 @@ async fn handle_setup_completion(
         // Setup completed successfully, create activity
         let activity_id = Uuid::new_v4();
         let create_activity = CreateTaskAttemptActivity {
-            task_attempt_id,
+            execution_process_id,
             status: Some(TaskAttemptStatus::SetupComplete),
             note: Some(format!("Setup script completed successfully{}", exit_text)),
         };
@@ -319,7 +346,7 @@ async fn handle_setup_completion(
         // Setup failed, create activity and update task status
         let activity_id = Uuid::new_v4();
         let create_activity = CreateTaskAttemptActivity {
-            task_attempt_id,
+            execution_process_id,
             status: Some(TaskAttemptStatus::SetupFailed),
             note: Some(format!("Setup script failed{}", exit_text)),
         };
@@ -363,6 +390,7 @@ async fn handle_setup_completion(
 async fn handle_coding_agent_completion(
     app_state: &AppState,
     task_attempt_id: Uuid,
+    execution_process_id: Uuid,
     _execution_process: ExecutionProcess,
     success: bool,
     exit_code: Option<i64>,
@@ -405,7 +433,7 @@ async fn handle_coding_agent_completion(
             TaskAttemptStatus::ExecutorFailed
         };
         let create_activity = CreateTaskAttemptActivity {
-            task_attempt_id,
+            execution_process_id,
             status: Some(status.clone()),
             note: Some(format!("Coding agent execution completed{}", exit_text)),
         };
@@ -452,6 +480,7 @@ async fn handle_coding_agent_completion(
 async fn handle_dev_server_completion(
     _app_state: &AppState,
     task_attempt_id: Uuid,
+    _execution_process_id: Uuid,
     _execution_process: ExecutionProcess,
     _success: bool,
     exit_code: Option<i64>,

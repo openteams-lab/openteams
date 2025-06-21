@@ -50,14 +50,12 @@ impl From<GitError> for TaskAttemptError {
 #[serde(rename_all = "lowercase")]
 #[ts(export)]
 pub enum TaskAttemptStatus {
-    Init,
     SetupRunning,
     SetupComplete,
     SetupFailed,
     ExecutorRunning,
     ExecutorComplete,
     ExecutorFailed,
-    Paused,
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
@@ -436,18 +434,7 @@ impl TaskAttempt {
             CreateTaskAttemptActivity, TaskAttemptActivity,
         };
 
-        // Create activity for process start
-        let activity_id = Uuid::new_v4();
-        let create_activity = CreateTaskAttemptActivity {
-            task_attempt_id: attempt_id,
-            status: Some(activity_status.clone()),
-            note: Some(activity_note.clone()),
-        };
-
-        TaskAttemptActivity::create(pool, &create_activity, activity_id, activity_status.clone())
-            .await?;
-
-        // Create execution process record
+        // Create execution process record first (since activity now references it)
         let process_id = Uuid::new_v4();
         let (command, args) = match &executor_type {
             crate::executor::ExecutorType::SetupScript(_) => (
@@ -466,6 +453,17 @@ impl TaskAttempt {
         };
 
         let _process = ExecutionProcess::create(pool, &create_process, process_id).await?;
+
+        // Create activity for process start (after process is created)
+        let activity_id = Uuid::new_v4();
+        let create_activity = CreateTaskAttemptActivity {
+            execution_process_id: process_id,
+            status: Some(activity_status.clone()),
+            note: Some(activity_note.clone()),
+        };
+
+        TaskAttemptActivity::create(pool, &create_activity, activity_id, activity_status.clone())
+            .await?;
 
         tracing::info!("Starting {} for task attempt {}", activity_note, attempt_id);
 

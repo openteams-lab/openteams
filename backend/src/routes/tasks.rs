@@ -10,9 +10,8 @@ use uuid::Uuid;
 
 use crate::models::{
     project::Project,
-    task::{CreateTask, Task, TaskStatus, TaskWithAttemptStatus, UpdateTask},
-    task_attempt::{CreateTaskAttempt, TaskAttempt, TaskAttemptStatus},
-    task_attempt_activity::{CreateTaskAttemptActivity, TaskAttemptActivity},
+    task::{CreateTask, Task, TaskWithAttemptStatus, UpdateTask},
+    task_attempt::{CreateTaskAttempt, TaskAttempt},
     ApiResponse,
 };
 
@@ -151,10 +150,6 @@ pub async fn create_task_and_start(
 
     match TaskAttempt::create(&pool, &attempt_payload, attempt_id).await {
         Ok(attempt) => {
-            // Create initial activity record
-            let activity_id = Uuid::new_v4();
-            let _ = TaskAttemptActivity::create_initial(&pool, attempt.id, activity_id).await;
-
             // Start execution asynchronously (don't block the response)
             let pool_clone = pool.clone();
             let app_state_clone = app_state.clone();

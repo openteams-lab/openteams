@@ -1,17 +1,17 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: Uuid\", task_attempt_id as \"task_attempt_id!: Uuid\", status as \"status!: TaskAttemptStatus\", note, created_at as \"created_at!: DateTime<Utc>\"\n               FROM task_attempt_activities \n               WHERE task_attempt_id = $1 \n               ORDER BY created_at DESC",
+  "query": "SELECT id as \"id!: Uuid\", execution_process_id as \"execution_process_id!: Uuid\", status as \"status!: TaskAttemptStatus\", note, created_at as \"created_at!: DateTime<Utc>\"\n               FROM task_attempt_activities \n               WHERE execution_process_id = $1 \n               ORDER BY created_at DESC",
   "describe": {
     "columns": [
       {
         "name": "id!: Uuid",
         "ordinal": 0,
-        "type_info": "Blob"
+        "type_info": "Text"
       },
       {
-        "name": "task_attempt_id!: Uuid",
+        "name": "execution_process_id!: Uuid",
         "ordinal": 1,
-        "type_info": "Blob"
+        "type_info": "Text"
       },
       {
         "name": "status!: TaskAttemptStatus",
@@ -26,7 +26,7 @@
       {
         "name": "created_at!: DateTime<Utc>",
         "ordinal": 4,
-        "type_info": "Text"
+        "type_info": "Datetime"
       }
     ],
     "parameters": {
@@ -40,5 +40,5 @@
       false
     ]
   },
-  "hash": "2b317dcc5541a2b778f7c280e7e16976aa603741eda05d663c713e6f91bb5cd6"
+  "hash": "cb56bae2e03ef702cd8737f072d9c73957cc04695741fd7788370dfd9184548a"
 }

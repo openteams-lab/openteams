@@ -76,17 +76,18 @@ impl Task {
                 CASE WHEN merged_attempts.task_id IS NOT NULL THEN true ELSE false END as "has_merged_attempt!"
                FROM tasks t
                LEFT JOIN (
-                   SELECT DISTINCT ta.task_id 
-                   FROM task_attempts ta
-                   INNER JOIN (
-                       SELECT task_attempt_id, MAX(created_at) as latest_created_at
-                       FROM task_attempt_activities
-                       GROUP BY task_attempt_id
-                   ) latest_activity ON ta.id = latest_activity.task_attempt_id
-                   INNER JOIN task_attempt_activities taa ON ta.id = taa.task_attempt_id 
-                       AND taa.created_at = latest_activity.latest_created_at
+               SELECT DISTINCT ta.task_id 
+               FROM task_attempts ta
+               INNER JOIN execution_processes ep ON ta.id = ep.task_attempt_id
+               INNER JOIN (
+               SELECT execution_process_id, MAX(created_at) as latest_created_at
+               FROM task_attempt_activities
+                   GROUP BY execution_process_id
+               ) latest_activity ON ep.id = latest_activity.execution_process_id
+               INNER JOIN task_attempt_activities taa ON ep.id = taa.execution_process_id 
+                   AND taa.created_at = latest_activity.latest_created_at
                    WHERE taa.status IN ('setuprunning', 'executorrunning')
-               ) in_progress_attempts ON t.id = in_progress_attempts.task_id
+                ) in_progress_attempts ON t.id = in_progress_attempts.task_id
                LEFT JOIN (
                    SELECT DISTINCT ta.task_id 
                    FROM task_attempts ta
