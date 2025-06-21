@@ -8,6 +8,7 @@ import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
 import { useKeyboardShortcuts } from "@/lib/keyboard-shortcuts";
 
 import { TaskKanbanBoard } from "@/components/tasks/TaskKanbanBoard";
+import { TaskDetailsPanel } from "@/components/tasks/TaskDetailsPanel";
 import type { TaskStatus, TaskWithAttemptStatus } from "shared/types";
 import type { DragEndEvent } from "@/components/ui/shadcn-io/kanban";
 
@@ -37,6 +38,11 @@ export function ProjectTasks() {
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
+  // Panel state
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"overlay" | "sideBySide">("overlay");
+
   // Define task creation handler
   const handleCreateNewTask = () => {
     setEditingTask(null);
@@ -49,7 +55,7 @@ export function ProjectTasks() {
     currentPath: `/projects/${projectId}/tasks`,
     hasOpenDialog: isTaskDialogOpen,
     closeDialog: () => setIsTaskDialogOpen(false),
-    openCreateTask: handleCreateNewTask
+    openCreateTask: handleCreateNewTask,
   });
 
   useEffect(() => {
@@ -96,7 +102,7 @@ export function ProjectTasks() {
         const result: ApiResponse<Task[]> = await response.json();
         if (result.success && result.data) {
           // Only update if data has actually changed
-          setTasks(prevTasks => {
+          setTasks((prevTasks) => {
             const newTasks = result.data!;
             if (JSON.stringify(prevTasks) === JSON.stringify(newTasks)) {
               return prevTasks; // Return same reference to prevent re-render
@@ -137,16 +143,22 @@ export function ProjectTasks() {
     }
   };
 
-  const handleCreateAndStartTask = async (title: string, description: string) => {
+  const handleCreateAndStartTask = async (
+    title: string,
+    description: string
+  ) => {
     try {
-      const response = await makeRequest(`/api/projects/${projectId}/tasks/create-and-start`, {
-        method: "POST",
-        body: JSON.stringify({
-          project_id: projectId,
-          title,
-          description: description || null,
-        }),
-      });
+      const response = await makeRequest(
+        `/api/projects/${projectId}/tasks/create-and-start`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            project_id: projectId,
+            title,
+            description: description || null,
+          }),
+        }
+      );
 
       if (response.ok) {
         await fetchTasks();
@@ -215,7 +227,19 @@ export function ProjectTasks() {
     setIsTaskDialogOpen(true);
   };
 
+  const handleViewTaskDetails = (task: Task) => {
+    setSelectedTask(task);
+    setIsPanelOpen(true);
+  };
 
+  const handleClosePanel = () => {
+    setIsPanelOpen(false);
+    setSelectedTask(null);
+  };
+
+  const handleViewModeChange = (mode: "overlay" | "sideBySide") => {
+    setViewMode(mode);
+  };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -276,72 +300,106 @@ export function ProjectTasks() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate("/projects")}
-            className="flex items-center"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Projects
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">
-              {project?.name || "Project"} Tasks
-            </h1>
-            <p className="text-muted-foreground">
-              Manage tasks for this project
-            </p>
+    <div
+      className={`w-full ${
+        viewMode === "sideBySide" && isPanelOpen ? "flex h-full" : ""
+      }`}
+    >
+      {/* Left Column - Kanban Section */}
+      <div
+        className={`
+        ${
+          viewMode === "sideBySide" && isPanelOpen
+            ? "flex-1 min-w-0 h-full overflow-y-auto"
+            : "w-full"
+        }
+        ${
+          viewMode === "overlay" && isPanelOpen
+            ? "opacity-50 pointer-events-none"
+            : ""
+        }
+        transition-all duration-300
+      `}
+      >
+        <div className="space-y-6 max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/projects")}
+                className="flex items-center"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Projects
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold">
+                  {project?.name || "Project"} Tasks
+                </h1>
+                <p className="text-muted-foreground">
+                  Manage tasks for this project
+                </p>
+              </div>
+            </div>
+
+            <Button onClick={handleCreateNewTask}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Task
+            </Button>
           </div>
+
+          <TaskFormDialog
+            isOpen={isTaskDialogOpen}
+            onOpenChange={setIsTaskDialogOpen}
+            task={editingTask}
+            projectId={projectId}
+            onCreateTask={handleCreateTask}
+            onCreateAndStartTask={handleCreateAndStartTask}
+            onUpdateTask={handleUpdateTask}
+          />
         </div>
 
-        <Button onClick={handleCreateNewTask}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Task
-        </Button>
+        {/* Tasks View */}
+        {tasks.length === 0 ? (
+          <div className="max-w-7xl mx-auto">
+            <Card>
+              <CardContent className="text-center py-8">
+                <p className="text-muted-foreground">
+                  No tasks found for this project.
+                </p>
+                <Button className="mt-4" onClick={handleCreateNewTask}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create First Task
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <div className="px-4 scroll">
+            <TaskKanbanBoard
+              tasks={tasks}
+              onDragEnd={handleDragEnd}
+              onEditTask={handleEditTask}
+              onDeleteTask={handleDeleteTask}
+              onViewTaskDetails={handleViewTaskDetails}
+            />
+          </div>
+        )}
       </div>
 
-      <TaskFormDialog
-        isOpen={isTaskDialogOpen}
-        onOpenChange={setIsTaskDialogOpen}
-        task={editingTask}
-        projectId={projectId}
-        onCreateTask={handleCreateTask}
-        onCreateAndStartTask={handleCreateAndStartTask}
-        onUpdateTask={handleUpdateTask}
-      />
-
-      {/* Tasks View */}
-      {tasks.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">
-              No tasks found for this project.
-            </p>
-            <Button
-              className="mt-4"
-              onClick={handleCreateNewTask}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create First Task
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <TaskKanbanBoard
-          tasks={tasks}
+      {/* Right Column - Task Details Panel */}
+      {isPanelOpen && (
+        <TaskDetailsPanel
+          task={selectedTask}
           projectId={projectId!}
-          onDragEnd={handleDragEnd}
-          onEditTask={handleEditTask}
-          onDeleteTask={handleDeleteTask}
+          isOpen={isPanelOpen}
+          onClose={handleClosePanel}
+          viewMode={viewMode}
+          onViewModeChange={handleViewModeChange}
         />
       )}
-
-
     </div>
   );
 }

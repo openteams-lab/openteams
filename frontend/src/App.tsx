@@ -20,7 +20,7 @@ function AppContent() {
       try {
         const response = await fetch("/api/config");
         const data: ApiResponse<Config> = await response.json();
-        
+
         if (data.success && data.data) {
           setConfig(data.data);
           setShowDisclaimer(!data.data.disclaimer_acknowledged);
@@ -37,9 +37,9 @@ function AppContent() {
 
   const handleDisclaimerAccept = async () => {
     if (!config) return;
-    
+
     const updatedConfig = { ...config, disclaimer_acknowledged: true };
-    
+
     try {
       const response = await fetch("/api/config", {
         method: "POST",
@@ -48,9 +48,9 @@ function AppContent() {
         },
         body: JSON.stringify(updatedConfig),
       });
-      
+
       const data: ApiResponse<Config> = await response.json();
-      
+
       if (data.success) {
         setConfig(updatedConfig);
         setShowDisclaimer(false);
@@ -72,13 +72,13 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen flex flex-col bg-background">
       <DisclaimerDialog
         open={showDisclaimer}
         onAccept={handleDisclaimerAccept}
       />
       {showNavbar && <Navbar />}
-      <div className={showNavbar ? "max-w-7xl mx-auto p-6 sm:p-8" : ""}>
+      <div className="flex-1 overflow-y-scroll">
         <Routes>
           <Route path="/" element={<Projects />} />
           <Route path="/projects" element={<Projects />} />
