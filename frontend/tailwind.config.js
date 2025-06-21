@@ -7,6 +7,20 @@ module.exports = {
     './app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}',
   ],
+  safelist: [
+    'xl:hidden',
+    'xl:relative',
+    'xl:inset-auto',
+    'xl:z-auto',
+    'xl:h-full',
+    'xl:w-[800px]',
+    'xl:flex',
+    'xl:flex-1',
+    'xl:min-w-0',
+    'xl:overflow-y-auto',
+    'xl:opacity-100',
+    'xl:pointer-events-auto',
+  ],
   prefix: "",
   theme: {
     container: {
