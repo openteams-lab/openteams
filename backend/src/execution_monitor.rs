@@ -108,91 +108,7 @@ pub async fn execution_monitor(app_state: AppState) {
     loop {
         interval.tick().await;
 
-        // Check for orphaned task attempts with latest activity status = ExecutorRunning but no running execution
-        let executor_running_process_ids =
-            match TaskAttemptActivity::find_processes_with_latest_executor_running_status(
-                &app_state.db_pool,
-            )
-            .await
-            {
-                Ok(processes) => processes,
-                Err(e) => {
-                    tracing::error!("Failed to query executor running attempts: {}", e);
-                    continue;
-                }
-            };
-
-        for process_id in executor_running_process_ids {
-            // Check if this attempt has a running execution
-            if !app_state.has_running_execution(process_id).await {
-                // Get the execution process to find the task attempt ID
-                let task_attempt_id =
-                    match ExecutionProcess::find_by_id(&app_state.db_pool, process_id).await {
-                        Ok(Some(process)) => process.task_attempt_id,
-                        Ok(None) => {
-                            tracing::error!("Execution process {} not found", process_id);
-                            continue;
-                        }
-                        Err(e) => {
-                            tracing::error!(
-                                "Failed to fetch execution process {}: {}",
-                                process_id,
-                                e
-                            );
-                            continue;
-                        }
-                    };
-
-                // This is an orphaned task attempt - mark it as failed
-                let activity_id = Uuid::new_v4();
-                let create_activity = CreateTaskAttemptActivity {
-                    execution_process_id: process_id,
-                    status: Some(TaskAttemptStatus::ExecutorFailed),
-                    note: Some("Execution lost (server restart or crash)".to_string()),
-                };
-
-                if let Err(e) = TaskAttemptActivity::create(
-                    &app_state.db_pool,
-                    &create_activity,
-                    activity_id,
-                    TaskAttemptStatus::ExecutorFailed,
-                )
-                .await
-                {
-                    tracing::error!(
-                        "Failed to create failed activity for orphaned process: {}",
-                        e
-                    );
-                } else {
-                    tracing::info!("Marked orphaned execution process {} as failed", process_id);
-
-                    // Get task attempt and task to access task_id and project_id for status update
-                    if let Ok(Some(task_attempt)) =
-                        TaskAttempt::find_by_id(&app_state.db_pool, task_attempt_id).await
-                    {
-                        if let Ok(Some(task)) =
-                            Task::find_by_id(&app_state.db_pool, task_attempt.task_id).await
-                        {
-                            // Update task status to InReview
-                            if let Err(e) = Task::update_status(
-                                &app_state.db_pool,
-                                task.id,
-                                task.project_id,
-                                TaskStatus::InReview,
-                            )
-                            .await
-                            {
-                                tracing::error!("Failed to update task status to InReview for orphaned attempt: {}", e);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Note: Execution starting logic moved to create_task_attempt endpoint
-
-        // Check for completed processes
+        // Check for completed processes FIRST to avoid race conditions
         let completed_executions = app_state.get_running_executions_for_monitor().await;
 
         // Handle completed executions
@@ -281,6 +197,106 @@ pub async fn execution_monitor(app_state: AppState) {
                     "Failed to find execution process {} for completion handling",
                     execution_process_id
                 );
+            }
+        }
+
+        // Check for orphaned task attempts AFTER handling completions
+        // Add a small delay to ensure completed processes are properly handled first
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let executor_running_process_ids =
+            match TaskAttemptActivity::find_processes_with_latest_executor_running_status(
+                &app_state.db_pool,
+            )
+            .await
+            {
+                Ok(processes) => processes,
+                Err(e) => {
+                    tracing::error!("Failed to query executor running attempts: {}", e);
+                    continue;
+                }
+            };
+
+        for process_id in executor_running_process_ids {
+            // Double-check that this process is not currently running and hasn't just completed
+            if !app_state.has_running_execution(process_id).await {
+                // Get the execution process to find the task attempt ID
+                let task_attempt_id =
+                    match ExecutionProcess::find_by_id(&app_state.db_pool, process_id).await {
+                        Ok(Some(process)) => {
+                            // Additional check: if the process was recently updated, skip it
+                            // This prevents race conditions with recent completions
+                            let now = chrono::Utc::now();
+                            let time_since_update = now - process.updated_at;
+                            if time_since_update.num_seconds() < 10 {
+                                // Process was updated within last 10 seconds, likely just completed
+                                tracing::debug!(
+                                    "Skipping recently updated process {} (updated {} seconds ago)",
+                                    process_id,
+                                    time_since_update.num_seconds()
+                                );
+                                continue;
+                            }
+                            process.task_attempt_id
+                        }
+                        Ok(None) => {
+                            tracing::error!("Execution process {} not found", process_id);
+                            continue;
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to fetch execution process {}: {}",
+                                process_id,
+                                e
+                            );
+                            continue;
+                        }
+                    };
+
+                // This is truly an orphaned task attempt - mark it as failed
+                let activity_id = Uuid::new_v4();
+                let create_activity = CreateTaskAttemptActivity {
+                    execution_process_id: process_id,
+                    status: Some(TaskAttemptStatus::ExecutorFailed),
+                    note: Some("Execution lost (server restart or crash)".to_string()),
+                };
+
+                if let Err(e) = TaskAttemptActivity::create(
+                    &app_state.db_pool,
+                    &create_activity,
+                    activity_id,
+                    TaskAttemptStatus::ExecutorFailed,
+                )
+                .await
+                {
+                    tracing::error!(
+                        "Failed to create failed activity for orphaned process: {}",
+                        e
+                    );
+                } else {
+                    tracing::info!("Marked orphaned execution process {} as failed", process_id);
+
+                    // Get task attempt and task to access task_id and project_id for status update
+                    if let Ok(Some(task_attempt)) =
+                        TaskAttempt::find_by_id(&app_state.db_pool, task_attempt_id).await
+                    {
+                        if let Ok(Some(task)) =
+                            Task::find_by_id(&app_state.db_pool, task_attempt.task_id).await
+                        {
+                            // Update task status to InReview
+                            if let Err(e) = Task::update_status(
+                                &app_state.db_pool,
+                                task.id,
+                                task.project_id,
+                                TaskStatus::InReview,
+                            )
+                            .await
+                            {
+                                tracing::error!("Failed to update task status to InReview for orphaned attempt: {}", e);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
