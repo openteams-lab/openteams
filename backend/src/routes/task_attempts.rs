@@ -11,6 +11,7 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::models::{
+    execution_process::ExecutionProcess,
     task::Task,
     task_attempt::{BranchStatus, CreateTaskAttempt, TaskAttempt, TaskAttemptStatus, WorktreeDiff},
     task_attempt_activity::{CreateTaskAttemptActivity, TaskAttemptActivity},
@@ -171,78 +172,6 @@ pub async fn create_task_attempt_activity(
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
-}
-
-pub async fn stop_task_attempt(
-    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::app_state::AppState>,
-) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
-    // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
-        Ok(false) => return Err(StatusCode::NOT_FOUND),
-        Err(e) => {
-            tracing::error!("Failed to check task attempt existence: {}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-        Ok(true) => {}
-    }
-
-    // Find and stop the running execution
-    let stopped = match app_state.stop_running_execution(attempt_id).await {
-        Ok(stopped) => stopped,
-        Err(e) => {
-            tracing::error!("Failed to stop execution for attempt {}: {}", attempt_id, e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    };
-
-    if !stopped {
-        return Ok(ResponseJson(ApiResponse {
-            success: true,
-            data: None,
-            message: Some("No running execution found for this attempt".to_string()),
-        }));
-    }
-
-    // Create a new activity record to mark as stopped
-    let activity_id = Uuid::new_v4();
-    let create_activity = CreateTaskAttemptActivity {
-        task_attempt_id: attempt_id,
-        status: Some(TaskAttemptStatus::Paused),
-        note: Some("Execution stopped by user".to_string()),
-    };
-
-    if let Err(e) = TaskAttemptActivity::create(
-        &pool,
-        &create_activity,
-        activity_id,
-        TaskAttemptStatus::Paused,
-    )
-    .await
-    {
-        tracing::error!("Failed to create stopped activity: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
-    }
-
-    // Update task status to InReview
-    if let Err(e) = Task::update_status(
-        &pool,
-        task_id,
-        project_id,
-        crate::models::task::TaskStatus::InReview,
-    )
-    .await
-    {
-        tracing::error!("Failed to update task status to InReview: {}", e);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
-    }
-
-    Ok(ResponseJson(ApiResponse {
-        success: true,
-        data: None,
-        message: Some("Task attempt stopped successfully".to_string()),
-    }))
 }
 
 pub async fn get_task_attempt_diff(
@@ -426,6 +355,127 @@ pub async fn rebase_task_attempt(
     }
 }
 
+pub async fn get_task_attempt_execution_processes(
+    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
+    Extension(pool): Extension<SqlitePool>,
+) -> Result<ResponseJson<ApiResponse<Vec<ExecutionProcess>>>, StatusCode> {
+    // Verify task attempt exists and belongs to the correct task
+    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check task attempt existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(true) => {}
+    }
+
+    match ExecutionProcess::find_by_task_attempt_id(&pool, attempt_id).await {
+        Ok(processes) => Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: Some(processes),
+            message: None,
+        })),
+        Err(e) => {
+            tracing::error!(
+                "Failed to fetch execution processes for attempt {}: {}",
+                attempt_id,
+                e
+            );
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+#[axum::debug_handler]
+pub async fn stop_execution_process(
+    Path((project_id, task_id, attempt_id, process_id)): Path<(Uuid, Uuid, Uuid, Uuid)>,
+    Extension(pool): Extension<SqlitePool>,
+    Extension(app_state): Extension<crate::app_state::AppState>,
+) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
+    // Verify task attempt exists and belongs to the correct task
+    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check task attempt existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(true) => {}
+    }
+
+    // Verify execution process exists and belongs to the task attempt
+    let process = match ExecutionProcess::find_by_id(&pool, process_id).await {
+        Ok(Some(process)) if process.task_attempt_id == attempt_id => process,
+        Ok(Some(_)) => return Err(StatusCode::NOT_FOUND), // Process exists but wrong attempt
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to fetch execution process {}: {}", process_id, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // Stop the specific execution process
+    let stopped = match app_state.stop_running_execution_by_id(process_id).await {
+        Ok(stopped) => stopped,
+        Err(e) => {
+            tracing::error!("Failed to stop execution process {}: {}", process_id, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    if !stopped {
+        return Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: None,
+            message: Some("Execution process was not running".to_string()),
+        }));
+    }
+
+    // Update the execution process status in the database
+    if let Err(e) = ExecutionProcess::update_completion(
+        &pool,
+        process_id,
+        crate::models::execution_process::ExecutionProcessStatus::Killed,
+        None,
+    )
+    .await
+    {
+        tracing::error!("Failed to update execution process status: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // Create a new activity record to mark as stopped
+    let activity_id = Uuid::new_v4();
+    let create_activity = CreateTaskAttemptActivity {
+        task_attempt_id: attempt_id,
+        status: Some(TaskAttemptStatus::Paused),
+        note: Some(format!(
+            "Execution process {:?} ({}) stopped by user",
+            process.process_type, process_id
+        )),
+    };
+
+    if let Err(e) = TaskAttemptActivity::create(
+        &pool,
+        &create_activity,
+        activity_id,
+        TaskAttemptStatus::Paused,
+    )
+    .await
+    {
+        tracing::error!("Failed to create stopped activity: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    Ok(ResponseJson(ApiResponse {
+        success: true,
+        data: None,
+        message: Some(format!(
+            "Execution process {} stopped successfully",
+            process_id
+        )),
+    }))
+}
+
 #[derive(serde::Deserialize)]
 pub struct DeleteFileQuery {
     file_path: String,
@@ -481,10 +531,7 @@ pub fn task_attempts_router() -> Router {
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/activities",
             get(get_task_attempt_activities).post(create_task_attempt_activity),
         )
-        .route(
-            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/stop",
-            post(stop_task_attempt),
-        )
+
         .route(
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/diff",
             get(get_task_attempt_diff),
@@ -508,5 +555,13 @@ pub fn task_attempts_router() -> Router {
         .route(
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/delete-file",
             post(delete_task_attempt_file),
+        )
+        .route(
+            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/execution-processes",
+            get(get_task_attempt_execution_processes),
+        )
+        .route(
+            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/execution-processes/:process_id/stop",
+            post(stop_execution_process),
         )
 }

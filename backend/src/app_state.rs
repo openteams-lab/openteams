@@ -89,39 +89,30 @@ impl AppState {
         executions.insert(execution_id, execution);
     }
 
-    pub async fn stop_running_execution(
+    pub async fn stop_running_execution_by_id(
         &self,
-        attempt_id: Uuid,
+        execution_id: Uuid,
     ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let mut executions = self.running_executions.lock().await;
-        let mut execution_id_to_remove = None;
-        let mut stopped = false;
 
-        // Find the execution for this attempt
-        for (exec_id, execution) in executions.iter_mut() {
-            if execution.task_attempt_id == attempt_id {
-                // Kill the process
-                match execution.child.kill().await {
-                    Ok(_) => {
-                        stopped = true;
-                        execution_id_to_remove = Some(*exec_id);
-                        tracing::info!("Stopped execution for task attempt {}", attempt_id);
-                        break;
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to kill process for attempt {}: {}", attempt_id, e);
-                        return Err(Box::new(e));
-                    }
+        if let Some(mut execution) = executions.remove(&execution_id) {
+            // Kill the process
+            match execution.child.kill().await {
+                Ok(_) => {
+                    tracing::info!("Stopped execution process {}", execution_id);
+                    Ok(true)
+                }
+                Err(e) => {
+                    tracing::error!("Failed to kill execution process {}: {}", execution_id, e);
+                    // Re-insert the execution since we failed to kill it
+                    executions.insert(execution_id, execution);
+                    Err(Box::new(e))
                 }
             }
+        } else {
+            // Execution not found (might already be finished)
+            Ok(false)
         }
-
-        // Remove the stopped execution from the map
-        if let Some(exec_id) = execution_id_to_remove {
-            executions.remove(&exec_id);
-        }
-
-        Ok(stopped)
     }
 
     // Config getters
