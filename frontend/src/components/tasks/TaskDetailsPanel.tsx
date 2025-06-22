@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Chip } from "@/components/ui/chip";
 import { ExecutionOutputViewer } from "./ExecutionOutputViewer";
+import { EditorSelectionDialog } from "./EditorSelectionDialog";
 
 import {
   DropdownMenu,
@@ -40,6 +41,7 @@ import type {
   ApiResponse,
   TaskWithAttemptStatus,
   ExecutionProcess,
+  EditorType,
 } from "shared/types";
 
 interface TaskDetailsPanelProps {
@@ -143,6 +145,7 @@ export function TaskDetailsPanel({
   const [expandedOutputs, setExpandedOutputs] = useState<Set<string>>(
     new Set()
   );
+  const [showEditorDialog, setShowEditorDialog] = useState(false);
   const { config } = useConfig();
 
   // Available executors
@@ -310,21 +313,30 @@ export function TaskDetailsPanel({
     }
   };
 
-  const openInEditor = async () => {
+  const openInEditor = async (editorType?: EditorType) => {
     if (!task || !selectedAttempt) return;
 
     try {
-      await makeRequest(
+      const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${task.id}/attempts/${selectedAttempt.id}/open-editor`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          body: JSON.stringify(editorType ? { editor_type: editorType } : null),
         }
       );
+
+      if (!response.ok) {
+        throw new Error("Failed to open editor");
+      }
     } catch (err) {
       console.error("Failed to open editor:", err);
+      // Show editor selection dialog if editor failed to open
+      if (!editorType) {
+        setShowEditorDialog(true);
+      }
     }
   };
 
@@ -616,7 +628,7 @@ export function TaskDetailsPanel({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={openInEditor}
+                        onClick={() => openInEditor()}
                       >
                         <Code className="h-4 w-4 mr-1" />
                         Editor
@@ -802,6 +814,13 @@ export function TaskDetailsPanel({
               </div> */}
             </div>
           </div>
+
+          {/* Editor Selection Dialog */}
+          <EditorSelectionDialog
+            isOpen={showEditorDialog}
+            onClose={() => setShowEditorDialog(false)}
+            onSelectEditor={(editorType) => openInEditor(editorType)}
+          />
         </>
       )}
     </>

@@ -279,10 +279,16 @@ pub async fn merge_task_attempt(
     }
 }
 
+#[derive(serde::Deserialize)]
+pub struct OpenEditorRequest {
+    editor_type: Option<String>,
+}
+
 pub async fn open_task_attempt_in_editor(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
     Extension(pool): Extension<SqlitePool>,
     Extension(config): Extension<Arc<RwLock<crate::models::config::Config>>>,
+    Json(payload): Json<Option<OpenEditorRequest>>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
     match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
@@ -304,10 +310,33 @@ pub async fn open_task_attempt_in_editor(
         }
     };
 
-    // Get editor command from config
+    // Get editor command from config or override
     let editor_command = {
         let config_guard = config.read().await;
-        config_guard.editor.get_command()
+        if let Some(ref request) = payload {
+            if let Some(ref editor_type) = request.editor_type {
+                // Create a temporary editor config with the override
+                use crate::models::config::{EditorConfig, EditorType};
+                let override_editor_type = match editor_type.as_str() {
+                    "vscode" => EditorType::VSCode,
+                    "cursor" => EditorType::Cursor,
+                    "windsurf" => EditorType::Windsurf,
+                    "intellij" => EditorType::IntelliJ,
+                    "zed" => EditorType::Zed,
+                    "custom" => EditorType::Custom,
+                    _ => config_guard.editor.editor_type.clone(),
+                };
+                let temp_config = EditorConfig {
+                    editor_type: override_editor_type,
+                    custom_command: config_guard.editor.custom_command.clone(),
+                };
+                temp_config.get_command()
+            } else {
+                config_guard.editor.get_command()
+            }
+        } else {
+            config_guard.editor.get_command()
+        }
     };
 
     // Open editor in the worktree directory
@@ -338,11 +367,7 @@ pub async fn open_task_attempt_in_editor(
                 attempt_id,
                 e
             );
-            Ok(ResponseJson(ApiResponse {
-                success: false,
-                data: None,
-                message: Some(format!("Failed to open editor: {}", e)),
-            }))
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
