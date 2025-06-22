@@ -8,17 +8,31 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Code } from "lucide-react";
 import type { EditorType, ExecutorConfig } from "shared/types";
-import { EXECUTOR_TYPES, EDITOR_TYPES, EXECUTOR_LABELS, EDITOR_LABELS } from "shared/types";
+import {
+  EXECUTOR_TYPES,
+  EDITOR_TYPES,
+  EXECUTOR_LABELS,
+  EDITOR_LABELS,
+} from "shared/types";
 
 interface OnboardingDialogProps {
   open: boolean;
-  onComplete: (config: { executor: ExecutorConfig; editor: { editor_type: EditorType; custom_command: string | null } }) => void;
+  onComplete: (config: {
+    executor: ExecutorConfig;
+    editor: { editor_type: EditorType; custom_command: string | null };
+  }) => void;
 }
 
 export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
@@ -36,7 +50,9 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
     });
   };
 
-  const isValid = editorType !== "custom" || (editorType === "custom" && customCommand.trim() !== "");
+  const isValid =
+    editorType !== "custom" ||
+    (editorType === "custom" && customCommand.trim() !== "");
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
@@ -44,10 +60,11 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
         <DialogHeader>
           <div className="flex items-center gap-3">
             <Sparkles className="h-6 w-6 text-primary" />
-            <DialogTitle>Welcome to Mission Control</DialogTitle>
+            <DialogTitle>Welcome to Vibe Kanban</DialogTitle>
           </div>
           <DialogDescription className="text-left pt-2">
-            Let's set up your coding preferences. You can always change these later in Settings.
+            Let's set up your coding preferences. You can always change these
+            later in Settings.
           </DialogDescription>
         </DialogHeader>
 
@@ -64,7 +81,9 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
                 <Label htmlFor="executor">Default Executor</Label>
                 <Select
                   value={executor.type}
-                  onValueChange={(value: "echo" | "claude" | "amp") => setExecutor({ type: value })}
+                  onValueChange={(value: "echo" | "claude" | "amp") =>
+                    setExecutor({ type: value })
+                  }
                 >
                   <SelectTrigger id="executor">
                     <SelectValue placeholder="Select your preferred coding agent" />
@@ -78,9 +97,10 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  {executor.type === "claude" && "Claude will handle your coding tasks with advanced reasoning."}
-                  {executor.type === "amp" && "Amp provides powerful code generation and debugging capabilities."}
-                  {executor.type === "echo" && "Echo is a simple testing executor that repeats your commands."}
+                  {executor.type === "claude" && "Claude Code from Anthropic"}
+                  {executor.type === "amp" && "From Sourcegraph"}
+                  {executor.type === "echo" &&
+                    "This is just for debugging vibe-kanban itself"}
                 </p>
               </div>
             </CardContent>
@@ -112,7 +132,8 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  This editor will be used to open task attempts and project files.
+                  This editor will be used to open task attempts and project
+                  files.
                 </p>
               </div>
 
@@ -126,7 +147,8 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
                     onChange={(e) => setCustomCommand(e.target.value)}
                   />
                   <p className="text-sm text-muted-foreground">
-                    Enter the command to run your custom editor. Use spaces for arguments (e.g., "code --wait").
+                    Enter the command to run your custom editor. Use spaces for
+                    arguments (e.g., "code --wait").
                   </p>
                 </div>
               )}
@@ -135,7 +157,11 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
         </div>
 
         <DialogFooter>
-          <Button onClick={handleComplete} disabled={!isValid} className="w-full">
+          <Button
+            onClick={handleComplete}
+            disabled={!isValid}
+            className="w-full"
+          >
             Complete Setup
           </Button>
         </DialogFooter>
