@@ -498,17 +498,22 @@ export function TaskDetailsPanel({
                 <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-md">
                   <div className="flex items-center gap-2 flex-1">
                     {selectedAttempt && (
-                      <span className="text-sm font-medium">
-                        <span className="text-sm text-muted-foreground">
-                          Current attempt:{" "}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm font-medium">
+                          <span className="text-sm text-muted-foreground">
+                            Current attempt:{" "}
+                          </span>
+                          {new Date(
+                            selectedAttempt.created_at
+                          ).toLocaleDateString()}{" "}
+                          {new Date(
+                            selectedAttempt.created_at
+                          ).toLocaleTimeString()}
                         </span>
-                        {new Date(
-                          selectedAttempt.created_at
-                        ).toLocaleDateString()}{" "}
-                        {new Date(
-                          selectedAttempt.created_at
-                        ).toLocaleTimeString()}
-                      </span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          Worktree: {selectedAttempt.worktree_path}
+                        </span>
+                      </div>
                     )}
                     <div className="flex gap-1">
                       {taskAttempts.length > 1 && (
@@ -650,6 +655,29 @@ export function TaskDetailsPanel({
                           </div>
                         ) : (
                           <div className="space-y-2">
+                            {/* Fake worktree created activity */}
+                            {selectedAttempt && (
+                              <div key="worktree-created">
+                                <div className="flex items-center gap-3 my-4 rounded-md">
+                                  <Chip dotColor="bg-green-500">
+                                    Worktree Created At
+                                  </Chip>
+                                  <span className="text-sm text-muted-foreground flex-1">
+                                    Git worktree created at {selectedAttempt.worktree_path}
+                                  </span>
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Clock className="h-3 w-3" />
+                                    {new Date(
+                                      selectedAttempt.created_at
+                                    ).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                      second: "2-digit",
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             {attemptActivities.slice().map((activity) => (
                               <div key={activity.id}>
                                 {/* Compact activity message */}
