@@ -778,17 +778,17 @@ impl TaskAttempt {
                 None,
             )?,
             (None, Some(new_b)) => {
-                // File was added
-                git2::Patch::from_blob_and_buffer(
-                    new_b,
+                // File was added - diff from empty buffer to new blob content
+                git2::Patch::from_buffers(
+                    &[], // empty buffer represents the "old" version (file didn't exist)
                     Some(Path::new(file_path)),
-                    &[],
+                    new_b.content(), // new blob content as buffer
                     Some(Path::new(file_path)),
                     None,
                 )?
             }
             (Some(old_b), None) => {
-                // File was deleted
+                // File was deleted - diff from old blob to empty buffer
                 git2::Patch::from_blob_and_buffer(
                     old_b,
                     Some(Path::new(file_path)),
