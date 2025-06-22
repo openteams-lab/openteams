@@ -129,6 +129,24 @@ export function TaskFormDialog({
     onOpenChange(false)
   }
 
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Command/Ctrl + Enter to Create & Start (only in create mode)
+      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+        if (!isEditMode && onCreateAndStartTask && title.trim() && !isSubmitting && !isSubmittingAndStart) {
+          event.preventDefault()
+          handleCreateAndStart()
+        }
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, isEditMode, onCreateAndStartTask, title, isSubmitting, isSubmittingAndStart, handleCreateAndStart])
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
