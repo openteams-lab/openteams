@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import type { ThemeMode, EditorType } from "shared/types";
+import { EXECUTOR_TYPES, EDITOR_TYPES, EXECUTOR_LABELS, EDITOR_LABELS } from "shared/types";
 import { useTheme } from "@/components/theme-provider";
 import { useConfig } from "@/components/config-provider";
 
@@ -49,6 +50,12 @@ export function Settings() {
     if (!config) return;
     
     updateConfig({ disclaimer_acknowledged: false });
+  };
+
+  const resetOnboarding = async () => {
+    if (!config) return;
+    
+    updateConfig({ onboarding_acknowledged: false });
   };
 
   if (loading) {
@@ -145,9 +152,11 @@ export function Settings() {
                     <SelectValue placeholder="Select executor" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="claude">Claude</SelectItem>
-                    <SelectItem value="amp">Amp</SelectItem>
-                    <SelectItem value="echo">Echo</SelectItem>
+                    {EXECUTOR_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {EXECUTOR_LABELS[type]}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
@@ -181,12 +190,11 @@ export function Settings() {
                     <SelectValue placeholder="Select editor" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="vscode">VS Code</SelectItem>
-                    <SelectItem value="cursor">Cursor</SelectItem>
-                    <SelectItem value="windsurf">Windsurf</SelectItem>
-                    <SelectItem value="intellij">IntelliJ IDEA</SelectItem>
-                    <SelectItem value="zed">Zed</SelectItem>
-                    <SelectItem value="custom">Custom Command</SelectItem>
+                    {EDITOR_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {EDITOR_LABELS[type]}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
@@ -260,7 +268,7 @@ export function Settings() {
                 Manage safety warnings and acknowledgments.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div>
@@ -282,6 +290,29 @@ export function Settings() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Resetting the disclaimer will require you to acknowledge the safety warning again on next app start.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Onboarding Status</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {config.onboarding_acknowledged 
+                        ? "You have completed the onboarding process." 
+                        : "The onboarding process has not been completed."}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={resetOnboarding}
+                    variant="outline"
+                    size="sm"
+                    disabled={!config.onboarding_acknowledged}
+                  >
+                    Reset Onboarding
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Resetting the onboarding will show the setup screen again on next app start.
                 </p>
               </div>
             </CardContent>

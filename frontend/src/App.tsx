@@ -6,18 +6,23 @@ import { ProjectTasks } from "@/pages/project-tasks";
 import { TaskAttemptComparePage } from "@/pages/task-attempt-compare";
 import { Settings } from "@/pages/Settings";
 import { DisclaimerDialog } from "@/components/DisclaimerDialog";
+import { OnboardingDialog } from "@/components/OnboardingDialog";
 import { ConfigProvider, useConfig } from "@/components/config-provider";
 import { ThemeProvider } from "@/components/theme-provider";
-import type { Config, ApiResponse } from "shared/types";
+import type { Config, ApiResponse, ExecutorConfig, EditorType } from "shared/types";
 
 function AppContent() {
   const { config, updateConfig, loading } = useConfig();
   const [showDisclaimer, setShowDisclaimer] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const showNavbar = true;
 
   useEffect(() => {
     if (config) {
       setShowDisclaimer(!config.disclaimer_acknowledged);
+      if (config.disclaimer_acknowledged) {
+        setShowOnboarding(!config.onboarding_acknowledged);
+      }
     }
   }, [config]);
 
@@ -39,6 +44,38 @@ function AppContent() {
 
       if (data.success) {
         setShowDisclaimer(false);
+        setShowOnboarding(!config.onboarding_acknowledged);
+      }
+    } catch (err) {
+      console.error("Error saving config:", err);
+    }
+  };
+
+  const handleOnboardingComplete = async (onboardingConfig: { executor: ExecutorConfig; editor: { editor_type: EditorType; custom_command: string | null } }) => {
+    if (!config) return;
+
+    const updatedConfig = {
+      ...config,
+      onboarding_acknowledged: true,
+      executor: onboardingConfig.executor,
+      editor: onboardingConfig.editor,
+    };
+
+    updateConfig(updatedConfig);
+    
+    try {
+      const response = await fetch("/api/config", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedConfig),
+      });
+
+      const data: ApiResponse<Config> = await response.json();
+
+      if (data.success) {
+        setShowOnboarding(false);
       }
     } catch (err) {
       console.error("Error saving config:", err);
@@ -62,6 +99,10 @@ function AppContent() {
         <DisclaimerDialog
           open={showDisclaimer}
           onAccept={handleDisclaimerAccept}
+        />
+        <OnboardingDialog
+          open={showOnboarding}
+          onComplete={handleOnboardingComplete}
         />
         {showNavbar && <Navbar />}
         <div className="flex-1 overflow-y-scroll">

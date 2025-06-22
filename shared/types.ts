@@ -4,7 +4,7 @@
 
 export type ApiResponse<T> = { success: boolean, data: T | null, message: string | null, };
 
-export type Config = { theme: ThemeMode, executor: ExecutorConfig, disclaimer_acknowledged: boolean, sound_alerts: boolean, push_notifications: boolean, editor: EditorConfig, };
+export type Config = { theme: ThemeMode, executor: ExecutorConfig, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, sound_alerts: boolean, push_notifications: boolean, editor: EditorConfig, };
 
 export type ThemeMode = "light" | "dark" | "system";
 
@@ -13,6 +13,25 @@ export type EditorConfig = { editor_type: EditorType, custom_command: string | n
 export type EditorType = "vscode" | "cursor" | "windsurf" | "intellij" | "zed" | "custom";
 
 export type ExecutorConfig = { "type": "echo" } | { "type": "claude" } | { "type": "amp" };
+
+// Constants for UI components
+export const EXECUTOR_TYPES = ["echo", "claude", "amp"] as const;
+export const EDITOR_TYPES = ["vscode", "cursor", "windsurf", "intellij", "zed", "custom"] as const;
+
+export const EXECUTOR_LABELS = {
+  echo: "Echo",
+  claude: "Claude",
+  amp: "Amp"
+} as const;
+
+export const EDITOR_LABELS = {
+  vscode: "VS Code",
+  cursor: "Cursor", 
+  windsurf: "Windsurf",
+  intellij: "IntelliJ IDEA",
+  zed: "Zed",
+  custom: "Custom Command"
+} as const;
 
 export type CreateProject = { name: string, git_repo_path: string, use_existing_repo: boolean, setup_script: string | null, };
 
