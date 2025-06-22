@@ -82,7 +82,9 @@ export function TaskCard({ task, index, status, onEdit, onDelete, onViewDetails 
         {task.description && (
           <div>
             <p className="text-xs text-muted-foreground break-words">
-              {task.description}
+              {task.description.length > 130 
+                ? `${task.description.substring(0, 130)}...` 
+                : task.description}
             </p>
           </div>
         )}
