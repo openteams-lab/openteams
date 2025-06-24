@@ -247,11 +247,12 @@ export function FileSearchTextarea({
       {showDropdown && createPortal(
         <div
           ref={dropdownRef}
-          className="fixed z-50 bg-background border border-border rounded-md shadow-lg overflow-y-auto min-w-64"
+          className="fixed bg-background border border-border rounded-md shadow-lg overflow-y-auto min-w-64"
           style={{
             top: dropdownPosition.top,
             left: dropdownPosition.left,
             maxHeight: dropdownPosition.maxHeight,
+            zIndex: 10000, // Higher than dialog z-[9999]
           }}
         >
           {isLoading ? (
