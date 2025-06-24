@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { Chip } from "@/components/ui/chip";
-import { Textarea } from "@/components/ui/textarea";
+import { FileSearchTextarea } from "@/components/ui/file-search-textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -1236,11 +1236,11 @@ export function TaskDetailsPanel({
                       </Alert>
                     )}
                     <div className="flex gap-2">
-                      <Textarea
-                        placeholder="Ask a follow-up question about this task..."
+                      <FileSearchTextarea
+                        placeholder="Ask a follow-up question about this task... Type @ to search files."
                         value={followUpMessage}
-                        onChange={(e) => {
-                          setFollowUpMessage(e.target.value);
+                        onChange={(value) => {
+                          setFollowUpMessage(value);
                           if (followUpError) setFollowUpError(null);
                         }}
                         onKeyDown={(e) => {
@@ -1257,6 +1257,8 @@ export function TaskDetailsPanel({
                         }}
                         className="flex-1 min-h-[60px] resize-none"
                         disabled={!canSendFollowUp}
+                        projectId={projectId}
+                        rows={3}
                       />
                       <Button
                         onClick={handleSendFollowUp}
