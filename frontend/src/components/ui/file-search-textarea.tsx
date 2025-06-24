@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Textarea } from '@/components/ui/textarea'
 import { makeRequest } from '@/lib/api'
 
@@ -161,22 +162,66 @@ export function FileSearchTextarea({
     }, 0)
   }
 
-  // Calculate dropdown position
+  // Calculate dropdown position relative to viewport
   const getDropdownPosition = () => {
-    if (!textareaRef.current || atSymbolPosition === -1) return { top: 0, left: 0 }
+    if (!textareaRef.current || atSymbolPosition === -1) return { top: 0, left: 0, maxHeight: 240 }
     
+    const textareaRect = textareaRef.current.getBoundingClientRect()
     const textBeforeAt = value.slice(0, atSymbolPosition)
     const lines = textBeforeAt.split('\n')
     const currentLine = lines.length - 1
     const charInLine = lines[lines.length - 1].length
     
-    // Rough calculation - this is an approximation
-    const lineHeight = 20
-    const charWidth = 8
-    const top = (currentLine + 1) * lineHeight + 10
-    const left = charWidth * charInLine
+    // More accurate calculation using computed styles
+    const computedStyle = window.getComputedStyle(textareaRef.current)
+    const lineHeight = parseInt(computedStyle.lineHeight) || 20
+    const fontSize = parseInt(computedStyle.fontSize) || 14
+    const charWidth = fontSize * 0.6 // Approximate character width
     
-    return { top, left }
+    // Position relative to textarea
+    const relativeTop = (currentLine + 1) * lineHeight + 8
+    const relativeLeft = charWidth * charInLine
+    
+    // Convert to viewport coordinates
+    const viewportTop = textareaRect.top + relativeTop
+    const viewportLeft = textareaRect.left + relativeLeft
+    
+    // Adjust for viewport boundaries
+    const dropdownHeight = 240 // max-h-60 = 240px
+    const dropdownWidth = 256 // min-w-64 = 256px
+    
+    let finalTop = viewportTop
+    let finalLeft = viewportLeft
+    let maxHeight = dropdownHeight
+    
+    // Prevent going off the right edge
+    if (viewportLeft + dropdownWidth > window.innerWidth) {
+      finalLeft = window.innerWidth - dropdownWidth - 16
+    }
+    
+    // Prevent going off the left edge
+    if (finalLeft < 16) {
+      finalLeft = 16
+    }
+    
+    // Prevent going off the bottom edge
+    if (viewportTop + dropdownHeight > window.innerHeight) {
+      // Try positioning above the line instead
+      const aboveTop = textareaRect.top + (currentLine * lineHeight) - dropdownHeight - 8
+      if (aboveTop > 16) {
+        finalTop = aboveTop
+      } else {
+        // If can't fit above either, limit height and scroll
+        maxHeight = window.innerHeight - viewportTop - 16
+        if (maxHeight < 120) {
+          // If still too small, position at bottom with limited height
+          finalTop = window.innerHeight - 120 - 16
+          maxHeight = 120
+        }
+      }
+    }
+    
+    return { top: finalTop, left: finalLeft, maxHeight }
   }
 
   const dropdownPosition = getDropdownPosition()
@@ -194,13 +239,14 @@ export function FileSearchTextarea({
         className={className}
       />
       
-      {showDropdown && (
+      {showDropdown && createPortal(
         <div
           ref={dropdownRef}
-          className="absolute z-50 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto min-w-64"
+          className="fixed z-50 bg-background border border-border rounded-md shadow-lg overflow-y-auto min-w-64"
           style={{
             top: dropdownPosition.top,
             left: dropdownPosition.left,
+            maxHeight: dropdownPosition.maxHeight,
           }}
         >
           {isLoading ? (
@@ -225,7 +271,8 @@ export function FileSearchTextarea({
               ))}
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
