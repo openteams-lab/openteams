@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   X,
@@ -152,6 +152,10 @@ export function TaskDetailsPanel({
   const [followUpMessage, setFollowUpMessage] = useState("");
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
+  
+  // Auto-scroll state
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { config } = useConfig();
 
   // Available executors
@@ -230,6 +234,27 @@ export function TaskDetailsPanel({
       fetchTaskAttempts();
     }
   }, [task, isOpen]);
+
+  // Auto-scroll to bottom when activities or execution processes change
+  useEffect(() => {
+    if (shouldAutoScroll && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [attemptActivities, executionProcesses, shouldAutoScroll]);
+
+  // Handle scroll events to detect manual scrolling
+  const handleScroll = useCallback(() => {
+    if (scrollContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 5; // 5px tolerance
+      
+      if (isAtBottom && !shouldAutoScroll) {
+        setShouldAutoScroll(true);
+      } else if (!isAtBottom && shouldAutoScroll) {
+        setShouldAutoScroll(false);
+      }
+    }
+  }, [shouldAutoScroll]);
 
   const fetchTaskAttempts = async () => {
     if (!task) return;
@@ -702,7 +727,11 @@ export function TaskDetailsPanel({
               </div>
 
               {/* Content */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div 
+                ref={scrollContainerRef}
+                onScroll={handleScroll}
+                className="flex-1 overflow-y-auto p-6 space-y-6"
+              >
                 {loading ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto mb-4"></div>
