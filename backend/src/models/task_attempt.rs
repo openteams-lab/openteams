@@ -496,6 +496,10 @@ impl TaskAttempt {
         prompt: &str,
     ) -> Result<(), TaskAttemptError> {
         use crate::models::executor_session::ExecutorSession;
+        use crate::models::task::{Task, TaskStatus};
+
+        // Update task status to indicate follow-up execution has started
+        Task::update_status(pool, task_id, project_id, TaskStatus::InProgress).await?;
 
         // Get task attempt
         let task_attempt = TaskAttempt::find_by_id(pool, attempt_id)
