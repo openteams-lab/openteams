@@ -315,6 +315,18 @@ export function TaskDetailsPanel({
     selectedAttempt?.id,
   ]);
 
+  // Memoize processed dev server logs to prevent stuttering
+  const processedDevServerLogs = useMemo(() => {
+    if (!devServerDetails) return "No output yet...";
+    
+    const stdout = devServerDetails.stdout || "";
+    const stderr = devServerDetails.stderr || "";
+    const allOutput = stdout + (stderr ? "\n" + stderr : "");
+    const lines = allOutput.split("\n").filter((line) => line.trim());
+    const lastLines = lines.slice(-10);
+    return lastLines.length > 0 ? lastLines.join("\n") : "No output yet...";
+  }, [devServerDetails?.stdout, devServerDetails?.stderr]);
+
   // Set default executor from config
   useEffect(() => {
     if (config) {
@@ -1009,21 +1021,7 @@ export function TaskDetailsPanel({
                                         Dev Server Logs (Last 10 lines):
                                       </p>
                                       <pre className="text-xs bg-muted p-2 rounded max-h-64 overflow-y-auto whitespace-pre-wrap">
-                                        {(() => {
-                                          const stdout =
-                                            devServerDetails.stdout || "";
-                                          const stderr =
-                                            devServerDetails.stderr || "";
-                                          const allOutput =
-                                            stdout + (stderr ? "\n" + stderr : "");
-                                          const lines = allOutput
-                                            .split("\n")
-                                            .filter((line) => line.trim());
-                                          const lastLines = lines.slice(-10);
-                                          return lastLines.length > 0
-                                            ? lastLines.join("\n")
-                                            : "No output yet...";
-                                        })()}
+                                      {processedDevServerLogs}
                                       </pre>
                                     </div>
                                   ) : runningDevServer ? (
