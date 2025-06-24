@@ -920,11 +920,11 @@ export function TaskDetailsPanel({
                                     onClick={() => createNewAttempt()}
                                     className="rounded-r-none border-r-0"
                                   >
-                                    {selectedAttempt ? "Retry" : "Start"}
+                                    {selectedAttempt ? "New Attempt" : "Start Attempt"}
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p>{selectedAttempt ? "Retry task with current executor" : "Start task with current executor"}</p>
+                                  <p>{selectedAttempt ? "Create new attempt with current executor" : "Start new attempt with current executor"}</p>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
