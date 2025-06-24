@@ -941,10 +941,15 @@ impl TaskAttempt {
             // second parent is the branch that was merged
             let parents: Vec<_> = merge_commit.parents().collect();
 
+            // Create diff options with more context
+            let mut diff_opts = git2::DiffOptions::new();
+            diff_opts.context_lines(10); // Include 10 lines of context around changes
+            diff_opts.interhunk_lines(0); // Don't merge hunks
+
             let diff = if parents.len() >= 2 {
                 let base_tree = parents[0].tree()?; // Main branch before merge
                 let merged_tree = parents[1].tree()?; // The branch that was merged
-                main_repo.diff_tree_to_tree(Some(&base_tree), Some(&merged_tree), None)?
+                main_repo.diff_tree_to_tree(Some(&base_tree), Some(&merged_tree), Some(&mut diff_opts))?
             } else {
                 // Fast-forward merge or single parent - compare merge commit with its parent
                 let base_tree = if !parents.is_empty() {
@@ -954,7 +959,7 @@ impl TaskAttempt {
                     main_repo.find_tree(git2::Oid::zero())?
                 };
                 let merged_tree = merge_commit.tree()?;
-                main_repo.diff_tree_to_tree(Some(&base_tree), Some(&merged_tree), None)?
+                main_repo.diff_tree_to_tree(Some(&base_tree), Some(&merged_tree), Some(&mut diff_opts))?
             };
 
             // Process each diff delta (file change)
@@ -1028,9 +1033,13 @@ impl TaskAttempt {
             let current_commit = worktree_repo.find_commit(worktree_head_oid)?;
             let current_tree = current_commit.tree()?;
 
-            // Create a diff between the base tree and current tree
+            // Create a diff between the base tree and current tree with more context
+            let mut diff_opts = git2::DiffOptions::new();
+            diff_opts.context_lines(10); // Include 10 lines of context around changes
+            diff_opts.interhunk_lines(0); // Don't merge hunks
+            
             let diff =
-                worktree_repo.diff_tree_to_tree(Some(&base_tree), Some(&current_tree), None)?;
+                worktree_repo.diff_tree_to_tree(Some(&base_tree), Some(&current_tree), Some(&mut diff_opts))?;
 
             // Process each diff delta (file change)
             diff.foreach(
@@ -1114,14 +1123,18 @@ impl TaskAttempt {
             None
         };
 
-        // Generate patch using Git's diff algorithm
+        // Generate patch using Git's diff algorithm with context
+        let mut diff_opts = git2::DiffOptions::new();
+        diff_opts.context_lines(10); // Include 10 lines of context around changes
+        diff_opts.interhunk_lines(0); // Don't merge hunks
+
         let patch = match (old_blob.as_ref(), new_blob.as_ref()) {
             (Some(old_b), Some(new_b)) => git2::Patch::from_blobs(
                 old_b,
                 Some(Path::new(file_path)),
                 new_b,
                 Some(Path::new(file_path)),
-                None,
+                Some(&mut diff_opts),
             )?,
             (None, Some(new_b)) => {
                 // File was added - diff from empty buffer to new blob content
@@ -1130,7 +1143,7 @@ impl TaskAttempt {
                     Some(Path::new(file_path)),
                     new_b.content(), // new blob content as buffer
                     Some(Path::new(file_path)),
-                    None,
+                    Some(&mut diff_opts),
                 )?
             }
             (Some(old_b), None) => {
@@ -1140,7 +1153,7 @@ impl TaskAttempt {
                     Some(Path::new(file_path)),
                     &[],
                     Some(Path::new(file_path)),
-                    None,
+                    Some(&mut diff_opts),
                 )?
             }
             (None, None) => {
