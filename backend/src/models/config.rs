@@ -11,6 +11,7 @@ pub struct Config {
     pub disclaimer_acknowledged: bool,
     pub onboarding_acknowledged: bool,
     pub sound_alerts: bool,
+    pub sound_file: SoundFile,
     pub push_notifications: bool,
     pub editor: EditorConfig,
 }
@@ -43,12 +44,32 @@ pub enum EditorType {
     Custom,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "kebab-case")]
+pub enum SoundFile {
+    AbstractSound1,
+    AbstractSound2,
+    AbstractSound3,
+    AbstractSound4,
+    CowMooing,
+    PhoneVibration,
+    Rooster,
+}
+
 // Constants for frontend
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct EditorConstants {
     pub editor_types: Vec<EditorType>,
     pub editor_labels: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SoundConstants {
+    pub sound_files: Vec<SoundFile>,
+    pub sound_labels: Vec<String>,
 }
 
 impl EditorConstants {
@@ -74,6 +95,31 @@ impl EditorConstants {
     }
 }
 
+impl SoundConstants {
+    pub fn new() -> Self {
+        Self {
+            sound_files: vec![
+                SoundFile::AbstractSound1,
+                SoundFile::AbstractSound2,
+                SoundFile::AbstractSound3,
+                SoundFile::AbstractSound4,
+                SoundFile::CowMooing,
+                SoundFile::PhoneVibration,
+                SoundFile::Rooster,
+            ],
+            sound_labels: vec![
+                "Gentle Chime".to_string(),
+                "Soft Bell".to_string(),
+                "Digital Tone".to_string(),
+                "Subtle Alert".to_string(),
+                "Cow Mooing".to_string(),
+                "Phone Vibration".to_string(),
+                "Rooster Call".to_string(),
+            ],
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -82,6 +128,7 @@ impl Default for Config {
             disclaimer_acknowledged: false,
             onboarding_acknowledged: false,
             sound_alerts: true,
+            sound_file: SoundFile::AbstractSound4,
             push_notifications: true,
             editor: EditorConfig::default(),
         }
@@ -113,6 +160,24 @@ impl EditorConfig {
                 }
             }
         }
+    }
+}
+
+impl SoundFile {
+    pub fn to_filename(&self) -> &'static str {
+        match self {
+            SoundFile::AbstractSound1 => "abstract-sound1.mp3",
+            SoundFile::AbstractSound2 => "abstract-sound2.mp3",
+            SoundFile::AbstractSound3 => "abstract-sound3.mp3",
+            SoundFile::AbstractSound4 => "abstract-sound4.mp3",
+            SoundFile::CowMooing => "cow-mooing.mp3",
+            SoundFile::PhoneVibration => "phone-vibration.mp3",
+            SoundFile::Rooster => "rooster.mp3",
+        }
+    }
+
+    pub fn to_path(&self) -> PathBuf {
+        PathBuf::from("backend/sounds").join(self.to_filename())
     }
 }
 

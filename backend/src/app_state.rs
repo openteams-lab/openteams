@@ -151,4 +151,9 @@ impl AppState {
         let config = self.config.read().await;
         config.push_notifications
     }
+
+    pub async fn get_sound_file(&self) -> crate::models::config::SoundFile {
+        let config = self.config.read().await;
+        config.sound_file.clone()
+    }
 }

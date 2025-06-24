@@ -31,6 +31,26 @@ export const EDITOR_LABELS: Record<string, string> = {
     "intellij": "IntelliJ IDEA",
     "zed": "Zed",
     "custom": "Custom"
+};
+
+export const SOUND_FILES: SoundFile[] = [
+    "abstract-sound1",
+    "abstract-sound2",
+    "abstract-sound3",
+    "abstract-sound4",
+    "cow-mooing",
+    "phone-vibration",
+    "rooster"
+];
+
+export const SOUND_LABELS: Record<string, string> = {
+    "abstract-sound1": "Gentle Chime",
+    "abstract-sound2": "Soft Bell",
+    "abstract-sound3": "Digital Tone",
+    "abstract-sound4": "Subtle Alert",
+    "cow-mooing": "Cow Mooing",
+    "phone-vibration": "Phone Vibration",
+    "rooster": "Rooster Call"
 };"#
     .to_string()
 }
@@ -53,6 +73,9 @@ fn main() {
         vibe_kanban::models::config::EditorConfig::decl(),
         vibe_kanban::models::config::EditorType::decl(),
         vibe_kanban::models::config::EditorConstants::decl(),
+        vibe_kanban::models::config::SoundFile::decl(),
+        vibe_kanban::models::config::SoundConstants::decl(),
+        vibe_kanban::routes::config::ConfigConstants::decl(),
         vibe_kanban::executor::ExecutorConfig::decl(),
         vibe_kanban::executor::ExecutorConstants::decl(),
         vibe_kanban::models::project::CreateProject::decl(),

@@ -4,7 +4,7 @@
 
 export type ApiResponse<T> = { success: boolean, data: T | null, message: string | null, };
 
-export type Config = { theme: ThemeMode, executor: ExecutorConfig, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, sound_alerts: boolean, push_notifications: boolean, editor: EditorConfig, };
+export type Config = { theme: ThemeMode, executor: ExecutorConfig, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, sound_alerts: boolean, sound_file: SoundFile, push_notifications: boolean, editor: EditorConfig, };
 
 export type ThemeMode = "light" | "dark" | "system";
 
@@ -13,6 +13,12 @@ export type EditorConfig = { editor_type: EditorType, custom_command: string | n
 export type EditorType = "vscode" | "cursor" | "windsurf" | "intellij" | "zed" | "custom";
 
 export type EditorConstants = { editor_types: Array<EditorType>, editor_labels: Array<string>, };
+
+export type SoundFile = "abstract-sound1" | "abstract-sound2" | "abstract-sound3" | "abstract-sound4" | "cow-mooing" | "phone-vibration" | "rooster";
+
+export type SoundConstants = { sound_files: Array<SoundFile>, sound_labels: Array<string>, };
+
+export type ConfigConstants = { editor: EditorConstants, sound: SoundConstants, };
 
 export type ExecutorConfig = { "type": "echo" } | { "type": "claude" } | { "type": "amp" };
 
@@ -111,4 +117,24 @@ export const EDITOR_LABELS: Record<string, string> = {
     "intellij": "IntelliJ IDEA",
     "zed": "Zed",
     "custom": "Custom"
+};
+
+export const SOUND_FILES: SoundFile[] = [
+    "abstract-sound1",
+    "abstract-sound2",
+    "abstract-sound3",
+    "abstract-sound4",
+    "cow-mooing",
+    "phone-vibration",
+    "rooster"
+];
+
+export const SOUND_LABELS: Record<string, string> = {
+    "abstract-sound1": "Gentle Chime",
+    "abstract-sound2": "Soft Bell",
+    "abstract-sound3": "Digital Tone",
+    "abstract-sound4": "Subtle Alert",
+    "cow-mooing": "Cow Mooing",
+    "phone-vibration": "Phone Vibration",
+    "rooster": "Rooster Call"
 };

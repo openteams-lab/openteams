@@ -6,9 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
-import type { ThemeMode, EditorType } from "shared/types";
-import { EXECUTOR_TYPES, EDITOR_TYPES, EXECUTOR_LABELS, EDITOR_LABELS } from "shared/types";
+import { Loader2, Volume2 } from "lucide-react";
+import type { ThemeMode, EditorType, SoundFile } from "shared/types";
+import { EXECUTOR_TYPES, EDITOR_TYPES, EXECUTOR_LABELS, EDITOR_LABELS, SOUND_FILES, SOUND_LABELS } from "shared/types";
 import { useTheme } from "@/components/theme-provider";
 import { useConfig } from "@/components/config-provider";
 
@@ -18,6 +18,15 @@ export function Settings() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const { setTheme } = useTheme();
+
+  const playSound = async (soundFile: SoundFile) => {
+    const audio = new Audio(`/api/sounds/${soundFile}.mp3`);
+    try {
+      await audio.play();
+    } catch (err) {
+      console.error("Failed to play sound:", err);
+    }
+  };
 
   const handleSave = async () => {
     if (!config) return;
@@ -245,6 +254,40 @@ export function Settings() {
                   </p>
                 </div>
               </div>
+              
+              {config.sound_alerts && (
+                <div className="space-y-2 ml-6">
+                  <Label htmlFor="sound-file">Sound</Label>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={config.sound_file}
+                      onValueChange={(value: SoundFile) => updateConfig({ sound_file: value })}
+                    >
+                      <SelectTrigger id="sound-file" className="flex-1">
+                        <SelectValue placeholder="Select sound" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SOUND_FILES.map((soundFile) => (
+                          <SelectItem key={soundFile} value={soundFile}>
+                            {SOUND_LABELS[soundFile]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => playSound(config.sound_file)}
+                      className="px-3"
+                    >
+                      <Volume2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Choose the sound to play when tasks complete. Click the volume button to preview.
+                  </p>
+                </div>
+              )}
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="push-notifications"

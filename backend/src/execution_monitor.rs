@@ -69,21 +69,23 @@ async fn commit_execution_changes(
 }
 
 /// Play a system sound notification
-async fn play_sound_notification() {
+async fn play_sound_notification(sound_file: &crate::models::config::SoundFile) {
     // Use platform-specific sound notification
     if cfg!(target_os = "macos") {
+        let sound_path = sound_file.to_path();
         let _ = tokio::process::Command::new("afplay")
-            .arg("/System/Library/Sounds/Glass.aiff")
+            .arg(sound_path)
             .spawn();
     } else if cfg!(target_os = "linux") {
         // Try different Linux notification sounds
+        let sound_path = sound_file.to_path();
         if let Ok(_) = tokio::process::Command::new("paplay")
-            .arg("/usr/share/sounds/alsa/Front_Left.wav")
+            .arg(&sound_path)
             .spawn()
         {
             // Success with paplay
         } else if let Ok(_) = tokio::process::Command::new("aplay")
-            .arg("/usr/share/sounds/alsa/Front_Left.wav")
+            .arg(&sound_path)
             .spawn()
         {
             // Success with aplay
@@ -429,7 +431,8 @@ async fn handle_coding_agent_completion(
 
     // Play sound notification if enabled
     if app_state.get_sound_alerts_enabled().await {
-        play_sound_notification().await;
+        let sound_file = app_state.get_sound_file().await;
+        play_sound_notification(&sound_file).await;
     }
 
     // Send push notification if enabled

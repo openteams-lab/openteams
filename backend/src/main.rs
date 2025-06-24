@@ -83,6 +83,40 @@ async fn serve_file(path: &str) -> impl IntoResponse {
     }
 }
 
+async fn serve_sound_file(axum::extract::Path(filename): axum::extract::Path<String>) -> impl IntoResponse {
+    use tokio::fs;
+    use std::path::Path;
+
+    // Validate filename contains only expected sound files
+    let valid_sounds = ["abstract-sound1.mp3", "abstract-sound2.mp3", "abstract-sound3.mp3", 
+                       "abstract-sound4.mp3", "cow-mooing.mp3", "phone-vibration.mp3", "rooster.mp3"];
+    
+    if !valid_sounds.contains(&filename.as_str()) {
+        return Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from("Sound file not found"))
+            .unwrap();
+    }
+
+    let sound_path = Path::new("backend/sounds").join(&filename);
+    
+    match fs::read(&sound_path).await {
+        Ok(content) => {
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, HeaderValue::from_static("audio/mpeg"))
+                .body(Body::from(content))
+                .unwrap()
+        }
+        Err(_) => {
+            Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::from("Sound file not found"))
+                .unwrap()
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().init();
@@ -130,7 +164,8 @@ async fn main() -> anyhow::Result<()> {
                 .merge(tasks::tasks_router())
                 .merge(task_attempts::task_attempts_router())
                 .merge(filesystem::filesystem_router())
-                .merge(config::config_router()),
+                .merge(config::config_router())
+                .route("/sounds/:filename", get(serve_sound_file)),
         )
         .layer(Extension(pool.clone()))
         .layer(Extension(config_arc));
