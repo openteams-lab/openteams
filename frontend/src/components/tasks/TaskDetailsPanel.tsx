@@ -158,6 +158,22 @@ export function TaskDetailsPanel({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { config } = useConfig();
 
+  // Handle ESC key locally to prevent global navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown, true); // Use capture phase
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, onClose]);
+
   // Available executors
   const availableExecutors = [
     { id: "echo", name: "Echo" },
