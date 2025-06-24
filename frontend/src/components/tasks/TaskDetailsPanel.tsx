@@ -4,7 +4,6 @@ import {
   X,
   History,
   Clock,
-  Code,
   ChevronDown,
   ChevronUp,
   Settings2,

@@ -198,7 +198,7 @@ export function FileSearchTextarea({
     // Dropdown dimensions
     const dropdownWidth = 256 // min-w-64 = 256px
     const minDropdownHeight = 120
-    const maxDropdownHeight = 240 // max-h-60 = 240px
+    const maxDropdownHeight = 400 // Increased to show more results without scrolling
     
     let finalTop = viewportTop
     let finalLeft = viewportLeft
@@ -214,17 +214,17 @@ export function FileSearchTextarea({
       finalLeft = 16
     }
     
-    // Prevent going off the bottom edge
-    const availableSpaceBelow = window.innerHeight - viewportTop - 16
-    const availableSpaceAbove = textareaRect.top + (currentLine * lineHeight) - 16
+    // Prevent going off the bottom edge - use more generous spacing
+    const availableSpaceBelow = window.innerHeight - viewportTop - 32
+    const availableSpaceAbove = textareaRect.top + (currentLine * lineHeight) - 32
     
     if (availableSpaceBelow < minDropdownHeight && availableSpaceAbove > availableSpaceBelow) {
       // Position above the cursor line
       finalTop = textareaRect.top + paddingTop + (currentLine * lineHeight) - maxDropdownHeight - 8
-      maxHeight = Math.min(maxDropdownHeight, availableSpaceAbove)
+      maxHeight = Math.min(maxDropdownHeight, Math.max(availableSpaceAbove, minDropdownHeight))
     } else {
-      // Position below the cursor line
-      maxHeight = Math.min(maxDropdownHeight, availableSpaceBelow)
+      // Position below the cursor line - prioritize using available space
+      maxHeight = Math.min(maxDropdownHeight, Math.max(availableSpaceBelow, minDropdownHeight))
     }
     
     // Ensure minimum height
