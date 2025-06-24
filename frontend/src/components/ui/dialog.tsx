@@ -21,7 +21,7 @@ const Dialog = React.forwardRef<
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center p-4 overflow-y-auto">
       <div
         className="fixed inset-0 bg-black/50"
         onClick={() => onOpenChange?.(false)}
@@ -29,7 +29,7 @@ const Dialog = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "relative z-[9999] grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg",
+          "relative z-[9999] grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg my-8",
           className
         )}
         {...props}
