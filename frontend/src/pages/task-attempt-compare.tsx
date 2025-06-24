@@ -50,7 +50,6 @@ export function TaskAttemptComparePage() {
   const [error, setError] = useState<string | null>(null);
   const [merging, setMerging] = useState(false);
   const [rebasing, setRebasing] = useState(false);
-  const [mergeSuccess, setMergeSuccess] = useState(false);
   const [rebaseSuccess, setRebaseSuccess] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set()
@@ -150,7 +149,6 @@ export function TaskAttemptComparePage() {
       if (response.ok) {
         const result: ApiResponse<string> = await response.json();
         if (result.success) {
-          setMergeSuccess(true);
           // Refetch both diff and branch status to show updated state
           fetchDiff();
           fetchBranchStatus();
@@ -493,15 +491,15 @@ export function TaskAttemptComparePage() {
                 {branchStatus.up_to_date ? (
                   <span className="text-green-600">Up to date</span>
                 ) : branchStatus.is_behind === true ? (
-                  <span className="text-orange-600">
-                    {branchStatus.commits_behind} commit
-                    {branchStatus.commits_behind !== 1 ? "s" : ""} behind main
-                  </span>
+                <span className="text-orange-600">
+                {branchStatus.commits_behind} commit
+                {branchStatus.commits_behind !== 1 ? "s" : ""} behind {branchStatus.base_branch_name}
+                </span>
                 ) : (
-                  <span className="text-blue-600">
-                    {branchStatus.commits_ahead} commit
-                    {branchStatus.commits_ahead !== 1 ? "s" : ""} ahead of main
-                  </span>
+                <span className="text-blue-600">
+                {branchStatus.commits_ahead} commit
+                {branchStatus.commits_ahead !== 1 ? "s" : ""} ahead of {branchStatus.base_branch_name}
+                </span>
                 )}
               </div>
               {branchStatus.has_uncommitted_changes && (
@@ -524,11 +522,6 @@ export function TaskAttemptComparePage() {
               Branch rebased successfully!
             </div>
           )}
-          {mergeSuccess && (
-            <div className="text-green-600 text-sm">
-              Changes merged successfully!
-            </div>
-          )}
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
@@ -544,7 +537,7 @@ export function TaskAttemptComparePage() {
                   <RefreshCw
                     className={`mr-2 h-4 w-4 ${rebasing ? "animate-spin" : ""}`}
                   />
-                  {rebasing ? "Rebasing..." : "Rebase onto Main"}
+                  {rebasing ? "Rebasing..." : `Rebase onto ${branchStatus.base_branch_name}`}
                 </Button>
               )}
             {!branchStatus?.merged && (
@@ -762,7 +755,7 @@ export function TaskAttemptComparePage() {
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
               <p className="text-sm text-yellow-800">
                 <strong>Warning:</strong> The worktree contains uncommitted changes (modified, added, or deleted files) 
-                that have not been committed to git. These changes will be permanently merged into the main branch.
+                that have not been committed to git. These changes will be permanently merged into the {branchStatus?.base_branch_name || 'base'} branch.
               </p>
             </div>
           </div>

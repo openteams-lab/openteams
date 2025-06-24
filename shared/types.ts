@@ -70,7 +70,7 @@ export type FileDiff = { path: string, chunks: Array<DiffChunk>, };
 
 export type WorktreeDiff = { files: Array<FileDiff>, };
 
-export type BranchStatus = { is_behind: boolean, commits_behind: number, commits_ahead: number, up_to_date: boolean, merged: boolean, has_uncommitted_changes: boolean, };
+export type BranchStatus = { is_behind: boolean, commits_behind: number, commits_ahead: number, up_to_date: boolean, merged: boolean, has_uncommitted_changes: boolean, base_branch_name: string, };
 
 export type ExecutionProcess = { id: string, task_attempt_id: string, process_type: ExecutionProcessType, executor_type: string | null, status: ExecutionProcessStatus, command: string, args: string | null, working_directory: string, stdout: string | null, stderr: string | null, exit_code: bigint | null, started_at: string, completed_at: string | null, created_at: string, updated_at: string, };
 

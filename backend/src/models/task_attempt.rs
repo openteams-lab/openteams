@@ -127,6 +127,7 @@ pub struct BranchStatus {
     pub up_to_date: bool,
     pub merged: bool,
     pub has_uncommitted_changes: bool,
+    pub base_branch_name: String,
 }
 
 impl TaskAttempt {
@@ -252,7 +253,7 @@ impl TaskAttempt {
         // Now we need to merge the worktree branch into the main repository
         let branch_name = format!("attempt-{}", attempt_id);
 
-        // Get the main branch (usually "main" or "master")
+        // Get the current base branch name (e.g., "main", "master", "develop", etc.)
         let main_branch = main_repo.head()?.shorthand().unwrap_or("main").to_string();
 
         // Fetch the worktree branch into the main repository
@@ -273,7 +274,7 @@ impl TaskAttempt {
             "Import worktree changes",
         )?;
 
-        // Now merge the branch into main
+        // Now merge the branch into the base branch
         let main_branch_commit = main_repo
             .reference_to_annotated_commit(&main_repo.find_reference(&main_branch_ref)?)?;
         let worktree_branch_commit = main_repo
@@ -1222,7 +1223,10 @@ impl TaskAttempt {
         // Open the worktree repository
         let worktree_repo = Repository::open(&attempt.worktree_path)?;
 
-        // Get the current HEAD of main branch in the main repo
+        // Get the base branch name from the main repository
+        let base_branch_name = main_repo.head()?.shorthand().unwrap_or("main").to_string();
+
+        // Get the current HEAD of base branch in the main repo
         let main_head = main_repo.head()?.peel_to_commit()?;
         let main_oid = main_head.id();
 
@@ -1250,6 +1254,7 @@ impl TaskAttempt {
                 up_to_date: true,
                 merged: attempt.merge_commit.is_some(),
                 has_uncommitted_changes,
+                base_branch_name,
             });
         }
 
@@ -1274,6 +1279,7 @@ impl TaskAttempt {
             up_to_date: commits_behind == 0 && commits_ahead == 0,
             merged: attempt.merge_commit.is_some(),
             has_uncommitted_changes,
+            base_branch_name,
         })
     }
 
