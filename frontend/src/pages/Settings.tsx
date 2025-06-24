@@ -107,8 +107,8 @@ export function Settings() {
         )}
 
         {success && (
-          <Alert>
-            <AlertDescription>Settings saved successfully!</AlertDescription>
+          <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+            <AlertDescription className="font-medium">✓ Settings saved successfully!</AlertDescription>
           </Alert>
         )}
 
@@ -365,9 +365,10 @@ export function Settings() {
         {/* Sticky save button */}
         <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm border-t p-4 z-10">
           <div className="container mx-auto max-w-4xl flex justify-end">
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving || success} className={success ? "bg-green-600 hover:bg-green-700" : ""}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Settings
+              {success && <span className="mr-2">✓</span>}
+              {success ? "Settings Saved!" : "Save Settings"}
             </Button>
           </div>
         </div>
