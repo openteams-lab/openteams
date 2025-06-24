@@ -830,49 +830,49 @@ export function TaskDetailsPanel({
                       {/* Attempt Management Group */}
                       <div className="flex items-center gap-1">
                         {taskAttempts.length > 1 && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <DropdownMenu>
+                          <DropdownMenu>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="outline" size="sm">
                                       <History className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="start" className="w-64">
-                                    {taskAttempts.map((attempt) => (
-                                      <DropdownMenuItem
-                                        key={attempt.id}
-                                        onClick={() => handleAttemptChange(attempt.id)}
-                                        className={
-                                          selectedAttempt?.id === attempt.id
-                                            ? "bg-accent"
-                                            : ""
-                                        }
-                                      >
-                                        <div className="flex flex-col w-full">
-                                          <span className="font-medium text-sm">
-                                            {new Date(
-                                              attempt.created_at
-                                            ).toLocaleDateString()}{" "}
-                                            {new Date(
-                                              attempt.created_at
-                                            ).toLocaleTimeString()}
-                                          </span>
-                                          <span className="text-xs text-muted-foreground">
-                                            {attempt.executor || "executor"}
-                                          </span>
-                                        </div>
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>View attempt history</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>View attempt history</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <DropdownMenuContent align="start" className="w-64">
+                              {taskAttempts.map((attempt) => (
+                                <DropdownMenuItem
+                                  key={attempt.id}
+                                  onClick={() => handleAttemptChange(attempt.id)}
+                                  className={
+                                    selectedAttempt?.id === attempt.id
+                                      ? "bg-accent"
+                                      : ""
+                                  }
+                                >
+                                  <div className="flex flex-col w-full">
+                                    <span className="font-medium text-sm">
+                                      {new Date(
+                                        attempt.created_at
+                                      ).toLocaleDateString()}{" "}
+                                      {new Date(
+                                        attempt.created_at
+                                      ).toLocaleTimeString()}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {attempt.executor || "executor"}
+                                    </span>
+                                  </div>
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                         <div className="flex">
                           <TooltipProvider>
@@ -892,10 +892,10 @@ export function TaskDetailsPanel({
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <DropdownMenu>
+                          <DropdownMenu>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
                                   <DropdownMenuTrigger asChild>
                                     <Button
                                       variant="outline"
@@ -905,30 +905,30 @@ export function TaskDetailsPanel({
                                       <Settings2 className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    {availableExecutors.map((executor) => (
-                                      <DropdownMenuItem
-                                        key={executor.id}
-                                        onClick={() => setSelectedExecutor(executor.id)}
-                                        className={
-                                          selectedExecutor === executor.id
-                                            ? "bg-accent"
-                                            : ""
-                                        }
-                                      >
-                                        {executor.name}
-                                        {selectedExecutor === executor.id &&
-                                          " (Default)"}
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Choose executor</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Choose executor</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <DropdownMenuContent align="end">
+                              {availableExecutors.map((executor) => (
+                                <DropdownMenuItem
+                                  key={executor.id}
+                                  onClick={() => setSelectedExecutor(executor.id)}
+                                  className={
+                                    selectedExecutor === executor.id
+                                      ? "bg-accent"
+                                      : ""
+                                  }
+                                >
+                                  {executor.name}
+                                  {config?.executor.type === executor.id &&
+                                    " (Default)"}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
 
