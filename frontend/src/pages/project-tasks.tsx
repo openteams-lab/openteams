@@ -17,7 +17,7 @@ import { TaskDetailsPanel } from "@/components/tasks/TaskDetailsPanel";
 import type {
   TaskStatus,
   TaskWithAttemptStatus,
-  Project,
+  ProjectWithBranch,
   ExecutorConfig,
   CreateTaskAndStart,
 } from "shared/types";
@@ -38,7 +38,7 @@ export function ProjectTasks() {
   }>();
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<ProjectWithBranch | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -92,10 +92,10 @@ export function ProjectTasks() {
 
   const fetchProject = async () => {
     try {
-      const response = await makeRequest(`/api/projects/${projectId}`);
+      const response = await makeRequest(`/api/projects/${projectId}/with-branch`);
 
       if (response.ok) {
-        const result: ApiResponse<Project> = await response.json();
+        const result: ApiResponse<ProjectWithBranch> = await response.json();
         if (result.success && result.data) {
           setProject(result.data);
         }
@@ -349,6 +349,11 @@ export function ProjectTasks() {
         <div className="px-8 my-12 flex flex-row">
           <div className="w-full flex items-center gap-3">
             <h1 className="text-2xl font-bold">{project?.name || "Project"}</h1>
+            {project?.current_branch && (
+              <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-md">
+                {project.current_branch}
+              </span>
+            )}
             <Button
               variant="ghost"
               size="sm"

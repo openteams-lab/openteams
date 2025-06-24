@@ -80,6 +80,7 @@ fn main() {
         vibe_kanban::executor::ExecutorConstants::decl(),
         vibe_kanban::models::project::CreateProject::decl(),
         vibe_kanban::models::project::Project::decl(),
+        vibe_kanban::models::project::ProjectWithBranch::decl(),
         vibe_kanban::models::project::UpdateProject::decl(),
         vibe_kanban::models::project::SearchResult::decl(),
         vibe_kanban::models::project::SearchMatchType::decl(),

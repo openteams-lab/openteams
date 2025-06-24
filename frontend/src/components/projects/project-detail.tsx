@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Project, ApiResponse } from 'shared/types'
+import { ProjectWithBranch, ApiResponse } from 'shared/types'
 import { ProjectForm } from './project-form'
 import { makeRequest } from '@/lib/api'
 import { ArrowLeft, Edit, Trash2, Calendar, Clock, AlertCircle, Loader2, CheckSquare } from 'lucide-react'
@@ -16,7 +16,7 @@ interface ProjectDetailProps {
 
 export function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
   const navigate = useNavigate()
-  const [project, setProject] = useState<Project | null>(null)
+  const [project, setProject] = useState<ProjectWithBranch | null>(null)
   const [loading, setLoading] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
   const [error, setError] = useState('')
@@ -25,8 +25,8 @@ export function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
     setLoading(true)
     setError('')
     try {
-      const response = await makeRequest(`/api/projects/${projectId}`)
-      const data: ApiResponse<Project> = await response.json()
+      const response = await makeRequest(`/api/projects/${projectId}/with-branch`)
+      const data: ApiResponse<ProjectWithBranch> = await response.json()
       if (data.success && data.data) {
         setProject(data.data)
       } else {
@@ -109,7 +109,14 @@ export function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
             Back to Projects
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{project.name}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">{project.name}</h1>
+              {project.current_branch && (
+                <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-md">
+                  {project.current_branch}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">Project details and settings</p>
           </div>
         </div>

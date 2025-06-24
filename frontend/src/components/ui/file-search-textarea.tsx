@@ -22,6 +22,7 @@ interface FileSearchTextareaProps {
   disabled?: boolean
   className?: string
   projectId?: string
+  onKeyDown?: (e: React.KeyboardEvent) => void
 }
 
 export function FileSearchTextarea({
@@ -31,7 +32,8 @@ export function FileSearchTextarea({
   rows = 3,
   disabled = false,
   className,
-  projectId
+  projectId,
+  onKeyDown
 }: FileSearchTextareaProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<FileSearchResult[]>([])
@@ -109,34 +111,39 @@ export function FileSearchTextarea({
 
   // Handle keyboard navigation
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!showDropdown || searchResults.length === 0) return
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault()
-        setSelectedIndex(prev => 
-          prev < searchResults.length - 1 ? prev + 1 : 0
-        )
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        setSelectedIndex(prev => 
-          prev > 0 ? prev - 1 : searchResults.length - 1
-        )
-        break
-      case 'Enter':
-        if (selectedIndex >= 0) {
+    // Handle dropdown navigation first
+    if (showDropdown && searchResults.length > 0) {
+      switch (e.key) {
+        case 'ArrowDown':
           e.preventDefault()
-          selectFile(searchResults[selectedIndex])
-        }
-        break
-      case 'Escape':
-        e.preventDefault()
-        setShowDropdown(false)
-        setSearchQuery('')
-        setAtSymbolPosition(-1)
-        break
+          setSelectedIndex(prev => 
+            prev < searchResults.length - 1 ? prev + 1 : 0
+          )
+          return
+        case 'ArrowUp':
+          e.preventDefault()
+          setSelectedIndex(prev => 
+            prev > 0 ? prev - 1 : searchResults.length - 1
+          )
+          return
+        case 'Enter':
+          if (selectedIndex >= 0) {
+            e.preventDefault()
+            selectFile(searchResults[selectedIndex])
+            return
+          }
+          break
+        case 'Escape':
+          e.preventDefault()
+          setShowDropdown(false)
+          setSearchQuery('')
+          setAtSymbolPosition(-1)
+          return
+      }
     }
+
+    // Call the passed onKeyDown handler
+    onKeyDown?.(e)
   }
 
   // Select a file and insert it into the text

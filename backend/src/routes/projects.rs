@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::models::{
-    project::{CreateProject, Project, SearchMatchType, SearchResult, UpdateProject},
+    project::{CreateProject, Project, ProjectWithBranch, SearchMatchType, SearchResult, UpdateProject},
     ApiResponse,
 };
 
@@ -38,6 +38,24 @@ pub async fn get_project(
         Ok(Some(project)) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(project),
+            message: None,
+        })),
+        Ok(None) => Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to fetch project: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+pub async fn get_project_with_branch(
+    Path(id): Path<Uuid>,
+    Extension(pool): Extension<SqlitePool>,
+) -> Result<ResponseJson<ApiResponse<ProjectWithBranch>>, StatusCode> {
+    match Project::find_by_id(&pool, id).await {
+        Ok(Some(project)) => Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: Some(project.with_branch_info()),
             message: None,
         })),
         Ok(None) => Err(StatusCode::NOT_FOUND),
@@ -388,5 +406,6 @@ pub fn projects_router() -> Router {
             "/projects/:id",
             get(get_project).put(update_project).delete(delete_project),
         )
+        .route("/projects/:id/with-branch", get(get_project_with_branch))
         .route("/projects/:id/search", get(search_project_files))
 }

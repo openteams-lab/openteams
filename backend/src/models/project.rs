@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use git2::Repository;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
 use ts_rs::TS;
@@ -36,6 +37,22 @@ pub struct UpdateProject {
     pub git_repo_path: Option<String>,
     pub setup_script: Option<String>,
     pub dev_script: Option<String>,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct ProjectWithBranch {
+    pub id: Uuid,
+    pub name: String,
+    pub git_repo_path: String,
+    pub setup_script: Option<String>,
+    pub dev_script: Option<String>,
+    pub current_branch: Option<String>,
+
+    #[ts(type = "Date")]
+    pub created_at: DateTime<Utc>,
+    #[ts(type = "Date")]
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -161,5 +178,31 @@ impl Project {
         .await?;
 
         Ok(result.count > 0)
+    }
+
+    pub fn get_current_branch(&self) -> Result<String, git2::Error> {
+        let repo = Repository::open(&self.git_repo_path)?;
+        let head = repo.head()?;
+        
+        if let Some(branch_name) = head.shorthand() {
+            Ok(branch_name.to_string())
+        } else {
+            Ok("HEAD".to_string())
+        }
+    }
+
+    pub fn with_branch_info(self) -> ProjectWithBranch {
+        let current_branch = self.get_current_branch().ok();
+        
+        ProjectWithBranch {
+            id: self.id,
+            name: self.name,
+            git_repo_path: self.git_repo_path,
+            setup_script: self.setup_script,
+            dev_script: self.dev_script,
+            current_branch,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        }
     }
 }
