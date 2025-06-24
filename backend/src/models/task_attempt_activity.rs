@@ -24,6 +24,17 @@ pub struct CreateTaskAttemptActivity {
     pub note: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TaskAttemptActivityWithPrompt {
+    pub id: Uuid,
+    pub execution_process_id: Uuid,
+    pub status: TaskAttemptStatus,
+    pub note: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub prompt: Option<String>, // From executor_session
+}
+
 impl TaskAttemptActivity {
     pub async fn find_by_execution_process_id(
         pool: &SqlitePool,
@@ -83,5 +94,41 @@ impl TaskAttemptActivity {
         .await?;
 
         Ok(records.into_iter().map(|r| r.id).collect())
+    }
+
+    /// Find activities for all execution processes in a task attempt, with executor session prompts
+    pub async fn find_with_prompts_by_task_attempt_id(
+        pool: &SqlitePool,
+        task_attempt_id: Uuid,
+    ) -> Result<Vec<TaskAttemptActivityWithPrompt>, sqlx::Error> {
+        let records = sqlx::query!(
+            r#"SELECT 
+                taa.id as "activity_id!: Uuid",
+                taa.execution_process_id as "execution_process_id!: Uuid",
+                taa.status as "status!: TaskAttemptStatus",
+                taa.note,
+                taa.created_at as "created_at!: DateTime<Utc>",
+                es.prompt
+               FROM task_attempt_activities taa
+               INNER JOIN execution_processes ep ON taa.execution_process_id = ep.id
+               LEFT JOIN executor_sessions es ON es.execution_process_id = ep.id
+               WHERE ep.task_attempt_id = $1
+               ORDER BY taa.created_at ASC"#,
+            task_attempt_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(records
+            .into_iter()
+            .map(|record| TaskAttemptActivityWithPrompt {
+                id: record.activity_id,
+                execution_process_id: record.execution_process_id,
+                status: record.status,
+                note: record.note,
+                created_at: record.created_at,
+                prompt: record.prompt,
+            })
+            .collect())
     }
 }

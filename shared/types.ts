@@ -62,6 +62,8 @@ export type TaskAttemptActivity = { id: string, execution_process_id: string, st
 
 export type CreateTaskAttemptActivity = { execution_process_id: string, status: TaskAttemptStatus | null, note: string | null, };
 
+export type TaskAttemptActivityWithPrompt = { id: string, execution_process_id: string, status: TaskAttemptStatus, note: string | null, created_at: string, prompt: string | null, };
+
 export type DirectoryEntry = { name: string, path: string, is_directory: boolean, is_git_repo: boolean, };
 
 export type DiffChunkType = "Equal" | "Insert" | "Delete";

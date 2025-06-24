@@ -47,6 +47,7 @@ import type {
   TaskStatus,
   TaskAttempt,
   TaskAttemptActivity,
+  TaskAttemptActivityWithPrompt,
   TaskAttemptStatus,
   ApiResponse,
   TaskWithAttemptStatus,
@@ -150,7 +151,7 @@ export function TaskDetailsPanel({
   );
   // Combined attempt data state
   const [attemptData, setAttemptData] = useState<{
-    activities: TaskAttemptActivity[];
+    activities: TaskAttemptActivityWithPrompt[];
     processes: ExecutionProcessSummary[];
     runningProcessDetails: Record<string, ExecutionProcess>;
   }>({
@@ -421,7 +422,7 @@ export function TaskDetailsPanel({
       ]);
 
       if (activitiesResponse.ok && processesResponse.ok) {
-        const activitiesResult: ApiResponse<TaskAttemptActivity[]> =
+        const activitiesResult: ApiResponse<TaskAttemptActivityWithPrompt[]> =
           await activitiesResponse.json();
         const processesResult: ApiResponse<ExecutionProcessSummary[]> =
           await processesResponse.json();
@@ -1160,7 +1161,30 @@ export function TaskDetailsPanel({
                                   </div>
                                 </div>
 
-                                {/* Show stdio output for running processes */}
+                                {/* Show prompt for coding agent executions */}
+                                 {activity.prompt && 
+                                   (activity.status === "setuprunning" ||
+                                    activity.status === "setupcomplete" ||
+                                    activity.status === "setupfailed" ||
+                                    activity.status === "executorrunning" ||
+                                    activity.status === "executorcomplete" ||
+                                    activity.status === "executorfailed") && (
+                                   <div className="mt-2 mb-4">
+                                     <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800">
+                                       <div className="flex items-start gap-2 mb-2">
+                                         <Code className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                                         <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                           Prompt
+                                         </span>
+                                       </div>
+                                       <pre className="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap break-words">
+                                         {activity.prompt}
+                                       </pre>
+                                     </div>
+                                   </div>
+                                 )}
+
+                                 {/* Show stdio output for running processes */}
                                 {(activity.status === "setuprunning" ||
                                   activity.status === "executorrunning") &&
                                   attemptData.runningProcessDetails[

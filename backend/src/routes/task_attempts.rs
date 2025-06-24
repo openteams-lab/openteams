@@ -17,7 +17,7 @@ use crate::models::{
         BranchStatus, CreateFollowUpAttempt, CreateTaskAttempt, TaskAttempt, TaskAttemptStatus,
         WorktreeDiff,
     },
-    task_attempt_activity::{CreateTaskAttemptActivity, TaskAttemptActivity},
+    task_attempt_activity::{CreateTaskAttemptActivity, TaskAttemptActivity, TaskAttemptActivityWithPrompt},
     ApiResponse,
 };
 
@@ -51,7 +51,7 @@ pub async fn get_task_attempts(
 pub async fn get_task_attempt_activities(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
     Extension(pool): Extension<SqlitePool>,
-) -> Result<ResponseJson<ApiResponse<Vec<TaskAttemptActivity>>>, StatusCode> {
+) -> Result<ResponseJson<ApiResponse<Vec<TaskAttemptActivityWithPrompt>>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
     match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
@@ -62,40 +62,8 @@ pub async fn get_task_attempt_activities(
         Ok(true) => {}
     }
 
-    // Get all execution processes for the task attempt
-    let execution_processes =
-        match ExecutionProcess::find_by_task_attempt_id(&pool, attempt_id).await {
-            Ok(processes) => processes,
-            Err(e) => {
-                tracing::error!(
-                    "Failed to fetch execution processes for attempt {}: {}",
-                    attempt_id,
-                    e
-                );
-                return Err(StatusCode::INTERNAL_SERVER_ERROR);
-            }
-        };
-
-    // Get activities for all execution processes
-    let mut all_activities = Vec::new();
-    for process in execution_processes {
-        match TaskAttemptActivity::find_by_execution_process_id(&pool, process.id).await {
-            Ok(mut activities) => all_activities.append(&mut activities),
-            Err(e) => {
-                tracing::error!(
-                    "Failed to fetch activities for execution process {}: {}",
-                    process.id,
-                    e
-                );
-                return Err(StatusCode::INTERNAL_SERVER_ERROR);
-            }
-        }
-    }
-
-    // Sort activities by created_at
-    all_activities.sort_by(|a, b| a.created_at.cmp(&b.created_at));
-
-    match Ok::<Vec<TaskAttemptActivity>, sqlx::Error>(all_activities) {
+    // Get activities with prompts for the task attempt
+    match TaskAttemptActivity::find_with_prompts_by_task_attempt_id(&pool, attempt_id).await {
         Ok(activities) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(activities),
