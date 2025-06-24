@@ -198,7 +198,7 @@ export function FileSearchTextarea({
     // Dropdown dimensions
     const dropdownWidth = 256 // min-w-64 = 256px
     const minDropdownHeight = 120
-    const maxDropdownHeight = 240 // max-h-60 = 240px
+    const maxDropdownHeight = 400 // Increased to show more results without scrolling
     
     let finalTop = viewportTop
     let finalLeft = viewportLeft
@@ -214,17 +214,25 @@ export function FileSearchTextarea({
       finalLeft = 16
     }
     
-    // Prevent going off the bottom edge
-    const availableSpaceBelow = window.innerHeight - viewportTop - 16
-    const availableSpaceAbove = textareaRect.top + (currentLine * lineHeight) - 16
+    // Smart positioning: avoid clipping by positioning above when needed
+    const availableSpaceBelow = window.innerHeight - viewportTop - 32
+    const availableSpaceAbove = textareaRect.top + (currentLine * lineHeight) - 32
     
-    if (availableSpaceBelow < minDropdownHeight && availableSpaceAbove > availableSpaceBelow) {
-      // Position above the cursor line
+    // Check if dropdown would be clipped at bottom - if so, try positioning above
+    const wouldBeClippedBelow = availableSpaceBelow < maxDropdownHeight
+    const hasEnoughSpaceAbove = availableSpaceAbove >= maxDropdownHeight
+    
+    if (wouldBeClippedBelow && hasEnoughSpaceAbove) {
+      // Position above the cursor line with full height
       finalTop = textareaRect.top + paddingTop + (currentLine * lineHeight) - maxDropdownHeight - 8
-      maxHeight = Math.min(maxDropdownHeight, availableSpaceAbove)
+      maxHeight = maxDropdownHeight
+    } else if (wouldBeClippedBelow && availableSpaceAbove > availableSpaceBelow) {
+      // Position above but with reduced height if not enough space
+      finalTop = textareaRect.top + paddingTop + (currentLine * lineHeight) - availableSpaceAbove - 8
+      maxHeight = Math.max(availableSpaceAbove, minDropdownHeight)
     } else {
       // Position below the cursor line
-      maxHeight = Math.min(maxDropdownHeight, availableSpaceBelow)
+      maxHeight = Math.min(maxDropdownHeight, Math.max(availableSpaceBelow, minDropdownHeight))
     }
     
     // Ensure minimum height
