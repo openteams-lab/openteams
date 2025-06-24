@@ -13,7 +13,10 @@ use uuid::Uuid;
 use crate::models::{
     execution_process::ExecutionProcess,
     task::Task,
-    task_attempt::{BranchStatus, CreateTaskAttempt, TaskAttempt, TaskAttemptStatus, WorktreeDiff},
+    task_attempt::{
+        BranchStatus, CreateFollowUpAttempt, CreateTaskAttempt, TaskAttempt, TaskAttemptStatus,
+        WorktreeDiff,
+    },
     task_attempt_activity::{CreateTaskAttemptActivity, TaskAttemptActivity},
     ApiResponse,
 };
@@ -746,6 +749,53 @@ pub async fn delete_task_attempt_file(
     }
 }
 
+pub async fn create_followup_attempt(
+    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
+    Extension(pool): Extension<SqlitePool>,
+    Extension(app_state): Extension<crate::app_state::AppState>,
+    Json(payload): Json<CreateFollowUpAttempt>,
+) -> Result<ResponseJson<ApiResponse<String>>, StatusCode> {
+    // Verify task attempt exists
+    if !TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to check task attempt existence: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+    {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    // Start follow-up execution asynchronously
+    let pool_clone = pool.clone();
+    let app_state_clone = app_state.clone();
+    let prompt = payload.prompt.clone();
+    tokio::spawn(async move {
+        if let Err(e) = TaskAttempt::start_followup_execution(
+            &pool_clone,
+            &app_state_clone,
+            attempt_id,
+            task_id,
+            project_id,
+            &prompt,
+        )
+        .await
+        {
+            tracing::error!(
+                "Failed to start follow-up execution for task attempt {}: {}",
+                attempt_id,
+                e
+            );
+        }
+    });
+
+    Ok(ResponseJson(ApiResponse {
+        success: true,
+        data: Some("Follow-up execution started successfully".to_string()),
+        message: Some("Follow-up execution started successfully".to_string()),
+    }))
+}
+
 pub fn task_attempts_router() -> Router {
     use axum::routing::post;
 
@@ -798,5 +848,9 @@ pub fn task_attempts_router() -> Router {
         .route(
             "/projects/:project_id/execution-processes/:process_id",
             get(get_execution_process),
+        )
+        .route(
+            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/follow-up",
+            post(create_followup_attempt),
         )
 }

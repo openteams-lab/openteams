@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT \n                id as \"id!: Uuid\", \n                task_attempt_id as \"task_attempt_id!: Uuid\", \n                process_type as \"process_type!: ExecutionProcessType\",\n                status as \"status!: ExecutionProcessStatus\",\n                command, \n                args, \n                working_directory, \n                stdout, \n                stderr, \n                exit_code,\n                started_at as \"started_at!: DateTime<Utc>\",\n                completed_at as \"completed_at?: DateTime<Utc>\",\n                created_at as \"created_at!: DateTime<Utc>\", \n                updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM execution_processes \n               WHERE id = $1",
+  "query": "SELECT \n                id as \"id!: Uuid\", \n                task_attempt_id as \"task_attempt_id!: Uuid\", \n                process_type as \"process_type!: ExecutionProcessType\",\n                executor_type,\n                status as \"status!: ExecutionProcessStatus\",\n                command, \n                args, \n                working_directory, \n                stdout, \n                stderr, \n                exit_code,\n                started_at as \"started_at!: DateTime<Utc>\",\n                completed_at as \"completed_at?: DateTime<Utc>\",\n                created_at as \"created_at!: DateTime<Utc>\", \n                updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM execution_processes \n               WHERE status = 'running' \n               ORDER BY created_at ASC",
   "describe": {
     "columns": [
       {
@@ -19,68 +19,74 @@
         "type_info": "Text"
       },
       {
-        "name": "status!: ExecutionProcessStatus",
+        "name": "executor_type",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "command",
+        "name": "status!: ExecutionProcessStatus",
         "ordinal": 4,
         "type_info": "Text"
       },
       {
-        "name": "args",
+        "name": "command",
         "ordinal": 5,
         "type_info": "Text"
       },
       {
-        "name": "working_directory",
+        "name": "args",
         "ordinal": 6,
         "type_info": "Text"
       },
       {
-        "name": "stdout",
+        "name": "working_directory",
         "ordinal": 7,
         "type_info": "Text"
       },
       {
-        "name": "stderr",
+        "name": "stdout",
         "ordinal": 8,
         "type_info": "Text"
       },
       {
-        "name": "exit_code",
+        "name": "stderr",
         "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "exit_code",
+        "ordinal": 10,
         "type_info": "Integer"
       },
       {
         "name": "started_at!: DateTime<Utc>",
-        "ordinal": 10,
-        "type_info": "Text"
-      },
-      {
-        "name": "completed_at?: DateTime<Utc>",
         "ordinal": 11,
         "type_info": "Text"
       },
       {
-        "name": "created_at!: DateTime<Utc>",
+        "name": "completed_at?: DateTime<Utc>",
         "ordinal": 12,
         "type_info": "Text"
       },
       {
-        "name": "updated_at!: DateTime<Utc>",
+        "name": "created_at!: DateTime<Utc>",
         "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 14,
         "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 0
     },
     "nullable": [
       true,
       false,
       false,
+      true,
       false,
       false,
       true,
@@ -94,5 +100,5 @@
       false
     ]
   },
-  "hash": "1ada5613889792cd6098da71ce2ba1ecdee7e5dc2ff8196872368fff0caa48d8"
+  "hash": "1f619f01f46859a64ded531dd0ef61abacfe62e758abe7030a6aa745140b95ca"
 }

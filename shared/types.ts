@@ -12,26 +12,11 @@ export type EditorConfig = { editor_type: EditorType, custom_command: string | n
 
 export type EditorType = "vscode" | "cursor" | "windsurf" | "intellij" | "zed" | "custom";
 
+export type EditorConstants = { editor_types: Array<EditorType>, editor_labels: Array<string>, };
+
 export type ExecutorConfig = { "type": "echo" } | { "type": "claude" } | { "type": "amp" };
 
-// Constants for UI components
-export const EXECUTOR_TYPES = ["echo", "claude", "amp"] as const;
-export const EDITOR_TYPES = ["vscode", "cursor", "windsurf", "intellij", "zed", "custom"] as const;
-
-export const EXECUTOR_LABELS = {
-  echo: "Echo",
-  claude: "Claude",
-  amp: "Amp"
-} as const;
-
-export const EDITOR_LABELS = {
-  vscode: "VS Code",
-  cursor: "Cursor", 
-  windsurf: "Windsurf",
-  intellij: "IntelliJ IDEA",
-  zed: "Zed",
-  custom: "Custom Command"
-} as const;
+export type ExecutorConstants = { executor_types: Array<ExecutorConfig>, executor_labels: Array<string>, };
 
 export type CreateProject = { name: string, git_repo_path: string, use_existing_repo: boolean, setup_script: string | null, };
 
@@ -63,6 +48,8 @@ export type CreateTaskAttempt = { executor: string | null, };
 
 export type UpdateTaskAttempt = Record<string, never>;
 
+export type CreateFollowUpAttempt = { prompt: string, };
+
 export type TaskAttemptActivity = { id: string, execution_process_id: string, status: TaskAttemptStatus, note: string | null, created_at: string, };
 
 export type CreateTaskAttemptActivity = { execution_process_id: string, status: TaskAttemptStatus | null, note: string | null, };
@@ -79,12 +66,49 @@ export type WorktreeDiff = { files: Array<FileDiff>, };
 
 export type BranchStatus = { is_behind: boolean, commits_behind: number, commits_ahead: number, up_to_date: boolean, merged: boolean, };
 
-export type ExecutionProcess = { id: string, task_attempt_id: string, process_type: ExecutionProcessType, status: ExecutionProcessStatus, command: string, args: string | null, working_directory: string, stdout: string | null, stderr: string | null, exit_code: bigint | null, started_at: string, completed_at: string | null, created_at: string, updated_at: string, };
+export type ExecutionProcess = { id: string, task_attempt_id: string, process_type: ExecutionProcessType, executor_type: string | null, status: ExecutionProcessStatus, command: string, args: string | null, working_directory: string, stdout: string | null, stderr: string | null, exit_code: bigint | null, started_at: string, completed_at: string | null, created_at: string, updated_at: string, };
 
 export type ExecutionProcessStatus = "running" | "completed" | "failed" | "killed";
 
 export type ExecutionProcessType = "setupscript" | "codingagent" | "devserver";
 
-export type CreateExecutionProcess = { task_attempt_id: string, process_type: ExecutionProcessType, command: string, args: string | null, working_directory: string, };
+export type CreateExecutionProcess = { task_attempt_id: string, process_type: ExecutionProcessType, executor_type: string | null, command: string, args: string | null, working_directory: string, };
 
 export type UpdateExecutionProcess = { status: ExecutionProcessStatus | null, exit_code: bigint | null, completed_at: string | null, };
+
+export type ExecutorSession = { id: string, task_attempt_id: string, execution_process_id: string, session_id: string | null, prompt: string | null, created_at: string, updated_at: string, };
+
+export type CreateExecutorSession = { task_attempt_id: string, execution_process_id: string, prompt: string | null, };
+
+export type UpdateExecutorSession = { session_id: string | null, prompt: string | null, };
+
+// Generated constants
+export const EXECUTOR_TYPES: string[] = [
+    "echo",
+    "claude",
+    "amp"
+];
+
+export const EDITOR_TYPES: EditorType[] = [
+    "vscode",
+    "cursor", 
+    "windsurf",
+    "intellij",
+    "zed",
+    "custom"
+];
+
+export const EXECUTOR_LABELS: Record<string, string> = {
+    "echo": "Echo (Test Mode)",
+    "claude": "Claude",
+    "amp": "Amp"
+};
+
+export const EDITOR_LABELS: Record<string, string> = {
+    "vscode": "VS Code",
+    "cursor": "Cursor",
+    "windsurf": "Windsurf",
+    "intellij": "IntelliJ IDEA",
+    "zed": "Zed",
+    "custom": "Custom"
+};

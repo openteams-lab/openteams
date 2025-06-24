@@ -53,6 +53,7 @@ pub struct ExecutionProcess {
     pub id: Uuid,
     pub task_attempt_id: Uuid,
     pub process_type: ExecutionProcessType,
+    pub executor_type: Option<String>, // "echo", "claude", "amp", etc. - only for CodingAgent processes
     pub status: ExecutionProcessStatus,
     pub command: String,
     pub args: Option<String>, // JSON array of arguments
@@ -71,6 +72,7 @@ pub struct ExecutionProcess {
 pub struct CreateExecutionProcess {
     pub task_attempt_id: Uuid,
     pub process_type: ExecutionProcessType,
+    pub executor_type: Option<String>,
     pub command: String,
     pub args: Option<String>,
     pub working_directory: String,
@@ -93,6 +95,7 @@ impl ExecutionProcess {
                 id as "id!: Uuid", 
                 task_attempt_id as "task_attempt_id!: Uuid", 
                 process_type as "process_type!: ExecutionProcessType",
+                executor_type,
                 status as "status!: ExecutionProcessStatus",
                 command, 
                 args, 
@@ -123,6 +126,7 @@ impl ExecutionProcess {
                 id as "id!: Uuid", 
                 task_attempt_id as "task_attempt_id!: Uuid", 
                 process_type as "process_type!: ExecutionProcessType",
+                executor_type,
                 status as "status!: ExecutionProcessStatus",
                 command, 
                 args, 
@@ -151,6 +155,7 @@ impl ExecutionProcess {
                 id as "id!: Uuid", 
                 task_attempt_id as "task_attempt_id!: Uuid", 
                 process_type as "process_type!: ExecutionProcessType",
+                executor_type,
                 status as "status!: ExecutionProcessStatus",
                 command, 
                 args, 
@@ -181,15 +186,16 @@ impl ExecutionProcess {
         sqlx::query_as!(
             ExecutionProcess,
             r#"INSERT INTO execution_processes (
-                id, task_attempt_id, process_type, status, command, args, 
+                id, task_attempt_id, process_type, executor_type, status, command, args, 
                 working_directory, stdout, stderr, exit_code, started_at, 
                 completed_at, created_at, updated_at
                ) 
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) 
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
                RETURNING 
                 id as "id!: Uuid", 
                 task_attempt_id as "task_attempt_id!: Uuid", 
                 process_type as "process_type!: ExecutionProcessType",
+                executor_type,
                 status as "status!: ExecutionProcessStatus",
                 command, 
                 args, 
@@ -204,6 +210,7 @@ impl ExecutionProcess {
             process_id,
             data.task_attempt_id,
             data.process_type,
+            data.executor_type,
             ExecutionProcessStatus::Running,
             data.command,
             data.args,

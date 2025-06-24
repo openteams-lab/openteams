@@ -12,11 +12,13 @@ import {
   Edit,
   Trash2,
   StopCircle,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import { Label } from "@/components/ui/label";
 import { Chip } from "@/components/ui/chip";
+import { Textarea } from "@/components/ui/textarea";
 import { ExecutionOutputViewer } from "./ExecutionOutputViewer";
 import { EditorSelectionDialog } from "./EditorSelectionDialog";
 
@@ -146,6 +148,8 @@ export function TaskDetailsPanel({
     new Set()
   );
   const [showEditorDialog, setShowEditorDialog] = useState(false);
+  const [followUpMessage, setFollowUpMessage] = useState("");
+  const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const { config } = useConfig();
 
   // Available executors
@@ -184,6 +188,20 @@ export function TaskDetailsPanel({
         activity.status === "executorrunning"
     );
   }, [selectedAttempt, attemptActivities, isStopping]);
+
+  // Check if follow-up should be enabled
+  const canSendFollowUp = useMemo(() => {
+    if (!selectedAttempt || attemptActivities.length === 0 || isAttemptRunning || isSendingFollowUp) {
+      return false;
+    }
+
+    // Need at least one completed coding agent execution
+    const codingAgentActivities = attemptActivities.filter(
+      (activity) => activity.status === "executorcomplete"
+    );
+
+    return codingAgentActivities.length > 0;
+  }, [selectedAttempt, attemptActivities, isAttemptRunning, isSendingFollowUp]);
 
   // Polling for updates when attempt is running
   useEffect(() => {
@@ -408,6 +426,39 @@ export function TaskDetailsPanel({
       }
       return newSet;
     });
+  };
+
+  const handleSendFollowUp = async () => {
+    if (!task || !selectedAttempt || !followUpMessage.trim()) return;
+
+    try {
+      setIsSendingFollowUp(true);
+      const response = await makeRequest(
+        `/api/projects/${projectId}/tasks/${task.id}/attempts/${selectedAttempt.id}/follow-up`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: followUpMessage.trim(),
+          }),
+        }
+      );
+
+      if (response.ok) {
+        // Clear the message
+        setFollowUpMessage("");
+        // Refresh activities to show the new follow-up execution
+        fetchAttemptActivities(selectedAttempt.id);
+      } else {
+        console.error("Failed to send follow-up:", await response.text());
+      }
+    } catch (err) {
+      console.error("Failed to send follow-up:", err);
+    } finally {
+      setIsSendingFollowUp(false);
+    }
   };
 
   if (!task) return null;
@@ -730,13 +781,13 @@ export function TaskDetailsPanel({
                                   ] && (
                                     <div className="mt-2">
                                       <div
-                                        className={`transition-all duration-200 ${
-                                          expandedOutputs.has(
-                                            activity.execution_process_id
-                                          )
-                                            ? ""
-                                            : "max-h-64 overflow-hidden"
-                                        }`}
+                                      className={`transition-all duration-200 ${
+                                      expandedOutputs.has(
+                                      activity.execution_process_id
+                                      )
+                                      ? ""
+                                      : "max-h-64 overflow-hidden flex flex-col justify-end"
+                                      }`}
                                       >
                                         <ExecutionOutputViewer
                                           executionProcess={
@@ -786,32 +837,51 @@ export function TaskDetailsPanel({
                 )}
               </div>
 
-              {/* Footer */}
-              {/* <div className="border-t p-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    Follow-up question
-                  </Label>
-                  <div className="flex gap-2">
-                    <Textarea
-                      placeholder="Ask a follow-up question about this task..."
-                      value={followUpMessage}
-                      onChange={(e) => setFollowUpMessage(e.target.value)}
-                      className="flex-1 min-h-[60px] resize-none"
-                    />
-                    <Button
-                      onClick={handleSendFollowUp}
-                      disabled={!followUpMessage.trim()}
-                      className="self-end"
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
+              {/* Footer - Follow-up section */}
+              {selectedAttempt && (
+                <div className="border-t p-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      Follow-up question
+                    </Label>
+                    <div className="flex gap-2">
+                      <Textarea
+                        placeholder="Ask a follow-up question about this task..."
+                        value={followUpMessage}
+                        onChange={(e) => setFollowUpMessage(e.target.value)}
+                        onKeyDown={(e) => {
+                          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                            e.preventDefault();
+                            if (canSendFollowUp && followUpMessage.trim() && !isSendingFollowUp) {
+                              handleSendFollowUp();
+                            }
+                          }
+                        }}
+                        className="flex-1 min-h-[60px] resize-none"
+                        disabled={!canSendFollowUp}
+                      />
+                      <Button
+                        onClick={handleSendFollowUp}
+                        disabled={!canSendFollowUp || !followUpMessage.trim() || isSendingFollowUp}
+                        className="self-end"
+                      >
+                        {isSendingFollowUp ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {!canSendFollowUp
+                        ? isAttemptRunning
+                          ? "Wait for current execution to complete before asking follow-up questions"
+                          : "Complete at least one coding agent execution to enable follow-up questions"
+                        : "Continue the conversation with the most recent executor session"}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Follow-up functionality coming soon
-                  </p>
                 </div>
-              </div> */}
+              )}
             </div>
           </div>
 

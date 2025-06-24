@@ -43,6 +43,37 @@ pub enum EditorType {
     Custom,
 }
 
+// Constants for frontend
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct EditorConstants {
+    pub editor_types: Vec<EditorType>,
+    pub editor_labels: Vec<String>,
+}
+
+impl EditorConstants {
+    pub fn new() -> Self {
+        Self {
+            editor_types: vec![
+                EditorType::VSCode,
+                EditorType::Cursor,
+                EditorType::Windsurf,
+                EditorType::IntelliJ,
+                EditorType::Zed,
+                EditorType::Custom,
+            ],
+            editor_labels: vec![
+                "VS Code".to_string(),
+                "Cursor".to_string(),
+                "Windsurf".to_string(),
+                "IntelliJ IDEA".to_string(),
+                "Zed".to_string(),
+                "Custom".to_string(),
+            ],
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
