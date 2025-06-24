@@ -235,12 +235,12 @@ export function TaskDetailsPanel({
     }
   }, [task, isOpen]);
 
-  // Auto-scroll to bottom when activities change
+  // Auto-scroll to bottom when activities or execution processes change
   useEffect(() => {
     if (shouldAutoScroll && scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
-  }, [attemptActivities, shouldAutoScroll]);
+  }, [attemptActivities, executionProcesses, shouldAutoScroll]);
 
   // Handle scroll events to detect manual scrolling
   const handleScroll = useCallback(() => {
