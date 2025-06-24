@@ -644,7 +644,12 @@ impl TaskAttempt {
             process_type,
             crate::models::execution_process::ExecutionProcessType::CodingAgent
         ) {
-            Self::create_executor_session_record(pool, attempt_id, task_id, process_id).await?;
+            // Extract follow-up prompt if this is a follow-up execution
+            let followup_prompt = match &executor_type {
+                crate::executor::ExecutorType::FollowUpCodingAgent { prompt, .. } => Some(prompt.clone()),
+                _ => None,
+            };
+            Self::create_executor_session_record(pool, attempt_id, task_id, process_id, followup_prompt).await?;
         }
 
         // Create activity record (skip for dev servers as they run in parallel)
@@ -749,15 +754,19 @@ impl TaskAttempt {
         attempt_id: Uuid,
         task_id: Uuid,
         process_id: Uuid,
+        followup_prompt: Option<String>,
     ) -> Result<(), TaskAttemptError> {
         use crate::models::executor_session::{CreateExecutorSession, ExecutorSession};
 
-        // Get the task to create prompt
-        let task = Task::find_by_id(pool, task_id)
-            .await?
-            .ok_or(TaskAttemptError::TaskNotFound)?;
-
-        let prompt = format!("{}\n\n{}", task.title, task.description.unwrap_or_default());
+        // Use follow-up prompt if provided, otherwise get the task to create prompt
+        let prompt = if let Some(followup_prompt) = followup_prompt {
+            followup_prompt
+        } else {
+            let task = Task::find_by_id(pool, task_id)
+                .await?
+                .ok_or(TaskAttemptError::TaskNotFound)?;
+            format!("{}\n\n{}", task.title, task.description.unwrap_or_default())
+        };
 
         let session_id = Uuid::new_v4();
         let create_session = CreateExecutorSession {
