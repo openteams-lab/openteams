@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { Chip } from "@/components/ui/chip";
-import { Textarea } from "@/components/ui/textarea";
+import { FileSearchTextarea } from "@/components/ui/file-search-textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -1224,8 +1224,8 @@ export function TaskDetailsPanel({
 
               {/* Footer - Follow-up section */}
               {selectedAttempt && (
-                <div className="border-t p-4">
-                  <div className="space-y-2">
+                <div className="border-t p-6">
+                  <div className="space-y-3">
                     <Label className="text-sm font-medium">
                       Follow-up question
                     </Label>
@@ -1235,12 +1235,12 @@ export function TaskDetailsPanel({
                         <AlertDescription>{followUpError}</AlertDescription>
                       </Alert>
                     )}
-                    <div className="flex gap-2">
-                      <Textarea
-                        placeholder="Ask a follow-up question about this task..."
+                    <div className="space-y-3">
+                      <FileSearchTextarea
+                        placeholder="Ask a follow-up question about this task... Type @ to search files."
                         value={followUpMessage}
-                        onChange={(e) => {
-                          setFollowUpMessage(e.target.value);
+                        onChange={(value) => {
+                          setFollowUpMessage(value);
                           if (followUpError) setFollowUpError(null);
                         }}
                         onKeyDown={(e) => {
@@ -1255,24 +1255,31 @@ export function TaskDetailsPanel({
                             }
                           }
                         }}
-                        className="flex-1 min-h-[60px] resize-none"
+                        className="w-full min-h-[80px] resize-none"
                         disabled={!canSendFollowUp}
+                        projectId={projectId}
+                        rows={4}
                       />
-                      <Button
-                        onClick={handleSendFollowUp}
-                        disabled={
-                          !canSendFollowUp ||
-                          !followUpMessage.trim() ||
-                          isSendingFollowUp
-                        }
-                        className="self-end"
-                      >
-                        {isSendingFollowUp ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                      </Button>
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={handleSendFollowUp}
+                          disabled={
+                            !canSendFollowUp ||
+                            !followUpMessage.trim() ||
+                            isSendingFollowUp
+                          }
+                          size="sm"
+                        >
+                          {isSendingFollowUp ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                          ) : (
+                            <>
+                              <Send className="h-4 w-4 mr-2" />
+                              Send
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {!canSendFollowUp
