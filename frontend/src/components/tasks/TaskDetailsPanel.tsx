@@ -64,6 +64,7 @@ interface TaskDetailsPanelProps {
   onClose: () => void;
   onEditTask?: (task: TaskWithAttemptStatus) => void;
   onDeleteTask?: (taskId: string) => void;
+  isDialogOpen?: boolean; // New prop to indicate if any dialog is open
 }
 
 const statusLabels: Record<TaskStatus, string> = {
@@ -141,6 +142,7 @@ export function TaskDetailsPanel({
   onClose,
   onEditTask,
   onDeleteTask,
+  isDialogOpen = false,
 }: TaskDetailsPanelProps) {
   const [taskAttempts, setTaskAttempts] = useState<TaskAttempt[]>([]);
   const [selectedAttempt, setSelectedAttempt] = useState<TaskAttempt | null>(
@@ -187,7 +189,7 @@ export function TaskDetailsPanel({
 
   // Handle ESC key locally to prevent global navigation
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isDialogOpen) return; // Don't handle ESC if dialog is open
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -199,7 +201,7 @@ export function TaskDetailsPanel({
 
     document.addEventListener("keydown", handleKeyDown, true); // Use capture phase
     return () => document.removeEventListener("keydown", handleKeyDown, true);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isDialogOpen]);
 
   // Available executors
   const availableExecutors = [

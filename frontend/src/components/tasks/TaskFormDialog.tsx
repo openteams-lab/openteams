@@ -132,6 +132,14 @@ export function TaskFormDialog({
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // ESC to close dialog (prevent it from reaching TaskDetailsPanel)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        handleCancel()
+        return
+      }
+      
       // Command/Ctrl + Enter to Create & Start (only in create mode)
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
         if (!isEditMode && onCreateAndStartTask && title.trim() && !isSubmitting && !isSubmittingAndStart) {
@@ -142,10 +150,10 @@ export function TaskFormDialog({
     }
 
     if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown)
-      return () => document.removeEventListener('keydown', handleKeyDown)
+      document.addEventListener('keydown', handleKeyDown, true) // Use capture phase to get priority
+      return () => document.removeEventListener('keydown', handleKeyDown, true)
     }
-  }, [isOpen, isEditMode, onCreateAndStartTask, title, isSubmitting, isSubmittingAndStart, handleCreateAndStart])
+  }, [isOpen, isEditMode, onCreateAndStartTask, title, isSubmitting, isSubmittingAndStart, handleCreateAndStart, handleCancel])
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
