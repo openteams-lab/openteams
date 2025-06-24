@@ -4,7 +4,6 @@ import {
   X,
   History,
   Clock,
-  FileText,
   Code,
   ChevronDown,
   ChevronUp,
@@ -15,6 +14,7 @@ import {
   Send,
   AlertCircle,
   Play,
+  GitCompare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -684,300 +684,397 @@ export function TaskDetailsPanel({
           <div className={getTaskPanelClasses()}>
             <div className="flex flex-col h-full">
               {/* Header */}
-              <div className="p-6 border-b space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-xl font-bold mb-2 line-clamp-2">
-                      {task.title}
-                    </h2>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Chip dotColor={getTaskStatusDotColor(task.status)}>
-                        {statusLabels[task.status]}
-                      </Chip>
+              <div className="border-b">
+                {/* Title and Task Actions */}
+                <div className="p-6 pb-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h2 className="text-xl font-bold mb-2 line-clamp-2">
+                        {task.title}
+                      </h2>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Chip dotColor={getTaskStatusDotColor(task.status)}>
+                          {statusLabels[task.status]}
+                        </Chip>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {onEditTask && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onEditTask(task)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {onDeleteTask && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onDeleteTask(task.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="icon" onClick={onClose}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div>
-                  <div className="p-3 bg-muted/30 rounded-md">
-                    {task.description ? (
-                      <div>
-                        <p
-                          className={`text-sm whitespace-pre-wrap ${
-                            !isDescriptionExpanded &&
-                            task.description.length > 200
-                              ? "line-clamp-6"
-                              : ""
-                          }`}
-                        >
-                          {task.description}
-                        </p>
-                        {task.description.length > 200 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              setIsDescriptionExpanded(!isDescriptionExpanded)
-                            }
-                            className="mt-2 p-0 h-auto text-xs text-muted-foreground hover:text-foreground"
-                          >
-                            {isDescriptionExpanded ? (
-                              <>
-                                <ChevronUp className="h-3 w-3 mr-1" />
-                                Show less
-                              </>
-                            ) : (
-                              <>
-                                <ChevronDown className="h-3 w-3 mr-1" />
-                                Show more
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">
-                        No description provided
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Attempt Selection */}
-                <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-md">
-                  <div className="flex items-center gap-2 flex-1">
-                    {selectedAttempt && (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm font-medium">
-                          <span className="text-sm text-muted-foreground">
-                            Current attempt:{" "}
-                          </span>
-                          {new Date(
-                            selectedAttempt.created_at
-                          ).toLocaleDateString()}{" "}
-                          {new Date(
-                            selectedAttempt.created_at
-                          ).toLocaleTimeString()}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex gap-1">
-                      {taskAttempts.length > 1 && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <History className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-64">
-                            {taskAttempts.map((attempt) => (
-                              <DropdownMenuItem
-                                key={attempt.id}
-                                onClick={() => handleAttemptChange(attempt.id)}
-                                className={
-                                  selectedAttempt?.id === attempt.id
-                                    ? "bg-accent"
-                                    : ""
-                                }
+                    <div className="flex items-center gap-1">
+                      {onEditTask && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onEditTask(task)}
                               >
-                                <div className="flex flex-col w-full">
-                                  <span className="font-medium text-sm">
-                                    {new Date(
-                                      attempt.created_at
-                                    ).toLocaleDateString()}{" "}
-                                    {new Date(
-                                      attempt.created_at
-                                    ).toLocaleTimeString()}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {attempt.executor || "executor"}
-                                  </span>
-                                </div>
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Edit task</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
-                      <div className="flex">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => createNewAttempt()}
-                          className="rounded-r-none border-r-0"
-                        >
-                          {selectedAttempt ? "Retry " : "Attempt "}
-                          with{" "}
-                          {
-                            availableExecutors.find(
-                              (e) => e.id === selectedExecutor
-                            )?.name
-                          }
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="rounded-l-none px-2"
-                            >
-                              <Settings2 className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {availableExecutors.map((executor) => (
-                              <DropdownMenuItem
-                                key={executor.id}
-                                onClick={() => setSelectedExecutor(executor.id)}
-                                className={
-                                  selectedExecutor === executor.id
-                                    ? "bg-accent"
-                                    : ""
-                                }
+                      {onDeleteTask && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onDeleteTask(task.id)}
                               >
-                                {executor.name}
-                                {selectedExecutor === executor.id &&
-                                  " (Default)"}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </div>
-
-                  {selectedAttempt && (
-                    <div className="flex gap-1">
-                      {(isAttemptRunning || isStopping) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={stopAllExecutions}
-                          disabled={isStopping}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 disabled:opacity-50"
-                        >
-                          <StopCircle className="h-4 w-4 mr-1" />
-                          {isStopping ? "Stopping..." : "Stop"}
-                        </Button>
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Delete task</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span
-                              className={
-                                !project?.dev_script ? "cursor-not-allowed" : ""
-                              }
-                              onMouseEnter={() => setIsHoveringDevServer(true)}
-                              onMouseLeave={() => setIsHoveringDevServer(false)}
-                            >
-                              <Button
-                                variant={
-                                  runningDevServer ? "destructive" : "outline"
-                                }
-                                size="sm"
-                                onClick={
-                                  runningDevServer
-                                    ? stopDevServer
-                                    : startDevServer
-                                }
-                                disabled={
-                                  isStartingDevServer || !project?.dev_script
-                                }
-                              >
-                                {runningDevServer ? (
-                                  <StopCircle className="h-4 w-4 mr-1" />
-                                ) : (
-                                  <Play className="h-4 w-4 mr-1" />
-                                )}
-                                {isStartingDevServer
-                                  ? runningDevServer
-                                    ? "Stopping..."
-                                    : "Starting..."
-                                  : runningDevServer
-                                  ? "Stop Dev Server"
-                                  : "Start Dev Server"}
-                              </Button>
-                            </span>
+                            <Button variant="ghost" size="icon" onClick={onClose}>
+                              <X className="h-4 w-4" />
+                            </Button>
                           </TooltipTrigger>
-                          <TooltipContent
-                            className={runningDevServer ? "max-w-2xl p-4" : ""}
-                            side="top"
-                            align="center"
-                            avoidCollisions={true}
-                          >
-                            {!project?.dev_script ? (
-                              <p>
-                                Configure a dev server command in project
-                                settings
-                              </p>
-                            ) : runningDevServer && devServerDetails ? (
-                              <div className="space-y-2">
-                                <p className="text-sm font-medium">
-                                  Dev Server Logs (Last 10 lines):
-                                </p>
-                                <pre className="text-xs bg-muted p-2 rounded max-h-64 overflow-y-auto whitespace-pre-wrap">
-                                  {(() => {
-                                    const stdout =
-                                      devServerDetails.stdout || "";
-                                    const stderr =
-                                      devServerDetails.stderr || "";
-                                    const allOutput =
-                                      stdout + (stderr ? "\n" + stderr : "");
-                                    const lines = allOutput
-                                      .split("\n")
-                                      .filter((line) => line.trim());
-                                    const lastLines = lines.slice(-10);
-                                    return lastLines.length > 0
-                                      ? lastLines.join("\n")
-                                      : "No output yet...";
-                                  })()}
-                                </pre>
-                              </div>
-                            ) : null}
+                          <TooltipContent>
+                            <p>Close panel</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openInEditor()}
-                      >
-                        <Code className="h-4 w-4 mr-1" />
-                        Editor
-                      </Button>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link
-                          to={`/projects/${projectId}/tasks/${task.id}/attempts/${selectedAttempt.id}/compare`}
-                        >
-                          <FileText className="h-4 w-4 mr-1" />
-                          Changes
-                        </Link>
-                      </Button>
                     </div>
-                  )}
+                  </div>
+
+                  {/* Description */}
+                  <div className="mt-4">
+                    <div className="p-3 bg-muted/30 rounded-md">
+                      {task.description ? (
+                        <div>
+                          <p
+                            className={`text-sm whitespace-pre-wrap ${
+                              !isDescriptionExpanded &&
+                              task.description.length > 200
+                                ? "line-clamp-6"
+                                : ""
+                            }`}
+                          >
+                            {task.description}
+                          </p>
+                          {task.description.length > 200 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setIsDescriptionExpanded(!isDescriptionExpanded)
+                              }
+                              className="mt-2 p-0 h-auto text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              {isDescriptionExpanded ? (
+                                <>
+                                  <ChevronUp className="h-3 w-3 mr-1" />
+                                  Show less
+                                </>
+                              ) : (
+                                <>
+                                  <ChevronDown className="h-3 w-3 mr-1" />
+                                  Show more
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">
+                          No description provided
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Integrated Toolbar */}
+                <div className="px-6 pb-4">
+                  <div className="flex items-center justify-between gap-4 p-3 bg-muted/20 rounded-lg border">
+                    {/* Current Attempt Info */}
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {selectedAttempt ? (
+                        <>
+                          <div className="text-sm">
+                            <span className="font-medium">
+                              {new Date(selectedAttempt.created_at).toLocaleDateString()}{" "}
+                              {new Date(selectedAttempt.created_at).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                            <span className="text-muted-foreground ml-2">
+                              ({selectedAttempt.executor || "executor"})
+                            </span>
+                          </div>
+                          <div className="h-4 w-px bg-border" />
+                        </>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">
+                          No attempts yet
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Button Groups */}
+                    <div className="flex items-center gap-2">
+                      {/* Attempt Management Group */}
+                      <div className="flex items-center gap-1">
+                        {taskAttempts.length > 1 && (
+                          <DropdownMenu>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                      <History className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>View attempt history</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <DropdownMenuContent align="start" className="w-64">
+                              {taskAttempts.map((attempt) => (
+                                <DropdownMenuItem
+                                  key={attempt.id}
+                                  onClick={() => handleAttemptChange(attempt.id)}
+                                  className={
+                                    selectedAttempt?.id === attempt.id
+                                      ? "bg-accent"
+                                      : ""
+                                  }
+                                >
+                                  <div className="flex flex-col w-full">
+                                    <span className="font-medium text-sm">
+                                      {new Date(
+                                        attempt.created_at
+                                      ).toLocaleDateString()}{" "}
+                                      {new Date(
+                                        attempt.created_at
+                                      ).toLocaleTimeString()}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {attempt.executor || "executor"}
+                                    </span>
+                                  </div>
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                        <div className="flex">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => createNewAttempt()}
+                                  className="rounded-r-none border-r-0"
+                                >
+                                  {selectedAttempt ? "Retry" : "Start"}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{selectedAttempt ? "Retry task with current executor" : "Start task with current executor"}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <DropdownMenu>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="rounded-l-none px-2"
+                                    >
+                                      <Settings2 className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Choose executor</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <DropdownMenuContent align="end">
+                              {availableExecutors.map((executor) => (
+                                <DropdownMenuItem
+                                  key={executor.id}
+                                  onClick={() => setSelectedExecutor(executor.id)}
+                                  className={
+                                    selectedExecutor === executor.id
+                                      ? "bg-accent"
+                                      : ""
+                                  }
+                                >
+                                  {executor.name}
+                                  {config?.executor.type === executor.id &&
+                                    " (Default)"}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+
+                      {selectedAttempt && (
+                        <>
+                          <div className="h-4 w-px bg-border" />
+                          
+                          {/* Execution Control Group */}
+                          <div className="flex items-center gap-1">
+                            {(isAttemptRunning || isStopping) && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={stopAllExecutions}
+                                      disabled={isStopping}
+                                      className="text-red-600 hover:text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                    >
+                                      <StopCircle className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{isStopping ? "Stopping execution..." : "Stop execution"}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    className={
+                                      !project?.dev_script ? "cursor-not-allowed" : ""
+                                    }
+                                    onMouseEnter={() => setIsHoveringDevServer(true)}
+                                    onMouseLeave={() => setIsHoveringDevServer(false)}
+                                  >
+                                    <Button
+                                      variant={
+                                        runningDevServer ? "destructive" : "outline"
+                                      }
+                                      size="sm"
+                                      onClick={
+                                        runningDevServer
+                                          ? stopDevServer
+                                          : startDevServer
+                                      }
+                                      disabled={
+                                        isStartingDevServer || !project?.dev_script
+                                      }
+                                    >
+                                      {runningDevServer ? (
+                                        <StopCircle className="h-4 w-4" />
+                                      ) : (
+                                        <Play className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  className={runningDevServer ? "max-w-2xl p-4" : ""}
+                                  side="top"
+                                  align="center"
+                                  avoidCollisions={true}
+                                >
+                                  {!project?.dev_script ? (
+                                    <p>
+                                      Configure a dev server command in project
+                                      settings
+                                    </p>
+                                  ) : runningDevServer && devServerDetails ? (
+                                    <div className="space-y-2">
+                                      <p className="text-sm font-medium">
+                                        Dev Server Logs (Last 10 lines):
+                                      </p>
+                                      <pre className="text-xs bg-muted p-2 rounded max-h-64 overflow-y-auto whitespace-pre-wrap">
+                                        {(() => {
+                                          const stdout =
+                                            devServerDetails.stdout || "";
+                                          const stderr =
+                                            devServerDetails.stderr || "";
+                                          const allOutput =
+                                            stdout + (stderr ? "\n" + stderr : "");
+                                          const lines = allOutput
+                                            .split("\n")
+                                            .filter((line) => line.trim());
+                                          const lastLines = lines.slice(-10);
+                                          return lastLines.length > 0
+                                            ? lastLines.join("\n")
+                                            : "No output yet...";
+                                        })()}
+                                      </pre>
+                                    </div>
+                                  ) : runningDevServer ? (
+                                    <p>Stop the running dev server</p>
+                                  ) : (
+                                    <p>Start the dev server</p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+
+                          <div className="h-4 w-px bg-border" />
+
+                          {/* Code Actions Group */}
+                          <div className="flex items-center gap-1">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openInEditor()}
+                                  >
+                                    <Code className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Open in editor</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="outline" size="sm" asChild>
+                                    <Link
+                                      to={`/projects/${projectId}/tasks/${task.id}/attempts/${selectedAttempt.id}/compare`}
+                                    >
+                                      <GitCompare className="h-4 w-4" />
+                                    </Link>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>View code changes</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
