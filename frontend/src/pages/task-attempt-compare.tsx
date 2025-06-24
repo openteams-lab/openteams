@@ -18,6 +18,8 @@ import {
   RefreshCw,
   GitBranch,
   Trash2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { makeRequest } from "@/lib/api";
 import type {
@@ -53,6 +55,7 @@ export function TaskAttemptComparePage() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set()
   );
+  const [showAllUnchanged, setShowAllUnchanged] = useState(false);
   const [deletingFiles, setDeletingFiles] = useState<Set<string>>(new Set());
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
 
@@ -184,7 +187,7 @@ export function TaskAttemptComparePage() {
   };
 
   const getChunkClassName = (chunkType: DiffChunkType) => {
-    const baseClass = "font-mono text-sm whitespace-pre px-3 py-1";
+    const baseClass = "font-mono text-sm whitespace-pre py-1 flex";
 
     switch (chunkType) {
       case "Insert":
@@ -212,7 +215,8 @@ export function TaskAttemptComparePage() {
   interface ProcessedLine {
     content: string;
     chunkType: DiffChunkType;
-    lineNumber: number;
+    oldLineNumber?: number;
+    newLineNumber?: number;
   }
 
   interface ProcessedSection {
@@ -226,7 +230,8 @@ export function TaskAttemptComparePage() {
   const processFileChunks = (chunks: DiffChunk[], fileIndex: number) => {
     const CONTEXT_LINES = 3;
     const lines: ProcessedLine[] = [];
-    let currentLineNumber = 1;
+    let oldLineNumber = 1;
+    let newLineNumber = 1;
 
     // Convert chunks to lines with line numbers
     chunks.forEach((chunk) => {
@@ -234,11 +239,28 @@ export function TaskAttemptComparePage() {
       chunkLines.forEach((line, index) => {
         if (index < chunkLines.length - 1 || line !== "") {
           // Skip empty last line from split
-          lines.push({
+          const processedLine: ProcessedLine = {
             content: line,
             chunkType: chunk.chunk_type,
-            lineNumber: currentLineNumber++,
-          });
+          };
+
+          // Set line numbers based on chunk type
+          switch (chunk.chunk_type) {
+            case "Equal":
+              processedLine.oldLineNumber = oldLineNumber++;
+              processedLine.newLineNumber = newLineNumber++;
+              break;
+            case "Delete":
+              processedLine.oldLineNumber = oldLineNumber++;
+              // No new line number for deletions
+              break;
+            case "Insert":
+              processedLine.newLineNumber = newLineNumber++;
+              // No old line number for insertions
+              break;
+          }
+
+          lines.push(processedLine);
         }
       });
     });
@@ -267,9 +289,10 @@ export function TaskAttemptComparePage() {
 
         if (
           contextLength <= CONTEXT_LINES * 2 ||
-          (!hasPrevChange && !hasNextChange)
+          (!hasPrevChange && !hasNextChange) ||
+          showAllUnchanged
         ) {
-          // Show all context if it's short or if there are no changes around it
+          // Show all context if it's short, no changes around it, or global toggle is on
           sections.push({
             type: "context",
             lines: lines.slice(i, nextChangeIndex),
@@ -292,7 +315,7 @@ export function TaskAttemptComparePage() {
 
             if (expandEnd > expandStart) {
               const expandKey = `${fileIndex}-${expandStart}-${expandEnd}`;
-              const isExpanded = expandedSections.has(expandKey);
+              const isExpanded = expandedSections.has(expandKey) || showAllUnchanged;
 
               if (isExpanded) {
                 sections.push({
@@ -514,13 +537,35 @@ export function TaskAttemptComparePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">
-            Diff: Base Commit vs. Current Worktree
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Shows changes made in the task attempt worktree compared to the base
-            commit
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">
+                Diff: Base Commit vs. Current Worktree
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Shows changes made in the task attempt worktree compared to the base
+                commit
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAllUnchanged(!showAllUnchanged)}
+              className="flex items-center gap-2"
+            >
+              {showAllUnchanged ? (
+                <>
+                  <EyeOff className="h-4 w-4" />
+                  Hide Unchanged
+                </>
+              ) : (
+                <>
+                  <Eye className="h-4 w-4" />
+                  Show All Unchanged
+                </>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {!diff || diff.files.length === 0 ? (
@@ -562,36 +607,38 @@ export function TaskAttemptComparePage() {
                     {processFileChunks(file.chunks, fileIndex).map(
                       (section, sectionIndex) => {
                         if (
-                          section.type === "context" &&
-                          section.lines.length === 0 &&
-                          section.expandKey
+                        section.type === "context" &&
+                        section.lines.length === 0 &&
+                        section.expandKey &&
+                          !showAllUnchanged
                         ) {
-                          // Render expand button
-                          const lineCount =
-                            parseInt(section.expandKey.split("-")[2]) -
-                            parseInt(section.expandKey.split("-")[1]);
-                          return (
-                            <div key={`expand-${section.expandKey}`}>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  toggleExpandSection(section.expandKey!)
-                                }
-                                className="w-full h-8 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-t border-b border-gray-200 rounded-none"
-                              >
-                                <ChevronDown className="h-3 w-3 mr-1" />
-                                Show {lineCount} more lines
-                              </Button>
-                            </div>
-                          );
+                        // Render expand button (only when global toggle is off)
+                        const lineCount =
+                        parseInt(section.expandKey.split("-")[2]) -
+                          parseInt(section.expandKey.split("-")[1]);
+                        return (
+                        <div key={`expand-${section.expandKey}`}>
+                        <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          toggleExpandSection(section.expandKey!)
                         }
+                          className="w-full h-8 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-t border-b border-gray-200 rounded-none"
+                        >
+                        <ChevronDown className="h-3 w-3 mr-1" />
+                          Show {lineCount} more lines
+                          </Button>
+                          </div>
+                          );
+                          }
 
                         // Render lines (context, change, or expanded)
                         return (
                           <div key={`section-${sectionIndex}`}>
                             {section.type === "expanded" &&
-                              section.expandKey && (
+                              section.expandKey && 
+                              !showAllUnchanged && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -609,8 +656,20 @@ export function TaskAttemptComparePage() {
                                 key={`${sectionIndex}-${lineIndex}`}
                                 className={getChunkClassName(line.chunkType)}
                               >
-                                {getChunkPrefix(line.chunkType)}
-                                {line.content}
+                                <div className="flex-shrink-0 w-16 px-2 text-xs text-gray-500 bg-gray-50 border-r select-none">
+                                  <span className="inline-block w-6 text-right">
+                                    {line.oldLineNumber || ""}
+                                  </span>
+                                  <span className="inline-block w-6 text-right ml-1">
+                                    {line.newLineNumber || ""}
+                                  </span>
+                                </div>
+                                <div className="flex-1 px-3">
+                                  <span className="inline-block w-4">
+                                    {getChunkPrefix(line.chunkType)}
+                                  </span>
+                                  <span>{line.content}</span>
+                                </div>
                               </div>
                             ))}
                           </div>
