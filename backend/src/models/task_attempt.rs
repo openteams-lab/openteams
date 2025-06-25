@@ -576,9 +576,6 @@ impl TaskAttempt {
                 .await?
                 .ok_or(TaskAttemptError::TaskNotFound)?; // No session found
 
-        // Update the executor session with the new prompt
-        ExecutorSession::update_prompt(pool, executor_session.id, prompt).await?;
-
         // Determine the executor config from the stored executor_type
         let executor_config = match most_recent_coding_agent.executor_type.as_deref() {
             Some("claude") => crate::executor::ExecutorConfig::Claude,
