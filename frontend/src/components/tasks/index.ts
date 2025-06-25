@@ -1,3 +1,3 @@
-export { TaskFormDialog } from './TaskFormDialog'
-export { TaskCard } from './TaskCard'
-export { TaskKanbanBoard } from './TaskKanbanBoard'
+export { TaskFormDialog } from './TaskFormDialog';
+export { TaskCard } from './TaskCard';
+export { TaskKanbanBoard } from './TaskKanbanBoard';

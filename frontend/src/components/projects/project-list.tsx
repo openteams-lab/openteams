@@ -1,18 +1,18 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Project, ApiResponse } from "shared/types";
-import { ProjectForm } from "./project-form";
-import { makeRequest } from "@/lib/api";
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Project, ApiResponse } from 'shared/types';
+import { ProjectForm } from './project-form';
+import { makeRequest } from '@/lib/api';
 import {
   Plus,
   Edit,
@@ -22,13 +22,13 @@ import {
   Loader2,
   MoreHorizontal,
   ExternalLink,
-} from "lucide-react";
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 
 export function ProjectList() {
   const navigate = useNavigate();
@@ -36,22 +36,22 @@ export function ProjectList() {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const fetchProjects = async () => {
     setLoading(true);
-    setError("");
+    setError('');
     try {
-      const response = await makeRequest("/api/projects");
+      const response = await makeRequest('/api/projects');
       const data: ApiResponse<Project[]> = await response.json();
       if (data.success && data.data) {
         setProjects(data.data);
       } else {
-        setError("Failed to load projects");
+        setError('Failed to load projects');
       }
     } catch (error) {
-      console.error("Failed to fetch projects:", error);
-      setError("Failed to connect to server");
+      console.error('Failed to fetch projects:', error);
+      setError('Failed to connect to server');
     } finally {
       setLoading(false);
     }
@@ -67,14 +67,14 @@ export function ProjectList() {
 
     try {
       const response = await makeRequest(`/api/projects/${id}`, {
-        method: "DELETE",
+        method: 'DELETE',
       });
       if (response.ok) {
         fetchProjects();
       }
     } catch (error) {
-      console.error("Failed to delete project:", error);
-      setError("Failed to delete project");
+      console.error('Failed to delete project:', error);
+      setError('Failed to delete project');
     }
   };
 

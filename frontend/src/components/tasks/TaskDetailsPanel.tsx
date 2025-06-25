@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   X,
   History,
@@ -16,34 +16,34 @@ import {
   GitCompare,
   ExternalLink,
   Code,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Label } from "@/components/ui/label";
-import { Chip } from "@/components/ui/chip";
-import { FileSearchTextarea } from "@/components/ui/file-search-textarea";
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Label } from '@/components/ui/label';
+import { Chip } from '@/components/ui/chip';
+import { FileSearchTextarea } from '@/components/ui/file-search-textarea';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { ExecutionOutputViewer } from "./ExecutionOutputViewer";
-import { EditorSelectionDialog } from "./EditorSelectionDialog";
+} from '@/components/ui/tooltip';
+import { ExecutionOutputViewer } from './ExecutionOutputViewer';
+import { EditorSelectionDialog } from './EditorSelectionDialog';
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 
-import { makeRequest } from "@/lib/api";
+import { makeRequest } from '@/lib/api';
 import {
   getTaskPanelClasses,
   getBackdropClasses,
-} from "@/lib/responsive-config";
-import { useConfig } from "@/components/config-provider";
+} from '@/lib/responsive-config';
+import { useConfig } from '@/components/config-provider';
 import type {
   TaskStatus,
   TaskAttempt,
@@ -56,7 +56,7 @@ import type {
   ExecutionProcessSummary,
   EditorType,
   Project,
-} from "shared/types";
+} from 'shared/types';
 
 interface TaskDetailsPanelProps {
   task: TaskWithAttemptStatus | null;
@@ -70,27 +70,27 @@ interface TaskDetailsPanelProps {
 }
 
 const statusLabels: Record<TaskStatus, string> = {
-  todo: "To Do",
-  inprogress: "In Progress",
-  inreview: "In Review",
-  done: "Done",
-  cancelled: "Cancelled",
+  todo: 'To Do',
+  inprogress: 'In Progress',
+  inreview: 'In Review',
+  done: 'Done',
+  cancelled: 'Cancelled',
 };
 
 const getTaskStatusDotColor = (status: TaskStatus): string => {
   switch (status) {
-    case "todo":
-      return "bg-gray-400";
-    case "inprogress":
-      return "bg-blue-500";
-    case "inreview":
-      return "bg-yellow-500";
-    case "done":
-      return "bg-green-500";
-    case "cancelled":
-      return "bg-red-500";
+    case 'todo':
+      return 'bg-gray-400';
+    case 'inprogress':
+      return 'bg-blue-500';
+    case 'inreview':
+      return 'bg-yellow-500';
+    case 'done':
+      return 'bg-green-500';
+    case 'cancelled':
+      return 'bg-red-500';
     default:
-      return "bg-gray-400";
+      return 'bg-gray-400';
   }
 };
 
@@ -98,40 +98,40 @@ const getAttemptStatusDisplay = (
   status: TaskAttemptStatus
 ): { label: string; dotColor: string } => {
   switch (status) {
-    case "setuprunning":
+    case 'setuprunning':
       return {
-        label: "Setup Running",
-        dotColor: "bg-blue-500",
+        label: 'Setup Running',
+        dotColor: 'bg-blue-500',
       };
-    case "setupcomplete":
+    case 'setupcomplete':
       return {
-        label: "Setup Complete",
-        dotColor: "bg-green-500",
+        label: 'Setup Complete',
+        dotColor: 'bg-green-500',
       };
-    case "setupfailed":
+    case 'setupfailed':
       return {
-        label: "Setup Failed",
-        dotColor: "bg-red-500",
+        label: 'Setup Failed',
+        dotColor: 'bg-red-500',
       };
-    case "executorrunning":
+    case 'executorrunning':
       return {
-        label: "Executor Running",
-        dotColor: "bg-blue-500",
+        label: 'Executor Running',
+        dotColor: 'bg-blue-500',
       };
-    case "executorcomplete":
+    case 'executorcomplete':
       return {
-        label: "Executor Complete",
-        dotColor: "bg-green-500",
+        label: 'Executor Complete',
+        dotColor: 'bg-green-500',
       };
-    case "executorfailed":
+    case 'executorfailed':
       return {
-        label: "Executor Failed",
-        dotColor: "bg-red-500",
+        label: 'Executor Failed',
+        dotColor: 'bg-red-500',
       };
     default:
       return {
-        label: "Unknown",
-        dotColor: "bg-gray-400",
+        label: 'Unknown',
+        dotColor: 'bg-gray-400',
       };
   }
 };
@@ -162,13 +162,13 @@ export function TaskDetailsPanel({
   });
   const [loading, setLoading] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-  const [selectedExecutor, setSelectedExecutor] = useState<string>("claude");
+  const [selectedExecutor, setSelectedExecutor] = useState<string>('claude');
   const [isStopping, setIsStopping] = useState(false);
   const [expandedOutputs, setExpandedOutputs] = useState<Set<string>>(
     new Set()
   );
   const [showEditorDialog, setShowEditorDialog] = useState(false);
-  const [followUpMessage, setFollowUpMessage] = useState("");
+  const [followUpMessage, setFollowUpMessage] = useState('');
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [isStartingDevServer, setIsStartingDevServer] = useState(false);
@@ -185,7 +185,7 @@ export function TaskDetailsPanel({
   const runningDevServer = useMemo(() => {
     return attemptData.processes.find(
       (process) =>
-        process.process_type === "devserver" && process.status === "running"
+        process.process_type === 'devserver' && process.status === 'running'
     );
   }, [attemptData.processes]);
 
@@ -194,22 +194,22 @@ export function TaskDetailsPanel({
     if (!isOpen || isDialogOpen) return; // Don't handle ESC if dialog is open
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         onClose();
       }
     };
 
-    document.addEventListener("keydown", handleKeyDown, true); // Use capture phase
-    return () => document.removeEventListener("keydown", handleKeyDown, true);
+    document.addEventListener('keydown', handleKeyDown, true); // Use capture phase
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, onClose, isDialogOpen]);
 
   // Available executors
   const availableExecutors = [
-    { id: "echo", name: "Echo" },
-    { id: "claude", name: "Claude" },
-    { id: "amp", name: "Amp" },
+    { id: 'echo', name: 'Echo' },
+    { id: 'claude', name: 'Claude' },
+    { id: 'amp', name: 'Amp' },
   ];
 
   // Check if any execution process is currently running
@@ -236,8 +236,8 @@ export function TaskDetailsPanel({
     // Check if any execution process has a running status as its latest activity
     return Array.from(latestActivitiesByProcess.values()).some(
       (activity) =>
-        activity.status === "setuprunning" ||
-        activity.status === "executorrunning"
+        activity.status === 'setuprunning' ||
+        activity.status === 'executorrunning'
     );
   }, [selectedAttempt, attemptData.activities, isStopping]);
 
@@ -254,7 +254,7 @@ export function TaskDetailsPanel({
 
     // Need at least one completed coding agent execution
     const codingAgentActivities = attemptData.activities.filter(
-      (activity) => activity.status === "executorcomplete"
+      (activity) => activity.status === 'executorcomplete'
     );
 
     return codingAgentActivities.length > 0;
@@ -293,7 +293,7 @@ export function TaskDetailsPanel({
         }
       }
     } catch (err) {
-      console.error("Failed to fetch dev server details:", err);
+      console.error('Failed to fetch dev server details:', err);
     }
   };
 
@@ -319,14 +319,14 @@ export function TaskDetailsPanel({
 
   // Memoize processed dev server logs to prevent stuttering
   const processedDevServerLogs = useMemo(() => {
-    if (!devServerDetails) return "No output yet...";
-    
-    const stdout = devServerDetails.stdout || "";
-    const stderr = devServerDetails.stderr || "";
-    const allOutput = stdout + (stderr ? "\n" + stderr : "");
-    const lines = allOutput.split("\n").filter((line) => line.trim());
+    if (!devServerDetails) return 'No output yet...';
+
+    const stdout = devServerDetails.stdout || '';
+    const stderr = devServerDetails.stderr || '';
+    const allOutput = stdout + (stderr ? '\n' + stderr : '');
+    const lines = allOutput.split('\n').filter((line) => line.trim());
     const lastLines = lines.slice(-10);
-    return lastLines.length > 0 ? lastLines.join("\n") : "No output yet...";
+    return lastLines.length > 0 ? lastLines.join('\n') : 'No output yet...';
   }, [devServerDetails?.stdout, devServerDetails?.stderr]);
 
   // Set default executor from config
@@ -400,7 +400,7 @@ export function TaskDetailsPanel({
         }
       }
     } catch (err) {
-      console.error("Failed to fetch task attempts:", err);
+      console.error('Failed to fetch task attempts:', err);
     } finally {
       setLoading(false);
     }
@@ -437,8 +437,8 @@ export function TaskDetailsPanel({
           // Find running activities that need detailed execution info
           const runningActivities = activitiesResult.data.filter(
             (activity) =>
-              activity.status === "setuprunning" ||
-              activity.status === "executorrunning"
+              activity.status === 'setuprunning' ||
+              activity.status === 'executorrunning'
           );
 
           // Fetch detailed execution info for running processes
@@ -473,7 +473,7 @@ export function TaskDetailsPanel({
         }
       }
     } catch (err) {
-      console.error("Failed to fetch attempt data:", err);
+      console.error('Failed to fetch attempt data:', err);
     }
   };
 
@@ -492,19 +492,19 @@ export function TaskDetailsPanel({
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${task.id}/attempts/${selectedAttempt.id}/open-editor`,
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify(editorType ? { editor_type: editorType } : null),
         }
       );
 
       if (!response.ok) {
-        throw new Error("Failed to open editor");
+        throw new Error('Failed to open editor');
       }
     } catch (err) {
-      console.error("Failed to open editor:", err);
+      console.error('Failed to open editor:', err);
       // Show editor selection dialog if editor failed to open
       if (!editorType) {
         setShowEditorDialog(true);
@@ -521,27 +521,27 @@ export function TaskDetailsPanel({
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${task.id}/attempts/${selectedAttempt.id}/start-dev-server`,
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
         }
       );
 
       if (!response.ok) {
-        throw new Error("Failed to start dev server");
+        throw new Error('Failed to start dev server');
       }
 
       const data: ApiResponse<null> = await response.json();
 
       if (!data.success) {
-        throw new Error(data.message || "Failed to start dev server");
+        throw new Error(data.message || 'Failed to start dev server');
       }
 
       // Refresh activities to show the new dev server process
       fetchAttemptData(selectedAttempt.id);
     } catch (err) {
-      console.error("Failed to start dev server:", err);
+      console.error('Failed to start dev server:', err);
     } finally {
       setIsStartingDevServer(false);
     }
@@ -556,21 +556,21 @@ export function TaskDetailsPanel({
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${task.id}/attempts/${selectedAttempt.id}/execution-processes/${runningDevServer.id}/stop`,
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
         }
       );
 
       if (!response.ok) {
-        throw new Error("Failed to stop dev server");
+        throw new Error('Failed to stop dev server');
       }
 
       // Refresh activities to show the stopped dev server
       fetchAttemptData(selectedAttempt.id);
     } catch (err) {
-      console.error("Failed to stop dev server:", err);
+      console.error('Failed to stop dev server:', err);
     } finally {
       setIsStartingDevServer(false);
     }
@@ -583,9 +583,9 @@ export function TaskDetailsPanel({
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${task.id}/attempts`,
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             executor: executor || selectedExecutor,
@@ -598,7 +598,7 @@ export function TaskDetailsPanel({
         fetchTaskAttempts();
       }
     } catch (err) {
-      console.error("Failed to create new attempt:", err);
+      console.error('Failed to create new attempt:', err);
     }
   };
 
@@ -610,9 +610,9 @@ export function TaskDetailsPanel({
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${task.id}/attempts/${selectedAttempt.id}/stop`,
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
         }
       );
@@ -626,7 +626,7 @@ export function TaskDetailsPanel({
         }, 1000);
       }
     } catch (err) {
-      console.error("Failed to stop executions:", err);
+      console.error('Failed to stop executions:', err);
     } finally {
       setIsStopping(false);
     }
@@ -653,9 +653,9 @@ export function TaskDetailsPanel({
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${task.id}/attempts/${selectedAttempt.id}/follow-up`,
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             prompt: followUpMessage.trim(),
@@ -665,7 +665,7 @@ export function TaskDetailsPanel({
 
       if (response.ok) {
         // Clear the message
-        setFollowUpMessage("");
+        setFollowUpMessage('');
         // Refresh activities to show the new follow-up execution
         fetchAttemptData(selectedAttempt.id);
       } else {
@@ -679,7 +679,7 @@ export function TaskDetailsPanel({
     } catch (err) {
       setFollowUpError(
         `Failed to send follow-up: ${
-          err instanceof Error ? err.message : "Unknown error"
+          err instanceof Error ? err.message : 'Unknown error'
         }`
       );
     } finally {
@@ -754,7 +754,11 @@ export function TaskDetailsPanel({
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={onClose}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={onClose}
+                            >
                               <X className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
@@ -775,8 +779,8 @@ export function TaskDetailsPanel({
                             className={`text-sm whitespace-pre-wrap ${
                               !isDescriptionExpanded &&
                               task.description.length > 200
-                                ? "line-clamp-6"
-                                : ""
+                                ? 'line-clamp-6'
+                                : ''
                             }`}
                           >
                             {task.description}
@@ -822,14 +826,18 @@ export function TaskDetailsPanel({
                         <>
                           <div className="text-sm">
                             <span className="font-medium">
-                              {new Date(selectedAttempt.created_at).toLocaleDateString()}{" "}
-                              {new Date(selectedAttempt.created_at).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
+                              {new Date(
+                                selectedAttempt.created_at
+                              ).toLocaleDateString()}{' '}
+                              {new Date(
+                                selectedAttempt.created_at
+                              ).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
                               })}
                             </span>
                             <span className="text-muted-foreground ml-2">
-                              ({selectedAttempt.executor || "executor"})
+                              ({selectedAttempt.executor || 'executor'})
                             </span>
                           </div>
                           <div className="h-4 w-px bg-border" />
@@ -865,24 +873,26 @@ export function TaskDetailsPanel({
                               {taskAttempts.map((attempt) => (
                                 <DropdownMenuItem
                                   key={attempt.id}
-                                  onClick={() => handleAttemptChange(attempt.id)}
+                                  onClick={() =>
+                                    handleAttemptChange(attempt.id)
+                                  }
                                   className={
                                     selectedAttempt?.id === attempt.id
-                                      ? "bg-accent"
-                                      : ""
+                                      ? 'bg-accent'
+                                      : ''
                                   }
                                 >
                                   <div className="flex flex-col w-full">
                                     <span className="font-medium text-sm">
                                       {new Date(
                                         attempt.created_at
-                                      ).toLocaleDateString()}{" "}
+                                      ).toLocaleDateString()}{' '}
                                       {new Date(
                                         attempt.created_at
                                       ).toLocaleTimeString()}
                                     </span>
                                     <span className="text-xs text-muted-foreground">
-                                      {attempt.executor || "executor"}
+                                      {attempt.executor || 'executor'}
                                     </span>
                                   </div>
                                 </DropdownMenuItem>
@@ -890,7 +900,7 @@ export function TaskDetailsPanel({
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
-                        {(isAttemptRunning || isStopping) ? (
+                        {isAttemptRunning || isStopping ? (
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -902,11 +912,15 @@ export function TaskDetailsPanel({
                                   className="text-red-600 hover:text-red-700 hover:bg-red-50 disabled:opacity-50"
                                 >
                                   <StopCircle className="h-4 w-4 mr-2" />
-                                  {isStopping ? "Stopping..." : "Stop Attempt"}
+                                  {isStopping ? 'Stopping...' : 'Stop Attempt'}
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>{isStopping ? "Stopping execution..." : "Stop execution"}</p>
+                                <p>
+                                  {isStopping
+                                    ? 'Stopping execution...'
+                                    : 'Stop execution'}
+                                </p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -921,11 +935,17 @@ export function TaskDetailsPanel({
                                     onClick={() => createNewAttempt()}
                                     className="rounded-r-none border-r-0"
                                   >
-                                    {selectedAttempt ? "New Attempt" : "Start Attempt"}
+                                    {selectedAttempt
+                                      ? 'New Attempt'
+                                      : 'Start Attempt'}
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p>{selectedAttempt ? "Create new attempt with current executor" : "Start new attempt with current executor"}</p>
+                                  <p>
+                                    {selectedAttempt
+                                      ? 'Create new attempt with current executor'
+                                      : 'Start new attempt with current executor'}
+                                  </p>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
@@ -952,16 +972,18 @@ export function TaskDetailsPanel({
                                 {availableExecutors.map((executor) => (
                                   <DropdownMenuItem
                                     key={executor.id}
-                                    onClick={() => setSelectedExecutor(executor.id)}
+                                    onClick={() =>
+                                      setSelectedExecutor(executor.id)
+                                    }
                                     className={
                                       selectedExecutor === executor.id
-                                        ? "bg-accent"
-                                        : ""
+                                        ? 'bg-accent'
+                                        : ''
                                     }
                                   >
                                     {executor.name}
                                     {config?.executor.type === executor.id &&
-                                      " (Default)"}
+                                      ' (Default)'}
                                   </DropdownMenuItem>
                                 ))}
                               </DropdownMenuContent>
@@ -973,7 +995,7 @@ export function TaskDetailsPanel({
                       {selectedAttempt && (
                         <>
                           <div className="h-4 w-px bg-border" />
-                          
+
                           {/* Dev Server Control Group */}
                           <div className="flex items-center gap-1">
                             <TooltipProvider>
@@ -981,14 +1003,22 @@ export function TaskDetailsPanel({
                                 <TooltipTrigger asChild>
                                   <span
                                     className={
-                                      !project?.dev_script ? "cursor-not-allowed" : ""
+                                      !project?.dev_script
+                                        ? 'cursor-not-allowed'
+                                        : ''
                                     }
-                                    onMouseEnter={() => setIsHoveringDevServer(true)}
-                                    onMouseLeave={() => setIsHoveringDevServer(false)}
+                                    onMouseEnter={() =>
+                                      setIsHoveringDevServer(true)
+                                    }
+                                    onMouseLeave={() =>
+                                      setIsHoveringDevServer(false)
+                                    }
                                   >
                                     <Button
                                       variant={
-                                        runningDevServer ? "destructive" : "outline"
+                                        runningDevServer
+                                          ? 'destructive'
+                                          : 'outline'
                                       }
                                       size="sm"
                                       onClick={
@@ -997,7 +1027,8 @@ export function TaskDetailsPanel({
                                           : startDevServer
                                       }
                                       disabled={
-                                        isStartingDevServer || !project?.dev_script
+                                        isStartingDevServer ||
+                                        !project?.dev_script
                                       }
                                     >
                                       {runningDevServer ? (
@@ -1009,7 +1040,9 @@ export function TaskDetailsPanel({
                                   </span>
                                 </TooltipTrigger>
                                 <TooltipContent
-                                  className={runningDevServer ? "max-w-2xl p-4" : ""}
+                                  className={
+                                    runningDevServer ? 'max-w-2xl p-4' : ''
+                                  }
                                   side="top"
                                   align="center"
                                   avoidCollisions={true}
@@ -1025,7 +1058,7 @@ export function TaskDetailsPanel({
                                         Dev Server Logs (Last 10 lines):
                                       </p>
                                       <pre className="text-xs bg-muted p-2 rounded max-h-64 overflow-y-auto whitespace-pre-wrap">
-                                      {processedDevServerLogs}
+                                        {processedDevServerLogs}
                                       </pre>
                                     </div>
                                   ) : runningDevServer ? (
@@ -1122,9 +1155,9 @@ export function TaskDetailsPanel({
                                     {new Date(
                                       selectedAttempt.created_at
                                     ).toLocaleTimeString([], {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                      second: "2-digit",
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      second: '2-digit',
                                     })}
                                   </div>
                                 </div>
@@ -1155,33 +1188,34 @@ export function TaskDetailsPanel({
                                     {new Date(
                                       activity.created_at
                                     ).toLocaleTimeString([], {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                      second: "2-digit",
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      second: '2-digit',
                                     })}
                                   </div>
                                 </div>
 
                                 {/* Show prompt for coding agent executions */}
-                                {activity.prompt && activity.status === "executorrunning" && (
-                                <div className="mt-2 mb-4">
-                                 <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800">
-                                   <div className="flex items-start gap-2 mb-2">
-                                     <Code className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-                                     <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                       Prompt
-                                      </span>
-                                  </div>
-                                <pre className="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap break-words">
-                                {activity.prompt}
-                                </pre>
-                                </div>
-                                </div>
-                                )}
+                                {activity.prompt &&
+                                  activity.status === 'executorrunning' && (
+                                    <div className="mt-2 mb-4">
+                                      <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800">
+                                        <div className="flex items-start gap-2 mb-2">
+                                          <Code className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                                          <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                            Prompt
+                                          </span>
+                                        </div>
+                                        <pre className="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap break-words">
+                                          {activity.prompt}
+                                        </pre>
+                                      </div>
+                                    </div>
+                                  )}
 
-                                 {/* Show stdio output for running processes */}
-                                {(activity.status === "setuprunning" ||
-                                  activity.status === "executorrunning") &&
+                                {/* Show stdio output for running processes */}
+                                {(activity.status === 'setuprunning' ||
+                                  activity.status === 'executorrunning') &&
                                   attemptData.runningProcessDetails[
                                     activity.execution_process_id
                                   ] && (
@@ -1191,8 +1225,8 @@ export function TaskDetailsPanel({
                                           expandedOutputs.has(
                                             activity.execution_process_id
                                           )
-                                            ? ""
-                                            : "max-h-64 overflow-hidden flex flex-col justify-end"
+                                            ? ''
+                                            : 'max-h-64 overflow-hidden flex flex-col justify-end'
                                         }`}
                                       >
                                         <ExecutionOutputViewer
@@ -1265,7 +1299,7 @@ export function TaskDetailsPanel({
                           if (followUpError) setFollowUpError(null);
                         }}
                         onKeyDown={(e) => {
-                          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                             e.preventDefault();
                             if (
                               canSendFollowUp &&
@@ -1305,9 +1339,9 @@ export function TaskDetailsPanel({
                     <p className="text-xs text-muted-foreground">
                       {!canSendFollowUp
                         ? isAttemptRunning
-                          ? "Wait for current execution to complete before asking follow-up questions"
-                          : "Complete at least one coding agent execution to enable follow-up questions"
-                        : "Continue the conversation with the most recent executor session"}
+                          ? 'Wait for current execution to complete before asking follow-up questions'
+                          : 'Complete at least one coding agent execution to enable follow-up questions'
+                        : 'Continue the conversation with the most recent executor session'}
                     </p>
                   </div>
                 </div>

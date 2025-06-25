@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   ArrowLeft,
   FileText,
@@ -20,14 +20,14 @@ import {
   Trash2,
   Eye,
   EyeOff,
-} from "lucide-react";
-import { makeRequest } from "@/lib/api";
+} from 'lucide-react';
+import { makeRequest } from '@/lib/api';
 import type {
   WorktreeDiff,
   DiffChunkType,
   DiffChunk,
   BranchStatus,
-} from "shared/types";
+} from 'shared/types';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -80,13 +80,13 @@ export function TaskAttemptComparePage() {
         if (result.success && result.data) {
           setDiff(result.data);
         } else {
-          setError("Failed to load diff");
+          setError('Failed to load diff');
         }
       } else {
-        setError("Failed to load diff");
+        setError('Failed to load diff');
       }
     } catch (err) {
-      setError("Failed to load diff");
+      setError('Failed to load diff');
     } finally {
       setLoading(false);
     }
@@ -106,13 +106,13 @@ export function TaskAttemptComparePage() {
         if (result.success && result.data) {
           setBranchStatus(result.data);
         } else {
-          setError("Failed to load branch status");
+          setError('Failed to load branch status');
         }
       } else {
-        setError("Failed to load branch status");
+        setError('Failed to load branch status');
       }
     } catch (err) {
-      setError("Failed to load branch status");
+      setError('Failed to load branch status');
     } finally {
       setBranchStatusLoading(false);
     }
@@ -142,7 +142,7 @@ export function TaskAttemptComparePage() {
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${taskId}/attempts/${attemptId}/merge`,
         {
-          method: "POST",
+          method: 'POST',
         }
       );
 
@@ -153,13 +153,13 @@ export function TaskAttemptComparePage() {
           fetchDiff();
           fetchBranchStatus();
         } else {
-          setError("Failed to merge changes");
+          setError('Failed to merge changes');
         }
       } else {
-        setError("Failed to merge changes");
+        setError('Failed to merge changes');
       }
     } catch (err) {
-      setError("Failed to merge changes");
+      setError('Failed to merge changes');
     } finally {
       setMerging(false);
     }
@@ -182,7 +182,7 @@ export function TaskAttemptComparePage() {
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${taskId}/attempts/${attemptId}/rebase`,
         {
-          method: "POST",
+          method: 'POST',
         }
       );
 
@@ -194,27 +194,27 @@ export function TaskAttemptComparePage() {
           fetchDiff();
           fetchBranchStatus();
         } else {
-          setError(result.message || "Failed to rebase branch");
+          setError(result.message || 'Failed to rebase branch');
         }
       } else {
-        setError("Failed to rebase branch");
+        setError('Failed to rebase branch');
       }
     } catch (err) {
-      setError("Failed to rebase branch");
+      setError('Failed to rebase branch');
     } finally {
       setRebasing(false);
     }
   };
 
   const getChunkClassName = (chunkType: DiffChunkType) => {
-    const baseClass = "font-mono text-sm whitespace-pre py-1 flex";
+    const baseClass = 'font-mono text-sm whitespace-pre py-1 flex';
 
     switch (chunkType) {
-      case "Insert":
+      case 'Insert':
         return `${baseClass} bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border-l-2 border-green-400 dark:border-green-500`;
-      case "Delete":
+      case 'Delete':
         return `${baseClass} bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border-l-2 border-red-400 dark:border-red-500`;
-      case "Equal":
+      case 'Equal':
       default:
         return `${baseClass} text-muted-foreground`;
     }
@@ -222,13 +222,13 @@ export function TaskAttemptComparePage() {
 
   const getChunkPrefix = (chunkType: DiffChunkType) => {
     switch (chunkType) {
-      case "Insert":
-        return "+";
-      case "Delete":
-        return "-";
-      case "Equal":
+      case 'Insert':
+        return '+';
+      case 'Delete':
+        return '-';
+      case 'Equal':
       default:
-        return " ";
+        return ' ';
     }
   };
 
@@ -240,7 +240,7 @@ export function TaskAttemptComparePage() {
   }
 
   interface ProcessedSection {
-    type: "context" | "change" | "expanded";
+    type: 'context' | 'change' | 'expanded';
     lines: ProcessedLine[];
     expandKey?: string;
     expandedAbove?: boolean;
@@ -255,9 +255,9 @@ export function TaskAttemptComparePage() {
 
     // Convert chunks to lines with line numbers
     chunks.forEach((chunk) => {
-      const chunkLines = chunk.content.split("\n");
+      const chunkLines = chunk.content.split('\n');
       chunkLines.forEach((line, index) => {
-        if (index < chunkLines.length - 1 || line !== "") {
+        if (index < chunkLines.length - 1 || line !== '') {
           // Skip empty last line from split
           const processedLine: ProcessedLine = {
             content: line,
@@ -266,15 +266,15 @@ export function TaskAttemptComparePage() {
 
           // Set line numbers based on chunk type
           switch (chunk.chunk_type) {
-            case "Equal":
+            case 'Equal':
               processedLine.oldLineNumber = oldLineNumber++;
               processedLine.newLineNumber = newLineNumber++;
               break;
-            case "Delete":
+            case 'Delete':
               processedLine.oldLineNumber = oldLineNumber++;
               // No new line number for deletions
               break;
-            case "Insert":
+            case 'Insert':
               processedLine.newLineNumber = newLineNumber++;
               // No old line number for insertions
               break;
@@ -291,12 +291,12 @@ export function TaskAttemptComparePage() {
     while (i < lines.length) {
       const line = lines[i];
 
-      if (line.chunkType === "Equal") {
+      if (line.chunkType === 'Equal') {
         // Look for the next change or end of file
         let nextChangeIndex = i + 1;
         while (
           nextChangeIndex < lines.length &&
-          lines[nextChangeIndex].chunkType === "Equal"
+          lines[nextChangeIndex].chunkType === 'Equal'
         ) {
           nextChangeIndex++;
         }
@@ -305,7 +305,7 @@ export function TaskAttemptComparePage() {
         const hasNextChange = nextChangeIndex < lines.length;
         const hasPrevChange =
           sections.length > 0 &&
-          sections[sections.length - 1].type === "change";
+          sections[sections.length - 1].type === 'change';
 
         if (
           contextLength <= CONTEXT_LINES * 2 ||
@@ -314,7 +314,7 @@ export function TaskAttemptComparePage() {
         ) {
           // Show all context if it's short, no changes around it, or global toggle is on
           sections.push({
-            type: "context",
+            type: 'context',
             lines: lines.slice(i, nextChangeIndex),
           });
         } else {
@@ -322,7 +322,7 @@ export function TaskAttemptComparePage() {
           if (hasPrevChange) {
             // Add context after previous change
             sections.push({
-              type: "context",
+              type: 'context',
               lines: lines.slice(i, i + CONTEXT_LINES),
             });
             i += CONTEXT_LINES;
@@ -335,17 +335,18 @@ export function TaskAttemptComparePage() {
 
             if (expandEnd > expandStart) {
               const expandKey = `${fileIndex}-${expandStart}-${expandEnd}`;
-              const isExpanded = expandedSections.has(expandKey) || showAllUnchanged;
+              const isExpanded =
+                expandedSections.has(expandKey) || showAllUnchanged;
 
               if (isExpanded) {
                 sections.push({
-                  type: "expanded",
+                  type: 'expanded',
                   lines: lines.slice(expandStart, expandEnd),
                   expandKey,
                 });
               } else {
                 sections.push({
-                  type: "context",
+                  type: 'context',
                   lines: [],
                   expandKey,
                 });
@@ -354,7 +355,7 @@ export function TaskAttemptComparePage() {
 
             // Add context before next change
             sections.push({
-              type: "context",
+              type: 'context',
               lines: lines.slice(
                 nextChangeIndex - CONTEXT_LINES,
                 nextChangeIndex
@@ -363,7 +364,7 @@ export function TaskAttemptComparePage() {
           } else if (!hasPrevChange) {
             // No changes around, just show first few lines
             sections.push({
-              type: "context",
+              type: 'context',
               lines: lines.slice(i, i + CONTEXT_LINES),
             });
           }
@@ -373,12 +374,12 @@ export function TaskAttemptComparePage() {
       } else {
         // Found a change, collect all consecutive changes
         const changeStart = i;
-        while (i < lines.length && lines[i].chunkType !== "Equal") {
+        while (i < lines.length && lines[i].chunkType !== 'Equal') {
           i++;
         }
 
         sections.push({
-          type: "change",
+          type: 'change',
           lines: lines.slice(changeStart, i),
         });
       }
@@ -413,7 +414,7 @@ export function TaskAttemptComparePage() {
           fileToDelete
         )}`,
         {
-          method: "POST",
+          method: 'POST',
         }
       );
 
@@ -423,13 +424,13 @@ export function TaskAttemptComparePage() {
           // Refresh the diff to show updated state
           fetchDiff();
         } else {
-          setError(result.message || "Failed to delete file");
+          setError(result.message || 'Failed to delete file');
         }
       } else {
-        setError("Failed to delete file");
+        setError('Failed to delete file');
       }
     } catch (err) {
-      setError("Failed to delete file");
+      setError('Failed to delete file');
     } finally {
       setDeletingFiles((prev) => {
         const newSet = new Set(prev);
@@ -491,15 +492,17 @@ export function TaskAttemptComparePage() {
                 {branchStatus.up_to_date ? (
                   <span className="text-green-600">Up to date</span>
                 ) : branchStatus.is_behind === true ? (
-                <span className="text-orange-600">
-                {branchStatus.commits_behind} commit
-                {branchStatus.commits_behind !== 1 ? "s" : ""} behind {branchStatus.base_branch_name}
-                </span>
+                  <span className="text-orange-600">
+                    {branchStatus.commits_behind} commit
+                    {branchStatus.commits_behind !== 1 ? 's' : ''} behind{' '}
+                    {branchStatus.base_branch_name}
+                  </span>
                 ) : (
-                <span className="text-blue-600">
-                {branchStatus.commits_ahead} commit
-                {branchStatus.commits_ahead !== 1 ? "s" : ""} ahead of {branchStatus.base_branch_name}
-                </span>
+                  <span className="text-blue-600">
+                    {branchStatus.commits_ahead} commit
+                    {branchStatus.commits_ahead !== 1 ? 's' : ''} ahead of{' '}
+                    {branchStatus.base_branch_name}
+                  </span>
                 )}
               </div>
               {branchStatus.has_uncommitted_changes && (
@@ -535,9 +538,11 @@ export function TaskAttemptComparePage() {
                   className="border-orange-300 text-orange-700 hover:bg-orange-50"
                 >
                   <RefreshCw
-                    className={`mr-2 h-4 w-4 ${rebasing ? "animate-spin" : ""}`}
+                    className={`mr-2 h-4 w-4 ${rebasing ? 'animate-spin' : ''}`}
                   />
-                  {rebasing ? "Rebasing..." : `Rebase onto ${branchStatus.base_branch_name}`}
+                  {rebasing
+                    ? 'Rebasing...'
+                    : `Rebase onto ${branchStatus.base_branch_name}`}
                 </Button>
               )}
             {!branchStatus?.merged && (
@@ -551,7 +556,7 @@ export function TaskAttemptComparePage() {
                 }
                 className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
               >
-                {merging ? "Merging..." : "Merge Changes"}
+                {merging ? 'Merging...' : 'Merge Changes'}
               </Button>
             )}
           </div>
@@ -566,8 +571,8 @@ export function TaskAttemptComparePage() {
                 Diff: Base Commit vs. Current Worktree
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                Shows changes made in the task attempt worktree compared to the base
-                commit
+                Shows changes made in the task attempt worktree compared to the
+                base commit
               </p>
             </div>
             <Button
@@ -621,8 +626,8 @@ export function TaskAttemptComparePage() {
                       <Trash2 className="h-4 w-4" />
                       <span className="text-xs">
                         {deletingFiles.has(file.path)
-                          ? "Deleting..."
-                          : "Delete File"}
+                          ? 'Deleting...'
+                          : 'Delete File'}
                       </span>
                     </Button>
                   </div>
@@ -630,37 +635,37 @@ export function TaskAttemptComparePage() {
                     {processFileChunks(file.chunks, fileIndex).map(
                       (section, sectionIndex) => {
                         if (
-                        section.type === "context" &&
-                        section.lines.length === 0 &&
-                        section.expandKey &&
+                          section.type === 'context' &&
+                          section.lines.length === 0 &&
+                          section.expandKey &&
                           !showAllUnchanged
                         ) {
-                        // Render expand button (only when global toggle is off)
-                        const lineCount =
-                        parseInt(section.expandKey.split("-")[2]) -
-                          parseInt(section.expandKey.split("-")[1]);
-                        return (
-                        <div key={`expand-${section.expandKey}`}>
-                        <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          toggleExpandSection(section.expandKey!)
-                        }
-                          className="w-full h-8 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 border-t border-b border-gray-200 dark:border-gray-700 rounded-none"
-                        >
-                        <ChevronDown className="h-3 w-3 mr-1" />
-                          Show {lineCount} more lines
-                          </Button>
-                          </div>
+                          // Render expand button (only when global toggle is off)
+                          const lineCount =
+                            parseInt(section.expandKey.split('-')[2]) -
+                            parseInt(section.expandKey.split('-')[1]);
+                          return (
+                            <div key={`expand-${section.expandKey}`}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  toggleExpandSection(section.expandKey!)
+                                }
+                                className="w-full h-8 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 border-t border-b border-gray-200 dark:border-gray-700 rounded-none"
+                              >
+                                <ChevronDown className="h-3 w-3 mr-1" />
+                                Show {lineCount} more lines
+                              </Button>
+                            </div>
                           );
-                          }
+                        }
 
                         // Render lines (context, change, or expanded)
                         return (
                           <div key={`section-${sectionIndex}`}>
-                            {section.type === "expanded" &&
-                              section.expandKey && 
+                            {section.type === 'expanded' &&
+                              section.expandKey &&
                               !showAllUnchanged && (
                                 <Button
                                   variant="ghost"
@@ -681,10 +686,10 @@ export function TaskAttemptComparePage() {
                               >
                                 <div className="flex-shrink-0 w-16 px-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 select-none">
                                   <span className="inline-block w-6 text-right">
-                                    {line.oldLineNumber || ""}
+                                    {line.oldLineNumber || ''}
                                   </span>
                                   <span className="inline-block w-6 text-right ml-1">
-                                    {line.newLineNumber || ""}
+                                    {line.newLineNumber || ''}
                                   </span>
                                 </div>
                                 <div className="flex-1 px-3">
@@ -713,7 +718,7 @@ export function TaskAttemptComparePage() {
           <DialogHeader>
             <DialogTitle>Delete File</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete the file{" "}
+              Are you sure you want to delete the file{' '}
               <span className="font-mono font-medium">"{fileToDelete}"</span>?
             </DialogDescription>
           </DialogHeader>
@@ -732,35 +737,44 @@ export function TaskAttemptComparePage() {
             <Button
               variant="destructive"
               onClick={handleConfirmDelete}
-              disabled={deletingFiles.has(fileToDelete || "")}
+              disabled={deletingFiles.has(fileToDelete || '')}
             >
-              {deletingFiles.has(fileToDelete || "")
-                ? "Deleting..."
-                : "Delete File"}
+              {deletingFiles.has(fileToDelete || '')
+                ? 'Deleting...'
+                : 'Delete File'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Uncommitted Changes Warning Dialog */}
-      <Dialog open={showUncommittedWarning} onOpenChange={() => handleCancelMergeWithUncommitted()}>
+      <Dialog
+        open={showUncommittedWarning}
+        onOpenChange={() => handleCancelMergeWithUncommitted()}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Uncommitted Changes Detected</DialogTitle>
             <DialogDescription>
-              There are uncommitted changes in the worktree that will be included in the merge.
+              There are uncommitted changes in the worktree that will be
+              included in the merge.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
               <p className="text-sm text-yellow-800">
-                <strong>Warning:</strong> The worktree contains uncommitted changes (modified, added, or deleted files) 
-                that have not been committed to git. These changes will be permanently merged into the {branchStatus?.base_branch_name || 'base'} branch.
+                <strong>Warning:</strong> The worktree contains uncommitted
+                changes (modified, added, or deleted files) that have not been
+                committed to git. These changes will be permanently merged into
+                the {branchStatus?.base_branch_name || 'base'} branch.
               </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={handleCancelMergeWithUncommitted}>
+            <Button
+              variant="outline"
+              onClick={handleCancelMergeWithUncommitted}
+            >
               Cancel
             </Button>
             <Button
@@ -768,7 +782,7 @@ export function TaskAttemptComparePage() {
               disabled={merging}
               className="bg-yellow-600 hover:bg-yellow-700"
             >
-              {merging ? "Merging..." : "Merge Anyway"}
+              {merging ? 'Merging...' : 'Merge Anyway'}
             </Button>
           </DialogFooter>
         </DialogContent>

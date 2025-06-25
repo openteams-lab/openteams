@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -6,10 +6,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { AlertTriangle } from "lucide-react";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { AlertTriangle } from 'lucide-react';
 
 interface DisclaimerDialogProps {
   open: boolean;
@@ -39,7 +39,8 @@ export function DisclaimerDialog({ open, onAccept }: DisclaimerDialogProps) {
             </p>
             <div className="space-y-3">
               <p>
-                <strong>Coding agents have full access to your computer</strong> and can execute any terminal commands, including:
+                <strong>Coding agents have full access to your computer</strong>{' '}
+                and can execute any terminal commands, including:
               </p>
               <ul className="list-disc list-inside space-y-1 ml-4">
                 <li>Installing, modifying, or deleting software</li>
@@ -48,13 +49,27 @@ export function DisclaimerDialog({ open, onAccept }: DisclaimerDialogProps) {
                 <li>Running system-level commands with your permissions</li>
               </ul>
               <p>
-                <strong>This software is experimental and may cause catastrophic damage</strong> to your system, data, or projects. By using this software, you acknowledge that:
+                <strong>
+                  This software is experimental and may cause catastrophic
+                  damage
+                </strong>{' '}
+                to your system, data, or projects. By using this software, you
+                acknowledge that:
               </p>
               <ul className="list-disc list-inside space-y-1 ml-4">
                 <li>You use this software entirely at your own risk</li>
-                <li>The developers are not responsible for any damage, data loss, or security issues</li>
-                <li>You should have proper backups of important data before using this software</li>
-                <li>You understand the potential consequences of granting unrestricted system access</li>
+                <li>
+                  The developers are not responsible for any damage, data loss,
+                  or security issues
+                </li>
+                <li>
+                  You should have proper backups of important data before using
+                  this software
+                </li>
+                <li>
+                  You understand the potential consequences of granting
+                  unrestricted system access
+                </li>
               </ul>
             </div>
           </DialogDescription>
@@ -63,13 +78,17 @@ export function DisclaimerDialog({ open, onAccept }: DisclaimerDialogProps) {
           <Checkbox
             id="acknowledge"
             checked={acknowledged}
-            onCheckedChange={(checked: boolean) => setAcknowledged(checked === true)}
+            onCheckedChange={(checked: boolean) =>
+              setAcknowledged(checked === true)
+            }
           />
           <label
             htmlFor="acknowledge"
             className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
           >
-            I understand and acknowledge the risks described above. I am aware that coding agents have full access to my computer and may cause catastrophic damage.
+            I understand and acknowledge the risks described above. I am aware
+            that coding agents have full access to my computer and may cause
+            catastrophic damage.
           </label>
         </div>
         <DialogFooter>

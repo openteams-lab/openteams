@@ -1,14 +1,14 @@
-import * as React from "react"
-import { X } from "lucide-react"
+import * as React from 'react';
+import { X } from 'lucide-react';
 
-import { cn } from "@/lib/utils"
-import { useDialogKeyboardShortcuts } from "@/lib/keyboard-shortcuts"
+import { cn } from '@/lib/utils';
+import { useDialogKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 
 const Dialog = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & {
-    open?: boolean
-    onOpenChange?: (open: boolean) => void
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
   }
 >(({ className, open, onOpenChange, children, ...props }, ref) => {
   // Add keyboard shortcut support for closing dialog with Esc
@@ -18,7 +18,7 @@ const Dialog = React.forwardRef<
     }
   });
 
-  if (!open) return null
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-start justify-center p-4 overflow-y-auto">
@@ -29,7 +29,7 @@ const Dialog = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "relative z-[9999] grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg my-8",
+          'relative z-[9999] grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg my-8',
           className
         )}
         {...props}
@@ -44,9 +44,9 @@ const Dialog = React.forwardRef<
         {children}
       </div>
     </div>
-  )
-})
-Dialog.displayName = "Dialog"
+  );
+});
+Dialog.displayName = 'Dialog';
 
 const DialogHeader = ({
   className,
@@ -54,13 +54,13 @@ const DialogHeader = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-col space-y-1.5 text-center sm:text-left",
+      'flex flex-col space-y-1.5 text-center sm:text-left',
       className
     )}
     {...props}
   />
-)
-DialogHeader.displayName = "DialogHeader"
+);
+DialogHeader.displayName = 'DialogHeader';
 
 const DialogTitle = React.forwardRef<
   HTMLParagraphElement,
@@ -69,13 +69,13 @@ const DialogTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      "text-lg font-semibold leading-none tracking-tight",
+      'text-lg font-semibold leading-none tracking-tight',
       className
     )}
     {...props}
   />
-))
-DialogTitle.displayName = "DialogTitle"
+));
+DialogTitle.displayName = 'DialogTitle';
 
 const DialogDescription = React.forwardRef<
   HTMLParagraphElement,
@@ -83,19 +83,19 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn('text-sm text-muted-foreground', className)}
     {...props}
   />
-))
-DialogDescription.displayName = "DialogDescription"
+));
+DialogDescription.displayName = 'DialogDescription';
 
 const DialogContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("grid gap-4", className)} {...props} />
-))
-DialogContent.displayName = "DialogContent"
+  <div ref={ref} className={cn('grid gap-4', className)} {...props} />
+));
+DialogContent.displayName = 'DialogContent';
 
 const DialogFooter = ({
   className,
@@ -103,13 +103,13 @@ const DialogFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
+      'flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2',
       className
     )}
     {...props}
   />
-)
-DialogFooter.displayName = "DialogFooter"
+);
+DialogFooter.displayName = 'DialogFooter';
 
 export {
   Dialog,
@@ -118,4 +118,4 @@ export {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-}
+};

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -6,26 +6,26 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles, Code } from "lucide-react";
-import type { EditorType, ExecutorConfig } from "shared/types";
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Sparkles, Code } from 'lucide-react';
+import type { EditorType, ExecutorConfig } from 'shared/types';
 import {
   EXECUTOR_TYPES,
   EDITOR_TYPES,
   EXECUTOR_LABELS,
   EDITOR_LABELS,
-} from "shared/types";
+} from 'shared/types';
 
 interface OnboardingDialogProps {
   open: boolean;
@@ -36,23 +36,23 @@ interface OnboardingDialogProps {
 }
 
 export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
-  const [executor, setExecutor] = useState<ExecutorConfig>({ type: "claude" });
-  const [editorType, setEditorType] = useState<EditorType>("vscode");
-  const [customCommand, setCustomCommand] = useState<string>("");
+  const [executor, setExecutor] = useState<ExecutorConfig>({ type: 'claude' });
+  const [editorType, setEditorType] = useState<EditorType>('vscode');
+  const [customCommand, setCustomCommand] = useState<string>('');
 
   const handleComplete = () => {
     onComplete({
       executor,
       editor: {
         editor_type: editorType,
-        custom_command: editorType === "custom" ? customCommand || null : null,
+        custom_command: editorType === 'custom' ? customCommand || null : null,
       },
     });
   };
 
   const isValid =
-    editorType !== "custom" ||
-    (editorType === "custom" && customCommand.trim() !== "");
+    editorType !== 'custom' ||
+    (editorType === 'custom' && customCommand.trim() !== '');
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
@@ -81,7 +81,7 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
                 <Label htmlFor="executor">Default Executor</Label>
                 <Select
                   value={executor.type}
-                  onValueChange={(value: "echo" | "claude" | "amp") =>
+                  onValueChange={(value: 'echo' | 'claude' | 'amp') =>
                     setExecutor({ type: value })
                   }
                 >
@@ -97,10 +97,10 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  {executor.type === "claude" && "Claude Code from Anthropic"}
-                  {executor.type === "amp" && "From Sourcegraph"}
-                  {executor.type === "echo" &&
-                    "This is just for debugging vibe-kanban itself"}
+                  {executor.type === 'claude' && 'Claude Code from Anthropic'}
+                  {executor.type === 'amp' && 'From Sourcegraph'}
+                  {executor.type === 'echo' &&
+                    'This is just for debugging vibe-kanban itself'}
                 </p>
               </div>
             </CardContent>
@@ -137,7 +137,7 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
                 </p>
               </div>
 
-              {editorType === "custom" && (
+              {editorType === 'custom' && (
                 <div className="space-y-2">
                   <Label htmlFor="custom-command">Custom Command</Label>
                   <Input

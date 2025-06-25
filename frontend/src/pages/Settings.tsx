@@ -1,16 +1,35 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Loader2, Volume2 } from "lucide-react";
-import type { ThemeMode, EditorType, SoundFile } from "shared/types";
-import { EXECUTOR_TYPES, EDITOR_TYPES, EXECUTOR_LABELS, EDITOR_LABELS, SOUND_FILES, SOUND_LABELS } from "shared/types";
-import { useTheme } from "@/components/theme-provider";
-import { useConfig } from "@/components/config-provider";
+import { useState } from 'react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Loader2, Volume2 } from 'lucide-react';
+import type { ThemeMode, EditorType, SoundFile } from 'shared/types';
+import {
+  EXECUTOR_TYPES,
+  EDITOR_TYPES,
+  EXECUTOR_LABELS,
+  EDITOR_LABELS,
+  SOUND_FILES,
+  SOUND_LABELS,
+} from 'shared/types';
+import { useTheme } from '@/components/theme-provider';
+import { useConfig } from '@/components/config-provider';
 
 export function Settings() {
   const { config, updateConfig, saveConfig, loading } = useConfig();
@@ -24,32 +43,32 @@ export function Settings() {
     try {
       await audio.play();
     } catch (err) {
-      console.error("Failed to play sound:", err);
+      console.error('Failed to play sound:', err);
     }
   };
 
   const handleSave = async () => {
     if (!config) return;
-    
+
     setSaving(true);
     setError(null);
     setSuccess(false);
-    
+
     try {
       const success = await saveConfig();
-      
+
       if (success) {
         setSuccess(true);
         // Update theme provider to reflect the saved theme
         setTheme(config.theme);
-        
+
         setTimeout(() => setSuccess(false), 3000);
       } else {
-        setError("Failed to save configuration");
+        setError('Failed to save configuration');
       }
     } catch (err) {
-      setError("Failed to save configuration");
-      console.error("Error saving config:", err);
+      setError('Failed to save configuration');
+      console.error('Error saving config:', err);
     } finally {
       setSaving(false);
     }
@@ -57,13 +76,13 @@ export function Settings() {
 
   const resetDisclaimer = async () => {
     if (!config) return;
-    
+
     updateConfig({ disclaimer_acknowledged: false });
   };
 
   const resetOnboarding = async () => {
     if (!config) return;
-    
+
     updateConfig({ onboarding_acknowledged: false });
   };
 
@@ -82,9 +101,7 @@ export function Settings() {
     return (
       <div className="container mx-auto px-4 py-8">
         <Alert variant="destructive">
-          <AlertDescription>
-            Failed to load settings. {error}
-          </AlertDescription>
+          <AlertDescription>Failed to load settings. {error}</AlertDescription>
         </Alert>
       </div>
     );
@@ -108,7 +125,9 @@ export function Settings() {
 
         {success && (
           <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
-            <AlertDescription className="font-medium">✓ Settings saved successfully!</AlertDescription>
+            <AlertDescription className="font-medium">
+              ✓ Settings saved successfully!
+            </AlertDescription>
           </Alert>
         )}
 
@@ -125,7 +144,9 @@ export function Settings() {
                 <Label htmlFor="theme">Theme</Label>
                 <Select
                   value={config.theme}
-                  onValueChange={(value: ThemeMode) => updateConfig({ theme: value })}
+                  onValueChange={(value: ThemeMode) =>
+                    updateConfig({ theme: value })
+                  }
                 >
                   <SelectTrigger id="theme">
                     <SelectValue placeholder="Select theme" />
@@ -155,7 +176,9 @@ export function Settings() {
                 <Label htmlFor="executor">Default Executor</Label>
                 <Select
                   value={config.executor.type}
-                  onValueChange={(value: "echo" | "claude" | "amp") => updateConfig({ executor: { type: value } })}
+                  onValueChange={(value: 'echo' | 'claude' | 'amp') =>
+                    updateConfig({ executor: { type: value } })
+                  }
                 >
                   <SelectTrigger id="executor">
                     <SelectValue placeholder="Select executor" />
@@ -187,13 +210,18 @@ export function Settings() {
                 <Label htmlFor="editor">Preferred Editor</Label>
                 <Select
                   value={config.editor.editor_type}
-                  onValueChange={(value: EditorType) => updateConfig({ 
-                    editor: { 
-                      ...config.editor, 
-                      editor_type: value,
-                      custom_command: value === "custom" ? config.editor.custom_command : null
-                    } 
-                  })}
+                  onValueChange={(value: EditorType) =>
+                    updateConfig({
+                      editor: {
+                        ...config.editor,
+                        editor_type: value,
+                        custom_command:
+                          value === 'custom'
+                            ? config.editor.custom_command
+                            : null,
+                      },
+                    })
+                  }
                 >
                   <SelectTrigger id="editor">
                     <SelectValue placeholder="Select editor" />
@@ -210,23 +238,26 @@ export function Settings() {
                   Choose your preferred code editor for opening task attempts.
                 </p>
               </div>
-              
-              {config.editor.editor_type === "custom" && (
+
+              {config.editor.editor_type === 'custom' && (
                 <div className="space-y-2">
                   <Label htmlFor="custom-command">Custom Command</Label>
                   <Input
                     id="custom-command"
                     placeholder="e.g., code, subl, vim"
-                    value={config.editor.custom_command || ""}
-                    onChange={(e) => updateConfig({ 
-                      editor: { 
-                        ...config.editor, 
-                        custom_command: e.target.value || null
-                      } 
-                    })}
+                    value={config.editor.custom_command || ''}
+                    onChange={(e) =>
+                      updateConfig({
+                        editor: {
+                          ...config.editor,
+                          custom_command: e.target.value || null,
+                        },
+                      })
+                    }
                   />
                   <p className="text-sm text-muted-foreground">
-                    Enter the command to run your custom editor. Use spaces for arguments (e.g., "code --wait").
+                    Enter the command to run your custom editor. Use spaces for
+                    arguments (e.g., "code --wait").
                   </p>
                 </div>
               )}
@@ -245,23 +276,29 @@ export function Settings() {
                 <Checkbox
                   id="sound-alerts"
                   checked={config.sound_alerts}
-                  onCheckedChange={(checked: boolean) => updateConfig({ sound_alerts: checked })}
+                  onCheckedChange={(checked: boolean) =>
+                    updateConfig({ sound_alerts: checked })
+                  }
                 />
                 <div className="space-y-0.5">
-                  <Label htmlFor="sound-alerts" className="cursor-pointer">Sound Alerts</Label>
+                  <Label htmlFor="sound-alerts" className="cursor-pointer">
+                    Sound Alerts
+                  </Label>
                   <p className="text-sm text-muted-foreground">
                     Play a sound when task attempts finish running.
                   </p>
                 </div>
               </div>
-              
+
               {config.sound_alerts && (
                 <div className="space-y-2 ml-6">
                   <Label htmlFor="sound-file">Sound</Label>
                   <div className="flex items-center gap-2">
                     <Select
                       value={config.sound_file}
-                      onValueChange={(value: SoundFile) => updateConfig({ sound_file: value })}
+                      onValueChange={(value: SoundFile) =>
+                        updateConfig({ sound_file: value })
+                      }
                     >
                       <SelectTrigger id="sound-file" className="flex-1">
                         <SelectValue placeholder="Select sound" />
@@ -284,7 +321,8 @@ export function Settings() {
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Choose the sound to play when tasks complete. Click the volume button to preview.
+                    Choose the sound to play when tasks complete. Click the
+                    volume button to preview.
                   </p>
                 </div>
               )}
@@ -292,10 +330,17 @@ export function Settings() {
                 <Checkbox
                   id="push-notifications"
                   checked={config.push_notifications}
-                  onCheckedChange={(checked: boolean) => updateConfig({ push_notifications: checked })}
+                  onCheckedChange={(checked: boolean) =>
+                    updateConfig({ push_notifications: checked })
+                  }
                 />
                 <div className="space-y-0.5">
-                  <Label htmlFor="push-notifications" className="cursor-pointer">Push Notifications (macOS)</Label>
+                  <Label
+                    htmlFor="push-notifications"
+                    className="cursor-pointer"
+                  >
+                    Push Notifications (macOS)
+                  </Label>
                   <p className="text-sm text-muted-foreground">
                     Show system notifications when task attempts finish running.
                   </p>
@@ -317,9 +362,9 @@ export function Settings() {
                   <div>
                     <Label>Disclaimer Status</Label>
                     <p className="text-sm text-muted-foreground">
-                      {config.disclaimer_acknowledged 
-                        ? "You have acknowledged the safety disclaimer." 
-                        : "The safety disclaimer has not been acknowledged."}
+                      {config.disclaimer_acknowledged
+                        ? 'You have acknowledged the safety disclaimer.'
+                        : 'The safety disclaimer has not been acknowledged.'}
                     </p>
                   </div>
                   <Button
@@ -332,7 +377,8 @@ export function Settings() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Resetting the disclaimer will require you to acknowledge the safety warning again on next app start.
+                  Resetting the disclaimer will require you to acknowledge the
+                  safety warning again on next app start.
                 </p>
               </div>
               <div className="space-y-2">
@@ -340,9 +386,9 @@ export function Settings() {
                   <div>
                     <Label>Onboarding Status</Label>
                     <p className="text-sm text-muted-foreground">
-                      {config.onboarding_acknowledged 
-                        ? "You have completed the onboarding process." 
-                        : "The onboarding process has not been completed."}
+                      {config.onboarding_acknowledged
+                        ? 'You have completed the onboarding process.'
+                        : 'The onboarding process has not been completed.'}
                     </p>
                   </div>
                   <Button
@@ -355,7 +401,8 @@ export function Settings() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Resetting the onboarding will show the setup screen again on next app start.
+                  Resetting the onboarding will show the setup screen again on
+                  next app start.
                 </p>
               </div>
             </CardContent>
@@ -365,14 +412,18 @@ export function Settings() {
         {/* Sticky save button */}
         <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm border-t p-4 z-10">
           <div className="container mx-auto max-w-4xl flex justify-end">
-            <Button onClick={handleSave} disabled={saving || success} className={success ? "bg-green-600 hover:bg-green-700" : ""}>
+            <Button
+              onClick={handleSave}
+              disabled={saving || success}
+              className={success ? 'bg-green-600 hover:bg-green-700' : ''}
+            >
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {success && <span className="mr-2">✓</span>}
-              {success ? "Settings Saved!" : "Save Settings"}
+              {success ? 'Settings Saved!' : 'Save Settings'}
             </Button>
           </div>
         </div>
-        
+
         {/* Spacer to prevent content from being hidden behind sticky button */}
         <div className="h-20"></div>
       </div>

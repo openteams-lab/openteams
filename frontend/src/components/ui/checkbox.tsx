@@ -1,6 +1,6 @@
-import * as React from "react"
-import { Check } from "lucide-react"
-import { cn } from "@/lib/utils"
+import * as React from 'react';
+import { Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface CheckboxProps {
   id?: string;
@@ -11,7 +11,10 @@ interface CheckboxProps {
 }
 
 const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
-  ({ className, checked = false, onCheckedChange, disabled, ...props }, ref) => {
+  (
+    { className, checked = false, onCheckedChange, disabled, ...props },
+    ref
+  ) => {
     return (
       <button
         type="button"
@@ -19,8 +22,8 @@ const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
         aria-checked={checked}
         ref={ref}
         className={cn(
-          "peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-          checked && "bg-primary text-primary-foreground",
+          'peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+          checked && 'bg-primary text-primary-foreground',
           className
         )}
         disabled={disabled}
@@ -33,9 +36,9 @@ const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
           </div>
         )}
       </button>
-    )
+    );
   }
-)
-Checkbox.displayName = "Checkbox"
+);
+Checkbox.displayName = 'Checkbox';
 
-export { Checkbox }
+export { Checkbox };

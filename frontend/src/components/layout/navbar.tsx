@@ -1,8 +1,8 @@
-import { Link, useLocation } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { FolderOpen, Settings, HelpCircle } from "lucide-react";
-import { Logo } from "@/components/logo";
-import { SupportDialog } from "@/components/support-dialog";
+import { Link, useLocation } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { FolderOpen, Settings, HelpCircle } from 'lucide-react';
+import { Logo } from '@/components/logo';
+import { SupportDialog } from '@/components/support-dialog';
 
 export function Navbar() {
   const location = useLocation();
@@ -17,7 +17,7 @@ export function Navbar() {
               <Button
                 asChild
                 variant={
-                  location.pathname === "/projects" ? "default" : "ghost"
+                  location.pathname === '/projects' ? 'default' : 'ghost'
                 }
                 size="sm"
               >
@@ -29,7 +29,7 @@ export function Navbar() {
               <Button
                 asChild
                 variant={
-                  location.pathname === "/settings" ? "default" : "ghost"
+                  location.pathname === '/settings' ? 'default' : 'ghost'
                 }
                 size="sm"
               >

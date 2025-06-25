@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { useState, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 import {
   Brain,
@@ -12,7 +12,7 @@ import {
   Zap,
   AlertTriangle,
   FileText,
-} from "lucide-react";
+} from 'lucide-react';
 
 interface JSONLLine {
   type: string;
@@ -21,9 +21,9 @@ interface JSONLLine {
   messages?: [
     number,
     {
-      role: "user" | "assistant";
+      role: 'user' | 'assistant';
       content: Array<{
-        type: "text" | "thinking" | "tool_use" | "tool_result";
+        type: 'text' | 'thinking' | 'tool_use' | 'tool_result';
         text?: string;
         thinking?: string;
         id?: string;
@@ -43,10 +43,10 @@ interface JSONLLine {
         type: string;
         stopReason?: string;
       };
-    }
+    },
   ][];
   toolResults?: Array<{
-    type: "tool_use" | "tool_result";
+    type: 'tool_use' | 'tool_result';
     id?: string;
     name?: string;
     input?: any;
@@ -66,17 +66,19 @@ interface JSONLLine {
   command?: string;
   // Claude format
   message?: {
-    role: "user" | "assistant" | "system";
-    content: Array<{
-      type: "text" | "tool_use" | "tool_result";
-      text?: string;
-      id?: string;
-      name?: string;
-      input?: any;
-      tool_use_id?: string;
-      content?: any;
-      is_error?: boolean;
-    }> | string;
+    role: 'user' | 'assistant' | 'system';
+    content:
+      | Array<{
+          type: 'text' | 'tool_use' | 'tool_result';
+          text?: string;
+          id?: string;
+          name?: string;
+          input?: any;
+          tool_use_id?: string;
+          content?: any;
+          is_error?: boolean;
+        }>
+      | string;
   };
   // Tool rejection message (string format)
   rejectionMessage?: string;
@@ -99,57 +101,58 @@ interface ConversationViewerProps {
 // Validation functions
 const isValidMessage = (data: any): boolean => {
   return (
-    typeof data.role === "string" &&
+    typeof data.role === 'string' &&
     Array.isArray(data.content) &&
     data.content.every(
       (item: any) =>
-        typeof item.type === "string" &&
-        (item.type !== "text" || typeof item.text === "string") &&
-        (item.type !== "thinking" || typeof item.thinking === "string") &&
-        (item.type !== "tool_use" || typeof item.name === "string") &&
-        (item.type !== "tool_result" ||
+        typeof item.type === 'string' &&
+        (item.type !== 'text' || typeof item.text === 'string') &&
+        (item.type !== 'thinking' || typeof item.thinking === 'string') &&
+        (item.type !== 'tool_use' || typeof item.name === 'string') &&
+        (item.type !== 'tool_result' ||
           !item.run ||
-          typeof item.run.status === "string")
+          typeof item.run.status === 'string')
     )
   );
 };
 
 const isValidClaudeMessage = (data: any): boolean => {
   return (
-    typeof data.role === "string" &&
-    (typeof data.content === "string" || 
-     (Array.isArray(data.content) &&
-      data.content.every(
-        (item: any) =>
-          typeof item.type === "string" &&
-          (item.type !== "text" || typeof item.text === "string") &&
-          (item.type !== "tool_use" || typeof item.name === "string") &&
-          (item.type !== "tool_result" || typeof item.content !== "undefined")
-      )))
+    typeof data.role === 'string' &&
+    (typeof data.content === 'string' ||
+      (Array.isArray(data.content) &&
+        data.content.every(
+          (item: any) =>
+            typeof item.type === 'string' &&
+            (item.type !== 'text' || typeof item.text === 'string') &&
+            (item.type !== 'tool_use' || typeof item.name === 'string') &&
+            (item.type !== 'tool_result' || typeof item.content !== 'undefined')
+        )))
   );
 };
 
 const isValidTokenUsage = (data: any): boolean => {
   return (
     data &&
-    typeof data.used === "number" &&
-    typeof data.maxAvailable === "number"
+    typeof data.used === 'number' &&
+    typeof data.maxAvailable === 'number'
   );
 };
 
 const isValidClaudeUsage = (data: any): boolean => {
   return (
     data &&
-    typeof data.input_tokens === "number" &&
-    typeof data.output_tokens === "number"
+    typeof data.input_tokens === 'number' &&
+    typeof data.output_tokens === 'number'
   );
 };
 
 const isValidToolRejection = (data: any): boolean => {
   return (
-    typeof data.tool === "string" &&
-    typeof data.command === "string" &&
-    (typeof data.message === "string" || typeof data.rejectionMessage === "string")
+    typeof data.tool === 'string' &&
+    typeof data.command === 'string' &&
+    (typeof data.message === 'string' ||
+      typeof data.rejectionMessage === 'string')
   );
 };
 
@@ -160,7 +163,7 @@ const isValidMessagesLine = (line: any): boolean => {
       (msg: any) =>
         Array.isArray(msg) &&
         msg.length >= 2 &&
-        typeof msg[0] === "number" &&
+        typeof msg[0] === 'number' &&
         isValidMessage(msg[1])
     )
   );
@@ -175,7 +178,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
   const parsedLines = useMemo(() => {
     try {
       return jsonlOutput
-        .split("\n")
+        .split('\n')
         .filter((line) => line.trim())
         .map((line, index) => {
           try {
@@ -187,10 +190,10 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
             } as JSONLLine & { _lineIndex: number; _rawLine: string };
           } catch {
             return {
-              type: "parse-error",
+              type: 'parse-error',
               _lineIndex: index,
               _rawLine: line,
-              error: "Failed to parse JSON",
+              error: 'Failed to parse JSON',
             } as JSONLLine & {
               _lineIndex: number;
               _rawLine: string;
@@ -205,8 +208,8 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
 
   const conversation = useMemo(() => {
     const items: Array<{
-      type: "message" | "tool-rejection" | "parse-error" | "unknown";
-      role?: "user" | "assistant";
+      type: 'message' | 'tool-rejection' | 'parse-error' | 'unknown';
+      role?: 'user' | 'assistant';
       content?: Array<{
         type: string;
         text?: string;
@@ -236,22 +239,22 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
 
     for (const line of parsedLines) {
       try {
-        if (line.type === "parse-error") {
+        if (line.type === 'parse-error') {
           items.push({
-            type: "parse-error",
+            type: 'parse-error',
             error: line.error,
             rawLine: line._rawLine,
             lineIndex: line._lineIndex,
           });
         } else if (
-          line.type === "messages" &&
+          line.type === 'messages' &&
           isValidMessagesLine(line) &&
           line.messages
         ) {
           // Amp format
           for (const [messageIndex, message] of line.messages) {
             items.push({
-              type: "message",
+              type: 'message',
               role: message.role,
               content: message.content,
               timestamp: message.meta?.sentAt,
@@ -260,34 +263,39 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
             });
           }
         } else if (
-          (line.type === "user" || line.type === "assistant" || line.type === "system") &&
+          (line.type === 'user' ||
+            line.type === 'assistant' ||
+            line.type === 'system') &&
           line.message &&
           isValidClaudeMessage(line.message)
         ) {
           // Claude format
-          const content = typeof line.message.content === "string" 
-            ? [{ type: "text", text: line.message.content }]
-            : line.message.content;
-          
+          const content =
+            typeof line.message.content === 'string'
+              ? [{ type: 'text', text: line.message.content }]
+              : line.message.content;
+
           items.push({
-            type: "message",
-            role: line.message.role === "system" ? "assistant" : line.message.role,
+            type: 'message',
+            role:
+              line.message.role === 'system' ? 'assistant' : line.message.role,
             content: content,
             lineIndex: line._lineIndex,
           });
         } else if (
-          line.type === "result" &&
+          line.type === 'result' &&
           line.usage &&
           isValidClaudeUsage(line.usage)
         ) {
           // Claude usage info
           tokenUsages.push({
             used: line.usage.input_tokens + line.usage.output_tokens,
-            maxAvailable: line.usage.input_tokens + line.usage.output_tokens + 100000, // Approximate
+            maxAvailable:
+              line.usage.input_tokens + line.usage.output_tokens + 100000, // Approximate
             lineIndex: line._lineIndex,
           });
         } else if (
-          line.type === "token-usage" &&
+          line.type === 'token-usage' &&
           line.tokenUsage &&
           isValidTokenUsage(line.tokenUsage)
         ) {
@@ -297,26 +305,29 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
             maxAvailable: line.tokenUsage.maxAvailable,
             lineIndex: line._lineIndex,
           });
-        } else if (line.type === "state" && typeof line.state === "string") {
+        } else if (line.type === 'state' && typeof line.state === 'string') {
           states.push({
             state: line.state,
             lineIndex: line._lineIndex,
           });
         } else if (
-          line.type === "tool-rejected" &&
+          line.type === 'tool-rejected' &&
           isValidToolRejection(line)
         ) {
           items.push({
-            type: "tool-rejection",
+            type: 'tool-rejection',
             tool: line.tool,
             command: line.command,
-            message: typeof line.message === "string" ? line.message : line.rejectionMessage || "Tool rejected",
+            message:
+              typeof line.message === 'string'
+                ? line.message
+                : line.rejectionMessage || 'Tool rejected',
             lineIndex: line._lineIndex,
           });
         } else {
           // Unknown line type or invalid structure - add as unknown for fallback rendering
           items.push({
-            type: "unknown",
+            type: 'unknown',
             rawLine: line._rawLine,
             lineIndex: line._lineIndex,
           });
@@ -324,7 +335,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
       } catch (error) {
         // If anything goes wrong processing a line, treat it as unknown
         items.push({
-          type: "unknown",
+          type: 'unknown',
           rawLine: line._rawLine,
           lineIndex: line._lineIndex,
         });
@@ -333,7 +344,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
 
     // Sort by messageIndex for messages, then by lineIndex for everything else
     items.sort((a, b) => {
-      if (a.type === "message" && b.type === "message") {
+      if (a.type === 'message' && b.type === 'message') {
         return (a.messageIndex || 0) - (b.messageIndex || 0);
       }
       return (a.lineIndex || 0) - (b.lineIndex || 0);
@@ -361,7 +372,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
       if (input === null || input === undefined) {
         return String(input);
       }
-      if (typeof input === "object") {
+      if (typeof input === 'object') {
         // Try to stringify, but handle circular references and complex objects
         return JSON.stringify(input);
       }
@@ -373,16 +384,16 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
   };
 
   const safeRenderString = (value: any): string => {
-    if (typeof value === "string") {
+    if (typeof value === 'string') {
       return value;
     }
     if (value === null || value === undefined) {
       return String(value);
     }
-    if (typeof value === "object") {
+    if (typeof value === 'object') {
       try {
         // Use the same safe JSON.stringify logic as formatToolInput
-        return "(RAW)" + JSON.stringify(value);
+        return '(RAW)' + JSON.stringify(value);
       } catch (error) {
         return `[Object - serialization failed: ${String(value).substring(
           0,
@@ -395,15 +406,15 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
 
   const getToolStatusColor = (status: string) => {
     switch (status) {
-      case "done":
-        return "bg-green-500";
-      case "rejected-by-user":
-      case "blocked-on-user":
-        return "bg-yellow-500";
-      case "error":
-        return "bg-red-500";
+      case 'done':
+        return 'bg-green-500';
+      case 'rejected-by-user':
+      case 'blocked-on-user':
+        return 'bg-yellow-500';
+      case 'error':
+        return 'bg-red-500';
       default:
-        return "bg-blue-500";
+        return 'bg-blue-500';
     }
   };
 
@@ -434,7 +445,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
           {latestTokenUsage && (
             <Badge variant="outline" className="text-xs">
               <Zap className="h-3 w-3 mr-1" />
-              {latestTokenUsage.used.toLocaleString()} /{" "}
+              {latestTokenUsage.used.toLocaleString()} /{' '}
               {latestTokenUsage.maxAvailable.toLocaleString()} tokens
             </Badge>
           )}
@@ -469,7 +480,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
                     Step {index + 1}
                   </span>
                   <span>
-                    {usage.used.toLocaleString()} /{" "}
+                    {usage.used.toLocaleString()} /{' '}
                     {usage.maxAvailable.toLocaleString()}
                   </span>
                 </div>
@@ -482,7 +493,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
       {/* Conversation items (messages and tool rejections) */}
       <div className="space-y-3">
         {conversation.items.map((item, index) => {
-          if (item.type === "parse-error") {
+          if (item.type === 'parse-error') {
             return (
               <Card
                 key={`error-${index}`}
@@ -508,11 +519,11 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
             );
           }
 
-          if (item.type === "unknown") {
+          if (item.type === 'unknown') {
             let prettyJson = item.rawLine;
             try {
               prettyJson = JSON.stringify(
-                JSON.parse(item.rawLine || "{}"),
+                JSON.parse(item.rawLine || '{}'),
                 null,
                 2
               );
@@ -540,7 +551,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
             );
           }
 
-          if (item.type === "tool-rejection") {
+          if (item.type === 'tool-rejection') {
             return (
               <Card
                 key={`rejection-${index}`}
@@ -579,20 +590,20 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
             );
           }
 
-          if (item.type === "message") {
+          if (item.type === 'message') {
             const messageId = `message-${index}`;
             const isExpanded = expandedMessages.has(messageId);
             const hasThinking = item.content?.some(
-              (c: any) => c.type === "thinking"
+              (c: any) => c.type === 'thinking'
             );
 
             return (
               <Card
                 key={messageId}
                 className={`${
-                  item.role === "user"
-                    ? "bg-blue-100/50 dark:bg-blue-900/20 border ml-12"
-                    : "bg-muted/50 border mr-12"
+                  item.role === 'user'
+                    ? 'bg-blue-100/50 dark:bg-blue-900/20 border ml-12'
+                    : 'bg-muted/50 border mr-12'
                 }`}
               >
                 <CardContent className="p-4">
@@ -630,7 +641,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
 
                   <div className="space-y-2">
                     {item.content?.map((content: any, contentIndex: number) => {
-                      if (content.type === "text") {
+                      if (content.type === 'text') {
                         return (
                           <div
                             key={contentIndex}
@@ -643,7 +654,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
                         );
                       }
 
-                      if (content.type === "thinking" && isExpanded) {
+                      if (content.type === 'thinking' && isExpanded) {
                         return (
                           <div key={contentIndex} className="mt-3">
                             <div className="flex items-center gap-2 mb-2">
@@ -658,7 +669,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
                         );
                       }
 
-                      if (content.type === "tool_use") {
+                      if (content.type === 'tool_use') {
                         return (
                           <div key={contentIndex} className="mt-3">
                             <div className="flex items-center gap-2 mb-2">
@@ -676,7 +687,7 @@ export function ConversationViewer({ jsonlOutput }: ConversationViewerProps) {
                         );
                       }
 
-                      if (content.type === "tool_result") {
+                      if (content.type === 'tool_result') {
                         return (
                           <div key={contentIndex} className="mt-3">
                             <div className="flex items-center gap-2 mb-2">

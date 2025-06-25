@@ -1,13 +1,13 @@
-import { useState, ReactNode } from "react";
-import { HelpCircle, Mail } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState, ReactNode } from 'react';
+import { HelpCircle, Mail } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 
 interface SupportDialogProps {
   children: ReactNode;
@@ -17,7 +17,7 @@ export function SupportDialog({ children }: SupportDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleEmailClick = () => {
-    window.location.href = "mailto:louis@bloop.ai";
+    window.location.href = 'mailto:louis@bloop.ai';
   };
 
   return (
@@ -36,7 +36,7 @@ export function SupportDialog({ children }: SupportDialogProps) {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Email me at{" "}
+              Email me at{' '}
               <strong className="text-foreground">louis@bloop.ai</strong> with
               any questions and I'll respond ASAP.
             </p>

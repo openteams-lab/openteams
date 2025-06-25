@@ -3,61 +3,73 @@ import {
   KanbanBoard,
   KanbanHeader,
   KanbanCards,
-  type DragEndEvent
-} from '@/components/ui/shadcn-io/kanban'
-import { TaskCard } from './TaskCard'
-import type { TaskStatus, TaskWithAttemptStatus } from 'shared/types'
+  type DragEndEvent,
+} from '@/components/ui/shadcn-io/kanban';
+import { TaskCard } from './TaskCard';
+import type { TaskStatus, TaskWithAttemptStatus } from 'shared/types';
 
-type Task = TaskWithAttemptStatus
+type Task = TaskWithAttemptStatus;
 
 interface TaskKanbanBoardProps {
-  tasks: Task[]
-  onDragEnd: (event: DragEndEvent) => void
-  onEditTask: (task: Task) => void
-  onDeleteTask: (taskId: string) => void
-  onViewTaskDetails: (task: Task) => void
+  tasks: Task[];
+  onDragEnd: (event: DragEndEvent) => void;
+  onEditTask: (task: Task) => void;
+  onDeleteTask: (taskId: string) => void;
+  onViewTaskDetails: (task: Task) => void;
 }
 
-const allTaskStatuses: TaskStatus[] = ['todo', 'inprogress', 'inreview', 'done', 'cancelled']
+const allTaskStatuses: TaskStatus[] = [
+  'todo',
+  'inprogress',
+  'inreview',
+  'done',
+  'cancelled',
+];
 
 const statusLabels: Record<TaskStatus, string> = {
   todo: 'To Do',
   inprogress: 'In Progress',
   inreview: 'In Review',
   done: 'Done',
-  cancelled: 'Cancelled'
-}
+  cancelled: 'Cancelled',
+};
 
 const statusBoardColors: Record<TaskStatus, string> = {
   todo: 'hsl(var(--neutral))',
   inprogress: 'hsl(var(--info))',
   inreview: 'hsl(var(--warning))',
   done: 'hsl(var(--success))',
-  cancelled: 'hsl(var(--destructive))'
-}
+  cancelled: 'hsl(var(--destructive))',
+};
 
-export function TaskKanbanBoard({ tasks, onDragEnd, onEditTask, onDeleteTask, onViewTaskDetails }: TaskKanbanBoardProps) {
+export function TaskKanbanBoard({
+  tasks,
+  onDragEnd,
+  onEditTask,
+  onDeleteTask,
+  onViewTaskDetails,
+}: TaskKanbanBoardProps) {
   const groupTasksByStatus = () => {
-    const groups: Record<TaskStatus, Task[]> = {} as Record<TaskStatus, Task[]>
-    
+    const groups: Record<TaskStatus, Task[]> = {} as Record<TaskStatus, Task[]>;
+
     // Initialize groups for all possible statuses
-    allTaskStatuses.forEach(status => {
-      groups[status] = []
-    })
-    
-    tasks.forEach(task => {
+    allTaskStatuses.forEach((status) => {
+      groups[status] = [];
+    });
+
+    tasks.forEach((task) => {
       // Convert old capitalized status to lowercase if needed
-      const normalizedStatus = task.status.toLowerCase() as TaskStatus
+      const normalizedStatus = task.status.toLowerCase() as TaskStatus;
       if (groups[normalizedStatus]) {
-        groups[normalizedStatus].push(task)
+        groups[normalizedStatus].push(task);
       } else {
         // Default to todo if status doesn't match any expected value
-        groups['todo'].push(task)
+        groups['todo'].push(task);
       }
-    })
-    
-    return groups
-  }
+    });
+
+    return groups;
+  };
 
   return (
     <KanbanProvider onDragEnd={onDragEnd}>
@@ -83,5 +95,5 @@ export function TaskKanbanBoard({ tasks, onDragEnd, onEditTask, onDeleteTask, on
         </KanbanBoard>
       ))}
     </KanbanProvider>
-  )
+  );
 }

@@ -1,5 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import type { Config, ApiResponse } from "shared/types";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
+import type { Config, ApiResponse } from 'shared/types';
 
 interface ConfigContextType {
   config: Config | null;
@@ -21,14 +27,14 @@ export function ConfigProvider({ children }: ConfigProviderProps) {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const response = await fetch("/api/config");
+        const response = await fetch('/api/config');
         const data: ApiResponse<Config> = await response.json();
 
         if (data.success && data.data) {
           setConfig(data.data);
         }
       } catch (err) {
-        console.error("Error loading config:", err);
+        console.error('Error loading config:', err);
       } finally {
         setLoading(false);
       }
@@ -38,17 +44,17 @@ export function ConfigProvider({ children }: ConfigProviderProps) {
   }, []);
 
   const updateConfig = (updates: Partial<Config>) => {
-    setConfig((prev) => prev ? { ...prev, ...updates } : null);
+    setConfig((prev) => (prev ? { ...prev, ...updates } : null));
   };
 
   const saveConfig = async (): Promise<boolean> => {
     if (!config) return false;
 
     try {
-      const response = await fetch("/api/config", {
-        method: "POST",
+      const response = await fetch('/api/config', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(config),
       });
@@ -56,13 +62,15 @@ export function ConfigProvider({ children }: ConfigProviderProps) {
       const data: ApiResponse<Config> = await response.json();
       return data.success;
     } catch (err) {
-      console.error("Error saving config:", err);
+      console.error('Error saving config:', err);
       return false;
     }
   };
 
   return (
-    <ConfigContext.Provider value={{ config, updateConfig, saveConfig, loading }}>
+    <ConfigContext.Provider
+      value={{ config, updateConfig, saveConfig, loading }}
+    >
       {children}
     </ConfigContext.Provider>
   );
@@ -71,7 +79,7 @@ export function ConfigProvider({ children }: ConfigProviderProps) {
 export function useConfig() {
   const context = useContext(ConfigContext);
   if (context === undefined) {
-    throw new Error("useConfig must be used within a ConfigProvider");
+    throw new Error('useConfig must be used within a ConfigProvider');
   }
   return context;
 }

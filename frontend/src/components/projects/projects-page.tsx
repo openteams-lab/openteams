@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { ProjectList } from './project-list'
-import { ProjectDetail } from './project-detail'
+import { useState } from 'react';
+import { ProjectList } from './project-list';
+import { ProjectDetail } from './project-detail';
 
 export function ProjectsPage() {
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null
+  );
 
   if (selectedProjectId) {
     return (
@@ -11,8 +13,8 @@ export function ProjectsPage() {
         projectId={selectedProjectId}
         onBack={() => setSelectedProjectId(null)}
       />
-    )
+    );
   }
 
-  return <ProjectList />
+  return <ProjectList />;
 }

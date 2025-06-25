@@ -20,8 +20,10 @@ export interface KeyboardShortcutContext {
 }
 
 // Centralized shortcut definitions
-export const createKeyboardShortcuts = (context: KeyboardShortcutContext): Record<string, KeyboardShortcut> => ({
-  'Escape': {
+export const createKeyboardShortcuts = (
+  context: KeyboardShortcutContext
+): Record<string, KeyboardShortcut> => ({
+  Escape: {
     key: 'Escape',
     description: 'Go back or close dialog',
     action: () => {
@@ -30,21 +32,31 @@ export const createKeyboardShortcuts = (context: KeyboardShortcutContext): Recor
         context.closeDialog();
         return;
       }
-      
+
       // Otherwise, navigate back
       if (context.navigate) {
-        const currentPath = context.currentPath || context.location?.pathname || '/';
-        
+        const currentPath =
+          context.currentPath || context.location?.pathname || '/';
+
         // Navigate back based on current path
-        if (currentPath.includes('/attempts/') && currentPath.includes('/compare')) {
+        if (
+          currentPath.includes('/attempts/') &&
+          currentPath.includes('/compare')
+        ) {
           // From compare page, go back to task details
           const taskPath = currentPath.split('/attempts/')[0];
           context.navigate(taskPath);
-        } else if (currentPath.includes('/tasks/') && !currentPath.endsWith('/tasks')) {
+        } else if (
+          currentPath.includes('/tasks/') &&
+          !currentPath.endsWith('/tasks')
+        ) {
           // From task details, go back to project tasks
           const projectPath = currentPath.split('/tasks/')[0] + '/tasks';
           context.navigate(projectPath);
-        } else if (currentPath.includes('/projects/') && currentPath.includes('/tasks')) {
+        } else if (
+          currentPath.includes('/projects/') &&
+          currentPath.includes('/tasks')
+        ) {
           // From project tasks, go back to projects
           context.navigate('/projects');
         } else if (currentPath !== '/' && currentPath !== '/projects') {
@@ -52,48 +64,55 @@ export const createKeyboardShortcuts = (context: KeyboardShortcutContext): Recor
           context.navigate('/projects');
         }
       }
-    }
+    },
   },
-  'KeyC': {
+  KeyC: {
     key: 'c',
     description: 'Create new task',
     action: () => {
       if (context.openCreateTask) {
         context.openCreateTask();
       }
-    }
-  }
+    },
+  },
 });
 
 // Hook to register global keyboard shortcuts
 export function useKeyboardShortcuts(context: KeyboardShortcutContext) {
   const shortcuts = createKeyboardShortcuts(context);
-  
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    // Don't trigger shortcuts when typing in input fields
-    const target = event.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-      return;
-    }
-    
-    // Don't trigger shortcuts when modifier keys are pressed (except for specific shortcuts)
-    if (event.ctrlKey || event.metaKey || event.altKey) {
-      return;
-    }
-    
-    const shortcut = shortcuts[event.code] || shortcuts[event.key];
-    
-    if (shortcut && !shortcut.disabled) {
-      event.preventDefault();
-      shortcut.action(context);
-    }
-  }, [shortcuts, context]);
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in input fields
+      const target = event.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Don't trigger shortcuts when modifier keys are pressed (except for specific shortcuts)
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+
+      const shortcut = shortcuts[event.code] || shortcuts[event.key];
+
+      if (shortcut && !shortcut.disabled) {
+        event.preventDefault();
+        shortcut.action(context);
+      }
+    },
+    [shortcuts, context]
+  );
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
-  
+
   return shortcuts;
 }
 

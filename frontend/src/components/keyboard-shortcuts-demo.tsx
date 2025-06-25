@@ -7,7 +7,7 @@ export function KeyboardShortcutsDemo() {
     currentPath: '/demo',
     hasOpenDialog: false,
     closeDialog: () => {},
-    openCreateTask: () => {}
+    openCreateTask: () => {},
   });
 
   return (
@@ -18,7 +18,10 @@ export function KeyboardShortcutsDemo() {
       <CardContent>
         <div className="space-y-2">
           {Object.values(shortcuts).map((shortcut) => (
-            <div key={shortcut.key} className="flex justify-between items-center">
+            <div
+              key={shortcut.key}
+              className="flex justify-between items-center"
+            >
               <span className="text-sm">{shortcut.description}</span>
               <kbd className="px-2 py-1 text-xs bg-muted rounded border">
                 {shortcut.key === 'KeyC' ? 'C' : shortcut.key}

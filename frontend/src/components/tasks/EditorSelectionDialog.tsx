@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -7,15 +7,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import type { EditorType } from "shared/types";
+} from '@/components/ui/select';
+import type { EditorType } from 'shared/types';
 
 interface EditorSelectionDialogProps {
   isOpen: boolean;
@@ -23,36 +23,40 @@ interface EditorSelectionDialogProps {
   onSelectEditor: (editorType: EditorType) => void;
 }
 
-const editorOptions: { value: EditorType; label: string; description: string }[] = [
+const editorOptions: {
+  value: EditorType;
+  label: string;
+  description: string;
+}[] = [
   {
-    value: "vscode",
-    label: "Visual Studio Code",
+    value: 'vscode',
+    label: 'Visual Studio Code',
     description: "Microsoft's popular code editor",
   },
   {
-    value: "cursor",
-    label: "Cursor",
-    description: "AI-powered code editor",
+    value: 'cursor',
+    label: 'Cursor',
+    description: 'AI-powered code editor',
   },
   {
-    value: "windsurf",
-    label: "Windsurf",
-    description: "Modern code editor",
+    value: 'windsurf',
+    label: 'Windsurf',
+    description: 'Modern code editor',
   },
   {
-    value: "intellij",
-    label: "IntelliJ IDEA",
-    description: "JetBrains IDE",
+    value: 'intellij',
+    label: 'IntelliJ IDEA',
+    description: 'JetBrains IDE',
   },
   {
-    value: "zed",
-    label: "Zed",
-    description: "High-performance code editor",
+    value: 'zed',
+    label: 'Zed',
+    description: 'High-performance code editor',
   },
   {
-    value: "custom",
-    label: "Custom Editor",
-    description: "Use your configured custom editor",
+    value: 'custom',
+    label: 'Custom Editor',
+    description: 'Use your configured custom editor',
   },
 ];
 
@@ -61,7 +65,7 @@ export function EditorSelectionDialog({
   onClose,
   onSelectEditor,
 }: EditorSelectionDialogProps) {
-  const [selectedEditor, setSelectedEditor] = useState<EditorType>("vscode");
+  const [selectedEditor, setSelectedEditor] = useState<EditorType>('vscode');
 
   const handleConfirm = () => {
     onSelectEditor(selectedEditor);

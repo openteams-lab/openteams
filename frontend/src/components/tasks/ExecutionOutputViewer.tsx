@@ -1,10 +1,10 @@
-import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { FileText, MessageSquare } from "lucide-react";
-import { ConversationViewer } from "./ConversationViewer";
-import type { ExecutionProcess, ExecutionProcessStatus } from "shared/types";
+import { useState, useMemo, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { FileText, MessageSquare } from 'lucide-react';
+import { ConversationViewer } from './ConversationViewer';
+import type { ExecutionProcess, ExecutionProcessStatus } from 'shared/types';
 
 interface ExecutionOutputViewerProps {
   executionProcess: ExecutionProcess;
@@ -15,16 +15,16 @@ const getExecutionProcessStatusDisplay = (
   status: ExecutionProcessStatus
 ): { label: string; color: string } => {
   switch (status) {
-    case "running":
-      return { label: "Running", color: "bg-blue-500" };
-    case "completed":
-      return { label: "Completed", color: "bg-green-500" };
-    case "failed":
-      return { label: "Failed", color: "bg-red-500" };
-    case "killed":
-      return { label: "Stopped", color: "bg-gray-500" };
+    case 'running':
+      return { label: 'Running', color: 'bg-blue-500' };
+    case 'completed':
+      return { label: 'Completed', color: 'bg-green-500' };
+    case 'failed':
+      return { label: 'Failed', color: 'bg-red-500' };
+    case 'killed':
+      return { label: 'Stopped', color: 'bg-gray-500' };
     default:
-      return { label: "Unknown", color: "bg-gray-400" };
+      return { label: 'Unknown', color: 'bg-gray-400' };
   }
 };
 
@@ -32,10 +32,10 @@ export function ExecutionOutputViewer({
   executionProcess,
   executor,
 }: ExecutionOutputViewerProps) {
-  const [viewMode, setViewMode] = useState<"conversation" | "raw">("raw");
+  const [viewMode, setViewMode] = useState<'conversation' | 'raw'>('raw');
 
-  const isAmpExecutor = executor === "amp";
-  const isClaudeExecutor = executor === "claude";
+  const isAmpExecutor = executor === 'amp';
+  const isClaudeExecutor = executor === 'claude';
   const hasStdout = !!executionProcess.stdout;
   const hasStderr = !!executionProcess.stderr;
 
@@ -47,7 +47,7 @@ export function ExecutionOutputViewer({
 
     try {
       const lines = executionProcess.stdout
-        .split("\n")
+        .split('\n')
         .filter((line) => line.trim());
       if (lines.length === 0) return { isValidJsonl: false, jsonlFormat: null };
 
@@ -71,10 +71,15 @@ export function ExecutionOutputViewer({
       for (const line of testLines) {
         try {
           const parsed = JSON.parse(line);
-          if (parsed.type === "messages" || parsed.type === "token-usage") {
+          if (parsed.type === 'messages' || parsed.type === 'token-usage') {
             hasAmpFormat = true;
           }
-          if (parsed.type === "user" || parsed.type === "assistant" || parsed.type === "system" || parsed.type === "result") {
+          if (
+            parsed.type === 'user' ||
+            parsed.type === 'assistant' ||
+            parsed.type === 'system' ||
+            parsed.type === 'result'
+          ) {
             hasClaudeFormat = true;
           }
         } catch {
@@ -84,7 +89,11 @@ export function ExecutionOutputViewer({
 
       return {
         isValidJsonl: true,
-        jsonlFormat: hasAmpFormat ? "amp" : hasClaudeFormat ? "claude" : "unknown"
+        jsonlFormat: hasAmpFormat
+          ? 'amp'
+          : hasClaudeFormat
+            ? 'claude'
+            : 'unknown',
       };
     } catch {
       return { isValidJsonl: false, jsonlFormat: null };
@@ -94,7 +103,7 @@ export function ExecutionOutputViewer({
   // Set initial view mode based on JSONL detection
   useEffect(() => {
     if (isValidJsonl) {
-      setViewMode("conversation");
+      setViewMode('conversation');
     }
   }, [isValidJsonl]);
 
@@ -110,7 +119,9 @@ export function ExecutionOutputViewer({
     );
   }
 
-  const statusDisplay = getExecutionProcessStatusDisplay(executionProcess.status);
+  const statusDisplay = getExecutionProcessStatusDisplay(
+    executionProcess.status
+  );
 
   return (
     <Card className="">
@@ -120,11 +131,17 @@ export function ExecutionOutputViewer({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs capitalize">
-                {executionProcess.process_type.replace(/([A-Z])/g, ' $1').toLowerCase()}
+                {executionProcess.process_type
+                  .replace(/([A-Z])/g, ' $1')
+                  .toLowerCase()}
               </Badge>
               <div className="flex items-center gap-1">
-                <div className={`h-2 w-2 rounded-full ${statusDisplay.color}`} />
-                <span className="text-xs text-muted-foreground">{statusDisplay.label}</span>
+                <div
+                  className={`h-2 w-2 rounded-full ${statusDisplay.color}`}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {statusDisplay.label}
+                </span>
               </div>
               {executor && (
                 <Badge variant="secondary" className="text-xs">
@@ -146,18 +163,18 @@ export function ExecutionOutputViewer({
               </div>
               <div className="flex items-center gap-1">
                 <Button
-                  variant={viewMode === "conversation" ? "default" : "ghost"}
+                  variant={viewMode === 'conversation' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setViewMode("conversation")}
+                  onClick={() => setViewMode('conversation')}
                   className="h-7 px-2 text-xs"
                 >
                   <MessageSquare className="h-3 w-3 mr-1" />
                   Conversation
                 </Button>
                 <Button
-                  variant={viewMode === "raw" ? "default" : "ghost"}
+                  variant={viewMode === 'raw' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setViewMode("raw")}
+                  onClick={() => setViewMode('raw')}
                   className="h-7 px-2 text-xs"
                 >
                   <FileText className="h-3 w-3 mr-1" />
@@ -170,9 +187,9 @@ export function ExecutionOutputViewer({
           {/* Output content */}
           {hasStdout && (
             <div>
-              {isValidJsonl && viewMode === "conversation" ? (
+              {isValidJsonl && viewMode === 'conversation' ? (
                 <ConversationViewer
-                  jsonlOutput={executionProcess.stdout || ""}
+                  jsonlOutput={executionProcess.stdout || ''}
                 />
               ) : (
                 <div>

@@ -1,33 +1,33 @@
-import { useTheme } from "@/components/theme-provider";
-import { useEffect, useState } from "react";
+import { useTheme } from '@/components/theme-provider';
+import { useEffect, useState } from 'react';
 
-export function Logo({ className = "" }: { className?: string }) {
+export function Logo({ className = '' }: { className?: string }) {
   const { theme } = useTheme();
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
     const updateTheme = () => {
-      if (theme === "dark") {
+      if (theme === 'dark') {
         setIsDark(true);
-      } else if (theme === "light") {
+      } else if (theme === 'light') {
         setIsDark(false);
       } else {
         // System theme
-        setIsDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
+        setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches);
       }
     };
 
     updateTheme();
 
     // Listen for system theme changes when using system theme
-    if (theme === "system") {
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      mediaQuery.addEventListener("change", updateTheme);
-      return () => mediaQuery.removeEventListener("change", updateTheme);
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      mediaQuery.addEventListener('change', updateTheme);
+      return () => mediaQuery.removeEventListener('change', updateTheme);
     }
   }, [theme]);
 
-  const fillColor = isDark ? "#ffffff" : "#000000";
+  const fillColor = isDark ? '#ffffff' : '#000000';
 
   return (
     <svg

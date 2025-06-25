@@ -1,27 +1,27 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Settings } from "lucide-react";
-import { makeRequest } from "@/lib/api";
-import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
-import { ProjectForm } from "@/components/projects/project-form";
-import { useKeyboardShortcuts } from "@/lib/keyboard-shortcuts";
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Plus, Settings } from 'lucide-react';
+import { makeRequest } from '@/lib/api';
+import { TaskFormDialog } from '@/components/tasks/TaskFormDialog';
+import { ProjectForm } from '@/components/projects/project-form';
+import { useKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 import {
   getMainContainerClasses,
   getKanbanSectionClasses,
-} from "@/lib/responsive-config";
+} from '@/lib/responsive-config';
 
-import { TaskKanbanBoard } from "@/components/tasks/TaskKanbanBoard";
-import { TaskDetailsPanel } from "@/components/tasks/TaskDetailsPanel";
+import { TaskKanbanBoard } from '@/components/tasks/TaskKanbanBoard';
+import { TaskDetailsPanel } from '@/components/tasks/TaskDetailsPanel';
 import type {
   TaskStatus,
   TaskWithAttemptStatus,
   ProjectWithBranch,
   ExecutorConfig,
   CreateTaskAndStart,
-} from "shared/types";
-import type { DragEndEvent } from "@/components/ui/shadcn-io/kanban";
+} from 'shared/types';
+import type { DragEndEvent } from '@/components/ui/shadcn-io/kanban';
 
 type Task = TaskWithAttemptStatus;
 
@@ -92,7 +92,9 @@ export function ProjectTasks() {
 
   const fetchProject = async () => {
     try {
-      const response = await makeRequest(`/api/projects/${projectId}/with-branch`);
+      const response = await makeRequest(
+        `/api/projects/${projectId}/with-branch`
+      );
 
       if (response.ok) {
         const result: ApiResponse<ProjectWithBranch> = await response.json();
@@ -100,11 +102,11 @@ export function ProjectTasks() {
           setProject(result.data);
         }
       } else if (response.status === 404) {
-        setError("Project not found");
-        navigate("/projects");
+        setError('Project not found');
+        navigate('/projects');
       }
     } catch (err) {
-      setError("Failed to load project");
+      setError('Failed to load project');
     }
   };
 
@@ -143,10 +145,10 @@ export function ProjectTasks() {
           });
         }
       } else {
-        setError("Failed to load tasks");
+        setError('Failed to load tasks');
       }
     } catch (err) {
-      setError("Failed to load tasks");
+      setError('Failed to load tasks');
     } finally {
       if (!skipLoading) {
         setLoading(false);
@@ -157,7 +159,7 @@ export function ProjectTasks() {
   const handleCreateTask = async (title: string, description: string) => {
     try {
       const response = await makeRequest(`/api/projects/${projectId}/tasks`, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify({
           project_id: projectId,
           title,
@@ -168,10 +170,10 @@ export function ProjectTasks() {
       if (response.ok) {
         await fetchTasks();
       } else {
-        setError("Failed to create task");
+        setError('Failed to create task');
       }
     } catch (err) {
-      setError("Failed to create task");
+      setError('Failed to create task');
     }
   };
 
@@ -191,7 +193,7 @@ export function ProjectTasks() {
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/create-and-start`,
         {
-          method: "POST",
+          method: 'POST',
           body: JSON.stringify(payload),
         }
       );
@@ -199,10 +201,10 @@ export function ProjectTasks() {
       if (response.ok) {
         await fetchTasks();
       } else {
-        setError("Failed to create and start task");
+        setError('Failed to create and start task');
       }
     } catch (err) {
-      setError("Failed to create and start task");
+      setError('Failed to create and start task');
     }
   };
 
@@ -217,7 +219,7 @@ export function ProjectTasks() {
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${editingTask.id}`,
         {
-          method: "PUT",
+          method: 'PUT',
           body: JSON.stringify({
             title,
             description: description || null,
@@ -230,31 +232,31 @@ export function ProjectTasks() {
         await fetchTasks();
         setEditingTask(null);
       } else {
-        setError("Failed to update task");
+        setError('Failed to update task');
       }
     } catch (err) {
-      setError("Failed to update task");
+      setError('Failed to update task');
     }
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    if (!confirm("Are you sure you want to delete this task?")) return;
+    if (!confirm('Are you sure you want to delete this task?')) return;
 
     try {
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${taskId}`,
         {
-          method: "DELETE",
+          method: 'DELETE',
         }
       );
 
       if (response.ok) {
         await fetchTasks();
       } else {
-        setError("Failed to delete task");
+        setError('Failed to delete task');
       }
     } catch (err) {
-      setError("Failed to delete task");
+      setError('Failed to delete task');
     }
   };
 
@@ -288,7 +290,7 @@ export function ProjectTasks() {
     if (!over || !active.data.current) return;
 
     const taskId = active.id as string;
-    const newStatus = over.id as Task["status"];
+    const newStatus = over.id as Task['status'];
     const task = tasks.find((t) => t.id === taskId);
 
     if (!task || task.status === newStatus) return;
@@ -303,7 +305,7 @@ export function ProjectTasks() {
       const response = await makeRequest(
         `/api/projects/${projectId}/tasks/${taskId}`,
         {
-          method: "PUT",
+          method: 'PUT',
           body: JSON.stringify({
             title: task.title,
             description: task.description,
@@ -319,7 +321,7 @@ export function ProjectTasks() {
             t.id === taskId ? { ...t, status: previousStatus } : t
           )
         );
-        setError("Failed to update task status");
+        setError('Failed to update task status');
       }
     } catch (err) {
       // Revert the optimistic update if the API call failed
@@ -328,7 +330,7 @@ export function ProjectTasks() {
           t.id === taskId ? { ...t, status: previousStatus } : t
         )
       );
-      setError("Failed to update task status");
+      setError('Failed to update task status');
     }
   };
 
@@ -348,7 +350,7 @@ export function ProjectTasks() {
 
         <div className="px-8 my-12 flex flex-row">
           <div className="w-full flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{project?.name || "Project"}</h1>
+            <h1 className="text-2xl font-bold">{project?.name || 'Project'}</h1>
             {project?.current_branch && (
               <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-md">
                 {project.current_branch}

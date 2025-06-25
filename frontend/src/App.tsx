@@ -1,15 +1,20 @@
-import { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { Navbar } from "@/components/layout/navbar";
-import { Projects } from "@/pages/projects";
-import { ProjectTasks } from "@/pages/project-tasks";
-import { TaskAttemptComparePage } from "@/pages/task-attempt-compare";
-import { Settings } from "@/pages/Settings";
-import { DisclaimerDialog } from "@/components/DisclaimerDialog";
-import { OnboardingDialog } from "@/components/OnboardingDialog";
-import { ConfigProvider, useConfig } from "@/components/config-provider";
-import { ThemeProvider } from "@/components/theme-provider";
-import type { Config, ApiResponse, ExecutorConfig, EditorType } from "shared/types";
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Navbar } from '@/components/layout/navbar';
+import { Projects } from '@/pages/projects';
+import { ProjectTasks } from '@/pages/project-tasks';
+import { TaskAttemptComparePage } from '@/pages/task-attempt-compare';
+import { Settings } from '@/pages/Settings';
+import { DisclaimerDialog } from '@/components/DisclaimerDialog';
+import { OnboardingDialog } from '@/components/OnboardingDialog';
+import { ConfigProvider, useConfig } from '@/components/config-provider';
+import { ThemeProvider } from '@/components/theme-provider';
+import type {
+  Config,
+  ApiResponse,
+  ExecutorConfig,
+  EditorType,
+} from 'shared/types';
 
 function AppContent() {
   const { config, updateConfig, loading } = useConfig();
@@ -30,12 +35,12 @@ function AppContent() {
     if (!config) return;
 
     updateConfig({ disclaimer_acknowledged: true });
-    
+
     try {
-      const response = await fetch("/api/config", {
-        method: "POST",
+      const response = await fetch('/api/config', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ ...config, disclaimer_acknowledged: true }),
       });
@@ -47,11 +52,14 @@ function AppContent() {
         setShowOnboarding(!config.onboarding_acknowledged);
       }
     } catch (err) {
-      console.error("Error saving config:", err);
+      console.error('Error saving config:', err);
     }
   };
 
-  const handleOnboardingComplete = async (onboardingConfig: { executor: ExecutorConfig; editor: { editor_type: EditorType; custom_command: string | null } }) => {
+  const handleOnboardingComplete = async (onboardingConfig: {
+    executor: ExecutorConfig;
+    editor: { editor_type: EditorType; custom_command: string | null };
+  }) => {
     if (!config) return;
 
     const updatedConfig = {
@@ -62,12 +70,12 @@ function AppContent() {
     };
 
     updateConfig(updatedConfig);
-    
+
     try {
-      const response = await fetch("/api/config", {
-        method: "POST",
+      const response = await fetch('/api/config', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(updatedConfig),
       });
@@ -78,7 +86,7 @@ function AppContent() {
         setShowOnboarding(false);
       }
     } catch (err) {
-      console.error("Error saving config:", err);
+      console.error('Error saving config:', err);
     }
   };
 
@@ -94,7 +102,7 @@ function AppContent() {
   }
 
   return (
-    <ThemeProvider initialTheme={config?.theme || "system"}>
+    <ThemeProvider initialTheme={config?.theme || 'system'}>
       <div className="h-screen flex flex-col bg-background">
         <DisclaimerDialog
           open={showDisclaimer}
@@ -110,7 +118,10 @@ function AppContent() {
             <Route path="/" element={<Projects />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/projects/:projectId" element={<Projects />} />
-            <Route path="/projects/:projectId/tasks" element={<ProjectTasks />} />
+            <Route
+              path="/projects/:projectId/tasks"
+              element={<ProjectTasks />}
+            />
             <Route
               path="/projects/:projectId/tasks/:taskId"
               element={<ProjectTasks />}

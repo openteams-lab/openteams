@@ -1,165 +1,190 @@
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { FileSearchTextarea } from '@/components/ui/file-search-textarea'
-import { Label } from '@/components/ui/label'
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { FileSearchTextarea } from '@/components/ui/file-search-textarea';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
-import { useConfig } from '@/components/config-provider'
-import type { TaskStatus, ExecutorConfig } from 'shared/types'
+  SelectValue,
+} from '@/components/ui/select';
+import { useConfig } from '@/components/config-provider';
+import type { TaskStatus, ExecutorConfig } from 'shared/types';
 
 interface Task {
-  id: string
-  project_id: string
-  title: string
-  description: string | null
-  status: TaskStatus
-  created_at: string
-  updated_at: string
+  id: string;
+  project_id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  created_at: string;
+  updated_at: string;
 }
 
 interface TaskFormDialogProps {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  task?: Task | null // Optional for create mode
-  projectId?: string // For file search functionality
-  onCreateTask?: (title: string, description: string) => Promise<void>
-  onCreateAndStartTask?: (title: string, description: string, executor?: ExecutorConfig) => Promise<void>
-  onUpdateTask?: (title: string, description: string, status: TaskStatus) => Promise<void>
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  task?: Task | null; // Optional for create mode
+  projectId?: string; // For file search functionality
+  onCreateTask?: (title: string, description: string) => Promise<void>;
+  onCreateAndStartTask?: (
+    title: string,
+    description: string,
+    executor?: ExecutorConfig
+  ) => Promise<void>;
+  onUpdateTask?: (
+    title: string,
+    description: string,
+    status: TaskStatus
+  ) => Promise<void>;
 }
 
-export function TaskFormDialog({ 
-  isOpen, 
-  onOpenChange, 
-  task, 
+export function TaskFormDialog({
+  isOpen,
+  onOpenChange,
+  task,
   projectId,
-  onCreateTask, 
+  onCreateTask,
   onCreateAndStartTask,
-  onUpdateTask 
+  onUpdateTask,
 }: TaskFormDialogProps) {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [status, setStatus] = useState<TaskStatus>('todo')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isSubmittingAndStart, setIsSubmittingAndStart] = useState(false)
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<TaskStatus>('todo');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingAndStart, setIsSubmittingAndStart] = useState(false);
 
-  const { config } = useConfig()
-  const isEditMode = Boolean(task)
+  const { config } = useConfig();
+  const isEditMode = Boolean(task);
 
   useEffect(() => {
     if (task) {
       // Edit mode - populate with existing task data
-      setTitle(task.title)
-      setDescription(task.description || '')
-      setStatus(task.status)
+      setTitle(task.title);
+      setDescription(task.description || '');
+      setStatus(task.status);
     } else {
       // Create mode - reset to defaults
-      setTitle('')
-      setDescription('')
-      setStatus('todo')
+      setTitle('');
+      setDescription('');
+      setStatus('todo');
     }
-  }, [task, isOpen])
+  }, [task, isOpen]);
 
   const handleSubmit = async () => {
-    if (!title.trim()) return
-    
-    setIsSubmitting(true)
+    if (!title.trim()) return;
+
+    setIsSubmitting(true);
     try {
       if (isEditMode && onUpdateTask) {
-        await onUpdateTask(title, description, status)
+        await onUpdateTask(title, description, status);
       } else if (!isEditMode && onCreateTask) {
-        await onCreateTask(title, description)
+        await onCreateTask(title, description);
       }
-      
+
       // Reset form on successful creation
       if (!isEditMode) {
-        setTitle('')
-        setDescription('')
-        setStatus('todo')
+        setTitle('');
+        setDescription('');
+        setStatus('todo');
       }
-      
-      onOpenChange(false)
+
+      onOpenChange(false);
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const handleCreateAndStart = async () => {
-    if (!title.trim()) return
-    
-    setIsSubmittingAndStart(true)
+    if (!title.trim()) return;
+
+    setIsSubmittingAndStart(true);
     try {
       if (!isEditMode && onCreateAndStartTask) {
-        await onCreateAndStartTask(title, description, config?.executor)
+        await onCreateAndStartTask(title, description, config?.executor);
       }
-      
+
       // Reset form on successful creation
-      setTitle('')
-      setDescription('')
-      setStatus('todo')
-      
-      onOpenChange(false)
+      setTitle('');
+      setDescription('');
+      setStatus('todo');
+
+      onOpenChange(false);
     } finally {
-      setIsSubmittingAndStart(false)
+      setIsSubmittingAndStart(false);
     }
-  }
+  };
 
   const handleCancel = () => {
     // Reset form state when canceling
     if (task) {
-      setTitle(task.title)
-      setDescription(task.description || '')
-      setStatus(task.status)
+      setTitle(task.title);
+      setDescription(task.description || '');
+      setStatus(task.status);
     } else {
-      setTitle('')
-      setDescription('')
-      setStatus('todo')
+      setTitle('');
+      setDescription('');
+      setStatus('todo');
     }
-    onOpenChange(false)
-  }
+    onOpenChange(false);
+  };
 
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // ESC to close dialog (prevent it from reaching TaskDetailsPanel)
       if (event.key === 'Escape') {
-        event.preventDefault()
-        event.stopPropagation()
-        handleCancel()
-        return
+        event.preventDefault();
+        event.stopPropagation();
+        handleCancel();
+        return;
       }
-      
+
       // Command/Ctrl + Enter to Create & Start (only in create mode)
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-        if (!isEditMode && onCreateAndStartTask && title.trim() && !isSubmitting && !isSubmittingAndStart) {
-          event.preventDefault()
-          handleCreateAndStart()
+        if (
+          !isEditMode &&
+          onCreateAndStartTask &&
+          title.trim() &&
+          !isSubmitting &&
+          !isSubmittingAndStart
+        ) {
+          event.preventDefault();
+          handleCreateAndStart();
         }
       }
-    }
+    };
 
     if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown, true) // Use capture phase to get priority
-      return () => document.removeEventListener('keydown', handleKeyDown, true)
+      document.addEventListener('keydown', handleKeyDown, true); // Use capture phase to get priority
+      return () => document.removeEventListener('keydown', handleKeyDown, true);
     }
-  }, [isOpen, isEditMode, onCreateAndStartTask, title, isSubmitting, isSubmittingAndStart, handleCreateAndStart, handleCancel])
+  }, [
+    isOpen,
+    isEditMode,
+    onCreateAndStartTask,
+    title,
+    isSubmitting,
+    isSubmittingAndStart,
+    handleCreateAndStart,
+    handleCancel,
+  ]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEditMode ? 'Edit Task' : 'Create New Task'}</DialogTitle>
+          <DialogTitle>
+            {isEditMode ? 'Edit Task' : 'Create New Task'}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -172,7 +197,7 @@ export function TaskFormDialog({
               disabled={isSubmitting || isSubmittingAndStart}
             />
           </div>
-          
+
           <div>
             <Label htmlFor="task-description">Description</Label>
             <FileSearchTextarea
@@ -184,7 +209,7 @@ export function TaskFormDialog({
               projectId={projectId}
             />
           </div>
-          
+
           {isEditMode && (
             <div>
               <Label htmlFor="task-status">Status</Label>
@@ -206,7 +231,7 @@ export function TaskFormDialog({
               </Select>
             </div>
           )}
-          
+
           <div className="flex justify-end space-x-2">
             <Button
               variant="outline"
@@ -216,7 +241,7 @@ export function TaskFormDialog({
               Cancel
             </Button>
             {isEditMode ? (
-              <Button 
+              <Button
                 onClick={handleSubmit}
                 disabled={isSubmitting || !title.trim()}
               >
@@ -224,19 +249,25 @@ export function TaskFormDialog({
               </Button>
             ) : (
               <>
-                <Button 
+                <Button
                   variant="outline"
                   onClick={handleSubmit}
-                  disabled={isSubmitting || isSubmittingAndStart || !title.trim()}
+                  disabled={
+                    isSubmitting || isSubmittingAndStart || !title.trim()
+                  }
                 >
                   {isSubmitting ? 'Creating...' : 'Create Task'}
                 </Button>
                 {onCreateAndStartTask && (
-                  <Button 
+                  <Button
                     onClick={handleCreateAndStart}
-                    disabled={isSubmitting || isSubmittingAndStart || !title.trim()}
+                    disabled={
+                      isSubmitting || isSubmittingAndStart || !title.trim()
+                    }
                   >
-                    {isSubmittingAndStart ? 'Creating & Starting...' : 'Create & Start'}
+                    {isSubmittingAndStart
+                      ? 'Creating & Starting...'
+                      : 'Create & Start'}
                   </Button>
                 )}
               </>
@@ -245,5 +276,5 @@ export function TaskFormDialog({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
