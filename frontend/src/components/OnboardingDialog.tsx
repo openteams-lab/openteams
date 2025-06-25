@@ -99,6 +99,7 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
                 <p className="text-sm text-muted-foreground">
                   {executor.type === 'claude' && 'Claude Code from Anthropic'}
                   {executor.type === 'amp' && 'From Sourcegraph'}
+                  {executor.type === 'gemini' && 'Google Gemini from Bloop'}
                   {executor.type === 'echo' &&
                     'This is just for debugging vibe-kanban itself'}
                 </p>

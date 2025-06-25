@@ -20,7 +20,7 @@ export type SoundConstants = { sound_files: Array<SoundFile>, sound_labels: Arra
 
 export type ConfigConstants = { editor: EditorConstants, sound: SoundConstants, };
 
-export type ExecutorConfig = { "type": "echo" } | { "type": "claude" } | { "type": "amp" };
+export type ExecutorConfig = { "type": "echo" } | { "type": "claude" } | { "type": "amp" } | { "type": "gemini" };
 
 export type ExecutorConstants = { executor_types: Array<ExecutorConfig>, executor_labels: Array<string>, };
 
@@ -60,9 +60,9 @@ export type CreateFollowUpAttempt = { prompt: string, };
 
 export type TaskAttemptActivity = { id: string, execution_process_id: string, status: TaskAttemptStatus, note: string | null, created_at: string, };
 
-export type CreateTaskAttemptActivity = { execution_process_id: string, status: TaskAttemptStatus | null, note: string | null, };
-
 export type TaskAttemptActivityWithPrompt = { id: string, execution_process_id: string, status: TaskAttemptStatus, note: string | null, created_at: string, prompt: string | null, };
+
+export type CreateTaskAttemptActivity = { execution_process_id: string, status: TaskAttemptStatus | null, note: string | null, };
 
 export type DirectoryEntry = { name: string, path: string, is_directory: boolean, is_git_repo: boolean, };
 
@@ -98,7 +98,8 @@ export type UpdateExecutorSession = { session_id: string | null, prompt: string 
 export const EXECUTOR_TYPES: string[] = [
     "echo",
     "claude",
-    "amp"
+    "amp",
+        "gemini"
 ];
 
 export const EDITOR_TYPES: EditorType[] = [
@@ -113,7 +114,8 @@ export const EDITOR_TYPES: EditorType[] = [
 export const EXECUTOR_LABELS: Record<string, string> = {
     "echo": "Echo (Test Mode)",
     "claude": "Claude",
-    "amp": "Amp"
+    "amp": "Amp",
+        "gemini": "Gemini"
 };
 
 export const EDITOR_LABELS: Record<string, string> = {

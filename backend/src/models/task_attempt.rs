@@ -583,6 +583,7 @@ impl TaskAttempt {
         let executor_config = match most_recent_coding_agent.executor_type.as_deref() {
             Some("claude") => crate::executor::ExecutorConfig::Claude,
             Some("amp") => crate::executor::ExecutorConfig::Amp,
+            Some("gemini") => crate::executor::ExecutorConfig::Gemini,
             Some("echo") => crate::executor::ExecutorConfig::Echo,
             _ => return Err(TaskAttemptError::TaskNotFound), // Invalid executor type
         };
@@ -613,6 +614,7 @@ impl TaskAttempt {
         match executor_name.as_ref().map(|s| s.as_str()) {
             Some("claude") => crate::executor::ExecutorConfig::Claude,
             Some("amp") => crate::executor::ExecutorConfig::Amp,
+            Some("gemini") => crate::executor::ExecutorConfig::Gemini,
             _ => crate::executor::ExecutorConfig::Echo, // Default for "echo" or None
         }
     }
@@ -725,6 +727,7 @@ impl TaskAttempt {
                     crate::executor::ExecutorConfig::Echo => "echo",
                     crate::executor::ExecutorConfig::Claude => "claude",
                     crate::executor::ExecutorConfig::Amp => "amp",
+                    crate::executor::ExecutorConfig::Gemini => "gemini",
                 };
                 (
                     "executor".to_string(),
@@ -737,6 +740,7 @@ impl TaskAttempt {
                     crate::executor::ExecutorConfig::Echo => "echo",
                     crate::executor::ExecutorConfig::Claude => "claude",
                     crate::executor::ExecutorConfig::Amp => "amp",
+                    crate::executor::ExecutorConfig::Gemini => "gemini",
                 };
                 (
                     "followup_executor".to_string(),
@@ -856,7 +860,9 @@ impl TaskAttempt {
                 session_id,
                 prompt,
             } => {
-                use crate::executors::{AmpFollowupExecutor, ClaudeFollowupExecutor};
+                use crate::executors::{
+                    AmpFollowupExecutor, ClaudeFollowupExecutor, GeminiFollowupExecutor,
+                };
 
                 let executor: Box<dyn crate::executor::Executor> = match config {
                     crate::executor::ExecutorConfig::Claude => {
@@ -877,6 +883,16 @@ impl TaskAttempt {
                             })
                         } else {
                             return Err(TaskAttemptError::TaskNotFound); // No thread ID for followup
+                        }
+                    }
+                    crate::executor::ExecutorConfig::Gemini => {
+                        if let Some(sid) = session_id {
+                            Box::new(GeminiFollowupExecutor {
+                                session_id: sid.clone(),
+                                prompt: prompt.clone(),
+                            })
+                        } else {
+                            return Err(TaskAttemptError::TaskNotFound); // No session ID for followup
                         }
                     }
                     crate::executor::ExecutorConfig::Echo => {

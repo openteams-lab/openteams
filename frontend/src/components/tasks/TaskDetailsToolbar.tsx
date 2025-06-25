@@ -56,6 +56,7 @@ const availableExecutors = [
   { id: 'echo', name: 'Echo' },
   { id: 'claude', name: 'Claude' },
   { id: 'amp', name: 'Amp' },
+  { id: 'gemini', name: 'Gemini' },
 ];
 
 export function TaskDetailsToolbar({

@@ -7,7 +7,8 @@ fn generate_constants() -> String {
 export const EXECUTOR_TYPES: string[] = [
     "echo",
     "claude",
-    "amp"
+    "amp",
+        "gemini"
 ];
 
 export const EDITOR_TYPES: EditorType[] = [
@@ -22,7 +23,8 @@ export const EDITOR_TYPES: EditorType[] = [
 export const EXECUTOR_LABELS: Record<string, string> = {
     "echo": "Echo (Test Mode)",
     "claude": "Claude",
-    "amp": "Amp"
+    "amp": "Amp",
+        "gemini": "Gemini"
 };
 
 export const EDITOR_LABELS: Record<string, string> = {
@@ -97,6 +99,7 @@ fn main() {
         vibe_kanban::models::task_attempt::UpdateTaskAttempt::decl(),
         vibe_kanban::models::task_attempt::CreateFollowUpAttempt::decl(),
         vibe_kanban::models::task_attempt_activity::TaskAttemptActivity::decl(),
+        vibe_kanban::models::task_attempt_activity::TaskAttemptActivityWithPrompt::decl(),
         vibe_kanban::models::task_attempt_activity::CreateTaskAttemptActivity::decl(),
         vibe_kanban::routes::filesystem::DirectoryEntry::decl(),
         vibe_kanban::models::task_attempt::DiffChunkType::decl(),

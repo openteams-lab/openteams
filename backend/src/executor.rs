@@ -7,7 +7,7 @@ use tokio::{
 use ts_rs::TS;
 use uuid::Uuid;
 
-use crate::executors::{AmpExecutor, ClaudeExecutor, EchoExecutor};
+use crate::executors::{AmpExecutor, ClaudeExecutor, EchoExecutor, GeminiExecutor};
 
 #[derive(Debug)]
 pub enum ExecutorError {
@@ -110,6 +110,7 @@ pub enum ExecutorConfig {
     Echo,
     Claude,
     Amp,
+    Gemini,
     // Future executors can be added here
     // Shell { command: String },
     // Docker { image: String, command: String },
@@ -130,11 +131,13 @@ impl ExecutorConstants {
                 ExecutorConfig::Echo,
                 ExecutorConfig::Claude,
                 ExecutorConfig::Amp,
+                ExecutorConfig::Gemini,
             ],
             executor_labels: vec![
                 "Echo (Test Mode)".to_string(),
                 "Claude".to_string(),
                 "Amp".to_string(),
+                "Gemini".to_string(),
             ],
         }
     }
@@ -146,6 +149,7 @@ impl ExecutorConfig {
             ExecutorConfig::Echo => Box::new(EchoExecutor),
             ExecutorConfig::Claude => Box::new(ClaudeExecutor),
             ExecutorConfig::Amp => Box::new(AmpExecutor),
+            ExecutorConfig::Gemini => Box::new(GeminiExecutor),
         }
     }
 }

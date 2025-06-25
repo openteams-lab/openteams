@@ -141,6 +141,7 @@ pub async fn create_task_and_start(
         crate::executor::ExecutorConfig::Echo => "echo".to_string(),
         crate::executor::ExecutorConfig::Claude => "claude".to_string(),
         crate::executor::ExecutorConfig::Amp => "amp".to_string(),
+        crate::executor::ExecutorConfig::Gemini => "gemini".to_string(),
     });
     let attempt_payload = CreateTaskAttempt {
         executor: executor_string,

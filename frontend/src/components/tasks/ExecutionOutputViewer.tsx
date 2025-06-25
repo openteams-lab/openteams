@@ -36,12 +36,13 @@ export function ExecutionOutputViewer({
 
   const isAmpExecutor = executor === 'amp';
   const isClaudeExecutor = executor === 'claude';
+  const isGeminiExecutor = executor === 'gemini';
   const hasStdout = !!executionProcess.stdout;
   const hasStderr = !!executionProcess.stderr;
 
-  // Check if stdout looks like JSONL (for Amp or Claude executor)
+  // Check if stdout looks like JSONL (for Amp, Claude, or Gemini executor)
   const { isValidJsonl, jsonlFormat } = useMemo(() => {
-    if ((!isAmpExecutor && !isClaudeExecutor) || !executionProcess.stdout) {
+    if ((!isAmpExecutor && !isClaudeExecutor && !isGeminiExecutor) || !executionProcess.stdout) {
       return { isValidJsonl: false, jsonlFormat: null };
     }
 
@@ -98,7 +99,7 @@ export function ExecutionOutputViewer({
     } catch {
       return { isValidJsonl: false, jsonlFormat: null };
     }
-  }, [isAmpExecutor, isClaudeExecutor, executionProcess.stdout]);
+  }, [isAmpExecutor, isClaudeExecutor, isGeminiExecutor, executionProcess.stdout]);
 
   // Set initial view mode based on JSONL detection
   useEffect(() => {
