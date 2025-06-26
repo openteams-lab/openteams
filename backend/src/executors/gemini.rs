@@ -71,7 +71,7 @@ impl Executor for GeminiFollowupExecutor {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .current_dir(worktree_path)
-            .arg("@bloopai/gemini-cli-interactive")
+            .arg("https://github.com/google-gemini/gemini-cli")
             .arg("-p")
             .arg(&self.prompt)
             .arg(format!("--resume={}", self.session_id))
