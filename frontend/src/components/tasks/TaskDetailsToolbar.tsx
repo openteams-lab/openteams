@@ -315,7 +315,7 @@ export function TaskDetailsToolbar({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={onOpenInEditor}
+                        onClick={() => onOpenInEditor()}
                       >
                         <ExternalLink className="h-4 w-4" />
                       </Button>
