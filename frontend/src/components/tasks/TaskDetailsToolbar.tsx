@@ -57,6 +57,7 @@ const availableExecutors = [
   { id: 'claude', name: 'Claude' },
   { id: 'amp', name: 'Amp' },
   { id: 'gemini', name: 'Gemini' },
+  { id: 'opencode', name: 'OpenCode' },
 ];
 
 export function TaskDetailsToolbar({
