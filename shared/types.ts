@@ -20,7 +20,7 @@ export type SoundConstants = { sound_files: Array<SoundFile>, sound_labels: Arra
 
 export type ConfigConstants = { editor: EditorConstants, sound: SoundConstants, };
 
-export type ExecutorConfig = { "type": "echo" } | { "type": "claude" } | { "type": "amp" } | { "type": "gemini" };
+export type ExecutorConfig = { "type": "echo" } | { "type": "claude" } | { "type": "amp" } | { "type": "gemini" } | { "type": "opencode" };
 
 export type ExecutorConstants = { executor_types: Array<ExecutorConfig>, executor_labels: Array<string>, };
 
@@ -99,7 +99,8 @@ export const EXECUTOR_TYPES: string[] = [
     "echo",
     "claude",
     "amp",
-        "gemini"
+    "gemini",
+    "opencode"
 ];
 
 export const EDITOR_TYPES: EditorType[] = [
@@ -115,7 +116,8 @@ export const EXECUTOR_LABELS: Record<string, string> = {
     "echo": "Echo (Test Mode)",
     "claude": "Claude",
     "amp": "Amp",
-        "gemini": "Gemini"
+    "gemini": "Gemini",
+    "opencode": "OpenCode"
 };
 
 export const EDITOR_LABELS: Record<string, string> = {

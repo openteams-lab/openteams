@@ -8,7 +8,8 @@ export const EXECUTOR_TYPES: string[] = [
     "echo",
     "claude",
     "amp",
-        "gemini"
+    "gemini",
+    "opencode"
 ];
 
 export const EDITOR_TYPES: EditorType[] = [
@@ -24,7 +25,8 @@ export const EXECUTOR_LABELS: Record<string, string> = {
     "echo": "Echo (Test Mode)",
     "claude": "Claude",
     "amp": "Amp",
-        "gemini": "Gemini"
+    "gemini": "Gemini",
+    "opencode": "OpenCode"
 };
 
 export const EDITOR_LABELS: Record<string, string> = {

@@ -4,7 +4,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use ts_rs::TS;
 use uuid::Uuid;
 
-use crate::executors::{AmpExecutor, ClaudeExecutor, EchoExecutor, GeminiExecutor};
+use crate::executors::{AmpExecutor, ClaudeExecutor, EchoExecutor, GeminiExecutor, OpencodeExecutor};
 
 /// Context information for spawn failures to provide comprehensive error details
 #[derive(Debug, Clone)]
@@ -231,6 +231,7 @@ pub enum ExecutorConfig {
     Claude,
     Amp,
     Gemini,
+    Opencode,
     // Future executors can be added here
     // Shell { command: String },
     // Docker { image: String, command: String },
@@ -251,6 +252,7 @@ impl ExecutorConfig {
             ExecutorConfig::Claude => Box::new(ClaudeExecutor),
             ExecutorConfig::Amp => Box::new(AmpExecutor),
             ExecutorConfig::Gemini => Box::new(GeminiExecutor),
+            ExecutorConfig::Opencode => Box::new(OpencodeExecutor),
         }
     }
 }
