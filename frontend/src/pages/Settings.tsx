@@ -155,6 +155,11 @@ export function Settings() {
                     <SelectItem value="light">Light</SelectItem>
                     <SelectItem value="dark">Dark</SelectItem>
                     <SelectItem value="system">System</SelectItem>
+                    <SelectItem value="purple">Purple</SelectItem>
+                    <SelectItem value="green">Green</SelectItem>
+                    <SelectItem value="blue">Blue</SelectItem>
+                    <SelectItem value="orange">Orange</SelectItem>
+                    <SelectItem value="red">Red</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
