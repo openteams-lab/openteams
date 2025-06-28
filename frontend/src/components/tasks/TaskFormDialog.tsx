@@ -155,7 +155,7 @@ export function TaskFormDialog({
         return;
       }
 
-      // Command/Ctrl + Enter to Create & Start (only in create mode)
+      // Command/Ctrl + Enter to Create & Start (create mode) or Save (edit mode)
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
         if (
           !isEditMode &&
@@ -166,6 +166,14 @@ export function TaskFormDialog({
         ) {
           event.preventDefault();
           handleCreateAndStart();
+        } else if (
+          isEditMode &&
+          title.trim() &&
+          !isSubmitting &&
+          !isSubmittingAndStart
+        ) {
+          event.preventDefault();
+          handleSubmit();
         }
       }
     };
