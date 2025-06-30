@@ -2,7 +2,8 @@ use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use git2::{
-    build::CheckoutBuilder, Error as GitError, MergeOptions, Oid, RebaseOptions, Repository,
+    build::CheckoutBuilder, Error as GitError, MergeOptions, Oid, RebaseOptions, Reference,
+    Repository, WorktreeAddOptions,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool, Type};
@@ -20,6 +21,7 @@ pub enum TaskAttemptError {
     TaskNotFound,
     ProjectNotFound,
     ValidationError(String),
+    BranchNotFound(String),
 }
 
 impl std::fmt::Display for TaskAttemptError {
@@ -30,6 +32,7 @@ impl std::fmt::Display for TaskAttemptError {
             TaskAttemptError::TaskNotFound => write!(f, "Task not found"),
             TaskAttemptError::ProjectNotFound => write!(f, "Project not found"),
             TaskAttemptError::ValidationError(e) => write!(f, "Validation error: {}", e),
+            TaskAttemptError::BranchNotFound(e) => write!(f, "Branch not found: {}", e),
         }
     }
 }
@@ -77,6 +80,7 @@ pub struct TaskAttempt {
 #[ts(export)]
 pub struct CreateTaskAttempt {
     pub executor: Option<String>, // Optional executor name (defaults to "echo")
+    pub base_branch: Option<String>, // Optional base branch to checkout (defaults to current HEAD)
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -163,9 +167,11 @@ impl TaskAttempt {
     pub async fn create(
         pool: &SqlitePool,
         data: &CreateTaskAttempt,
-        attempt_id: Uuid,
         task_id: Uuid,
     ) -> Result<Self, TaskAttemptError> {
+        let attempt_id = Uuid::new_v4();
+        let prefixed_id = format!("vibe-kanban-{}", attempt_id);
+
         // First, get the task to get the project_id
         let task = Task::find_by_id(pool, task_id)
             .await?
@@ -178,23 +184,54 @@ impl TaskAttempt {
 
         // Generate worktree path automatically using cross-platform temporary directory
         let temp_dir = std::env::temp_dir();
-        let worktree_path = temp_dir.join(format!("mission-control-worktree-{}", attempt_id));
+        let worktree_path = temp_dir.join(&prefixed_id);
         let worktree_path_str = worktree_path.to_string_lossy().to_string();
 
-        // Create the worktree using git2
-        let repo = Repository::open(&project.git_repo_path)?;
+        // Solve scoping issues
+        {
+            // Create the worktree using git2
+            let repo = Repository::open(&project.git_repo_path)?;
 
-        // We no longer store base_commit in the database - it's retrieved live via git2
+            let mut worktree_opts = WorktreeAddOptions::new();
+            let new_base_ref: Reference;
 
-        // Create the worktree directory if it doesn't exist
-        if let Some(parent) = worktree_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| TaskAttemptError::Git(GitError::from_str(&e.to_string())))?;
+            if let Some(base_branch) = data.base_branch.clone() {
+                let base_ref = Some(str::trim(base_branch.as_str())) // chop off any whitespace
+                    .filter(|b| !b.is_empty()) // ditch empty strings
+                    .and_then(|branch| {
+                        // pick the right ref name
+                        let candidate = if branch.starts_with("origin/") || branch.contains('/') {
+                            format!("refs/remotes/{}", branch)
+                        } else {
+                            let local = format!("refs/heads/{}", branch);
+                            if repo.find_reference(&local).is_ok() {
+                                local
+                            } else {
+                                format!("refs/remotes/origin/{}", branch)
+                            }
+                        };
+                        // try to look it up, turning Ok(r) → Some(r), Err(_) → None
+                        repo.find_reference(&candidate).ok()
+                    })
+                    .ok_or(TaskAttemptError::BranchNotFound(base_branch))?;
+
+                let target_commit = base_ref.peel_to_commit()?;
+                repo.branch(&prefixed_id, &target_commit, false)?;
+                new_base_ref = repo.find_reference(&format!("refs/heads/{}", prefixed_id))?;
+
+                worktree_opts.reference(Some(&new_base_ref));
+            }
+
+            // Create the worktree directory if it doesn't exist
+            if let Some(parent) = worktree_path.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| TaskAttemptError::Git(GitError::from_str(&e.to_string())))?;
+            }
+
+            // Create the worktree at the specified path
+            let branch_name = format!("attempt-{}", attempt_id);
+            repo.worktree(&branch_name, &worktree_path, Some(&worktree_opts))?;
         }
-
-        // Create the worktree at the specified path
-        let branch_name = format!("attempt-{}", attempt_id);
-        repo.worktree(&branch_name, &worktree_path, None)?;
 
         // Insert the record into the database
         Ok(sqlx::query_as!(
