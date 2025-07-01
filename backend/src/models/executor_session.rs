@@ -12,6 +12,7 @@ pub struct ExecutorSession {
     pub execution_process_id: Uuid,
     pub session_id: Option<String>, // External session ID from Claude/Amp
     pub prompt: Option<String>,     // The prompt sent to the executor
+    pub summary: Option<String>,    // Final assistant message/summary
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -30,6 +31,7 @@ pub struct CreateExecutorSession {
 pub struct UpdateExecutorSession {
     pub session_id: Option<String>,
     pub prompt: Option<String>,
+    pub summary: Option<String>,
 }
 
 impl ExecutorSession {
@@ -44,6 +46,7 @@ impl ExecutorSession {
                 execution_process_id as "execution_process_id!: Uuid", 
                 session_id, 
                 prompt,
+                summary,
                 created_at as "created_at!: DateTime<Utc>", 
                 updated_at as "updated_at!: DateTime<Utc>"
                FROM executor_sessions 
@@ -67,6 +70,7 @@ impl ExecutorSession {
                 execution_process_id as "execution_process_id!: Uuid", 
                 session_id, 
                 prompt,
+                summary,
                 created_at as "created_at!: DateTime<Utc>", 
                 updated_at as "updated_at!: DateTime<Utc>"
                FROM executor_sessions 
@@ -91,6 +95,7 @@ impl ExecutorSession {
                 execution_process_id as "execution_process_id!: Uuid", 
                 session_id, 
                 prompt,
+                summary,
                 created_at as "created_at!: DateTime<Utc>", 
                 updated_at as "updated_at!: DateTime<Utc>"
                FROM executor_sessions 
@@ -113,16 +118,17 @@ impl ExecutorSession {
         sqlx::query_as!(
             ExecutorSession,
             r#"INSERT INTO executor_sessions (
-                id, task_attempt_id, execution_process_id, session_id, prompt, 
+                id, task_attempt_id, execution_process_id, session_id, prompt, summary,
                 created_at, updated_at
                ) 
-               VALUES ($1, $2, $3, $4, $5, $6, $7) 
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
                RETURNING 
                 id as "id!: Uuid", 
                 task_attempt_id as "task_attempt_id!: Uuid", 
                 execution_process_id as "execution_process_id!: Uuid", 
                 session_id, 
                 prompt,
+                summary,
                 created_at as "created_at!: DateTime<Utc>", 
                 updated_at as "updated_at!: DateTime<Utc>""#,
             session_id,
@@ -130,8 +136,9 @@ impl ExecutorSession {
             data.execution_process_id,
             None::<String>, // session_id initially None until parsed from output
             data.prompt,
-            now, // created_at
-            now  // updated_at
+            None::<String>, // summary initially None
+            now,            // created_at
+            now             // updated_at
         )
         .fetch_one(pool)
         .await
@@ -169,6 +176,25 @@ impl ExecutorSession {
                WHERE id = $2"#,
             prompt,
             id
+        )
+        .execute(pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Update executor session summary
+    pub async fn update_summary(
+        pool: &SqlitePool,
+        execution_process_id: Uuid,
+        summary: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"UPDATE executor_sessions 
+               SET summary = $1, updated_at = datetime('now') 
+               WHERE execution_process_id = $2"#,
+            summary,
+            execution_process_id
         )
         .execute(pool)
         .await?;
