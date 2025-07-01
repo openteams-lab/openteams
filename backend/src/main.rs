@@ -20,12 +20,14 @@ mod executors;
 mod mcp;
 mod models;
 mod routes;
+mod services;
 mod utils;
 
 use app_state::AppState;
 use execution_monitor::execution_monitor;
 use models::{ApiResponse, Config};
 use routes::{config, filesystem, health, projects, task_attempts, tasks};
+use services::PrMonitorService;
 
 async fn echo_handler(
     Json(payload): Json<serde_json::Value>,
@@ -145,6 +147,14 @@ async fn main() -> anyhow::Result<()> {
     let state_clone = app_state.clone();
     tokio::spawn(async move {
         execution_monitor(state_clone).await;
+    });
+
+    // Start PR monitoring service
+    let pr_monitor = PrMonitorService::new(pool.clone());
+    let config_for_monitor = config_arc.clone();
+
+    tokio::spawn(async move {
+        pr_monitor.start_with_config(config_for_monitor).await;
     });
 
     // Public routes (no auth required)
