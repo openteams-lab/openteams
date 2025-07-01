@@ -1,15 +1,18 @@
-# To pre-release:
-# ```
-# git tag -a v0.1.0 -m "Release 0.1.0"
-# git push origin v0.1.0
-# ```
-
 name: Create GitHub Pre-Release
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prerelease
 
 concurrency:
   group: release
@@ -23,49 +26,55 @@ permissions:
 env:
   NODE_VERSION: 22
   PNPM_VERSION: 10.8.1
-  TAG_REGEX: '^v[0-9]+\.[0-9]+\.[0-9]+$'
   RUST_TOOLCHAIN: nightly-2025-05-18
 
 jobs:
-  tag-check:
+  bump-version:
     runs-on: ubuntu-latest
-    if: github.ref_type == 'tag'
+    outputs:
+      new_tag: ${{ steps.version.outputs.new_tag }}
+      new_version: ${{ steps.version.outputs.new_version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Validate tag matches package.json version
-        shell: bash
+      - name: Setup Node
+        uses: ./.github/actions/setup-node
+
+      - name: Determine and update versions
+        id: version
         run: |
-          set -euo pipefail
-          echo "::group::Tag validation"
+          # Update root package.json and get new version
+          npm version ${{ github.event.inputs.version_type }} --no-git-tag-version
+          new_version=$(node -p "require('./package.json').version")
+          
+          # Update npx-cli package.json to match
+          cd npx-cli
+          npm version $new_version --no-git-tag-version
+          cd ..
+          
+          echo "New version: $new_version"
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+          echo "new_tag=v$new_version" >> $GITHUB_OUTPUT
 
-          # 1. Must be a tag and match the regex
-          [[ "${GITHUB_REF_TYPE}" == "tag" ]] \
-            || { echo "❌  Not a tag push"; exit 1; }
-          [[ "${GITHUB_REF_NAME}" =~ ${TAG_REGEX} ]] \
-            || { echo "❌  Tag '${GITHUB_REF_NAME}' != ${TAG_REGEX}"; exit 1; }
-
-          # 2. Extract versions
-          tag_ver="${GITHUB_REF_NAME#v}"
-          package_ver="$(node -p "require('./package.json').version")"
-          cli_package_ver="$(node -p "require('./npx-cli/package.json').version")"
-
-          # 3. Compare
-          [[ "${tag_ver}" == "${package_ver}" ]] \
-            || { echo "❌  Tag ${tag_ver} ≠ package.json ${package_ver}"; exit 1; }
-            
-          # 4. Compare tag with npx-cli package.json
-          [[ "${tag_ver}" == "${cli_package_ver}" ]] \
-            || { echo "❌  Tag ${tag_ver} ≠ npx-cli package.json ${cli_package_ver}"; exit 1; }
-
-          echo "✅  Tag and package.json agree (${tag_ver})"
-          echo "::endgroup::"
+      - name: Commit changes and create tag
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json npx-cli/package.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
+          git tag -a ${{ steps.version.outputs.new_tag }} -m "Release ${{ steps.version.outputs.new_tag }}"
+          git push
+          git push --tags
 
   build-frontend:
-    needs: tag-check
+    needs: bump-version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump-version.outputs.new_tag }}
 
       - name: Setup Node
         uses: ./.github/actions/setup-node
@@ -90,9 +99,8 @@ jobs:
           retention-days: 1
 
   build-backend:
-    needs: [tag-check, build-frontend]
+    needs: [bump-version, build-frontend]
     runs-on: ${{ matrix.os }}
-    if: github.ref_type == 'tag'
     strategy:
       # Platform matrix - keep target/name in sync with package-npx-cli job
       matrix:
@@ -117,6 +125,8 @@ jobs:
             name: linux-arm64
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump-version.outputs.new_tag }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -178,6 +188,7 @@ jobs:
           echo "${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}" | base64 --decode > certificate.p12
 
       - name: Write API Key to file
+        if: runner.os == 'macOS'
         env:
           API_KEY: ${{ secrets.APP_STORE_API_KEY }}
         run: echo $API_KEY > app_store_key.json
@@ -253,7 +264,7 @@ jobs:
           retention-days: 1
 
   package-npx-cli:
-    needs: [build-frontend, build-backend]
+    needs: [bump-version, build-frontend, build-backend]
     runs-on: ubuntu-latest
     strategy:
       # NOTE: This matrix must be kept in sync with build-backend job above
@@ -286,6 +297,8 @@ jobs:
             mcp_binary: vibe-kanban-mcp
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump-version.outputs.new_tag }}
 
       - name: Download frontend artifact
         uses: actions/download-artifact@v4
@@ -317,8 +330,7 @@ jobs:
           zip -j npx-cli/dist/${{ matrix.name }}/vibe-kanban.zip vibe-kanban-${{ matrix.name }}/${{ matrix.binary }}
           zip -j npx-cli/dist/${{ matrix.name }}/vibe-kanban-mcp.zip vibe-kanban-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
 
-      # MacOS notarization step already produced .zip files
-      - name: Create platform package
+      - name: Create platform package (macOS)
         if: matrix.name == 'macos-arm64' || matrix.name == 'macos-x64'
         run: |
           mkdir -p npx-cli/dist/${{ matrix.name }}
@@ -334,14 +346,12 @@ jobs:
           retention-days: 1
 
   create-prerelease:
-    needs: [build-frontend, build-backend, package-npx-cli]
+    needs: [bump-version, build-frontend, build-backend, package-npx-cli]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Get version from tag
-        id: get-version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+        with:
+          ref: ${{ needs.bump-version.outputs.new_tag }}
 
       - name: Download frontend artifact
         uses: actions/download-artifact@v4
@@ -365,9 +375,9 @@ jobs:
 
       - name: Zip frontend
         run: |
-          mkdir vibe-kanban-${{ github.ref_name }}
-          mv frontend/dist vibe-kanban-${{ github.ref_name }}
-          zip -r vibe-kanban-${{ github.ref_name }}.zip vibe-kanban-${{ github.ref_name }}
+          mkdir vibe-kanban-${{ needs.bump-version.outputs.new_tag }}
+          mv frontend/dist vibe-kanban-${{ needs.bump-version.outputs.new_tag }}
+          zip -r vibe-kanban-${{ needs.bump-version.outputs.new_tag }}.zip vibe-kanban-${{ needs.bump-version.outputs.new_tag }}
 
       - name: Setup Node for npm pack
         uses: ./.github/actions/setup-node
@@ -380,10 +390,10 @@ jobs:
       - name: Create GitHub Pre-Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Pre-release ${{ github.ref_name }}
+          tag_name: ${{ needs.bump-version.outputs.new_tag }}
+          name: Pre-release ${{ needs.bump-version.outputs.new_tag }}
           prerelease: true
           generate_release_notes: true
           files: |
-            vibe-kanban-${{ github.ref_name }}.zip
+            vibe-kanban-${{ needs.bump-version.outputs.new_tag }}.zip
             npx-cli/vibe-kanban-*.tgz
