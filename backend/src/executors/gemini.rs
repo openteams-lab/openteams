@@ -1,6 +1,8 @@
+use std::process::Stdio;
+
 use async_trait::async_trait;
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
-use tokio::process::Command;
+use tokio::{io::AsyncWriteExt, process::Command};
 use uuid::Uuid;
 
 use crate::{
@@ -32,8 +34,7 @@ impl Executor for GeminiExecutor {
             .ok_or(ExecutorError::TaskNotFound)?;
 
         let prompt = format!(
-            "Task title: {}
-            Task description: {}",
+            "Task title: {}\nTask description: {}",
             task.title,
             task.description
                 .as_deref()
@@ -42,23 +43,20 @@ impl Executor for GeminiExecutor {
 
         // Use shell command for cross-platform compatibility
         let (shell_cmd, shell_arg) = get_shell_command();
-        let gemini_command = format!(
-            "npx @google/gemini-cli --yolo -p \"{}\"",
-            prompt.replace("\"", "\\\"")
-        );
+        let gemini_command = "npx @google/gemini-cli --yolo";
 
         let mut command = Command::new(shell_cmd);
         command
             .kill_on_drop(true)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .current_dir(worktree_path)
             .arg(shell_arg)
-            .arg(&gemini_command)
+            .arg(gemini_command)
             .env("NODE_NO_WARNINGS", "1");
 
-        let child = command
+        let mut child = command
             .group_spawn() // Create new process group so we can kill entire tree
             .map_err(|e| {
                 crate::executor::SpawnContext::from_command(&command, "Gemini")
@@ -66,6 +64,23 @@ impl Executor for GeminiExecutor {
                     .with_context("Gemini CLI execution for new task")
                     .spawn_error(e)
             })?;
+
+        // Send the prompt via stdin instead of command line arguments
+        // This avoids Windows command line parsing issues
+        if let Some(mut stdin) = child.inner().stdin.take() {
+            stdin.write_all(prompt.as_bytes()).await.map_err(|e| {
+                let context = crate::executor::SpawnContext::from_command(&command, "Gemini")
+                    .with_task(task_id, Some(task.title.clone()))
+                    .with_context("Failed to write prompt to Gemini CLI stdin");
+                ExecutorError::spawn_failed(e, context)
+            })?;
+            stdin.shutdown().await.map_err(|e| {
+                let context = crate::executor::SpawnContext::from_command(&command, "Gemini")
+                    .with_task(task_id, Some(task.title.clone()))
+                    .with_context("Failed to close Gemini CLI stdin");
+                ExecutorError::spawn_failed(e, context)
+            })?;
+        }
 
         Ok(child)
     }
@@ -84,24 +99,20 @@ impl Executor for GeminiFollowupExecutor {
 
         // Use shell command for cross-platform compatibility
         let (shell_cmd, shell_arg) = get_shell_command();
-        let gemini_command = format!(
-            "npx @google/gemini-cli --yolo -p \"{}\" --resume={}",
-            self.prompt.replace("\"", "\\\""),
-            self.session_id
-        );
+        let gemini_command = format!("npx @google/gemini-cli --yolo --resume={}", self.session_id);
 
         let mut command = Command::new(shell_cmd);
         command
             .kill_on_drop(true)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .current_dir(worktree_path)
             .arg(shell_arg)
             .arg(&gemini_command)
             .env("NODE_NO_WARNINGS", "1");
 
-        let child = command
+        let mut child = command
             .group_spawn() // Create new process group so we can kill entire tree
             .map_err(|e| {
                 crate::executor::SpawnContext::from_command(&command, "Gemini")
@@ -111,6 +122,27 @@ impl Executor for GeminiFollowupExecutor {
                     ))
                     .spawn_error(e)
             })?;
+
+        // Send the prompt via stdin instead of command line arguments
+        // This avoids Windows command line parsing issues
+        if let Some(mut stdin) = child.inner().stdin.take() {
+            stdin.write_all(self.prompt.as_bytes()).await.map_err(|e| {
+                let context = crate::executor::SpawnContext::from_command(&command, "Gemini")
+                    .with_context(format!(
+                        "Failed to write prompt to Gemini CLI stdin for session {}",
+                        self.session_id
+                    ));
+                ExecutorError::spawn_failed(e, context)
+            })?;
+            stdin.shutdown().await.map_err(|e| {
+                let context = crate::executor::SpawnContext::from_command(&command, "Gemini")
+                    .with_context(format!(
+                        "Failed to close Gemini CLI stdin for session {}",
+                        self.session_id
+                    ));
+                ExecutorError::spawn_failed(e, context)
+            })?;
+        }
 
         Ok(child)
     }
