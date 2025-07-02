@@ -5,6 +5,8 @@ const path = require("path");
 const net = require("net");
 
 const PORTS_FILE = path.join(__dirname, "..", ".dev-ports.json");
+const DEV_ASSETS_SEED = path.join(__dirname, "..", "dev_assets_seed");
+const DEV_ASSETS = path.join(__dirname, "..", "dev_assets");
 
 /**
  * Check if a port is available
@@ -128,7 +130,26 @@ async function allocatePorts() {
  */
 async function getPorts() {
   const ports = await allocatePorts();
+  copyDevAssets();
   return ports;
+}
+
+/**
+ * Copy dev_assets_seed to dev_assets
+ */
+function copyDevAssets() {
+  try {
+    if (!fs.existsSync(DEV_ASSETS)) {
+      // Copy dev_assets_seed to dev_assets
+      fs.cpSync(DEV_ASSETS_SEED, DEV_ASSETS, { recursive: true });
+
+      if (process.argv[2] === "get") {
+        console.log("Copied dev_assets_seed to dev_assets");
+      }
+    }
+  } catch (error) {
+    console.error("Failed to copy dev assets:", error.message);
+  }
 }
 
 /**
@@ -183,15 +204,17 @@ if (require.main === module) {
     default:
       console.log("Usage:");
       console.log(
-        "  node manage-dev-ports.js get     - Get all ports (allocate if needed)"
+        "  node setup-dev-environment.js get     - Setup dev environment (ports + assets)"
       );
       console.log(
-        "  node manage-dev-ports.js frontend - Get frontend port only"
+        "  node setup-dev-environment.js frontend - Get frontend port only"
       );
       console.log(
-        "  node manage-dev-ports.js backend  - Get backend port only"
+        "  node setup-dev-environment.js backend  - Get backend port only"
       );
-      console.log("  node manage-dev-ports.js clear    - Clear saved ports");
+      console.log(
+        "  node setup-dev-environment.js clear    - Clear saved ports"
+      );
       break;
   }
 }
