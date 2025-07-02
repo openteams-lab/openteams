@@ -12,6 +12,7 @@ type Task = TaskWithAttemptStatus;
 
 interface TaskKanbanBoardProps {
   tasks: Task[];
+  searchQuery?: string;
   onDragEnd: (event: DragEndEvent) => void;
   onEditTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => void;
@@ -44,11 +45,25 @@ const statusBoardColors: Record<TaskStatus, string> = {
 
 export function TaskKanbanBoard({
   tasks,
+  searchQuery = '',
   onDragEnd,
   onEditTask,
   onDeleteTask,
   onViewTaskDetails,
 }: TaskKanbanBoardProps) {
+  const filterTasks = (tasks: Task[]) => {
+    if (!searchQuery.trim()) {
+      return tasks;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return tasks.filter(
+      (task) =>
+        task.title.toLowerCase().includes(query) ||
+        (task.description && task.description.toLowerCase().includes(query))
+    );
+  };
+
   const groupTasksByStatus = () => {
     const groups: Record<TaskStatus, Task[]> = {} as Record<TaskStatus, Task[]>;
 
@@ -57,7 +72,9 @@ export function TaskKanbanBoard({
       groups[status] = [];
     });
 
-    tasks.forEach((task) => {
+    const filteredTasks = filterTasks(tasks);
+
+    filteredTasks.forEach((task) => {
       // Convert old capitalized status to lowercase if needed
       const normalizedStatus = task.status.toLowerCase() as TaskStatus;
       if (groups[normalizedStatus]) {
