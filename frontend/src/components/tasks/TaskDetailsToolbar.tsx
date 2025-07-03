@@ -11,7 +11,6 @@ import {
   ArrowDown,
   Plus,
   RefreshCw,
-  FileText,
   GitPullRequest,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -128,9 +127,6 @@ export function TaskDetailsToolbar({
   const [branchStatusLoading, setBranchStatusLoading] = useState(false);
   const [merging, setMerging] = useState(false);
   const [rebasing, setRebasing] = useState(false);
-  const [rebaseSuccess, setRebaseSuccess] = useState(false);
-  const [showUncommittedWarning, setShowUncommittedWarning] = useState(false);
-  const [showMergeConfirmDialog, setShowMergeConfirmDialog] = useState(false);
   const [creatingPR, setCreatingPR] = useState(false);
   const [showCreatePRDialog, setShowCreatePRDialog] = useState(false);
   const [prTitle, setPrTitle] = useState('');
@@ -181,14 +177,8 @@ export function TaskDetailsToolbar({
   const handleMergeClick = async () => {
     if (!projectId || !task.id || !selectedAttempt?.id) return;
 
-    // Check for uncommitted changes and show warning dialog
-    if (branchStatus?.has_uncommitted_changes) {
-      setShowUncommittedWarning(true);
-      return;
-    }
-
-    // Show confirmation dialog for regular merge
-    setShowMergeConfirmDialog(true);
+    // Directly perform merge without checking branch status
+    await performMerge();
   };
 
   const performMerge = async () => {
@@ -209,7 +199,7 @@ export function TaskDetailsToolbar({
           // Refetch branch status to show updated state
           fetchBranchStatus();
         } else {
-          setError('Failed to merge changes');
+          setError(result.message || 'Failed to merge changes');
         }
       } else {
         setError('Failed to merge changes');
@@ -219,24 +209,6 @@ export function TaskDetailsToolbar({
     } finally {
       setMerging(false);
     }
-  };
-
-  const handleConfirmMergeWithUncommitted = async () => {
-    setShowUncommittedWarning(false);
-    await performMerge();
-  };
-
-  const handleCancelMergeWithUncommitted = () => {
-    setShowUncommittedWarning(false);
-  };
-
-  const handleConfirmMerge = async () => {
-    setShowMergeConfirmDialog(false);
-    await performMerge();
-  };
-
-  const handleCancelMerge = () => {
-    setShowMergeConfirmDialog(false);
   };
 
   const handleRebaseClick = async () => {
@@ -254,7 +226,6 @@ export function TaskDetailsToolbar({
       if (response.ok) {
         const result: ApiResponse<string> = await response.json();
         if (result.success) {
-          setRebaseSuccess(true);
           // Refresh branch status after rebase
           fetchBranchStatus();
         } else {
@@ -272,6 +243,12 @@ export function TaskDetailsToolbar({
 
   const handleCreatePRClick = async () => {
     if (!projectId || !task.id || !selectedAttempt?.id) return;
+
+    // If PR already exists, open it
+    if (selectedAttempt.pr_url) {
+      window.open(selectedAttempt.pr_url, '_blank');
+      return;
+    }
 
     // Auto-fill with task details if available
     setPrTitle(`${task.title} (vibe-kanban)`);
@@ -540,52 +517,10 @@ export function TaskDetailsToolbar({
   return (
     <>
       <div className="px-6 pb-4 border-b">
-        {/* Branch Status Display */}
-        {selectedAttempt && branchStatus && (
-          <div className="mb-4 p-3 bg-muted/10 rounded-lg border">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <GitBranchIcon className="h-4 w-4" />
-                  {branchStatus.up_to_date ? (
-                    <span className="text-green-600">Up to date</span>
-                  ) : branchStatus.is_behind === true ? (
-                    <span className="text-orange-600">
-                      {branchStatus.commits_behind} commit
-                      {branchStatus.commits_behind !== 1 ? 's' : ''} behind{' '}
-                      {branchStatus.base_branch_name}
-                    </span>
-                  ) : (
-                    <span className="text-blue-600">
-                      {branchStatus.commits_ahead} commit
-                      {branchStatus.commits_ahead !== 1 ? 's' : ''} ahead of{' '}
-                      {branchStatus.base_branch_name}
-                    </span>
-                  )}
-                </div>
-                {branchStatus.has_uncommitted_changes && (
-                  <div className="flex items-center gap-1 text-yellow-600">
-                    <FileText className="h-4 w-4" />
-                    <span>Uncommitted changes</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Status Messages */}
-              <div className="flex items-center gap-4">
-                {branchStatus.merged && (
-                  <div className="text-green-600 text-sm font-medium">
-                    ✓ Changes have been merged
-                  </div>
-                )}
-                {rebaseSuccess && (
-                  <div className="text-green-600 text-sm">
-                    Branch rebased successfully!
-                  </div>
-                )}
-                {error && <div className="text-red-600 text-sm">{error}</div>}
-              </div>
-            </div>
+        {/* Error Display */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="text-red-600 text-sm">{error}</div>
           </div>
         )}
 
@@ -859,7 +794,11 @@ export function TaskDetailsToolbar({
                                   className="border-blue-300 text-blue-700 hover:bg-blue-50 gap-1"
                                 >
                                   <GitPullRequest className="h-3 w-3" />
-                                  {creatingPR ? 'Creating...' : 'Create PR'}
+                                  {selectedAttempt.pr_url
+                                    ? 'Open PR'
+                                    : creatingPR
+                                      ? 'Creating...'
+                                      : 'Create PR'}
                                 </Button>
                                 <Button
                                   onClick={handleMergeClick}
@@ -933,84 +872,6 @@ export function TaskDetailsToolbar({
           </div>
         )}
       </div>
-
-      {/* Merge Confirmation Dialog */}
-      <Dialog
-        open={showMergeConfirmDialog}
-        onOpenChange={() => handleCancelMerge()}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Merge</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to merge the changes from this task branch
-              into {branchStatus?.base_branch_name || 'the base branch'}?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-              <p className="text-sm text-blue-800">
-                This will merge all committed changes from the task branch into{' '}
-                {branchStatus?.base_branch_name || 'the base branch'}. This
-                action cannot be undone.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCancelMerge}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmMerge}
-              disabled={merging}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {merging ? 'Merging...' : 'Confirm Merge'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Uncommitted Changes Warning Dialog */}
-      <Dialog
-        open={showUncommittedWarning}
-        onOpenChange={() => handleCancelMergeWithUncommitted()}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Uncommitted Changes Detected</DialogTitle>
-            <DialogDescription>
-              There are uncommitted changes in the worktree that will be
-              included in the merge.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-              <p className="text-sm text-yellow-800">
-                <strong>Warning:</strong> The worktree contains uncommitted
-                changes (modified, added, or deleted files) that have not been
-                committed to git. These changes will be permanently merged into
-                the {branchStatus?.base_branch_name || 'base'} branch.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={handleCancelMergeWithUncommitted}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmMergeWithUncommitted}
-              disabled={merging}
-              className="bg-yellow-600 hover:bg-yellow-700"
-            >
-              {merging ? 'Merging...' : 'Merge Anyway'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Create PR Dialog */}
       <Dialog
