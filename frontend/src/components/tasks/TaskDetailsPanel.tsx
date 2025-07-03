@@ -506,11 +506,15 @@ export function TaskDetailsPanel({
     }
 
     const isSetupRunning = executionState.execution_state === 'SetupRunning';
+    const isSetupComplete = executionState.execution_state === 'SetupComplete';
     const isSetupFailed = executionState.execution_state === 'SetupFailed';
     const isCodingAgentRunning =
       executionState.execution_state === 'CodingAgentRunning';
     const isCodingAgentComplete =
       executionState.execution_state === 'CodingAgentComplete';
+    const isCodingAgentFailed =
+      executionState.execution_state === 'CodingAgentFailed';
+    const isComplete = executionState.execution_state === 'Complete';
     const hasChanges = executionState.has_changes;
 
     // When setup script is running, show setup execution stdio
@@ -548,14 +552,100 @@ export function TaskDetailsPanel({
       );
     }
 
-    // When setup failed, show error message
+    // When setup failed, show error message and stderr
     if (isSetupFailed) {
+      const setupProcess = executionState.setup_process_id
+        ? attemptData.runningProcessDetails[executionState.setup_process_id]
+        : Object.values(attemptData.runningProcessDetails).find(
+            (process) => process.process_type === 'setupscript'
+          );
+
       return (
         <div className="flex-1 min-h-0 p-6 overflow-y-auto">
-          <div className="text-center py-8 text-destructive">
-            <p className="text-lg font-semibold mb-2">Setup Script Failed</p>
+          <div className="mb-4">
+            <p className="text-lg font-semibold mb-2 text-destructive">
+              Setup Script Failed
+            </p>
+            <p className="text-muted-foreground mb-4">
+              The setup script encountered an error. Error details below:
+            </p>
+          </div>
+
+          {setupProcess && (
+            <div className="font-mono text-sm whitespace-pre-wrap text-muted-foreground">
+              {(() => {
+                const stderr = setupProcess.stderr || '';
+                const stdout = setupProcess.stdout || '';
+                const combined = [stderr, stdout].filter(Boolean).join('\n');
+                return combined || 'No error output available';
+              })()}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // When coding agent failed, show error message and stderr
+    if (isCodingAgentFailed) {
+      const codingAgentProcess = executionState.coding_agent_process_id
+        ? attemptData.runningProcessDetails[
+            executionState.coding_agent_process_id
+          ]
+        : Object.values(attemptData.runningProcessDetails).find(
+            (process) => process.process_type === 'codingagent'
+          );
+
+      return (
+        <div className="flex-1 min-h-0 p-6 overflow-y-auto">
+          <div className="mb-4">
+            <p className="text-lg font-semibold mb-2 text-destructive">
+              Coding Agent Failed
+            </p>
+            <p className="text-muted-foreground mb-4">
+              The coding agent encountered an error. Error details below:
+            </p>
+          </div>
+
+          {codingAgentProcess && (
+            <div className="font-mono text-sm whitespace-pre-wrap text-muted-foreground">
+              {(() => {
+                const stderr = codingAgentProcess.stderr || '';
+                const stdout = codingAgentProcess.stdout || '';
+                const combined = [stderr, stdout].filter(Boolean).join('\n');
+                return combined || 'No error output available';
+              })()}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // When setup is complete but coding agent hasn't started, show waiting state
+    if (
+      isSetupComplete &&
+      !isCodingAgentRunning &&
+      !isCodingAgentComplete &&
+      !isCodingAgentFailed &&
+      !hasChanges
+    ) {
+      return (
+        <div className="flex-1 min-h-0 p-6 overflow-y-auto">
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-lg font-semibold mb-2">Setup Complete</p>
+            <p>Waiting for coding agent to start...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // When task is complete, show completion message
+    if (isComplete) {
+      return (
+        <div className="flex-1 min-h-0 p-6 overflow-y-auto">
+          <div className="text-center py-8 text-green-600">
+            <p className="text-lg font-semibold mb-2">Task Complete</p>
             <p className="text-muted-foreground">
-              The setup script encountered an error. Check the logs for details.
+              The task has been completed successfully.
             </p>
           </div>
         </div>
