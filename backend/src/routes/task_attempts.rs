@@ -12,18 +12,22 @@ use sqlx::SqlitePool;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::models::{
-    config::Config,
-    execution_process::{ExecutionProcess, ExecutionProcessSummary},
-    task::Task,
-    task_attempt::{
-        BranchStatus, CreateFollowUpAttempt, CreatePrParams, CreateTaskAttempt, TaskAttempt,
-        TaskAttemptStatus, WorktreeDiff,
+use crate::{
+    executor::{ExecutorConfig, NormalizedConversation},
+    models::{
+        config::Config,
+        execution_process::{ExecutionProcess, ExecutionProcessStatus, ExecutionProcessSummary},
+        executor_session::ExecutorSession,
+        task::Task,
+        task_attempt::{
+            BranchStatus, CreateFollowUpAttempt, CreatePrParams, CreateTaskAttempt, TaskAttempt,
+            TaskAttemptState, TaskAttemptStatus, WorktreeDiff,
+        },
+        task_attempt_activity::{
+            CreateTaskAttemptActivity, TaskAttemptActivity, TaskAttemptActivityWithPrompt,
+        },
+        ApiResponse,
     },
-    task_attempt_activity::{
-        CreateTaskAttemptActivity, TaskAttemptActivity, TaskAttemptActivityWithPrompt,
-    },
-    ApiResponse,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -948,6 +952,175 @@ pub async fn start_dev_server(
     }
 }
 
+pub async fn get_task_attempt_execution_state(
+    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
+    Extension(pool): Extension<SqlitePool>,
+) -> Result<ResponseJson<ApiResponse<TaskAttemptState>>, StatusCode> {
+    // Verify task attempt exists and belongs to the correct task
+    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+        Ok(false) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to check task attempt existence: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(true) => {}
+    }
+
+    // Get the execution state
+    match TaskAttempt::get_execution_state(&pool, attempt_id, task_id, project_id).await {
+        Ok(state) => Ok(ResponseJson(ApiResponse {
+            success: true,
+            data: Some(state),
+            message: None,
+        })),
+        Err(e) => {
+            tracing::error!(
+                "Failed to get execution state for task attempt {}: {}",
+                attempt_id,
+                e
+            );
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+pub async fn get_execution_process_normalized_logs(
+    Path((project_id, process_id)): Path<(Uuid, Uuid)>,
+    Extension(pool): Extension<SqlitePool>,
+) -> Result<ResponseJson<ApiResponse<NormalizedConversation>>, StatusCode> {
+    // Get the execution process and verify it belongs to the correct project
+    let process = match ExecutionProcess::find_by_id(&pool, process_id).await {
+        Ok(Some(process)) => process,
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to fetch execution process {}: {}", process_id, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // Verify the process belongs to a task attempt in the correct project
+    let attempt = match TaskAttempt::find_by_id(&pool, process.task_attempt_id).await {
+        Ok(Some(attempt)) => attempt,
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to fetch task attempt: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    let _task = match Task::find_by_id(&pool, attempt.task_id).await {
+        Ok(Some(task)) if task.project_id == project_id => task,
+        Ok(Some(_)) => return Err(StatusCode::NOT_FOUND), // Wrong project
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to fetch task: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // Get logs from the execution process
+    let logs = match process.stdout {
+        Some(stdout) => stdout,
+        None => {
+            // If the process is still running, return empty logs instead of an error
+            if process.status == ExecutionProcessStatus::Running {
+                // Get executor session data for this execution process
+                let executor_session =
+                    match ExecutorSession::find_by_execution_process_id(&pool, process_id).await {
+                        Ok(session) => session,
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to fetch executor session for process {}: {}",
+                                process_id,
+                                e
+                            );
+                            None
+                        }
+                    };
+
+                return Ok(ResponseJson(ApiResponse {
+                    success: true,
+                    data: Some(NormalizedConversation {
+                        entries: vec![],
+                        session_id: None,
+                        executor_type: process
+                            .executor_type
+                            .clone()
+                            .unwrap_or("unknown".to_string()),
+                        prompt: executor_session.as_ref().and_then(|s| s.prompt.clone()),
+                        summary: executor_session.as_ref().and_then(|s| s.summary.clone()),
+                    }),
+                    message: None,
+                }));
+            }
+
+            return Ok(ResponseJson(ApiResponse {
+                success: false,
+                data: None,
+                message: Some("No logs available for this execution process".to_string()),
+            }));
+        }
+    };
+
+    // Determine executor type and create appropriate executor for normalization
+    let executor_type = process.executor_type.as_deref().unwrap_or("unknown");
+    let executor_config = match executor_type {
+        "amp" => ExecutorConfig::Amp,
+        "claude" => ExecutorConfig::Claude,
+        "echo" => ExecutorConfig::Echo,
+        "gemini" => ExecutorConfig::Gemini,
+        "opencode" => ExecutorConfig::Opencode,
+        _ => {
+            return Ok(ResponseJson(ApiResponse {
+                success: false,
+                data: None,
+                message: Some(format!("Unsupported executor type: {}", executor_type)),
+            }));
+        }
+    };
+
+    let executor = executor_config.create_executor();
+
+    // Get executor session data for this execution process
+    let executor_session =
+        match ExecutorSession::find_by_execution_process_id(&pool, process_id).await {
+            Ok(session) => session,
+            Err(e) => {
+                tracing::error!(
+                    "Failed to fetch executor session for process {}: {}",
+                    process_id,
+                    e
+                );
+                None
+            }
+        };
+
+    // Normalize the logs
+    match executor.normalize_logs(&logs) {
+        Ok(mut normalized) => {
+            // Add prompt and summary from executor session
+            if let Some(session) = executor_session {
+                normalized.prompt = session.prompt;
+                normalized.summary = session.summary;
+            }
+
+            Ok(ResponseJson(ApiResponse {
+                success: true,
+                data: Some(normalized),
+                message: None,
+            }))
+        }
+        Err(e) => {
+            tracing::error!("Failed to normalize logs for process {}: {}", process_id, e);
+            Ok(ResponseJson(ApiResponse {
+                success: false,
+                data: None,
+                message: Some(format!("Failed to normalize logs: {}", e)),
+            }))
+        }
+    }
+}
+
 pub fn task_attempts_router() -> Router {
     use axum::routing::post;
 
@@ -1006,11 +1179,19 @@ pub fn task_attempts_router() -> Router {
             get(get_execution_process),
         )
         .route(
+            "/projects/:project_id/execution-processes/:process_id/normalized-logs",
+            get(get_execution_process_normalized_logs),
+        )
+        .route(
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/follow-up",
             post(create_followup_attempt),
         )
         .route(
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/start-dev-server",
             post(start_dev_server),
+        )
+        .route(
+            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id",
+            get(get_task_attempt_execution_state),
         )
 }

@@ -10,6 +10,7 @@ import type {
   ExecutionProcessSummary,
   EditorType,
   GitBranch,
+  TaskAttemptState,
 } from 'shared/types';
 
 export function useTaskDetails(
@@ -45,6 +46,9 @@ export function useTaskDetails(
   const [isHoveringDevServer, setIsHoveringDevServer] = useState(false);
   const [branches, setBranches] = useState<GitBranch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
+  const [executionState, setExecutionState] = useState<TaskAttemptState | null>(
+    null
+  );
 
   // Find running dev server in current project
   const runningDevServer = useMemo(() => {
@@ -153,6 +157,8 @@ export function useTaskDetails(
             );
 
             const runningProcessDetails: Record<string, ExecutionProcess> = {};
+
+            // Fetch details for running activities
             for (const activity of runningActivities) {
               try {
                 const detailResponse = await makeRequest(
@@ -174,6 +180,30 @@ export function useTaskDetails(
               }
             }
 
+            // Also fetch setup script process details if it exists in the processes
+            const setupProcess = processesResult.data.find(
+              (process) => process.process_type === 'setupscript'
+            );
+            if (setupProcess && !runningProcessDetails[setupProcess.id]) {
+              try {
+                const detailResponse = await makeRequest(
+                  `/api/projects/${projectId}/execution-processes/${setupProcess.id}`
+                );
+                if (detailResponse.ok) {
+                  const detailResult: ApiResponse<ExecutionProcess> =
+                    await detailResponse.json();
+                  if (detailResult.success && detailResult.data) {
+                    runningProcessDetails[setupProcess.id] = detailResult.data;
+                  }
+                }
+              } catch (err) {
+                console.error(
+                  `Failed to fetch setup process details ${setupProcess.id}:`,
+                  err
+                );
+              }
+            }
+
             setAttemptData({
               activities: activitiesResult.data,
               processes: processesResult.data,
@@ -183,6 +213,28 @@ export function useTaskDetails(
         }
       } catch (err) {
         console.error('Failed to fetch attempt data:', err);
+      }
+    },
+    [task, projectId]
+  );
+
+  const fetchExecutionState = useCallback(
+    async (attemptId: string) => {
+      if (!task) return;
+
+      try {
+        const response = await makeRequest(
+          `/api/projects/${projectId}/tasks/${task.id}/attempts/${attemptId}`
+        );
+
+        if (response.ok) {
+          const result: ApiResponse<TaskAttemptState> = await response.json();
+          if (result.success && result.data) {
+            setExecutionState(result.data);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch execution state:', err);
       }
     },
     [task, projectId]
@@ -210,6 +262,7 @@ export function useTaskDetails(
             );
             setSelectedAttempt(latestAttempt);
             fetchAttemptData(latestAttempt.id);
+            fetchExecutionState(latestAttempt.id);
           } else {
             setSelectedAttempt(null);
             setAttemptData({
@@ -225,7 +278,7 @@ export function useTaskDetails(
     } finally {
       setLoading(false);
     }
-  }, [task, projectId, fetchAttemptData]);
+  }, [task, projectId, fetchAttemptData, fetchExecutionState]);
 
   // Fetch dev server details when hovering
   const fetchDevServerDetails = useCallback(async () => {
@@ -280,6 +333,14 @@ export function useTaskDetails(
     }
   }, [task, isOpen, fetchTaskAttempts, fetchProjectBranches]);
 
+  // Load attempt data when selectedAttempt changes
+  useEffect(() => {
+    if (selectedAttempt && task) {
+      fetchAttemptData(selectedAttempt.id);
+      fetchExecutionState(selectedAttempt.id);
+    }
+  }, [selectedAttempt, task, fetchAttemptData, fetchExecutionState]);
+
   // Polling for updates when attempt is running
   useEffect(() => {
     if (!isAttemptRunning || !task) return;
@@ -287,11 +348,18 @@ export function useTaskDetails(
     const interval = setInterval(() => {
       if (selectedAttempt) {
         fetchAttemptData(selectedAttempt.id);
+        fetchExecutionState(selectedAttempt.id);
       }
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [isAttemptRunning, task, selectedAttempt, fetchAttemptData]);
+  }, [
+    isAttemptRunning,
+    task,
+    selectedAttempt,
+    fetchAttemptData,
+    fetchExecutionState,
+  ]);
 
   // Poll dev server details while hovering
   useEffect(() => {
@@ -310,6 +378,7 @@ export function useTaskDetails(
     if (attempt) {
       setSelectedAttempt(attempt);
       fetchAttemptData(attempt.id);
+      fetchExecutionState(attempt.id);
     }
   };
 
@@ -510,6 +579,7 @@ export function useTaskDetails(
     isHoveringDevServer,
     branches,
     selectedBranch,
+    executionState,
 
     // Computed
     runningDevServer,

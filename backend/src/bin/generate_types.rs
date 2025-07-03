@@ -112,6 +112,8 @@ fn main() {
         vibe_kanban::models::task_attempt::FileDiff::decl(),
         vibe_kanban::models::task_attempt::WorktreeDiff::decl(),
         vibe_kanban::models::task_attempt::BranchStatus::decl(),
+        vibe_kanban::models::task_attempt::ExecutionState::decl(),
+        vibe_kanban::models::task_attempt::TaskAttemptState::decl(),
         vibe_kanban::models::execution_process::ExecutionProcess::decl(),
         vibe_kanban::models::execution_process::ExecutionProcessSummary::decl(),
         vibe_kanban::models::execution_process::ExecutionProcessStatus::decl(),
@@ -121,6 +123,10 @@ fn main() {
         vibe_kanban::models::executor_session::ExecutorSession::decl(),
         vibe_kanban::models::executor_session::CreateExecutorSession::decl(),
         vibe_kanban::models::executor_session::UpdateExecutorSession::decl(),
+        vibe_kanban::executor::NormalizedConversation::decl(),
+        vibe_kanban::executor::NormalizedEntry::decl(),
+        vibe_kanban::executor::NormalizedEntryType::decl(),
+        vibe_kanban::executor::ActionType::decl(),
     ];
 
     // 4. Friendly banner

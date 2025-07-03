@@ -148,6 +148,29 @@ pub struct BranchStatus {
     pub base_branch_name: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub enum ExecutionState {
+    NotStarted,
+    SetupRunning,
+    SetupComplete,
+    SetupFailed,
+    CodingAgentRunning,
+    CodingAgentComplete,
+    CodingAgentFailed,
+    Complete,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TaskAttemptState {
+    pub execution_state: ExecutionState,
+    pub has_changes: bool,
+    pub has_setup_script: bool,
+    pub setup_process_id: Option<String>,
+    pub coding_agent_process_id: Option<String>,
+}
+
 impl TaskAttempt {
     pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
@@ -1241,9 +1264,154 @@ impl TaskAttempt {
                 None,
                 None,
             )?;
+
+            // Now also get unstaged changes (working directory changes)
+            let current_tree = worktree_repo.head()?.peel_to_tree()?;
+
+            // Create diff from HEAD to working directory for unstaged changes
+            let mut unstaged_diff_opts = git2::DiffOptions::new();
+            unstaged_diff_opts.context_lines(10);
+            unstaged_diff_opts.interhunk_lines(0);
+            unstaged_diff_opts.include_untracked(true); // Include untracked files
+
+            let unstaged_diff = worktree_repo.diff_tree_to_workdir_with_index(
+                Some(&current_tree),
+                Some(&mut unstaged_diff_opts),
+            )?;
+
+            // Process unstaged changes
+            unstaged_diff.foreach(
+                &mut |delta, _progress| {
+                    if let Some(path_str) = delta.new_file().path().and_then(|p| p.to_str()) {
+                        if let Err(e) = Self::process_unstaged_file(
+                            &mut files,
+                            &worktree_repo,
+                            base_oid,
+                            &attempt.worktree_path,
+                            path_str,
+                            &delta,
+                        ) {
+                            eprintln!("Error processing unstaged file {}: {:?}", path_str, e);
+                        }
+                    }
+                    true
+                },
+                None,
+                None,
+                None,
+            )?;
         }
 
         Ok(WorktreeDiff { files })
+    }
+
+    fn process_unstaged_file(
+        files: &mut Vec<FileDiff>,
+        worktree_repo: &Repository,
+        base_oid: git2::Oid,
+        worktree_path: &str,
+        path_str: &str,
+        delta: &git2::DiffDelta,
+    ) -> Result<(), TaskAttemptError> {
+        let old_file = delta.old_file();
+        let new_file = delta.new_file();
+
+        // Check if we already have a diff for this file from committed changes
+        if let Some(existing_file) = files.iter_mut().find(|f| f.path == path_str) {
+            // File already has committed changes, need to create a combined diff
+            // from the base branch to the current working directory (including unstaged changes)
+
+            // Get the base content (from the fork point)
+            let base_content = if let Ok(base_commit) = worktree_repo.find_commit(base_oid) {
+                if let Ok(base_tree) = base_commit.tree() {
+                    match base_tree.get_path(std::path::Path::new(path_str)) {
+                        Ok(entry) => {
+                            if let Ok(blob) = worktree_repo.find_blob(entry.id()) {
+                                String::from_utf8_lossy(blob.content()).to_string()
+                            } else {
+                                String::new()
+                            }
+                        }
+                        Err(_) => String::new(),
+                    }
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            };
+
+            // Get the working directory content
+            let working_content = if delta.status() != git2::Delta::Deleted {
+                let file_path = std::path::Path::new(worktree_path).join(path_str);
+                std::fs::read_to_string(&file_path).unwrap_or_default()
+            } else {
+                String::new()
+            };
+
+            // Create a combined diff from base to working directory
+            if base_content != working_content {
+                // Use git's patch generation with the content directly
+                let mut diff_opts = git2::DiffOptions::new();
+                diff_opts.context_lines(10);
+                diff_opts.interhunk_lines(0);
+
+                if let Ok(patch) = git2::Patch::from_buffers(
+                    base_content.as_bytes(),
+                    Some(std::path::Path::new(path_str)),
+                    working_content.as_bytes(),
+                    Some(std::path::Path::new(path_str)),
+                    Some(&mut diff_opts),
+                ) {
+                    let mut combined_chunks = Vec::new();
+
+                    // Process the patch hunks
+                    for hunk_idx in 0..patch.num_hunks() {
+                        if let Ok((_hunk, hunk_lines)) = patch.hunk(hunk_idx) {
+                            // Process each line in the hunk
+                            for line_idx in 0..hunk_lines {
+                                if let Ok(line) = patch.line_in_hunk(hunk_idx, line_idx) {
+                                    let content =
+                                        String::from_utf8_lossy(line.content()).to_string();
+
+                                    let chunk_type = match line.origin() {
+                                        ' ' => DiffChunkType::Equal,
+                                        '+' => DiffChunkType::Insert,
+                                        '-' => DiffChunkType::Delete,
+                                        _ => continue, // Skip other line types
+                                    };
+
+                                    combined_chunks.push(DiffChunk {
+                                        chunk_type,
+                                        content,
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    if !combined_chunks.is_empty() {
+                        existing_file.chunks = combined_chunks;
+                    }
+                }
+            }
+        } else {
+            // File only has unstaged changes (new file or uncommitted changes only)
+            match Self::generate_git_diff_chunks(worktree_repo, &old_file, &new_file, path_str) {
+                Ok(diff_chunks) if !diff_chunks.is_empty() => {
+                    files.push(FileDiff {
+                        path: path_str.to_string(),
+                        chunks: diff_chunks,
+                    });
+                }
+                Err(e) => {
+                    eprintln!("Error generating unstaged diff for {}: {:?}", path_str, e);
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
     }
 
     /// Generate diff chunks using Git's native diff algorithm
@@ -1784,5 +1952,129 @@ impl TaskAttempt {
         .await?;
 
         Ok(())
+    }
+
+    /// Get the current execution state for a task attempt
+    pub async fn get_execution_state(
+        pool: &SqlitePool,
+        attempt_id: Uuid,
+        task_id: Uuid,
+        project_id: Uuid,
+    ) -> Result<TaskAttemptState, TaskAttemptError> {
+        // Get the task attempt with validation
+        let _attempt = sqlx::query_as!(
+            TaskAttempt,
+            r#"SELECT ta.id as "id!: Uuid", ta.task_id as "task_id!: Uuid", ta.worktree_path, ta.branch, ta.merge_commit, ta.executor, ta.pr_url, ta.pr_number, ta.pr_status, ta.pr_merged_at as "pr_merged_at: DateTime<Utc>", ta.created_at as "created_at!: DateTime<Utc>", ta.updated_at as "updated_at!: DateTime<Utc>"
+               FROM task_attempts ta 
+               JOIN tasks t ON ta.task_id = t.id 
+               WHERE ta.id = $1 AND t.id = $2 AND t.project_id = $3"#,
+            attempt_id,
+            task_id,
+            project_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or(TaskAttemptError::TaskNotFound)?;
+
+        // Get the project to check if it has a setup script
+        let project = Project::find_by_id(pool, project_id)
+            .await?
+            .ok_or(TaskAttemptError::ProjectNotFound)?;
+
+        let has_setup_script = project
+            .setup_script
+            .as_ref()
+            .map(|script| !script.trim().is_empty())
+            .unwrap_or(false);
+
+        // Get all execution processes for this attempt, ordered by created_at
+        let processes =
+            crate::models::execution_process::ExecutionProcess::find_by_task_attempt_id(
+                pool, attempt_id,
+            )
+            .await?;
+
+        // Find setup and coding agent processes
+        let setup_process = processes.iter().find(|p| {
+            matches!(
+                p.process_type,
+                crate::models::execution_process::ExecutionProcessType::SetupScript
+            )
+        });
+
+        let coding_agent_process = processes.iter().find(|p| {
+            matches!(
+                p.process_type,
+                crate::models::execution_process::ExecutionProcessType::CodingAgent
+            )
+        });
+
+        // Determine execution state based on processes
+        let execution_state = if let Some(setup) = setup_process {
+            match setup.status {
+                crate::models::execution_process::ExecutionProcessStatus::Running => {
+                    ExecutionState::SetupRunning
+                }
+                crate::models::execution_process::ExecutionProcessStatus::Completed => {
+                    if let Some(agent) = coding_agent_process {
+                        match agent.status {
+                            crate::models::execution_process::ExecutionProcessStatus::Running => {
+                                ExecutionState::CodingAgentRunning
+                            }
+                            crate::models::execution_process::ExecutionProcessStatus::Completed => {
+                                ExecutionState::CodingAgentComplete
+                            }
+                            crate::models::execution_process::ExecutionProcessStatus::Failed => {
+                                ExecutionState::CodingAgentFailed
+                            }
+                            crate::models::execution_process::ExecutionProcessStatus::Killed => {
+                                ExecutionState::CodingAgentFailed
+                            }
+                        }
+                    } else {
+                        ExecutionState::SetupComplete
+                    }
+                }
+                crate::models::execution_process::ExecutionProcessStatus::Failed => {
+                    ExecutionState::SetupFailed
+                }
+                crate::models::execution_process::ExecutionProcessStatus::Killed => {
+                    ExecutionState::SetupFailed
+                }
+            }
+        } else if let Some(agent) = coding_agent_process {
+            // No setup script, only coding agent
+            match agent.status {
+                crate::models::execution_process::ExecutionProcessStatus::Running => {
+                    ExecutionState::CodingAgentRunning
+                }
+                crate::models::execution_process::ExecutionProcessStatus::Completed => {
+                    ExecutionState::CodingAgentComplete
+                }
+                crate::models::execution_process::ExecutionProcessStatus::Failed => {
+                    ExecutionState::CodingAgentFailed
+                }
+                crate::models::execution_process::ExecutionProcessStatus::Killed => {
+                    ExecutionState::CodingAgentFailed
+                }
+            }
+        } else {
+            // No processes started yet
+            ExecutionState::NotStarted
+        };
+
+        // Check if there are any changes (quick diff check)
+        let has_changes = match Self::get_diff(pool, attempt_id, task_id, project_id).await {
+            Ok(diff) => !diff.files.is_empty(),
+            Err(_) => false, // If diff fails, assume no changes
+        };
+
+        Ok(TaskAttemptState {
+            execution_state,
+            has_changes,
+            has_setup_script,
+            setup_process_id: setup_process.map(|p| p.id.to_string()),
+            coding_agent_process_id: coding_agent_process.map(|p| p.id.to_string()),
+        })
     }
 }

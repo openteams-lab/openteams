@@ -82,6 +82,10 @@ export type WorktreeDiff = { files: Array<FileDiff>, };
 
 export type BranchStatus = { is_behind: boolean, commits_behind: number, commits_ahead: number, up_to_date: boolean, merged: boolean, has_uncommitted_changes: boolean, base_branch_name: string, };
 
+export type ExecutionState = "NotStarted" | "SetupRunning" | "SetupComplete" | "SetupFailed" | "CodingAgentRunning" | "CodingAgentComplete" | "CodingAgentFailed" | "Complete";
+
+export type TaskAttemptState = { execution_state: ExecutionState, has_changes: boolean, has_setup_script: boolean, setup_process_id: string | null, coding_agent_process_id: string | null, };
+
 export type ExecutionProcess = { id: string, task_attempt_id: string, process_type: ExecutionProcessType, executor_type: string | null, status: ExecutionProcessStatus, command: string, args: string | null, working_directory: string, stdout: string | null, stderr: string | null, exit_code: bigint | null, started_at: string, completed_at: string | null, created_at: string, updated_at: string, };
 
 export type ExecutionProcessSummary = { id: string, task_attempt_id: string, process_type: ExecutionProcessType, executor_type: string | null, status: ExecutionProcessStatus, command: string, args: string | null, working_directory: string, exit_code: bigint | null, started_at: string, completed_at: string | null, created_at: string, updated_at: string, };
@@ -99,6 +103,14 @@ export type ExecutorSession = { id: string, task_attempt_id: string, execution_p
 export type CreateExecutorSession = { task_attempt_id: string, execution_process_id: string, prompt: string | null, };
 
 export type UpdateExecutorSession = { session_id: string | null, prompt: string | null, summary: string | null, };
+
+export type NormalizedConversation = { entries: Array<NormalizedEntry>, session_id: string | null, executor_type: string, prompt: string | null, summary: string | null, };
+
+export type NormalizedEntry = { timestamp: string | null, entry_type: NormalizedEntryType, content: string, };
+
+export type NormalizedEntryType = { "type": "user_message" } | { "type": "assistant_message" } | { "type": "tool_use", tool_name: string, action_type: ActionType, } | { "type": "system_message" } | { "type": "thinking" };
+
+export type ActionType = { "action": "file_read", path: string, } | { "action": "file_write", path: string, } | { "action": "command_run", command: string, } | { "action": "search", query: string, } | { "action": "web_fetch", url: string, } | { "action": "task_create", description: string, } | { "action": "other", description: string, };
 
 // Generated constants
 export const EXECUTOR_TYPES: string[] = [
