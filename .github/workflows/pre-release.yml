@@ -44,6 +44,15 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node
 
+      - name: Install cargo-edit
+        run: cargo install cargo-edit
+
+      - name: Cache cargo-edit
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin/cargo-set-version
+          key: cargo-edit-${{ runner.os }}
+
       - name: Generate branch suffix
         id: branch
         run: |
@@ -72,6 +81,8 @@ jobs:
           npm version $new_version --no-git-tag-version
           cd ..
           
+          cd backend && cargo set-version "$new_version"
+          
           echo "New version: $new_version"
           echo "new_version=$new_version" >> $GITHUB_OUTPUT
           echo "new_tag=v$new_version" >> $GITHUB_OUTPUT
@@ -80,7 +91,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add package.json npx-cli/package.json
+          git add package.json npx-cli/package.json backend/Cargo.toml
           git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
           git tag -a ${{ steps.version.outputs.new_tag }} -m "Release ${{ steps.version.outputs.new_tag }}"
           git push
