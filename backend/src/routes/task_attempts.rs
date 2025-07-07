@@ -1,15 +1,11 @@
-use std::sync::Arc;
-
 use axum::{
-    extract::{Extension, Path, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::Json as ResponseJson,
     routing::get,
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
-use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::{
@@ -45,10 +41,10 @@ pub struct CreateGitHubPRRequest {
 
 pub async fn get_task_attempts(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<Vec<TaskAttempt>>>, StatusCode> {
     // Verify task exists in project first
-    match Task::exists(&pool, task_id, project_id).await {
+    match Task::exists(&app_state.db_pool, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task existence: {}", e);
@@ -57,7 +53,7 @@ pub async fn get_task_attempts(
         Ok(true) => {}
     }
 
-    match TaskAttempt::find_by_task_id(&pool, task_id).await {
+    match TaskAttempt::find_by_task_id(&app_state.db_pool, task_id).await {
         Ok(attempts) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(attempts),
@@ -72,10 +68,10 @@ pub async fn get_task_attempts(
 
 pub async fn get_task_attempt_activities(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<Vec<TaskAttemptActivityWithPrompt>>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -85,7 +81,9 @@ pub async fn get_task_attempt_activities(
     }
 
     // Get activities with prompts for the task attempt
-    match TaskAttemptActivity::find_with_prompts_by_task_attempt_id(&pool, attempt_id).await {
+    match TaskAttemptActivity::find_with_prompts_by_task_attempt_id(&app_state.db_pool, attempt_id)
+        .await
+    {
         Ok(activities) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(activities),
@@ -104,12 +102,11 @@ pub async fn get_task_attempt_activities(
 
 pub async fn create_task_attempt(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::app_state::AppState>,
+    State(app_state): State<AppState>,
     Json(payload): Json<CreateTaskAttempt>,
 ) -> Result<ResponseJson<ApiResponse<TaskAttempt>>, StatusCode> {
     // Verify task exists in project first
-    match Task::exists(&pool, task_id, project_id).await {
+    match Task::exists(&app_state.db_pool, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task existence: {}", e);
@@ -120,7 +117,7 @@ pub async fn create_task_attempt(
 
     let executor_string = payload.executor.as_ref().map(|exec| exec.to_string());
 
-    match TaskAttempt::create(&pool, &payload, task_id).await {
+    match TaskAttempt::create(&app_state.db_pool, &payload, task_id).await {
         Ok(attempt) => {
             app_state
                 .track_analytics_event(
@@ -134,12 +131,11 @@ pub async fn create_task_attempt(
                 .await;
 
             // Start execution asynchronously (don't block the response)
-            let pool_clone = pool.clone();
             let app_state_clone = app_state.clone();
             let attempt_id = attempt.id;
             tokio::spawn(async move {
                 if let Err(e) = TaskAttempt::start_execution(
-                    &pool_clone,
+                    &app_state_clone.db_pool,
                     &app_state_clone,
                     attempt_id,
                     task_id,
@@ -170,11 +166,11 @@ pub async fn create_task_attempt(
 
 pub async fn create_task_attempt_activity(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
     Json(payload): Json<CreateTaskAttemptActivity>,
 ) -> Result<ResponseJson<ApiResponse<TaskAttemptActivity>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -191,7 +187,7 @@ pub async fn create_task_attempt_activity(
     }
 
     // Verify the execution process exists and belongs to this task attempt
-    match ExecutionProcess::find_by_id(&pool, payload.execution_process_id).await {
+    match ExecutionProcess::find_by_id(&app_state.db_pool, payload.execution_process_id).await {
         Ok(Some(process)) => {
             if process.task_attempt_id != attempt_id {
                 return Err(StatusCode::BAD_REQUEST);
@@ -210,7 +206,7 @@ pub async fn create_task_attempt_activity(
         .clone()
         .unwrap_or(TaskAttemptStatus::SetupRunning);
 
-    match TaskAttemptActivity::create(&pool, &payload, id, status).await {
+    match TaskAttemptActivity::create(&app_state.db_pool, &payload, id, status).await {
         Ok(activity) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(activity),
@@ -225,9 +221,9 @@ pub async fn create_task_attempt_activity(
 
 pub async fn get_task_attempt_diff(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<WorktreeDiff>>, StatusCode> {
-    match TaskAttempt::get_diff(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::get_diff(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(diff) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(diff),
@@ -243,11 +239,10 @@ pub async fn get_task_attempt_diff(
 #[axum::debug_handler]
 pub async fn merge_task_attempt(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<Arc<AppState>>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -256,11 +251,11 @@ pub async fn merge_task_attempt(
         Ok(true) => {}
     }
 
-    match TaskAttempt::merge_changes(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::merge_changes(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(_) => {
             // Update task status to Done
             if let Err(e) = Task::update_status(
-                &pool,
+                &app_state.db_pool,
                 task_id,
                 project_id,
                 crate::models::task::TaskStatus::Done,
@@ -298,12 +293,11 @@ pub async fn merge_task_attempt(
 
 pub async fn create_github_pr(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<Arc<AppState>>,
+    State(app_state): State<AppState>,
     Json(request): Json<CreateGitHubPRRequest>,
 ) -> Result<ResponseJson<ApiResponse<String>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -341,7 +335,7 @@ pub async fn create_github_pr(
         .unwrap_or_else(|| "main".to_string());
 
     match TaskAttempt::create_github_pr(
-        &pool,
+        &app_state.db_pool,
         CreatePrParams {
             attempt_id,
             task_id,
@@ -394,12 +388,11 @@ pub struct OpenEditorRequest {
 
 pub async fn open_task_attempt_in_editor(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(config): Extension<Arc<RwLock<crate::models::config::Config>>>,
+    State(app_state): State<AppState>,
     Json(payload): Json<Option<OpenEditorRequest>>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -409,7 +402,7 @@ pub async fn open_task_attempt_in_editor(
     }
 
     // Get the task attempt to access the worktree path
-    let attempt = match TaskAttempt::find_by_id(&pool, attempt_id).await {
+    let attempt = match TaskAttempt::find_by_id(&app_state.db_pool, attempt_id).await {
         Ok(Some(attempt)) => attempt,
         Ok(None) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
@@ -420,7 +413,7 @@ pub async fn open_task_attempt_in_editor(
 
     // Get editor command from config or override
     let editor_command = {
-        let config_guard = config.read().await;
+        let config_guard = app_state.get_config().read().await;
         if let Some(ref request) = payload {
             if let Some(ref editor_type) = request.editor_type {
                 // Create a temporary editor config with the override
@@ -482,9 +475,10 @@ pub async fn open_task_attempt_in_editor(
 
 pub async fn get_task_attempt_branch_status(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<BranchStatus>>, StatusCode> {
-    match TaskAttempt::get_branch_status(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::get_branch_status(&app_state.db_pool, attempt_id, task_id, project_id).await
+    {
         Ok(status) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(status),
@@ -504,11 +498,11 @@ pub async fn get_task_attempt_branch_status(
 #[axum::debug_handler]
 pub async fn rebase_task_attempt(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
     request_body: Option<Json<RebaseTaskAttemptRequest>>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -520,7 +514,14 @@ pub async fn rebase_task_attempt(
     // Extract new base branch from request body if provided
     let new_base_branch = request_body.and_then(|body| body.new_base_branch.clone());
 
-    match TaskAttempt::rebase_attempt(&pool, attempt_id, task_id, project_id, new_base_branch).await
+    match TaskAttempt::rebase_attempt(
+        &app_state.db_pool,
+        attempt_id,
+        task_id,
+        project_id,
+        new_base_branch,
+    )
+    .await
     {
         Ok(_new_base_commit) => Ok(ResponseJson(ApiResponse {
             success: true,
@@ -540,10 +541,10 @@ pub async fn rebase_task_attempt(
 
 pub async fn get_task_attempt_execution_processes(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<Vec<ExecutionProcessSummary>>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -552,7 +553,8 @@ pub async fn get_task_attempt_execution_processes(
         Ok(true) => {}
     }
 
-    match ExecutionProcess::find_summaries_by_task_attempt_id(&pool, attempt_id).await {
+    match ExecutionProcess::find_summaries_by_task_attempt_id(&app_state.db_pool, attempt_id).await
+    {
         Ok(processes) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(processes),
@@ -571,14 +573,14 @@ pub async fn get_task_attempt_execution_processes(
 
 pub async fn get_execution_process(
     Path((project_id, process_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<ExecutionProcess>>, StatusCode> {
-    match ExecutionProcess::find_by_id(&pool, process_id).await {
+    match ExecutionProcess::find_by_id(&app_state.db_pool, process_id).await {
         Ok(Some(process)) => {
             // Verify the process belongs to a task attempt in the correct project
-            match TaskAttempt::find_by_id(&pool, process.task_attempt_id).await {
+            match TaskAttempt::find_by_id(&app_state.db_pool, process.task_attempt_id).await {
                 Ok(Some(attempt)) => {
-                    match Task::find_by_id(&pool, attempt.task_id).await {
+                    match Task::find_by_id(&app_state.db_pool, attempt.task_id).await {
                         Ok(Some(task)) if task.project_id == project_id => {
                             Ok(ResponseJson(ApiResponse {
                                 success: true,
@@ -612,11 +614,10 @@ pub async fn get_execution_process(
 #[axum::debug_handler]
 pub async fn stop_all_execution_processes(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::app_state::AppState>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -626,17 +627,18 @@ pub async fn stop_all_execution_processes(
     }
 
     // Get all execution processes for the task attempt
-    let processes = match ExecutionProcess::find_by_task_attempt_id(&pool, attempt_id).await {
-        Ok(processes) => processes,
-        Err(e) => {
-            tracing::error!(
-                "Failed to fetch execution processes for attempt {}: {}",
-                attempt_id,
-                e
-            );
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    };
+    let processes =
+        match ExecutionProcess::find_by_task_attempt_id(&app_state.db_pool, attempt_id).await {
+            Ok(processes) => processes,
+            Err(e) => {
+                tracing::error!(
+                    "Failed to fetch execution processes for attempt {}: {}",
+                    attempt_id,
+                    e
+                );
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        };
 
     let mut stopped_count = 0;
     let mut errors = Vec::new();
@@ -649,7 +651,7 @@ pub async fn stop_all_execution_processes(
 
                 // Update the execution process status in the database
                 if let Err(e) = ExecutionProcess::update_completion(
-                    &pool,
+                    &app_state.db_pool,
                     process.id,
                     crate::models::execution_process::ExecutionProcessStatus::Killed,
                     None,
@@ -675,7 +677,7 @@ pub async fn stop_all_execution_processes(
                         };
 
                         if let Err(e) = TaskAttemptActivity::create(
-                            &pool,
+                            &app_state.db_pool,
                             &create_activity,
                             activity_id,
                             TaskAttemptStatus::ExecutorFailed,
@@ -734,11 +736,10 @@ pub async fn stop_all_execution_processes(
 #[axum::debug_handler]
 pub async fn stop_execution_process(
     Path((project_id, task_id, attempt_id, process_id)): Path<(Uuid, Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::app_state::AppState>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -748,7 +749,7 @@ pub async fn stop_execution_process(
     }
 
     // Verify execution process exists and belongs to the task attempt
-    let process = match ExecutionProcess::find_by_id(&pool, process_id).await {
+    let process = match ExecutionProcess::find_by_id(&app_state.db_pool, process_id).await {
         Ok(Some(process)) if process.task_attempt_id == attempt_id => process,
         Ok(Some(_)) => return Err(StatusCode::NOT_FOUND), // Process exists but wrong attempt
         Ok(None) => return Err(StatusCode::NOT_FOUND),
@@ -777,7 +778,7 @@ pub async fn stop_execution_process(
 
     // Update the execution process status in the database
     if let Err(e) = ExecutionProcess::update_completion(
-        &pool,
+        &app_state.db_pool,
         process_id,
         crate::models::execution_process::ExecutionProcessStatus::Killed,
         None,
@@ -804,7 +805,7 @@ pub async fn stop_execution_process(
         };
 
         if let Err(e) = TaskAttemptActivity::create(
-            &pool,
+            &app_state.db_pool,
             &create_activity,
             activity_id,
             TaskAttemptStatus::ExecutorFailed,
@@ -835,10 +836,10 @@ pub struct DeleteFileQuery {
 pub async fn delete_task_attempt_file(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
     Query(query): Query<DeleteFileQuery>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -847,7 +848,15 @@ pub async fn delete_task_attempt_file(
         Ok(true) => {}
     }
 
-    match TaskAttempt::delete_file(&pool, attempt_id, task_id, project_id, &query.file_path).await {
+    match TaskAttempt::delete_file(
+        &app_state.db_pool,
+        attempt_id,
+        task_id,
+        project_id,
+        &query.file_path,
+    )
+    .await
+    {
         Ok(_commit_id) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: None,
@@ -871,12 +880,11 @@ pub async fn delete_task_attempt_file(
 
 pub async fn create_followup_attempt(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::app_state::AppState>,
+    State(app_state): State<AppState>,
     Json(payload): Json<CreateFollowUpAttempt>,
 ) -> Result<ResponseJson<ApiResponse<String>>, StatusCode> {
     // Verify task attempt exists
-    if !TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id)
+    if !TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id)
         .await
         .map_err(|e| {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -888,7 +896,7 @@ pub async fn create_followup_attempt(
 
     // Start follow-up execution synchronously to catch errors
     match TaskAttempt::start_followup_execution(
-        &pool,
+        &app_state.db_pool,
         &app_state,
         attempt_id,
         task_id,
@@ -915,11 +923,10 @@ pub async fn create_followup_attempt(
 
 pub async fn start_dev_server(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::app_state::AppState>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -930,7 +937,9 @@ pub async fn start_dev_server(
 
     // Stop any existing dev servers for this project
     let existing_dev_servers =
-        match ExecutionProcess::find_running_dev_servers_by_project(&pool, project_id).await {
+        match ExecutionProcess::find_running_dev_servers_by_project(&app_state.db_pool, project_id)
+            .await
+        {
             Ok(servers) => servers,
             Err(e) => {
                 tracing::error!(
@@ -955,7 +964,7 @@ pub async fn start_dev_server(
         } else {
             // Update the execution process status in the database
             if let Err(e) = ExecutionProcess::update_completion(
-                &pool,
+                &app_state.db_pool,
                 dev_server.id,
                 crate::models::execution_process::ExecutionProcessStatus::Killed,
                 None,
@@ -972,7 +981,15 @@ pub async fn start_dev_server(
     }
 
     // Start dev server execution
-    match TaskAttempt::start_dev_server(&pool, &app_state, attempt_id, task_id, project_id).await {
+    match TaskAttempt::start_dev_server(
+        &app_state.db_pool,
+        &app_state,
+        attempt_id,
+        task_id,
+        project_id,
+    )
+    .await
+    {
         Ok(_) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: None,
@@ -995,10 +1012,10 @@ pub async fn start_dev_server(
 
 pub async fn get_task_attempt_execution_state(
     Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<TaskAttemptState>>, StatusCode> {
     // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check task attempt existence: {}", e);
@@ -1008,7 +1025,9 @@ pub async fn get_task_attempt_execution_state(
     }
 
     // Get the execution state
-    match TaskAttempt::get_execution_state(&pool, attempt_id, task_id, project_id).await {
+    match TaskAttempt::get_execution_state(&app_state.db_pool, attempt_id, task_id, project_id)
+        .await
+    {
         Ok(state) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(state),
@@ -1027,10 +1046,10 @@ pub async fn get_task_attempt_execution_state(
 
 pub async fn get_execution_process_normalized_logs(
     Path((project_id, process_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<NormalizedConversation>>, StatusCode> {
     // Get the execution process and verify it belongs to the correct project
-    let process = match ExecutionProcess::find_by_id(&pool, process_id).await {
+    let process = match ExecutionProcess::find_by_id(&app_state.db_pool, process_id).await {
         Ok(Some(process)) => process,
         Ok(None) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
@@ -1040,7 +1059,7 @@ pub async fn get_execution_process_normalized_logs(
     };
 
     // Verify the process belongs to a task attempt in the correct project
-    let attempt = match TaskAttempt::find_by_id(&pool, process.task_attempt_id).await {
+    let attempt = match TaskAttempt::find_by_id(&app_state.db_pool, process.task_attempt_id).await {
         Ok(Some(attempt)) => attempt,
         Ok(None) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
@@ -1049,7 +1068,7 @@ pub async fn get_execution_process_normalized_logs(
         }
     };
 
-    let _task = match Task::find_by_id(&pool, attempt.task_id).await {
+    let _task = match Task::find_by_id(&app_state.db_pool, attempt.task_id).await {
         Ok(Some(task)) if task.project_id == project_id => task,
         Ok(Some(_)) => return Err(StatusCode::NOT_FOUND), // Wrong project
         Ok(None) => return Err(StatusCode::NOT_FOUND),
@@ -1066,18 +1085,22 @@ pub async fn get_execution_process_normalized_logs(
             // If the process is still running, return empty logs instead of an error
             if process.status == ExecutionProcessStatus::Running {
                 // Get executor session data for this execution process
-                let executor_session =
-                    match ExecutorSession::find_by_execution_process_id(&pool, process_id).await {
-                        Ok(session) => session,
-                        Err(e) => {
-                            tracing::error!(
-                                "Failed to fetch executor session for process {}: {}",
-                                process_id,
-                                e
-                            );
-                            None
-                        }
-                    };
+                let executor_session = match ExecutorSession::find_by_execution_process_id(
+                    &app_state.db_pool,
+                    process_id,
+                )
+                .await
+                {
+                    Ok(session) => session,
+                    Err(e) => {
+                        tracing::error!(
+                            "Failed to fetch executor session for process {}: {}",
+                            process_id,
+                            e
+                        );
+                        None
+                    }
+                };
 
                 return Ok(ResponseJson(ApiResponse {
                     success: true,
@@ -1124,7 +1147,7 @@ pub async fn get_execution_process_normalized_logs(
 
     // Get executor session data for this execution process
     let executor_session =
-        match ExecutorSession::find_by_execution_process_id(&pool, process_id).await {
+        match ExecutorSession::find_by_execution_process_id(&app_state.db_pool, process_id).await {
             Ok(session) => session,
             Err(e) => {
                 tracing::error!(
@@ -1162,7 +1185,7 @@ pub async fn get_execution_process_normalized_logs(
     }
 }
 
-pub fn task_attempts_router() -> Router {
+pub fn task_attempts_router() -> Router<AppState> {
     use axum::routing::post;
 
     Router::new()

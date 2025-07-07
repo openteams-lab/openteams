@@ -1,25 +1,27 @@
 use axum::{
-    extract::{Extension, Path},
+    extract::{Path, State},
     http::StatusCode,
     response::Json as ResponseJson,
     routing::get,
     Json, Router,
 };
-use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use crate::models::{
-    project::Project,
-    task::{CreateTask, CreateTaskAndStart, Task, TaskWithAttemptStatus, UpdateTask},
-    task_attempt::{CreateTaskAttempt, TaskAttempt},
-    ApiResponse,
+use crate::{
+    app_state::AppState,
+    models::{
+        project::Project,
+        task::{CreateTask, CreateTaskAndStart, Task, TaskWithAttemptStatus, UpdateTask},
+        task_attempt::{CreateTaskAttempt, TaskAttempt},
+        ApiResponse,
+    },
 };
 
 pub async fn get_project_tasks(
     Path(project_id): Path<Uuid>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<Vec<TaskWithAttemptStatus>>>, StatusCode> {
-    match Task::find_by_project_id_with_attempt_status(&pool, project_id).await {
+    match Task::find_by_project_id_with_attempt_status(&app_state.db_pool, project_id).await {
         Ok(tasks) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(tasks),
@@ -34,9 +36,9 @@ pub async fn get_project_tasks(
 
 pub async fn get_task(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
-    match Task::find_by_id_and_project_id(&pool, task_id, project_id).await {
+    match Task::find_by_id_and_project_id(&app_state.db_pool, task_id, project_id).await {
         Ok(Some(task)) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(task),
@@ -57,8 +59,7 @@ pub async fn get_task(
 
 pub async fn create_task(
     Path(project_id): Path<Uuid>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::app_state::AppState>,
+    State(app_state): State<AppState>,
     Json(mut payload): Json<CreateTask>,
 ) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
     let id = Uuid::new_v4();
@@ -67,7 +68,7 @@ pub async fn create_task(
     payload.project_id = project_id;
 
     // Verify project exists first
-    match Project::exists(&pool, project_id).await {
+    match Project::exists(&app_state.db_pool, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check project existence: {}", e);
@@ -82,7 +83,7 @@ pub async fn create_task(
         project_id
     );
 
-    match Task::create(&pool, &payload, id).await {
+    match Task::create(&app_state.db_pool, &payload, id).await {
         Ok(task) => {
             // Track task creation event
             app_state
@@ -111,8 +112,7 @@ pub async fn create_task(
 
 pub async fn create_task_and_start(
     Path(project_id): Path<Uuid>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::app_state::AppState>,
+    State(app_state): State<AppState>,
     Json(mut payload): Json<CreateTaskAndStart>,
 ) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
     let task_id = Uuid::new_v4();
@@ -121,7 +121,7 @@ pub async fn create_task_and_start(
     payload.project_id = project_id;
 
     // Verify project exists first
-    match Project::exists(&pool, project_id).await {
+    match Project::exists(&app_state.db_pool, project_id).await {
         Ok(false) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
             tracing::error!("Failed to check project existence: {}", e);
@@ -142,7 +142,7 @@ pub async fn create_task_and_start(
         title: payload.title.clone(),
         description: payload.description.clone(),
     };
-    let task = match Task::create(&pool, &create_task_payload, task_id).await {
+    let task = match Task::create(&app_state.db_pool, &create_task_payload, task_id).await {
         Ok(task) => task,
         Err(e) => {
             tracing::error!("Failed to create task: {}", e);
@@ -157,7 +157,7 @@ pub async fn create_task_and_start(
         base_branch: None, // Not supported in task creation endpoint, only in task attempts
     };
 
-    match TaskAttempt::create(&pool, &attempt_payload, task_id).await {
+    match TaskAttempt::create(&app_state.db_pool, &attempt_payload, task_id).await {
         Ok(attempt) => {
             app_state
                 .track_analytics_event(
@@ -182,12 +182,11 @@ pub async fn create_task_and_start(
                 .await;
 
             // Start execution asynchronously (don't block the response)
-            let pool_clone = pool.clone();
             let app_state_clone = app_state.clone();
             let attempt_id = attempt.id;
             tokio::spawn(async move {
                 if let Err(e) = TaskAttempt::start_execution(
-                    &pool_clone,
+                    &app_state_clone.db_pool,
                     &app_state_clone,
                     attempt_id,
                     task_id,
@@ -218,25 +217,35 @@ pub async fn create_task_and_start(
 
 pub async fn update_task(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
     Json(payload): Json<UpdateTask>,
 ) -> Result<ResponseJson<ApiResponse<Task>>, StatusCode> {
     // Check if task exists in the specified project
-    let existing_task = match Task::find_by_id_and_project_id(&pool, task_id, project_id).await {
-        Ok(Some(task)) => task,
-        Ok(None) => return Err(StatusCode::NOT_FOUND),
-        Err(e) => {
-            tracing::error!("Failed to check task existence: {}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    };
+    let existing_task =
+        match Task::find_by_id_and_project_id(&app_state.db_pool, task_id, project_id).await {
+            Ok(Some(task)) => task,
+            Ok(None) => return Err(StatusCode::NOT_FOUND),
+            Err(e) => {
+                tracing::error!("Failed to check task existence: {}", e);
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        };
 
     // Use existing values if not provided in update
     let title = payload.title.unwrap_or(existing_task.title);
     let description = payload.description.or(existing_task.description);
     let status = payload.status.unwrap_or(existing_task.status);
 
-    match Task::update(&pool, task_id, project_id, title, description, status).await {
+    match Task::update(
+        &app_state.db_pool,
+        task_id,
+        project_id,
+        title,
+        description,
+        status,
+    )
+    .await
+    {
         Ok(task) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(task),
@@ -251,9 +260,9 @@ pub async fn update_task(
 
 pub async fn delete_task(
     Path((project_id, task_id)): Path<(Uuid, Uuid)>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
-    match Task::delete(&pool, task_id, project_id).await {
+    match Task::delete(&app_state.db_pool, task_id, project_id).await {
         Ok(rows_affected) => {
             if rows_affected == 0 {
                 Err(StatusCode::NOT_FOUND)
@@ -272,7 +281,7 @@ pub async fn delete_task(
     }
 }
 
-pub fn tasks_router() -> Router {
+pub fn tasks_router() -> Router<AppState> {
     use axum::routing::post;
 
     Router::new()

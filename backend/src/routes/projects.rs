@@ -1,28 +1,29 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use axum::{
-    extract::{Extension, Path, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::Json as ResponseJson,
     routing::get,
     Json, Router,
 };
-use sqlx::SqlitePool;
-use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::models::{
-    project::{
-        CreateBranch, CreateProject, GitBranch, Project, ProjectWithBranch, SearchMatchType,
-        SearchResult, UpdateProject,
+use crate::{
+    app_state::AppState,
+    models::{
+        project::{
+            CreateBranch, CreateProject, GitBranch, Project, ProjectWithBranch, SearchMatchType,
+            SearchResult, UpdateProject,
+        },
+        ApiResponse,
     },
-    ApiResponse,
 };
 
 pub async fn get_projects(
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<Vec<Project>>>, StatusCode> {
-    match Project::find_all(&pool).await {
+    match Project::find_all(&app_state.db_pool).await {
         Ok(projects) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(projects),
@@ -37,9 +38,9 @@ pub async fn get_projects(
 
 pub async fn get_project(
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
-    match Project::find_by_id(&pool, id).await {
+    match Project::find_by_id(&app_state.db_pool, id).await {
         Ok(Some(project)) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(project),
@@ -55,9 +56,9 @@ pub async fn get_project(
 
 pub async fn get_project_with_branch(
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<ProjectWithBranch>>, StatusCode> {
-    match Project::find_by_id(&pool, id).await {
+    match Project::find_by_id(&app_state.db_pool, id).await {
         Ok(Some(project)) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(project.with_branch_info()),
@@ -73,9 +74,9 @@ pub async fn get_project_with_branch(
 
 pub async fn get_project_branches(
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<Vec<GitBranch>>>, StatusCode> {
-    match Project::find_by_id(&pool, id).await {
+    match Project::find_by_id(&app_state.db_pool, id).await {
         Ok(Some(project)) => match project.get_all_branches() {
             Ok(branches) => Ok(ResponseJson(ApiResponse {
                 success: true,
@@ -97,7 +98,7 @@ pub async fn get_project_branches(
 
 pub async fn create_project_branch(
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
     Json(payload): Json<CreateBranch>,
 ) -> Result<ResponseJson<ApiResponse<GitBranch>>, StatusCode> {
     // Validate branch name
@@ -118,7 +119,7 @@ pub async fn create_project_branch(
         }));
     }
 
-    match Project::find_by_id(&pool, id).await {
+    match Project::find_by_id(&app_state.db_pool, id).await {
         Ok(Some(project)) => {
             match project.create_branch(&payload.name, payload.base_branch.as_deref()) {
                 Ok(branch) => Ok(ResponseJson(ApiResponse {
@@ -150,8 +151,7 @@ pub async fn create_project_branch(
 }
 
 pub async fn create_project(
-    Extension(pool): Extension<SqlitePool>,
-    Extension(app_state): Extension<crate::app_state::AppState>,
+    State(app_state): State<AppState>,
     Json(payload): Json<CreateProject>,
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
     let id = Uuid::new_v4();
@@ -159,7 +159,7 @@ pub async fn create_project(
     tracing::debug!("Creating project '{}'", payload.name);
 
     // Check if git repo path is already used by another project
-    match Project::find_by_git_repo_path(&pool, &payload.git_repo_path).await {
+    match Project::find_by_git_repo_path(&app_state.db_pool, &payload.git_repo_path).await {
         Ok(Some(_)) => {
             return Ok(ResponseJson(ApiResponse {
                 success: false,
@@ -249,7 +249,7 @@ pub async fn create_project(
         }
     }
 
-    match Project::create(&pool, &payload, id).await {
+    match Project::create(&app_state.db_pool, &payload, id).await {
         Ok(project) => {
             // Track project creation event
             app_state
@@ -279,11 +279,11 @@ pub async fn create_project(
 
 pub async fn update_project(
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
     Json(payload): Json<UpdateProject>,
 ) -> Result<ResponseJson<ApiResponse<Project>>, StatusCode> {
     // Check if project exists first
-    let existing_project = match Project::find_by_id(&pool, id).await {
+    let existing_project = match Project::find_by_id(&app_state.db_pool, id).await {
         Ok(Some(project)) => project,
         Ok(None) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
@@ -295,7 +295,13 @@ pub async fn update_project(
     // If git_repo_path is being changed, check if the new path is already used by another project
     if let Some(new_git_repo_path) = &payload.git_repo_path {
         if new_git_repo_path != &existing_project.git_repo_path {
-            match Project::find_by_git_repo_path_excluding_id(&pool, new_git_repo_path, id).await {
+            match Project::find_by_git_repo_path_excluding_id(
+                &app_state.db_pool,
+                new_git_repo_path,
+                id,
+            )
+            .await
+            {
                 Ok(Some(_)) => {
                     return Ok(ResponseJson(ApiResponse {
                         success: false,
@@ -329,7 +335,16 @@ pub async fn update_project(
     let name = name.unwrap_or(existing_project.name);
     let git_repo_path = git_repo_path.unwrap_or(existing_project.git_repo_path);
 
-    match Project::update(&pool, id, name, git_repo_path, setup_script, dev_script).await {
+    match Project::update(
+        &app_state.db_pool,
+        id,
+        name,
+        git_repo_path,
+        setup_script,
+        dev_script,
+    )
+    .await
+    {
         Ok(project) => Ok(ResponseJson(ApiResponse {
             success: true,
             data: Some(project),
@@ -344,9 +359,9 @@ pub async fn update_project(
 
 pub async fn delete_project(
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
-    match Project::delete(&pool, id).await {
+    match Project::delete(&app_state.db_pool, id).await {
         Ok(rows_affected) => {
             if rows_affected == 0 {
                 Err(StatusCode::NOT_FOUND)
@@ -372,12 +387,11 @@ pub struct OpenEditorRequest {
 
 pub async fn open_project_in_editor(
     Path(id): Path<Uuid>,
-    Extension(pool): Extension<SqlitePool>,
-    Extension(config): Extension<Arc<RwLock<crate::models::config::Config>>>,
+    State(app_state): State<AppState>,
     Json(payload): Json<Option<OpenEditorRequest>>,
 ) -> Result<ResponseJson<ApiResponse<()>>, StatusCode> {
     // Get the project
-    let project = match Project::find_by_id(&pool, id).await {
+    let project = match Project::find_by_id(&app_state.db_pool, id).await {
         Ok(Some(project)) => project,
         Ok(None) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
@@ -388,7 +402,7 @@ pub async fn open_project_in_editor(
 
     // Get editor command from config or override
     let editor_command = {
-        let config_guard = config.read().await;
+        let config_guard = app_state.get_config().read().await;
         if let Some(ref request) = payload {
             if let Some(ref editor_type) = request.editor_type {
                 // Create a temporary editor config with the override
@@ -451,7 +465,7 @@ pub async fn open_project_in_editor(
 pub async fn search_project_files(
     Path(id): Path<Uuid>,
     Query(params): Query<HashMap<String, String>>,
-    Extension(pool): Extension<SqlitePool>,
+    State(app_state): State<AppState>,
 ) -> Result<ResponseJson<ApiResponse<Vec<SearchResult>>>, StatusCode> {
     let query = match params.get("q") {
         Some(q) if !q.trim().is_empty() => q.trim(),
@@ -465,7 +479,7 @@ pub async fn search_project_files(
     };
 
     // Check if project exists
-    let project = match Project::find_by_id(&pool, id).await {
+    let project = match Project::find_by_id(&app_state.db_pool, id).await {
         Ok(Some(project)) => project,
         Ok(None) => return Err(StatusCode::NOT_FOUND),
         Err(e) => {
@@ -587,7 +601,7 @@ async fn search_files_in_repo(
     Ok(results)
 }
 
-pub fn projects_router() -> Router {
+pub fn projects_router() -> Router<AppState> {
     use axum::routing::post;
 
     Router::new()

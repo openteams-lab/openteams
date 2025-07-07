@@ -227,6 +227,10 @@ impl AppState {
         config.sound_file.clone()
     }
 
+    pub fn get_config(&self) -> &Arc<tokio::sync::RwLock<crate::models::config::Config>> {
+        &self.config
+    }
+
     pub async fn track_analytics_event(
         &self,
         event_name: &str,

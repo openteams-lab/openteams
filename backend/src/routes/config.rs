@@ -1,17 +1,18 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use axum::{
-    extract::{Extension, Query},
+    extract::{Query, State},
     response::Json as ResponseJson,
     routing::{get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::{fs, sync::RwLock};
+use tokio::fs;
 use ts_rs::TS;
 
 use crate::{
+    app_state::AppState,
     executor::ExecutorConfig,
     models::{
         config::{Config, EditorConstants, SoundConstants},
@@ -20,7 +21,7 @@ use crate::{
     utils,
 };
 
-pub fn config_router() -> Router {
+pub fn config_router() -> Router<AppState> {
     Router::new()
         .route("/config", get(get_config))
         .route("/config", post(update_config))
@@ -29,10 +30,8 @@ pub fn config_router() -> Router {
         .route("/mcp-servers", post(update_mcp_servers))
 }
 
-async fn get_config(
-    Extension(config): Extension<Arc<RwLock<Config>>>,
-) -> ResponseJson<ApiResponse<Config>> {
-    let config = config.read().await;
+async fn get_config(State(app_state): State<AppState>) -> ResponseJson<ApiResponse<Config>> {
+    let config = app_state.get_config().read().await;
     ResponseJson(ApiResponse {
         success: true,
         data: Some(config.clone()),
@@ -41,15 +40,14 @@ async fn get_config(
 }
 
 async fn update_config(
-    Extension(config_arc): Extension<Arc<RwLock<Config>>>,
-    Extension(app_state): Extension<crate::app_state::AppState>,
+    State(app_state): State<AppState>,
     Json(new_config): Json<Config>,
 ) -> ResponseJson<ApiResponse<Config>> {
     let config_path = utils::config_path();
 
     match new_config.save(&config_path) {
         Ok(_) => {
-            let mut config = config_arc.write().await;
+            let mut config = app_state.get_config().write().await;
             *config = new_config.clone();
             drop(config);
 
@@ -119,11 +117,11 @@ fn resolve_executor_config(
 }
 
 async fn get_mcp_servers(
-    Extension(config): Extension<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Query(query): Query<McpServerQuery>,
 ) -> ResponseJson<ApiResponse<Value>> {
     let saved_config = {
-        let config = config.read().await;
+        let config = app_state.get_config().read().await;
         config.executor.clone()
     };
 
@@ -171,12 +169,12 @@ async fn get_mcp_servers(
 }
 
 async fn update_mcp_servers(
-    Extension(config): Extension<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Query(query): Query<McpServerQuery>,
     Json(new_servers): Json<HashMap<String, Value>>,
 ) -> ResponseJson<ApiResponse<String>> {
     let saved_config = {
-        let config = config.read().await;
+        let config = app_state.get_config().read().await;
         config.executor.clone()
     };
 

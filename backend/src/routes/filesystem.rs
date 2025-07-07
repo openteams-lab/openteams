@@ -9,7 +9,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::models::ApiResponse;
+use crate::{app_state::AppState, models::ApiResponse};
 
 #[derive(Debug, Serialize, TS)]
 #[ts(export)]
@@ -199,7 +199,7 @@ pub async fn create_git_repo(
     }
 }
 
-pub fn filesystem_router() -> Router {
+pub fn filesystem_router() -> Router<AppState> {
     Router::new()
         .route("/filesystem/list", get(list_directory))
         .route("/filesystem/validate-git", get(validate_git_path))
