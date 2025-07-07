@@ -92,16 +92,18 @@ function extractAndRun(baseName, launch) {
   if (platform !== "win32") {
     try {
       fs.chmodSync(binPath, 0o755);
-    } catch {}
+    } catch { }
   }
   return launch(binPath);
 }
 
 if (isMcpMode) {
   extractAndRun("vibe-kanban-mcp", (bin) => {
-    const proc = spawn(bin, [], { stdio: ["pipe", "pipe", "inherit"] });
+    const proc = spawn(bin, [], { stdio: ["pipe", "pipe", "pipe"] });
     process.stdin.pipe(proc.stdin);
     proc.stdout.pipe(process.stdout);
+    proc.stderr.pipe(process.stdout);
+
     proc.on("exit", (c) => process.exit(c || 0));
     proc.on("error", (e) => {
       console.error("❌ MCP server error:", e.message);

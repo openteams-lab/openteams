@@ -134,6 +134,49 @@ export function McpServers() {
     }
   };
 
+  const handleConfigureVibeKanban = async () => {
+    if (!selectedMcpExecutor) return;
+
+    try {
+      // Parse existing configuration
+      const existingConfig = mcpServers.trim() ? JSON.parse(mcpServers) : {};
+
+      // Always use production MCP installation instructions
+      const vibeKanbanConfig = {
+        command: 'npx',
+        args: ['-y', 'vibe-kanban', '--mcp'],
+      };
+
+      // Add vibe_kanban to the existing configuration
+      let updatedConfig;
+      if (selectedMcpExecutor === 'amp') {
+        updatedConfig = {
+          ...existingConfig,
+          'amp.mcpServers': {
+            ...(existingConfig['amp.mcpServers'] || {}),
+            vibe_kanban: vibeKanbanConfig,
+          },
+        };
+      } else {
+        updatedConfig = {
+          ...existingConfig,
+          mcpServers: {
+            ...(existingConfig.mcpServers || {}),
+            vibe_kanban: vibeKanbanConfig,
+          },
+        };
+      }
+
+      // Update the textarea with the new configuration
+      const configJson = JSON.stringify(updatedConfig, null, 2);
+      setMcpServers(configJson);
+      setMcpError(null);
+    } catch (err) {
+      setMcpError('Failed to configure vibe-kanban MCP server');
+      console.error('Error configuring vibe-kanban:', err);
+    }
+  };
+
   const handleApplyMcpServers = async () => {
     if (!selectedMcpExecutor) return;
 
@@ -328,6 +371,19 @@ export function McpServers() {
                       )}
                     </span>
                   )}
+                </div>
+
+                <div className="pt-4">
+                  <Button
+                    onClick={handleConfigureVibeKanban}
+                    disabled={mcpApplying || mcpLoading || !selectedMcpExecutor}
+                    className="w-64"
+                  >
+                    Add Vibe-Kanban MCP
+                  </Button>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Automatically adds the Vibe-Kanban MCP server.
+                  </p>
                 </div>
               </div>
             )}
