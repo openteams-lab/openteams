@@ -16,9 +16,10 @@ import {
   ChevronUp,
   ToggleLeft,
   ToggleRight,
+  CheckSquare,
 } from 'lucide-react';
-import Markdown from 'react-markdown';
 import { makeRequest } from '@/lib/api';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import type {
   NormalizedConversation,
   NormalizedEntry,
@@ -50,7 +51,19 @@ const getEntryIcon = (entryType: NormalizedEntryType) => {
     return <AlertCircle className="h-4 w-4 text-red-600" />;
   }
   if (entryType.type === 'tool_use') {
-    const { action_type } = entryType;
+    const { action_type, tool_name } = entryType;
+
+    // Special handling for TODO tools
+    if (
+      tool_name &&
+      (tool_name.toLowerCase() === 'todowrite' ||
+        tool_name.toLowerCase() === 'todoread' ||
+        tool_name.toLowerCase() === 'todo_write' ||
+        tool_name.toLowerCase() === 'todo_read')
+    ) {
+      return <CheckSquare className="h-4 w-4 text-purple-600" />;
+    }
+
     if (action_type.action === 'file_read') {
       return <Eye className="h-4 w-4 text-orange-600" />;
     }
@@ -86,6 +99,18 @@ const getContentClassName = (entryType: NormalizedEntryType) => {
 
   if (entryType.type === 'error_message') {
     return `${baseClasses} text-red-600 font-mono bg-red-50 dark:bg-red-950/20 px-2 py-1 rounded`;
+  }
+
+  // Special styling for TODO lists
+  if (
+    entryType.type === 'tool_use' &&
+    entryType.tool_name &&
+    (entryType.tool_name.toLowerCase() === 'todowrite' ||
+      entryType.tool_name.toLowerCase() === 'todoread' ||
+      entryType.tool_name.toLowerCase() === 'todo_write' ||
+      entryType.tool_name.toLowerCase() === 'todo_read')
+  ) {
+    return `${baseClasses} font-mono text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/20 px-2 py-1 rounded`;
   }
 
   return baseClasses;
@@ -180,6 +205,37 @@ const clusterGeminiMessages = (
   flushCluster();
 
   return clustered;
+};
+
+// Helper function to determine if content should be rendered as markdown
+const shouldRenderMarkdown = (entryType: NormalizedEntryType) => {
+  // Render markdown for assistant messages and tool outputs that contain backticks
+  return (
+    entryType.type === 'assistant_message' ||
+    (entryType.type === 'tool_use' &&
+      entryType.tool_name &&
+      (entryType.tool_name.toLowerCase() === 'todowrite' ||
+        entryType.tool_name.toLowerCase() === 'todoread' ||
+        entryType.tool_name.toLowerCase() === 'todo_write' ||
+        entryType.tool_name.toLowerCase() === 'todo_read' ||
+        entryType.tool_name.toLowerCase() === 'glob' ||
+        entryType.tool_name.toLowerCase() === 'ls' ||
+        entryType.tool_name.toLowerCase() === 'list_directory' ||
+        entryType.tool_name.toLowerCase() === 'read' ||
+        entryType.tool_name.toLowerCase() === 'read_file' ||
+        entryType.tool_name.toLowerCase() === 'write' ||
+        entryType.tool_name.toLowerCase() === 'create_file' ||
+        entryType.tool_name.toLowerCase() === 'edit' ||
+        entryType.tool_name.toLowerCase() === 'edit_file' ||
+        entryType.tool_name.toLowerCase() === 'multiedit' ||
+        entryType.tool_name.toLowerCase() === 'bash' ||
+        entryType.tool_name.toLowerCase() === 'run_command' ||
+        entryType.tool_name.toLowerCase() === 'grep' ||
+        entryType.tool_name.toLowerCase() === 'search' ||
+        entryType.tool_name.toLowerCase() === 'webfetch' ||
+        entryType.tool_name.toLowerCase() === 'web_fetch' ||
+        entryType.tool_name.toLowerCase() === 'task'))
+  );
 };
 
 export function NormalizedConversationViewer({
@@ -358,7 +414,10 @@ export function NormalizedConversationViewer({
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm whitespace-pre-wrap text-foreground">
-              {conversation.prompt}
+              <MarkdownRenderer
+                content={conversation.prompt}
+                className="whitespace-pre-wrap break-words"
+              />
             </div>
           </div>
         </div>
@@ -391,7 +450,14 @@ export function NormalizedConversationViewer({
                   <div className={isExpanded ? 'space-y-2' : ''}>
                     <div className={getContentClassName(entry.entry_type)}>
                       {isExpanded ? (
-                        entry.content
+                        shouldRenderMarkdown(entry.entry_type) ? (
+                          <MarkdownRenderer
+                            content={entry.content}
+                            className="whitespace-pre-wrap break-words"
+                          />
+                        ) : (
+                          entry.content
+                        )
                       ) : (
                         <>
                           {entry.content.split('\n')[0]}
@@ -417,10 +483,11 @@ export function NormalizedConversationViewer({
                   </div>
                 ) : (
                   <div className={getContentClassName(entry.entry_type)}>
-                    {entry.entry_type.type === 'assistant_message' ? (
-                      <div className="[&>p]:mb-2 [&>ul]:list-disc [&>ul]:ml-4 [&>ol]:list-decimal [&>ol]:ml-4 [&>code]:bg-muted [&>code]:px-1 [&>code]:rounded [&>pre]:bg-muted [&>pre]:p-3 [&>pre]:rounded [&>h1]:font-bold [&>h2]:font-semibold">
-                        <Markdown>{entry.content}</Markdown>
-                      </div>
+                    {shouldRenderMarkdown(entry.entry_type) ? (
+                      <MarkdownRenderer
+                        content={entry.content}
+                        className="whitespace-pre-wrap break-words"
+                      />
                     ) : (
                       entry.content
                     )}
