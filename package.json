@@ -1,6 +1,6 @@
 {
   "name": "vibe-kanban",
-  "version": "0.0.39",
+  "version": "0.0.40-nbump.3",
   "private": true,
   "scripts": {
     "dev": "export FRONTEND_PORT=$(node scripts/setup-dev-environment.js frontend) && export BACKEND_PORT=$(node scripts/setup-dev-environment.js backend) && concurrently \"npm run backend:dev:watch\" \"npm run frontend:dev\"",

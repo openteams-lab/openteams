@@ -44,14 +44,16 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node
 
-      - name: Install cargo-edit
-        run: cargo install cargo-edit
-
       - name: Cache cargo-edit
         uses: actions/cache@v3
+        id: cache-cargo-edit
         with:
           path: ~/.cargo/bin/cargo-set-version
-          key: cargo-edit-${{ runner.os }}
+          key: cargo-edit-${{ runner.os }}-${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install cargo-edit
+        if: steps.cache-cargo-edit.outputs.cache-hit != 'true'
+        run: cargo install cargo-edit
 
       - name: Generate branch suffix
         id: branch
@@ -66,26 +68,38 @@ jobs:
       - name: Determine and update versions
         id: version
         run: |
-          # Update root package.json and get new version
+          # Get the latest version from npm registry
+          latest_npm_version=$(npm view vibe-kanban version 2>/dev/null || echo "0.0.0")
+          echo "Latest npm version: $latest_npm_version"
+          
+          timestamp=$(date +%Y%m%d%H%M%S)
+
+          # Update root package.json based on npm version, not current package.json
           if [[ "${{ github.event.inputs.version_type }}" == "prerelease" ]]; then
-            # For prerelease, add branch suffix to make it unique
+            # For prerelease, use current package.json version and add branch suffix
             npm version prerelease --preid="${{ steps.branch.outputs.suffix }}" --no-git-tag-version
+
+            new_version=$(node -p "require('./package.json').version")
+            new_tag="v${new_version}.${timestamp}"
           else
+            # For regular releases, use npm version and bump it
+            npm version $latest_npm_version --no-git-tag-version --allow-same-version
             npm version ${{ github.event.inputs.version_type }} --no-git-tag-version
+
+            new_version=$(node -p "require('./package.json').version")
+            new_tag="v${new_version}-${timestamp}"
           fi
-          
-          new_version=$(node -p "require('./package.json').version")
-          
+
           # Update npx-cli package.json to match
           cd npx-cli
           npm version $new_version --no-git-tag-version
           cd ..
-          
+
           cd backend && cargo set-version "$new_version"
-          
+
           echo "New version: $new_version"
           echo "new_version=$new_version" >> $GITHUB_OUTPUT
-          echo "new_tag=v$new_version" >> $GITHUB_OUTPUT
+          echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
 
       - name: Commit changes and create tag
         run: |
@@ -129,7 +143,7 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
         with:
-          release:  ${{ needs.bump-version.outputs.new_version }}
+          release: ${{ needs.bump-version.outputs.new_version }}
           environment: production
           sourcemaps: "./frontend/dist"
 
@@ -141,7 +155,7 @@ jobs:
           retention-days: 1
 
   build-backend:
-    needs: [bump-version, build-frontend]
+    needs: [ bump-version, build-frontend ]
     runs-on: ${{ matrix.os }}
     strategy:
       # Platform matrix - keep target/name in sync with package-npx-cli job
@@ -320,7 +334,7 @@ jobs:
           retention-days: 1
 
   package-npx-cli:
-    needs: [bump-version, build-frontend, build-backend]
+    needs: [ bump-version, build-frontend, build-backend ]
     runs-on: ubuntu-22.04
     strategy:
       # NOTE: This matrix must be kept in sync with build-backend job above
@@ -402,7 +416,7 @@ jobs:
           retention-days: 1
 
   create-prerelease:
-    needs: [bump-version, build-frontend, build-backend, package-npx-cli]
+    needs: [ bump-version, build-frontend, build-backend, package-npx-cli ]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
