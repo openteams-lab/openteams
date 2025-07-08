@@ -88,6 +88,7 @@ export function TaskDetailsPanel({
   const [diff, setDiff] = useState<WorktreeDiff | null>(null);
   const [diffLoading, setDiffLoading] = useState(true);
   const [diffError, setDiffError] = useState<string | null>(null);
+  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set()
   );
@@ -132,43 +133,54 @@ export function TaskDetailsPanel({
   const diffLoadingRef = useRef(false);
 
   // Fetch diff when attempt changes
-  const fetchDiff = useCallback(async () => {
-    if (!projectId || !selectedAttempt?.id || !selectedAttempt?.task_id) {
-      setDiff(null);
-      setDiffLoading(false);
-      return;
-    }
+  const fetchDiff = useCallback(
+    async (isBackgroundRefresh = false) => {
+      if (!projectId || !selectedAttempt?.id || !selectedAttempt?.task_id) {
+        setDiff(null);
+        setDiffLoading(false);
+        return;
+      }
 
-    // Prevent multiple concurrent requests
-    if (diffLoadingRef.current) {
-      return;
-    }
+      // Prevent multiple concurrent requests
+      if (diffLoadingRef.current) {
+        return;
+      }
 
-    try {
-      diffLoadingRef.current = true;
-      setDiffLoading(true);
-      setDiffError(null);
-      const response = await makeRequest(
-        `/api/projects/${projectId}/tasks/${selectedAttempt.task_id}/attempts/${selectedAttempt.id}/diff`
-      );
+      try {
+        diffLoadingRef.current = true;
+        if (isBackgroundRefresh) {
+          setIsBackgroundRefreshing(true);
+        } else {
+          setDiffLoading(true);
+        }
+        setDiffError(null);
+        const response = await makeRequest(
+          `/api/projects/${projectId}/tasks/${selectedAttempt.task_id}/attempts/${selectedAttempt.id}/diff`
+        );
 
-      if (response.ok) {
-        const result: ApiResponse<WorktreeDiff> = await response.json();
-        if (result.success && result.data) {
-          setDiff(result.data);
+        if (response.ok) {
+          const result: ApiResponse<WorktreeDiff> = await response.json();
+          if (result.success && result.data) {
+            setDiff(result.data);
+          } else {
+            setDiffError('Failed to load diff');
+          }
         } else {
           setDiffError('Failed to load diff');
         }
-      } else {
+      } catch (err) {
         setDiffError('Failed to load diff');
+      } finally {
+        diffLoadingRef.current = false;
+        if (isBackgroundRefresh) {
+          setIsBackgroundRefreshing(false);
+        } else {
+          setDiffLoading(false);
+        }
       }
-    } catch (err) {
-      setDiffError('Failed to load diff');
-    } finally {
-      diffLoadingRef.current = false;
-      setDiffLoading(false);
-    }
-  }, [projectId, selectedAttempt?.id, selectedAttempt?.task_id]);
+    },
+    [projectId, selectedAttempt?.id, selectedAttempt?.task_id]
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -185,11 +197,11 @@ export function TaskDetailsPanel({
 
     if (isCodingAgentRunning) {
       // Immediately refresh diff when coding agent starts running
-      fetchDiff();
+      fetchDiff(true);
 
       // Then refresh diff every 2 seconds while coding agent is active
       const interval = setInterval(() => {
-        fetchDiff();
+        fetchDiff(true);
       }, 2000);
 
       return () => {
@@ -867,9 +879,19 @@ export function TaskDetailsPanel({
                   <div
                     className={`flex items-center justify-between ${areAllFilesCollapsed() ? 'mb-1' : 'mb-3'}`}
                   >
-                    <div className="text-sm text-muted-foreground">
-                      {diff.files.length} file
-                      {diff.files.length !== 1 ? 's' : ''} changed
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm text-muted-foreground">
+                        {diff.files.length} file
+                        {diff.files.length !== 1 ? 's' : ''} changed
+                      </div>
+                      {isBackgroundRefreshing && (
+                        <div className="flex items-center gap-1">
+                          <div className="animate-spin h-3 w-3 border border-blue-500 border-t-transparent rounded-full"></div>
+                          <span className="text-xs text-blue-600 dark:text-blue-400">
+                            Updating...
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
