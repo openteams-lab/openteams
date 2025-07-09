@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use os_info;
 use serde_json::{json, Value};
 
 #[derive(Debug, Clone)]
@@ -75,6 +76,7 @@ impl AnalyticsService {
                     json!(chrono::Utc::now().to_rfc3339()),
                 );
                 props.insert("version".to_string(), json!(env!("CARGO_PKG_VERSION")));
+                props.insert("device".to_string(), get_device_info());
             }
             payload["properties"] = event_properties;
         }
@@ -165,6 +167,17 @@ pub fn generate_user_id() -> String {
     }
 
     format!("npm_user_{:016x}", hasher.finish())
+}
+
+fn get_device_info() -> Value {
+    let info = os_info::get();
+
+    json!({
+        "os_type": info.os_type().to_string(),
+        "os_version": info.version().to_string(),
+        "architecture": info.architecture().unwrap_or("unknown").to_string(),
+        "bitness": info.bitness().to_string(),
+    })
 }
 
 #[cfg(test)]
