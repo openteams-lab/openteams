@@ -1,6 +1,6 @@
 {
   "name": "vibe-kanban",
-  "version": "0.0.41",
+  "version": "0.0.42",
   "private": true,
   "scripts": {
     "dev": "export FRONTEND_PORT=$(node scripts/setup-dev-environment.js frontend) && export BACKEND_PORT=$(node scripts/setup-dev-environment.js backend) && export DISABLE_WORKTREE_ORPHAN_CLEANUP=1 && concurrently \"npm run backend:dev:watch\" \"npm run frontend:dev\"",
