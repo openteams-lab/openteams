@@ -12,6 +12,7 @@ pub struct Config {
     pub executor: ExecutorConfig,
     pub disclaimer_acknowledged: bool,
     pub onboarding_acknowledged: bool,
+    pub telemetry_acknowledged: bool,
     pub sound_alerts: bool,
     pub sound_file: SoundFile,
     pub push_notifications: bool,
@@ -158,12 +159,13 @@ impl Default for Config {
             executor: ExecutorConfig::Claude,
             disclaimer_acknowledged: false,
             onboarding_acknowledged: false,
+            telemetry_acknowledged: false,
             sound_alerts: true,
             sound_file: SoundFile::AbstractSound4,
             push_notifications: true,
             editor: EditorConfig::default(),
             github: GitHubConfig::default(),
-            analytics_enabled: Some(true),
+            analytics_enabled: None,
         }
     }
 }
