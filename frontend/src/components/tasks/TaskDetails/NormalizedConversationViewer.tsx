@@ -1,43 +1,42 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useContext, useEffect, useState } from 'react';
 import {
-  User,
-  Bot,
-  Eye,
-  Edit,
-  Terminal,
-  Search,
-  Globe,
-  Plus,
-  Settings,
-  Brain,
-  Hammer,
   AlertCircle,
+  Bot,
+  Brain,
+  CheckSquare,
   ChevronRight,
   ChevronUp,
+  Edit,
+  Eye,
+  Globe,
+  Hammer,
+  Plus,
+  Search,
+  Settings,
+  Terminal,
   ToggleLeft,
   ToggleRight,
-  CheckSquare,
+  User,
 } from 'lucide-react';
-import { makeRequest } from '@/lib/api';
-import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
-import { DiffCard } from './DiffCard';
+import { makeRequest } from '@/lib/api.ts';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer.tsx';
+import { DiffCard } from './DiffCard.tsx';
 import type {
+  ApiResponse,
+  ExecutionProcess,
   NormalizedConversation,
   NormalizedEntry,
   NormalizedEntryType,
-  ExecutionProcess,
-  ApiResponse,
   WorktreeDiff,
-} from 'shared/types';
+} from 'shared/types.ts';
+import { TaskDetailsContext } from '@/components/context/taskDetailsContext.ts';
 
 interface NormalizedConversationViewerProps {
   executionProcess: ExecutionProcess;
-  projectId: string;
   onConversationUpdate?: () => void;
   diff?: WorktreeDiff | null;
   isBackgroundRefreshing?: boolean;
-  onDeleteFile?: (filePath: string) => void;
-  deletingFiles?: Set<string>;
+  diffDeletable?: boolean;
 }
 
 const getEntryIcon = (entryType: NormalizedEntryType) => {
@@ -356,13 +355,10 @@ const shouldRenderMarkdown = (entryType: NormalizedEntryType) => {
 
 export function NormalizedConversationViewer({
   executionProcess,
-  projectId,
+  diffDeletable,
   onConversationUpdate,
-  diff,
-  isBackgroundRefreshing = false,
-  onDeleteFile,
-  deletingFiles = new Set(),
 }: NormalizedConversationViewerProps) {
+  const { projectId, diff } = useContext(TaskDetailsContext);
   const [conversation, setConversation] =
     useState<NormalizedConversation | null>(null);
   const [loading, setLoading] = useState(true);
@@ -642,9 +638,7 @@ export function NormalizedConversationViewer({
                 <div className="mt-4 mb-2">
                   <DiffCard
                     diff={incrementalDiff}
-                    isBackgroundRefreshing={isBackgroundRefreshing}
-                    onDeleteFile={onDeleteFile}
-                    deletingFiles={deletingFiles}
+                    deletable={diffDeletable}
                     compact={true}
                   />
                 </div>
