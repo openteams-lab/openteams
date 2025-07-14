@@ -13,7 +13,9 @@ use crate::{
     executor::{ExecutorConfig, NormalizedConversation, NormalizedEntry, NormalizedEntryType},
     models::{
         config::Config,
-        execution_process::{ExecutionProcess, ExecutionProcessStatus, ExecutionProcessSummary},
+        execution_process::{
+            ExecutionProcess, ExecutionProcessStatus, ExecutionProcessSummary, ExecutionProcessType,
+        },
         executor_session::ExecutorSession,
         task::Task,
         task_attempt::{
@@ -1215,22 +1217,33 @@ pub async fn get_execution_process_normalized_logs(
         if !stdout.trim().is_empty() {
             // Determine executor type and create appropriate executor for normalization
             let executor_type = process.executor_type.as_deref().unwrap_or("unknown");
-            let executor_config = match executor_type {
-                "amp" => ExecutorConfig::Amp,
-                "claude" => ExecutorConfig::Claude,
-                "echo" => ExecutorConfig::Echo,
-                "gemini" => ExecutorConfig::Gemini,
-                "opencode" => ExecutorConfig::Opencode,
-                _ => {
-                    tracing::warn!(
-                        "Unsupported executor type: {}, cannot normalize logs properly",
-                        executor_type
-                    );
-                    return Ok(ResponseJson(ApiResponse {
-                        success: false,
-                        data: None,
-                        message: Some(format!("Unsupported executor type: {}", executor_type)),
-                    }));
+
+            let executor_config = if process.process_type == ExecutionProcessType::SetupScript {
+                // For setup scripts, use the setup script executor
+                ExecutorConfig::SetupScript {
+                    script: executor_session
+                        .as_ref()
+                        .and_then(|s| s.prompt.clone())
+                        .unwrap_or_else(|| "setup script".to_string()),
+                }
+            } else {
+                match executor_type {
+                    "amp" => ExecutorConfig::Amp,
+                    "claude" => ExecutorConfig::Claude,
+                    "echo" => ExecutorConfig::Echo,
+                    "gemini" => ExecutorConfig::Gemini,
+                    "opencode" => ExecutorConfig::Opencode,
+                    _ => {
+                        tracing::warn!(
+                            "Unsupported executor type: {}, cannot normalize logs properly",
+                            executor_type
+                        );
+                        return Ok(ResponseJson(ApiResponse {
+                            success: false,
+                            data: None,
+                            message: Some(format!("Unsupported executor type: {}", executor_type)),
+                        }));
+                    }
                 }
             };
 
@@ -1248,9 +1261,9 @@ pub async fn get_execution_process_normalized_logs(
                 }
                 Err(_) => {
                     tracing::debug!(
-                        "Working directory {} no longer exists, using stored path for normalization",
-                        process.working_directory
-                    );
+                            "Working directory {} no longer exists, using stored path for normalization",
+                            process.working_directory
+                        );
                     process.working_directory.clone()
                 }
             };
@@ -1292,12 +1305,16 @@ pub async fn get_execution_process_normalized_logs(
             for chunk in chunks {
                 let chunk_trimmed = chunk.trim();
                 if !chunk_trimmed.is_empty() {
-                    stderr_entries.push(NormalizedEntry {
-                        timestamp: Some(chrono::Utc::now().to_rfc3339()),
-                        entry_type: NormalizedEntryType::ErrorMessage,
-                        content: chunk_trimmed.to_string(),
-                        metadata: None,
-                    });
+                    // Filter out any remaining boundary markers from the chunk content
+                    let filtered_content = chunk_trimmed.replace("---STDERR_CHUNK_BOUNDARY---", "");
+                    if !filtered_content.trim().is_empty() {
+                        stderr_entries.push(NormalizedEntry {
+                            timestamp: Some(chrono::Utc::now().to_rfc3339()),
+                            entry_type: NormalizedEntryType::ErrorMessage,
+                            content: filtered_content.trim().to_string(),
+                            metadata: None,
+                        });
+                    }
                 }
             }
 
@@ -1323,13 +1340,19 @@ pub async fn get_execution_process_normalized_logs(
     });
 
     // Create final normalized conversation
+    let executor_type = if process.process_type == ExecutionProcessType::SetupScript {
+        "setup_script".to_string()
+    } else {
+        process
+            .executor_type
+            .clone()
+            .unwrap_or("unknown".to_string())
+    };
+
     let normalized_conversation = NormalizedConversation {
         entries: all_entries,
         session_id: None,
-        executor_type: process
-            .executor_type
-            .clone()
-            .unwrap_or("unknown".to_string()),
+        executor_type,
         prompt: executor_session.as_ref().and_then(|s| s.prompt.clone()),
         summary: executor_session.as_ref().and_then(|s| s.summary.clone()),
     };
