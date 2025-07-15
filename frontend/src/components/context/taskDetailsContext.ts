@@ -1,12 +1,21 @@
 import { createContext, Dispatch, SetStateAction } from 'react';
 import type {
-  AttemptData,
   EditorType,
   TaskAttempt,
   TaskAttemptState,
   TaskWithAttemptStatus,
   WorktreeDiff,
+  TaskAttemptActivityWithPrompt,
+  ExecutionProcessSummary,
+  ExecutionProcess,
 } from 'shared/types.ts';
+
+// Frontend-only type for combining attempt data
+export interface AttemptData {
+  activities: TaskAttemptActivityWithPrompt[];
+  processes: ExecutionProcessSummary[];
+  runningProcessDetails: Record<string, ExecutionProcess>;
+}
 
 export interface TaskDetailsContextValue {
   task: TaskWithAttemptStatus;

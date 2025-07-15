@@ -12,7 +12,7 @@ import { useConfig } from './config-provider';
 import { Check, Clipboard } from 'lucide-react';
 import { Loader } from './ui/loader';
 import { githubAuthApi } from '../lib/api';
-import { StartGitHubDeviceFlowType } from 'shared/types.ts';
+import { DeviceStartResponse } from 'shared/types.ts';
 
 export function GitHubLoginDialog({
   open,
@@ -24,8 +24,9 @@ export function GitHubLoginDialog({
   const { config, loading, githubTokenInvalid } = useConfig();
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deviceState, setDeviceState] =
-    useState<null | StartGitHubDeviceFlowType>(null);
+  const [deviceState, setDeviceState] = useState<null | DeviceStartResponse>(
+    null
+  );
   const [polling, setPolling] = useState(false);
   const [copied, setCopied] = useState(false);
 

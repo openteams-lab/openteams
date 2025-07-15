@@ -10,7 +10,6 @@ import {
   useState,
 } from 'react';
 import type {
-  AttemptData,
   EditorType,
   ExecutionProcess,
   TaskAttempt,
@@ -18,6 +17,7 @@ import type {
   TaskWithAttemptStatus,
   WorktreeDiff,
 } from 'shared/types.ts';
+import type { AttemptData } from './taskDetailsContext';
 import { attemptsApi, executionProcessesApi } from '@/lib/api.ts';
 import {
   TaskAttemptDataContext,

@@ -107,6 +107,7 @@ fn main() {
         vibe_kanban::models::task_attempt_activity::TaskAttemptActivityWithPrompt::decl(),
         vibe_kanban::models::task_attempt_activity::CreateTaskAttemptActivity::decl(),
         vibe_kanban::routes::filesystem::DirectoryEntry::decl(),
+        vibe_kanban::routes::filesystem::DirectoryListResponse::decl(),
         vibe_kanban::models::task_attempt::DiffChunkType::decl(),
         vibe_kanban::models::task_attempt::DiffChunk::decl(),
         vibe_kanban::models::task_attempt::FileDiff::decl(),
@@ -127,6 +128,7 @@ fn main() {
         vibe_kanban::executor::NormalizedEntry::decl(),
         vibe_kanban::executor::NormalizedEntryType::decl(),
         vibe_kanban::executor::ActionType::decl(),
+        vibe_kanban::routes::auth::DeviceStartResponse::decl(),
     ];
 
     // 4. Friendly banner
