@@ -415,20 +415,18 @@ impl ProcessService {
                     )
                 })?;
 
-        // Determine the executor config from the stored executor_type
-        let executor_config = match most_recent_coding_agent.executor_type.as_deref() {
-            Some("claude") => crate::executor::ExecutorConfig::Claude,
-            Some("amp") => crate::executor::ExecutorConfig::Amp,
-            Some("gemini") => crate::executor::ExecutorConfig::Gemini,
-            Some("echo") => crate::executor::ExecutorConfig::Echo,
-            Some("opencode") => crate::executor::ExecutorConfig::Opencode,
+        let executor_config: crate::executor::ExecutorConfig = match most_recent_coding_agent
+            .executor_type
+            .as_deref()
+        {
+            Some(executor_str) => executor_str.parse().unwrap(),
             _ => {
                 tracing::error!(
-                    "Invalid or missing executor type '{}' for execution process {} (task attempt {})",
-                    most_recent_coding_agent.executor_type.as_deref().unwrap_or("None"),
-                    most_recent_coding_agent.id,
-                    attempt_id
-                );
+                                    "Invalid or missing executor type '{}' for execution process {} (task attempt {})",
+                                    most_recent_coding_agent.executor_type.as_deref().unwrap_or("None"),
+                                    most_recent_coding_agent.id,
+                                    attempt_id
+                                );
                 return Err(TaskAttemptError::ValidationError(format!(
                     "Invalid executor type for follow-up: {}",
                     most_recent_coding_agent
@@ -640,7 +638,7 @@ impl ProcessService {
             Some("claude") => crate::executor::ExecutorConfig::Claude,
             Some("amp") => crate::executor::ExecutorConfig::Amp,
             Some("gemini") => crate::executor::ExecutorConfig::Gemini,
-            Some("opencode") => crate::executor::ExecutorConfig::Opencode,
+            Some("charmopencode") => crate::executor::ExecutorConfig::CharmOpencode,
             _ => crate::executor::ExecutorConfig::Echo, // Default for "echo" or None
         }
     }
@@ -667,35 +665,13 @@ impl ProcessService {
                 None, // Dev servers don't have an executor type
             ),
             crate::executor::ExecutorType::CodingAgent(config) => {
-                let executor_type_str = match config {
-                    crate::executor::ExecutorConfig::Echo => "echo",
-                    crate::executor::ExecutorConfig::Claude => "claude",
-                    crate::executor::ExecutorConfig::Amp => "amp",
-                    crate::executor::ExecutorConfig::Gemini => "gemini",
-                    crate::executor::ExecutorConfig::Opencode => "opencode",
-                    crate::executor::ExecutorConfig::SetupScript { .. } => "setup_script",
-                };
-                (
-                    "executor".to_string(),
-                    None,
-                    Some(executor_type_str.to_string()),
-                )
+                ("executor".to_string(), None, Some(format!("{}", config)))
             }
-            crate::executor::ExecutorType::FollowUpCodingAgent { config, .. } => {
-                let executor_type_str = match config {
-                    crate::executor::ExecutorConfig::Echo => "echo",
-                    crate::executor::ExecutorConfig::Claude => "claude",
-                    crate::executor::ExecutorConfig::Amp => "amp",
-                    crate::executor::ExecutorConfig::Gemini => "gemini",
-                    crate::executor::ExecutorConfig::Opencode => "opencode",
-                    crate::executor::ExecutorConfig::SetupScript { .. } => "setup_script",
-                };
-                (
-                    "followup_executor".to_string(),
-                    None,
-                    Some(executor_type_str.to_string()),
-                )
-            }
+            crate::executor::ExecutorType::FollowUpCodingAgent { config, .. } => (
+                "followup_executor".to_string(),
+                None,
+                Some(format!("{}", config)),
+            ),
         };
 
         let create_process = CreateExecutionProcess {
@@ -803,8 +779,8 @@ impl ProcessService {
                 prompt,
             } => {
                 use crate::executors::{
-                    AmpFollowupExecutor, ClaudeFollowupExecutor, GeminiFollowupExecutor,
-                    OpencodeFollowupExecutor,
+                    AmpFollowupExecutor, CharmOpencodeFollowupExecutor, ClaudeFollowupExecutor,
+                    GeminiFollowupExecutor,
                 };
 
                 let executor: Box<dyn crate::executor::Executor> = match config {
@@ -839,9 +815,9 @@ impl ProcessService {
                         // Echo doesn't support followup, use regular echo
                         config.create_executor()
                     }
-                    crate::executor::ExecutorConfig::Opencode => {
+                    crate::executor::ExecutorConfig::CharmOpencode => {
                         if let Some(sid) = session_id {
-                            Box::new(OpencodeFollowupExecutor {
+                            Box::new(CharmOpencodeFollowupExecutor {
                                 session_id: sid.clone(),
                                 prompt: prompt.clone(),
                             })
