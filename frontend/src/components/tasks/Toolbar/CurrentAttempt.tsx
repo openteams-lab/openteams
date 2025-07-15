@@ -7,6 +7,7 @@ import {
   Plus,
   RefreshCw,
   StopCircle,
+  Settings,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -21,6 +22,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.tsx';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.tsx';
+import BranchSelector from '@/components/tasks/BranchSelector.tsx';
 import { attemptsApi, executionProcessesApi } from '@/lib/api.ts';
 import {
   Dispatch,
@@ -34,6 +44,7 @@ import {
 import type {
   BranchStatus,
   ExecutionProcess,
+  GitBranch,
   TaskAttempt,
 } from 'shared/types.ts';
 import {
@@ -77,6 +88,7 @@ type Props = {
     id: string;
     name: string;
   }[];
+  branches: GitBranch[];
 };
 
 function CurrentAttempt({
@@ -88,6 +100,7 @@ function CurrentAttempt({
   creatingPR,
   handleEnterCreateAttemptMode,
   availableExecutors,
+  branches,
 }: Props) {
   const { task, projectId, handleOpenInEditor, projectHasDevScript } =
     useContext(TaskDetailsContext);
@@ -107,6 +120,8 @@ function CurrentAttempt({
   const [isHoveringDevServer, setIsHoveringDevServer] = useState(false);
   const [branchStatus, setBranchStatus] = useState<BranchStatus | null>(null);
   const [branchStatusLoading, setBranchStatusLoading] = useState(false);
+  const [showRebaseDialog, setShowRebaseDialog] = useState(false);
+  const [selectedRebaseBranch, setSelectedRebaseBranch] = useState<string>('');
 
   const processedDevServerLogs = useMemo(() => {
     if (!devServerDetails) return 'No output yet...';
@@ -296,6 +311,38 @@ function CurrentAttempt({
     }
   };
 
+  const handleRebaseWithNewBranch = async (newBaseBranch: string) => {
+    if (!projectId || !selectedAttempt?.id || !selectedAttempt?.task_id) return;
+
+    try {
+      setRebasing(true);
+      await attemptsApi.rebase(
+        projectId,
+        selectedAttempt.task_id,
+        selectedAttempt.id,
+        newBaseBranch
+      );
+      // Refresh branch status after rebase
+      fetchBranchStatus();
+      setShowRebaseDialog(false);
+    } catch (err) {
+      setError('Failed to rebase branch');
+    } finally {
+      setRebasing(false);
+    }
+  };
+
+  const handleRebaseDialogConfirm = () => {
+    if (selectedRebaseBranch) {
+      handleRebaseWithNewBranch(selectedRebaseBranch);
+    }
+  };
+
+  const handleRebaseDialogOpen = () => {
+    setSelectedRebaseBranch('');
+    setShowRebaseDialog(true);
+  };
+
   const handleCreatePRClick = async () => {
     if (!projectId || !selectedAttempt?.id || !selectedAttempt?.task_id) return;
 
@@ -355,8 +402,28 @@ function CurrentAttempt({
         </div>
 
         <div>
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Base Branch
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+            <span>Base Branch</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRebaseDialogOpen}
+                    disabled={
+                      rebasing || branchStatusLoading || isAttemptRunning
+                    }
+                    className="h-4 w-4 p-0 hover:bg-muted"
+                  >
+                    <Settings className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Change base branch</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <div className="flex items-center gap-1.5">
             <GitBranchIcon className="h-3 w-3 text-muted-foreground" />
@@ -592,6 +659,49 @@ function CurrentAttempt({
           )}
         </div>
       </div>
+
+      {/* Rebase Dialog */}
+      <Dialog open={showRebaseDialog} onOpenChange={setShowRebaseDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rebase Task Attempt</DialogTitle>
+            <DialogDescription>
+              Choose a new base branch to rebase this task attempt onto.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="base-branch" className="text-sm font-medium">
+                Base Branch
+              </label>
+              <BranchSelector
+                branches={branches}
+                selectedBranch={selectedRebaseBranch}
+                onBranchSelect={setSelectedRebaseBranch}
+                placeholder="Select a base branch"
+                excludeCurrentBranch={false}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRebaseDialog(false)}
+              disabled={rebasing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRebaseDialogConfirm}
+              disabled={rebasing || !selectedRebaseBranch}
+            >
+              {rebasing ? 'Rebasing...' : 'Rebase'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

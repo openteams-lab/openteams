@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use git2::{
-    BranchType, DiffOptions, Error as GitError, RebaseOptions, Repository, WorktreeAddOptions,
+    BranchType, Cred, DiffOptions, Error as GitError, FetchOptions, RebaseOptions, RemoteCallbacks,
+    Repository, WorktreeAddOptions,
 };
 use regex;
 use tracing::{debug, info};
@@ -238,6 +239,19 @@ impl GitService {
         let worktree_repo = Repository::open(worktree_path)?;
         let main_repo = self.open_repo()?;
 
+        // Check if there's an existing rebase in progress and abort it
+        let state = worktree_repo.state();
+        if state == git2::RepositoryState::Rebase
+            || state == git2::RepositoryState::RebaseInteractive
+            || state == git2::RepositoryState::RebaseMerge
+        {
+            tracing::warn!("Existing rebase in progress, aborting it first");
+            // Try to abort the existing rebase
+            if let Ok(mut existing_rebase) = worktree_repo.open_rebase(None) {
+                let _ = existing_rebase.abort();
+            }
+        }
+
         // Get the target base branch reference
         let base_branch_name = match new_base_branch {
             Some(branch) => branch.to_string(),
@@ -249,10 +263,46 @@ impl GitService {
         };
         let base_branch_name = base_branch_name.as_str();
 
-        // Check if the specified base branch exists in the main repo
+        // Handle remote branches by fetching them first and creating/updating local tracking branches
+        let local_branch_name = if base_branch_name.starts_with("origin/") {
+            // This is a remote branch, fetch it and create/update local tracking branch
+            let remote_branch_name = base_branch_name.strip_prefix("origin/").unwrap();
+
+            // First, fetch the latest changes from remote
+            self.fetch_from_remote(&main_repo)?;
+
+            // Try to find the remote branch after fetch
+            let remote_branch = main_repo
+                .find_branch(base_branch_name, BranchType::Remote)
+                .map_err(|_| GitServiceError::BranchNotFound(base_branch_name.to_string()))?;
+
+            // Check if local tracking branch exists
+            match main_repo.find_branch(remote_branch_name, BranchType::Local) {
+                Ok(mut local_branch) => {
+                    // Local tracking branch exists, update it to match remote
+                    let remote_commit = remote_branch.get().peel_to_commit()?;
+                    local_branch
+                        .get_mut()
+                        .set_target(remote_commit.id(), "Update local branch to match remote")?;
+                }
+                Err(_) => {
+                    // Local tracking branch doesn't exist, create it
+                    let remote_commit = remote_branch.get().peel_to_commit()?;
+                    main_repo.branch(remote_branch_name, &remote_commit, false)?;
+                }
+            }
+
+            // Use the local branch name for rebase
+            remote_branch_name
+        } else {
+            // This is already a local branch
+            base_branch_name
+        };
+
+        // Get the local branch for rebase
         let base_branch = main_repo
-            .find_branch(base_branch_name, BranchType::Local)
-            .map_err(|_| GitServiceError::BranchNotFound(base_branch_name.to_string()))?;
+            .find_branch(local_branch_name, BranchType::Local)
+            .map_err(|_| GitServiceError::BranchNotFound(local_branch_name.to_string()))?;
 
         let base_commit_id = base_branch.get().peel_to_commit()?.id();
 
@@ -998,6 +1048,40 @@ impl GitService {
         push_result?;
 
         info!("Pushed branch {} to GitHub using HTTPS", branch_name);
+        Ok(())
+    }
+
+    /// Fetch from remote repository, with SSH authentication callbacks
+    fn fetch_from_remote(&self, repo: &Repository) -> Result<(), GitServiceError> {
+        // Find the “origin” remote
+        let mut remote = repo.find_remote("origin").map_err(|_| {
+            GitServiceError::Git(git2::Error::from_str("Remote 'origin' not found"))
+        })?;
+
+        // Prepare callbacks for authentication
+        let mut callbacks = RemoteCallbacks::new();
+        callbacks.credentials(|_url, username_from_url, _| {
+            // Try SSH agent first
+            if let Some(username) = username_from_url {
+                if let Ok(cred) = Cred::ssh_key_from_agent(username) {
+                    return Ok(cred);
+                }
+            }
+            // Fallback to key file (~/.ssh/id_rsa)
+            let home = dirs::home_dir()
+                .ok_or_else(|| git2::Error::from_str("Could not find home directory"))?;
+            let key_path = home.join(".ssh").join("id_rsa");
+            Cred::ssh_key(username_from_url.unwrap_or("git"), None, &key_path, None)
+        });
+
+        // Set up fetch options with our callbacks
+        let mut fetch_opts = FetchOptions::new();
+        fetch_opts.remote_callbacks(callbacks);
+
+        // Actually fetch (no specific refspecs = fetch all configured)
+        remote
+            .fetch(&[] as &[&str], Some(&mut fetch_opts), None)
+            .map_err(GitServiceError::Git)?;
         Ok(())
     }
 }
