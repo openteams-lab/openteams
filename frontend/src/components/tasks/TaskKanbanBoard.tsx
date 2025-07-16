@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import {
   type DragEndEvent,
   KanbanBoard,
@@ -8,6 +8,11 @@ import {
 } from '@/components/ui/shadcn-io/kanban';
 import { TaskCard } from './TaskCard';
 import type { TaskStatus, TaskWithAttemptStatus } from 'shared/types';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+  useKeyboardShortcuts,
+  useKanbanKeyboardNavigation,
+} from '@/lib/keyboard-shortcuts.ts';
 
 type Task = TaskWithAttemptStatus;
 
@@ -52,6 +57,22 @@ function TaskKanbanBoard({
   onDeleteTask,
   onViewTaskDetails,
 }: TaskKanbanBoardProps) {
+  const { projectId, taskId } = useParams<{
+    projectId: string;
+    taskId?: string;
+  }>();
+  const navigate = useNavigate();
+
+  useKeyboardShortcuts({
+    navigate,
+    currentPath: `/projects/${projectId}/tasks${taskId ? `/${taskId}` : ''}`,
+  });
+
+  const [focusedTaskId, setFocusedTaskId] = useState<string | null>(
+    taskId || null
+  );
+  const [focusedStatus, setFocusedStatus] = useState<TaskStatus | null>(null);
+
   // Memoize filtered tasks
   const filteredTasks = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -82,6 +103,42 @@ function TaskKanbanBoard({
     return groups;
   }, [filteredTasks]);
 
+  // Sync focus state with taskId param
+  useEffect(() => {
+    if (taskId) {
+      const found = filteredTasks.find((t) => t.id === taskId);
+      if (found) {
+        setFocusedTaskId(taskId);
+        setFocusedStatus((found.status.toLowerCase() as TaskStatus) || null);
+      }
+    }
+  }, [taskId, filteredTasks]);
+
+  // If no taskId in params, keep last focused, or focus first available
+  useEffect(() => {
+    if (!taskId && !focusedTaskId) {
+      for (const status of allTaskStatuses) {
+        if (groupedTasks[status] && groupedTasks[status].length > 0) {
+          setFocusedTaskId(groupedTasks[status][0].id);
+          setFocusedStatus(status);
+          break;
+        }
+      }
+    }
+  }, [taskId, focusedTaskId, groupedTasks]);
+
+  // Keyboard navigation handler
+  useKanbanKeyboardNavigation({
+    focusedTaskId,
+    setFocusedTaskId: (id) => setFocusedTaskId(id as string | null),
+    focusedStatus,
+    setFocusedStatus: (status) => setFocusedStatus(status as TaskStatus | null),
+    groupedTasks,
+    filteredTasks,
+    allTaskStatuses,
+    onViewTaskDetails,
+  });
+
   return (
     <KanbanProvider onDragEnd={onDragEnd}>
       {Object.entries(groupedTasks).map(([status, statusTasks]) => (
@@ -100,6 +157,8 @@ function TaskKanbanBoard({
                 onEdit={onEditTask}
                 onDelete={onDeleteTask}
                 onViewDetails={onViewTaskDetails}
+                isFocused={focusedTaskId === task.id}
+                tabIndex={focusedTaskId === task.id ? 0 : -1}
               />
             ))}
           </KanbanCards>

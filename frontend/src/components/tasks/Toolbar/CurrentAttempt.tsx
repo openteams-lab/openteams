@@ -6,8 +6,8 @@ import {
   Play,
   Plus,
   RefreshCw,
-  StopCircle,
   Settings,
+  StopCircle,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -55,6 +55,7 @@ import {
   TaskSelectedAttemptContext,
 } from '@/components/context/taskDetailsContext.ts';
 import { useConfig } from '@/components/config-provider.tsx';
+import { useKeyboardShortcuts } from '@/lib/keyboard-shortcuts.ts';
 
 // Helper function to get the display name for different editor types
 function getEditorDisplayName(editorType: string): string {
@@ -122,6 +123,7 @@ function CurrentAttempt({
   const [branchStatusLoading, setBranchStatusLoading] = useState(false);
   const [showRebaseDialog, setShowRebaseDialog] = useState(false);
   const [selectedRebaseBranch, setSelectedRebaseBranch] = useState<string>('');
+  const [showStopConfirmation, setShowStopConfirmation] = useState(false);
 
   const processedDevServerLogs = useMemo(() => {
     if (!devServerDetails) return 'No output yet...';
@@ -206,8 +208,8 @@ function CurrentAttempt({
     }
   };
 
-  const stopAllExecutions = async () => {
-    if (!task || !selectedAttempt) return;
+  const stopAllExecutions = useCallback(async () => {
+    if (!task || !selectedAttempt || !isAttemptRunning) return;
 
     try {
       setIsStopping(true);
@@ -225,7 +227,25 @@ function CurrentAttempt({
     } finally {
       setIsStopping(false);
     }
-  };
+  }, [
+    task,
+    selectedAttempt,
+    projectId,
+    fetchAttemptData,
+    setIsStopping,
+    isAttemptRunning,
+  ]);
+
+  useKeyboardShortcuts({
+    stopExecution: () => setShowStopConfirmation(true),
+    newAttempt: !isAttemptRunning ? handleEnterCreateAttemptMode : () => {},
+    hasOpenDialog: showStopConfirmation,
+    closeDialog: () => setShowStopConfirmation(false),
+    onEnter: () => {
+      setShowStopConfirmation(false);
+      stopAllExecutions();
+    },
+  });
 
   const handleAttemptChange = useCallback(
     (attempt: TaskAttempt) => {
@@ -698,6 +718,41 @@ function CurrentAttempt({
               disabled={rebasing || !selectedRebaseBranch}
             >
               {rebasing ? 'Rebasing...' : 'Rebase'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stop Execution Confirmation Dialog */}
+      <Dialog
+        open={showStopConfirmation}
+        onOpenChange={setShowStopConfirmation}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Stop Current Attempt?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to stop the current execution? This action
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowStopConfirmation(false)}
+              disabled={isStopping}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                setShowStopConfirmation(false);
+                await stopAllExecutions();
+              }}
+              disabled={isStopping}
+            >
+              {isStopping ? 'Stopping...' : 'Stop'}
             </Button>
           </DialogFooter>
         </DialogContent>

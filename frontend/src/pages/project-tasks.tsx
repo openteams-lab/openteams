@@ -69,7 +69,7 @@ export function ProjectTasks() {
     currentPath: `/projects/${projectId}/tasks`,
     hasOpenDialog: isTaskDialogOpen,
     closeDialog: () => setIsTaskDialogOpen(false),
-    openCreateTask: handleCreateNewTask,
+    onC: handleCreateNewTask,
   });
 
   useEffect(() => {
@@ -98,10 +98,8 @@ export function ProjectTasks() {
         });
         setIsPanelOpen(true);
       }
-    } else {
-      // Close panel when no taskId in URL
+    } else if (!taskId) {
       setIsPanelOpen(false);
-      setSelectedTask(null);
     }
   }, [taskId, tasks]);
 

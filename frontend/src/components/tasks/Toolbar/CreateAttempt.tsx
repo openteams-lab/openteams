@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useContext } from 'react';
+import { Dispatch, SetStateAction, useCallback, useContext } from 'react';
 import { Button } from '@/components/ui/button.tsx';
 import { ArrowDown, Play, Settings2, X } from 'lucide-react';
 import {
@@ -15,6 +15,16 @@ import {
 } from '@/components/context/taskDetailsContext.ts';
 import { useConfig } from '@/components/config-provider.tsx';
 import BranchSelector from '@/components/tasks/BranchSelector.tsx';
+import { useKeyboardShortcuts } from '@/lib/keyboard-shortcuts.ts';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.tsx';
+import { useState } from 'react';
 
 type Props = {
   branches: GitBranch[];
@@ -50,17 +60,63 @@ function CreateAttempt({
   const { isAttemptRunning } = useContext(TaskAttemptDataContext);
   const { config } = useConfig();
 
-  const onCreateNewAttempt = async (executor?: string, baseBranch?: string) => {
-    try {
-      await attemptsApi.create(projectId!, task.id, {
-        executor: executor || selectedExecutor,
-        base_branch: baseBranch || selectedBranch,
-      });
-      fetchTaskAttempts();
-    } catch (error) {
-      // Optionally handle error
-    }
-  };
+  const [showCreateAttemptConfirmation, setShowCreateAttemptConfirmation] =
+    useState(false);
+  const [pendingExecutor, setPendingExecutor] = useState<string | undefined>(
+    undefined
+  );
+  const [pendingBaseBranch, setPendingBaseBranch] = useState<
+    string | undefined
+  >(undefined);
+
+  // Create attempt logic
+  const actuallyCreateAttempt = useCallback(
+    async (executor?: string, baseBranch?: string) => {
+      try {
+        await attemptsApi.create(projectId!, task.id, {
+          executor: executor || selectedExecutor,
+          base_branch: baseBranch || selectedBranch,
+        });
+        fetchTaskAttempts();
+      } catch (error) {
+        // Optionally handle error
+      }
+    },
+    [projectId, task.id, selectedExecutor, selectedBranch, fetchTaskAttempts]
+  );
+
+  // Handler for Enter key or Start button
+  const onCreateNewAttempt = useCallback(
+    (executor?: string, baseBranch?: string, isKeyTriggered?: boolean) => {
+      if (task.status === 'todo' && isKeyTriggered) {
+        setPendingExecutor(executor);
+        setPendingBaseBranch(baseBranch);
+        setShowCreateAttemptConfirmation(true);
+      } else {
+        actuallyCreateAttempt(executor, baseBranch);
+        setShowCreateAttemptConfirmation(false);
+        setIsInCreateAttemptMode(false);
+      }
+    },
+    [task.status, actuallyCreateAttempt, setIsInCreateAttemptMode]
+  );
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onEnter: () => {
+      if (showCreateAttemptConfirmation) {
+        handleConfirmCreateAttempt();
+      } else {
+        onCreateNewAttempt(
+          createAttemptExecutor,
+          createAttemptBranch || undefined,
+          true
+        );
+      }
+    },
+    hasOpenDialog: showCreateAttemptConfirmation,
+    closeDialog: () => setShowCreateAttemptConfirmation(false),
+  });
 
   const handleExitCreateAttemptMode = () => {
     setIsInCreateAttemptMode(false);
@@ -68,7 +124,12 @@ function CreateAttempt({
 
   const handleCreateAttempt = () => {
     onCreateNewAttempt(createAttemptExecutor, createAttemptBranch || undefined);
-    handleExitCreateAttemptMode();
+  };
+
+  const handleConfirmCreateAttempt = () => {
+    actuallyCreateAttempt(pendingExecutor, pendingBaseBranch);
+    setShowCreateAttemptConfirmation(false);
+    setIsInCreateAttemptMode(false);
   };
 
   return (
@@ -158,7 +219,7 @@ function CreateAttempt({
               onClick={handleCreateAttempt}
               disabled={!createAttemptExecutor || isAttemptRunning}
               size="sm"
-              className="w-full text-xs"
+              className="w-full text-xs gap-2"
             >
               <Play className="h-3 w-3 mr-1.5" />
               Start
@@ -166,6 +227,31 @@ function CreateAttempt({
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={showCreateAttemptConfirmation}
+        onOpenChange={setShowCreateAttemptConfirmation}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Start New Attempt?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to start a new attempt for this task? This
+              will create a new session and branch.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateAttemptConfirmation(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmCreateAttempt}>Start</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
