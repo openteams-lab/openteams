@@ -9,11 +9,16 @@ import {
 } from 'react';
 import { TaskAttemptDataContext } from '@/components/context/taskDetailsContext.ts';
 import { Loader } from '@/components/ui/loader.tsx';
+import { Button } from '@/components/ui/button';
+import Prompt from './Prompt';
+import ConversationEntry from './ConversationEntry';
+import { ConversationEntryDisplayType } from '@/lib/types';
 
 function Conversation() {
   const { attemptData } = useContext(TaskAttemptDataContext);
   const [shouldAutoScrollLogs, setShouldAutoScrollLogs] = useState(true);
   const [conversationUpdateTrigger, setConversationUpdateTrigger] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(100);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -27,7 +32,7 @@ function Conversation() {
       scrollContainerRef.current.scrollTop =
         scrollContainerRef.current.scrollHeight;
     }
-  }, [attemptData.processes, conversationUpdateTrigger, shouldAutoScrollLogs]);
+  }, [attemptData.allLogs, conversationUpdateTrigger, shouldAutoScrollLogs]);
 
   const handleLogsScroll = useCallback(() => {
     if (scrollContainerRef.current) {
@@ -43,57 +48,128 @@ function Conversation() {
     }
   }, [shouldAutoScrollLogs]);
 
-  const mainCodingAgentProcess = useMemo(() => {
-    let mainCAProcess = Object.values(attemptData.runningProcessDetails).find(
-      (process) =>
-        process.process_type === 'codingagent' && process.command === 'executor'
-    );
+  // Find main and follow-up processes from allLogs
+  const mainCodingAgentLog = useMemo(
+    () =>
+      attemptData.allLogs.find(
+        (log) =>
+          log.process_type.toLowerCase() === 'codingagent' &&
+          log.command === 'executor'
+      ),
+    [attemptData.allLogs]
+  );
+  const followUpLogs = useMemo(
+    () =>
+      attemptData.allLogs.filter(
+        (log) =>
+          log.process_type.toLowerCase() === 'codingagent' &&
+          log.command === 'followup_executor'
+      ),
+    [attemptData.allLogs]
+  );
 
-    if (!mainCAProcess) {
-      const mainCodingAgentSummary = attemptData.processes.find(
-        (process) =>
-          process.process_type === 'codingagent' &&
-          process.command === 'executor'
-      );
+  // Combine all logs in order (main first, then follow-ups)
+  const allProcessLogs = useMemo(
+    () =>
+      [mainCodingAgentLog, ...followUpLogs].filter(Boolean) as Array<
+        NonNullable<typeof mainCodingAgentLog>
+      >,
+    [mainCodingAgentLog, followUpLogs]
+  );
 
-      if (mainCodingAgentSummary) {
-        mainCAProcess = Object.values(attemptData.runningProcessDetails).find(
-          (process) => process.id === mainCodingAgentSummary.id
-        );
-
-        if (!mainCAProcess) {
-          mainCAProcess = {
-            ...mainCodingAgentSummary,
-            stdout: null,
-            stderr: null,
-          } as any;
-        }
-      }
-    }
-    return mainCAProcess;
-  }, [attemptData.processes, attemptData.runningProcessDetails]);
-
-  const followUpProcesses = useMemo(() => {
-    return attemptData.processes
-      .filter(
-        (process) =>
-          process.process_type === 'codingagent' &&
-          process.command === 'followup_executor'
-      )
-      .map((summary) => {
-        const detailedProcess = Object.values(
-          attemptData.runningProcessDetails
-        ).find((process) => process.id === summary.id);
-        return (
-          detailedProcess ||
-          ({
-            ...summary,
-            stdout: null,
-            stderr: null,
-          } as any)
-        );
+  // Flatten all entries, keeping process info for each entry
+  const allEntries = useMemo(() => {
+    const entries: Array<ConversationEntryDisplayType> = [];
+    allProcessLogs.forEach((log, processIndex) => {
+      if (!log) return;
+      if (log.status === 'running') return; // Skip static entries for running processes
+      const processId = String(log.id); // Ensure string
+      const processPrompt = log.normalized_conversation.prompt || undefined; // Ensure undefined, not null
+      const entriesArr = log.normalized_conversation.entries || [];
+      entriesArr.forEach((entry, entryIndex) => {
+        entries.push({
+          entry,
+          processId,
+          processPrompt,
+          processStatus: log.status,
+          processIsRunning: false, // Only completed processes here
+          process: log,
+          isFirstInProcess: entryIndex === 0,
+          processIndex,
+          entryIndex,
+        });
       });
-  }, [attemptData.processes, attemptData.runningProcessDetails]);
+    });
+    // Sort by timestamp (entries without timestamp go last)
+    entries.sort((a, b) => {
+      if (a.entry.timestamp && b.entry.timestamp) {
+        return a.entry.timestamp.localeCompare(b.entry.timestamp);
+      }
+      if (a.entry.timestamp) return -1;
+      if (b.entry.timestamp) return 1;
+      return 0;
+    });
+    return entries;
+  }, [allProcessLogs]);
+
+  // Identify running processes (main + follow-ups)
+  const runningProcessLogs = useMemo(
+    () => allProcessLogs.filter((log) => log.status === 'running'),
+    [allProcessLogs]
+  );
+
+  // Paginate: show only the last visibleCount entries
+  const visibleEntries = useMemo(
+    () => allEntries.slice(-visibleCount),
+    [allEntries, visibleCount]
+  );
+
+  const renderedVisibleEntries = useMemo(
+    () =>
+      visibleEntries.map((entry, index) => (
+        <ConversationEntry
+          key={entry.entry.timestamp || index}
+          idx={index}
+          item={entry}
+          handleConversationUpdate={handleConversationUpdate}
+          visibleEntriesLength={visibleEntries.length}
+          runningProcessDetails={attemptData.runningProcessDetails}
+        />
+      )),
+    [
+      visibleEntries,
+      handleConversationUpdate,
+      attemptData.runningProcessDetails,
+    ]
+  );
+
+  const renderedRunningProcessLogs = useMemo(() => {
+    return runningProcessLogs.map((log, i) => {
+      const runningProcess = attemptData.runningProcessDetails[String(log.id)];
+      if (!runningProcess) return null;
+      // Show prompt only if this is the first entry in the process (i.e., no completed entries for this process)
+      const showPrompt =
+        log.normalized_conversation.prompt &&
+        !allEntries.some((e) => e.processId === String(log.id));
+      return (
+        <div key={String(log.id)} className={i > 0 ? 'mt-8' : ''}>
+          {showPrompt && (
+            <Prompt prompt={log.normalized_conversation.prompt || ''} />
+          )}
+          <NormalizedConversationViewer
+            executionProcess={runningProcess}
+            onConversationUpdate={handleConversationUpdate}
+            diffDeletable
+          />
+        </div>
+      );
+    });
+  }, [
+    runningProcessLogs,
+    attemptData.runningProcessDetails,
+    handleConversationUpdate,
+    allEntries,
+  ]);
 
   return (
     <div
@@ -101,29 +177,26 @@ function Conversation() {
       onScroll={handleLogsScroll}
       className="h-full overflow-y-auto"
     >
-      {mainCodingAgentProcess || followUpProcesses.length > 0 ? (
-        <div className="space-y-8">
-          {mainCodingAgentProcess && (
-            <div className="space-y-6">
-              <NormalizedConversationViewer
-                executionProcess={mainCodingAgentProcess}
-                onConversationUpdate={handleConversationUpdate}
-                diffDeletable
-              />
-            </div>
-          )}
-          {followUpProcesses.map((followUpProcess) => (
-            <div key={followUpProcess.id}>
-              <div className="border-t border-border mb-8"></div>
-              <NormalizedConversationViewer
-                executionProcess={followUpProcess}
-                onConversationUpdate={handleConversationUpdate}
-                diffDeletable
-              />
-            </div>
-          ))}
+      {visibleCount < allEntries.length && (
+        <div className="flex justify-center mb-4">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() =>
+              setVisibleCount((c) => Math.min(c + 100, allEntries.length))
+            }
+          >
+            Load previous logs
+          </Button>
         </div>
-      ) : (
+      )}
+      {visibleEntries.length > 0 && (
+        <div className="space-y-2">{renderedVisibleEntries}</div>
+      )}
+      {/* Render live viewers for running processes (after paginated list) */}
+      {renderedRunningProcessLogs}
+      {/* If nothing to show at all, show loader */}
+      {visibleEntries.length === 0 && runningProcessLogs.length === 0 && (
         <Loader
           message={
             <>

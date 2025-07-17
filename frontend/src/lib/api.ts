@@ -7,14 +7,14 @@ import {
   CreateTask,
   CreateTaskAndStart,
   CreateTaskAttempt,
-  DeviceStartResponse,
   CreateTaskTemplate,
+  DeviceStartResponse,
   DirectoryEntry,
   type EditorType,
   ExecutionProcess,
   ExecutionProcessSummary,
   GitBranch,
-  NormalizedConversation,
+  ProcessLogsResponse,
   Project,
   ProjectWithBranch,
   Task,
@@ -471,6 +471,17 @@ export const attemptsApi = {
     const response = await makeRequest(`/api/attempts/${attemptId}/details`);
     return handleApiResponse<TaskAttempt>(response);
   },
+
+  getAllLogs: async (
+    projectId: string,
+    taskId: string,
+    attemptId: string
+  ): Promise<ProcessLogsResponse[]> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/tasks/${taskId}/attempts/${attemptId}/logs`
+    );
+    return handleApiResponse(response);
+  },
 };
 
 // Execution Process APIs
@@ -483,16 +494,6 @@ export const executionProcessesApi = {
       `/api/projects/${projectId}/execution-processes/${processId}`
     );
     return handleApiResponse<ExecutionProcess>(response);
-  },
-
-  getNormalizedLogs: async (
-    projectId: string,
-    processId: string
-  ): Promise<NormalizedConversation> => {
-    const response = await makeRequest(
-      `/api/projects/${projectId}/execution-processes/${processId}/normalized-logs`
-    );
-    return handleApiResponse<NormalizedConversation>(response);
   },
 };
 
