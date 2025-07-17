@@ -79,7 +79,6 @@ const TaskDetailsProvider: FC<{
   );
 
   const [attemptData, setAttemptData] = useState<AttemptData>({
-    activities: [],
     processes: [],
     runningProcessDetails: {},
   });
@@ -234,29 +233,28 @@ const TaskDetailsProvider: FC<{
       if (!task) return;
 
       try {
-        const [activitiesResult, processesResult] = await Promise.all([
-          attemptsApi.getActivities(projectId, taskId, attemptId),
-          attemptsApi.getExecutionProcesses(projectId, taskId, attemptId),
-        ]);
+        const processesResult = await attemptsApi.getExecutionProcesses(
+          projectId,
+          taskId,
+          attemptId
+        );
 
-        if (activitiesResult !== undefined && processesResult !== undefined) {
-          const runningActivities = activitiesResult.filter(
-            (activity) =>
-              activity.status === 'setuprunning' ||
-              activity.status === 'executorrunning'
+        if (processesResult !== undefined) {
+          const runningProcesses = processesResult.filter(
+            (process) => process.status === 'running'
           );
 
           const runningProcessDetails: Record<string, ExecutionProcess> = {};
 
-          // Fetch details for running activities
-          for (const activity of runningActivities) {
+          // Fetch details for running processes
+          for (const process of runningProcesses) {
             const result = await executionProcessesApi.getDetails(
               projectId,
-              activity.execution_process_id
+              process.id
             );
 
             if (result !== undefined) {
-              runningProcessDetails[activity.execution_process_id] = result;
+              runningProcessDetails[process.id] = result;
             }
           }
 
@@ -277,7 +275,6 @@ const TaskDetailsProvider: FC<{
 
           setAttemptData((prev: AttemptData) => {
             const newData = {
-              activities: activitiesResult,
               processes: processesResult,
               runningProcessDetails,
             };

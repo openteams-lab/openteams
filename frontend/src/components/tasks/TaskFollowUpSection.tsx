@@ -25,21 +25,22 @@ export function TaskFollowUpSection() {
   const canSendFollowUp = useMemo(() => {
     if (
       !selectedAttempt ||
-      attemptData.activities.length === 0 ||
+      attemptData.processes.length === 0 ||
       isAttemptRunning ||
       isSendingFollowUp
     ) {
       return false;
     }
 
-    const codingAgentActivities = attemptData.activities.filter(
-      (activity) => activity.status === 'executorcomplete'
+    const completedCodingAgentProcesses = attemptData.processes.filter(
+      (process) =>
+        process.process_type === 'codingagent' && process.status === 'completed'
     );
 
-    return codingAgentActivities.length > 0;
+    return completedCodingAgentProcesses.length > 0;
   }, [
     selectedAttempt,
-    attemptData.activities,
+    attemptData.processes,
     isAttemptRunning,
     isSendingFollowUp,
   ]);

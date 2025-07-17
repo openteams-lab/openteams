@@ -19,7 +19,6 @@ import {
   ProjectWithBranch,
   Task,
   TaskAttempt,
-  TaskAttemptActivityWithPrompt,
   TaskAttemptState,
   TaskTemplate,
   TaskWithAttemptStatus,
@@ -316,17 +315,6 @@ export const attemptsApi = {
       }
     );
     return handleApiResponse<void>(response);
-  },
-
-  getActivities: async (
-    projectId: string,
-    taskId: string,
-    attemptId: string
-  ): Promise<TaskAttemptActivityWithPrompt[]> => {
-    const response = await makeRequest(
-      `/api/projects/${projectId}/tasks/${taskId}/attempts/${attemptId}/activities`
-    );
-    return handleApiResponse<TaskAttemptActivityWithPrompt[]>(response);
   },
 
   getDiff: async (

@@ -2,11 +2,9 @@ import {
   DiffChunkType,
   ExecutionProcess,
   ExecutionProcessSummary,
-  TaskAttemptActivityWithPrompt,
 } from 'shared/types.ts';
 
 export type AttemptData = {
-  activities: TaskAttemptActivityWithPrompt[];
   processes: ExecutionProcessSummary[];
   runningProcessDetails: Record<string, ExecutionProcess>;
 };

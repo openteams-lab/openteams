@@ -171,7 +171,6 @@ function TaskDetailsToolbar() {
       } else {
         setSelectedAttempt(null);
         setAttemptData({
-          activities: [],
           processes: [],
           runningProcessDetails: {},
         });

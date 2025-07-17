@@ -9,8 +9,7 @@ use crate::{
         executor_session::{CreateExecutorSession, ExecutorSession},
         project::Project,
         task::Task,
-        task_attempt::{TaskAttempt, TaskAttemptError, TaskAttemptStatus},
-        task_attempt_activity::{CreateTaskAttemptActivity, TaskAttemptActivity},
+        task_attempt::{TaskAttempt, TaskAttemptError},
     },
     utils::shell::get_shell_command,
 };
@@ -120,14 +119,7 @@ impl ProcessService {
         )
         .await?;
 
-        // Create activity record
-        Self::create_activity_record(
-            pool,
-            process_id,
-            TaskAttemptStatus::SetupRunning,
-            "Starting setup script with delegation",
-        )
-        .await?;
+        // Setup script starting with delegation
 
         tracing::info!(
             "Starting setup script with delegation to {} for task attempt {}",
@@ -218,7 +210,6 @@ impl ProcessService {
             task_id,
             crate::executor::ExecutorType::CodingAgent(executor_config),
             "Starting executor".to_string(),
-            TaskAttemptStatus::ExecutorRunning,
             ExecutionProcessType::CodingAgent,
             &task_attempt.worktree_path,
         )
@@ -286,7 +277,6 @@ impl ProcessService {
             task_id,
             crate::executor::ExecutorType::DevServer(dev_script),
             "Starting dev server".to_string(),
-            TaskAttemptStatus::ExecutorRunning, // Dev servers don't create activities, just use generic status
             ExecutionProcessType::DevServer,
             &worktree_path,
         )
@@ -466,7 +456,6 @@ impl ProcessService {
             task_id,
             followup_executor,
             "Starting follow-up executor".to_string(),
-            TaskAttemptStatus::ExecutorRunning,
             ExecutionProcessType::CodingAgent,
             &worktree_path,
         )
@@ -492,7 +481,6 @@ impl ProcessService {
                 task_id,
                 new_session_executor,
                 "Starting new executor session (follow-up session failed)".to_string(),
-                TaskAttemptStatus::ExecutorRunning,
                 ExecutionProcessType::CodingAgent,
                 &worktree_path,
             )
@@ -514,7 +502,6 @@ impl ProcessService {
         task_id: Uuid,
         executor_type: crate::executor::ExecutorType,
         activity_note: String,
-        activity_status: TaskAttemptStatus,
         process_type: ExecutionProcessType,
         worktree_path: &str,
     ) -> Result<(), TaskAttemptError> {
@@ -550,11 +537,7 @@ impl ProcessService {
             .await?;
         }
 
-        // Create activity record (skip for dev servers as they run in parallel)
-        if !matches!(process_type, ExecutionProcessType::DevServer) {
-            Self::create_activity_record(pool, process_id, activity_status.clone(), &activity_note)
-                .await?;
-        }
+        // Process started successfully
 
         tracing::info!("Starting {} for task attempt {}", activity_note, attempt_id);
 
@@ -625,7 +608,6 @@ impl ProcessService {
             task_id,
             crate::executor::ExecutorType::SetupScript(setup_script.clone()),
             "Starting setup script".to_string(),
-            TaskAttemptStatus::SetupRunning,
             ExecutionProcessType::SetupScript,
             worktree_path,
         )
@@ -716,26 +698,6 @@ impl ProcessService {
         };
 
         ExecutorSession::create(pool, &create_session, session_id)
-            .await
-            .map(|_| ())
-            .map_err(TaskAttemptError::from)
-    }
-
-    /// Create activity record for process start
-    async fn create_activity_record(
-        pool: &SqlitePool,
-        process_id: Uuid,
-        activity_status: TaskAttemptStatus,
-        activity_note: &str,
-    ) -> Result<(), TaskAttemptError> {
-        let activity_id = Uuid::new_v4();
-        let create_activity = CreateTaskAttemptActivity {
-            execution_process_id: process_id,
-            status: Some(activity_status.clone()),
-            note: Some(activity_note.to_string()),
-        };
-
-        TaskAttemptActivity::create(pool, &create_activity, activity_id, activity_status)
             .await
             .map(|_| ())
             .map_err(TaskAttemptError::from)

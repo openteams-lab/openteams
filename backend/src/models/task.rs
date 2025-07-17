@@ -81,114 +81,85 @@ impl Task {
     ) -> Result<Vec<TaskWithAttemptStatus>, sqlx::Error> {
         let records = sqlx::query!(
             r#"SELECT 
-                t.id                  AS "id!: Uuid", 
-                t.project_id          AS "project_id!: Uuid", 
-                t.title, 
-                t.description, 
-                t.status              AS "status!: TaskStatus", 
-                t.parent_task_attempt AS "parent_task_attempt: Uuid", 
-                t.created_at          AS "created_at!: DateTime<Utc>", 
-                t.updated_at          AS "updated_at!: DateTime<Utc>",
-                CASE 
-                WHEN in_progress_attempts.task_id IS NOT NULL THEN true 
-                ELSE false 
-                END                   AS "has_in_progress_attempt!: i64",
-                CASE 
-                WHEN merged_attempts.task_id IS NOT NULL THEN true 
-                ELSE false 
-                END                   AS "has_merged_attempt!",
-                CASE 
-                WHEN failed_attempts.task_id IS NOT NULL THEN true 
-                ELSE false 
-                END                   AS "has_failed_attempt!",
-                latest_executor_attempts.executor AS "latest_attempt_executor"
-            FROM tasks t
-            LEFT JOIN (
-                SELECT DISTINCT ta.task_id
+            t.id                        AS "id!: Uuid",
+            t.project_id                AS "project_id!: Uuid",
+            t.title,
+            t.description,
+            t.status                    AS "status!: TaskStatus",
+            t.parent_task_attempt AS "parent_task_attempt: Uuid", 
+            t.created_at                AS "created_at!: DateTime<Utc>",
+            t.updated_at                AS "updated_at!: DateTime<Utc>",
+            CASE 
+              WHEN ip.task_id IS NOT NULL THEN true 
+              ELSE false 
+            END                         AS "has_in_progress_attempt!: i64",
+            CASE 
+              WHEN ma.task_id IS NOT NULL THEN true 
+              ELSE false 
+            END                         AS "has_merged_attempt!: i64",
+            CASE 
+              WHEN fa.task_id IS NOT NULL THEN true 
+              ELSE false 
+            END                         AS "has_failed_attempt!: i64",
+            latest_executor_attempts.executor AS "latest_attempt_executor"
+        FROM tasks t
+
+        -- in-progress if any running setupscript/codingagent
+        LEFT JOIN (
+            SELECT DISTINCT ta.task_id
+            FROM task_attempts ta
+            JOIN execution_processes ep 
+              ON ta.id = ep.task_attempt_id
+            WHERE ep.status = 'running'
+              AND ep.process_type IN ('setupscript','codingagent')
+        ) ip 
+          ON t.id = ip.task_id
+
+        -- merged if merge_commit not null
+        LEFT JOIN (
+            SELECT DISTINCT task_id
+            FROM task_attempts
+            WHERE merge_commit IS NOT NULL
+        ) ma 
+          ON t.id = ma.task_id
+
+        -- failed if latest attempt has a failed setupscript/codingagent
+        LEFT JOIN (
+            SELECT sub.task_id
+            FROM (
+                SELECT
+                  ta.task_id,
+                  ep.status,
+                  ep.process_type,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY ta.task_id 
+                    ORDER BY ta.created_at DESC
+                  ) AS rn
                 FROM task_attempts ta
                 JOIN execution_processes ep 
-                ON ta.id = ep.task_attempt_id
-                JOIN (
-                    -- pick exactly one “latest” activity per process,
-                    -- tiebreaking so that running‐states are lower priority
-                    SELECT execution_process_id, status
-                    FROM (
-                        SELECT
-                            execution_process_id,
-                            status,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY execution_process_id
-                                ORDER BY
-                                    created_at DESC,
-                                    CASE 
-                                    WHEN status IN ('setuprunning','executorrunning') THEN 1 
-                                    ELSE 0 
-                                    END
-                            ) AS rn
-                        FROM task_attempt_activities
-                    ) sub
-                    WHERE rn = 1
-                ) latest_act 
-                ON ep.id = latest_act.execution_process_id
-                WHERE latest_act.status IN ('setuprunning','executorrunning')
-            ) in_progress_attempts 
-            ON t.id = in_progress_attempts.task_id
-            LEFT JOIN (
-                SELECT DISTINCT ta.task_id
-                FROM task_attempts ta
-                WHERE ta.merge_commit IS NOT NULL
-            ) merged_attempts 
-            ON t.id = merged_attempts.task_id
-            LEFT JOIN (
-                SELECT DISTINCT latest_attempts.task_id
-                FROM (
-                    -- Get the latest attempt for each task
-                    SELECT task_id, id as attempt_id, created_at,
-                           ROW_NUMBER() OVER (PARTITION BY task_id ORDER BY created_at DESC) AS rn
-                    FROM task_attempts
-                    WHERE merge_commit IS NULL  -- Don't show as failed if already merged
-                ) latest_attempts
-                JOIN execution_processes ep 
-                ON latest_attempts.attempt_id = ep.task_attempt_id
-                JOIN (
-                    -- pick exactly one "latest" activity per process,
-                    -- tiebreaking so that running‐states are lower priority
-                    SELECT execution_process_id, status
-                    FROM (
-                        SELECT
-                            execution_process_id,
-                            status,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY execution_process_id
-                                ORDER BY
-                                    created_at DESC,
-                                    CASE 
-                                    WHEN status IN ('setuprunning','executorrunning') THEN 1 
-                                    ELSE 0 
-                                    END
-                            ) AS rn
-                        FROM task_attempt_activities
-                    ) sub
-                    WHERE rn = 1
-                ) latest_act 
-                ON ep.id = latest_act.execution_process_id
-                WHERE latest_attempts.rn = 1  -- Only consider the latest attempt
-                  AND latest_act.status IN ('setupfailed','executorfailed')
-            ) failed_attempts 
-            ON t.id = failed_attempts.task_id
-            LEFT JOIN (
-                SELECT task_id, executor
-                FROM (
-                    SELECT task_id, executor, created_at,
-                           ROW_NUMBER() OVER (PARTITION BY task_id ORDER BY created_at DESC) AS rn
-                    FROM task_attempts
-                ) latest_attempts
-                WHERE rn = 1
-            ) latest_executor_attempts 
-            ON t.id = latest_executor_attempts.task_id
-            WHERE t.project_id = $1
-            ORDER BY t.created_at DESC;
-            "#,
+                  ON ta.id = ep.task_attempt_id
+                WHERE ep.process_type IN ('setupscript','codingagent')
+            ) sub
+            WHERE sub.rn = 1
+              AND sub.status IN ('failed','killed')
+        ) fa
+          ON t.id = fa.task_id
+
+        -- get the executor of the latest attempt
+        LEFT JOIN (
+            SELECT task_id, executor
+            FROM (
+                SELECT task_id, executor, created_at,
+                        ROW_NUMBER() OVER (PARTITION BY task_id ORDER BY created_at DESC) AS rn
+                FROM task_attempts
+            ) latest_attempts
+            WHERE rn = 1
+        ) latest_executor_attempts 
+        ON t.id = latest_executor_attempts.task_id
+
+        WHERE t.project_id = $1
+        ORDER BY t.created_at DESC;
+        "#,
             project_id
         )
         .fetch_all(pool)
@@ -196,19 +167,19 @@ impl Task {
 
         let tasks = records
             .into_iter()
-            .map(|record| TaskWithAttemptStatus {
-                id: record.id,
-                project_id: record.project_id,
-                title: record.title,
-                description: record.description,
-                status: record.status,
-                parent_task_attempt: record.parent_task_attempt,
-                created_at: record.created_at,
-                updated_at: record.updated_at,
-                has_in_progress_attempt: record.has_in_progress_attempt != 0,
-                has_merged_attempt: record.has_merged_attempt != 0,
-                has_failed_attempt: record.has_failed_attempt != 0,
-                latest_attempt_executor: record.latest_attempt_executor,
+            .map(|rec| TaskWithAttemptStatus {
+                id: rec.id,
+                project_id: rec.project_id,
+                title: rec.title,
+                description: rec.description,
+                status: rec.status,
+                parent_task_attempt: rec.parent_task_attempt,
+                created_at: rec.created_at,
+                updated_at: rec.updated_at,
+                has_in_progress_attempt: rec.has_in_progress_attempt != 0,
+                has_merged_attempt: rec.has_merged_attempt != 0,
+                has_failed_attempt: rec.has_failed_attempt != 0,
+                latest_attempt_executor: rec.latest_attempt_executor,
             })
             .collect();
 

@@ -21,10 +21,7 @@ use crate::{
         task::{Task, TaskStatus},
         task_attempt::{
             BranchStatus, CreateFollowUpAttempt, CreatePrParams, CreateTaskAttempt, TaskAttempt,
-            TaskAttemptState, TaskAttemptStatus, WorktreeDiff,
-        },
-        task_attempt_activity::{
-            CreateTaskAttemptActivity, TaskAttemptActivity, TaskAttemptActivityWithPrompt,
+            TaskAttemptState, WorktreeDiff,
         },
         ApiResponse,
     },
@@ -71,40 +68,6 @@ pub async fn get_task_attempts(
         })),
         Err(e) => {
             tracing::error!("Failed to fetch task attempts for task {}: {}", task_id, e);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
-    }
-}
-
-pub async fn get_task_attempt_activities(
-    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    State(app_state): State<AppState>,
-) -> Result<ResponseJson<ApiResponse<Vec<TaskAttemptActivityWithPrompt>>>, StatusCode> {
-    // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
-        Ok(false) => return Err(StatusCode::NOT_FOUND),
-        Err(e) => {
-            tracing::error!("Failed to check task attempt existence: {}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-        Ok(true) => {}
-    }
-
-    // Get activities with prompts for the task attempt
-    match TaskAttemptActivity::find_with_prompts_by_task_attempt_id(&app_state.db_pool, attempt_id)
-        .await
-    {
-        Ok(activities) => Ok(ResponseJson(ApiResponse {
-            success: true,
-            data: Some(activities),
-            message: None,
-        })),
-        Err(e) => {
-            tracing::error!(
-                "Failed to fetch task attempt activities for attempt {}: {}",
-                attempt_id,
-                e
-            );
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -169,61 +132,6 @@ pub async fn create_task_attempt(
         }
         Err(e) => {
             tracing::error!("Failed to create task attempt: {}", e);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
-    }
-}
-
-pub async fn create_task_attempt_activity(
-    Path((project_id, task_id, attempt_id)): Path<(Uuid, Uuid, Uuid)>,
-    State(app_state): State<AppState>,
-    Json(payload): Json<CreateTaskAttemptActivity>,
-) -> Result<ResponseJson<ApiResponse<TaskAttemptActivity>>, StatusCode> {
-    // Verify task attempt exists and belongs to the correct task
-    match TaskAttempt::exists_for_task(&app_state.db_pool, attempt_id, task_id, project_id).await {
-        Ok(false) => return Err(StatusCode::NOT_FOUND),
-        Err(e) => {
-            tracing::error!("Failed to check task attempt existence: {}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-        Ok(true) => {}
-    }
-
-    let id = Uuid::new_v4();
-
-    // Check that execution_process_id is provided in payload
-    if payload.execution_process_id == Uuid::nil() {
-        return Err(StatusCode::BAD_REQUEST);
-    }
-
-    // Verify the execution process exists and belongs to this task attempt
-    match ExecutionProcess::find_by_id(&app_state.db_pool, payload.execution_process_id).await {
-        Ok(Some(process)) => {
-            if process.task_attempt_id != attempt_id {
-                return Err(StatusCode::BAD_REQUEST);
-            }
-        }
-        Ok(None) => return Err(StatusCode::NOT_FOUND),
-        Err(e) => {
-            tracing::error!("Failed to verify execution process: {}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    // Default to SetupRunning status if not provided
-    let status = payload
-        .status
-        .clone()
-        .unwrap_or(TaskAttemptStatus::SetupRunning);
-
-    match TaskAttemptActivity::create(&app_state.db_pool, &payload, id, status).await {
-        Ok(activity) => Ok(ResponseJson(ApiResponse {
-            success: true,
-            data: Some(activity),
-            message: Some("Task attempt activity created successfully".to_string()),
-        })),
-        Err(e) => {
-            tracing::error!("Failed to create task attempt activity: {}", e);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -736,36 +644,7 @@ pub async fn stop_all_execution_processes(
                     tracing::error!("Failed to update execution process status: {}", e);
                     errors.push(format!("Failed to update process {} status", process.id));
                 } else {
-                    // Create activity record for stopped processes (skip dev servers)
-                    if !matches!(
-                        process.process_type,
-                        crate::models::execution_process::ExecutionProcessType::DevServer
-                    ) {
-                        let activity_id = Uuid::new_v4();
-                        let create_activity = CreateTaskAttemptActivity {
-                            execution_process_id: process.id,
-                            status: Some(TaskAttemptStatus::ExecutorFailed),
-                            note: Some(format!(
-                                "Execution process {:?} ({}) stopped by user",
-                                process.process_type, process.id
-                            )),
-                        };
-
-                        if let Err(e) = TaskAttemptActivity::create(
-                            &app_state.db_pool,
-                            &create_activity,
-                            activity_id,
-                            TaskAttemptStatus::ExecutorFailed,
-                        )
-                        .await
-                        {
-                            tracing::error!("Failed to create stopped activity: {}", e);
-                            errors.push(format!(
-                                "Failed to create activity for process {}",
-                                process.id
-                            ));
-                        }
-                    }
+                    // Process stopped successfully
                 }
             }
             Ok(false) => {
@@ -824,7 +703,7 @@ pub async fn stop_execution_process(
     }
 
     // Verify execution process exists and belongs to the task attempt
-    let process = match ExecutionProcess::find_by_id(&app_state.db_pool, process_id).await {
+    match ExecutionProcess::find_by_id(&app_state.db_pool, process_id).await {
         Ok(Some(process)) if process.task_attempt_id == attempt_id => process,
         Ok(Some(_)) => return Err(StatusCode::NOT_FOUND), // Process exists but wrong attempt
         Ok(None) => return Err(StatusCode::NOT_FOUND),
@@ -864,33 +743,7 @@ pub async fn stop_execution_process(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    // Create activity record for stopped processes (skip dev servers)
-    if !matches!(
-        process.process_type,
-        crate::models::execution_process::ExecutionProcessType::DevServer
-    ) {
-        let activity_id = Uuid::new_v4();
-        let create_activity = CreateTaskAttemptActivity {
-            execution_process_id: process_id,
-            status: Some(TaskAttemptStatus::ExecutorFailed),
-            note: Some(format!(
-                "Execution process {:?} ({}) stopped by user",
-                process.process_type, process_id
-            )),
-        };
-
-        if let Err(e) = TaskAttemptActivity::create(
-            &app_state.db_pool,
-            &create_activity,
-            activity_id,
-            TaskAttemptStatus::ExecutorFailed,
-        )
-        .await
-        {
-            tracing::error!("Failed to create stopped activity: {}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    }
+    // Process stopped successfully
 
     Ok(ResponseJson(ApiResponse {
         success: true,
@@ -1556,10 +1409,7 @@ pub fn task_attempts_router() -> Router<AppState> {
             "/projects/:project_id/tasks/:task_id/attempts",
             get(get_task_attempts).post(create_task_attempt),
         )
-        .route(
-            "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/activities",
-            get(get_task_attempt_activities).post(create_task_attempt_activity),
-        )
+
 
         .route(
             "/projects/:project_id/tasks/:task_id/attempts/:attempt_id/diff",
