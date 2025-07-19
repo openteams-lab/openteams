@@ -80,86 +80,57 @@ impl Task {
         project_id: Uuid,
     ) -> Result<Vec<TaskWithAttemptStatus>, sqlx::Error> {
         let records = sqlx::query!(
-            r#"SELECT 
-            t.id                        AS "id!: Uuid",
-            t.project_id                AS "project_id!: Uuid",
-            t.title,
-            t.description,
-            t.status                    AS "status!: TaskStatus",
-            t.parent_task_attempt AS "parent_task_attempt: Uuid", 
-            t.created_at                AS "created_at!: DateTime<Utc>",
-            t.updated_at                AS "updated_at!: DateTime<Utc>",
-            CASE 
-              WHEN ip.task_id IS NOT NULL THEN true 
-              ELSE false 
-            END                         AS "has_in_progress_attempt!: i64",
-            CASE 
-              WHEN ma.task_id IS NOT NULL THEN true 
-              ELSE false 
-            END                         AS "has_merged_attempt!: i64",
-            CASE 
-              WHEN fa.task_id IS NOT NULL THEN true 
-              ELSE false 
-            END                         AS "last_attempt_failed!: i64",
-            latest_executor_attempts.executor AS "latest_attempt_executor"
-        FROM tasks t
+            r#"SELECT
+  t.id                            AS "id!: Uuid",
+  t.project_id                    AS "project_id!: Uuid",
+  t.title,
+  t.description,
+  t.status                        AS "status!: TaskStatus",
+  t.parent_task_attempt           AS "parent_task_attempt: Uuid",
+  t.created_at                    AS "created_at!: DateTime<Utc>",
+  t.updated_at                    AS "updated_at!: DateTime<Utc>",
 
-        -- in-progress if any running setupscript/codingagent
-        LEFT JOIN (
-            SELECT DISTINCT ta.task_id
-            FROM task_attempts ta
-            JOIN execution_processes ep 
-              ON ta.id = ep.task_attempt_id
-            WHERE ep.status = 'running'
-              AND ep.process_type IN ('setupscript','codingagent')
-        ) ip 
-          ON t.id = ip.task_id
+  CASE WHEN EXISTS (
+    SELECT 1
+      FROM task_attempts ta
+      JOIN execution_processes ep
+        ON ep.task_attempt_id = ta.id
+     WHERE ta.task_id       = t.id
+       AND ep.status        = 'running'
+       AND ep.process_type IN ('setupscript','codingagent')
+     LIMIT 1
+  ) THEN 1 ELSE 0 END            AS "has_in_progress_attempt!: i64",
 
-        -- merged if merge_commit not null
-        LEFT JOIN (
-            SELECT DISTINCT task_id
-            FROM task_attempts
-            WHERE merge_commit IS NOT NULL
-        ) ma 
-          ON t.id = ma.task_id
+  CASE WHEN EXISTS (
+    SELECT 1
+      FROM task_attempts ta
+     WHERE ta.task_id       = t.id
+       AND ta.merge_commit IS NOT NULL
+     LIMIT 1
+  ) THEN 1 ELSE 0 END            AS "has_merged_attempt!: i64",
 
-        -- failed if latest execution process has a failed setupscript/codingagent
-        LEFT JOIN (
-            SELECT sub.task_id
-            FROM (
-                SELECT
-                  ta.task_id,
-                  ep.status,
-                  ep.process_type,
-                  ROW_NUMBER() OVER (
-                    PARTITION BY ta.task_id 
-                    ORDER BY ep.created_at DESC
-                  ) AS rn
-                FROM task_attempts ta
-                JOIN execution_processes ep 
-                  ON ta.id = ep.task_attempt_id
-                WHERE ep.process_type IN ('setupscript','codingagent')
-            ) sub
-            WHERE sub.rn = 1
-              AND sub.status IN ('failed','killed')
-        ) fa
-          ON t.id = fa.task_id
+  CASE WHEN (
+    SELECT ep.status
+      FROM task_attempts ta
+      JOIN execution_processes ep
+        ON ep.task_attempt_id = ta.id
+     WHERE ta.task_id       = t.id
+       AND ep.process_type IN ('setupscript','codingagent')
+     ORDER BY ep.created_at DESC
+     LIMIT 1
+  ) IN ('failed','killed') THEN 1 ELSE 0 END
+                                 AS "last_attempt_failed!: i64",
 
-        -- get the executor of the latest attempt
-        LEFT JOIN (
-            SELECT task_id, executor
-            FROM (
-                SELECT task_id, executor, created_at,
-                        ROW_NUMBER() OVER (PARTITION BY task_id ORDER BY created_at DESC) AS rn
-                FROM task_attempts
-            ) latest_attempts
-            WHERE rn = 1
-        ) latest_executor_attempts 
-        ON t.id = latest_executor_attempts.task_id
+  ( SELECT ta.executor
+      FROM task_attempts ta
+     WHERE ta.task_id = t.id
+     ORDER BY ta.created_at DESC
+     LIMIT 1
+  )                               AS "latest_attempt_executor"
 
-        WHERE t.project_id = $1
-        ORDER BY t.created_at DESC;
-        "#,
+FROM tasks t
+WHERE t.project_id = $1
+ORDER BY t.created_at DESC"#,
             project_id
         )
         .fetch_all(pool)
