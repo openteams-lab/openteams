@@ -6,9 +6,12 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use ts_rs::TS;
 use uuid::Uuid;
 
-use crate::executors::{
-    AiderExecutor, AmpExecutor, CCRExecutor, CharmOpencodeExecutor, ClaudeExecutor, EchoExecutor,
-    GeminiExecutor, SetupScriptExecutor, SstOpencodeExecutor,
+use crate::{
+    command_runner::{CommandError, CommandProcess, CommandRunner},
+    executors::{
+        AiderExecutor, AmpExecutor, CCRExecutor, CharmOpencodeExecutor, ClaudeExecutor,
+        EchoExecutor, GeminiExecutor, SetupScriptExecutor, SstOpencodeExecutor,
+    },
 };
 
 // Constants for database streaming - fast for near-real-time updates
@@ -106,37 +109,28 @@ impl SpawnContext {
         self.additional_context = Some(context.into());
         self
     }
-
     /// Create SpawnContext from Command, then use builder methods for additional context
-    pub fn from_command(
-        command: &tokio::process::Command,
-        executor_type: impl Into<String>,
-    ) -> Self {
+    pub fn from_command(command: &CommandRunner, executor_type: impl Into<String>) -> Self {
         Self::from(command).with_executor_type(executor_type)
     }
 
     /// Finalize the context and create an ExecutorError
-    pub fn spawn_error(self, error: std::io::Error) -> ExecutorError {
+    pub fn spawn_error(self, error: CommandError) -> ExecutorError {
         ExecutorError::spawn_failed(error, self)
     }
 }
 
 /// Extract SpawnContext from a tokio::process::Command
 /// This automatically captures all available information from the Command object
-impl From<&tokio::process::Command> for SpawnContext {
-    fn from(command: &tokio::process::Command) -> Self {
-        let program = command.as_std().get_program().to_string_lossy().to_string();
-        let args = command
-            .as_std()
-            .get_args()
-            .map(|s| s.to_string_lossy().to_string())
-            .collect();
+impl From<&CommandRunner> for SpawnContext {
+    fn from(command: &CommandRunner) -> Self {
+        let program = command.get_program().to_string();
+        let args = command.get_args().to_vec();
 
         let working_dir = command
-            .as_std()
             .get_current_dir()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|| "current_dir".to_string());
+            .unwrap_or("current_dir")
+            .to_string();
 
         Self {
             executor_type: "Unknown".to_string(), // Must be set using with_executor_type()
@@ -153,7 +147,7 @@ impl From<&tokio::process::Command> for SpawnContext {
 #[derive(Debug)]
 pub enum ExecutorError {
     SpawnFailed {
-        error: std::io::Error,
+        error: CommandError,
         context: SpawnContext,
     },
     TaskNotFound,
@@ -249,7 +243,7 @@ impl From<crate::models::task_attempt::TaskAttemptError> for ExecutorError {
 
 impl ExecutorError {
     /// Create a new SpawnFailed error with context
-    pub fn spawn_failed(error: std::io::Error, context: SpawnContext) -> Self {
+    pub fn spawn_failed(error: CommandError, context: SpawnContext) -> Self {
         ExecutorError::SpawnFailed { error, context }
     }
 }
@@ -263,7 +257,7 @@ pub trait Executor: Send + Sync {
         pool: &sqlx::SqlitePool,
         task_id: Uuid,
         worktree_path: &str,
-    ) -> Result<command_group::AsyncGroupChild, ExecutorError>;
+    ) -> Result<CommandProcess, ExecutorError>;
 
     /// Spawn a follow-up session for executors that support it
     ///
@@ -277,10 +271,9 @@ pub trait Executor: Send + Sync {
         _session_id: &str,
         _prompt: &str,
         _worktree_path: &str,
-    ) -> Result<command_group::AsyncGroupChild, ExecutorError> {
+    ) -> Result<CommandProcess, ExecutorError> {
         Err(ExecutorError::FollowUpNotSupported)
     }
-
     /// Normalize executor logs into a standard format
     fn normalize_logs(
         &self,
@@ -298,22 +291,22 @@ pub trait Executor: Send + Sync {
     }
 
     #[allow(clippy::result_large_err)]
-    fn setup_streaming(
+    async fn setup_streaming(
         &self,
-        child: &mut command_group::AsyncGroupChild,
+        child: &mut CommandProcess,
         pool: &sqlx::SqlitePool,
         attempt_id: Uuid,
         execution_process_id: Uuid,
     ) -> Result<(), ExecutorError> {
-        let stdout = child
-            .inner()
+        let streams = child
+            .stream()
+            .await
+            .expect("Failed to get stdio from child process");
+        let stdout = streams
             .stdout
-            .take()
             .expect("Failed to take stdout from child process");
-        let stderr = child
-            .inner()
+        let stderr = streams
             .stderr
-            .take()
             .expect("Failed to take stderr from child process");
 
         let pool_clone1 = pool.clone();
@@ -345,9 +338,9 @@ pub trait Executor: Send + Sync {
         attempt_id: Uuid,
         execution_process_id: Uuid,
         worktree_path: &str,
-    ) -> Result<command_group::AsyncGroupChild, ExecutorError> {
+    ) -> Result<CommandProcess, ExecutorError> {
         let mut child = self.spawn(pool, task_id, worktree_path).await?;
-        Self::setup_streaming(self, &mut child, pool, attempt_id, execution_process_id)?;
+        Self::setup_streaming(self, &mut child, pool, attempt_id, execution_process_id).await?;
         Ok(child)
     }
 
@@ -362,11 +355,11 @@ pub trait Executor: Send + Sync {
         session_id: &str,
         prompt: &str,
         worktree_path: &str,
-    ) -> Result<command_group::AsyncGroupChild, ExecutorError> {
+    ) -> Result<CommandProcess, ExecutorError> {
         let mut child = self
             .spawn_followup(pool, task_id, session_id, prompt, worktree_path)
             .await?;
-        Self::setup_streaming(self, &mut child, pool, attempt_id, execution_process_id)?;
+        Self::setup_streaming(self, &mut child, pool, attempt_id, execution_process_id).await?;
         Ok(child)
     }
 }
