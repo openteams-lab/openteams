@@ -13,7 +13,7 @@ use db::models::project::{
 };
 use deployment::Deployment;
 use ignore::WalkBuilder;
-use services::services::git::{GitBranch, GitService};
+use services::services::git::GitBranch;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
@@ -34,8 +34,9 @@ pub async fn get_project(
 
 pub async fn get_project_branches(
     Extension(project): Extension<Project>,
+    State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<Vec<GitBranch>>>, ApiError> {
-    let branches = GitService::new().get_all_branches(&project.git_repo_path)?;
+    let branches = deployment.git().get_all_branches(&project.git_repo_path)?;
     Ok(ResponseJson(ApiResponse::success(branches)))
 }
 
@@ -84,6 +85,15 @@ pub async fn create_project(
                 "The specified directory is not a git repository",
             )));
         }
+
+        // Ensure existing repo has a main branch if it's empty
+        if let Err(e) = deployment.git().ensure_main_branch_exists(path) {
+            tracing::error!("Failed to ensure main branch exists: {}", e);
+            return Ok(ResponseJson(ApiResponse::error(&format!(
+                "Failed to ensure main branch exists: {}",
+                e
+            ))));
+        }
     } else {
         // For new repos, create directory and initialize git
 
@@ -100,28 +110,12 @@ pub async fn create_project(
 
         // Check if it's already a git repo, if not initialize it
         if !path.join(".git").exists() {
-            match std::process::Command::new("git")
-                .arg("init")
-                .current_dir(path)
-                .output()
-            {
-                Ok(output) => {
-                    if !output.status.success() {
-                        let error_msg = String::from_utf8_lossy(&output.stderr);
-                        tracing::error!("Git init failed: {}", error_msg);
-                        return Ok(ResponseJson(ApiResponse::error(&format!(
-                            "Git init failed: {}",
-                            error_msg
-                        ))));
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("Failed to run git init: {}", e);
-                    return Ok(ResponseJson(ApiResponse::error(&format!(
-                        "Failed to run git init: {}",
-                        e
-                    ))));
-                }
+            if let Err(e) = deployment.git().initialize_repo_with_main_branch(path) {
+                tracing::error!("Failed to initialize git repository: {}", e);
+                return Ok(ResponseJson(ApiResponse::error(&format!(
+                    "Failed to initialize git repository: {}",
+                    e
+                ))));
             }
         }
     }
