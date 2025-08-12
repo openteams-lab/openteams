@@ -8,6 +8,7 @@ import {
   ScriptPlaceholderContext,
 } from '@/utils/script-placeholders';
 import { useUserSystem } from '@/components/config-provider';
+import { CopyFilesField } from './copy-files-field';
 
 interface ProjectFormFieldsProps {
   isEditing: boolean;
@@ -28,7 +29,10 @@ interface ProjectFormFieldsProps {
   setDevScript: (script: string) => void;
   cleanupScript: string;
   setCleanupScript: (script: string) => void;
+  copyFiles: string;
+  setCopyFiles: (files: string) => void;
   error: string;
+  projectId?: string;
 }
 
 export function ProjectFormFields({
@@ -50,7 +54,10 @@ export function ProjectFormFields({
   setDevScript,
   cleanupScript,
   setCleanupScript,
+  copyFiles,
+  setCopyFiles,
   error,
+  projectId,
 }: ProjectFormFieldsProps) {
   const { system } = useUserSystem();
 
@@ -243,6 +250,22 @@ export function ProjectFormFields({
           This script will run after coding agent execution is complete. Use it
           for quality assurance tasks like running linters, formatters, tests,
           or other validation steps.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="copy-files">Copy Files (Optional)</Label>
+        <CopyFilesField
+          value={copyFiles}
+          onChange={setCopyFiles}
+          projectId={projectId}
+        />
+        <p className="text-sm text-muted-foreground">
+          Comma-separated list of files to copy from the original project
+          directory to the worktree. These files will be copied after the
+          worktree is created but before the setup script runs. Useful for
+          environment-specific files like .env, configuration files, and local
+          settings. Make sure these are gitignored or they could get committed!
         </p>
       </div>
 

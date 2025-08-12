@@ -35,6 +35,7 @@ export function ProjectForm({
   const [cleanupScript, setCleanupScript] = useState(
     project?.cleanup_script ?? ''
   );
+  const [copyFiles, setCopyFiles] = useState(project?.copy_files ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showFolderPicker, setShowFolderPicker] = useState(false);
@@ -52,12 +53,14 @@ export function ProjectForm({
       setSetupScript(project.setup_script ?? '');
       setDevScript(project.dev_script ?? '');
       setCleanupScript(project.cleanup_script ?? '');
+      setCopyFiles(project.copy_files ?? '');
     } else {
       setName('');
       setGitRepoPath('');
       setSetupScript('');
       setDevScript('');
       setCleanupScript('');
+      setCopyFiles('');
     }
   }, [project]);
 
@@ -98,6 +101,7 @@ export function ProjectForm({
           setup_script: setupScript.trim() || null,
           dev_script: devScript.trim() || null,
           cleanup_script: cleanupScript.trim() || null,
+          copy_files: copyFiles.trim() || null,
         };
 
         await projectsApi.update(project.id, updateData);
@@ -135,6 +139,7 @@ export function ProjectForm({
           setup_script: setupScript.trim() || null,
           dev_script: devScript.trim() || null,
           cleanup_script: cleanupScript.trim() || null,
+          copy_files: copyFiles.trim() || null,
         };
 
         await projectsApi.create(createData);
@@ -148,6 +153,7 @@ export function ProjectForm({
       setSetupScript('');
       setDevScript('');
       setCleanupScript('');
+      setCopyFiles('');
       setParentPath('');
       setFolderName('');
     } catch (error) {
@@ -163,11 +169,13 @@ export function ProjectForm({
       setGitRepoPath(project.git_repo_path || '');
       setSetupScript(project.setup_script ?? '');
       setDevScript(project.dev_script ?? '');
+      setCopyFiles(project.copy_files ?? '');
     } else {
       setName('');
       setGitRepoPath('');
       setSetupScript('');
       setDevScript('');
+      setCopyFiles('');
     }
     setParentPath('');
     setFolderName('');
@@ -218,7 +226,10 @@ export function ProjectForm({
                   setDevScript={setDevScript}
                   cleanupScript={cleanupScript}
                   setCleanupScript={setCleanupScript}
+                  copyFiles={copyFiles}
+                  setCopyFiles={setCopyFiles}
                   error={error}
+                  projectId={(project as any)?.id}
                 />
                 <DialogFooter>
                   <Button
@@ -326,7 +337,10 @@ export function ProjectForm({
               setDevScript={setDevScript}
               cleanupScript={cleanupScript}
               setCleanupScript={setCleanupScript}
+              copyFiles={copyFiles}
+              setCopyFiles={setCopyFiles}
               error={error}
+              projectId={(project as any)?.id}
             />
             {/* )} */}
             <DialogFooter>

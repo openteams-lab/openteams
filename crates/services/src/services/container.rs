@@ -123,6 +123,13 @@ pub trait ContainerService {
 
     async fn try_commit_changes(&self, ctx: &ExecutionContext) -> Result<(), ContainerError>;
 
+    async fn copy_project_files(
+        &self,
+        source_dir: &PathBuf,
+        target_dir: &PathBuf,
+        copy_files: &str,
+    ) -> Result<(), ContainerError>;
+
     async fn get_diff(
         &self,
         task_attempt: &TaskAttempt,

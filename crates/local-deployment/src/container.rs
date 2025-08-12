@@ -671,6 +671,17 @@ impl ContainerService for LocalContainerService {
         )
         .await?;
 
+        // Copy files specified in the project's copy_files field
+        if let Some(copy_files) = &project.copy_files
+            && !copy_files.trim().is_empty()
+        {
+            self.copy_project_files(&project.git_repo_path, &worktree_path, copy_files)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::warn!("Failed to copy project files: {}", e);
+                });
+        }
+
         // Update both container_ref and branch in the database
         TaskAttempt::update_container_ref(
             &self.db.pool,
@@ -932,5 +943,52 @@ impl ContainerService for LocalContainerService {
         );
 
         Ok(self.git().commit(Path::new(container_ref), &message)?)
+    }
+
+    /// Copy files from the original project directory to the worktree
+    async fn copy_project_files(
+        &self,
+        source_dir: &PathBuf,
+        target_dir: &PathBuf,
+        copy_files: &str,
+    ) -> Result<(), ContainerError> {
+        let files: Vec<&str> = copy_files
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        for file_path in files {
+            let source_file = source_dir.join(file_path);
+            let target_file = target_dir.join(file_path);
+
+            // Create parent directories if needed
+            if let Some(parent) = target_file.parent()
+                && !parent.exists()
+            {
+                std::fs::create_dir_all(parent).map_err(|e| {
+                    ContainerError::Other(anyhow!("Failed to create directory {:?}: {}", parent, e))
+                })?;
+            }
+
+            // Copy the file
+            if source_file.exists() {
+                std::fs::copy(&source_file, &target_file).map_err(|e| {
+                    ContainerError::Other(anyhow!(
+                        "Failed to copy file {:?} to {:?}: {}",
+                        source_file,
+                        target_file,
+                        e
+                    ))
+                })?;
+                tracing::info!("Copied file {:?} to worktree", file_path);
+            } else {
+                return Err(ContainerError::Other(anyhow!(
+                    "File {:?} does not exist in the project directory",
+                    source_file
+                )));
+            }
+        }
+        Ok(())
     }
 }

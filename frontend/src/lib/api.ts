@@ -224,9 +224,14 @@ export const projectsApi = {
     return handleApiResponse<GitBranch[]>(response);
   },
 
-  searchFiles: async (id: string, query: string): Promise<SearchResult[]> => {
+  searchFiles: async (
+    id: string,
+    query: string,
+    options?: RequestInit
+  ): Promise<SearchResult[]> => {
     const response = await makeRequest(
-      `/api/projects/${id}/search?q=${encodeURIComponent(query)}`
+      `/api/projects/${id}/search?q=${encodeURIComponent(query)}`,
+      options
     );
     return handleApiResponse<SearchResult[]>(response);
   },
