@@ -18,7 +18,11 @@ pub fn make_path_relative(path: &str, worktree_path: &str) -> String {
         Ok(relative_path) => {
             let result = relative_path.to_string_lossy().to_string();
             tracing::debug!("Successfully made relative: '{}' -> '{}'", path, result);
-            result
+            if result.is_empty() {
+                ".".to_string()
+            } else {
+                result
+            }
         }
         Err(_) => {
             // Handle symlinks by resolving canonical paths
@@ -43,7 +47,11 @@ pub fn make_path_relative(path: &str, worktree_path: &str) -> String {
                                 path,
                                 result
                             );
-                            result
+                            if result.is_empty() {
+                                ".".to_string()
+                            } else {
+                                result
+                            }
                         }
                         Err(e) => {
                             tracing::warn!(

@@ -126,7 +126,7 @@ impl StandardCodingAgentExecutor for Opencode {
         let stderr_lines = msg_store
             .stderr_lines_stream()
             .filter_map(|res| ready(res.ok()))
-            .map(|line| LogUtils::strip_ansi_codes(&line))
+            .map(|line| strip_ansi_escapes::strip_str(&line))
             .fork();
 
         // Log line: INFO  2025-08-05T10:17:26 +1ms service=session id=ses_786439b6dffe4bLqNBS4fGd7mJ
@@ -240,7 +240,7 @@ impl Opencode {
                     action_type,
                 },
                 content: tool_content,
-                metadata: Some(tool_call.arguments()),
+                metadata: None,
             };
         }
 
@@ -291,16 +291,17 @@ pub enum Tool {
     Write {
         #[serde(rename = "filePath")]
         file_path: String,
-        content: String,
+        #[serde(default)]
+        content: Option<String>,
     },
     #[serde(rename = "edit")]
     Edit {
         #[serde(rename = "filePath")]
         file_path: String,
-        #[serde(rename = "oldString")]
-        old_string: String,
-        #[serde(rename = "newString")]
-        new_string: String,
+        #[serde(rename = "oldString", default)]
+        old_string: Option<String>,
+        #[serde(rename = "newString", default)]
+        new_string: Option<String>,
         #[serde(rename = "replaceAll", default)]
         replace_all: Option<bool>,
     },
@@ -345,6 +346,8 @@ pub enum Tool {
         #[serde(default)]
         timeout: Option<u64>,
     },
+    #[serde(rename = "task")]
+    Task { description: String },
     /// Catch-all for unknown tools (including MCP tools)
     Other {
         tool_name: String,
@@ -384,6 +387,7 @@ impl Tool {
             Tool::TodoRead => "todoread".to_string(),
             Tool::List { .. } => "list".to_string(),
             Tool::WebFetch { .. } => "webfetch".to_string(),
+            Tool::Task { .. } => "task".to_string(),
             Tool::Other { tool_name, .. } => tool_name.clone(),
         }
     }
@@ -406,7 +410,11 @@ impl Tool {
                 args
             }
             Tool::Write { file_path, content } => {
-                serde_json::json!({ "filePath": file_path, "content": content })
+                let mut args = serde_json::json!({ "filePath": file_path });
+                if let Some(content) = content {
+                    args["content"] = content.clone().into();
+                }
+                args
             }
             Tool::Edit {
                 file_path,
@@ -415,10 +423,14 @@ impl Tool {
                 replace_all,
             } => {
                 let mut args = serde_json::json!({
-                    "filePath": file_path,
-                    "oldString": old_string,
-                    "newString": new_string
+                    "filePath": file_path
                 });
+                if let Some(old_string) = old_string {
+                    args["oldString"] = old_string.clone().into();
+                }
+                if let Some(new_string) = new_string {
+                    args["newString"] = new_string.clone().into();
+                }
                 if let Some(replace_all) = replace_all {
                     args["replaceAll"] = (*replace_all).into();
                 }
@@ -491,6 +503,9 @@ impl Tool {
                 }
                 args
             }
+            Tool::Task { description } => {
+                serde_json::json!({ "description": description })
+            }
             Tool::Other { arguments, .. } => arguments.clone(),
         }
     }
@@ -508,49 +523,137 @@ pub struct ToolCall {
 
 impl ToolCall {
     /// Parse a tool call from a string that starts with |
+    ///
+    /// Supports both legacy JSON argument format and new simplified formats, e.g.:
+    /// |  Write    drill.md
+    /// |  Read     drill.md
+    /// |  Edit     drill.md
+    /// |  List     {"path":"/path","ignore":["node_modules"]}
+    /// |  Glob     {"pattern":"*.md"}
+    /// |  Grep     pattern here
+    /// |  Bash     echo "cmd"
+    /// |  webfetch  https://example.com (application/json)
+    /// |  Todo     2 todos
+    /// |  task     Some description
     pub fn parse(line: &str) -> Option<Self> {
-        let line: &str = line.trim_end();
+        let line = line.trim_end();
         if !line.starts_with('|') {
             return None;
         }
 
-        // Remove the | and any surrounding whitespace
+        // Remove the leading '|' and trim surrounding whitespace
         let content = line[1..].trim();
-
-        // Split into tool name and JSON arguments
-        let parts: Vec<&str> = content.splitn(2, char::is_whitespace).collect();
-        if parts.len() != 2 {
+        if content.is_empty() {
             return None;
         }
 
-        let tool_name = parts[0].to_string().to_lowercase();
-        let args_str = parts[1].trim();
+        // First token is the tool name, remainder are arguments
+        let mut parts = content.split_whitespace();
+        let raw_tool = parts.next()?;
+        let tool_name = raw_tool.to_lowercase();
 
-        // Try to parse the arguments as JSON
-        let arguments: serde_json::Value = match serde_json::from_str(args_str) {
-            Ok(args) => args,
-            Err(_) => return None,
-        };
+        // Compute the remainder (preserve original spacing after tool name)
+        let rest = content.get(raw_tool.len()..).unwrap_or("").trim_start();
 
-        // Create a JSON object that matches our Tool enum's serde format
-        let tool_json = serde_json::json!({
-            "tool_name": tool_name,
-            "arguments": arguments
-        });
+        // JSON tool arguments
+        if rest.starts_with('{')
+            && let Ok(arguments) = serde_json::from_str::<serde_json::Value>(rest)
+        {
+            let tool_json = serde_json::json!({
+                "tool_name": tool_name,
+                "arguments": arguments
+            });
 
-        // Let serde deserialize the tool automatically
-        match serde_json::from_value::<Tool>(tool_json) {
-            Ok(tool) => Some(ToolCall { tool }),
-            Err(_) => {
-                // If serde parsing fails, fall back to Other variant
-                Some(ToolCall {
+            return match serde_json::from_value::<Tool>(tool_json) {
+                Ok(tool) => Some(ToolCall { tool }),
+                Err(_) => Some(ToolCall {
                     tool: Tool::Other {
                         tool_name,
                         arguments,
                     },
-                })
-            }
+                }),
+            };
         }
+
+        // Simplified tool argument summary
+        let tool = match tool_name.as_str() {
+            "read" => Tool::Read {
+                file_path: rest.to_string(),
+                offset: None,
+                limit: None,
+            },
+            "write" => Tool::Write {
+                file_path: rest.to_string(),
+                // Simplified logs omit content; set to None
+                content: None,
+            },
+            "edit" => {
+                // Simplified logs provide only file path; set strings to None
+                Tool::Edit {
+                    file_path: rest.to_string(),
+                    old_string: None,
+                    new_string: None,
+                    replace_all: None,
+                }
+            }
+            "bash" => Tool::Bash {
+                command: rest.to_string(),
+                timeout: None,
+                description: None,
+            },
+            "grep" => Tool::Grep {
+                // Treat the remainder as the pattern if not JSON
+                pattern: rest.to_string(),
+                path: None,
+                include: None,
+            },
+            "glob" => Tool::Glob {
+                pattern: rest.to_string(),
+                path: None,
+            },
+            "list" => {
+                if rest.is_empty() {
+                    Tool::List {
+                        path: None,
+                        ignore: None,
+                    }
+                } else {
+                    Tool::List {
+                        path: Some(rest.to_string()),
+                        ignore: None,
+                    }
+                }
+            }
+            "webfetch" => {
+                // Extract the first token as URL, ignore trailing "(...)" content-type hints
+                let url = rest.split_whitespace().next().unwrap_or(rest).to_string();
+                Tool::WebFetch {
+                    url,
+                    format: None,
+                    timeout: None,
+                }
+            }
+            "todo" => Tool::TodoRead,
+            "task" => {
+                // Use the rest as the task description
+                Tool::Task {
+                    description: rest.to_string(),
+                }
+            }
+            other => {
+                let arguments = if rest.is_empty() {
+                    serde_json::Value::Null
+                } else {
+                    serde_json::json!({ "content": rest })
+                };
+                Tool::Other {
+                    tool_name: other.to_string(),
+                    arguments,
+                }
+            }
+        };
+
+        Some(ToolCall { tool })
     }
 
     /// Check if a line is a valid tool line
@@ -596,10 +699,13 @@ impl ToolUtils {
             Tool::Write {
                 file_path, content, ..
             } => {
-                let diffs = vec![EditDiff::Replace {
-                    old: String::new(),
-                    new: content.clone(),
-                }];
+                let diffs = match content {
+                    Some(content) => vec![EditDiff::Replace {
+                        old: String::new(),
+                        new: content.clone(),
+                    }],
+                    None => Vec::new(),
+                };
                 ActionType::FileEdit {
                     path: make_path_relative(file_path, worktree_path),
                     diffs,
@@ -611,10 +717,13 @@ impl ToolUtils {
                 new_string,
                 ..
             } => {
-                let diffs = vec![EditDiff::Replace {
-                    old: old_string.clone(),
-                    new: new_string.clone(),
-                }];
+                let diffs = match (old_string, new_string) {
+                    (Some(old), Some(new)) => vec![EditDiff::Replace {
+                        old: old.clone(),
+                        new: new.clone(),
+                    }],
+                    _ => Vec::new(),
+                };
                 ActionType::FileEdit {
                     path: make_path_relative(file_path, worktree_path),
                     diffs,
@@ -637,6 +746,9 @@ impl ToolUtils {
             },
             Tool::TodoWrite { .. } | Tool::TodoRead => ActionType::Other {
                 description: "TODO list management".to_string(),
+            },
+            Tool::Task { description } => ActionType::Other {
+                description: format!("Task: {description}"),
             },
             Tool::Other { tool_name, .. } => {
                 // Handle MCP tools (format: client_name_tool_name)
@@ -684,7 +796,10 @@ impl ToolUtils {
             }
             Tool::List { path, .. } => {
                 if let Some(path) = path {
-                    format!("`{}`", make_path_relative(path, worktree_path))
+                    format!(
+                        "List directory: `{}`",
+                        make_path_relative(path, worktree_path)
+                    )
                 } else {
                     "List directory".to_string()
                 }
@@ -694,6 +809,9 @@ impl ToolUtils {
             }
             Tool::TodoWrite { todos } => Self::generate_todo_content(todos),
             Tool::TodoRead => "Managing TODO list".to_string(),
+            Tool::Task { description } => {
+                format!("Task: `{description}`")
+            }
             Tool::Other { tool_name, .. } => {
                 // Handle MCP tools (format: client_name_tool_name)
                 if tool_name.contains('_') {
@@ -735,44 +853,21 @@ lazy_static! {
     static ref OPENCODE_LOG_REGEX: Regex = Regex::new(r"^(INFO|DEBUG|WARN|ERROR)\s+\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\s+\+\d+\s*ms.*").unwrap();
     static ref SESSION_ID_REGEX: Regex = Regex::new(r".*\b(id|session|sessionID)=([^ ]+)").unwrap();
     static ref NPM_WARN_REGEX: Regex = Regex::new(r"^npm warn .*").unwrap();
+    static ref CWD_GIT_LOG_NOISE: Regex = Regex::new(r"^ cwd=.* git=.*/snapshots tracking$").unwrap();
 }
 
 /// Log utilities for OpenCode processing
 pub struct LogUtils;
 
 impl LogUtils {
-    /// Strip ANSI escape codes from text (conservative)
-    pub fn strip_ansi_codes(text: &str) -> String {
-        // Handle both unicode escape sequences and raw ANSI codes
-        let result = text.replace("\\u001b", "\x1b");
-
-        let mut cleaned = String::new();
-        let mut chars = result.chars().peekable();
-
-        while let Some(ch) = chars.next() {
-            if ch == '\x1b' {
-                // Skip ANSI escape sequence
-                if chars.peek() == Some(&'[') {
-                    chars.next(); // consume '['
-                    // Skip until we find a letter (end of ANSI sequence)
-                    for next_ch in chars.by_ref() {
-                        if next_ch.is_ascii_alphabetic() {
-                            break;
-                        }
-                    }
-                }
-            } else {
-                cleaned.push(ch);
-            }
-        }
-
-        cleaned
-    }
-
     /// Check if a line should be skipped as noise
     pub fn is_noise(line: &str) -> bool {
         // Empty lines are noise
         if line.is_empty() {
+            return true;
+        }
+
+        if CWD_GIT_LOG_NOISE.is_match(line) {
             return true;
         }
 
