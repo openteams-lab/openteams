@@ -18,6 +18,7 @@ import { configApi } from '@/lib/api';
 import * as Sentry from '@sentry/react';
 import { Loader } from '@/components/ui/loader';
 import { GitHubLoginDialog } from '@/components/GitHubLoginDialog';
+import { AppWithStyleOverride } from '@/utils/style-override';
 
 const SentryRoutes = Sentry.withSentryReactRouterV6Routing(Routes);
 
@@ -136,55 +137,57 @@ function AppContent() {
 
   return (
     <ThemeProvider initialTheme={config?.theme || ThemeMode.SYSTEM}>
-      <div className="h-screen flex flex-col bg-background">
-        <GitHubLoginDialog
-          open={showGitHubLogin}
-          onOpenChange={handleGitHubLoginComplete}
-        />
-        <DisclaimerDialog
-          open={showDisclaimer}
-          onAccept={handleDisclaimerAccept}
-        />
-        <OnboardingDialog
-          open={showOnboarding}
-          onComplete={handleOnboardingComplete}
-        />
-        <PrivacyOptInDialog
-          open={showPrivacyOptIn}
-          onComplete={handlePrivacyOptInComplete}
-        />
-        {showNavbar && <Navbar />}
-        <div className="flex-1 overflow-y-scroll">
-          <SentryRoutes>
-            <Route path="/" element={<Projects />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/projects/:projectId" element={<Projects />} />
-            <Route
-              path="/projects/:projectId/tasks"
-              element={<ProjectTasks />}
-            />
-            <Route
-              path="/projects/:projectId/tasks/:taskId/full"
-              element={<TaskDetailsPage />}
-            />
-            <Route
-              path="/projects/:projectId/tasks/:taskId/attempts/:attemptId/full"
-              element={<TaskDetailsPage />}
-            />
-            <Route
-              path="/projects/:projectId/tasks/:taskId/attempts/:attemptId"
-              element={<ProjectTasks />}
-            />
-            <Route
-              path="/projects/:projectId/tasks/:taskId"
-              element={<ProjectTasks />}
-            />
+      <AppWithStyleOverride>
+        <div className="h-screen flex flex-col bg-background">
+          <GitHubLoginDialog
+            open={showGitHubLogin}
+            onOpenChange={handleGitHubLoginComplete}
+          />
+          <DisclaimerDialog
+            open={showDisclaimer}
+            onAccept={handleDisclaimerAccept}
+          />
+          <OnboardingDialog
+            open={showOnboarding}
+            onComplete={handleOnboardingComplete}
+          />
+          <PrivacyOptInDialog
+            open={showPrivacyOptIn}
+            onComplete={handlePrivacyOptInComplete}
+          />
+          {showNavbar && <Navbar />}
+          <div className="flex-1 overflow-y-scroll">
+            <SentryRoutes>
+              <Route path="/" element={<Projects />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/projects/:projectId" element={<Projects />} />
+              <Route
+                path="/projects/:projectId/tasks"
+                element={<ProjectTasks />}
+              />
+              <Route
+                path="/projects/:projectId/tasks/:taskId/full"
+                element={<TaskDetailsPage />}
+              />
+              <Route
+                path="/projects/:projectId/tasks/:taskId/attempts/:attemptId/full"
+                element={<TaskDetailsPage />}
+              />
+              <Route
+                path="/projects/:projectId/tasks/:taskId/attempts/:attemptId"
+                element={<ProjectTasks />}
+              />
+              <Route
+                path="/projects/:projectId/tasks/:taskId"
+                element={<ProjectTasks />}
+              />
 
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/mcp-servers" element={<McpServers />} />
-          </SentryRoutes>
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/mcp-servers" element={<McpServers />} />
+            </SentryRoutes>
+          </div>
         </div>
-      </div>
+      </AppWithStyleOverride>
     </ThemeProvider>
   );
 }
