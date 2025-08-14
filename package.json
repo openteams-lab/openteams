@@ -1,6 +1,6 @@
 {
   "name": "vibe-kanban",
-  "version": "0.0.60",
+  "version": "0.0.61",
   "private": true,
   "scripts": {
     "check": "npm run frontend:check && npm run backend:check",
