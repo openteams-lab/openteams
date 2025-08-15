@@ -11,7 +11,6 @@ use axum::{
 };
 use db::models::{
     execution_process::{ExecutionProcess, ExecutionProcessRunReason},
-    executor_session::ExecutorSession,
     task::{Task, TaskStatus},
     task_attempt::{CreateTaskAttempt, TaskAttempt, TaskAttemptError},
 };
@@ -312,7 +311,17 @@ pub async fn follow_up(
 ) -> Result<ResponseJson<ApiResponse<ExecutionProcess>>, ApiError> {
     tracing::info!("{:?}", task_attempt);
 
-    // First, get the most recent execution process with executor action type = StandardCoding
+    // Get session_id with simple query
+    let session_id = ExecutionProcess::find_latest_session_id_by_task_attempt(
+        &deployment.db().pool,
+        task_attempt.id,
+    )
+    .await?
+    .ok_or(ApiError::TaskAttempt(TaskAttemptError::ValidationError(
+        "Couldn't find a prior CodingAgent execution that already has a session_id".to_string(),
+    )))?;
+
+    // Get ExecutionProcess for profile data
     let latest_execution_process = ExecutionProcess::find_latest_by_task_attempt_and_run_reason(
         &deployment.db().pool,
         task_attempt.id,
@@ -321,20 +330,6 @@ pub async fn follow_up(
     .await?
     .ok_or(ApiError::TaskAttempt(TaskAttemptError::ValidationError(
         "Couldn't find initial coding agent process, has it run yet?".to_string(),
-    )))?;
-
-    // Get session_id
-    let session_id = ExecutorSession::find_by_execution_process_id(
-        &deployment.db().pool,
-        latest_execution_process.id,
-    )
-    .await?
-    .ok_or(ApiError::TaskAttempt(TaskAttemptError::ValidationError(
-        "Couldn't find related executor session for this execution process".to_string(),
-    )))?
-    .session_id
-    .ok_or(ApiError::TaskAttempt(TaskAttemptError::ValidationError(
-        "This executor session doesn't have a session_id".to_string(),
     )))?;
     let initial_profile_variant_label = match &latest_execution_process
         .executor_action()
