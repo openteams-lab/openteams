@@ -14,7 +14,7 @@ use crate::{
     command::CommandBuilder,
     executors::{ExecutorError, StandardCodingAgentExecutor},
     logs::{
-        ActionType, EditDiff, NormalizedEntry, NormalizedEntryType,
+        ActionType, EditDiff, NormalizedEntry, NormalizedEntryType, TodoItem,
         stderr_processor::normalize_stderr_logs,
         utils::{EntryIndexProvider, patch::ConversationPatch},
     },
@@ -505,8 +505,16 @@ impl ClaudeLogProcessor {
                 path: make_path_relative(notebook_path, worktree_path),
                 diffs: vec![],
             },
-            ClaudeToolData::TodoWrite { .. } => ActionType::Other {
-                description: "Manage TODO list".to_string(),
+            ClaudeToolData::TodoWrite { todos } => ActionType::TodoManagement {
+                todos: todos
+                    .iter()
+                    .map(|t| TodoItem {
+                        content: t.content.clone(),
+                        status: t.status.clone(),
+                        priority: t.priority.clone(),
+                    })
+                    .collect(),
+                operation: "write".to_string(),
             },
             ClaudeToolData::Glob { pattern, path: _ } => ActionType::Search {
                 query: pattern.clone(),
@@ -534,26 +542,8 @@ impl ClaudeLogProcessor {
             ActionType::WebFetch { url } => format!("`{url}`"),
             ActionType::TaskCreate { description } => description.clone(),
             ActionType::PlanPresentation { plan } => plan.clone(),
+            ActionType::TodoManagement { .. } => "TODO list updated".to_string(),
             ActionType::Other { description: _ } => match tool_data {
-                ClaudeToolData::TodoWrite { todos } => {
-                    let mut todo_items = Vec::new();
-                    for todo in todos {
-                        let status_emoji = match todo.status.as_str() {
-                            "completed" => "✅",
-                            "in_progress" => "🔄",
-                            "pending" | "todo" => "⏳",
-                            _ => "📝",
-                        };
-                        let priority = todo.priority.as_deref().unwrap_or("medium");
-                        todo_items
-                            .push(format!("{} {} ({})", status_emoji, todo.content, priority));
-                    }
-                    if !todo_items.is_empty() {
-                        format!("TODO List:\n{}", todo_items.join("\n"))
-                    } else {
-                        "Managing TODO list".to_string()
-                    }
-                }
                 ClaudeToolData::LS { path } => {
                     let relative_path = make_path_relative(path, worktree_path);
                     if relative_path.is_empty() {
@@ -844,45 +834,6 @@ mod tests {
     }
 
     #[test]
-    fn test_todo_tool_content_extraction() {
-        // Test TodoWrite with actual todo list
-        let todo_data = ClaudeToolData::TodoWrite {
-            todos: vec![
-                ClaudeTodoItem {
-                    id: Some("1".to_string()),
-                    content: "Fix the navigation bug".to_string(),
-                    status: "completed".to_string(),
-                    priority: Some("high".to_string()),
-                },
-                ClaudeTodoItem {
-                    id: Some("2".to_string()),
-                    content: "Add user authentication".to_string(),
-                    status: "in_progress".to_string(),
-                    priority: Some("medium".to_string()),
-                },
-                ClaudeTodoItem {
-                    id: Some("3".to_string()),
-                    content: "Write documentation".to_string(),
-                    status: "pending".to_string(),
-                    priority: Some("low".to_string()),
-                },
-            ],
-        };
-
-        let action_type = ClaudeLogProcessor::extract_action_type(&todo_data, "/tmp/test-worktree");
-        let result = ClaudeLogProcessor::generate_concise_content(
-            &todo_data,
-            &action_type,
-            "/tmp/test-worktree",
-        );
-
-        assert!(result.contains("TODO List:"));
-        assert!(result.contains("✅ Fix the navigation bug (high)"));
-        assert!(result.contains("🔄 Add user authentication (medium)"));
-        assert!(result.contains("⏳ Write documentation (low)"));
-    }
-
-    #[test]
     fn test_todo_tool_empty_list() {
         // Test TodoWrite with empty todo list
         let empty_data = ClaudeToolData::TodoWrite { todos: vec![] };
@@ -895,7 +846,7 @@ mod tests {
             "/tmp/test-worktree",
         );
 
-        assert_eq!(result, "Managing TODO list");
+        assert_eq!(result, "TODO list updated");
     }
 
     #[test]

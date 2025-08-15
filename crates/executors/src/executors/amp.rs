@@ -13,7 +13,7 @@ use crate::{
     command::CommandBuilder,
     executors::{ExecutorError, StandardCodingAgentExecutor},
     logs::{
-        ActionType, EditDiff, NormalizedEntry, NormalizedEntryType,
+        ActionType, EditDiff, NormalizedEntry, NormalizedEntryType, TodoItem as LogsTodoItem,
         stderr_processor::normalize_stderr_logs,
         utils::{EntryIndexProvider, patch::ConversationPatch},
     },
@@ -499,8 +499,21 @@ impl AmpContentItem {
             AmpToolData::List { .. } => ActionType::Other {
                 description: "List directory".to_string(),
             },
-            AmpToolData::Todo { .. } => ActionType::Other {
-                description: "Manage TODO list".to_string(),
+            AmpToolData::Todo { todos } => ActionType::TodoManagement {
+                todos: todos
+                    .as_ref()
+                    .map(|todos| {
+                        todos
+                            .iter()
+                            .map(|t| LogsTodoItem {
+                                content: t.content.clone(),
+                                status: t.status.clone(),
+                                priority: t.priority.clone(),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                operation: "write".to_string(),
             },
             AmpToolData::Unknown { .. } => ActionType::Other {
                 description: format!("Tool: {tool_name}"),
@@ -522,32 +535,10 @@ impl AmpContentItem {
             ActionType::WebFetch { url } => format!("`{url}`"),
             ActionType::PlanPresentation { plan } => format!("Plan Presentation: `{plan}`"),
             ActionType::TaskCreate { description } => description.clone(),
+            ActionType::TodoManagement { .. } => "TODO list updated".to_string(),
             ActionType::Other { description: _ } => {
                 // For other tools, try to extract key information or fall back to tool name
                 match input {
-                    AmpToolData::Todo { todos, .. } => {
-                        if let Some(todos) = todos {
-                            let mut todo_items = Vec::new();
-                            for todo in todos {
-                                let emoji = match todo.status.as_str() {
-                                    "completed" => "✅",
-                                    "in_progress" | "in-progress" => "🔄",
-                                    "pending" | "todo" => "⏳",
-                                    _ => "📝",
-                                };
-                                let priority = todo.priority.as_deref().unwrap_or("medium");
-                                todo_items
-                                    .push(format!("{} {} ({})", emoji, todo.content, priority));
-                            }
-                            if !todo_items.is_empty() {
-                                format!("TODO List:\n{}", todo_items.join("\n"))
-                            } else {
-                                "Managing TODO list".to_string()
-                            }
-                        } else {
-                            "Managing TODO list".to_string()
-                        }
-                    }
                     AmpToolData::List { path, .. } => {
                         if let Some(path) = path {
                             let relative_path = make_path_relative(path, worktree_path);
@@ -583,6 +574,19 @@ impl AmpContentItem {
                             parts.push(format!("at `{relative_path}`"));
                         }
                         parts.join(" ")
+                    }
+                    AmpToolData::Unknown { data } => {
+                        // Manually check if "name" is prefixed with "todo"
+                        // This is a hack to avoid flickering on the frontend
+                        let name = data
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(tool_name);
+                        if name.starts_with("todo") {
+                            "TODO list updated".to_string()
+                        } else {
+                            tool_name.to_string()
+                        }
                     }
                     _ => tool_name.to_string(),
                 }
