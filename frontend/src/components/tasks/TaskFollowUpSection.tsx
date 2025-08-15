@@ -2,7 +2,7 @@ import { AlertCircle, Send, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FileSearchTextarea } from '@/components/ui/file-search-textarea';
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { attemptsApi } from '@/lib/api.ts';
 import {
   TaskAttemptDataContext,
@@ -17,6 +17,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { useVariantCyclingShortcut } from '@/lib/keyboard-shortcuts';
 
 export function TaskFollowUpSection() {
   const { task, projectId } = useContext(TaskDetailsContext);
@@ -35,6 +37,8 @@ export function TaskFollowUpSection() {
   const [selectedVariant, setSelectedVariant] = useState<string | null>(
     defaultFollowUpVariant
   );
+  const [isAnimating, setIsAnimating] = useState(false);
+  const variantButtonRef = useRef<HTMLButtonElement>(null);
 
   // Get the profile from the selected attempt
   const selectedProfile = selectedAttempt?.profile || null;
@@ -64,6 +68,14 @@ export function TaskFollowUpSection() {
   useEffect(() => {
     setSelectedVariant(defaultFollowUpVariant);
   }, [defaultFollowUpVariant]);
+
+  // Use the centralized keyboard shortcut hook for cycling through variants
+  useVariantCyclingShortcut({
+    currentProfile,
+    selectedVariant,
+    setSelectedVariant,
+    setIsAnimating,
+  });
 
   const onSendFollowUp = async () => {
     if (!task || !selectedAttempt || !followUpMessage.trim()) return;
@@ -134,9 +146,13 @@ export function TaskFollowUpSection() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
+                          ref={variantButtonRef}
                           variant="outline"
                           size="sm"
-                          className="h-10 w-24 px-2 flex items-center justify-between"
+                          className={cn(
+                            'h-10 w-24 px-2 flex items-center justify-between transition-all',
+                            isAnimating && 'scale-105 bg-accent'
+                          )}
                         >
                           <span className="text-xs truncate flex-1 text-left">
                             {selectedVariant || 'Default'}
@@ -171,9 +187,10 @@ export function TaskFollowUpSection() {
                   // Show disabled button when profile exists but has no variants
                   return (
                     <Button
+                      ref={variantButtonRef}
                       variant="outline"
                       size="sm"
-                      className="h-10 w-24 px-2 flex items-center justify-between"
+                      className="h-10 w-24 px-2 flex items-center justify-between transition-all"
                       disabled
                     >
                       <span className="text-xs truncate flex-1 text-left">
