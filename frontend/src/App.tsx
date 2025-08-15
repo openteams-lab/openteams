@@ -19,6 +19,7 @@ import * as Sentry from '@sentry/react';
 import { Loader } from '@/components/ui/loader';
 import { GitHubLoginDialog } from '@/components/GitHubLoginDialog';
 import { AppWithStyleOverride } from '@/utils/style-override';
+import { WebviewContextMenu } from '@/vscode/ContextMenu';
 
 const SentryRoutes = Sentry.withSentryReactRouterV6Routing(Routes);
 
@@ -139,6 +140,8 @@ function AppContent() {
     <ThemeProvider initialTheme={config?.theme || ThemeMode.SYSTEM}>
       <AppWithStyleOverride>
         <div className="h-screen flex flex-col bg-background">
+          {/* Custom context menu and VS Code-friendly interactions when embedded in iframe */}
+          <WebviewContextMenu />
           <GitHubLoginDialog
             open={showGitHubLogin}
             onOpenChange={handleGitHubLoginComplete}
