@@ -379,6 +379,13 @@ export const attemptsApi = {
     return handleApiResponse<void>(response);
   },
 
+  push: async (attemptId: string): Promise<void> => {
+    const response = await makeRequest(`/api/task-attempts/${attemptId}/push`, {
+      method: 'POST',
+    });
+    return handleApiResponse<void>(response);
+  },
+
   rebase: async (
     attemptId: string,
     data: RebaseTaskAttemptRequest

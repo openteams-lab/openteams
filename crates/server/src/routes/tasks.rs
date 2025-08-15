@@ -12,7 +12,7 @@ use db::models::{
 };
 use deployment::Deployment;
 use serde::Deserialize;
-use services::services::{container::ContainerService, git::GitService};
+use services::services::container::ContainerService;
 use sqlx::Error as SqlxError;
 use utils::response::ApiResponse;
 use uuid::Uuid;
@@ -94,7 +94,9 @@ pub async fn create_task_and_start(
     let project = Project::find_by_id(&deployment.db().pool, payload.project_id)
         .await?
         .ok_or(ApiError::Database(SqlxError::RowNotFound))?;
-    let branch = GitService::new().get_current_branch(&project.git_repo_path)?;
+    let branch = deployment
+        .git()
+        .get_current_branch(&project.git_repo_path)?;
     let profile_label = executors::profile::ProfileConfigs::get_cached()
         .get_profile(&default_profile_variant.profile)
         .map(|profile| profile.default.label.clone())

@@ -4,6 +4,7 @@ import {
   GitBranch as GitBranchIcon,
   GitPullRequest,
   History,
+  Upload,
   Play,
   Plus,
   RefreshCw,
@@ -105,6 +106,7 @@ function CurrentAttempt({
 
   const [isStartingDevServer, setIsStartingDevServer] = useState(false);
   const [merging, setMerging] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [rebasing, setRebasing] = useState(false);
   const [devServerDetails, setDevServerDetails] =
     useState<ExecutionProcess | null>(null);
@@ -234,6 +236,20 @@ function CurrentAttempt({
 
     // Directly perform merge without checking branch status
     await performMerge();
+  };
+
+  const handlePushClick = async () => {
+    if (!selectedAttempt?.id) return;
+    try {
+      setPushing(true);
+      await attemptsApi.push(selectedAttempt.id);
+      fetchBranchStatus();
+    } catch (error: any) {
+      console.error('Failed to push changes:', error);
+      setError(error.message || 'Failed to push changes');
+    } finally {
+      setPushing(false);
+    }
   };
 
   const fetchBranchStatus = useCallback(async () => {
@@ -583,20 +599,23 @@ function CurrentAttempt({
           {/* Git Operations */}
           {selectedAttempt && branchStatus && (
             <>
-              {branchStatus.is_behind && !branchStatus.merged && (
-                <Button
-                  onClick={handleRebaseClick}
-                  disabled={rebasing || branchStatusLoading || isAttemptRunning}
-                  variant="outline"
-                  size="sm"
-                  className="border-orange-300 text-orange-700 hover:bg-orange-50 gap-1"
-                >
-                  <RefreshCw
-                    className={`h-3 w-3 ${rebasing ? 'animate-spin' : ''}`}
-                  />
-                  {rebasing ? 'Rebasing...' : `Rebase`}
-                </Button>
-              )}
+              {(branchStatus.commits_behind ?? 0) > 0 &&
+                !branchStatus.merged && (
+                  <Button
+                    onClick={handleRebaseClick}
+                    disabled={
+                      rebasing || branchStatusLoading || isAttemptRunning
+                    }
+                    variant="outline"
+                    size="sm"
+                    className="border-orange-300 text-orange-700 hover:bg-orange-50 gap-1"
+                  >
+                    <RefreshCw
+                      className={`h-3 w-3 ${rebasing ? 'animate-spin' : ''}`}
+                    />
+                    {rebasing ? 'Rebasing...' : `Rebase`}
+                  </Button>
+                )}
               {
                 // Normal merge and PR buttons for regular tasks
                 !branchStatus.merged && (
@@ -605,7 +624,7 @@ function CurrentAttempt({
                       onClick={handlePRButtonClick}
                       disabled={
                         creatingPR ||
-                        Boolean(branchStatus.is_behind) ||
+                        Boolean((branchStatus.commits_behind ?? 0) > 0) ||
                         isAttemptRunning
                       }
                       variant="outline"
@@ -620,17 +639,42 @@ function CurrentAttempt({
                           : 'Create PR'}
                     </Button>
                     <Button
-                      onClick={handleMergeClick}
+                      onClick={
+                        selectedAttempt.pr_status === 'open'
+                          ? handlePushClick
+                          : handleMergeClick
+                      }
                       disabled={
-                        merging ||
-                        Boolean(branchStatus.is_behind) ||
-                        isAttemptRunning
+                        selectedAttempt.pr_status === 'open'
+                          ? pushing ||
+                            isAttemptRunning ||
+                            (branchStatus.remote_up_to_date ?? true)
+                          : merging ||
+                            Boolean((branchStatus.commits_behind ?? 0) > 0) ||
+                            isAttemptRunning
                       }
                       size="sm"
                       className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 gap-1"
                     >
-                      <GitBranchIcon className="h-3 w-3" />
-                      {merging ? 'Merging...' : 'Merge'}
+                      {selectedAttempt.pr_status === 'open' ? (
+                        <>
+                          <Upload className="h-3 w-3" />
+                          {pushing
+                            ? 'Pushing...'
+                            : branchStatus.remote_commits_behind === null
+                              ? 'Disconnected'
+                              : branchStatus.remote_commits_behind === 0
+                                ? 'Push to remote'
+                                : branchStatus.remote_commits_behind === 1
+                                  ? 'Push 1 commit'
+                                  : `Push ${branchStatus.remote_commits_behind} commits`}
+                        </>
+                      ) : (
+                        <>
+                          <GitBranchIcon className="h-3 w-3" />
+                          {merging ? 'Merging...' : 'Merge'}
+                        </>
+                      )}
                     </Button>
                   </>
                 )

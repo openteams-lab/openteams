@@ -88,7 +88,7 @@ export enum CheckTokenResponse { VALID = "VALID", INVALID = "INVALID" }
 
 export type GitBranch = { name: string, is_current: boolean, is_remote: boolean, last_commit_date: Date, };
 
-export type BranchStatus = { is_behind: boolean, commits_behind: number, commits_ahead: number, up_to_date: boolean, merged: boolean, has_uncommitted_changes: boolean, base_branch_name: string, };
+export type BranchStatus = { commits_behind: number | null, commits_ahead: number | null, up_to_date: boolean | null, merged: boolean, has_uncommitted_changes: boolean, base_branch_name: string, remote_commits_behind: number | null, remote_commits_ahead: number | null, remote_up_to_date: boolean | null, };
 
 export type Diff = { oldFile: FileDiffDetails | null, newFile: FileDiffDetails | null, hunks: Array<string>, };
 
