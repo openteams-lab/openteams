@@ -200,7 +200,35 @@ impl ExecutionProcess {
         .await
     }
 
-    /// Find latest execution process by task attempt and executor action type
+    /// Find latest session_id by task attempt (simple scalar query)
+    pub async fn find_latest_session_id_by_task_attempt(
+        pool: &SqlitePool,
+        task_attempt_id: Uuid,
+    ) -> Result<Option<String>, sqlx::Error> {
+        tracing::info!(
+            "Finding latest session id for task attempt {}",
+            task_attempt_id
+        );
+        let row = sqlx::query!(
+            r#"SELECT es.session_id
+               FROM execution_processes ep
+               JOIN executor_sessions es ON ep.id = es.execution_process_id  
+               WHERE ep.task_attempt_id = $1
+                 AND ep.run_reason = 'codingagent'
+                 AND es.session_id IS NOT NULL
+               ORDER BY ep.created_at DESC
+               LIMIT 1"#,
+            task_attempt_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        tracing::info!("Latest session id: {:?}", row);
+
+        Ok(row.and_then(|r| r.session_id))
+    }
+
+    /// Find latest execution process by task attempt and run reason
     pub async fn find_latest_by_task_attempt_and_run_reason(
         pool: &SqlitePool,
         task_attempt_id: Uuid,
@@ -220,8 +248,8 @@ impl ExecutionProcess {
                 created_at as "created_at!: DateTime<Utc>", 
                 updated_at as "updated_at!: DateTime<Utc>"
                FROM execution_processes 
-               WHERE task_attempt_id = $1 
-               AND run_reason = $2
+               WHERE task_attempt_id = ?1 
+               AND run_reason = ?2
                ORDER BY created_at DESC 
                LIMIT 1"#,
             task_attempt_id,
