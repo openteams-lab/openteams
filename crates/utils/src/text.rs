@@ -22,3 +22,10 @@ pub fn short_uuid(u: &Uuid) -> String {
     let full = u.simple().to_string();
     full.chars().take(4).collect() // grab the first 4 chars
 }
+
+pub fn combine_prompt(append: &Option<String>, prompt: &str) -> String {
+    match append {
+        Some(append) => format!("{prompt}{append}"),
+        None => prompt.to_string(),
+    }
+}
