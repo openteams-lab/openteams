@@ -114,6 +114,15 @@ impl LocalContainerService {
             ))
     }
 
+    /// Finalize task execution by updating status to InReview and sending notifications
+    async fn finalize_task(db: &DBService, config: &Arc<RwLock<Config>>, ctx: &ExecutionContext) {
+        if let Err(e) = Task::update_status(&db.pool, ctx.task.id, TaskStatus::InReview).await {
+            tracing::error!("Failed to update task status to InReview: {e}");
+        }
+        let notify_cfg = config.read().await.notifications.clone();
+        NotificationService::notify_execution_halted(notify_cfg, ctx).await;
+    }
+
     /// Defensively check for externally deleted worktrees and mark them as deleted in the database
     async fn check_externally_deleted_worktrees(db: &DBService) -> Result<(), DeploymentError> {
         let active_attempts = TaskAttempt::find_by_worktree_deleted(&db.pool).await?;
@@ -335,28 +344,52 @@ impl LocalContainerService {
                             ExecutionProcessStatus::Completed
                         ) && exit_code == Some(0)
                         {
-                            if let Err(e) = container.try_commit_changes(&ctx).await {
-                                tracing::error!("Failed to commit changes after execution: {}", e);
-                            }
+                            // Commit changes (if any) and get feedback about whether changes were made
+                            let changes_committed = match container.try_commit_changes(&ctx).await {
+                                Ok(committed) => committed,
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Failed to commit changes after execution: {}",
+                                        e
+                                    );
+                                    // Treat commit failures as if changes were made to be safe
+                                    true
+                                }
+                            };
 
-                            // If the process exited successfully, start the next action
-                            if let Err(e) = container.try_start_next_action(&ctx).await {
-                                tracing::error!(
-                                    "Failed to start next action after completion: {}",
-                                    e
+                            // Determine whether to start the next action based on execution context
+                            let should_start_next = if matches!(
+                                ctx.execution_process.run_reason,
+                                ExecutionProcessRunReason::CodingAgent
+                            ) {
+                                // Skip CleanupScript when CodingAgent produced no changes
+                                changes_committed
+                            } else {
+                                // SetupScript always proceeds to CodingAgent
+                                true
+                            };
+
+                            if should_start_next {
+                                // If the process exited successfully, start the next action
+                                if let Err(e) = container.try_start_next_action(&ctx).await {
+                                    tracing::error!(
+                                        "Failed to start next action after completion: {}",
+                                        e
+                                    );
+                                }
+                            } else {
+                                tracing::info!(
+                                    "Skipping cleanup script for task attempt {} - no changes made by coding agent",
+                                    ctx.task_attempt.id
                                 );
+
+                                // Manually finalize task since we're bypassing normal execution flow
+                                Self::finalize_task(&db, &config, &ctx).await;
                             }
                         }
 
                         if Self::should_finalize(&ctx) {
-                            if let Err(e) =
-                                Task::update_status(&db.pool, ctx.task.id, TaskStatus::InReview)
-                                    .await
-                            {
-                                tracing::error!("Failed to update task status to InReview: {e}");
-                            }
-                            let notify_cfg = config.read().await.notifications.clone();
-                            NotificationService::notify_execution_halted(notify_cfg, &ctx).await;
+                            Self::finalize_task(&db, &config, &ctx).await;
                         }
 
                         // Fire event when CodingAgent execution has finished
@@ -886,12 +919,12 @@ impl ContainerService for LocalContainerService {
         .await
     }
 
-    async fn try_commit_changes(&self, ctx: &ExecutionContext) -> Result<(), ContainerError> {
+    async fn try_commit_changes(&self, ctx: &ExecutionContext) -> Result<bool, ContainerError> {
         if !matches!(
             ctx.execution_process.run_reason,
             ExecutionProcessRunReason::CodingAgent | ExecutionProcessRunReason::CleanupScript,
         ) {
-            return Ok(());
+            return Ok(false);
         }
 
         let message = match ctx.execution_process.run_reason {
@@ -950,7 +983,8 @@ impl ContainerService for LocalContainerService {
             message
         );
 
-        Ok(self.git().commit(Path::new(container_ref), &message)?)
+        let changes_committed = self.git().commit(Path::new(container_ref), &message)?;
+        Ok(changes_committed)
     }
 
     /// Copy files from the original project directory to the worktree
