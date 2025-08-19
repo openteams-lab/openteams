@@ -1,5 +1,4 @@
 import {
-  Check,
   ExternalLink,
   GitBranch as GitBranchIcon,
   GitPullRequest,
@@ -56,18 +55,18 @@ import { useKeyboardShortcuts } from '@/lib/keyboard-shortcuts.ts';
 // Helper function to get the display name for different editor types
 function getEditorDisplayName(editorType: string): string {
   switch (editorType) {
-    case 'vscode':
+    case 'VS_CODE':
       return 'Visual Studio Code';
-    case 'cursor':
+    case 'CURSOR':
       return 'Cursor';
-    case 'windsurf':
+    case 'WINDSURF':
       return 'Windsurf';
-    case 'intellij':
+    case 'INTELLIJ':
       return 'IntelliJ IDEA';
-    case 'zed':
+    case 'ZED':
       return 'Zed';
-    case 'custom':
-      return 'Custom Editor';
+    case 'CUSTOM':
+      return 'Editor';
     default:
       return 'Editor';
   }
@@ -379,36 +378,35 @@ function CurrentAttempt({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-4 gap-3 items-start">
-        <div>
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Started
-          </div>
-          <div className="text-sm font-medium">
-            {new Date(selectedAttempt.created_at).toLocaleDateString()}{' '}
-            {new Date(selectedAttempt.created_at).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </div>
-        </div>
-
-        <div>
+      <div className="flex gap-6 items-start">
+        <div className="min-w-0">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Profile
           </div>
           <div className="text-sm font-medium">{selectedAttempt.profile}</div>
         </div>
 
-        <div>
+        <div className="min-w-0">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+            Task Branch
+          </div>
+          <div className="flex items-center gap-1.5">
+            <GitBranchIcon className="h-3 w-3 text-muted-foreground" />
+            <span className="text-sm font-medium truncate">
+              {selectedAttempt.branch}
+            </span>
+          </div>
+        </div>
+
+        <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            <span>Base Branch</span>
+            <span className="truncate">Base Branch</span>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="xs"
                     onClick={handleRebaseDialogOpen}
                     disabled={
                       rebasing || branchStatusLoading || isAttemptRunning
@@ -426,29 +424,29 @@ function CurrentAttempt({
           </div>
           <div className="flex items-center gap-1.5">
             <GitBranchIcon className="h-3 w-3 text-muted-foreground" />
-            <span className="text-sm font-medium">
+            <span className="text-sm font-medium truncate">
               {branchStatus?.base_branch_name || selectedBranchDisplayName}
             </span>
           </div>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Merge Status
+            Status
           </div>
           <div className="flex items-center gap-1.5">
             {selectedAttempt.merge_commit ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 overflow-hidden">
                 <div className="h-2 w-2 bg-green-500 rounded-full" />
-                <span className="text-sm font-medium text-green-700">
+                <span className="text-sm font-medium text-green-700 truncate">
                   Merged
                 </span>
-                <span className="text-xs font-mono text-muted-foreground">
+                <span className="text-xs font-mono text-muted-foreground truncate">
                   ({selectedAttempt.merge_commit.slice(0, 8)})
                 </span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 overflow-hidden">
                 <div className="h-2 w-2 bg-yellow-500 rounded-full" />
                 <span className="text-sm font-medium text-yellow-700">
                   Not merged
@@ -461,12 +459,12 @@ function CurrentAttempt({
 
       <div className="col-span-4">
         <div className="flex items-center gap-1.5 mb-1">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Worktree Path
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 pt-1">
+            Path
           </div>
           <Button
             variant="ghost"
-            size="sm"
+            size="xs"
             onClick={() => handleOpenInEditor()}
             className="h-6 px-2 text-xs hover:bg-muted gap-1"
           >
@@ -475,7 +473,7 @@ function CurrentAttempt({
           </Button>
         </div>
         <div
-          className={`text-xs font-mono px-2 py-1 rounded break-all cursor-pointer transition-all duration-300 flex items-center gap-2 ${
+          className={`text-xs font-mono px-2 py-1 rounded cursor-pointer transition-all duration-300 flex items-center gap-2 ${
             copied
               ? 'bg-green-100 text-green-800 border border-green-300'
               : 'text-muted-foreground bg-muted hover:bg-muted/80'
@@ -483,12 +481,16 @@ function CurrentAttempt({
           onClick={handleCopyWorktreePath}
           title={copied ? 'Copied!' : 'Click to copy worktree path'}
         >
-          {copied && <Check className="h-3 w-3 text-green-600" />}
-          <span className={copied ? 'text-green-800' : ''}>
+          <span
+            className={`truncate ${copied ? 'text-green-800' : ''}`}
+            dir="rtl"
+          >
             {selectedAttempt.container_ref}
           </span>
           {copied && (
-            <span className="text-green-700 font-medium">Copied!</span>
+            <span className="text-green-700 font-medium whitespace-nowrap">
+              Copied!
+            </span>
           )}
         </div>
       </div>
@@ -505,7 +507,7 @@ function CurrentAttempt({
                 >
                   <Button
                     variant={runningDevServer ? 'destructive' : 'outline'}
-                    size="sm"
+                    size="xs"
                     onClick={runningDevServer ? stopDevServer : startDevServer}
                     disabled={isStartingDevServer || !projectHasDevScript}
                     className="gap-1"
@@ -518,7 +520,7 @@ function CurrentAttempt({
                     ) : (
                       <>
                         <Play className="h-3 w-3" />
-                        Dev Server
+                        Dev
                       </>
                     )}
                   </Button>
@@ -555,47 +557,6 @@ function CurrentAttempt({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {taskAttempts.length > 1 && (
-            <DropdownMenu>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <History className="h-4 w-4" />
-                        History
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>View attempt history</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <DropdownMenuContent align="start" className="w-64">
-                {taskAttempts.map((attempt) => (
-                  <DropdownMenuItem
-                    key={attempt.id}
-                    onClick={() => handleAttemptChange(attempt)}
-                    className={
-                      selectedAttempt?.id === attempt.id ? 'bg-accent' : ''
-                    }
-                  >
-                    <div className="flex flex-col w-full">
-                      <span className="font-medium text-sm">
-                        {new Date(attempt.created_at).toLocaleDateString()}{' '}
-                        {new Date(attempt.created_at).toLocaleTimeString()}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {attempt.profile || 'Base Agent'}
-                      </span>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
           {/* Git Operations */}
           {selectedAttempt && branchStatus && (
             <>
@@ -607,7 +568,7 @@ function CurrentAttempt({
                       rebasing || branchStatusLoading || isAttemptRunning
                     }
                     variant="outline"
-                    size="sm"
+                    size="xs"
                     className="border-orange-300 text-orange-700 hover:bg-orange-50 gap-1"
                   >
                     <RefreshCw
@@ -628,7 +589,7 @@ function CurrentAttempt({
                         isAttemptRunning
                       }
                       variant="outline"
-                      size="sm"
+                      size="xs"
                       className="border-blue-300 text-blue-700 hover:bg-blue-50 gap-1"
                     >
                       <GitPullRequest className="h-3 w-3" />
@@ -653,7 +614,7 @@ function CurrentAttempt({
                             Boolean((branchStatus.commits_behind ?? 0) > 0) ||
                             isAttemptRunning
                       }
-                      size="sm"
+                      size="xs"
                       className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 gap-1"
                     >
                       {selectedAttempt.pr_status === 'open' ? (
@@ -685,7 +646,7 @@ function CurrentAttempt({
           {isStopping || isAttemptRunning ? (
             <Button
               variant="destructive"
-              size="sm"
+              size="xs"
               onClick={stopAllExecutions}
               disabled={isStopping}
               className="gap-2"
@@ -696,13 +657,52 @@ function CurrentAttempt({
           ) : (
             <Button
               variant="outline"
-              size="sm"
+              size="xs"
               onClick={handleEnterCreateAttemptMode}
               className="gap-2"
             >
               <Plus className="h-4 w-4" />
               New Attempt
             </Button>
+          )}
+          {taskAttempts.length > 1 && (
+            <DropdownMenu>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="xs" className="gap-2">
+                        <History className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View attempt history</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <DropdownMenuContent align="start" className="w-64">
+                {taskAttempts.map((attempt) => (
+                  <DropdownMenuItem
+                    key={attempt.id}
+                    onClick={() => handleAttemptChange(attempt)}
+                    className={
+                      selectedAttempt?.id === attempt.id ? 'bg-accent' : ''
+                    }
+                  >
+                    <div className="flex flex-col w-full">
+                      <span className="font-medium text-sm">
+                        {new Date(attempt.created_at).toLocaleDateString()}{' '}
+                        {new Date(attempt.created_at).toLocaleTimeString()}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {attempt.profile || 'Base Agent'}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>

@@ -11,7 +11,7 @@ type Props = {
 function TabNavigation({ activeTab, setActiveTab }: Props) {
   const { attemptData } = useContext(TaskAttemptDataContext);
   return (
-    <div className="border-b bg-muted/30">
+    <div className="border-b bg-muted/20">
       <div className="flex px-4">
         <button
           onClick={() => {
