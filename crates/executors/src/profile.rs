@@ -28,6 +28,7 @@ pub struct VariantAgentConfig {
     /// Optional profile-specific MCP config file path (absolute; supports leading ~). Overrides the default `BaseCodingAgent` config path
     pub mcp_config_path: Option<String>,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
 pub struct ProfileConfig {
     #[serde(flatten)]

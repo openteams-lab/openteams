@@ -20,7 +20,7 @@ pub struct CodingAgentInitialRequest {
 #[async_trait]
 impl Executable for CodingAgentInitialRequest {
     async fn spawn(&self, current_dir: &PathBuf) -> Result<AsyncGroupChild, ExecutorError> {
-        let executor = CodingAgent::from_profile_variant_label(&self.profile_variant_label)?;
-        executor.spawn(current_dir, &self.prompt).await
+        let agent = CodingAgent::from_profile_variant_label(&self.profile_variant_label)?;
+        agent.spawn(current_dir, &self.prompt).await
     }
 }

@@ -101,7 +101,7 @@ export function ProjectTasks() {
     } catch (err) {
       setError('Failed to load project');
     }
-  }, [projectId, navigate]);
+  }, [projectId]);
 
   const fetchTemplates = useCallback(async () => {
     if (!projectId) return;
@@ -169,13 +169,14 @@ export function ProjectTasks() {
   );
 
   const handleCreateTask = useCallback(
-    async (title: string, description: string) => {
+    async (title: string, description: string, imageIds?: string[]) => {
       try {
         const createdTask = await tasksApi.create({
           project_id: projectId!,
           title,
           description: description || null,
           parent_task_attempt: null,
+          image_ids: imageIds || null,
         });
         await fetchTasks();
         // Open the newly created task in the details panel
@@ -190,13 +191,14 @@ export function ProjectTasks() {
   );
 
   const handleCreateAndStartTask = useCallback(
-    async (title: string, description: string) => {
+    async (title: string, description: string, imageIds?: string[]) => {
       try {
         const payload: CreateTask = {
           project_id: projectId!,
           title,
           description: description || null,
           parent_task_attempt: null,
+          image_ids: imageIds || null,
         };
         const result = await tasksApi.createAndStart(payload);
         await fetchTasks();
@@ -210,7 +212,12 @@ export function ProjectTasks() {
   );
 
   const handleUpdateTask = useCallback(
-    async (title: string, description: string, status: TaskStatus) => {
+    async (
+      title: string,
+      description: string,
+      status: TaskStatus,
+      imageIds?: string[]
+    ) => {
       if (!editingTask) return;
 
       try {
@@ -219,6 +226,7 @@ export function ProjectTasks() {
           description: description || null,
           status,
           parent_task_attempt: null,
+          image_ids: imageIds || null,
         });
         await fetchTasks();
         setEditingTask(null);
@@ -226,7 +234,7 @@ export function ProjectTasks() {
         setError('Failed to update task');
       }
     },
-    [projectId, editingTask, fetchTasks]
+    [editingTask, fetchTasks]
   );
 
   const handleDeleteTask = useCallback(
@@ -240,7 +248,7 @@ export function ProjectTasks() {
         setError('Failed to delete task');
       }
     },
-    [projectId, fetchTasks]
+    [fetchTasks]
   );
 
   const handleEditTask = useCallback((task: Task) => {
@@ -297,6 +305,7 @@ export function ProjectTasks() {
           description: task.description,
           status: newStatus,
           parent_task_attempt: task.parent_task_attempt,
+          image_ids: null,
         });
       } catch (err) {
         // Revert the optimistic update if the API call failed
@@ -308,7 +317,7 @@ export function ProjectTasks() {
         setError('Failed to update task status');
       }
     },
-    [projectId, tasks]
+    [tasks]
   );
 
   // Setup keyboard shortcuts

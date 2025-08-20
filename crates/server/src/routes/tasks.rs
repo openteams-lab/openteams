@@ -6,6 +6,7 @@ use axum::{
     Extension, Json, Router,
 };
 use db::models::{
+    image::TaskImage,
     project::Project,
     task::{CreateTask, Task, TaskWithAttemptStatus, UpdateTask},
     task_attempt::{CreateTaskAttempt, TaskAttempt, TaskAttemptError},
@@ -56,7 +57,10 @@ pub async fn create_task(
 
     let task = Task::create(&deployment.db().pool, &payload, id).await?;
 
-    // Track task creation event
+    if let Some(image_ids) = &payload.image_ids {
+        TaskImage::associate_many(&deployment.db().pool, task.id, image_ids).await?;
+    }
+
     deployment
         .track_if_analytics_allowed(
             "task_created",
@@ -64,6 +68,7 @@ pub async fn create_task(
             "task_id": task.id.to_string(),
             "project_id": payload.project_id,
             "has_description": task.description.is_some(),
+            "has_images": payload.image_ids.is_some(),
             }),
         )
         .await;
@@ -75,9 +80,13 @@ pub async fn create_task_and_start(
     State(deployment): State<DeploymentImpl>,
     Json(payload): Json<CreateTask>,
 ) -> Result<ResponseJson<ApiResponse<TaskWithAttemptStatus>>, ApiError> {
-    // create the task first
     let task_id = Uuid::new_v4();
     let task = Task::create(&deployment.db().pool, &payload, task_id).await?;
+
+    if let Some(image_ids) = &payload.image_ids {
+        TaskImage::associate_many(&deployment.db().pool, task.id, image_ids).await?;
+    }
+
     deployment
         .track_if_analytics_allowed(
             "task_created",
@@ -85,6 +94,7 @@ pub async fn create_task_and_start(
                 "task_id": task.id.to_string(),
                 "project_id": task.project_id,
                 "has_description": task.description.is_some(),
+                "has_images": payload.image_ids.is_some(),
             }),
         )
         .await;
@@ -176,6 +186,11 @@ pub async fn update_task(
         parent_task_attempt,
     )
     .await?;
+
+    if let Some(image_ids) = &payload.image_ids {
+        TaskImage::delete_by_task_id(&deployment.db().pool, task.id).await?;
+        TaskImage::associate_many(&deployment.db().pool, task.id, image_ids).await?;
+    }
 
     Ok(ResponseJson(ApiResponse::success(task)))
 }
