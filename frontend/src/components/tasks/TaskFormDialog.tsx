@@ -82,13 +82,38 @@ export function TaskFormDialog({
 
   // Check if there's any content that would be lost
   const hasUnsavedChanges = useCallback(() => {
-    // Only warn in create mode when there's content
     if (!isEditMode) {
+      // Create mode - warn when there's content
       return title.trim() !== '' || description.trim() !== '';
+    } else if (task) {
+      // Edit mode - warn when current values differ from original task
+      const titleChanged = title.trim() !== task.title.trim();
+      const descriptionChanged =
+        (description || '').trim() !== (task.description || '').trim();
+      const statusChanged = status !== task.status;
+      return titleChanged || descriptionChanged || statusChanged;
     }
-    // No warning for edit mode - users can always reopen the task
     return false;
-  }, [title, description, isEditMode]);
+  }, [title, description, status, isEditMode, task]);
+
+  // Warn on browser/tab close if there are unsaved changes
+  useEffect(() => {
+    if (!isOpen) return; // dialog closed → nothing to do
+
+    // always re-evaluate latest fields via hasUnsavedChanges()
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges()) {
+        e.preventDefault();
+        // Chrome / Edge still require returnValue to be set
+        e.returnValue = '';
+        return '';
+      }
+      // nothing returned → no prompt
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isOpen, hasUnsavedChanges]); // hasUnsavedChanges is memoised with title/descr deps
 
   useEffect(() => {
     if (task) {
