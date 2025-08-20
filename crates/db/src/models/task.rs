@@ -51,6 +51,7 @@ pub struct CreateTask {
     pub title: String,
     pub description: Option<String>,
     pub parent_task_attempt: Option<Uuid>,
+    pub image_ids: Option<Vec<Uuid>>,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -59,6 +60,7 @@ pub struct UpdateTask {
     pub description: Option<String>,
     pub status: Option<TaskStatus>,
     pub parent_task_attempt: Option<Uuid>,
+    pub image_ids: Option<Vec<Uuid>>,
 }
 
 impl Task {

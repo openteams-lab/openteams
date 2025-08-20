@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Globe2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ImageUploadSection } from '@/components/ui/ImageUploadSection';
 import {
   Dialog,
   DialogContent,
@@ -17,9 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useUserSystem } from '@/components/config-provider';
-import { templatesApi } from '@/lib/api';
-import type { TaskStatus, TaskTemplate } from 'shared/types';
+import { templatesApi, imagesApi } from '@/lib/api';
+import type { TaskStatus, TaskTemplate, ImageResponse } from 'shared/types';
 
 interface Task {
   id: string;
@@ -37,12 +37,21 @@ interface TaskFormDialogProps {
   task?: Task | null; // Optional for create mode
   projectId?: string; // For file search functionality
   initialTemplate?: TaskTemplate | null; // For pre-filling from template
-  onCreateTask?: (title: string, description: string) => Promise<void>;
-  onCreateAndStartTask?: (title: string, description: string) => Promise<void>;
+  onCreateTask?: (
+    title: string,
+    description: string,
+    imageIds?: string[]
+  ) => Promise<void>;
+  onCreateAndStartTask?: (
+    title: string,
+    description: string,
+    imageIds?: string[]
+  ) => Promise<void>;
   onUpdateTask?: (
     title: string,
     description: string,
-    status: TaskStatus
+    status: TaskStatus,
+    imageIds?: string[]
   ) => Promise<void>;
 }
 
@@ -64,8 +73,11 @@ export function TaskFormDialog({
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [showDiscardWarning, setShowDiscardWarning] = useState(false);
+  const [images, setImages] = useState<ImageResponse[]>([]);
+  const [newlyUploadedImageIds, setNewlyUploadedImageIds] = useState<string[]>(
+    []
+  );
 
-  const { config } = useUserSystem();
   const isEditMode = Boolean(task);
 
   // Check if there's any content that would be lost
@@ -84,6 +96,17 @@ export function TaskFormDialog({
       setTitle(task.title);
       setDescription(task.description || '');
       setStatus(task.status);
+
+      // Load existing images for the task
+      if (isOpen) {
+        imagesApi
+          .getTaskImages(task.id)
+          .then((taskImages) => setImages(taskImages))
+          .catch((err) => {
+            console.error('Failed to load task images:', err);
+            setImages([]);
+          });
+      }
     } else if (initialTemplate) {
       // Create mode with template - pre-fill from template
       setTitle(initialTemplate.title);
@@ -96,6 +119,8 @@ export function TaskFormDialog({
       setDescription('');
       setStatus('todo');
       setSelectedTemplate('');
+      setImages([]);
+      setNewlyUploadedImageIds([]);
     }
   }, [task, initialTemplate, isOpen]);
 
@@ -131,15 +156,50 @@ export function TaskFormDialog({
     }
   };
 
-  const handleSubmit = async () => {
+  // Handle image upload success by inserting markdown into description
+  const handleImageUploaded = useCallback((image: ImageResponse) => {
+    const markdownText = `![${image.original_name}](${image.file_path})`;
+    setDescription((prev) => {
+      if (prev.trim() === '') {
+        return markdownText;
+      } else {
+        return prev + ' ' + markdownText;
+      }
+    });
+
+    setImages((prev) => [...prev, image]);
+    // Track as newly uploaded for backend association
+    setNewlyUploadedImageIds((prev) => [...prev, image.id]);
+  }, []);
+
+  const handleImagesChange = useCallback((updatedImages: ImageResponse[]) => {
+    setImages(updatedImages);
+    // Also update newlyUploadedImageIds to remove any deleted image IDs
+    setNewlyUploadedImageIds((prev) =>
+      prev.filter((id) => updatedImages.some((img) => img.id === id))
+    );
+  }, []);
+
+  const handleSubmit = useCallback(async () => {
     if (!title.trim()) return;
 
     setIsSubmitting(true);
     try {
+      let imageIds: string[] | undefined;
+
+      if (isEditMode) {
+        // In edit mode, send all current image IDs (existing + newly uploaded)
+        imageIds = images.length > 0 ? images.map((img) => img.id) : undefined;
+      } else {
+        // In create mode, only send newly uploaded image IDs
+        imageIds =
+          newlyUploadedImageIds.length > 0 ? newlyUploadedImageIds : undefined;
+      }
+
       if (isEditMode && onUpdateTask) {
-        await onUpdateTask(title, description, status);
+        await onUpdateTask(title, description, status, imageIds);
       } else if (!isEditMode && onCreateTask) {
-        await onCreateTask(title, description);
+        await onCreateTask(title, description, imageIds);
       }
 
       // Reset form on successful creation
@@ -147,13 +207,25 @@ export function TaskFormDialog({
         setTitle('');
         setDescription('');
         setStatus('todo');
+        setImages([]);
+        setNewlyUploadedImageIds([]);
       }
 
       onOpenChange(false);
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [
+    title,
+    description,
+    status,
+    isEditMode,
+    onCreateTask,
+    onUpdateTask,
+    onOpenChange,
+    newlyUploadedImageIds,
+    images,
+  ]);
 
   const handleCreateAndStart = useCallback(async () => {
     if (!title.trim()) return;
@@ -161,13 +233,17 @@ export function TaskFormDialog({
     setIsSubmittingAndStart(true);
     try {
       if (!isEditMode && onCreateAndStartTask) {
-        await onCreateAndStartTask(title, description);
+        const imageIds =
+          newlyUploadedImageIds.length > 0 ? newlyUploadedImageIds : undefined;
+        await onCreateAndStartTask(title, description, imageIds);
       }
 
       // Reset form on successful creation
       setTitle('');
       setDescription('');
       setStatus('todo');
+      setImages([]);
+      setNewlyUploadedImageIds([]);
 
       onOpenChange(false);
     } finally {
@@ -176,10 +252,10 @@ export function TaskFormDialog({
   }, [
     title,
     description,
-    config?.profile,
     isEditMode,
     onCreateAndStartTask,
     onOpenChange,
+    newlyUploadedImageIds,
   ]);
 
   const handleCancel = useCallback(() => {
@@ -240,6 +316,7 @@ export function TaskFormDialog({
     isEditMode,
     onCreateAndStartTask,
     title,
+    handleSubmit,
     isSubmitting,
     isSubmittingAndStart,
     handleCreateAndStart,
@@ -296,6 +373,18 @@ export function TaskFormDialog({
                 projectId={projectId}
               />
             </div>
+
+            <ImageUploadSection
+              images={images}
+              onImagesChange={handleImagesChange}
+              onUpload={imagesApi.upload}
+              onDelete={imagesApi.delete}
+              onImageUploaded={handleImageUploaded}
+              disabled={isSubmitting || isSubmittingAndStart}
+              readOnly={isEditMode}
+              collapsible={true}
+              defaultExpanded={false}
+            />
 
             {!isEditMode && templates.length > 0 && (
               <div className="pt-2">

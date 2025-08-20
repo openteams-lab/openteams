@@ -21,8 +21,9 @@ pub struct CodingAgentFollowUpRequest {
 #[async_trait]
 impl Executable for CodingAgentFollowUpRequest {
     async fn spawn(&self, current_dir: &PathBuf) -> Result<AsyncGroupChild, ExecutorError> {
-        let executor = CodingAgent::from_profile_variant_label(&self.profile_variant_label)?;
-        executor
+        let agent = CodingAgent::from_profile_variant_label(&self.profile_variant_label)?;
+
+        agent
             .spawn_follow_up(current_dir, &self.prompt, &self.session_id)
             .await
     }
