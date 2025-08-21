@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { useCallback, useContext, useEffect, useState } from 'react';
 import {
+  TaskAttemptDataContext,
   TaskDetailsContext,
   TaskSelectedAttemptContext,
 } from '@/components/context/taskDetailsContext.ts';
@@ -46,6 +47,7 @@ function CreatePrDialog({
 }: Props) {
   const { projectId, task } = useContext(TaskDetailsContext);
   const { selectedAttempt } = useContext(TaskSelectedAttemptContext);
+  const { fetchAttemptData } = useContext(TaskAttemptDataContext);
   const [prTitle, setPrTitle] = useState('');
   const [prBody, setPrBody] = useState('');
   const [prBaseBranch, setPrBaseBranch] = useState(
@@ -82,12 +84,14 @@ function CreatePrDialog({
     });
 
     if (result.success) {
+      setError(null); // Clear any previous errors on success
       window.open(result.data, '_blank');
-      setShowCreatePRDialog(false);
       // Reset form
       setPrTitle('');
       setPrBody('');
       setPrBaseBranch(selectedAttempt?.base_branch || 'main');
+      // Refresh branch status to show the new PR
+      fetchAttemptData(selectedAttempt.id);
     } else {
       if (result.error) {
         setShowCreatePRDialog(false);
@@ -112,7 +116,7 @@ function CreatePrDialog({
         setError('Failed to create GitHub PR');
       }
     }
-
+    setShowCreatePRDialog(false);
     setCreatingPR(false);
   }, [
     projectId,

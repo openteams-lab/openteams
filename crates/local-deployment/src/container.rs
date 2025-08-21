@@ -18,6 +18,7 @@ use db::{
             ExecutionContext, ExecutionProcess, ExecutionProcessRunReason, ExecutionProcessStatus,
         },
         executor_session::ExecutorSession,
+        merge::Merge,
         project::Project,
         task::{Task, TaskStatus},
         task_attempt::TaskAttempt,
@@ -813,6 +814,20 @@ impl ContainerService for LocalContainerService {
         Ok(container_ref.to_string())
     }
 
+    async fn is_container_clean(&self, task_attempt: &TaskAttempt) -> Result<bool, ContainerError> {
+        if let Some(container_ref) = &task_attempt.container_ref {
+            // If container_ref is set, check if the worktree exists
+            let path = PathBuf::from(container_ref);
+            if path.exists() {
+                self.git().is_worktree_clean(&path).map_err(|e| e.into())
+            } else {
+                return Ok(true); // No worktree means it's clean
+            }
+        } else {
+            return Ok(true); // No container_ref means no worktree, so it's clean
+        }
+    }
+
     async fn start_execution_inner(
         &self,
         task_attempt: &TaskAttempt,
@@ -904,16 +919,9 @@ impl ContainerService for LocalContainerService {
         task_attempt: &TaskAttempt,
     ) -> Result<futures::stream::BoxStream<'static, Result<Event, std::io::Error>>, ContainerError>
     {
-        let container_ref = self.ensure_container_exists(task_attempt).await?;
-
-        let worktree_path = PathBuf::from(container_ref);
         let project_repo_path = self.get_project_repo_path(task_attempt).await?;
-
-        // Handle merged attempts (static diff)
-        if let Some(merge_commit_id) = &task_attempt.merge_commit {
-            return self.create_merged_diff_stream(&project_repo_path, merge_commit_id);
-        }
-
+        let latest_merge =
+            Merge::find_latest_by_task_attempt_id(&self.db.pool, task_attempt.id).await?;
         let task_branch = task_attempt
             .branch
             .clone()
@@ -921,6 +929,29 @@ impl ContainerService for LocalContainerService {
                 "Task attempt {} does not have a branch",
                 task_attempt.id
             )))?;
+
+        let is_ahead = if let Ok((ahead, _)) = self.git().get_local_branch_status(
+            &project_repo_path,
+            &task_branch,
+            &task_attempt.base_branch,
+        ) {
+            ahead > 0
+        } else {
+            false
+        };
+
+        // Show merged diff when no new work is on the branch or container
+        if let Some(merge) = &latest_merge
+            && let Some(commit) = merge.merge_commit()
+            && self.is_container_clean(task_attempt).await?
+            && !is_ahead
+        {
+            return self.create_merged_diff_stream(&project_repo_path, &commit);
+        }
+
+        // worktree is needed for non-merged diffs
+        let container_ref = self.ensure_container_exists(task_attempt).await?;
+        let worktree_path = PathBuf::from(container_ref);
 
         // Handle ongoing attempts (live streaming diff)
         self.create_live_diff_stream(

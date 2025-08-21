@@ -3,7 +3,6 @@ import {
   GitBranch as GitBranchIcon,
   GitPullRequest,
   History,
-  Upload,
   Play,
   Plus,
   RefreshCw,
@@ -44,7 +43,7 @@ import {
   useState,
 } from 'react';
 import type { ExecutionProcess } from 'shared/types';
-import type { BranchStatus, GitBranch, TaskAttempt } from 'shared/types';
+import type { GitBranch, TaskAttempt } from 'shared/types';
 import {
   TaskAttemptDataContext,
   TaskAttemptStoppingContext,
@@ -103,9 +102,8 @@ function CurrentAttempt({
     useContext(TaskDetailsContext);
   const { config } = useConfig();
   const { isStopping, setIsStopping } = useContext(TaskAttemptStoppingContext);
-  const { attemptData, fetchAttemptData, isAttemptRunning } = useContext(
-    TaskAttemptDataContext
-  );
+  const { attemptData, fetchAttemptData, isAttemptRunning, branchStatus } =
+    useContext(TaskAttemptDataContext);
   const { jumpToProcess } = useProcessSelection();
 
   const [isStartingDevServer, setIsStartingDevServer] = useState(false);
@@ -115,12 +113,12 @@ function CurrentAttempt({
   const [devServerDetails, setDevServerDetails] =
     useState<ExecutionProcess | null>(null);
   const [isHoveringDevServer, setIsHoveringDevServer] = useState(false);
-  const [branchStatus, setBranchStatus] = useState<BranchStatus | null>(null);
-  const [branchStatusLoading, setBranchStatusLoading] = useState(false);
   const [showRebaseDialog, setShowRebaseDialog] = useState(false);
   const [selectedRebaseBranch, setSelectedRebaseBranch] = useState<string>('');
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [mergeSuccess, setMergeSuccess] = useState(false);
+  const [pushSuccess, setPushSuccess] = useState(false);
 
   const processedDevServerLogs = useMemo(() => {
     if (!devServerDetails) return 'No output yet...';
@@ -263,7 +261,10 @@ function CurrentAttempt({
     try {
       setPushing(true);
       await attemptsApi.push(selectedAttempt.id);
-      fetchBranchStatus();
+      setError(null); // Clear any previous errors on success
+      setPushSuccess(true);
+      setTimeout(() => setPushSuccess(false), 2000);
+      fetchAttemptData(selectedAttempt.id);
     } catch (error: any) {
       console.error('Failed to push changes:', error);
       setError(error.message || 'Failed to push changes');
@@ -272,38 +273,16 @@ function CurrentAttempt({
     }
   };
 
-  const fetchBranchStatus = useCallback(async () => {
-    if (!selectedAttempt?.id) return;
-
-    try {
-      setBranchStatusLoading(true);
-      const result = await attemptsApi.getBranchStatus(selectedAttempt.id);
-      setBranchStatus((prev) => {
-        if (JSON.stringify(prev) === JSON.stringify(result)) return prev;
-        return result;
-      });
-    } catch (err) {
-      setError('Failed to load branch status');
-    } finally {
-      setBranchStatusLoading(false);
-    }
-  }, [projectId, selectedAttempt?.id, selectedAttempt?.task_id, setError]);
-
-  // Fetch branch status when selected attempt changes
-  useEffect(() => {
-    if (selectedAttempt) {
-      fetchBranchStatus();
-    }
-  }, [selectedAttempt, fetchBranchStatus]);
-
   const performMerge = async () => {
     if (!projectId || !selectedAttempt?.id || !selectedAttempt?.task_id) return;
 
     try {
       setMerging(true);
       await attemptsApi.merge(selectedAttempt.id);
-      // Refetch branch status to show updated state
-      fetchBranchStatus();
+      setError(null); // Clear any previous errors on success
+      setMergeSuccess(true);
+      setTimeout(() => setMergeSuccess(false), 2000);
+      fetchAttemptData(selectedAttempt.id);
     } catch (error) {
       console.error('Failed to merge changes:', error);
       // @ts-expect-error it is type ApiError
@@ -319,8 +298,8 @@ function CurrentAttempt({
     try {
       setRebasing(true);
       await attemptsApi.rebase(selectedAttempt.id, { new_base_branch: null });
-      // Refresh branch status after rebase
-      fetchBranchStatus();
+      setError(null); // Clear any previous errors on success
+      fetchAttemptData(selectedAttempt.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to rebase branch');
     } finally {
@@ -336,8 +315,8 @@ function CurrentAttempt({
       await attemptsApi.rebase(selectedAttempt.id, {
         new_base_branch: newBaseBranch,
       });
-      // Refresh branch status after rebase
-      fetchBranchStatus();
+      setError(null); // Clear any previous errors on success
+      fetchAttemptData(selectedAttempt.id);
       setShowRebaseDialog(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to rebase branch');
@@ -360,9 +339,9 @@ function CurrentAttempt({
   const handlePRButtonClick = async () => {
     if (!projectId || !selectedAttempt?.id || !selectedAttempt?.task_id) return;
 
-    // If PR already exists, view it in a new tab
-    if (selectedAttempt.pr_url) {
-      window.open(selectedAttempt.pr_url, '_blank');
+    // If PR already exists, push to it
+    if (mergeInfo.hasOpenPR) {
+      await handlePushClick();
       return;
     }
 
@@ -387,6 +366,42 @@ function CurrentAttempt({
     return getEditorDisplayName(config.editor.editor_type);
   }, [config?.editor?.editor_type]);
 
+  // Memoize merge status information to avoid repeated calculations
+  const mergeInfo = useMemo(() => {
+    if (!branchStatus?.merges)
+      return {
+        hasOpenPR: false,
+        openPR: null,
+        hasMergedPR: false,
+        mergedPR: null,
+        hasMerged: false,
+        latestMerge: null,
+      };
+
+    const openPR = branchStatus.merges.find(
+      (m) => m.type === 'pr' && m.pr_info.status === 'open'
+    );
+
+    const mergedPR = branchStatus.merges.find(
+      (m) => m.type === 'pr' && m.pr_info.status === 'merged'
+    );
+
+    const merges = branchStatus.merges.filter(
+      (m) =>
+        m.type === 'direct' ||
+        (m.type === 'pr' && m.pr_info.status === 'merged')
+    );
+
+    return {
+      hasOpenPR: !!openPR,
+      openPR,
+      hasMergedPR: !!mergedPR,
+      mergedPR,
+      hasMerged: merges.length > 0,
+      latestMerge: branchStatus.merges[0] || null, // Most recent merge
+    };
+  }, [branchStatus?.merges]);
+
   const handleCopyWorktreePath = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(selectedAttempt.container_ref || '');
@@ -396,6 +411,71 @@ function CurrentAttempt({
       console.error('Failed to copy worktree path:', err);
     }
   }, [selectedAttempt.container_ref]);
+
+  // Get status information for display
+  const getStatusInfo = useCallback(() => {
+    if (mergeInfo.hasMergedPR && mergeInfo.mergedPR?.type === 'pr') {
+      const prMerge = mergeInfo.mergedPR;
+      return {
+        dotColor: 'bg-green-500',
+        textColor: 'text-green-700',
+        text: `PR #${prMerge.pr_info.number} merged`,
+        isClickable: true,
+        onClick: () => window.open(prMerge.pr_info.url, '_blank'),
+      };
+    }
+    if (
+      mergeInfo.hasMerged &&
+      mergeInfo.latestMerge?.type === 'direct' &&
+      (branchStatus?.commits_ahead ?? 0) === 0
+    ) {
+      return {
+        dotColor: 'bg-green-500',
+        textColor: 'text-green-700',
+        text: `Merged`,
+        isClickable: false,
+      };
+    }
+
+    if (mergeInfo.hasOpenPR && mergeInfo.openPR?.type === 'pr') {
+      const prMerge = mergeInfo.openPR;
+      return {
+        dotColor: 'bg-blue-500',
+        textColor: 'text-blue-700',
+        text: `PR #${prMerge.pr_info.number}`,
+        isClickable: true,
+        onClick: () => window.open(prMerge.pr_info.url, '_blank'),
+      };
+    }
+
+    if ((branchStatus?.commits_behind ?? 0) > 0) {
+      return {
+        dotColor: 'bg-orange-500',
+        textColor: 'text-orange-700',
+        text: `Rebase needed${branchStatus?.has_uncommitted_changes ? ' (dirty)' : ''}`,
+        isClickable: false,
+      };
+    }
+
+    if ((branchStatus?.commits_ahead ?? 0) > 0) {
+      return {
+        dotColor: 'bg-yellow-500',
+        textColor: 'text-yellow-700',
+        text:
+          branchStatus?.commits_ahead === 1
+            ? `1 commit ahead${branchStatus?.has_uncommitted_changes ? ' (dirty)' : ''}`
+            : `${branchStatus?.commits_ahead} commits ahead${branchStatus?.has_uncommitted_changes ? ' (dirty)' : ''}`,
+        isClickable: false,
+      };
+    }
+
+    return {
+      dotColor: 'bg-gray-500',
+      textColor: 'text-gray-700',
+      text: `Up to date${branchStatus?.has_uncommitted_changes ? ' (dirty)' : ''}`,
+      isClickable: false,
+    };
+  }, [mergeInfo, branchStatus]);
 
   return (
     <div className="space-y-2">
@@ -429,9 +509,7 @@ function CurrentAttempt({
                     variant="ghost"
                     size="xs"
                     onClick={handleRebaseDialogOpen}
-                    disabled={
-                      rebasing || branchStatusLoading || isAttemptRunning
-                    }
+                    disabled={rebasing || isAttemptRunning}
                     className="h-4 w-4 p-0 hover:bg-muted"
                   >
                     <Settings className="h-3 w-3" />
@@ -456,24 +534,30 @@ function CurrentAttempt({
             Status
           </div>
           <div className="flex items-center gap-1.5">
-            {selectedAttempt.merge_commit ? (
-              <div className="flex items-center gap-1.5 overflow-hidden">
-                <div className="h-2 w-2 bg-green-500 rounded-full" />
-                <span className="text-sm font-medium text-green-700 truncate">
-                  Merged
-                </span>
-                <span className="text-xs font-mono text-muted-foreground truncate">
-                  ({selectedAttempt.merge_commit.slice(0, 8)})
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 overflow-hidden">
-                <div className="h-2 w-2 bg-yellow-500 rounded-full" />
-                <span className="text-sm font-medium text-yellow-700">
-                  Not merged
-                </span>
-              </div>
-            )}
+            {(() => {
+              const statusInfo = getStatusInfo();
+              return (
+                <div className="flex items-center gap-1.5">
+                  <div
+                    className={`h-2 w-2 ${statusInfo.dotColor} rounded-full`}
+                  />
+                  {statusInfo.isClickable ? (
+                    <button
+                      onClick={statusInfo.onClick}
+                      className={`text-sm font-medium ${statusInfo.textColor} hover:underline cursor-pointer`}
+                    >
+                      {statusInfo.text}
+                    </button>
+                  ) : (
+                    <span
+                      className={`text-sm font-medium ${statusInfo.textColor}`}
+                    >
+                      {statusInfo.text}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -494,7 +578,7 @@ function CurrentAttempt({
           </Button>
         </div>
         <div
-          className={`text-xs font-mono px-2 py-1 rounded cursor-pointer transition-all duration-300 flex items-center gap-2 ${
+          className={`text-xs font-mono px-2 py-1 rounded break-all cursor-pointer transition-all duration-300 flex items-center gap-2 ${
             copied
               ? 'bg-green-100 text-green-800 border border-green-300'
               : 'text-muted-foreground bg-muted hover:bg-muted/80'
@@ -600,88 +684,73 @@ function CurrentAttempt({
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Git Operations */}
-          {selectedAttempt && branchStatus && (
+          {selectedAttempt && branchStatus && !mergeInfo.hasMergedPR && (
             <>
-              {(branchStatus.commits_behind ?? 0) > 0 &&
-                !branchStatus.merged && (
-                  <Button
-                    onClick={handleRebaseClick}
-                    disabled={
-                      rebasing || branchStatusLoading || isAttemptRunning
-                    }
-                    variant="outline"
-                    size="xs"
-                    className="border-orange-300 text-orange-700 hover:bg-orange-50 gap-1"
-                  >
-                    <RefreshCw
-                      className={`h-3 w-3 ${rebasing ? 'animate-spin' : ''}`}
-                    />
-                    {rebasing ? 'Rebasing...' : `Rebase`}
-                  </Button>
-                )}
-              {
-                // Normal merge and PR buttons for regular tasks
-                !branchStatus.merged && (
-                  <>
-                    <Button
-                      onClick={handlePRButtonClick}
-                      disabled={
-                        creatingPR ||
-                        Boolean((branchStatus.commits_behind ?? 0) > 0) ||
-                        isAttemptRunning
-                      }
-                      variant="outline"
-                      size="xs"
-                      className="border-blue-300 text-blue-700 hover:bg-blue-50 gap-1"
-                    >
-                      <GitPullRequest className="h-3 w-3" />
-                      {selectedAttempt.pr_url
-                        ? 'View PR'
-                        : creatingPR
-                          ? 'Creating...'
-                          : 'Create PR'}
-                    </Button>
-                    <Button
-                      onClick={
-                        selectedAttempt.pr_status === 'open'
-                          ? handlePushClick
-                          : handleMergeClick
-                      }
-                      disabled={
-                        selectedAttempt.pr_status === 'open'
-                          ? pushing ||
-                            isAttemptRunning ||
-                            (branchStatus.remote_up_to_date ?? true)
-                          : merging ||
-                            Boolean((branchStatus.commits_behind ?? 0) > 0) ||
-                            isAttemptRunning
-                      }
-                      size="xs"
-                      className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 gap-1"
-                    >
-                      {selectedAttempt.pr_status === 'open' ? (
-                        <>
-                          <Upload className="h-3 w-3" />
-                          {pushing
-                            ? 'Pushing...'
-                            : branchStatus.remote_commits_behind === null
-                              ? 'Disconnected'
-                              : branchStatus.remote_commits_behind === 0
-                                ? 'Push to remote'
-                                : branchStatus.remote_commits_behind === 1
-                                  ? 'Push 1 commit'
-                                  : `Push ${branchStatus.remote_commits_behind} commits`}
-                        </>
-                      ) : (
-                        <>
-                          <GitBranchIcon className="h-3 w-3" />
-                          {merging ? 'Merging...' : 'Merge'}
-                        </>
-                      )}
-                    </Button>
-                  </>
-                )
-              }
+              {(branchStatus.commits_behind ?? 0) > 0 && (
+                <Button
+                  onClick={handleRebaseClick}
+                  disabled={rebasing || isAttemptRunning}
+                  variant="outline"
+                  size="xs"
+                  className="border-orange-300 text-orange-700 hover:bg-orange-50 gap-1"
+                >
+                  <RefreshCw
+                    className={`h-3 w-3 ${rebasing ? 'animate-spin' : ''}`}
+                  />
+                  {rebasing ? 'Rebasing...' : `Rebase`}
+                </Button>
+              )}
+              <>
+                <Button
+                  onClick={handlePRButtonClick}
+                  disabled={
+                    creatingPR ||
+                    pushing ||
+                    Boolean((branchStatus.commits_behind ?? 0) > 0) ||
+                    isAttemptRunning ||
+                    (mergeInfo.hasOpenPR &&
+                      branchStatus.remote_commits_ahead === 0) ||
+                    ((branchStatus.commits_ahead ?? 0) === 0 &&
+                      !pushSuccess &&
+                      !mergeSuccess)
+                  }
+                  variant="outline"
+                  size="xs"
+                  className="border-blue-300 text-blue-700 hover:bg-blue-50 gap-1 min-w-[120px]"
+                >
+                  <GitPullRequest className="h-3 w-3" />
+                  {mergeInfo.hasOpenPR
+                    ? pushSuccess
+                      ? 'Pushed!'
+                      : pushing
+                        ? 'Pushing...'
+                        : branchStatus.remote_commits_ahead === 0
+                          ? 'Push to PR'
+                          : branchStatus.remote_commits_ahead === 1
+                            ? 'Push 1 commit'
+                            : `Push ${branchStatus.remote_commits_ahead || 0} commits`
+                    : creatingPR
+                      ? 'Creating...'
+                      : 'Create PR'}
+                </Button>
+                <Button
+                  onClick={handleMergeClick}
+                  disabled={
+                    mergeInfo.hasOpenPR ||
+                    merging ||
+                    Boolean((branchStatus.commits_behind ?? 0) > 0) ||
+                    isAttemptRunning ||
+                    ((branchStatus.commits_ahead ?? 0) === 0 &&
+                      !pushSuccess &&
+                      !mergeSuccess)
+                  }
+                  size="xs"
+                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 gap-1 min-w-[120px]"
+                >
+                  <GitBranchIcon className="h-3 w-3" />
+                  {mergeSuccess ? 'Merged!' : merging ? 'Merging...' : 'Merge'}
+                </Button>
+              </>
             </>
           )}
 

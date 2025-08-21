@@ -13,6 +13,7 @@ import type {
   EditorType,
   TaskAttempt,
   TaskWithAttemptStatus,
+  BranchStatus,
 } from 'shared/types';
 import { attemptsApi, executionProcessesApi } from '@/lib/api.ts';
 import {
@@ -52,6 +53,7 @@ const TaskDetailsProvider: FC<{
     processes: [],
     runningProcessDetails: {},
   });
+  const [branchStatus, setBranchStatus] = useState<BranchStatus | null>(null);
 
   const handleOpenInEditor = useCallback(
     async (editorType?: EditorType) => {
@@ -111,6 +113,15 @@ const TaskDetailsProvider: FC<{
             return newData;
           });
         }
+
+        // Also fetch branch status as part of attempt data
+        try {
+          const branchResult = await attemptsApi.getBranchStatus(attemptId);
+          setBranchStatus(branchResult);
+        } catch (err) {
+          console.error('Failed to fetch branch status:', err);
+          setBranchStatus(null);
+        }
       } catch (err) {
         console.error('Failed to fetch attempt data:', err);
       }
@@ -165,8 +176,6 @@ const TaskDetailsProvider: FC<{
   }, [attemptData.processes, selectedAttempt?.profile, profiles]);
 
   useEffect(() => {
-    if (!isAttemptRunning || !task) return;
-
     const interval = setInterval(() => {
       if (selectedAttempt) {
         fetchAttemptData(selectedAttempt.id);
@@ -175,6 +184,26 @@ const TaskDetailsProvider: FC<{
 
     return () => clearInterval(interval);
   }, [isAttemptRunning, task, selectedAttempt, fetchAttemptData]);
+
+  // Fetch branch status when selected attempt changes
+  useEffect(() => {
+    if (!selectedAttempt) {
+      setBranchStatus(null);
+      return;
+    }
+
+    const fetchBranchStatus = async () => {
+      try {
+        const result = await attemptsApi.getBranchStatus(selectedAttempt.id);
+        setBranchStatus(result);
+      } catch (err) {
+        console.error('Failed to fetch branch status:', err);
+        setBranchStatus(null);
+      }
+    };
+
+    fetchBranchStatus();
+  }, [selectedAttempt]);
 
   const value = useMemo(
     () => ({
@@ -218,8 +247,16 @@ const TaskDetailsProvider: FC<{
       fetchAttemptData,
       isAttemptRunning,
       defaultFollowUpVariant,
+      branchStatus,
+      setBranchStatus,
     }),
-    [attemptData, fetchAttemptData, isAttemptRunning, defaultFollowUpVariant]
+    [
+      attemptData,
+      fetchAttemptData,
+      isAttemptRunning,
+      defaultFollowUpVariant,
+      branchStatus,
+    ]
   );
 
   return (
