@@ -159,7 +159,7 @@ function CreateAttempt({
             </Button>
           )}
         </div>
-        <div className="flex items-center w-4/5">
+        <div className="flex items-center">
           <label className="text-xs font-medium text-muted-foreground">
             Each time you start an attempt, a new session is initiated with your
             selected coding agent, and a git worktree and corresponding task
@@ -167,7 +167,7 @@ function CreateAttempt({
           </label>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
           {/* Step 1: Choose Base Branch */}
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
@@ -183,136 +183,147 @@ function CreateAttempt({
             />
           </div>
 
-          {/* Step 2: Choose Profile and Mode */}
+          {/* Step 2: Choose Profile */}
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
               <label className="text-xs font-medium text-muted-foreground">
                 Profile
               </label>
             </div>
-            <div className="flex gap-2">
-              {availableProfiles && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 justify-between text-xs"
+            {availableProfiles && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-between text-xs"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Settings2 className="h-3 w-3" />
+                      <span className="truncate">
+                        {selectedProfile?.profile || 'Select profile'}
+                      </span>
+                    </div>
+                    <ArrowDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-full">
+                  {availableProfiles.map((profile) => (
+                    <DropdownMenuItem
+                      key={profile.label}
+                      onClick={() => {
+                        setSelectedProfile({
+                          profile: profile.label,
+                          variant: null,
+                        });
+                      }}
+                      className={
+                        selectedProfile?.profile === profile.label
+                          ? 'bg-accent'
+                          : ''
+                      }
                     >
-                      <div className="flex items-center gap-1.5">
-                        <Settings2 className="h-3 w-3" />
-                        <span className="truncate">
-                          {selectedProfile?.profile || 'Select profile'}
-                        </span>
-                      </div>
-                      <ArrowDown className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-full">
-                    {availableProfiles.map((profile) => (
-                      <DropdownMenuItem
-                        key={profile.label}
-                        onClick={() => {
-                          setSelectedProfile({
-                            profile: profile.label,
-                            variant: null,
-                          });
-                        }}
-                        className={
-                          selectedProfile?.profile === profile.label
-                            ? 'bg-accent'
-                            : ''
-                        }
+                      {profile.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+
+          {/* Step 3: Choose Variant (if available) */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Variant
+              </label>
+            </div>
+            {(() => {
+              const currentProfile = availableProfiles?.find(
+                (p) => p.label === selectedProfile?.profile
+              );
+              const hasVariants =
+                currentProfile?.variants && currentProfile.variants.length > 0;
+
+              if (hasVariants && currentProfile) {
+                return (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full px-2 flex items-center justify-between text-xs"
                       >
-                        {profile.label}
+                        <span className="truncate flex-1 text-left">
+                          {selectedProfile?.variant || 'Default'}
+                        </span>
+                        <ArrowDown className="h-3 w-3 ml-1 flex-shrink-0" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-full">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (selectedProfile) {
+                            setSelectedProfile({
+                              ...selectedProfile,
+                              variant: null,
+                            });
+                          }
+                        }}
+                        className={!selectedProfile?.variant ? 'bg-accent' : ''}
+                      >
+                        Default
                       </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-
-              {/* Show variant dropdown or disabled button */}
-              {(() => {
-                const currentProfile = availableProfiles?.find(
-                  (p) => p.label === selectedProfile?.profile
-                );
-                const hasVariants =
-                  currentProfile?.variants &&
-                  currentProfile.variants.length > 0;
-
-                if (hasVariants) {
-                  return (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-24 px-2 flex items-center justify-between text-xs"
-                        >
-                          <span className="truncate flex-1 text-left">
-                            {selectedProfile?.variant || 'Default'}
-                          </span>
-                          <ArrowDown className="h-3 w-3 ml-1 flex-shrink-0" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
+                      {currentProfile.variants.map((variant) => (
                         <DropdownMenuItem
+                          key={variant.label}
                           onClick={() => {
                             if (selectedProfile) {
                               setSelectedProfile({
                                 ...selectedProfile,
-                                variant: null,
+                                variant: variant.label,
                               });
                             }
                           }}
                           className={
-                            !selectedProfile?.variant ? 'bg-accent' : ''
+                            selectedProfile?.variant === variant.label
+                              ? 'bg-accent'
+                              : ''
                           }
                         >
-                          Default
+                          {variant.label}
                         </DropdownMenuItem>
-                        {currentProfile.variants.map((variant) => (
-                          <DropdownMenuItem
-                            key={variant.label}
-                            onClick={() => {
-                              if (selectedProfile) {
-                                setSelectedProfile({
-                                  ...selectedProfile,
-                                  variant: variant.label,
-                                });
-                              }
-                            }}
-                            className={
-                              selectedProfile?.variant === variant.label
-                                ? 'bg-accent'
-                                : ''
-                            }
-                          >
-                            {variant.label}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  );
-                } else if (currentProfile) {
-                  // Show disabled button when profile exists but has no variants
-                  return (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-24 px-2 flex items-center justify-between text-xs"
-                      disabled
-                    >
-                      <span className="truncate flex-1 text-left">Default</span>
-                    </Button>
-                  );
-                }
-                return null;
-              })()}
-            </div>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              }
+              if (currentProfile) {
+                return (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    className="w-full text-xs justify-start"
+                  >
+                    Default
+                  </Button>
+                );
+              }
+              return (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  className="w-full text-xs justify-start"
+                >
+                  Select profile first
+                </Button>
+              );
+            })()}
           </div>
 
-          {/* Step 3: Start Attempt */}
+          {/* Step 4: Start Attempt */}
           <div className="space-y-1">
             <Button
               onClick={handleCreateAttempt}
@@ -320,7 +331,9 @@ function CreateAttempt({
                 !selectedProfile || !createAttemptBranch || isAttemptRunning
               }
               size="sm"
-              className={'w-full text-xs gap-2'}
+              className={
+                'w-full text-xs gap-2 justify-center bg-black text-white hover:bg-black/90'
+              }
               title={
                 !createAttemptBranch
                   ? 'Base branch is required'
@@ -355,7 +368,12 @@ function CreateAttempt({
             >
               Cancel
             </Button>
-            <Button onClick={handleConfirmCreateAttempt}>Start</Button>
+            <Button
+              onClick={handleConfirmCreateAttempt}
+              className="bg-black text-white hover:bg-black/90"
+            >
+              Start
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

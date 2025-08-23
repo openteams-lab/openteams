@@ -38,11 +38,9 @@ import {
   SetStateAction,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
 } from 'react';
-import type { ExecutionProcess } from 'shared/types';
 import type { GitBranch, TaskAttempt } from 'shared/types';
 import {
   TaskAttemptDataContext,
@@ -111,23 +109,12 @@ function CurrentAttempt({
   const [merging, setMerging] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [rebasing, setRebasing] = useState(false);
-  const [devServerDetails, setDevServerDetails] =
-    useState<ExecutionProcess | null>(null);
-  const [isHoveringDevServer, setIsHoveringDevServer] = useState(false);
   const [showRebaseDialog, setShowRebaseDialog] = useState(false);
   const [selectedRebaseBranch, setSelectedRebaseBranch] = useState<string>('');
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mergeSuccess, setMergeSuccess] = useState(false);
   const [pushSuccess, setPushSuccess] = useState(false);
-
-  const processedDevServerLogs = useMemo(() => {
-    if (!devServerDetails) return 'No output yet...';
-
-    // TODO: stdout/stderr fields need to be restored to ExecutionProcess type
-    // For now, show basic status information
-    return `Status: ${devServerDetails.status}\nStarted: ${devServerDetails.started_at}`;
-  }, [devServerDetails]);
 
   // Find running dev server in current project
   const runningDevServer = useMemo(() => {
@@ -146,30 +133,6 @@ function CurrentAttempt({
           new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
       )[0];
   }, [attemptData.processes]);
-
-  const fetchDevServerDetails = useCallback(async () => {
-    if (!runningDevServer || !task || !selectedAttempt) return;
-
-    try {
-      const result = await executionProcessesApi.getDetails(
-        runningDevServer.id
-      );
-      setDevServerDetails(result);
-    } catch (err) {
-      console.error('Failed to fetch dev server details:', err);
-    }
-  }, [runningDevServer, task, selectedAttempt, projectId]);
-
-  useEffect(() => {
-    if (!isHoveringDevServer || !runningDevServer) {
-      setDevServerDetails(null);
-      return;
-    }
-
-    fetchDevServerDetails();
-    const interval = setInterval(fetchDevServerDetails, 2000);
-    return () => clearInterval(interval);
-  }, [isHoveringDevServer, runningDevServer, fetchDevServerDetails]);
 
   const startDevServer = async () => {
     if (!task || !selectedAttempt) return;
@@ -479,8 +442,9 @@ function CurrentAttempt({
   }, [mergeInfo, branchStatus]);
 
   return (
-    <div className="space-y-2">
-      <div className="flex gap-6 items-start">
+    <div className="space-y-2 @container">
+      {/* <div className="flex gap-6 items-start"> */}
+      <div className="grid grid-cols-2 gap-3 items-start @md:flex @md:items-start">
         <div className="min-w-0">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Profile
@@ -538,7 +502,7 @@ function CurrentAttempt({
             {(() => {
               const statusInfo = getStatusInfo();
               return (
-                <div className="flex items-center gap-1.5">
+                <>
                   <div
                     className={`h-2 w-2 ${statusInfo.dotColor} rounded-full`}
                   />
@@ -551,19 +515,19 @@ function CurrentAttempt({
                     </button>
                   ) : (
                     <span
-                      className={`text-sm font-medium ${statusInfo.textColor}`}
+                      className={`text-sm font-medium ${statusInfo.textColor} truncate`}
                     >
                       {statusInfo.text}
                     </span>
                   )}
-                </div>
+                </>
               );
             })()}
           </div>
         </div>
       </div>
 
-      <div className="col-span-4">
+      <div>
         <div className="flex items-center gap-1.5 mb-1">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 pt-1">
             Path
@@ -601,89 +565,50 @@ function CurrentAttempt({
         </div>
       </div>
 
-      <div className="col-span-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  className={!projectHasDevScript ? 'cursor-not-allowed' : ''}
-                  onMouseEnter={() => setIsHoveringDevServer(true)}
-                  onMouseLeave={() => setIsHoveringDevServer(false)}
-                >
-                  <Button
-                    variant={runningDevServer ? 'destructive' : 'outline'}
-                    size="xs"
-                    onClick={runningDevServer ? stopDevServer : startDevServer}
-                    disabled={isStartingDevServer || !projectHasDevScript}
-                    className="gap-1"
-                  >
-                    {runningDevServer ? (
-                      <>
-                        <StopCircle className="h-3 w-3" />
-                        Stop Dev
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-3 w-3" />
-                        Dev
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent
-                className={runningDevServer ? 'max-w-2xl p-4' : ''}
-                side="top"
-                align="center"
-                avoidCollisions={true}
-              >
-                {!projectHasDevScript ? (
-                  <p>
-                    Add a dev server script in project settings to enable this
-                    feature
-                  </p>
-                ) : runningDevServer && devServerDetails ? (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">
-                      Dev Server Logs (Last 10 lines):
-                    </p>
-                    <pre className="text-xs bg-muted p-2 rounded max-h-64 overflow-y-auto whitespace-pre-wrap">
-                      {processedDevServerLogs}
-                    </pre>
-                  </div>
-                ) : runningDevServer ? (
-                  <p>Stop the running dev server</p>
-                ) : (
-                  <p>Start the dev server</p>
-                )}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+      <div>
+        <div className="grid grid-cols-2 gap-3 @md:flex @md:flex-wrap @md:items-center">
+          <div className="flex gap-2 @md:flex-none">
+            <Button
+              variant={runningDevServer ? 'destructive' : 'outline'}
+              size="xs"
+              onClick={runningDevServer ? stopDevServer : startDevServer}
+              disabled={isStartingDevServer || !projectHasDevScript}
+              className="gap-1 flex-1"
+            >
+              {runningDevServer ? (
+                <>
+                  <StopCircle className="h-3 w-3" />
+                  Stop Dev
+                </>
+              ) : (
+                <>
+                  <Play className="h-3 w-3" />
+                  Dev
+                </>
+              )}
+            </Button>
 
-          {/* View Dev Server Logs Button */}
-          {latestDevServerProcess && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={handleViewDevServerLogs}
-                    className="gap-1"
-                  >
-                    <ScrollText className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>View dev server logs</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
+            {/* View Dev Server Logs Button */}
+            {latestDevServerProcess && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={handleViewDevServerLogs}
+                      className="gap-1"
+                    >
+                      <ScrollText className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View dev server logs</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           {/* Git Operations */}
           {selectedAttempt && branchStatus && !mergeInfo.hasMergedPR && (
             <>
@@ -755,67 +680,69 @@ function CurrentAttempt({
             </>
           )}
 
-          {isStopping || isAttemptRunning ? (
-            <Button
-              variant="destructive"
-              size="xs"
-              onClick={stopAllExecutions}
-              disabled={isStopping}
-              className="gap-2"
-            >
-              <StopCircle className="h-4 w-4" />
-              {isStopping ? 'Stopping...' : 'Stop Attempt'}
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={handleEnterCreateAttemptMode}
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              New Attempt
-            </Button>
-          )}
-          {taskAttempts.length > 1 && (
-            <DropdownMenu>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="xs" className="gap-2">
-                        <History className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>View attempt history</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <DropdownMenuContent align="start" className="w-64">
-                {taskAttempts.map((attempt) => (
-                  <DropdownMenuItem
-                    key={attempt.id}
-                    onClick={() => handleAttemptChange(attempt)}
-                    className={
-                      selectedAttempt?.id === attempt.id ? 'bg-accent' : ''
-                    }
-                  >
-                    <div className="flex flex-col w-full">
-                      <span className="font-medium text-sm">
-                        {new Date(attempt.created_at).toLocaleDateString()}{' '}
-                        {new Date(attempt.created_at).toLocaleTimeString()}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {attempt.profile || 'Base Agent'}
-                      </span>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <div className="flex gap-2 @md:flex-none">
+            {isStopping || isAttemptRunning ? (
+              <Button
+                variant="destructive"
+                size="xs"
+                onClick={stopAllExecutions}
+                disabled={isStopping}
+                className="gap-1 flex-1"
+              >
+                <StopCircle className="h-4 w-4" />
+                {isStopping ? 'Stopping...' : 'Stop Attempt'}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={handleEnterCreateAttemptMode}
+                className="gap-1 flex-1"
+              >
+                <Plus className="h-4 w-4" />
+                New Attempt
+              </Button>
+            )}
+            {taskAttempts.length > 1 && (
+              <DropdownMenu>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="xs" className="gap-1">
+                          <History className="h-3 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>View attempt history</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <DropdownMenuContent align="start" className="w-64">
+                  {taskAttempts.map((attempt) => (
+                    <DropdownMenuItem
+                      key={attempt.id}
+                      onClick={() => handleAttemptChange(attempt)}
+                      className={
+                        selectedAttempt?.id === attempt.id ? 'bg-accent' : ''
+                      }
+                    >
+                      <div className="flex flex-col w-full">
+                        <span className="font-medium text-sm">
+                          {new Date(attempt.created_at).toLocaleDateString()}{' '}
+                          {new Date(attempt.created_at).toLocaleTimeString()}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {attempt.profile || 'Base Agent'}
+                        </span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
       </div>
 

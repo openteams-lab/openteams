@@ -70,7 +70,13 @@ function uiReducer(state: UiState, action: UiAction): UiState {
   }
 }
 
-function TaskDetailsToolbar() {
+function TaskDetailsToolbar({
+  forceCreateAttempt,
+  onLeaveForceCreateAttempt,
+}: {
+  forceCreateAttempt?: boolean;
+  onLeaveForceCreateAttempt?: () => void;
+}) {
   const { task, projectId } = useContext(TaskDetailsContext);
   const { setLoading } = useContext(TaskAttemptLoadingContext);
   const { selectedAttempt, setSelectedAttempt } = useContext(
@@ -109,7 +115,8 @@ function TaskDetailsToolbar() {
 
   // Derived state
   const isInCreateAttemptMode =
-    ui.userForcedCreateMode || taskAttempts.length === 0;
+    forceCreateAttempt ??
+    (ui.userForcedCreateMode || taskAttempts.length === 0);
 
   // Derive createAttemptBranch for backward compatibility
   const createAttemptBranch = useMemo(() => {
@@ -291,10 +298,11 @@ function TaskDetailsToolbar() {
       if (boolValue) {
         dispatch({ type: 'ENTER_CREATE_MODE' });
       } else {
+        if (onLeaveForceCreateAttempt) onLeaveForceCreateAttempt();
         dispatch({ type: 'LEAVE_CREATE_MODE' });
       }
     },
-    [isInCreateAttemptMode]
+    [isInCreateAttemptMode, onLeaveForceCreateAttempt]
   );
 
   // Wrapper functions for UI state dispatch
@@ -326,7 +334,7 @@ function TaskDetailsToolbar() {
 
   return (
     <>
-      <div className="p-4 border-b">
+      <div>
         {/* Error Display */}
         {ui.error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -375,13 +383,13 @@ function TaskDetailsToolbar() {
               )}
             </div>
 
-            {/* Special Actions */}
+            {/* Special Actions: show only in sidebar (non-fullscreen) */}
             {!selectedAttempt && !isAttemptRunning && !isStopping && (
               <div className="space-y-2 pt-3 border-t">
                 <Button
                   onClick={handleEnterCreateAttemptMode}
                   size="sm"
-                  className="w-full gap-2"
+                  className="w-full gap-2 bg-black text-white hover:bg-black/90"
                 >
                   <Play className="h-4 w-4" />
                   Start Attempt

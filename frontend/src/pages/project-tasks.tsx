@@ -83,6 +83,9 @@ export function ProjectTasks() {
     setIsTaskDialogOpen(true);
   }, []);
 
+  // Full screen
+  const [fullScreenTaskDetails, setFullScreenTaskDetails] = useState(false);
+
   const handleOpenInIDE = useCallback(async () => {
     if (!projectId) return;
 
@@ -380,9 +383,13 @@ export function ProjectTasks() {
   }
 
   return (
-    <div className={getMainContainerClasses(isPanelOpen)}>
+    <div
+      className={getMainContainerClasses(isPanelOpen, fullScreenTaskDetails)}
+    >
       {/* Left Column - Kanban Section */}
-      <div className={getKanbanSectionClasses(isPanelOpen)}>
+      <div
+        className={getKanbanSectionClasses(isPanelOpen, fullScreenTaskDetails)}
+      >
         {/* Header */}
 
         <div className="px-8 my-12 flex flex-row">
@@ -527,6 +534,8 @@ export function ProjectTasks() {
           onEditTask={handleEditTask}
           onDeleteTask={handleDeleteTask}
           isDialogOpen={isTaskDialogOpen || isProjectSettingsOpen}
+          isFullScreen={fullScreenTaskDetails}
+          setFullScreen={setFullScreenTaskDetails}
         />
       )}
 

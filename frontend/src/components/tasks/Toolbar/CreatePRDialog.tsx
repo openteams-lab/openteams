@@ -124,6 +124,7 @@ function CreatePrDialog({
     prBaseBranch,
     prBody,
     prTitle,
+    fetchAttemptData,
     setCreatingPR,
     setError,
     setShowCreatePRDialog,

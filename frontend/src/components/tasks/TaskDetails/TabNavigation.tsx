@@ -6,13 +6,14 @@ import type { TabType } from '@/types/tabs';
 type Props = {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
+  rightContent?: React.ReactNode;
 };
 
-function TabNavigation({ activeTab, setActiveTab }: Props) {
+function TabNavigation({ activeTab, setActiveTab, rightContent }: Props) {
   const { attemptData } = useContext(TaskAttemptDataContext);
   return (
-    <div className="border-b bg-muted/20">
-      <div className="flex px-4">
+    <div className="border-b bg-muted/20 sticky top-0 z-10">
+      <div className="flex items-center px-4">
         <button
           onClick={() => {
             setActiveTab('logs');
@@ -58,6 +59,7 @@ function TabNavigation({ activeTab, setActiveTab }: Props) {
             </span>
           )}
         </button>
+        <div className="ml-auto flex items-center">{rightContent}</div>
       </div>
     </div>
   );
