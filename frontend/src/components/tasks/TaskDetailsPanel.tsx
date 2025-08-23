@@ -166,7 +166,7 @@ export function TaskDetailsPanel({
                       </aside>
 
                       {/* Main content */}
-                      <main className="flex-1 min-h-0 flex flex-col">
+                      <main className="flex-1 min-h-0 min-w-0 flex flex-col">
                         <TabNavigation
                           activeTab={activeTab}
                           setActiveTab={setActiveTab}
