@@ -1,9 +1,11 @@
-import { useContext, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Circle, CircleCheckBig, CircleDotDashed } from 'lucide-react';
 import { useProcessesLogs } from '@/hooks/useProcessesLogs';
 import { usePinnedTodos } from '@/hooks/usePinnedTodos';
-import { TaskAttemptDataContext } from '@/components/context/taskDetailsContext';
+import { useAttemptExecution } from '@/hooks';
 import { shouldShowInLogs } from '@/constants/processes';
+import type { TaskAttempt } from 'shared/types';
+import { Card } from '../ui/card';
 
 function getStatusIcon(status?: string) {
   const s = (status || '').toLowerCase();
@@ -14,8 +16,12 @@ function getStatusIcon(status?: string) {
   return <Circle aria-hidden className="h-4 w-4 text-muted-foreground" />;
 }
 
-export function TodoPanel() {
-  const { attemptData } = useContext(TaskAttemptDataContext);
+interface TodoPanelProps {
+  selectedAttempt: TaskAttempt | null;
+}
+
+export function TodoPanel({ selectedAttempt }: TodoPanelProps) {
+  const { attemptData } = useAttemptExecution(selectedAttempt?.id);
 
   const filteredProcesses = useMemo(
     () =>
@@ -32,9 +38,11 @@ export function TodoPanel() {
   if (!todos || todos.length === 0) return null;
 
   return (
-    <div className="bg-background rounded-lg overflow-hidden border">
-      <div className="p-4">
-        <h3 className="font-medium mb-3">Task Breakdown</h3>
+    <div>
+      <Card className="bg-secondary p-3 border border-dashed text-sm">
+        Todos
+      </Card>
+      <div className="p-3">
         <ul className="space-y-2">
           {todos.map((todo, index) => (
             <li

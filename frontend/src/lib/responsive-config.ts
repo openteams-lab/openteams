@@ -21,9 +21,8 @@ export const PANEL_WIDTHS = {
 // Generate classes for TaskDetailsPanel
 export const getTaskPanelClasses = (forceFullScreen: boolean) => {
   const overlayClasses = forceFullScreen
-    ? 'fixed inset-y-0 right-0 z-50 w-full'
+    ? 'w-full'
     : [
-        'fixed inset-y-0 right-0 z-50',
         PANEL_WIDTHS.base,
         PANEL_WIDTHS.sm,
         PANEL_WIDTHS.md,
@@ -41,7 +40,11 @@ export const getTaskPanelClasses = (forceFullScreen: boolean) => {
         `${PANEL_SIDE_BY_SIDE_BREAKPOINT}:w-[800px]`,
       ].join(' ');
 
-  return `${overlayClasses} ${sideBySideClasses} bg-background border-l shadow-lg overflow-hidden`;
+  return `fixed flex flex-col items-center inset-y-0 right-0 z-50 ${overlayClasses} ${sideBySideClasses} bg-muted border-l shadow-lg overflow-hidden `;
+};
+
+export const getTaskPanelInnerClasses = () => {
+  return `flex-1 flex flex-col min-h-0 w-full max-w-[1400px] bg-background`;
 };
 
 // Generate classes for backdrop (only show in overlay mode)
@@ -56,8 +59,8 @@ export const getMainContainerClasses = (
 ) => {
   const overlayClasses =
     isPanelOpen && forceFullScreen
-      ? 'w-full'
-      : `${PANEL_SIDE_BY_SIDE_BREAKPOINT}:flex ${PANEL_SIDE_BY_SIDE_BREAKPOINT}:h-full`;
+      ? 'w-full h-full'
+      : `h-full ${PANEL_SIDE_BY_SIDE_BREAKPOINT}:flex`;
 
   return `${overlayClasses}`;
 };
@@ -67,7 +70,9 @@ export const getKanbanSectionClasses = (
   isPanelOpen: boolean,
   forceFullScreen: boolean
 ) => {
-  if (!isPanelOpen) return 'w-full';
+  const baseClasses = 'h-full w-full';
+
+  if (!isPanelOpen) return baseClasses;
 
   // const overlayClasses = 'w-full opacity-50 pointer-events-none';
   const sideBySideClasses =
@@ -83,5 +88,5 @@ export const getKanbanSectionClasses = (
         ].join(' ');
 
   // return `${overlayClasses} ${sideBySideClasses}`;
-  return `${sideBySideClasses}`;
+  return `${baseClasses} ${sideBySideClasses}`;
 };

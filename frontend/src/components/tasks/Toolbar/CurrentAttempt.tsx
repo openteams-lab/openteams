@@ -32,21 +32,25 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.tsx';
 import BranchSelector from '@/components/tasks/BranchSelector.tsx';
-import { attemptsApi, executionProcessesApi } from '@/lib/api.ts';
 import {
   Dispatch,
   SetStateAction,
   useCallback,
-  useContext,
   useMemo,
   useState,
 } from 'react';
-import type { GitBranch, TaskAttempt } from 'shared/types';
-import {
-  TaskAttemptDataContext,
-  TaskAttemptStoppingContext,
-  TaskDetailsContext,
-} from '@/components/context/taskDetailsContext.ts';
+import type {
+  GitBranch,
+  TaskAttempt,
+  TaskWithAttemptStatus,
+} from 'shared/types';
+import { useBranchStatus, useOpenInEditor } from '@/hooks';
+import { useAttemptExecution } from '@/hooks/useAttemptExecution';
+import { useDevServer } from '@/hooks/useDevServer';
+import { useRebase } from '@/hooks/useRebase';
+import { useMerge } from '@/hooks/useMerge';
+import { useCreatePRDialog } from '@/contexts/create-pr-dialog-context';
+import { usePush } from '@/hooks/usePush';
 import { useConfig } from '@/components/config-provider.tsx';
 import { useKeyboardShortcuts } from '@/lib/keyboard-shortcuts.ts';
 import { writeClipboardViaBridge } from '@/vscode/bridge';
@@ -75,37 +79,55 @@ function getEditorDisplayName(editorType: string): string {
 }
 
 type Props = {
+  task: TaskWithAttemptStatus;
+  projectId: string;
+  projectHasDevScript: boolean;
   setError: Dispatch<SetStateAction<string | null>>;
-  setShowCreatePRDialog: Dispatch<SetStateAction<boolean>>;
+
   selectedBranch: string | null;
   selectedAttempt: TaskAttempt;
   taskAttempts: TaskAttempt[];
   creatingPR: boolean;
   handleEnterCreateAttemptMode: () => void;
-  handleAttemptSelect: (attempt: TaskAttempt) => void;
   branches: GitBranch[];
+  setSelectedAttempt: (attempt: TaskAttempt | null) => void;
 };
 
 function CurrentAttempt({
+  task,
+  projectId,
+  projectHasDevScript,
   setError,
-  setShowCreatePRDialog,
   selectedBranch,
   selectedAttempt,
   taskAttempts,
   creatingPR,
   handleEnterCreateAttemptMode,
-  handleAttemptSelect,
   branches,
+  setSelectedAttempt,
 }: Props) {
-  const { task, projectId, handleOpenInEditor, projectHasDevScript } =
-    useContext(TaskDetailsContext);
   const { config } = useConfig();
-  const { isStopping, setIsStopping } = useContext(TaskAttemptStoppingContext);
-  const { attemptData, fetchAttemptData, isAttemptRunning, branchStatus } =
-    useContext(TaskAttemptDataContext);
+  const { isAttemptRunning, stopExecution, isStopping } = useAttemptExecution(
+    selectedAttempt?.id,
+    task.id
+  );
+  const { data: branchStatus } = useBranchStatus(selectedAttempt?.id);
+  const handleOpenInEditor = useOpenInEditor(selectedAttempt);
   const { jumpToProcess } = useProcessSelection();
 
-  const [isStartingDevServer, setIsStartingDevServer] = useState(false);
+  // Attempt action hooks
+  const {
+    start: startDevServer,
+    stop: stopDevServer,
+    isStarting: isStartingDevServer,
+    runningDevServer,
+    latestDevServerProcess,
+  } = useDevServer(selectedAttempt?.id);
+  const rebaseMutation = useRebase(selectedAttempt?.id, projectId);
+  const mergeMutation = useMerge(selectedAttempt?.id);
+  const pushMutation = usePush(selectedAttempt?.id);
+  const { showCreatePRDialog } = useCreatePRDialog();
+
   const [merging, setMerging] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [rebasing, setRebasing] = useState(false);
@@ -116,83 +138,13 @@ function CurrentAttempt({
   const [mergeSuccess, setMergeSuccess] = useState(false);
   const [pushSuccess, setPushSuccess] = useState(false);
 
-  // Find running dev server in current project
-  const runningDevServer = useMemo(() => {
-    return attemptData.processes.find(
-      (process) =>
-        process.run_reason === 'devserver' && process.status === 'running'
-    );
-  }, [attemptData.processes]);
-
-  // Find latest dev server process (for logs viewing)
-  const latestDevServerProcess = useMemo(() => {
-    return [...attemptData.processes]
-      .filter((process) => process.run_reason === 'devserver')
-      .sort(
-        (a, b) =>
-          new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
-      )[0];
-  }, [attemptData.processes]);
-
-  const startDevServer = async () => {
-    if (!task || !selectedAttempt) return;
-
-    setIsStartingDevServer(true);
-
-    try {
-      await attemptsApi.startDevServer(selectedAttempt.id);
-      fetchAttemptData(selectedAttempt.id);
-    } catch (err) {
-      console.error('Failed to start dev server:', err);
-    } finally {
-      setIsStartingDevServer(false);
-    }
-  };
-
-  const stopDevServer = async () => {
-    if (!task || !selectedAttempt || !runningDevServer) return;
-
-    setIsStartingDevServer(true);
-
-    try {
-      await executionProcessesApi.stopExecutionProcess(runningDevServer.id);
-      fetchAttemptData(selectedAttempt.id);
-    } catch (err) {
-      console.error('Failed to stop dev server:', err);
-    } finally {
-      setIsStartingDevServer(false);
-    }
-  };
-
   const handleViewDevServerLogs = () => {
     if (latestDevServerProcess) {
       jumpToProcess(latestDevServerProcess.id);
     }
   };
 
-  const stopAllExecutions = useCallback(async () => {
-    if (!task || !selectedAttempt || !isAttemptRunning) return;
-
-    try {
-      setIsStopping(true);
-      await attemptsApi.stop(selectedAttempt.id);
-      await fetchAttemptData(selectedAttempt.id);
-      setTimeout(() => {
-        fetchAttemptData(selectedAttempt.id);
-      }, 1000);
-    } catch (err) {
-      console.error('Failed to stop executions:', err);
-    } finally {
-      setIsStopping(false);
-    }
-  }, [
-    task,
-    selectedAttempt,
-    projectId,
-    fetchAttemptData,
-    setIsStopping,
-    isAttemptRunning,
-  ]);
+  // Use the stopExecution function from the hook
 
   useKeyboardShortcuts({
     stopExecution: () => setShowStopConfirmation(true),
@@ -201,16 +153,16 @@ function CurrentAttempt({
     closeDialog: () => setShowStopConfirmation(false),
     onEnter: () => {
       setShowStopConfirmation(false);
-      stopAllExecutions();
+      stopExecution();
     },
   });
 
   const handleAttemptChange = useCallback(
     (attempt: TaskAttempt) => {
-      handleAttemptSelect(attempt);
-      fetchAttemptData(attempt.id);
+      setSelectedAttempt(attempt);
+      // React Query will handle refetching when attemptId changes
     },
-    [fetchAttemptData, handleAttemptSelect]
+    [setSelectedAttempt]
   );
 
   const handleMergeClick = async () => {
@@ -221,16 +173,13 @@ function CurrentAttempt({
   };
 
   const handlePushClick = async () => {
-    if (!selectedAttempt?.id) return;
     try {
       setPushing(true);
-      await attemptsApi.push(selectedAttempt.id);
+      await pushMutation.mutateAsync();
       setError(null); // Clear any previous errors on success
       setPushSuccess(true);
       setTimeout(() => setPushSuccess(false), 2000);
-      fetchAttemptData(selectedAttempt.id);
     } catch (error: any) {
-      console.error('Failed to push changes:', error);
       setError(error.message || 'Failed to push changes');
     } finally {
       setPushing(false);
@@ -238,17 +187,13 @@ function CurrentAttempt({
   };
 
   const performMerge = async () => {
-    if (!projectId || !selectedAttempt?.id || !selectedAttempt?.task_id) return;
-
     try {
       setMerging(true);
-      await attemptsApi.merge(selectedAttempt.id);
+      await mergeMutation.mutateAsync();
       setError(null); // Clear any previous errors on success
       setMergeSuccess(true);
       setTimeout(() => setMergeSuccess(false), 2000);
-      fetchAttemptData(selectedAttempt.id);
     } catch (error) {
-      console.error('Failed to merge changes:', error);
       // @ts-expect-error it is type ApiError
       setError(error.message || 'Failed to merge changes');
     } finally {
@@ -257,13 +202,10 @@ function CurrentAttempt({
   };
 
   const handleRebaseClick = async () => {
-    if (!projectId || !selectedAttempt?.id || !selectedAttempt?.task_id) return;
-
     try {
       setRebasing(true);
-      await attemptsApi.rebase(selectedAttempt.id, { new_base_branch: null });
+      await rebaseMutation.mutateAsync(undefined);
       setError(null); // Clear any previous errors on success
-      fetchAttemptData(selectedAttempt.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to rebase branch');
     } finally {
@@ -272,15 +214,10 @@ function CurrentAttempt({
   };
 
   const handleRebaseWithNewBranch = async (newBaseBranch: string) => {
-    if (!projectId || !selectedAttempt?.id || !selectedAttempt?.task_id) return;
-
     try {
       setRebasing(true);
-      await attemptsApi.rebase(selectedAttempt.id, {
-        new_base_branch: newBaseBranch,
-      });
+      await rebaseMutation.mutateAsync(newBaseBranch);
       setError(null); // Clear any previous errors on success
-      fetchAttemptData(selectedAttempt.id);
       setShowRebaseDialog(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to rebase branch');
@@ -309,7 +246,11 @@ function CurrentAttempt({
       return;
     }
 
-    setShowCreatePRDialog(true);
+    showCreatePRDialog({
+      attempt: selectedAttempt,
+      task,
+      projectId,
+    });
   };
 
   // Get display name for selected branch
@@ -543,7 +484,7 @@ function CurrentAttempt({
           </Button>
         </div>
         <div
-          className={`text-xs font-mono px-2 py-1 rounded break-all cursor-pointer transition-all duration-300 flex items-center gap-2 ${
+          className={`text-xs font-mono px-2 py-1 break-all cursor-pointer transition-all duration-300 flex items-center gap-2 ${
             copied
               ? 'bg-green-100 text-green-800 border border-green-300'
               : 'text-muted-foreground bg-muted hover:bg-muted/80'
@@ -686,7 +627,7 @@ function CurrentAttempt({
               <Button
                 variant="destructive"
                 size="xs"
-                onClick={stopAllExecutions}
+                onClick={stopExecution}
                 disabled={isStopping}
                 className="gap-1 flex-1"
               >
@@ -815,7 +756,7 @@ function CurrentAttempt({
               variant="destructive"
               onClick={async () => {
                 setShowStopConfirmation(false);
-                await stopAllExecutions();
+                await stopExecution();
               }}
               disabled={isStopping}
             >

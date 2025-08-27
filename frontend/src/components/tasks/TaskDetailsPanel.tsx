@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import TaskDetailsHeader from './TaskDetailsHeader';
 import { TaskFollowUpSection } from './TaskFollowUpSection';
 import { EditorSelectionDialog } from './EditorSelectionDialog';
+import { TaskTitleDescription } from './TaskDetails/TaskTitleDescription';
+import type { TaskAttempt } from 'shared/types';
 import {
   getBackdropClasses,
   getTaskPanelClasses,
+  getTaskPanelInnerClasses,
 } from '@/lib/responsive-config';
 import type { TaskWithAttemptStatus } from 'shared/types';
 import type { TabType } from '@/types/tabs';
@@ -12,15 +15,13 @@ import DiffTab from '@/components/tasks/TaskDetails/DiffTab.tsx';
 import LogsTab from '@/components/tasks/TaskDetails/LogsTab.tsx';
 import ProcessesTab from '@/components/tasks/TaskDetails/ProcessesTab.tsx';
 import DeleteFileConfirmationDialog from '@/components/tasks/DeleteFileConfirmationDialog.tsx';
-import CreatePRDialog from '@/components/tasks/Toolbar/CreatePRDialog';
 import TabNavigation from '@/components/tasks/TaskDetails/TabNavigation.tsx';
-import TaskDetailsProvider from '../context/TaskDetailsContextProvider.tsx';
 import TaskDetailsToolbar from './TaskDetailsToolbar.tsx';
 import TodoPanel from '@/components/tasks/TodoPanel';
 import { TabNavContext } from '@/contexts/TabNavigationContext';
 import { ProcessSelectionProvider } from '@/contexts/ProcessSelectionContext';
-import { projectsApi } from '@/lib/api';
-import type { GitBranch } from 'shared/types';
+import { AttemptHeaderCard } from './AttemptHeaderCard';
+import { inIframe } from '@/vscode/bridge';
 
 interface TaskDetailsPanelProps {
   task: TaskWithAttemptStatus | null;
@@ -38,6 +39,9 @@ interface TaskDetailsPanelProps {
   forceCreateAttempt?: boolean;
   onLeaveForceCreateAttempt?: () => void;
   onNewAttempt?: () => void;
+  selectedAttempt: TaskAttempt | null;
+  attempts: TaskAttempt[];
+  setSelectedAttempt: (attempt: TaskAttempt | null) => void;
 }
 
 export function TaskDetailsPanel({
@@ -54,15 +58,26 @@ export function TaskDetailsPanel({
   setFullScreen,
   forceCreateAttempt,
   onLeaveForceCreateAttempt,
+  selectedAttempt,
+  attempts,
+  setSelectedAttempt,
 }: TaskDetailsPanelProps) {
+  // selectedAttempt now comes from AttemptContext for child components
   const [showEditorDialog, setShowEditorDialog] = useState(false);
-  const [showCreatePRDialog, setShowCreatePRDialog] = useState(false);
-  const [creatingPR, setCreatingPR] = useState(false);
-  const [, setPrError] = useState<string | null>(null);
-  const [branches, setBranches] = useState<GitBranch[]>([]);
+
+  // Attempt number, find the current attempt number
+  const attemptNumber =
+    attempts.length -
+    attempts.findIndex((attempt) => attempt.id === selectedAttempt?.id);
 
   // Tab and collapsible state
   const [activeTab, setActiveTab] = useState<TabType>('logs');
+
+  // Handler for jumping to diff tab in full screen
+  const jumpToDiffFullScreen = () => {
+    setFullScreen?.(true);
+    setActiveTab('diffs');
+  };
 
   // Reset to logs tab when task changes
   useEffect(() => {
@@ -71,18 +86,8 @@ export function TaskDetailsPanel({
     }
   }, [task?.id]);
 
-  // Fetch branches for PR dialog usage when panel opens
-  useEffect(() => {
-    const fetchBranches = async () => {
-      try {
-        const result = await projectsApi.getBranches(projectId);
-        setBranches(result);
-      } catch (e) {
-        // noop
-      }
-    };
-    if (projectId) fetchBranches();
-  }, [projectId]);
+  // Get selected attempt info for props
+  // (now received as props instead of hook)
 
   // Handle ESC key locally to prevent global navigation
   useEffect(() => {
@@ -103,31 +108,26 @@ export function TaskDetailsPanel({
   return (
     <>
       {!task ? null : (
-        <TaskDetailsProvider
-          key={task.id}
-          task={task}
-          projectId={projectId}
-          setShowEditorDialog={setShowEditorDialog}
-          projectHasDevScript={projectHasDevScript}
-        >
-          <TabNavContext.Provider value={{ activeTab, setActiveTab }}>
-            <ProcessSelectionProvider>
-              {/* Backdrop - only on smaller screens (overlay mode) */}
-              {!hideBackdrop && (
-                <div
-                  className={getBackdropClasses(isFullScreen || false)}
-                  onClick={onClose}
-                />
-              )}
-
-              {/* Panel */}
+        <TabNavContext.Provider value={{ activeTab, setActiveTab }}>
+          <ProcessSelectionProvider>
+            {/* Backdrop - only on smaller screens (overlay mode) */}
+            {!hideBackdrop && (
               <div
-                className={
-                  className || getTaskPanelClasses(isFullScreen || false)
-                }
-              >
-                <div className="flex flex-col h-full">
+                className={getBackdropClasses(isFullScreen || false)}
+                onClick={onClose}
+              />
+            )}
+
+            {/* Panel */}
+            <div
+              className={
+                className || getTaskPanelClasses(isFullScreen || false)
+              }
+            >
+              <div className={getTaskPanelInnerClasses()}>
+                {!inIframe() && (
                   <TaskDetailsHeader
+                    task={task}
                     onClose={onClose}
                     onEditTask={onEditTask}
                     onDeleteTask={onDeleteTask}
@@ -135,102 +135,119 @@ export function TaskDetailsPanel({
                     isFullScreen={isFullScreen}
                     setFullScreen={setFullScreen}
                   />
+                )}
 
-                  {isFullScreen ? (
-                    <div className="flex-1 min-h-0 flex">
-                      {/* Sidebar */}
-                      <aside className="w-[28rem] shrink-0 border-r overflow-y-auto p-4 space-y-4">
-                        {/* Fullscreen sidebar shows description only (no title) above edit/delete */}
-                        <div className="space-y-2">
-                          {/* Description */}
-                          <div className="text-sm text-muted-foreground block">
-                            {task.description ? (
-                              <p className="whitespace-pre-wrap break-words">
-                                {task.description}
-                              </p>
-                            ) : (
-                              <p className="italic">No description provided</p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Current Attempt / Actions */}
-                        <TaskDetailsToolbar
-                          forceCreateAttempt={forceCreateAttempt}
-                          onLeaveForceCreateAttempt={onLeaveForceCreateAttempt}
-                          // hide actions in sidebar; moved to header in fullscreen
-                        />
-
-                        {/* Task Breakdown (TODOs) */}
-                        <TodoPanel />
-                      </aside>
-
-                      {/* Main content */}
-                      <main className="flex-1 min-h-0 min-w-0 flex flex-col">
-                        <TabNavigation
-                          activeTab={activeTab}
-                          setActiveTab={setActiveTab}
-                        />
-
-                        <div className="flex-1 flex flex-col min-h-0">
-                          {activeTab === 'diffs' ? (
-                            <DiffTab />
-                          ) : activeTab === 'processes' ? (
-                            <ProcessesTab />
-                          ) : (
-                            <LogsTab />
-                          )}
-                        </div>
-
-                        <TaskFollowUpSection />
-                      </main>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="p-4 border-b">
-                        <TaskDetailsToolbar />
+                {isFullScreen ? (
+                  <div className="flex-1 min-h-0 flex">
+                    {/* Sidebar */}
+                    <aside
+                      className={`w-[28rem] shrink-0 border-r overflow-y-auto ${inIframe() ? 'hidden' : ''}`}
+                    >
+                      {/* Fullscreen sidebar shows title and description above edit/delete */}
+                      <div className="space-y-2 p-3">
+                        <TaskTitleDescription task={task} />
                       </div>
 
+                      {/* Current Attempt / Actions */}
+                      <TaskDetailsToolbar
+                        task={task}
+                        projectId={projectId}
+                        projectHasDevScript={projectHasDevScript}
+                        forceCreateAttempt={forceCreateAttempt}
+                        onLeaveForceCreateAttempt={onLeaveForceCreateAttempt}
+                        attempts={attempts}
+                        selectedAttempt={selectedAttempt}
+                        setSelectedAttempt={setSelectedAttempt}
+                        // hide actions in sidebar; moved to header in fullscreen
+                      />
+
+                      {/* Task Breakdown (TODOs) */}
+                      <TodoPanel selectedAttempt={selectedAttempt} />
+                    </aside>
+
+                    {/* Main content */}
+                    <main className="flex-1 min-h-0 min-w-0 flex flex-col">
                       <TabNavigation
                         activeTab={activeTab}
                         setActiveTab={setActiveTab}
+                        selectedAttempt={selectedAttempt}
                       />
 
-                      {/* Tab Content */}
                       <div className="flex-1 flex flex-col min-h-0">
                         {activeTab === 'diffs' ? (
-                          <DiffTab />
+                          <DiffTab selectedAttempt={selectedAttempt} />
                         ) : activeTab === 'processes' ? (
-                          <ProcessesTab />
+                          <ProcessesTab attemptId={selectedAttempt?.id} />
                         ) : (
-                          <LogsTab />
+                          <LogsTab selectedAttempt={selectedAttempt} />
                         )}
                       </div>
 
-                      <TaskFollowUpSection />
-                    </>
-                  )}
-                </div>
+                      <TaskFollowUpSection
+                        task={task}
+                        projectId={projectId}
+                        selectedAttemptId={selectedAttempt?.id}
+                        selectedAttemptProfile={selectedAttempt?.profile}
+                      />
+                    </main>
+                  </div>
+                ) : (
+                  <>
+                    {attempts.length === 0 ? (
+                      <TaskDetailsToolbar
+                        task={task}
+                        projectId={projectId}
+                        projectHasDevScript={projectHasDevScript}
+                        forceCreateAttempt={forceCreateAttempt}
+                        onLeaveForceCreateAttempt={onLeaveForceCreateAttempt}
+                        attempts={attempts}
+                        selectedAttempt={selectedAttempt}
+                        setSelectedAttempt={setSelectedAttempt}
+                        // hide actions in sidebar; moved to header in fullscreen
+                      />
+                    ) : (
+                      <>
+                        <AttemptHeaderCard
+                          attemptNumber={attemptNumber}
+                          totalAttempts={attempts.length}
+                          selectedAttempt={selectedAttempt}
+                          task={task}
+                          projectId={projectId}
+                          // onCreateNewAttempt={() => {
+                          //   // TODO: Implement create new attempt
+                          //   console.log('Create new attempt');
+                          // }}
+                          onJumpToDiffFullScreen={jumpToDiffFullScreen}
+                        />
+
+                        <LogsTab selectedAttempt={selectedAttempt} />
+
+                        <TaskFollowUpSection
+                          task={task}
+                          projectId={projectId}
+                          selectedAttemptId={selectedAttempt?.id}
+                          selectedAttemptProfile={selectedAttempt?.profile}
+                        />
+                      </>
+                    )}
+                  </>
+                )}
               </div>
+            </div>
 
-              <EditorSelectionDialog
-                isOpen={showEditorDialog}
-                onClose={() => setShowEditorDialog(false)}
-              />
+            <EditorSelectionDialog
+              isOpen={showEditorDialog}
+              onClose={() => setShowEditorDialog(false)}
+              selectedAttempt={selectedAttempt}
+            />
 
-              <DeleteFileConfirmationDialog />
-            </ProcessSelectionProvider>
-          </TabNavContext.Provider>
-          {/* PR Dialog mounted within provider so it has task context */}
-          <CreatePRDialog
-            creatingPR={creatingPR}
-            setShowCreatePRDialog={setShowCreatePRDialog}
-            showCreatePRDialog={showCreatePRDialog}
-            setCreatingPR={setCreatingPR}
-            setError={setPrError}
-            branches={branches}
-          />
-        </TaskDetailsProvider>
+            <DeleteFileConfirmationDialog
+              task={task}
+              projectId={projectId}
+              selectedAttempt={selectedAttempt}
+            />
+          </ProcessSelectionProvider>
+        </TabNavContext.Provider>
       )}
     </>
   );

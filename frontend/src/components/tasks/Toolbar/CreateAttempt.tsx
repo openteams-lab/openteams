@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useCallback, useContext } from 'react';
+import { Dispatch, SetStateAction, useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button.tsx';
 import { ArrowDown, Settings2, X } from 'lucide-react';
 import {
@@ -11,13 +11,11 @@ import type {
   ProfileConfig,
   GitBranch,
   ProfileVariantLabel,
+  Task,
 } from 'shared/types';
 import type { TaskAttempt } from 'shared/types';
-import { attemptsApi } from '@/lib/api.ts';
-import {
-  TaskAttemptDataContext,
-  TaskDetailsContext,
-} from '@/components/context/taskDetailsContext.ts';
+import { useAttemptCreation } from '@/hooks/useAttemptCreation';
+import { useAttemptExecution } from '@/hooks/useAttemptExecution';
 import BranchSelector from '@/components/tasks/BranchSelector.tsx';
 import { useKeyboardShortcuts } from '@/lib/keyboard-shortcuts.ts';
 import {
@@ -28,35 +26,37 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.tsx';
-import { useState } from 'react';
+import { Card } from '@/components/ui/card';
 
 type Props = {
+  task: Task;
   branches: GitBranch[];
   taskAttempts: TaskAttempt[];
   createAttemptBranch: string | null;
   selectedProfile: ProfileVariantLabel | null;
   selectedBranch: string | null;
-  fetchTaskAttempts: () => void;
   setIsInCreateAttemptMode: Dispatch<SetStateAction<boolean>>;
   setCreateAttemptBranch: Dispatch<SetStateAction<string | null>>;
   setSelectedProfile: Dispatch<SetStateAction<ProfileVariantLabel | null>>;
   availableProfiles: ProfileConfig[] | null;
+  selectedAttempt: TaskAttempt | null;
 };
 
 function CreateAttempt({
+  task,
   branches,
   taskAttempts,
   createAttemptBranch,
   selectedProfile,
   selectedBranch,
-  fetchTaskAttempts,
   setIsInCreateAttemptMode,
   setCreateAttemptBranch,
   setSelectedProfile,
   availableProfiles,
+  selectedAttempt,
 }: Props) {
-  const { task } = useContext(TaskDetailsContext);
-  const { isAttemptRunning } = useContext(TaskAttemptDataContext);
+  const { isAttemptRunning } = useAttemptExecution(selectedAttempt?.id);
+  const { createAttempt, isCreating } = useAttemptCreation(task.id);
 
   const [showCreateAttemptConfirmation, setShowCreateAttemptConfirmation] =
     useState(false);
@@ -74,14 +74,12 @@ function CreateAttempt({
         throw new Error('Base branch is required to create an attempt');
       }
 
-      await attemptsApi.create({
-        task_id: task.id,
-        profile_variant_label: profile,
-        base_branch: effectiveBaseBranch,
+      await createAttempt({
+        profile,
+        baseBranch: effectiveBaseBranch,
       });
-      fetchTaskAttempts();
     },
-    [task.id, selectedProfile, selectedBranch, fetchTaskAttempts]
+    [createAttempt, selectedBranch]
   );
 
   // Handler for Enter key or Start button
@@ -145,10 +143,12 @@ function CreateAttempt({
   };
 
   return (
-    <div className="p-4 bg-muted/20 rounded-lg border">
-      <div className="space-y-3">
+    <div className="">
+      <Card className="bg-secondary p-3 text-sm border-y border-dashed">
+        Create Attempt
+      </Card>
+      <div className="space-y-3 px-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">Create Attempt</h3>
           {taskAttempts.length > 0 && (
             <Button
               variant="ghost"
@@ -328,7 +328,10 @@ function CreateAttempt({
             <Button
               onClick={handleCreateAttempt}
               disabled={
-                !selectedProfile || !createAttemptBranch || isAttemptRunning
+                !selectedProfile ||
+                !createAttemptBranch ||
+                isAttemptRunning ||
+                isCreating
               }
               size="sm"
               className={
@@ -342,7 +345,7 @@ function CreateAttempt({
                     : undefined
               }
             >
-              Start
+              {isCreating ? 'Creating...' : 'Start'}
             </Button>
           </div>
         </div>
@@ -370,9 +373,10 @@ function CreateAttempt({
             </Button>
             <Button
               onClick={handleConfirmCreateAttempt}
+              disabled={isCreating}
               className="bg-black text-white hover:bg-black/90"
             >
-              Start
+              {isCreating ? 'Creating...' : 'Start'}
             </Button>
           </DialogFooter>
         </DialogContent>
