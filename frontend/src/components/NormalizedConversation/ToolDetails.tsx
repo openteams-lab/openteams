@@ -70,7 +70,7 @@ export default function ToolDetails({
               {commandExit && (
                 <>
                   {' '}
-                  <span className="ml-1 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] text-zinc-600 dark:text-zinc-300 border border-zinc-200/80 dark:border-zinc-700/80">
+                  <span className="ml-1 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] text-zinc-600 dark:text-zinc-300 border border-zinc-200/80 dark:border-zinc-700/80 whitespace-nowrap">
                     {commandExit.type === 'exit_code'
                       ? `exit ${commandExit.code}`
                       : commandExit.success

@@ -22,7 +22,7 @@ import {
 } from 'shared/types.ts';
 import FileChangeRenderer from './FileChangeRenderer';
 import ToolDetails from './ToolDetails';
-import { Braces, FileText, MoreHorizontal, Dot } from 'lucide-react';
+import { Braces, FileText, MoreHorizontal } from 'lucide-react';
 
 type Props = {
   entry: NormalizedEntry;
@@ -274,7 +274,7 @@ function DisplayConversationEntry({ entry, expansionKey }: Props) {
                           {typeof commandSuccess === 'boolean' && (
                             <span
                               className={
-                                'px-1.5 py-0.5 rounded text-[10px] border ' +
+                                'px-1.5 py-0.5 rounded text-[10px] border whitespace-nowrap ' +
                                 (commandSuccess
                                   ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-900/40'
                                   : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-900/40')
@@ -342,14 +342,27 @@ function DisplayConversationEntry({ entry, expansionKey }: Props) {
                     {isCommand ? (
                       <>
                         {typeof commandSuccess === 'boolean' && (
-                          <Dot
+                          <span
                             className={
-                              'h-4 w-4 ' +
+                              'px-1.5 py-0.5 rounded text-[10px] border whitespace-nowrap ' +
                               (commandSuccess
                                 ? 'text-success'
                                 : 'text-destructive')
                             }
-                          />
+                            title={
+                              typeof commandExitCode === 'number'
+                                ? `exit code: ${commandExitCode}`
+                                : commandSuccess
+                                  ? 'success'
+                                  : 'failed'
+                            }
+                          >
+                            {typeof commandExitCode === 'number'
+                              ? `exit ${commandExitCode}`
+                              : commandSuccess
+                                ? 'ok'
+                                : 'fail'}
+                          </span>
                         )}
                         {commandOutput && (
                           <span
