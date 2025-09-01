@@ -10,16 +10,16 @@ import {
 import {
   type Config,
   type Environment,
-  type ProfileConfig,
   type UserSystemInfo,
   CheckTokenResponse,
 } from 'shared/types';
+import type { ExecutorProfile } from 'shared/types';
 import { configApi, githubAuthApi } from '../lib/api';
 
 interface UserSystemState {
   config: Config | null;
   environment: Environment | null;
-  profiles: ProfileConfig[] | null;
+  profiles: Record<string, ExecutorProfile> | null;
 }
 
 interface UserSystemContextType {
@@ -34,9 +34,9 @@ interface UserSystemContextType {
 
   // System data access
   environment: Environment | null;
-  profiles: ProfileConfig[] | null;
+  profiles: Record<string, ExecutorProfile> | null;
   setEnvironment: (env: Environment | null) => void;
-  setProfiles: (profiles: ProfileConfig[] | null) => void;
+  setProfiles: (profiles: Record<string, ExecutorProfile> | null) => void;
 
   // Reload system data
   reloadSystem: () => Promise<void>;
@@ -58,7 +58,10 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
   // Split state for performance - independent re-renders
   const [config, setConfig] = useState<Config | null>(null);
   const [environment, setEnvironment] = useState<Environment | null>(null);
-  const [profiles, setProfiles] = useState<ProfileConfig[] | null>(null);
+  const [profiles, setProfiles] = useState<Record<
+    string,
+    ExecutorProfile
+  > | null>(null);
   const [loading, setLoading] = useState(true);
   const [githubTokenInvalid, setGithubTokenInvalid] = useState(false);
 
@@ -68,7 +71,9 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
         const userSystemInfo: UserSystemInfo = await configApi.getConfig();
         setConfig(userSystemInfo.config);
         setEnvironment(userSystemInfo.environment);
-        setProfiles(userSystemInfo.profiles);
+        setProfiles(
+          userSystemInfo.executors as Record<string, ExecutorProfile> | null
+        );
       } catch (err) {
         console.error('Error loading user system:', err);
       } finally {
@@ -142,7 +147,9 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
       const userSystemInfo: UserSystemInfo = await configApi.getConfig();
       setConfig(userSystemInfo.config);
       setEnvironment(userSystemInfo.environment);
-      setProfiles(userSystemInfo.profiles);
+      setProfiles(
+        userSystemInfo.executors as Record<string, ExecutorProfile> | null
+      );
     } catch (err) {
       console.error('Error reloading user system:', err);
     } finally {

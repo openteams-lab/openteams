@@ -1,10 +1,9 @@
 use anyhow::Error;
-use executors::profile::ProfileVariantLabel;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 pub use v4::{EditorConfig, EditorType, GitHubConfig, NotificationConfig, SoundFile, ThemeMode};
 
-use crate::services::config::versions::v4;
+use crate::services::config::versions::v4::{self, ProfileVariantLabel};
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Config {

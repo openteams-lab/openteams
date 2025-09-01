@@ -26,12 +26,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { JSONEditor } from '@/components/ui/json-editor';
 import { ChevronDown, Key, Loader2, Volume2 } from 'lucide-react';
-import {
-  ThemeMode,
-  EditorType,
-  SoundFile,
-  ProfileVariantLabel,
-} from 'shared/types';
+import { ThemeMode, EditorType, SoundFile } from 'shared/types';
+import type { ExecutorProfileId } from 'shared/types';
 
 import { toPrettyCase } from '@/utils/string';
 import { useTheme } from '@/components/theme-provider';
@@ -100,8 +96,8 @@ export function Settings() {
       try {
         const parsed = JSON.parse(value);
         // Basic structure validation
-        if (!parsed.profiles || !Array.isArray(parsed.profiles)) {
-          setProfilesError('Invalid structure: must have a "profiles" array');
+        if (!parsed.executors) {
+          setProfilesError('Invalid structure: must have a "executors" object');
         }
       } catch (err) {
         if (err instanceof SyntaxError) {
@@ -277,38 +273,43 @@ export function Settings() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="executor">Default Profile</Label>
+                <Label htmlFor="executor">Default Executor Profile</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <Select
-                    value={config.profile?.profile || ''}
+                    value={config.executor_profile?.executor ?? ''}
                     onValueChange={(value: string) => {
-                      const newProfile: ProfileVariantLabel = {
-                        profile: value,
+                      const newProfile: ExecutorProfileId = {
+                        executor: value,
                         variant: null,
                       };
-                      updateConfig({ profile: newProfile });
+                      updateConfig({
+                        executor_profile: newProfile,
+                      });
                     }}
                   >
                     <SelectTrigger id="executor">
                       <SelectValue placeholder="Select profile" />
                     </SelectTrigger>
                     <SelectContent>
-                      {profiles?.map((profile) => (
-                        <SelectItem key={profile.label} value={profile.label}>
-                          {profile.label}
-                        </SelectItem>
-                      ))}
+                      {profiles &&
+                        Object.entries(profiles)
+                          .sort((a, b) => a[0].localeCompare(b[0]))
+                          .map(([profileKey]) => (
+                            <SelectItem key={profileKey} value={profileKey}>
+                              {profileKey}
+                            </SelectItem>
+                          ))}
                     </SelectContent>
                   </Select>
 
                   {/* Show variant selector if selected profile has variants */}
                   {(() => {
-                    const selectedProfile = profiles?.find(
-                      (p) => p.label === config.profile?.profile
-                    );
+                    const currentProfileVariant = config.executor_profile;
+                    const selectedProfile =
+                      profiles?.[currentProfileVariant?.executor || ''];
                     const hasVariants =
-                      selectedProfile?.variants &&
-                      selectedProfile.variants.length > 0;
+                      selectedProfile &&
+                      Object.keys(selectedProfile).length > 0;
 
                     if (hasVariants) {
                       return (
@@ -319,45 +320,37 @@ export function Settings() {
                               className="w-full h-10 px-2 flex items-center justify-between"
                             >
                               <span className="text-sm truncate flex-1 text-left">
-                                {config.profile?.variant || 'Default'}
+                                {currentProfileVariant?.variant || 'DEFAULT'}
                               </span>
                               <ChevronDown className="h-4 w-4 ml-1 flex-shrink-0" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                const newProfile: ProfileVariantLabel = {
-                                  profile: config.profile?.profile || '',
-                                  variant: null,
-                                };
-                                updateConfig({ profile: newProfile });
-                              }}
-                              className={
-                                !config.profile?.variant ? 'bg-accent' : ''
-                              }
-                            >
-                              Default
-                            </DropdownMenuItem>
-                            {selectedProfile.variants.map((variant) => (
-                              <DropdownMenuItem
-                                key={variant.label}
-                                onClick={() => {
-                                  const newProfile: ProfileVariantLabel = {
-                                    profile: config.profile?.profile || '',
-                                    variant: variant.label,
-                                  };
-                                  updateConfig({ profile: newProfile });
-                                }}
-                                className={
-                                  config.profile?.variant === variant.label
-                                    ? 'bg-accent'
-                                    : ''
-                                }
-                              >
-                                {variant.label}
-                              </DropdownMenuItem>
-                            ))}
+                            {Object.entries(selectedProfile).map(
+                              ([variantLabel]) => (
+                                <DropdownMenuItem
+                                  key={variantLabel}
+                                  onClick={() => {
+                                    const newProfile: ExecutorProfileId = {
+                                      executor:
+                                        currentProfileVariant?.executor || '',
+                                      variant: variantLabel,
+                                    };
+                                    updateConfig({
+                                      executor_profile: newProfile,
+                                    });
+                                  }}
+                                  className={
+                                    currentProfileVariant?.variant ===
+                                    variantLabel
+                                      ? 'bg-accent'
+                                      : ''
+                                  }
+                                >
+                                  {variantLabel}
+                                </DropdownMenuItem>
+                              )
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       );
@@ -379,8 +372,8 @@ export function Settings() {
                   })()}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Choose the default profile to use when creating a task
-                  attempt.
+                  Choose the default executor profile to use when creating a
+                  task attempt.
                 </p>
               </div>
             </CardContent>

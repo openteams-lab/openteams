@@ -27,8 +27,14 @@ use crate::{
 /// An executor that uses OpenCode to process tasks
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
 pub struct Opencode {
-    pub command: CommandBuilder,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub append_prompt: Option<String>,
+}
+
+impl Opencode {
+    fn build_command_builder(&self) -> CommandBuilder {
+        CommandBuilder::new("npx -y opencode-ai@latest run").params(["--print-logs"])
+    }
 }
 
 #[async_trait]
@@ -39,7 +45,7 @@ impl StandardCodingAgentExecutor for Opencode {
         prompt: &str,
     ) -> Result<AsyncGroupChild, ExecutorError> {
         let (shell_cmd, shell_arg) = get_shell_command();
-        let opencode_command = self.command.build_initial();
+        let opencode_command = self.build_command_builder().build_initial();
 
         let combined_prompt = utils::text::combine_prompt(&self.append_prompt, prompt);
 
@@ -73,7 +79,7 @@ impl StandardCodingAgentExecutor for Opencode {
     ) -> Result<AsyncGroupChild, ExecutorError> {
         let (shell_cmd, shell_arg) = get_shell_command();
         let opencode_command = self
-            .command
+            .build_command_builder()
             .build_follow_up(&["--session".to_string(), session_id.to_string()]);
 
         let combined_prompt = utils::text::combine_prompt(&self.append_prompt, prompt);
@@ -150,6 +156,18 @@ impl StandardCodingAgentExecutor for Opencode {
             entry_index_counter,
             msg_store,
         ));
+    }
+
+    // MCP configuration methods
+    fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
+        #[cfg(unix)]
+        {
+            xdg::BaseDirectories::with_prefix("opencode").get_config_file("opencode.json")
+        }
+        #[cfg(not(unix))]
+        {
+            dirs::config_dir().map(|config| config.join("opencode").join("opencode.json"))
+        }
     }
 }
 impl Opencode {

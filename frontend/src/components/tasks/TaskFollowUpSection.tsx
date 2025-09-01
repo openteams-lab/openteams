@@ -61,7 +61,7 @@ export function TaskFollowUpSection({
           process.executor_action?.typ.type === 'CodingAgentInitialRequest' ||
           process.executor_action?.typ.type === 'CodingAgentFollowUpRequest'
         ) {
-          return process.executor_action?.typ.profile_variant_label;
+          return process.executor_action?.typ.executor_profile_id;
         }
         return undefined;
       })
@@ -73,9 +73,9 @@ export function TaskFollowUpSection({
       return null;
     } else if (selectedAttemptProfile && profiles) {
       // No processes yet, check if profile has default variant
-      const profile = profiles.find((p) => p.label === selectedAttemptProfile);
-      if (profile?.variants && profile.variants.length > 0) {
-        return profile.variants[0].label;
+      const profile = profiles?.[selectedAttemptProfile];
+      if (profile && Object.keys(profile).length > 0) {
+        return Object.keys(profile)[0];
       }
     }
 
@@ -127,7 +127,7 @@ export function TaskFollowUpSection({
   ]);
   const currentProfile = useMemo(() => {
     if (!selectedProfile || !profiles) return null;
-    return profiles.find((p) => p.label === selectedProfile);
+    return profiles?.[selectedProfile];
   }, [selectedProfile, profiles]);
 
   // Update selectedVariant when defaultFollowUpVariant changes
@@ -264,8 +264,7 @@ export function TaskFollowUpSection({
                   {/* Variant selector */}
                   {(() => {
                     const hasVariants =
-                      currentProfile?.variants &&
-                      currentProfile.variants.length > 0;
+                      currentProfile && Object.keys(currentProfile).length > 0;
 
                     if (hasVariants) {
                       return (
@@ -281,33 +280,29 @@ export function TaskFollowUpSection({
                               )}
                             >
                               <span className="text-xs truncate flex-1 text-left">
-                                {selectedVariant || 'Default'}
+                                {selectedVariant || 'DEFAULT'}
                               </span>
                               <ChevronDown className="h-3 w-3 ml-1 flex-shrink-0" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
-                            <DropdownMenuItem
-                              onClick={() => setSelectedVariant(null)}
-                              className={!selectedVariant ? 'bg-accent' : ''}
-                            >
-                              Default
-                            </DropdownMenuItem>
-                            {currentProfile.variants.map((variant) => (
-                              <DropdownMenuItem
-                                key={variant.label}
-                                onClick={() =>
-                                  setSelectedVariant(variant.label)
-                                }
-                                className={
-                                  selectedVariant === variant.label
-                                    ? 'bg-accent'
-                                    : ''
-                                }
-                              >
-                                {variant.label}
-                              </DropdownMenuItem>
-                            ))}
+                            {Object.entries(currentProfile).map(
+                              ([variantLabel]) => (
+                                <DropdownMenuItem
+                                  key={variantLabel}
+                                  onClick={() =>
+                                    setSelectedVariant(variantLabel)
+                                  }
+                                  className={
+                                    selectedVariant === variantLabel
+                                      ? 'bg-accent'
+                                      : ''
+                                  }
+                                >
+                                  {variantLabel}
+                                </DropdownMenuItem>
+                              )
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       );

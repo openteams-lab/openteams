@@ -15,7 +15,7 @@ use utils::{
 };
 
 use crate::{
-    command::CommandBuilder,
+    command::{CmdOverrides, CommandBuilder, apply_overrides},
     executors::{ExecutorError, StandardCodingAgentExecutor},
     logs::{
         ActionType, FileChange, NormalizedEntry, NormalizedEntryType, TodoItem,
@@ -24,12 +24,64 @@ use crate::{
     },
 };
 
+fn base_command(claude_code_router: bool) -> &'static str {
+    if claude_code_router {
+        "npx -y @musistudio/claude-code-router code"
+    } else {
+        "npx -y @anthropic-ai/claude-code@latest"
+    }
+}
+
+fn build_command_builder(
+    claude_code_router: bool,
+    plan: bool,
+    dangerously_skip_permissions: bool,
+) -> CommandBuilder {
+    let mut params: Vec<&'static str> = vec!["-p"];
+    if plan {
+        params.push("--permission-mode=plan");
+    }
+    if dangerously_skip_permissions {
+        params.push("--dangerously-skip-permissions");
+    }
+    params.extend_from_slice(&["--verbose", "--output-format=stream-json"]);
+
+    CommandBuilder::new(base_command(claude_code_router)).params(params)
+}
+
 /// An executor that uses Claude CLI to process tasks
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
 pub struct ClaudeCode {
-    pub command: CommandBuilder,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claude_code_router: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub append_prompt: Option<String>,
-    pub plan: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dangerously_skip_permissions: Option<bool>,
+    #[serde(flatten)]
+    pub cmd: CmdOverrides,
+}
+
+impl ClaudeCode {
+    fn build_command_builder(&self) -> CommandBuilder {
+        // If base_command_override is provided and claude_code_router is also set, log a warning
+        if self.cmd.base_command_override.is_some() && self.claude_code_router.is_some() {
+            tracing::warn!(
+                "base_command_override is set, this will override the claude_code_router setting"
+            );
+        }
+
+        apply_overrides(
+            build_command_builder(
+                self.claude_code_router.unwrap_or(false),
+                self.plan.unwrap_or(false),
+                self.dangerously_skip_permissions.unwrap_or(false),
+            ),
+            &self.cmd,
+        )
+    }
 }
 
 #[async_trait]
@@ -40,11 +92,12 @@ impl StandardCodingAgentExecutor for ClaudeCode {
         prompt: &str,
     ) -> Result<AsyncGroupChild, ExecutorError> {
         let (shell_cmd, shell_arg) = get_shell_command();
-        let claude_command = if self.plan {
-            let base_command = self.command.build_initial();
+        let command_builder = self.build_command_builder();
+        let base_command = command_builder.build_initial();
+        let claude_command = if self.plan.unwrap_or(false) {
             create_watchkill_script(&base_command)
         } else {
-            self.command.build_initial()
+            base_command
         };
 
         let combined_prompt = utils::text::combine_prompt(&self.append_prompt, prompt);
@@ -77,15 +130,14 @@ impl StandardCodingAgentExecutor for ClaudeCode {
         session_id: &str,
     ) -> Result<AsyncGroupChild, ExecutorError> {
         let (shell_cmd, shell_arg) = get_shell_command();
+        let command_builder = self.build_command_builder();
         // Build follow-up command with --resume {session_id}
-        let claude_command = if self.plan {
-            let base_command = self
-                .command
-                .build_follow_up(&["--resume".to_string(), session_id.to_string()]);
+        let base_command =
+            command_builder.build_follow_up(&["--resume".to_string(), session_id.to_string()]);
+        let claude_command = if self.plan.unwrap_or(false) {
             create_watchkill_script(&base_command)
         } else {
-            self.command
-                .build_follow_up(&["--resume".to_string(), session_id.to_string()])
+            base_command
         };
 
         let combined_prompt = utils::text::combine_prompt(&self.append_prompt, prompt);
@@ -125,10 +177,15 @@ impl StandardCodingAgentExecutor for ClaudeCode {
         // Process stderr logs using the standard stderr processor
         normalize_stderr_logs(msg_store, entry_index_provider);
     }
+
+    // MCP configuration methods
+    fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
+        dirs::home_dir().map(|home| home.join(".claude.json"))
+    }
 }
 
 fn create_watchkill_script(command: &str) -> String {
-    let claude_plan_stop_indicator = concat!("Exit ", "plan mode?"); // Use concat!() as a workaround to avoid killing plan mode when this file is read.
+    let claude_plan_stop_indicator = concat!("Exit ", "plan mode?");
     format!(
         r#"#!/usr/bin/env bash
 set -euo pipefail
@@ -1455,9 +1512,14 @@ mod tests {
         use utils::msg_store::MsgStore;
 
         let executor = ClaudeCode {
-            command: CommandBuilder::new(""),
-            plan: false,
+            claude_code_router: Some(false),
+            plan: None,
             append_prompt: None,
+            dangerously_skip_permissions: None,
+            cmd: crate::command::CmdOverrides {
+                base_command_override: None,
+                additional_params: None,
+            },
         };
         let msg_store = Arc::new(MsgStore::new());
         let current_dir = std::path::PathBuf::from("/tmp/test-worktree");

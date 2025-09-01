@@ -54,7 +54,7 @@ export type CreateImage = { file_path: string, original_name: string, mime_type:
 
 export type ApiResponse<T, E = T> = { success: boolean, data: T | null, error_data: E | null, message: string | null, };
 
-export type UserSystemInfo = { config: Config, environment: Environment, profiles: Array<ProfileConfig>, };
+export type UserSystemInfo = { config: Config, environment: Environment, executors: { [key in string]?: ExecutorProfile }, };
 
 export type Environment = { os_type: string, os_version: string, os_architecture: string, bitness: string, };
 
@@ -72,7 +72,7 @@ export type ImageResponse = { id: string, file_path: string, original_name: stri
 
 export enum GitHubServiceError { TOKEN_INVALID = "TOKEN_INVALID", INSUFFICIENT_PERMISSIONS = "INSUFFICIENT_PERMISSIONS", REPO_NOT_FOUND_OR_NO_ACCESS = "REPO_NOT_FOUND_OR_NO_ACCESS" }
 
-export type Config = { config_version: string, theme: ThemeMode, profile: ProfileVariantLabel, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, github_login_acknowledged: boolean, telemetry_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean | null, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, };
+export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, github_login_acknowledged: boolean, telemetry_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean | null, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, };
 
 export type NotificationConfig = { sound_enabled: boolean, push_enabled: boolean, sound_file: SoundFile, };
 
@@ -112,51 +112,55 @@ base: string,
  */
 params: Array<string> | null, };
 
-export type ProfileVariantLabel = { profile: string, variant: string | null, };
-
-export type ProfileConfig = { 
+export type ExecutorProfileId = { 
 /**
- * additional variants for this profile, e.g. plan, review, subagent
+ * The executor type (e.g., "CLAUDE_CODE", "AMP")
  */
-variants: Array<VariantAgentConfig>, 
+executor: string, 
 /**
- * Unique identifier for this profile (e.g., "MyClaudeCode", "FastAmp")
+ * Optional variant name (e.g., "PLAN", "ROUTER")
  */
-label: string, 
+variant: string | null, };
+
+export type ExecutorProfile = { [key in string]: VariantAgentConfig };
+
+export type VariantAgentConfig = { "CLAUDE_CODE": ClaudeCode } | { "AMP": Amp } | { "GEMINI": Gemini } | { "CODEX": Codex } | { "OPENCODE": Opencode } | { "CURSOR": Cursor } | { "QWEN_CODE": QwenCode };
+
+export type ExecutorConfigs = { executors: { [key in string]?: ExecutorProfile }, };
+
+export type ClaudeCode = { claude_code_router?: boolean | null, append_prompt?: string | null, plan?: boolean | null, dangerously_skip_permissions?: boolean | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
+
+export type Gemini = { model: GeminiModel, append_prompt?: string | null, yolo?: boolean | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
+
+export type GeminiModel = "default" | "flash";
+
+export type Amp = { append_prompt?: string | null, dangerously_allow_all?: boolean | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
+
+export type Codex = { append_prompt?: string | null, dangerously_bypass_approvals_and_sandbox?: boolean | null, };
+
+export type Cursor = { append_prompt?: string | null, force?: boolean | null, };
+
+export type Opencode = { append_prompt?: string | null, };
+
+export type QwenCode = { append_prompt?: string | null, yolo?: boolean | null, };
+
+export type CodingAgentInitialRequest = { prompt: string, 
 /**
- * Optional profile-specific MCP config file path (absolute; supports leading ~). Overrides the default `BaseCodingAgent` config path
+ * Executor profile specification
  */
-mcp_config_path: string | null, } & ({ "CLAUDE_CODE": ClaudeCode } | { "AMP": Amp } | { "GEMINI": Gemini } | { "CODEX": Codex } | { "OPENCODE": Opencode } | { "CURSOR": Cursor });
+executor_profile_id: ExecutorProfileId, };
 
-export type VariantAgentConfig = { 
+export type CodingAgentFollowUpRequest = { prompt: string, session_id: string, 
 /**
- * Unique identifier for this profile (e.g., "MyClaudeCode", "FastAmp")
+ * Executor profile specification
  */
-label: string, 
+executor_profile_id: ExecutorProfileId, };
+
+export type CreateTaskAttemptBody = { task_id: string, 
 /**
- * Optional profile-specific MCP config file path (absolute; supports leading ~). Overrides the default `BaseCodingAgent` config path
+ * Executor profile specification
  */
-mcp_config_path: string | null, } & ({ "CLAUDE_CODE": ClaudeCode } | { "AMP": Amp } | { "GEMINI": Gemini } | { "CODEX": Codex } | { "OPENCODE": Opencode } | { "CURSOR": Cursor });
-
-export type ProfileConfigs = { profiles: Array<ProfileConfig>, };
-
-export type ClaudeCode = { command: CommandBuilder, append_prompt: string | null, plan: boolean, };
-
-export type Gemini = { command: CommandBuilder, append_prompt: string | null, };
-
-export type Amp = { command: CommandBuilder, append_prompt: string | null, };
-
-export type Codex = { command: CommandBuilder, append_prompt: string | null, };
-
-export type Cursor = { command: CommandBuilder, append_prompt: string | null, };
-
-export type Opencode = { command: CommandBuilder, append_prompt: string | null, };
-
-export type CodingAgentInitialRequest = { prompt: string, profile_variant_label: ProfileVariantLabel, };
-
-export type CodingAgentFollowUpRequest = { prompt: string, session_id: string, profile_variant_label: ProfileVariantLabel, };
-
-export type CreateTaskAttemptBody = { task_id: string, profile_variant_label: ProfileVariantLabel | null, base_branch: string, };
+executor_profile_id: ExecutorProfileId, base_branch: string, };
 
 export type RebaseTaskAttemptRequest = { new_base_branch: string | null, };
 
