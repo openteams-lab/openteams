@@ -19,7 +19,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { JSONEditor } from '@/components/ui/json-editor';
 import { Loader2 } from 'lucide-react';
 import { McpConfig } from 'shared/types';
-import type { ExecutorProfile } from 'shared/types';
+import type { BaseCodingAgent, ExecutorConfig } from 'shared/types';
 import { useUserSystem } from '@/components/config-provider';
 import { mcpServersApi } from '../lib/api';
 import { McpConfigStrategyGeneral } from '../lib/mcp-strategies';
@@ -30,8 +30,9 @@ export function McpServers() {
   const [mcpConfig, setMcpConfig] = useState<McpConfig | null>(null);
   const [mcpError, setMcpError] = useState<string | null>(null);
   const [mcpLoading, setMcpLoading] = useState(true);
-  const [selectedProfile, setSelectedProfile] =
-    useState<ExecutorProfile | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<ExecutorConfig | null>(
+    null
+  );
   const [mcpApplying, setMcpApplying] = useState(false);
   const [mcpConfigPath, setMcpConfigPath] = useState<string>('');
   const [success, setSuccess] = useState(false);
@@ -52,7 +53,7 @@ export function McpServers() {
 
   // Load existing MCP configuration when selected profile changes
   useEffect(() => {
-    const loadMcpServersForProfile = async (profile: ExecutorProfile) => {
+    const loadMcpServersForProfile = async (profile: ExecutorConfig) => {
       // Reset state when loading
       setMcpLoading(true);
       setMcpError(null);
@@ -70,7 +71,7 @@ export function McpServers() {
         }
 
         const result = await mcpServersApi.load({
-          profile: profileKey,
+          executor: profileKey as BaseCodingAgent,
         });
         // Store the McpConfig from backend
         setMcpConfig(result.mcp_config);
@@ -171,7 +172,7 @@ export function McpServers() {
 
           await mcpServersApi.save(
             {
-              profile: selectedProfileKey,
+              executor: selectedProfileKey as BaseCodingAgent,
             },
             { servers: mcpServersConfig }
           );

@@ -24,7 +24,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Sparkles, Code, ChevronDown, HandMetal } from 'lucide-react';
-import { EditorType } from 'shared/types';
+import { BaseCodingAgent, EditorType } from 'shared/types';
 import type { ExecutorProfileId } from 'shared/types';
 import { useUserSystem } from '@/components/config-provider';
 
@@ -40,7 +40,7 @@ interface OnboardingDialogProps {
 
 export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
   const [profile, setProfile] = useState<ExecutorProfileId>({
-    executor: 'CLAUDE_CODE',
+    executor: BaseCodingAgent.CLAUDE_CODE,
     variant: null,
   });
   const [editorType, setEditorType] = useState<EditorType>(EditorType.VS_CODE);
@@ -86,8 +86,8 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
             <div className="flex gap-2">
               <Select
                 value={profile.executor}
-                onValueChange={(value) =>
-                  setProfile({ executor: value, variant: null })
+                onValueChange={(v) =>
+                  setProfile({ executor: v as BaseCodingAgent, variant: null })
                 }
               >
                 <SelectTrigger id="profile" className="flex-1">
@@ -95,11 +95,13 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
                 </SelectTrigger>
                 <SelectContent>
                   {profiles &&
-                    Object.keys(profiles).map((profile) => (
-                      <SelectItem key={profile} value={profile}>
-                        {profile}
-                      </SelectItem>
-                    ))}
+                    (Object.keys(profiles) as BaseCodingAgent[]).map(
+                      (agent) => (
+                        <SelectItem key={agent} value={agent}>
+                          {agent}
+                        </SelectItem>
+                      )
+                    )}
                 </SelectContent>
               </Select>
 
