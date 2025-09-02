@@ -32,7 +32,7 @@ impl Amp {
         let mut builder = CommandBuilder::new("npx -y @sourcegraph/amp@latest")
             .params(["--execute", "--stream-json"]);
         if self.dangerously_allow_all.unwrap_or(false) {
-            builder = builder.params(["--dangerously-allow-all"]);
+            builder = builder.extend_params(["--dangerously-allow-all"]);
         }
         apply_overrides(builder, &self.cmd)
     }

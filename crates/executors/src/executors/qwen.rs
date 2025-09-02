@@ -8,7 +8,7 @@ use ts_rs::TS;
 use utils::{msg_store::MsgStore, shell::get_shell_command};
 
 use crate::{
-    command::CommandBuilder,
+    command::{CmdOverrides, CommandBuilder, apply_overrides},
     executors::{ExecutorError, StandardCodingAgentExecutor, gemini::Gemini},
     logs::{stderr_processor::normalize_stderr_logs, utils::EntryIndexProvider},
 };
@@ -20,15 +20,19 @@ pub struct QwenCode {
     pub append_prompt: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub yolo: Option<bool>,
+    #[serde(flatten)]
+    pub cmd: CmdOverrides,
 }
 
 impl QwenCode {
     fn build_command_builder(&self) -> CommandBuilder {
         let mut builder = CommandBuilder::new("npx -y @qwen-code/qwen-code@latest");
+
         if self.yolo.unwrap_or(false) {
-            builder = builder.params(["--yolo"]);
+            builder = builder.extend_params(["--yolo"]);
         }
-        builder
+
+        apply_overrides(builder, &self.cmd)
     }
 }
 
