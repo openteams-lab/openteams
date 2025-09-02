@@ -1,9 +1,9 @@
 use axum::{
     extract::{Query, State},
     middleware::from_fn_with_state,
-    response::Json as ResponseJson,
+    response::{sse::KeepAlive, Json as ResponseJson, Sse},
     routing::{get, post},
-    Extension, Json, Router,
+    BoxError, Extension, Json, Router,
 };
 use db::models::{
     image::TaskImage,
@@ -12,8 +12,9 @@ use db::models::{
     task_attempt::{CreateTaskAttempt, TaskAttempt},
 };
 use deployment::Deployment;
+use futures_util::TryStreamExt;
 use serde::Deserialize;
-use services::services::container::ContainerService;
+use services::services::{container::ContainerService, events::task_patch};
 use sqlx::Error as SqlxError;
 use utils::response::ApiResponse;
 use uuid::Uuid;
@@ -34,6 +35,22 @@ pub async fn get_tasks(
             .await?;
 
     Ok(ResponseJson(ApiResponse::success(tasks)))
+}
+
+pub async fn stream_tasks(
+    State(deployment): State<DeploymentImpl>,
+    Query(query): Query<TaskQuery>,
+) -> Result<
+    Sse<impl futures_util::Stream<Item = Result<axum::response::sse::Event, BoxError>>>,
+    axum::http::StatusCode,
+> {
+    let stream = deployment
+        .events()
+        .stream_tasks_for_project(query.project_id)
+        .await
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Sse::new(stream.map_err(|e| -> BoxError { e.into() })).keep_alive(KeepAlive::default()))
 }
 
 pub async fn get_task(
@@ -213,6 +230,9 @@ pub async fn delete_task(
     if rows_affected == 0 {
         Err(ApiError::Database(SqlxError::RowNotFound))
     } else {
+        // Emit remove patch so SSE task streams update immediately
+        let patch = task_patch::remove(task.id);
+        deployment.events().msg_store().push_patch(patch);
         Ok(ResponseJson(ApiResponse::success(())))
     }
 }
@@ -224,6 +244,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
 
     let inner = Router::new()
         .route("/", get(get_tasks).post(create_task))
+        .route("/stream", get(stream_tasks))
         .route("/create-and-start", post(create_task_and_start))
         .nest("/{task_id}", task_id_router);
 
