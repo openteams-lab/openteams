@@ -89,7 +89,7 @@
 
     --primary: var(--vscode-button-background, var(--_primary));
     --primary-foreground: var(
-      --vscode-button-foreground,
+      --vscode-editor-foreground,
       var(--_primary-foreground)
     );
     --secondary: var(--vscode-input-background, var(--_secondary));
