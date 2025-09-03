@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use db::DBService;
 use deployment::{Deployment, DeploymentError};
+use executors::profile::ExecutorConfigs;
 use services::services::{
     analytics::{AnalyticsConfig, AnalyticsContext, AnalyticsService, generate_user_id},
     auth::AuthService,
@@ -43,6 +44,13 @@ pub struct LocalDeployment {
 impl Deployment for LocalDeployment {
     async fn new() -> Result<Self, DeploymentError> {
         let mut raw_config = load_config_from_file(&config_path()).await;
+
+        let profiles = ExecutorConfigs::get_cached();
+        if !raw_config.onboarding_acknowledged
+            && let Ok(recommended_executor) = profiles.get_recommended_executor_profile().await
+        {
+            raw_config.executor_profile = recommended_executor;
+        }
 
         // Check if app version has changed and set release notes flag
         {

@@ -145,4 +145,10 @@ pub trait StandardCodingAgentExecutor {
 
     // MCP configuration methods
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf>;
+
+    async fn check_availability(&self) -> bool {
+        self.default_mcp_config_path()
+            .map(|path| path.exists())
+            .unwrap_or(false)
+    }
 }
