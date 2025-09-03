@@ -14,6 +14,7 @@ import { TaskTemplateManager } from '@/components/TaskTemplateManager';
 import { ProjectFormFields } from './project-form-fields';
 import { CreateProject, Project, UpdateProject } from 'shared/types';
 import { projectsApi } from '@/lib/api';
+import { generateProjectNameFromPath } from '@/utils/string';
 
 interface ProjectFormProps {
   open: boolean;
@@ -42,6 +43,7 @@ export function ProjectForm({
   const [repoMode, setRepoMode] = useState<'existing' | 'new'>('existing');
   const [parentPath, setParentPath] = useState('');
   const [folderName, setFolderName] = useState('');
+  // Removed manual repo preview flow; quick-create on selection instead
 
   const isEditing = !!project;
 
@@ -70,15 +72,42 @@ export function ProjectForm({
 
     // Only auto-populate name for new projects
     if (!isEditing && path) {
-      // Extract the last part of the path (directory name)
-      const dirName = path.split('/').filter(Boolean).pop() || '';
-      if (dirName) {
-        // Clean up the directory name for a better project name
-        const cleanName = dirName
-          .replace(/[-_]/g, ' ') // Replace hyphens and underscores with spaces
-          .replace(/\b\w/g, (l) => l.toUpperCase()); // Capitalize first letter of each word
-        setName(cleanName);
-      }
+      const cleanName = generateProjectNameFromPath(path);
+      if (cleanName) setName(cleanName);
+    }
+  };
+
+  // Handle direct project creation from repo selection
+  const handleDirectCreate = async (path: string, suggestedName: string) => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const createData: CreateProject = {
+        name: suggestedName,
+        git_repo_path: path,
+        use_existing_repo: true,
+        setup_script: null,
+        dev_script: null,
+        cleanup_script: null,
+        copy_files: null,
+      };
+
+      await projectsApi.create(createData);
+      onSuccess();
+      // Reset form
+      setName('');
+      setGitRepoPath('');
+      setSetupScript('');
+      setDevScript('');
+      setCleanupScript('');
+      setCopyFiles('');
+      setParentPath('');
+      setFolderName('');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -88,15 +117,22 @@ export function ProjectForm({
     setLoading(true);
 
     try {
-      if (isEditing) {
-        // Editing existing project (local mode only)
-        let finalGitRepoPath = gitRepoPath;
-        if (repoMode === 'new') {
-          finalGitRepoPath = `${parentPath}/${folderName}`.replace(/\/+/g, '/');
-        }
+      let finalGitRepoPath = gitRepoPath;
+      if (repoMode === 'new') {
+        // Use home directory (~) if parentPath is empty
+        const effectiveParentPath = parentPath.trim() || '~';
+        finalGitRepoPath = `${effectiveParentPath}/${folderName}`.replace(
+          /\/+/g,
+          '/'
+        );
+      }
+      // Auto-populate name from git repo path if not provided
+      const finalName =
+        name.trim() || generateProjectNameFromPath(finalGitRepoPath);
 
+      if (isEditing) {
         const updateData: UpdateProject = {
-          name,
+          name: finalName,
           git_repo_path: finalGitRepoPath,
           setup_script: setupScript.trim() || null,
           dev_script: devScript.trim() || null,
@@ -126,20 +162,14 @@ export function ProjectForm({
 
         //   await githubApi.createProjectFromRepository(githubData);
         // } else {
-        // Local mode: Create local project
-        let finalGitRepoPath = gitRepoPath;
-        if (repoMode === 'new') {
-          finalGitRepoPath = `${parentPath}/${folderName}`.replace(/\/+/g, '/');
-        }
-
         const createData: CreateProject = {
-          name,
+          name: finalName,
           git_repo_path: finalGitRepoPath,
           use_existing_repo: repoMode === 'existing',
-          setup_script: setupScript.trim() || null,
-          dev_script: devScript.trim() || null,
-          cleanup_script: cleanupScript.trim() || null,
-          copy_files: copyFiles.trim() || null,
+          setup_script: null,
+          dev_script: null,
+          cleanup_script: null,
+          copy_files: null,
         };
 
         await projectsApi.create(createData);
@@ -185,17 +215,15 @@ export function ProjectForm({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent
-        className={isEditing ? 'sm:max-w-[600px]' : 'sm:max-w-[425px]'}
-      >
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {isEditing ? 'Edit Project' : 'Create New Project'}
+            {isEditing ? 'Edit Project' : 'Create Project'}
           </DialogTitle>
           <DialogDescription>
             {isEditing
               ? "Make changes to your project here. Click save when you're done."
-              : 'Choose whether to use an existing git repository or create a new one.'}
+              : 'Choose your repository source'}
           </DialogDescription>
         </DialogHeader>
 
@@ -216,7 +244,6 @@ export function ProjectForm({
                   setShowFolderPicker={setShowFolderPicker}
                   parentPath={parentPath}
                   setParentPath={setParentPath}
-                  folderName={folderName}
                   setFolderName={setFolderName}
                   setName={setName}
                   name={name}
@@ -229,20 +256,13 @@ export function ProjectForm({
                   copyFiles={copyFiles}
                   setCopyFiles={setCopyFiles}
                   error={error}
-                  projectId={(project as any)?.id}
+                  setError={setError}
+                  projectId={project ? project.id : undefined}
                 />
                 <DialogFooter>
                   <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleClose}
-                    disabled={loading}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
                     type="submit"
-                    disabled={loading || !name.trim() || !gitRepoPath.trim()}
+                    disabled={loading || !gitRepoPath.trim()}
                   >
                     {loading ? 'Saving...' : 'Save Changes'}
                   </Button>
@@ -250,7 +270,9 @@ export function ProjectForm({
               </form>
             </TabsContent>
             <TabsContent value="templates" className="mt-0 pt-0">
-              <TaskTemplateManager projectId={project?.id} />
+              <TaskTemplateManager
+                projectId={project ? project.id : undefined}
+              />
             </TabsContent>
           </Tabs>
         ) : (
@@ -327,7 +349,6 @@ export function ProjectForm({
               setShowFolderPicker={setShowFolderPicker}
               parentPath={parentPath}
               setParentPath={setParentPath}
-              folderName={folderName}
               setFolderName={setFolderName}
               setName={setName}
               name={name}
@@ -340,31 +361,18 @@ export function ProjectForm({
               copyFiles={copyFiles}
               setCopyFiles={setCopyFiles}
               error={error}
-              projectId={(project as any)?.id}
+              setError={setError}
+              projectId={(project as Project | null | undefined)?.id}
+              onCreateProject={handleDirectCreate}
             />
             {/* )} */}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={
-                  loading ||
-                  !name.trim() ||
-                  (repoMode === 'existing'
-                    ? !gitRepoPath.trim()
-                    : !parentPath.trim() || !folderName.trim())
-                }
-              >
-                {loading ? 'Creating...' : 'Create Project'}
-              </Button>
-            </DialogFooter>
+            {repoMode === 'new' && (
+              <DialogFooter>
+                <Button type="submit" disabled={loading || !folderName.trim()}>
+                  {loading ? 'Creating...' : 'Create Project'}
+                </Button>
+              </DialogFooter>
+            )}
           </form>
         )}
       </DialogContent>
@@ -374,7 +382,14 @@ export function ProjectForm({
         onClose={() => setShowFolderPicker(false)}
         onSelect={(path) => {
           if (repoMode === 'existing' || isEditing) {
-            handleGitRepoPathChange(path);
+            if (isEditing) {
+              // For editing, just set the path
+              handleGitRepoPathChange(path);
+            } else {
+              // For creating, immediately attempt to create project (same as quick select)
+              const projectName = generateProjectNameFromPath(path);
+              handleDirectCreate(path, projectName);
+            }
           } else {
             setParentPath(path);
           }
