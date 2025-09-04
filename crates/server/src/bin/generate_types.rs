@@ -1,5 +1,6 @@
 use std::{env, fs, path::Path};
 
+use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
 use ts_rs::TS;
 
 fn generate_types_content() -> String {
@@ -74,6 +75,7 @@ fn generate_types_content() -> String {
         executors::executors::cursor::Cursor::decl(),
         executors::executors::opencode::Opencode::decl(),
         executors::executors::qwen::QwenCode::decl(),
+        executors::executors::AppendPrompt::decl(),
         executors::actions::coding_agent_initial::CodingAgentInitialRequest::decl(),
         executors::actions::coding_agent_follow_up::CodingAgentFollowUpRequest::decl(),
         server::routes::task_attempts::CreateTaskAttemptBody::decl(),
@@ -125,13 +127,54 @@ fn generate_types_content() -> String {
     format!("{HEADER}\n\n{body}")
 }
 
+fn write_schema<T: JsonSchema>(
+    name: &str,
+    schemas_dir: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Draft-07, inline everything (no $defs)
+    let mut settings = SchemaSettings::draft07();
+    settings.inline_subschemas = true;
+
+    let generator: SchemaGenerator = settings.into_generator();
+    let schema: Schema = generator.into_root_schema_for::<T>();
+
+    // Convert to JSON value to manipulate it
+    let mut schema_value: serde_json::Value = serde_json::to_value(&schema)?;
+
+    // Remove the title from root schema to prevent RJSF from creating an outer field container
+    if let Some(obj) = schema_value.as_object_mut() {
+        obj.remove("title");
+    }
+
+    let schema_json = serde_json::to_string_pretty(&schema_value)?;
+    std::fs::write(schemas_dir.join(format!("{name}.json")), schema_json)?;
+    Ok(())
+}
+
+fn generate_schemas() -> Result<(), Box<dyn std::error::Error>> {
+    // Create schemas directory
+    let schemas_dir = Path::new("shared/schemas");
+    fs::create_dir_all(schemas_dir)?;
+
+    println!("Generating JSON schemas…");
+
+    // Generate schemas for all executor types
+    write_schema::<executors::executors::amp::Amp>("amp", schemas_dir)?;
+    write_schema::<executors::executors::claude::ClaudeCode>("claude_code", schemas_dir)?;
+    write_schema::<executors::executors::gemini::Gemini>("gemini", schemas_dir)?;
+    write_schema::<executors::executors::codex::Codex>("codex", schemas_dir)?;
+    write_schema::<executors::executors::cursor::Cursor>("cursor", schemas_dir)?;
+    write_schema::<executors::executors::opencode::Opencode>("opencode", schemas_dir)?;
+    write_schema::<executors::executors::qwen::QwenCode>("qwen_code", schemas_dir)?;
+
+    Ok(())
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let check_mode = args.iter().any(|arg| arg == "--check");
 
-    // 1. Make sure ../shared exists
     let shared_path = Path::new("shared");
-    fs::create_dir_all(shared_path).expect("cannot create shared");
 
     println!("Generating TypeScript types…");
 
@@ -151,8 +194,22 @@ fn main() {
             std::process::exit(1);
         }
     } else {
+        // Wipe existing shared
+        fs::remove_dir_all(shared_path).ok();
+
+        // Recreate folder
+        fs::create_dir_all(shared_path).expect("cannot create shared");
+
         // Write the file as before
         fs::write(&types_path, generated).expect("unable to write types.ts");
         println!("✅ TypeScript types generated in shared/");
+
+        // Generate JSON schemas
+        if let Err(e) = generate_schemas() {
+            eprintln!("❌ Failed to generate schemas: {}", e);
+            std::process::exit(1);
+        }
+
+        println!("✅ JSON schemas generated in shared/schemas/");
     }
 }

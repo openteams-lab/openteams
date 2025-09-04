@@ -11,6 +11,7 @@ use fork_stream::StreamExt as _;
 use futures::{StreamExt, future::ready, stream::BoxStream};
 use lazy_static::lazy_static;
 use regex::Regex;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command};
 use ts_rs::TS;
@@ -21,7 +22,7 @@ use utils::{
 
 use crate::{
     command::{CmdOverrides, CommandBuilder, apply_overrides},
-    executors::{ExecutorError, StandardCodingAgentExecutor},
+    executors::{AppendPrompt, ExecutorError, StandardCodingAgentExecutor},
     logs::{
         ActionType, FileChange, NormalizedEntry, NormalizedEntryType, TodoItem,
         plain_text_processor::{MessageBoundary, PlainTextLogProcessor},
@@ -29,11 +30,10 @@ use crate::{
     },
 };
 
-/// An executor that uses OpenCode to process tasks
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS, JsonSchema)]
 pub struct Opencode {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub append_prompt: Option<String>,
+    #[serde(default)]
+    pub append_prompt: AppendPrompt,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -69,7 +69,7 @@ impl StandardCodingAgentExecutor for Opencode {
         let (shell_cmd, shell_arg) = get_shell_command();
         let opencode_command = self.build_command_builder().build_initial();
 
-        let combined_prompt = utils::text::combine_prompt(&self.append_prompt, prompt);
+        let combined_prompt = self.append_prompt.combine_prompt(prompt);
 
         let mut command = Command::new(shell_cmd);
         command
@@ -104,7 +104,7 @@ impl StandardCodingAgentExecutor for Opencode {
             .build_command_builder()
             .build_follow_up(&["--session".to_string(), session_id.to_string()]);
 
-        let combined_prompt = utils::text::combine_prompt(&self.append_prompt, prompt);
+        let combined_prompt = self.append_prompt.combine_prompt(prompt);
 
         let mut command = Command::new(shell_cmd);
         command
@@ -383,7 +383,7 @@ pub enum Tool {
 }
 
 /// TODO information structure
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS, JsonSchema)]
 pub struct TodoInfo {
     pub content: String,
     pub status: String,
@@ -392,7 +392,7 @@ pub struct TodoInfo {
 }
 
 /// Web fetch format options
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum WebFetchFormat {
     Text,
