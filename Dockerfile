@@ -1,37 +1,71 @@
-FROM node:18-alpine
+# Build stage
+FROM node:24-alpine AS builder
 
-# Install Rust and dependencies
-RUN apk add --no-cache curl build-base perl tini
+# Install build dependencies
+RUN apk add --no-cache \
+    curl \
+    build-base \
+    perl
+
+# Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files first for dependency caching
+# Copy package files for dependency caching
 COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY frontend/package*.json ./frontend/
 COPY npx-cli/package*.json ./npx-cli/
 
-# Install pnpm and dependencies (cached if package files unchanged)
-RUN npm install -g pnpm
-RUN pnpm install
+# Install pnpm and dependencies
+RUN npm install -g pnpm && pnpm install
 
-COPY frontend/ ./frontend/
-COPY shared/ ./shared/
-RUN cd frontend && npm run build
+# Copy source code
+COPY . .
 
-# Copy Rust dependencies for cargo cache
-COPY backend/ ./backend/
-COPY Cargo.toml ./
-RUN cargo build --release --manifest-path backend/Cargo.toml
+# Build application
+RUN npm run generate-types
+RUN cd frontend && npm install && npm run build
+RUN cargo build --release --bin server
 
-# Expose port
+# Runtime stage
+FROM alpine:latest AS runtime
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    tini \
+    libgcc \
+    wget
+
+# Create app user for security
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+# Copy binary from builder
+COPY --from=builder /app/target/release/server /usr/local/bin/server
+
+# Create repos directory and set permissions
+RUN mkdir -p /repos && \
+    chown -R appuser:appgroup /repos
+
+# Switch to non-root user
+USER appuser
+
+# Set runtime environment
 ENV HOST=0.0.0.0
 ENV PORT=3000
 EXPOSE 3000
 
-# Run the application
+# Set working directory
 WORKDIR /repos
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --quiet --tries=1 --spider "http://${HOST:-localhost}:${PORT:-3000}" || exit 1
+
+# Run the application
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["/app/target/release/vibe-kanban"]
+CMD ["server"]
