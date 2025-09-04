@@ -2,6 +2,7 @@ use std::{path::Path, process::Stdio, sync::Arc};
 
 use async_trait::async_trait;
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command};
 use ts_rs::TS;
@@ -10,18 +11,21 @@ use utils::{msg_store::MsgStore, shell::get_shell_command};
 use crate::{
     command::{CmdOverrides, CommandBuilder, apply_overrides},
     executors::{
-        ExecutorError, StandardCodingAgentExecutor,
+        AppendPrompt, ExecutorError, StandardCodingAgentExecutor,
         claude::{ClaudeLogProcessor, HistoryStrategy},
     },
     logs::{stderr_processor::normalize_stderr_logs, utils::EntryIndexProvider},
 };
 
-/// An executor that uses Amp to process tasks
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS, JsonSchema)]
 pub struct Amp {
+    #[serde(default)]
+    pub append_prompt: AppendPrompt,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub append_prompt: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(
+        title = "Dangerously Allow All",
+        description = "Allow all commands to be executed, even if they are not safe."
+    )]
     pub dangerously_allow_all: Option<bool>,
     #[serde(flatten)]
     pub cmd: CmdOverrides,
@@ -48,7 +52,7 @@ impl StandardCodingAgentExecutor for Amp {
         let (shell_cmd, shell_arg) = get_shell_command();
         let amp_command = self.build_command_builder().build_initial();
 
-        let combined_prompt = utils::text::combine_prompt(&self.append_prompt, prompt);
+        let combined_prompt = self.append_prompt.combine_prompt(prompt);
 
         let mut command = Command::new(shell_cmd);
         command
@@ -118,7 +122,7 @@ impl StandardCodingAgentExecutor for Amp {
             new_thread_id.clone(),
         ]);
 
-        let combined_prompt = utils::text::combine_prompt(&self.append_prompt, prompt);
+        let combined_prompt = self.append_prompt.combine_prompt(prompt);
 
         let mut command = Command::new(shell_cmd);
         command
@@ -158,6 +162,6 @@ impl StandardCodingAgentExecutor for Amp {
 
     // MCP configuration methods
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
-        dirs::config_dir().map(|config| config.join("amp").join("settings.json"))
+        dirs::home_dir().map(|home| home.join(".config").join("amp").join("settings.json"))
     }
 }

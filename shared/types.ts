@@ -134,25 +134,27 @@ export type ExecutorConfig = { [key in string]?: { "CLAUDE_CODE": ClaudeCode } |
 
 export type BaseAgentCapability = "RESTORE_CHECKPOINT";
 
-export type ClaudeCode = { claude_code_router?: boolean | null, append_prompt?: string | null, plan?: boolean | null, dangerously_skip_permissions?: boolean | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
+export type ClaudeCode = { append_prompt: AppendPrompt, claude_code_router?: boolean | null, plan?: boolean | null, dangerously_skip_permissions?: boolean | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
 
-export type Gemini = { model: GeminiModel, append_prompt?: string | null, yolo?: boolean | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
+export type Gemini = { append_prompt: AppendPrompt, model: GeminiModel, yolo?: boolean | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
 
 export type GeminiModel = "default" | "flash";
 
-export type Amp = { append_prompt?: string | null, dangerously_allow_all?: boolean | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
+export type Amp = { append_prompt: AppendPrompt, dangerously_allow_all?: boolean | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
 
-export type Codex = { append_prompt?: string | null, sandbox?: SandboxMode | null, approval?: ApprovalPolicy | null, oss?: boolean | null, model?: string | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
+export type Codex = { append_prompt: AppendPrompt, sandbox?: SandboxMode | null, approval?: ApprovalPolicy | null, oss?: boolean | null, model?: string | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
 
 export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access";
 
 export type ApprovalPolicy = "untrusted" | "on-failure" | "on-request" | "never";
 
-export type Cursor = { append_prompt?: string | null, force?: boolean | null, model?: string | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
+export type Cursor = { append_prompt: AppendPrompt, force?: boolean | null, model?: string | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
 
-export type Opencode = { append_prompt?: string | null, model?: string | null, agent?: string | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
+export type Opencode = { append_prompt: AppendPrompt, model?: string | null, agent?: string | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
 
-export type QwenCode = { append_prompt?: string | null, yolo?: boolean | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
+export type QwenCode = { append_prompt: AppendPrompt, yolo?: boolean | null, base_command_override?: string | null, additional_params?: Array<string> | null, };
+
+export type AppendPrompt = string | null;
 
 export type CodingAgentInitialRequest = { prompt: string, 
 /**

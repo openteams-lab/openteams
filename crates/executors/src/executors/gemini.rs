@@ -7,6 +7,7 @@ use std::{
 use async_trait::async_trait;
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
 use futures::{StreamExt, stream::BoxStream};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{self, OpenOptions},
@@ -18,7 +19,7 @@ use utils::{msg_store::MsgStore, shell::get_shell_command};
 
 use crate::{
     command::{CmdOverrides, CommandBuilder, apply_overrides},
-    executors::{ExecutorError, StandardCodingAgentExecutor},
+    executors::{AppendPrompt, ExecutorError, StandardCodingAgentExecutor},
     logs::{
         NormalizedEntry, NormalizedEntryType, plain_text_processor::PlainTextLogProcessor,
         stderr_processor::normalize_stderr_logs, utils::EntryIndexProvider,
@@ -26,8 +27,7 @@ use crate::{
     stdout_dup,
 };
 
-/// Model variant of Gemini to use
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GeminiModel {
     Default, // no --model flag
@@ -50,12 +50,11 @@ impl GeminiModel {
     }
 }
 
-/// An executor that uses Gemini to process tasks
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS, JsonSchema)]
 pub struct Gemini {
+    #[serde(default)]
+    pub append_prompt: AppendPrompt,
     pub model: GeminiModel,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub append_prompt: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub yolo: Option<bool>,
     #[serde(flatten)]
@@ -84,7 +83,7 @@ impl StandardCodingAgentExecutor for Gemini {
         let (shell_cmd, shell_arg) = get_shell_command();
         let gemini_command = self.build_command_builder().build_initial();
 
-        let combined_prompt = utils::text::combine_prompt(&self.append_prompt, prompt);
+        let combined_prompt = self.append_prompt.combine_prompt(prompt);
 
         let mut command = Command::new(shell_cmd);
         command
@@ -364,7 +363,7 @@ The following is the conversation history from this session:
 === INSTRUCTIONS ===
 You are continuing work on the above task. The execution history shows the previous conversation in this session. Please continue from where the previous execution left off, taking into account all the context provided above.{}
 "#,
-            self.append_prompt.clone().unwrap_or_default(),
+            self.append_prompt.get().unwrap_or_default(),
         ))
     }
 

@@ -21,10 +21,10 @@ import { Loader2 } from 'lucide-react';
 import { McpConfig } from 'shared/types';
 import type { BaseCodingAgent, ExecutorConfig } from 'shared/types';
 import { useUserSystem } from '@/components/config-provider';
-import { mcpServersApi } from '../lib/api';
-import { McpConfigStrategyGeneral } from '../lib/mcp-strategies';
+import { mcpServersApi } from '@/lib/api';
+import { McpConfigStrategyGeneral } from '@/lib/mcp-strategies';
 
-export function McpServers() {
+export function McpSettings() {
   const { config, profiles } = useUserSystem();
   const [mcpServers, setMcpServers] = useState('{}');
   const [mcpConfig, setMcpConfig] = useState<McpConfig | null>(null);
@@ -202,7 +202,7 @@ export function McpServers() {
 
   if (!config) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="py-8">
         <Alert variant="destructive">
           <AlertDescription>Failed to load configuration.</AlertDescription>
         </Alert>
@@ -211,161 +211,149 @@ export function McpServers() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">MCP Servers</h1>
-          <p className="text-muted-foreground">
-            Configure MCP servers to extend coding agent capabilities.
-          </p>
-        </div>
+    <div className="space-y-6">
+      {mcpError && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            MCP Configuration Error: {mcpError}
+          </AlertDescription>
+        </Alert>
+      )}
 
-        {mcpError && (
-          <Alert variant="destructive">
-            <AlertDescription>
-              MCP Configuration Error: {mcpError}
-            </AlertDescription>
-          </Alert>
-        )}
+      {success && (
+        <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+          <AlertDescription className="font-medium">
+            ✓ MCP configuration saved successfully!
+          </AlertDescription>
+        </Alert>
+      )}
 
-        {success && (
-          <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
-            <AlertDescription className="font-medium">
-              ✓ MCP configuration saved successfully!
-            </AlertDescription>
-          </Alert>
-        )}
+      <Card>
+        <CardHeader>
+          <CardTitle>MCP Server Configuration</CardTitle>
+          <CardDescription>
+            Configure Model Context Protocol servers to extend coding agent
+            capabilities with custom tools and resources.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="mcp-executor">Agent</Label>
+            <Select
+              value={
+                selectedProfile
+                  ? Object.keys(profiles || {}).find(
+                      (key) => profiles![key] === selectedProfile
+                    ) || ''
+                  : ''
+              }
+              onValueChange={(value: string) => {
+                const profile = profiles?.[value];
+                if (profile) setSelectedProfile(profile);
+              }}
+            >
+              <SelectTrigger id="mcp-executor">
+                <SelectValue placeholder="Select executor" />
+              </SelectTrigger>
+              <SelectContent>
+                {profiles &&
+                  Object.entries(profiles)
+                    .sort((a, b) => a[0].localeCompare(b[0]))
+                    .map(([profileKey]) => (
+                      <SelectItem key={profileKey} value={profileKey}>
+                        {profileKey}
+                      </SelectItem>
+                    ))}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              Choose which agent to configure MCP servers for.
+            </p>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Configuration</CardTitle>
-            <CardDescription>
-              Configure MCP servers for different coding agents to extend their
-              capabilities with custom tools and resources.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="mcp-executor">Profile</Label>
-              <Select
-                value={
-                  selectedProfile
-                    ? Object.keys(profiles || {}).find(
-                        (key) => profiles![key] === selectedProfile
-                      ) || ''
-                    : ''
-                }
-                onValueChange={(value: string) => {
-                  const profile = profiles?.[value];
-                  if (profile) setSelectedProfile(profile);
-                }}
-              >
-                <SelectTrigger id="mcp-executor">
-                  <SelectValue placeholder="Select executor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {profiles &&
-                    Object.entries(profiles)
-                      .sort((a, b) => a[0].localeCompare(b[0]))
-                      .map(([profileKey]) => (
-                        <SelectItem key={profileKey} value={profileKey}>
-                          {profileKey}
-                        </SelectItem>
-                      ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Choose which profile to configure MCP servers for.
-              </p>
-            </div>
-
-            {mcpError && mcpError.includes('does not support MCP') ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
-                <div className="flex">
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                      MCP Not Supported
-                    </h3>
-                    <div className="mt-2 text-sm text-amber-700 dark:text-amber-300">
-                      <p>{mcpError}</p>
-                      <p className="mt-1">
-                        To use MCP servers, please select a different profile
-                        that supports MCP (Claude, Amp, Gemini, Codex, or
-                        Opencode) above.
-                      </p>
-                    </div>
+          {mcpError && mcpError.includes('does not support MCP') ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+              <div className="flex">
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    MCP Not Supported
+                  </h3>
+                  <div className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                    <p>{mcpError}</p>
+                    <p className="mt-1">
+                      To use MCP servers, please select a different executor
+                      that supports MCP (Claude, Amp, Gemini, Codex, or
+                      Opencode) above.
+                    </p>
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-2">
-                <Label htmlFor="mcp-servers">MCP Server Configuration</Label>
-                <JSONEditor
-                  id="mcp-servers"
-                  placeholder={
-                    mcpLoading
-                      ? 'Loading current configuration...'
-                      : '{\n  "server-name": {\n    "type": "stdio",\n    "command": "your-command",\n    "args": ["arg1", "arg2"]\n  }\n}'
-                  }
-                  value={mcpLoading ? 'Loading...' : mcpServers}
-                  onChange={handleMcpServersChange}
-                  disabled={mcpLoading}
-                  minHeight={300}
-                />
-                {mcpError && !mcpError.includes('does not support MCP') && (
-                  <p className="text-sm text-destructive dark:text-red-400">
-                    {mcpError}
-                  </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="mcp-servers">Server Configuration (JSON)</Label>
+              <JSONEditor
+                id="mcp-servers"
+                placeholder={
+                  mcpLoading
+                    ? 'Loading current configuration...'
+                    : '{\n  "server-name": {\n    "type": "stdio",\n    "command": "your-command",\n    "args": ["arg1", "arg2"]\n  }\n}'
+                }
+                value={mcpLoading ? 'Loading...' : mcpServers}
+                onChange={handleMcpServersChange}
+                disabled={mcpLoading}
+                minHeight={300}
+              />
+              {mcpError && !mcpError.includes('does not support MCP') && (
+                <p className="text-sm text-destructive dark:text-red-400">
+                  {mcpError}
+                </p>
+              )}
+              <div className="text-sm text-muted-foreground">
+                {mcpLoading ? (
+                  'Loading current MCP server configuration...'
+                ) : (
+                  <span>
+                    Changes will be saved to:
+                    {mcpConfigPath && (
+                      <span className="ml-2 font-mono text-xs">
+                        {mcpConfigPath}
+                      </span>
+                    )}
+                  </span>
                 )}
-                <div className="text-sm text-muted-foreground">
-                  {mcpLoading ? (
-                    'Loading current MCP server configuration...'
-                  ) : (
-                    <span>
-                      Changes will be saved to:
-                      {mcpConfigPath && (
-                        <span className="ml-2 font-mono text-xs">
-                          {mcpConfigPath}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </div>
-
-                <div className="pt-4">
-                  <Button
-                    onClick={handleConfigureVibeKanban}
-                    disabled={mcpApplying || mcpLoading || !selectedProfile}
-                    className="w-64"
-                  >
-                    Add Vibe-Kanban MCP
-                  </Button>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Automatically adds the Vibe-Kanban MCP server.
-                  </p>
-                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
 
-        {/* Sticky save button */}
-        <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm border-t p-4 z-10">
-          <div className="container mx-auto max-w-4xl flex justify-end">
-            <Button
-              onClick={handleApplyMcpServers}
-              disabled={mcpApplying || mcpLoading || !!mcpError || success}
-              className={success ? 'bg-green-600 hover:bg-green-700' : ''}
-            >
-              {mcpApplying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {success && <span className="mr-2">✓</span>}
-              {success ? 'Settings Saved!' : 'Save Settings'}
-            </Button>
-          </div>
+              <div className="pt-4">
+                <Button
+                  onClick={handleConfigureVibeKanban}
+                  disabled={mcpApplying || mcpLoading || !selectedProfile}
+                  className="w-64"
+                >
+                  Add Vibe-Kanban MCP
+                </Button>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Automatically adds the Vibe-Kanban MCP server configuration.
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Sticky Save Button */}
+      <div className="sticky bottom-0 z-10 bg-background/80 backdrop-blur-sm border-t pt-4">
+        <div className="flex justify-end">
+          <Button
+            onClick={handleApplyMcpServers}
+            disabled={mcpApplying || mcpLoading || !!mcpError || success}
+            className={success ? 'bg-green-600 hover:bg-green-700' : ''}
+          >
+            {mcpApplying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {success && <span className="mr-2">✓</span>}
+            {success ? 'Settings Saved!' : 'Save MCP Configuration'}
+          </Button>
         </div>
-
-        {/* Spacer to prevent content from being hidden behind sticky button */}
-        <div className="h-20"></div>
       </div>
     </div>
   );
