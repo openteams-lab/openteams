@@ -72,19 +72,20 @@ export const useJsonPatchStream = <T>(
       eventSource.addEventListener('json_patch', (event) => {
         try {
           const patches: Operation[] = JSON.parse(event.data);
-
-          // Apply deduplication if provided
-          const filteredPatches = options.deduplicatePatches
+          const filtered = options.deduplicatePatches
             ? options.deduplicatePatches(patches)
             : patches;
 
-          // Only apply patches if there are any left after filtering
-          if (filteredPatches.length > 0 && dataRef.current) {
-            applyPatch(dataRef.current, filteredPatches);
+          if (!filtered.length || !dataRef.current) return;
 
-            // Trigger re-render with updated data
-            setData({ ...dataRef.current });
-          }
+          // Deep clone the current state before mutating it
+          dataRef.current = structuredClone(dataRef.current);
+
+          // Apply patch (mutates the clone in place)
+          applyPatch(dataRef.current as any, filtered);
+
+          // React re-render: dataRef.current is already a new object
+          setData(dataRef.current);
         } catch (err) {
           console.error('Failed to apply JSON patch:', err);
           setError('Failed to process stream update');
