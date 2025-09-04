@@ -1,6 +1,9 @@
+use std::path::PathBuf;
+
 use axum::{
     BoxError, Extension, Json, Router,
     extract::{Query, State},
+    http::StatusCode,
     middleware::from_fn_with_state,
     response::{Json as ResponseJson, Sse, sse::KeepAlive},
     routing::{get, post},
@@ -14,7 +17,9 @@ use db::models::{
 use deployment::Deployment;
 use futures_util::TryStreamExt;
 use serde::Deserialize;
-use services::services::{container::ContainerService, events::task_patch};
+use services::services::container::{
+    ContainerService, WorktreeCleanupData, cleanup_worktrees_direct,
+};
 use sqlx::Error as SqlxError;
 use utils::response::ApiResponse;
 use uuid::Uuid;
@@ -206,35 +211,76 @@ pub async fn update_task(
 pub async fn delete_task(
     Extension(task): Extension<Task>,
     State(deployment): State<DeploymentImpl>,
-) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+) -> Result<(StatusCode, ResponseJson<ApiResponse<()>>), ApiError> {
+    // Validate no running execution processes
+    if deployment
+        .container()
+        .has_running_processes(task.id)
+        .await?
+    {
+        return Err(ApiError::Conflict("Task has running execution processes. Please wait for them to complete or stop them first.".to_string()));
+    }
+
+    // Gather task attempts data needed for background cleanup
     let attempts = TaskAttempt::fetch_all(&deployment.db().pool, Some(task.id))
         .await
-        .unwrap_or_default();
-    // Delete all attempts including their containers
-    for attempt in attempts {
-        deployment
-            .container()
-            .delete(&attempt)
-            .await
-            .unwrap_or_else(|e| {
-                tracing::warn!(
-                    "Failed to delete task attempt {} for task {}: {}",
-                    attempt.id,
-                    task.id,
-                    e
-                );
-            });
-    }
+        .map_err(|e| {
+            tracing::error!("Failed to fetch task attempts for task {}: {}", task.id, e);
+            ApiError::TaskAttempt(e)
+        })?;
+
+    // Gather cleanup data before deletion
+    let project = task
+        .parent_project(&deployment.db().pool)
+        .await?
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
+
+    let cleanup_data: Vec<WorktreeCleanupData> = attempts
+        .iter()
+        .filter_map(|attempt| {
+            attempt
+                .container_ref
+                .as_ref()
+                .map(|worktree_path| WorktreeCleanupData {
+                    attempt_id: attempt.id,
+                    worktree_path: PathBuf::from(worktree_path),
+                    git_repo_path: Some(project.git_repo_path.clone()),
+                })
+        })
+        .collect();
+
+    // Delete task from database (FK CASCADE will handle task_attempts)
     let rows_affected = Task::delete(&deployment.db().pool, task.id).await?;
 
     if rows_affected == 0 {
-        Err(ApiError::Database(SqlxError::RowNotFound))
-    } else {
-        // Emit remove patch so SSE task streams update immediately
-        let patch = task_patch::remove(task.id);
-        deployment.events().msg_store().push_patch(patch);
-        Ok(ResponseJson(ApiResponse::success(())))
+        return Err(ApiError::Database(SqlxError::RowNotFound));
     }
+
+    // Spawn background worktree cleanup task
+    let task_id = task.id;
+    tokio::spawn(async move {
+        let span = tracing::info_span!("background_worktree_cleanup", task_id = %task_id);
+        let _enter = span.enter();
+
+        tracing::info!(
+            "Starting background cleanup for task {} ({} worktrees)",
+            task_id,
+            cleanup_data.len()
+        );
+
+        if let Err(e) = cleanup_worktrees_direct(&cleanup_data).await {
+            tracing::error!(
+                "Background worktree cleanup failed for task {}: {}",
+                task_id,
+                e
+            );
+        } else {
+            tracing::info!("Background cleanup completed for task {}", task_id);
+        }
+    });
+
+    // Return 202 Accepted to indicate deletion was scheduled
+    Ok((StatusCode::ACCEPTED, ResponseJson(ApiResponse::success(()))))
 }
 
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {

@@ -43,9 +43,43 @@ use uuid::Uuid;
 use crate::services::{
     git::{GitService, GitServiceError},
     image::ImageService,
-    worktree_manager::WorktreeError,
+    worktree_manager::{WorktreeError, WorktreeManager},
 };
 pub type ContainerRef = String;
+
+/// Data needed for background worktree cleanup (doesn't require DB access)
+#[derive(Debug, Clone)]
+pub struct WorktreeCleanupData {
+    pub attempt_id: Uuid,
+    pub worktree_path: PathBuf,
+    pub git_repo_path: Option<PathBuf>,
+}
+
+/// Cleanup worktrees without requiring database access
+pub async fn cleanup_worktrees_direct(data: &[WorktreeCleanupData]) -> Result<(), ContainerError> {
+    for cleanup_data in data {
+        tracing::debug!(
+            "Cleaning up worktree for attempt {}: {:?}",
+            cleanup_data.attempt_id,
+            cleanup_data.worktree_path
+        );
+
+        if let Err(e) = WorktreeManager::cleanup_worktree(
+            &cleanup_data.worktree_path,
+            cleanup_data.git_repo_path.as_deref(),
+        )
+        .await
+        {
+            tracing::error!(
+                "Failed to cleanup worktree for task attempt {}: {}",
+                cleanup_data.attempt_id,
+                e
+            );
+            // Continue with other cleanups even if one fails
+        }
+    }
+    Ok(())
+}
 
 #[derive(Debug, Error)]
 pub enum ContainerError {
@@ -82,6 +116,36 @@ pub trait ContainerService {
     async fn delete(&self, task_attempt: &TaskAttempt) -> Result<(), ContainerError> {
         self.try_stop(task_attempt).await;
         self.delete_inner(task_attempt).await
+    }
+
+    /// Check if a task has any running execution processes
+    async fn has_running_processes(&self, task_id: Uuid) -> Result<bool, ContainerError> {
+        let attempts = TaskAttempt::fetch_all(&self.db().pool, Some(task_id)).await?;
+
+        for attempt in attempts {
+            if let Ok(processes) =
+                ExecutionProcess::find_by_task_attempt_id(&self.db().pool, attempt.id).await
+            {
+                for process in processes {
+                    if process.status == ExecutionProcessStatus::Running {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Stop execution processes for task attempts without cleanup
+    async fn stop_task_processes(
+        &self,
+        task_attempts: &[TaskAttempt],
+    ) -> Result<(), ContainerError> {
+        for attempt in task_attempts {
+            self.try_stop(attempt).await;
+        }
+        Ok(())
     }
 
     async fn try_stop(&self, task_attempt: &TaskAttempt) {
