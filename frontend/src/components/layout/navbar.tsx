@@ -18,11 +18,10 @@ import {
 import { Logo } from '@/components/logo';
 import { SearchBar } from '@/components/search-bar';
 import { useSearch } from '@/contexts/search-context';
-import { useTaskDialog } from '@/contexts/task-dialog-context';
+import { openTaskForm } from '@/lib/openTaskForm';
 import { useProject } from '@/contexts/project-context';
-import { projectsApi } from '@/lib/api';
-import { ProjectForm } from '@/components/projects/project-form';
-import { useState } from 'react';
+import { showProjectForm } from '@/lib/modals';
+import { useOpenProjectInEditor } from '@/hooks/useOpenProjectInEditor';
 
 const INTERNAL_NAV = [
   { label: 'Projects', icon: FolderOpen, to: '/projects' },
@@ -46,20 +45,25 @@ export function Navbar() {
   const location = useLocation();
   const { projectId, project } = useProject();
   const { query, setQuery, active, clear } = useSearch();
-  const { openCreate } = useTaskDialog();
-  const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
+  const handleOpenInEditor = useOpenProjectInEditor(project || null);
 
-  const handleOpenInIDE = async () => {
-    if (!projectId) return;
-    try {
-      await projectsApi.openEditor(projectId);
-    } catch (err) {
-      console.error('Failed to open project in IDE:', err);
+  const handleCreateTask = () => {
+    if (projectId) {
+      openTaskForm({ projectId });
     }
   };
 
-  const handleProjectSettingsSuccess = () => {
-    setIsProjectSettingsOpen(false);
+  const handleOpenInIDE = () => {
+    handleOpenInEditor();
+  };
+
+  const handleProjectSettings = async () => {
+    try {
+      await showProjectForm({ project });
+      // Settings saved successfully - no additional action needed
+    } catch (error) {
+      // User cancelled - do nothing
+    }
   };
 
   return (
@@ -95,7 +99,7 @@ export function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setIsProjectSettingsOpen(true)}
+                  onClick={handleProjectSettings}
                   aria-label="Project settings"
                 >
                   <Settings className="h-4 w-4" />
@@ -103,7 +107,7 @@ export function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => openCreate()}
+                  onClick={handleCreateTask}
                   aria-label="Create new task"
                 >
                   <Plus className="h-4 w-4" />
@@ -161,13 +165,6 @@ export function Navbar() {
           </div>
         </div>
       </div>
-
-      <ProjectForm
-        open={isProjectSettingsOpen}
-        onClose={() => setIsProjectSettingsOpen(false)}
-        onSuccess={handleProjectSettingsSuccess}
-        project={project || null}
-      />
     </div>
   );
 }

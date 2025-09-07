@@ -35,8 +35,8 @@ import {
 import { toPrettyCase } from '@/utils/string';
 import { useTheme } from '@/components/theme-provider';
 import { useUserSystem } from '@/components/config-provider';
-import { GitHubLoginDialog } from '@/components/GitHubLoginDialog';
 import { TaskTemplateManager } from '@/components/TaskTemplateManager';
+import NiceModal from '@ebay/nice-modal-react';
 
 export function GeneralSettings() {
   const {
@@ -51,7 +51,6 @@ export function GeneralSettings() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const { setTheme } = useTheme();
-  const [showGitHubLogin, setShowGitHubLogin] = useState(false);
 
   const playSound = async (soundFile: SoundFile) => {
     const audio = new Audio(`/api/sounds/${soundFile}`);
@@ -89,12 +88,12 @@ export function GeneralSettings() {
 
   const resetDisclaimer = async () => {
     if (!config) return;
-    updateConfig({ disclaimer_acknowledged: false });
+    updateAndSaveConfig({ disclaimer_acknowledged: false });
   };
 
   const resetOnboarding = async () => {
     if (!config) return;
-    updateConfig({ onboarding_acknowledged: false });
+    updateAndSaveConfig({ onboarding_acknowledged: false });
   };
 
   const isAuthenticated = !!(
@@ -380,7 +379,13 @@ export function GeneralSettings() {
                 Connect your GitHub account to access private repositories and
                 enable advanced Git operations.
               </p>
-              <Button onClick={() => setShowGitHubLogin(true)}>
+              <Button
+                onClick={() =>
+                  NiceModal.show('github-login').finally(() =>
+                    NiceModal.hide('github-login')
+                  )
+                }
+              >
                 Connect GitHub Account
               </Button>
             </div>
@@ -567,11 +572,6 @@ export function GeneralSettings() {
           </Button>
         </div>
       </div>
-
-      <GitHubLoginDialog
-        open={showGitHubLogin}
-        onOpenChange={(open) => setShowGitHubLogin(open)}
-      />
     </div>
   );
 }

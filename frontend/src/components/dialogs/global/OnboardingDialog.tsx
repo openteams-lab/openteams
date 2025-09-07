@@ -29,16 +29,15 @@ import type { ExecutorProfileId } from 'shared/types';
 import { useUserSystem } from '@/components/config-provider';
 
 import { toPrettyCase } from '@/utils/string';
+import NiceModal, { useModal } from '@ebay/nice-modal-react';
 
-interface OnboardingDialogProps {
-  open: boolean;
-  onComplete: (config: {
-    profile: ExecutorProfileId;
-    editor: { editor_type: EditorType; custom_command: string | null };
-  }) => void;
-}
+export type OnboardingResult = {
+  profile: ExecutorProfileId;
+  editor: { editor_type: EditorType; custom_command: string | null };
+};
 
-export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
+const OnboardingDialog = NiceModal.create(() => {
+  const modal = useModal();
   const { profiles, config } = useUserSystem();
 
   const [profile, setProfile] = useState<ExecutorProfileId>(
@@ -51,14 +50,15 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
   const [customCommand, setCustomCommand] = useState<string>('');
 
   const handleComplete = () => {
-    onComplete({
+    console.log('DEBUG1');
+    modal.resolve({
       profile,
       editor: {
         editor_type: editorType,
         custom_command:
           editorType === EditorType.CUSTOM ? customCommand || null : null,
       },
-    });
+    } as OnboardingResult);
   };
 
   const isValid =
@@ -66,7 +66,7 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
     (editorType === EditorType.CUSTOM && customCommand.trim() !== '');
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog open={modal.visible} uncloseable={true}>
       <DialogContent className="sm:max-w-[600px] space-y-4">
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -224,4 +224,6 @@ export function OnboardingDialog({ open, onComplete }: OnboardingDialogProps) {
       </DialogContent>
     </Dialog>
   );
-}
+});
+
+export { OnboardingDialog };
