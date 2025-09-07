@@ -5,20 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, Plus } from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
 import { projectsApi, tasksApi, attemptsApi } from '@/lib/api';
-import { useTaskDialog } from '@/contexts/task-dialog-context';
-import { ProjectForm } from '@/components/projects/project-form';
-import { TaskTemplateManager } from '@/components/TaskTemplateManager';
+import { openTaskForm } from '@/lib/openTaskForm';
 import { useKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 import { useSearch } from '@/contexts/search-context';
 import { useQuery } from '@tanstack/react-query';
-
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
 
 import {
   getKanbanSectionClasses,
@@ -27,11 +17,11 @@ import {
 
 import TaskKanbanBoard from '@/components/tasks/TaskKanbanBoard';
 import { TaskDetailsPanel } from '@/components/tasks/TaskDetailsPanel';
-import DeleteTaskConfirmationDialog from '@/components/tasks/DeleteTaskConfirmationDialog';
 import type { TaskWithAttemptStatus, Project, TaskAttempt } from 'shared/types';
 import type { DragEndEvent } from '@/components/ui/shadcn-io/kanban';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import NiceModal from '@ebay/nice-modal-react';
 
 type Task = TaskWithAttemptStatus;
 
@@ -46,19 +36,29 @@ export function ProjectTasks() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { openCreate, openEdit, openDuplicate } = useTaskDialog();
-  const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
-  const { query: searchQuery } = useSearch();
+  // Helper functions to open task forms
+  const handleCreateTask = () => {
+    if (project?.id) {
+      openTaskForm({ projectId: project.id });
+    }
+  };
 
-  // Template management state
-  const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
+  const handleEditTask = (task: Task) => {
+    if (project?.id) {
+      openTaskForm({ projectId: project.id, task });
+    }
+  };
+
+  const handleDuplicateTask = (task: Task) => {
+    if (project?.id) {
+      openTaskForm({ projectId: project.id, initialTask: task });
+    }
+  };
+  const { query: searchQuery } = useSearch();
 
   // Panel state
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-
-  // Task deletion state
-  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   // Fullscreen state from pathname
   const isFullscreen = location.pathname.endsWith('/full');
@@ -120,9 +120,8 @@ export function ProjectTasks() {
 
   // Define task creation handler
   const handleCreateNewTask = useCallback(() => {
-    if (!projectId) return;
-    openCreate();
-  }, [projectId, openCreate]);
+    handleCreateTask();
+  }, [handleCreateTask]);
 
   // Full screen
 
@@ -135,32 +134,47 @@ export function ProjectTasks() {
     }
   }, [projectId]);
 
-  const handleCloseTemplateManager = useCallback(() => {
-    setIsTemplateManagerOpen(false);
-  }, []);
+  const handleClosePanel = useCallback(() => {
+    // setIsPanelOpen(false);
+    // setSelectedTask(null);
+    // Remove task ID from URL when closing panel
+    navigate(`/projects/${projectId}/tasks`, { replace: true });
+  }, [projectId, navigate]);
 
   const handleDeleteTask = useCallback(
     (taskId: string) => {
       const task = tasksById[taskId];
       if (task) {
-        setTaskToDelete(task);
+        NiceModal.show('delete-task-confirmation', {
+          task,
+          projectId: projectId!,
+        })
+          .then(() => {
+            // Task was deleted, close panel if this task was selected
+            if (selectedTask?.id === taskId) {
+              handleClosePanel();
+            }
+          })
+          .catch(() => {
+            // Modal was cancelled - do nothing
+          });
       }
     },
-    [tasksById]
+    [tasksById, projectId, selectedTask, handleClosePanel]
   );
 
-  const handleEditTask = useCallback(
+  const handleEditTaskCallback = useCallback(
     (task: Task) => {
-      openEdit(task);
+      handleEditTask(task);
     },
-    [openEdit]
+    [handleEditTask]
   );
 
-  const handleDuplicateTask = useCallback(
+  const handleDuplicateTaskCallback = useCallback(
     (task: Task) => {
-      openDuplicate(task);
+      handleDuplicateTask(task);
     },
-    [openDuplicate]
+    [handleDuplicateTask]
   );
 
   const handleViewTaskDetails = useCallback(
@@ -175,18 +189,6 @@ export function ProjectTasks() {
     },
     [projectId, navigate]
   );
-
-  const handleClosePanel = useCallback(() => {
-    // setIsPanelOpen(false);
-    // setSelectedTask(null);
-    // Remove task ID from URL when closing panel
-    navigate(`/projects/${projectId}/tasks`, { replace: true });
-  }, [projectId, navigate]);
-
-  const handleProjectSettingsSuccess = useCallback(() => {
-    setIsProjectSettingsOpen(false);
-    fetchProject(); // Refresh project data after settings change
-  }, [fetchProject]);
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -218,8 +220,8 @@ export function ProjectTasks() {
   useKeyboardShortcuts({
     navigate,
     currentPath: window.location.pathname,
-    hasOpenDialog: isTemplateManagerOpen || isProjectSettingsOpen,
-    closeDialog: () => {}, // No local dialog to close
+    hasOpenDialog: false,
+    closeDialog: () => {},
     onC: handleCreateNewTask,
   });
 
@@ -288,9 +290,9 @@ export function ProjectTasks() {
                 tasks={tasks}
                 searchQuery={searchQuery}
                 onDragEnd={handleDragEnd}
-                onEditTask={handleEditTask}
+                onEditTask={handleEditTaskCallback}
                 onDeleteTask={handleDeleteTask}
-                onDuplicateTask={handleDuplicateTask}
+                onDuplicateTask={handleDuplicateTaskCallback}
                 onViewTaskDetails={handleViewTaskDetails}
                 isPanelOpen={isPanelOpen}
               />
@@ -305,9 +307,8 @@ export function ProjectTasks() {
             projectHasDevScript={!!project?.dev_script}
             projectId={projectId!}
             onClose={handleClosePanel}
-            onEditTask={handleEditTask}
+            onEditTask={handleEditTaskCallback}
             onDeleteTask={handleDeleteTask}
-            isDialogOpen={isProjectSettingsOpen}
             isFullScreen={isFullscreen}
             setFullScreen={
               selectedAttempt
@@ -324,48 +325,6 @@ export function ProjectTasks() {
           />
         )}
       </div>
-
-      {/* Dialogs - rendered at main container level to avoid stacking issues */}
-
-      {taskToDelete && (
-        <DeleteTaskConfirmationDialog
-          key={taskToDelete.id}
-          task={taskToDelete}
-          projectId={projectId!}
-          onClose={() => setTaskToDelete(null)}
-          onDeleted={() => {
-            setTaskToDelete(null);
-            if (selectedTask?.id === taskToDelete.id) {
-              handleClosePanel();
-            }
-          }}
-        />
-      )}
-
-      <ProjectForm
-        open={isProjectSettingsOpen}
-        onClose={() => setIsProjectSettingsOpen(false)}
-        onSuccess={handleProjectSettingsSuccess}
-        project={project}
-      />
-
-      {/* Template Manager Dialog */}
-      <Dialog
-        open={isTemplateManagerOpen}
-        onOpenChange={setIsTemplateManagerOpen}
-      >
-        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Manage Templates</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <TaskTemplateManager projectId={projectId} />
-          </div>
-          <DialogFooter>
-            <Button onClick={handleCloseTemplateManager}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
