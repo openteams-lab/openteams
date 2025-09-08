@@ -76,7 +76,45 @@ function DiffTab({ selectedAttempt }: DiffTabProps) {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <DiffTabContent
+      diffs={diffs}
+      fileCount={fileCount}
+      added={added}
+      deleted={deleted}
+      collapsedIds={collapsedIds}
+      allCollapsed={allCollapsed}
+      handleCollapseAll={handleCollapseAll}
+      toggle={toggle}
+      selectedAttempt={selectedAttempt}
+    />
+  );
+}
+
+interface DiffTabContentProps {
+  diffs: any[];
+  fileCount: number;
+  added: number;
+  deleted: number;
+  collapsedIds: Set<string>;
+  allCollapsed: boolean;
+  handleCollapseAll: () => void;
+  toggle: (id: string) => void;
+  selectedAttempt: TaskAttempt | null;
+}
+
+function DiffTabContent({
+  diffs,
+  fileCount,
+  added,
+  deleted,
+  collapsedIds,
+  allCollapsed,
+  handleCollapseAll,
+  toggle,
+  selectedAttempt,
+}: DiffTabContentProps) {
+  return (
+    <div className="h-full flex flex-col relative">
       {diffs.length > 0 && (
         <div className="sticky top-0 bg-background border-b px-4 py-2 z-10">
           <div className="flex items-center justify-between gap-4">
