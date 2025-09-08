@@ -24,12 +24,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useVariantCyclingShortcut } from '@/lib/keyboard-shortcuts';
+import { useReview } from '@/contexts/ReviewProvider';
 
 interface TaskFollowUpSectionProps {
   task: TaskWithAttemptStatus;
   projectId: string;
   selectedAttemptId?: string;
   selectedAttemptProfile?: string;
+  jumpToLogsTab: () => void;
 }
 
 export function TaskFollowUpSection({
@@ -37,6 +39,7 @@ export function TaskFollowUpSection({
   projectId,
   selectedAttemptId,
   selectedAttemptProfile,
+  jumpToLogsTab,
 }: TaskFollowUpSectionProps) {
   const {
     attemptData,
@@ -47,6 +50,12 @@ export function TaskFollowUpSection({
   } = useAttemptExecution(selectedAttemptId, task.id);
   const { data: branchStatus } = useBranchStatus(selectedAttemptId);
   const { profiles } = useUserSystem();
+  const { comments, generateReviewMarkdown, clearComments } = useReview();
+
+  // Generate review markdown when comments change
+  const reviewMarkdown = useMemo(() => {
+    return generateReviewMarkdown();
+  }, [generateReviewMarkdown, comments]);
 
   // Inline defaultFollowUpVariant logic
   const defaultFollowUpVariant = useMemo(() => {
@@ -118,12 +127,15 @@ export function TaskFollowUpSection({
       }
     }
 
-    return true;
+    // Allow sending if either review comments exist OR follow-up message is present
+    return Boolean(reviewMarkdown || followUpMessage.trim());
   }, [
     selectedAttemptId,
     attemptData.processes,
     isSendingFollowUp,
     branchStatus?.merges,
+    reviewMarkdown,
+    followUpMessage,
   ]);
   const currentProfile = useMemo(() => {
     if (!selectedProfile || !profiles) return null;
@@ -158,7 +170,15 @@ export function TaskFollowUpSection({
   });
 
   const onSendFollowUp = async () => {
-    if (!task || !selectedAttemptId || !followUpMessage.trim()) return;
+    if (!task || !selectedAttemptId) return;
+
+    // Combine review markdown and follow-up message
+    const extraMessage = followUpMessage.trim();
+    const finalPrompt = [reviewMarkdown, extraMessage]
+      .filter(Boolean)
+      .join('\n\n');
+
+    if (!finalPrompt) return;
 
     try {
       setIsSendingFollowUp(true);
@@ -172,15 +192,17 @@ export function TaskFollowUpSection({
             : null;
 
       await attemptsApi.followUp(selectedAttemptId, {
-        prompt: followUpMessage.trim(),
+        prompt: finalPrompt,
         variant: selectedVariant,
         image_ids: imageIds,
       });
       setFollowUpMessage('');
+      clearComments(); // Clear review comments after successful submission
       // Clear images and newly uploaded IDs after successful submission
       setImages([]);
       setNewlyUploadedImageIds([]);
       setShowImageUpload(false);
+      jumpToLogsTab();
       // No need to manually refetch - React Query will handle this
     } catch (error: unknown) {
       // @ts-expect-error it is type ApiError
@@ -215,10 +237,22 @@ export function TaskFollowUpSection({
                 />
               </div>
             )}
+
+            {/* Review comments preview */}
+            {reviewMarkdown && (
+              <div className="text-sm mb-4">
+                <div className="whitespace-pre-wrap">{reviewMarkdown}</div>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2">
               <div>
                 <FileSearchTextarea
-                  placeholder="Continue working on this task attempt... Type @ to search files."
+                  placeholder={
+                    reviewMarkdown
+                      ? '(Optional) Add additional instructions... Type @ to search files.'
+                      : 'Continue working on this task attempt... Type @ to search files.'
+                  }
                   value={followUpMessage}
                   onChange={(value) => {
                     setFollowUpMessage(value);
@@ -227,11 +261,7 @@ export function TaskFollowUpSection({
                   onKeyDown={(e) => {
                     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                       e.preventDefault();
-                      if (
-                        canSendFollowUp &&
-                        followUpMessage.trim() &&
-                        !isSendingFollowUp
-                      ) {
+                      if (canSendFollowUp && !isSendingFollowUp) {
                         onSendFollowUp();
                       }
                     }
@@ -324,42 +354,49 @@ export function TaskFollowUpSection({
                     return null;
                   })()}
                 </div>
-                {isAttemptRunning ? (
-                  <Button
-                    onClick={stopExecution}
-                    disabled={isStopping}
-                    size="sm"
-                    variant="destructive"
-                  >
-                    {isStopping ? (
-                      <Loader size={16} className="mr-2" />
-                    ) : (
-                      <>
-                        <StopCircle className="h-4 w-4 mr-2" />
-                        Stop
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={onSendFollowUp}
-                    disabled={
-                      !canSendFollowUp ||
-                      !followUpMessage.trim() ||
-                      isSendingFollowUp
-                    }
-                    size="sm"
-                  >
-                    {isSendingFollowUp ? (
-                      <Loader size={16} className="mr-2" />
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4 mr-2" />
-                        Send
-                      </>
-                    )}
-                  </Button>
-                )}
+                <div className="flex gap-2">
+                  {comments.length > 0 && (
+                    <Button
+                      onClick={clearComments}
+                      size="sm"
+                      variant="destructive"
+                    >
+                      Clear Review Comments
+                    </Button>
+                  )}
+                  {isAttemptRunning ? (
+                    <Button
+                      onClick={stopExecution}
+                      disabled={isStopping}
+                      size="sm"
+                      variant="destructive"
+                    >
+                      {isStopping ? (
+                        <Loader size={16} className="mr-2" />
+                      ) : (
+                        <>
+                          <StopCircle className="h-4 w-4 mr-2" />
+                          Stop
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={onSendFollowUp}
+                      disabled={!canSendFollowUp || isSendingFollowUp}
+                      size="sm"
+                    >
+                      {isSendingFollowUp ? (
+                        <Loader size={16} className="mr-2" />
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
