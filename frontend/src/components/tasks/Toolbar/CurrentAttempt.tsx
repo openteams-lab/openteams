@@ -1,11 +1,11 @@
 import {
   ExternalLink,
   GitBranch as GitBranchIcon,
+  GitFork,
   GitPullRequest,
   History,
   Play,
   Plus,
-  GitFork,
   RefreshCw,
   Settings,
   StopCircle,

@@ -21,6 +21,7 @@ import { ProcessSelectionProvider } from '@/contexts/ProcessSelectionContext';
 import { ReviewProvider } from '@/contexts/ReviewProvider';
 import { AttemptHeaderCard } from './AttemptHeaderCard';
 import { inIframe } from '@/vscode/bridge';
+import { TaskRelationshipViewer } from './TaskRelationshipViewer';
 
 interface TaskDetailsPanelProps {
   task: TaskWithAttemptStatus | null;
@@ -29,6 +30,7 @@ interface TaskDetailsPanelProps {
   onClose: () => void;
   onEditTask?: (task: TaskWithAttemptStatus) => void;
   onDeleteTask?: (taskId: string) => void;
+  onNavigateToTask?: (taskId: string) => void;
   isDialogOpen?: boolean;
   hideBackdrop?: boolean;
   className?: string;
@@ -50,6 +52,7 @@ export function TaskDetailsPanel({
   onClose,
   onEditTask,
   onDeleteTask,
+  onNavigateToTask,
   isDialogOpen = false,
   hideBackdrop = false,
   className,
@@ -164,6 +167,12 @@ export function TaskDetailsPanel({
 
                         {/* Task Breakdown (TODOs) */}
                         <TodoPanel selectedAttempt={selectedAttempt} />
+
+                        {/* Task Relationships */}
+                        <TaskRelationshipViewer
+                          selectedAttempt={selectedAttempt}
+                          onNavigateToTask={onNavigateToTask}
+                        />
                       </aside>
 
                       {/* Main content */}
