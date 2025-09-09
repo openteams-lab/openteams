@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { templatesApi, imagesApi, projectsApi } from '@/lib/api';
+import { templatesApi, imagesApi, projectsApi, attemptsApi } from '@/lib/api';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
 import { useUserSystem } from '@/components/config-provider';
 import { ExecutorProfileSelector } from '@/components/settings';
@@ -47,10 +47,19 @@ export interface TaskFormDialogProps {
   projectId?: string; // For file search functionality
   initialTemplate?: TaskTemplate | null; // For pre-filling from template
   initialTask?: Task | null; // For duplicating an existing task
+  initialBaseBranch?: string; // For pre-selecting base branch in spinoff
+  parentTaskAttemptId?: string; // For linking to parent task attempt
 }
 
 export const TaskFormDialog = NiceModal.create<TaskFormDialogProps>(
-  ({ task, projectId, initialTemplate, initialTask }) => {
+  ({
+    task,
+    projectId,
+    initialTemplate,
+    initialTask,
+    initialBaseBranch,
+    parentTaskAttemptId,
+  }) => {
     const modal = useModal();
     const { createTask, createAndStart, updateTask } =
       useTaskMutations(projectId);
@@ -176,17 +185,63 @@ export const TaskFormDialog = NiceModal.create<TaskFormDialogProps>(
             // Combine templates with project templates first
             setTemplates([...projectTemplates, ...globalTemplates]);
 
-            // Set branches and default to current branch
+            // Set branches and default to initialBaseBranch if provided, otherwise current branch
             setBranches(projectBranches);
-            const currentBranch = projectBranches.find((b) => b.is_current);
-            const defaultBranch = currentBranch || projectBranches[0];
-            if (defaultBranch) {
-              setSelectedBranch(defaultBranch.name);
+
+            if (
+              initialBaseBranch &&
+              projectBranches.some((b) => b.name === initialBaseBranch)
+            ) {
+              // Use initialBaseBranch if it exists in the project branches (for spinoff)
+              setSelectedBranch(initialBaseBranch);
+            } else {
+              // Default behavior: use current branch or first available
+              const currentBranch = projectBranches.find((b) => b.is_current);
+              const defaultBranch = currentBranch || projectBranches[0];
+              if (defaultBranch) {
+                setSelectedBranch(defaultBranch.name);
+              }
             }
           })
           .catch(console.error);
       }
-    }, [modal.visible, isEditMode, projectId]);
+    }, [modal.visible, isEditMode, projectId, initialBaseBranch]);
+
+    // Fetch parent base branch when parentTaskAttemptId is provided
+    useEffect(() => {
+      if (
+        modal.visible &&
+        !isEditMode &&
+        parentTaskAttemptId &&
+        !initialBaseBranch &&
+        branches.length > 0
+      ) {
+        attemptsApi
+          .get(parentTaskAttemptId)
+          .then((attempt) => {
+            const parentBranch = attempt.branch || attempt.base_branch;
+            if (parentBranch && branches.some((b) => b.name === parentBranch)) {
+              setSelectedBranch(parentBranch);
+            }
+          })
+          .catch(() => {
+            // Silently fail, will use current branch fallback
+          });
+      }
+    }, [
+      modal.visible,
+      isEditMode,
+      parentTaskAttemptId,
+      initialBaseBranch,
+      branches,
+    ]);
+
+    // Set default executor from config (following TaskDetailsToolbar pattern)
+    useEffect(() => {
+      if (system.config?.executor_profile) {
+        setSelectedExecutorProfile(system.config.executor_profile);
+      }
+    }, [system.config?.executor_profile]);
 
     // Set default executor from config (following TaskDetailsToolbar pattern)
     useEffect(() => {
@@ -262,7 +317,7 @@ export const TaskFormDialog = NiceModal.create<TaskFormDialogProps>(
                 title,
                 description: description || null,
                 status,
-                parent_task_attempt: null,
+                parent_task_attempt: parentTaskAttemptId || null,
                 image_ids: imageIds || null,
               },
             },
@@ -278,7 +333,7 @@ export const TaskFormDialog = NiceModal.create<TaskFormDialogProps>(
               project_id: projectId,
               title,
               description: description || null,
-              parent_task_attempt: null,
+              parent_task_attempt: parentTaskAttemptId || null,
               image_ids: imageIds || null,
             },
             {
@@ -332,7 +387,7 @@ export const TaskFormDialog = NiceModal.create<TaskFormDialogProps>(
                 project_id: projectId,
                 title,
                 description: description || null,
-                parent_task_attempt: null,
+                parent_task_attempt: parentTaskAttemptId || null,
                 image_ids: imageIds || null,
               },
               executor_profile_id: finalExecutorProfile,
