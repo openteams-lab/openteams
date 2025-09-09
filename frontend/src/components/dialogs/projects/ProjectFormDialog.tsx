@@ -184,7 +184,7 @@ export const ProjectFormDialog = NiceModal.create<ProjectFormDialogProps>(
 
     return (
       <Dialog open={modal.visible} onOpenChange={handleOpenChange}>
-        <DialogContent>
+        <DialogContent className="overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>
               {isEditing ? 'Edit Project' : 'Create Project'}
@@ -196,91 +196,93 @@ export const ProjectFormDialog = NiceModal.create<ProjectFormDialogProps>(
             </DialogDescription>
           </DialogHeader>
 
-          {isEditing ? (
-            <Tabs defaultValue="general" className="w-full -mt-2">
-              <TabsList className="grid w-full grid-cols-2 mb-4">
-                <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="templates">Task Templates</TabsTrigger>
-              </TabsList>
-              <TabsContent value="general" className="space-y-4">
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <ProjectFormFields
-                    isEditing={isEditing}
-                    repoMode={repoMode}
-                    setRepoMode={setRepoMode}
-                    gitRepoPath={gitRepoPath}
-                    handleGitRepoPathChange={handleGitRepoPathChange}
-                    parentPath={parentPath}
-                    setParentPath={setParentPath}
-                    setFolderName={setFolderName}
-                    setName={setName}
-                    name={name}
-                    setupScript={setupScript}
-                    setSetupScript={setSetupScript}
-                    devScript={devScript}
-                    setDevScript={setDevScript}
-                    cleanupScript={cleanupScript}
-                    setCleanupScript={setCleanupScript}
-                    copyFiles={copyFiles}
-                    setCopyFiles={setCopyFiles}
-                    error={error}
-                    setError={setError}
+          <div className="mx-auto w-full max-w-2xl overflow-x-hidden px-1">
+            {isEditing ? (
+              <Tabs defaultValue="general" className="w-full -mt-2">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="general">General</TabsTrigger>
+                  <TabsTrigger value="templates">Task Templates</TabsTrigger>
+                </TabsList>
+                <TabsContent value="general" className="space-y-4">
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <ProjectFormFields
+                      isEditing={isEditing}
+                      repoMode={repoMode}
+                      setRepoMode={setRepoMode}
+                      gitRepoPath={gitRepoPath}
+                      handleGitRepoPathChange={handleGitRepoPathChange}
+                      parentPath={parentPath}
+                      setParentPath={setParentPath}
+                      setFolderName={setFolderName}
+                      setName={setName}
+                      name={name}
+                      setupScript={setupScript}
+                      setSetupScript={setSetupScript}
+                      devScript={devScript}
+                      setDevScript={setDevScript}
+                      cleanupScript={cleanupScript}
+                      setCleanupScript={setCleanupScript}
+                      copyFiles={copyFiles}
+                      setCopyFiles={setCopyFiles}
+                      error={error}
+                      setError={setError}
+                      projectId={project ? project.id : undefined}
+                    />
+                    <DialogFooter>
+                      <Button
+                        type="submit"
+                        disabled={loading || !gitRepoPath.trim()}
+                      >
+                        {loading ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </TabsContent>
+                <TabsContent value="templates" className="mt-0 pt-0">
+                  <TaskTemplateManager
                     projectId={project ? project.id : undefined}
                   />
+                </TabsContent>
+              </Tabs>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <ProjectFormFields
+                  isEditing={isEditing}
+                  repoMode={repoMode}
+                  setRepoMode={setRepoMode}
+                  gitRepoPath={gitRepoPath}
+                  handleGitRepoPathChange={handleGitRepoPathChange}
+                  parentPath={parentPath}
+                  setParentPath={setParentPath}
+                  setFolderName={setFolderName}
+                  setName={setName}
+                  name={name}
+                  setupScript={setupScript}
+                  setSetupScript={setSetupScript}
+                  devScript={devScript}
+                  setDevScript={setDevScript}
+                  cleanupScript={cleanupScript}
+                  setCleanupScript={setCleanupScript}
+                  copyFiles={copyFiles}
+                  setCopyFiles={setCopyFiles}
+                  error={error}
+                  setError={setError}
+                  projectId={undefined}
+                  onCreateProject={handleDirectCreate}
+                />
+                {repoMode === 'new' && (
                   <DialogFooter>
                     <Button
                       type="submit"
-                      disabled={loading || !gitRepoPath.trim()}
+                      disabled={loading || !folderName.trim()}
                     >
-                      {loading ? 'Saving...' : 'Save Changes'}
+                      {loading ? 'Creating...' : 'Create Project'}
                     </Button>
                   </DialogFooter>
-                </form>
-              </TabsContent>
-              <TabsContent value="templates" className="mt-0 pt-0">
-                <TaskTemplateManager
-                  projectId={project ? project.id : undefined}
-                />
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <ProjectFormFields
-                isEditing={isEditing}
-                repoMode={repoMode}
-                setRepoMode={setRepoMode}
-                gitRepoPath={gitRepoPath}
-                handleGitRepoPathChange={handleGitRepoPathChange}
-                parentPath={parentPath}
-                setParentPath={setParentPath}
-                setFolderName={setFolderName}
-                setName={setName}
-                name={name}
-                setupScript={setupScript}
-                setSetupScript={setSetupScript}
-                devScript={devScript}
-                setDevScript={setDevScript}
-                cleanupScript={cleanupScript}
-                setCleanupScript={setCleanupScript}
-                copyFiles={copyFiles}
-                setCopyFiles={setCopyFiles}
-                error={error}
-                setError={setError}
-                projectId={undefined}
-                onCreateProject={handleDirectCreate}
-              />
-              {repoMode === 'new' && (
-                <DialogFooter>
-                  <Button
-                    type="submit"
-                    disabled={loading || !folderName.trim()}
-                  >
-                    {loading ? 'Creating...' : 'Create Project'}
-                  </Button>
-                </DialogFooter>
-              )}
-            </form>
-          )}
+                )}
+              </form>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     );
