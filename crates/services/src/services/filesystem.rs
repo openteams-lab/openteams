@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
 };
@@ -45,6 +46,44 @@ impl FilesystemService {
         FilesystemService {}
     }
 
+    fn get_directories_to_skip() -> HashSet<String> {
+        let mut skip_dirs = HashSet::from(
+            [
+                "node_modules",
+                "target",
+                "build",
+                "dist",
+                ".next",
+                ".nuxt",
+                ".cache",
+                ".npm",
+                ".yarn",
+                ".pnpm-store",
+                "Library",
+                "AppData",
+                "Applications",
+            ]
+            .map(String::from),
+        );
+
+        [
+            dirs::executable_dir(),
+            dirs::data_dir(),
+            dirs::download_dir(),
+            dirs::picture_dir(),
+            dirs::video_dir(),
+            dirs::audio_dir(),
+        ]
+        .into_iter()
+        .flatten()
+        .filter_map(|path| path.file_name()?.to_str().map(String::from))
+        .for_each(|name| {
+            skip_dirs.insert(name);
+        });
+
+        skip_dirs
+    }
+
     pub async fn list_git_repos(
         &self,
         path: Option<String>,
@@ -52,13 +91,30 @@ impl FilesystemService {
     ) -> Result<Vec<DirectoryEntry>, FilesystemError> {
         let base_path = path
             .map(PathBuf::from)
-            .unwrap_or_else(Self::get_home_directory);
+            .unwrap_or_else(Self::get_working_or_home_directory);
         Self::verify_directory(&base_path)?;
+        let skip_dirs = Self::get_directories_to_skip();
         let mut git_repos: Vec<DirectoryEntry> = WalkBuilder::new(&base_path)
             .follow_links(false)
-            .hidden(true)
+            .hidden(true) // true to skip hidden files
             .git_ignore(true)
-            .filter_entry(|entry| entry.path().is_dir())
+            .filter_entry({
+                move |entry| {
+                    let path = entry.path();
+                    if !path.is_dir() {
+                        return false;
+                    }
+
+                    // Skip common non-git folders
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str())
+                        && skip_dirs.contains(name)
+                    {
+                        return false;
+                    }
+
+                    true
+                }
+            })
             .max_depth(max_depth)
             .git_exclude(true)
             .build()
@@ -84,6 +140,15 @@ impl FilesystemService {
             .collect();
         git_repos.sort_by_key(|entry| entry.last_modified.unwrap_or(0));
         Ok(git_repos)
+    }
+
+    fn get_working_or_home_directory() -> PathBuf {
+        // Try current working directory first
+        if let Ok(current_dir) = std::env::current_dir() {
+            return current_dir;
+        }
+        // Fall back to home directory
+        Self::get_home_directory()
     }
 
     fn get_home_directory() -> PathBuf {
