@@ -80,6 +80,8 @@ export type FollowUpDraftResponse = { task_attempt_id: string, prompt: string, q
 
 export type UpdateFollowUpDraftRequest = { prompt: string | null, variant: string | null | null, image_ids: Array<string> | null, version: bigint | null, };
 
+export type CreateAndStartTaskRequest = { task: CreateTask, executor_profile_id: ExecutorProfileId, base_branch: string, };
+
 export type CreateGitHubPrRequest = { title: string, body: string | null, base_branch: string | null, };
 
 export type ImageResponse = { id: string, file_path: string, original_name: string, mime_type: string | null, size_bytes: bigint, hash: string, created_at: string, updated_at: string, };
