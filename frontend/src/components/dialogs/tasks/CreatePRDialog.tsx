@@ -25,7 +25,7 @@ import {
   TaskAttempt,
   TaskWithAttemptStatus,
 } from 'shared/types';
-import { useProjectBranches } from '@/hooks';
+import { projectsApi } from '@/lib/api.ts';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 const CreatePrDialog = NiceModal.create(() => {
   const modal = useModal();
@@ -34,18 +34,41 @@ const CreatePrDialog = NiceModal.create(() => {
     | undefined;
   const [prTitle, setPrTitle] = useState('');
   const [prBody, setPrBody] = useState('');
-  const [prBaseBranch, setPrBaseBranch] = useState('main');
+  const [prBaseBranch, setPrBaseBranch] = useState('');
   const [creatingPR, setCreatingPR] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Fetch branches when dialog opens
-  const { data: branches = [], isLoading: branchesLoading } =
-    useProjectBranches(modal.visible ? data?.projectId : undefined);
+  const [branches, setBranches] = useState<
+    Array<{ name: string; is_current: boolean; is_remote: boolean }>
+  >([]);
+  const [branchesLoading, setBranchesLoading] = useState(false);
 
   useEffect(() => {
     if (modal.visible && data) {
       setPrTitle(`${data.task.title} (vibe-kanban)`);
       setPrBody(data.task.description || '');
+
+      // Always fetch branches for dropdown population
+      if (data.projectId) {
+        setBranchesLoading(true);
+        projectsApi
+          .getBranches(data.projectId)
+          .then((projectBranches) => {
+            setBranches(projectBranches);
+
+            // Set smart default: task base branch OR current branch
+            if (data.attempt.base_branch) {
+              setPrBaseBranch(data.attempt.base_branch);
+            } else {
+              const currentBranch = projectBranches.find((b) => b.is_current);
+              if (currentBranch) {
+                setPrBaseBranch(currentBranch.name);
+              }
+            }
+          })
+          .catch(console.error)
+          .finally(() => setBranchesLoading(false));
+      }
+
       setError(null); // Reset error when opening
     }
   }, [modal.visible, data]);
@@ -67,7 +90,7 @@ const CreatePrDialog = NiceModal.create(() => {
       // Reset form and close dialog
       setPrTitle('');
       setPrBody('');
-      setPrBaseBranch('main');
+      setPrBaseBranch('');
       modal.hide();
     } else {
       if (result.error) {
@@ -100,7 +123,7 @@ const CreatePrDialog = NiceModal.create(() => {
     // Reset form to empty state
     setPrTitle('');
     setPrBody('');
-    setPrBaseBranch('main');
+    setPrBaseBranch('');
   }, [modal]);
 
   // Don't render if no data
@@ -159,13 +182,6 @@ const CreatePrDialog = NiceModal.create(() => {
                       {branch.is_current && ' (current)'}
                     </SelectItem>
                   ))}
-                  {/* Add common branches as fallback if not in the list */}
-                  {!branches.some((b) => b.name === 'main' && !b.is_remote) && (
-                    <SelectItem value="main">main</SelectItem>
-                  )}
-                  {!branches.some(
-                    (b) => b.name === 'master' && !b.is_remote
-                  ) && <SelectItem value="master">master</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
