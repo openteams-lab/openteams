@@ -200,12 +200,6 @@ impl WorktreeManager {
 
         let git_repo_path = Self::get_git_repo_path(repo)?;
 
-        // Try git CLI worktree remove first (force). This tends to be more robust.
-        let git = GitCli::new();
-        if let Err(e) = git.worktree_remove(&git_repo_path, worktree_path, true) {
-            debug!("git worktree remove non-fatal error: {}", e);
-        }
-
         // Step 1: Use Git CLI to remove the worktree registration (force) if present
         // The Git CLI is more robust than libgit2 for mutable worktree operations
         let git = GitCli::new();
