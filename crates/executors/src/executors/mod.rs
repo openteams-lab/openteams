@@ -85,10 +85,7 @@ impl CodingAgent {
                 serde_json::json!({
                     "mcp_servers": {}
                 }),
-                serde_json::json!({
-                    "command": "npx",
-                    "args": ["-y", "vibe-kanban", "--mcp"],
-                }),
+                self.preconfigured_mcp(),
                 true,
             ),
             Self::Amp(_) => McpConfig::new(
@@ -96,10 +93,7 @@ impl CodingAgent {
                 serde_json::json!({
                     "amp.mcpServers": {}
                 }),
-                serde_json::json!({
-                    "command": "npx",
-                    "args": ["-y", "vibe-kanban", "--mcp"],
-                }),
+                self.preconfigured_mcp(),
                 false,
             ),
             Self::Opencode(_) => McpConfig::new(
@@ -108,11 +102,7 @@ impl CodingAgent {
                     "mcp": {},
                     "$schema": "https://opencode.ai/config.json"
                 }),
-                serde_json::json!({
-                    "type": "local",
-                    "command": ["npx", "-y", "vibe-kanban", "--mcp"],
-                    "enabled": true
-                }),
+                self.preconfigured_mcp(),
                 false,
             ),
             _ => McpConfig::new(
@@ -120,10 +110,7 @@ impl CodingAgent {
                 serde_json::json!({
                     "mcpServers": {}
                 }),
-                serde_json::json!({
-                    "command": "npx",
-                    "args": ["-y", "vibe-kanban", "--mcp"],
-                }),
+                self.preconfigured_mcp(),
                 false,
             ),
         }
