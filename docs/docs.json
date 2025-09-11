@@ -1,0 +1,85 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Vibe Kanban",
+  "description": "A kanban board for developers to track coding tasks with AI coding agents",
+  "colors": {
+    "primary": "#000000",
+    "light": "#fefefe",
+    "dark": "#121212"
+  },
+  "background": {
+    "color": {
+      "light": "#FAF9F5",
+      "dark": "#2F2F2D"
+    }
+  },
+  "favicon": "/logo/v-192.png",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting started",
+        "pages": ["index", "getting-started", "onboarding", "global-settings"]
+      },
+      {
+        "group": "Supported Coding Agents",
+        "pages": [
+          "supported-coding-agents",
+          "supported-coding-agents/amp",
+          "supported-coding-agents/claude-code",
+          "supported-coding-agents/cursor-cli",
+          "supported-coding-agents/ccr",
+          "supported-coding-agents/codex",
+          "supported-coding-agents/gemini-cli",
+          "supported-coding-agents/sst-opencode",
+          "supported-coding-agents/qwen-code"
+        ]
+      },
+      {
+        "group": "User Guide",
+        "pages": [
+          "user-guide/creating-projects",
+          "user-guide/creating-tasks",
+          "user-guide/creating-task-attempts",
+          "user-guide/creating-task-templates",
+          "user-guide/agent-configurations",
+          "user-guide/vibe-kanban-mcp-server"
+        ]
+      }
+    ]
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/BloopAI/vibe-kanban"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://vibekanban.com/docs"
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/BloopAI/vibe-kanban"
+    }
+  }
+}
