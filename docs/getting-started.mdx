@@ -1,0 +1,37 @@
+# Install & Run Vibe Kanban
+
+## Supported Systems
+
+We build and test Vibe Kanban on the following systems:
+
+- macOS (Intel and Apple Silicon)
+- Linux
+- Windows
+
+## Pre-requisites
+
+- Node.js
+- Coding agent authenticated
+  - All supported coding agents can now be used via npx (no separate installation required)
+  - You still need to authenticate with each coding agent outside of Vibe Kanban
+  - You can find authentication instructions for each coding agent on their respective [websites](./supported-coding-agents).
+
+## Running Vibe Kanban
+
+1. Open a terminal and run:
+
+```
+npx vibe-kanban
+```
+
+2. [Complete the onboarding steps](/docs/getting-started/onboarding) in the application
+
+3. [Configure Global Settings](/docs/getting-started/global-settings) to personalize your experience
+
+4. [Create a project](/docs/user-guide/creating-projects)
+
+5. [Create tasks](/docs/user-guide/creating-tasks)
+
+6. Optional: [Set up MCP integration](/docs/user-guide/vibe-kanban-mcp-server) to streamline task creation with coding agents
+
+A note on ports: By default the application will bind to a random free port, print the URL in the terminal and attempt to open the link in the default browser. If you would like to use a fixed port you can optionally specify the `PORT` environment variable, so to force Vibe Kanban to start on port 8080 you would run `PORT=8080 npx vibe-kanban`.

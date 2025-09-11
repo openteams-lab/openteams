@@ -1,0 +1,31 @@
+# Creating Projects
+
+Before you can create tasks and execute coding agents, you must create a project.
+
+![Adding a project](/images/screenshot-create-project.png)
+
+Each project represents a git repo and can be configured with its own setup and dev server scripts.
+
+## Git
+
+You can either specify an existing Git repo, or Vibe Kanban will create a blank one for you if you choose the "Create new project" option.
+
+## Setup Scripts
+
+Setup scripts will be run before the coding agent is executed. This is useful for installing dependencies, for example you might run `npm install` or `cargo build`. This will save you time as your agent won't need to figure out that these commands haven't already been run.
+
+_Note, each time a coding agent is executed it runs in a [git worktree](https://git-scm.com/docs/git-worktree) which is unlikely to contain your dependencies, configs, .env etc..._
+
+## Dev Server Scripts
+
+The dev server script is run whenever you press the "run dev server" button. It's useful for quickly reviewing work after a coding agent has run.
+
+At the moment only one dev server can be running for each project, so if you start one it will kill any that are already running.
+
+## Cleanup Scripts
+
+Cleanup scripts run after a coding agent finishes. You can use these to tidy up the workspace, remove temporary files, or perform any post-execution cleanup. For example, you might run:
+
+```bash
+npm run clean
+```
