@@ -12,6 +12,7 @@ import { ExecutorProfileSelector } from '@/components/settings';
 import { useKeyboardShortcuts } from '@/lib/keyboard-shortcuts.ts';
 import { showModal } from '@/lib/modals';
 import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 
 type Props = {
   task: Task;
@@ -146,13 +147,23 @@ function CreateAttempt({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-          {/* Step 1: Choose Base Branch */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Base branch <span className="text-destructive">*</span>
-              </label>
+          {/* Top Row: Executor Profile and Variant (spans 2 columns) */}
+          {availableProfiles && (
+            <div className="col-span-1 sm:col-span-2">
+              <ExecutorProfileSelector
+                profiles={availableProfiles}
+                selectedProfile={selectedProfile}
+                onProfileSelect={setSelectedProfile}
+                showLabel={true}
+              />
             </div>
+          )}
+
+          {/* Bottom Row: Base Branch and Start Button */}
+          <div className="space-y-1">
+            <Label className="text-sm font-medium">
+              Base branch <span className="text-destructive">*</span>
+            </Label>
             <BranchSelector
               branches={branches}
               selectedBranch={createAttemptBranch}
@@ -161,18 +172,8 @@ function CreateAttempt({
             />
           </div>
 
-          {/* Step 2 & 3: Choose Profile and Variant */}
-          {availableProfiles && (
-            <ExecutorProfileSelector
-              profiles={availableProfiles}
-              selectedProfile={selectedProfile}
-              onProfileSelect={setSelectedProfile}
-              showLabel={true}
-            />
-          )}
-
-          {/* Step 3: Start Attempt */}
           <div className="space-y-1">
+            <Label className="text-sm font-medium opacity-0">Start</Label>
             <Button
               onClick={handleCreateAttempt}
               disabled={
@@ -182,9 +183,7 @@ function CreateAttempt({
                 isCreating
               }
               size="sm"
-              className={
-                'w-full text-xs gap-2 justify-center bg-black text-white hover:bg-black/90'
-              }
+              className="w-full text-xs gap-2 justify-center bg-black text-white hover:bg-black/90"
               title={
                 !createAttemptBranch
                   ? 'Base branch is required'

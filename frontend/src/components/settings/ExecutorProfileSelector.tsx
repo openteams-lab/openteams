@@ -20,7 +20,6 @@ type Props = {
   disabled?: boolean;
   showLabel?: boolean;
   showVariantSelector?: boolean;
-  className?: string;
 };
 
 function ExecutorProfileSelector({
@@ -30,7 +29,6 @@ function ExecutorProfileSelector({
   disabled = false,
   showLabel = true,
   showVariantSelector = true,
-  className = '',
 }: Props) {
   if (!profiles) {
     return null;
@@ -58,12 +56,12 @@ function ExecutorProfileSelector({
   const hasVariants = currentProfile && Object.keys(currentProfile).length > 0;
 
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div className="flex gap-3 flex-col sm:flex-row">
       {/* Executor Profile Selector */}
-      <div>
+      <div className="flex-1">
         {showLabel && (
           <Label htmlFor="executor-profile" className="text-sm font-medium">
-            Executor Profile
+            Agent
           </Label>
         )}
         <DropdownMenu>
@@ -106,9 +104,9 @@ function ExecutorProfileSelector({
         selectedProfile &&
         hasVariants &&
         currentProfile && (
-          <div>
+          <div className="flex-1">
             <Label htmlFor="executor-variant" className="text-sm font-medium">
-              Variant
+              Configuration
             </Label>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -146,9 +144,9 @@ function ExecutorProfileSelector({
         selectedProfile &&
         !hasVariants &&
         currentProfile && (
-          <div>
+          <div className="flex-1">
             <Label htmlFor="executor-variant" className="text-sm font-medium">
-              Variant
+              Configuration
             </Label>
             <Button
               variant="outline"
@@ -163,9 +161,9 @@ function ExecutorProfileSelector({
 
       {/* Show placeholder for variant when no profile selected */}
       {showVariantSelector && !selectedProfile && (
-        <div>
+        <div className="flex-1">
           <Label htmlFor="executor-variant" className="text-sm font-medium">
-            Variant
+            Configuration
           </Label>
           <Button
             variant="outline"
@@ -173,7 +171,7 @@ function ExecutorProfileSelector({
             disabled
             className="w-full text-xs justify-start mt-1.5"
           >
-            Select profile first
+            Select agent first
           </Button>
         </div>
       )}
