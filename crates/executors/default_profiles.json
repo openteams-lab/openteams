@@ -36,12 +36,12 @@
     "CODEX": {
       "DEFAULT": {
         "CODEX": {
-          "sandbox": "danger-full-access"
+          "sandbox": "auto"
         }
       },
       "HIGH": {
         "CODEX": {
-          "sandbox": "danger-full-access",
+          "sandbox": "auto",
           "model_reasoning_effort": "high"
         }
       }
