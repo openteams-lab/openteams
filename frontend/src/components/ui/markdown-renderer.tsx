@@ -91,7 +91,7 @@ function MarkdownRenderer({
     try {
       await writeClipboardViaBridge(content);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1400);
+      window.setTimeout(() => setCopied(false), 400);
     } catch {
       // noop – bridge handles fallback
     }
@@ -100,7 +100,7 @@ function MarkdownRenderer({
   return (
     <div className={`relative group`}>
       {enableCopyButton && (
-        <div className="sticky top-2 z-10 pointer-events-none">
+        <div className="sticky top-2 right-2 z-10 pointer-events-none h-0">
           <div className="flex justify-end pr-1">
             <TooltipProvider>
               <Tooltip>
@@ -113,7 +113,7 @@ function MarkdownRenderer({
                       variant="outline"
                       size="icon"
                       onClick={handleCopy}
-                      className="pointer-events-auto opacity-0 group-hover:opacity-100 group-hover:delay-200 delay-0 transition-opacity duration-150 h-8 w-8 rounded-md bg-background/95 backdrop-blur border border-border shadow-sm"
+                      className="pointer-events-auto opacity-0 group-hover:opacity-100 delay-0 transition-opacity duration-50 h-8 w-8 rounded-md bg-background/95 backdrop-blur border border-border shadow-sm"
                     >
                       {copied ? (
                         <Check className="h-4 w-4 text-green-600" />

@@ -2,6 +2,7 @@ import MarkdownRenderer from '@/components/ui/markdown-renderer.tsx';
 import {
   ActionType,
   NormalizedEntry,
+  TaskAttempt,
   type NormalizedEntryType,
 } from 'shared/types.ts';
 import type { ProcessStartPayload } from '@/types/logs';
@@ -25,11 +26,14 @@ import {
   User,
 } from 'lucide-react';
 import RawLogText from '../common/RawLogText';
+import UserMessage from './UserMessage';
 
 type Props = {
   entry: NormalizedEntry | ProcessStartPayload;
   expansionKey: string;
   diffDeletable?: boolean;
+  executionProcessId?: string;
+  taskAttempt?: TaskAttempt;
 };
 
 type FileEditAction = Extract<ActionType, { action: 'file_edit' }>;
@@ -89,36 +93,51 @@ const getEntryIcon = (entryType: NormalizedEntryType) => {
   return <Settings className={iconSize} />;
 };
 
+type ExitStatusVisualisation = 'success' | 'error' | 'pending';
+
 const getStatusIndicator = (entryType: NormalizedEntryType) => {
-  const result =
+  let status_visualisation: ExitStatusVisualisation | null = null;
+  if (
     entryType.type === 'tool_use' &&
     entryType.action_type.action === 'command_run'
-      ? entryType.action_type.result?.exit_status
-      : null;
+  ) {
+    status_visualisation = 'pending';
+    if (entryType.action_type.result?.exit_status?.type === 'success') {
+      if (entryType.action_type.result?.exit_status?.success) {
+        status_visualisation = 'success';
+      } else {
+        status_visualisation = 'error';
+      }
+    } else if (
+      entryType.action_type.result?.exit_status?.type === 'exit_code'
+    ) {
+      if (entryType.action_type.result?.exit_status?.code === 0) {
+        status_visualisation = 'success';
+      } else {
+        status_visualisation = 'error';
+      }
+    }
+  }
 
-  const status =
-    result?.type === 'success'
-      ? result.success
-        ? 'success'
-        : 'error'
-      : result?.type === 'exit_code'
-        ? result.code === 0
-          ? 'success'
-          : 'error'
-        : 'unknown';
-
-  if (status === 'unknown') return null;
-
-  const colorMap: Record<typeof status, string> = {
+  // If pending, should be a pulsing primary-foreground
+  const colorMap: Record<ExitStatusVisualisation, string> = {
     success: 'bg-green-300',
     error: 'bg-red-300',
+    pending: 'bg-primary-foreground/50',
   };
+
+  if (!status_visualisation) return null;
 
   return (
     <div className="relative">
       <div
-        className={`${colorMap[status]} h-1.5 w-1.5 rounded-full absolute -left-1 -bottom-4`}
+        className={`${colorMap[status_visualisation]} h-1.5 w-1.5 rounded-full absolute -left-1 -bottom-4`}
       />
+      {status_visualisation === 'pending' && (
+        <div
+          className={`${colorMap[status_visualisation]} h-1.5 w-1.5 rounded-full absolute -left-1 -bottom-4 animate-ping`}
+        />
+      )}
     </div>
   );
 };
@@ -463,11 +482,27 @@ const ToolCallCard: React.FC<{
   );
 };
 
+const LoadingCard = () => {
+  return (
+    <div className="flex animate-pulse space-x-2 items-center">
+      <div className="size-3 bg-foreground/10"></div>
+      <div className="flex-1 h-3 bg-foreground/10"></div>
+      <div className="flex-1 h-3"></div>
+      <div className="flex-1 h-3"></div>
+    </div>
+  );
+};
+
 /*******************
  * Main component  *
  *******************/
 
-function DisplayConversationEntry({ entry, expansionKey }: Props) {
+function DisplayConversationEntry({
+  entry,
+  expansionKey,
+  executionProcessId,
+  taskAttempt,
+}: Props) {
   const isNormalizedEntry = (
     entry: NormalizedEntry | ProcessStartPayload
   ): entry is NormalizedEntry => 'entry_type' in entry;
@@ -492,10 +527,23 @@ function DisplayConversationEntry({ entry, expansionKey }: Props) {
   const isSystem = entryType.type === 'system_message';
   const isError = entryType.type === 'error_message';
   const isToolUse = entryType.type === 'tool_use';
+  const isUserMessage = entryType.type === 'user_message';
+  const isLoading = entryType.type === 'loading';
   const isFileEdit = (a: ActionType): a is FileEditAction =>
     a.action === 'file_edit';
+
+  if (isUserMessage) {
+    return (
+      <UserMessage
+        content={entry.content}
+        executionProcessId={executionProcessId}
+        taskAttempt={taskAttempt}
+      />
+    );
+  }
+
   return (
-    <>
+    <div className="px-4 py-2 text-sm">
       {isSystem || isError ? (
         <CollapsibleEntry
           content={isNormalizedEntry(entry) ? entry.content : ''}
@@ -528,6 +576,8 @@ function DisplayConversationEntry({ entry, expansionKey }: Props) {
           expansionKey={expansionKey}
           entryContent={isNormalizedEntry(entry) ? entry.content : ''}
         />
+      ) : isLoading ? (
+        <LoadingCard />
       ) : (
         <div className={getContentClassName(entryType)}>
           {shouldRenderMarkdown(entryType) ? (
@@ -543,7 +593,7 @@ function DisplayConversationEntry({ entry, expansionKey }: Props) {
           )}
         </div>
       )}
-    </>
+    </div>
   );
 }
 

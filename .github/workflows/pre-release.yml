@@ -115,6 +115,8 @@ jobs:
   build-frontend:
     needs: bump-version
     runs-on: ubuntu-22.04
+    env:
+      VITE_PUBLIC_REACT_VIRTUOSO_LICENSE_KEY: ${{ secrets.PUBLIC_REACT_VIRTUOSO_LICENSE_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:

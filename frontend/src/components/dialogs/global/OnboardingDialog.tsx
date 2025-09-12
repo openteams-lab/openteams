@@ -50,7 +50,6 @@ const OnboardingDialog = NiceModal.create(() => {
   const [customCommand, setCustomCommand] = useState<string>('');
 
   const handleComplete = () => {
-    console.log('DEBUG1');
     modal.resolve({
       profile,
       editor: {

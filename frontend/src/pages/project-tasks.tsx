@@ -102,7 +102,7 @@ export function ProjectTasks() {
     tasksById,
     isLoading,
     error: streamError,
-  } = useProjectTasks(projectId);
+  } = useProjectTasks(projectId || '');
 
   // Sync selectedTask with URL params and live task updates
   useEffect(() => {

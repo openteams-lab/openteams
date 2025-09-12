@@ -1,6 +1,7 @@
 use axum::{
     BoxError, Extension, Router,
     extract::{Path, Query, State},
+    http::StatusCode,
     middleware::from_fn_with_state,
     response::{
         Json as ResponseJson, Sse,
@@ -10,7 +11,7 @@ use axum::{
 };
 use db::models::execution_process::ExecutionProcess;
 use deployment::Deployment;
-use futures_util::TryStreamExt;
+use futures_util::{Stream, TryStreamExt};
 use serde::Deserialize;
 use services::services::container::ContainerService;
 use utils::response::ApiResponse;
@@ -83,6 +84,19 @@ pub async fn stop_execution_process(
     Ok(ResponseJson(ApiResponse::success(())))
 }
 
+pub async fn stream_execution_processes(
+    State(deployment): State<DeploymentImpl>,
+    Query(query): Query<ExecutionProcessQuery>,
+) -> Result<Sse<impl Stream<Item = Result<Event, BoxError>>>, StatusCode> {
+    let stream = deployment
+        .events()
+        .stream_execution_processes_for_attempt(query.task_attempt_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Sse::new(stream.map_err(|e| -> BoxError { e.into() })).keep_alive(KeepAlive::default()))
+}
+
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     let task_attempt_id_router = Router::new()
         .route("/", get(get_execution_process_by_id))
@@ -96,6 +110,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
 
     let task_attempts_router = Router::new()
         .route("/", get(get_execution_processes))
+        .route("/stream", get(stream_execution_processes))
         .nest("/{id}", task_attempt_id_router);
 
     Router::new().nest("/execution-processes", task_attempts_router)

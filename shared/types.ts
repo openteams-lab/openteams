@@ -256,7 +256,7 @@ export type EventPatch = { op: string, path: string, value: EventPatchInner, };
 
 export type EventPatchInner = { db_op: string, record: RecordTypes, };
 
-export type RecordTypes = { "type": "TASK", "data": Task } | { "type": "TASK_ATTEMPT", "data": TaskAttempt } | { "type": "EXECUTION_PROCESS", "data": ExecutionProcess } | { "type": "FOLLOW_UP_DRAFT", "data": FollowUpDraft } | { "type": "DELETED_TASK", "data": { rowid: bigint, project_id: string | null, task_id: string | null, } } | { "type": "DELETED_TASK_ATTEMPT", "data": { rowid: bigint, task_id: string | null, } } | { "type": "DELETED_EXECUTION_PROCESS", "data": { rowid: bigint, task_attempt_id: string | null, } } | { "type": "DELETED_FOLLOW_UP_DRAFT", "data": { rowid: bigint, task_attempt_id: string | null, } };
+export type RecordTypes = { "type": "TASK", "data": Task } | { "type": "TASK_ATTEMPT", "data": TaskAttempt } | { "type": "EXECUTION_PROCESS", "data": ExecutionProcess } | { "type": "FOLLOW_UP_DRAFT", "data": FollowUpDraft } | { "type": "DELETED_TASK", "data": { rowid: bigint, project_id: string | null, task_id: string | null, } } | { "type": "DELETED_TASK_ATTEMPT", "data": { rowid: bigint, task_id: string | null, } } | { "type": "DELETED_EXECUTION_PROCESS", "data": { rowid: bigint, task_attempt_id: string | null, process_id: string | null, } } | { "type": "DELETED_FOLLOW_UP_DRAFT", "data": { rowid: bigint, task_attempt_id: string | null, } };
 
 export type FollowUpDraft = { id: string, task_attempt_id: string, prompt: string, queued: boolean, sending: boolean, variant: string | null, image_ids: Array<string> | null, created_at: string, updated_at: string, version: bigint, };
 
@@ -268,7 +268,7 @@ export type NormalizedConversation = { entries: Array<NormalizedEntry>, session_
 
 export type NormalizedEntry = { timestamp: string | null, entry_type: NormalizedEntryType, content: string, };
 
-export type NormalizedEntryType = { "type": "user_message" } | { "type": "assistant_message" } | { "type": "tool_use", tool_name: string, action_type: ActionType, } | { "type": "system_message" } | { "type": "error_message" } | { "type": "thinking" };
+export type NormalizedEntryType = { "type": "user_message" } | { "type": "assistant_message" } | { "type": "tool_use", tool_name: string, action_type: ActionType, } | { "type": "system_message" } | { "type": "error_message" } | { "type": "thinking" } | { "type": "loading" };
 
 export type FileChange = { "action": "write", content: string, } | { "action": "delete" } | { "action": "rename", new_path: string, } | { "action": "edit", 
 /**

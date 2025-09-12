@@ -20,7 +20,7 @@ type Props = {
 };
 
 export const renderJson = (v: JsonValue) => (
-  <pre>{JSON.stringify(v, null, 2)}</pre>
+  <pre className="whitespace-pre-wrap">{JSON.stringify(v, null, 2)}</pre>
 );
 
 export default function ToolDetails({
