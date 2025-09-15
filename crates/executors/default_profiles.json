@@ -46,6 +46,19 @@
           "model_reasoning_effort": "high",
           "model": "gpt-5-codex"
         }
+      },
+      "GPT_5": {
+        "CODEX": {
+          "sandbox": "auto",
+          "model": "gpt-5"
+        }
+      },
+      "GPT_5_HIGH": {
+        "CODEX": {
+          "sandbox": "auto",
+          "model_reasoning_effort": "high",
+          "model": "gpt-5"
+        }
       }
     },
     "OPENCODE": {
