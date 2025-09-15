@@ -887,7 +887,11 @@ export function TaskFollowUpSection({
                     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                       e.preventDefault();
                       if (canSendFollowUp && !isSendingFollowUp) {
-                        onSendFollowUp();
+                        if (isAttemptRunning) {
+                          onQueue(); // Use queue when something is running
+                        } else {
+                          onSendFollowUp(); // Direct send when nothing is running
+                        }
                       }
                     } else if (e.key === 'Escape') {
                       // Clear input and auto-cancel queue
@@ -1101,7 +1105,6 @@ export function TaskFollowUpSection({
                         !canSendFollowUp ||
                         isDraftLocked ||
                         !isDraftReady ||
-                        !followUpMessage.trim() ||
                         isSendingFollowUp
                       }
                       size="sm"
@@ -1242,7 +1245,6 @@ export function TaskFollowUpSection({
                           ? isUnqueuing
                           : !canSendFollowUp ||
                             !isDraftReady ||
-                            !followUpMessage.trim() ||
                             isQueuing ||
                             isUnqueuing ||
                             isDraftSending
