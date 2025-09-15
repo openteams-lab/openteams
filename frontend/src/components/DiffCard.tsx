@@ -1,10 +1,11 @@
 import { Diff } from 'shared/types';
 import { DiffModeEnum, DiffView, SplitSide } from '@git-diff-view/react';
-import { generateDiffFile } from '@git-diff-view/file';
+import { generateDiffFile, type DiffFile } from '@git-diff-view/file';
 import { useMemo } from 'react';
 import { useUserSystem } from '@/components/config-provider';
 import { getHighLightLanguageFromPath } from '@/utils/extToLanguage';
 import { getActualTheme } from '@/utils/theme';
+import { stripLineEnding } from '@/utils/string';
 import { Button } from '@/components/ui/button';
 import {
   ChevronRight,
@@ -43,6 +44,25 @@ function labelAndIcon(diff: Diff) {
   if (c === 'permissionChange')
     return { label: 'Permission Changed', Icon: Key };
   return { label: undefined as string | undefined, Icon: PencilLine };
+}
+
+function readPlainLine(
+  diffFile: DiffFile | null,
+  lineNumber: number,
+  side: SplitSide
+) {
+  if (!diffFile) return undefined;
+  try {
+    const rawLine =
+      side === SplitSide.old
+        ? diffFile.getOldPlainLine(lineNumber)
+        : diffFile.getNewPlainLine(lineNumber);
+    if (rawLine?.value === undefined) return undefined;
+    return stripLineEnding(rawLine.value);
+  } catch (error) {
+    console.error('Failed to read line content for review comment', error);
+    return undefined;
+  }
 }
 
 export default function DiffCard({
@@ -131,11 +151,13 @@ export default function DiffCard({
 
   const handleAddWidgetClick = (lineNumber: number, side: SplitSide) => {
     const widgetKey = `${filePath}-${side}-${lineNumber}`;
+    const codeLine = readPlainLine(diffFile, lineNumber, side);
     const draft: ReviewDraft = {
       filePath,
       side,
       lineNumber,
       text: '',
+      ...(codeLine !== undefined ? { codeLine } : {}),
     };
     setDraft(widgetKey, draft);
   };
