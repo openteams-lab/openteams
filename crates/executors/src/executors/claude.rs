@@ -615,6 +615,24 @@ impl ClaudeLogProcessor {
         }
     }
 
+    /// Generate warning entry if API key source is ANTHROPIC_API_KEY
+    fn warn_if_unmanaged_key(src: &Option<String>) -> Option<NormalizedEntry> {
+        match src.as_deref() {
+            Some("ANTHROPIC_API_KEY") => {
+                tracing::warn!(
+                    "ANTHROPIC_API_KEY env variable detected, your Anthropic subscription is not being used"
+                );
+                Some(NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::SystemMessage,
+                    content: "⚠️ ANTHROPIC_API_KEY env variable detected, your Anthropic subscription is not being used".to_string(),
+                    metadata: None,
+                })
+            }
+            _ => None,
+        }
+    }
+
     /// Convert Claude JSON to normalized entries
     fn normalize_entries(
         &mut self,
@@ -622,25 +640,52 @@ impl ClaudeLogProcessor {
         worktree_path: &str,
     ) -> Vec<NormalizedEntry> {
         match claude_json {
-            ClaudeJson::System { subtype, .. } => {
-                let content = match subtype.as_deref() {
+            ClaudeJson::System {
+                subtype,
+                api_key_source,
+                ..
+            } => {
+                let mut entries = Vec::new();
+
+                // 1) emit billing warning if required
+                if let Some(warning) = Self::warn_if_unmanaged_key(api_key_source) {
+                    entries.push(warning);
+                }
+
+                // 2) keep the existing behaviour for the normal system message
+                match subtype.as_deref() {
                     Some("init") => {
                         // Skip system init messages because it doesn't contain the actual model that will be used in assistant messages in case of claude-code-router.
                         // We'll send system initialized message with first assistant message that has a model field.
-                        return vec![];
+                        return entries; // only the warning (if any)
                     }
-                    Some(subtype) => format!("System: {subtype}"),
-                    None => "System message".to_string(),
-                };
+                    Some(subtype) => {
+                        let content = format!("System: {subtype}");
+                        entries.push(NormalizedEntry {
+                            timestamp: None,
+                            entry_type: NormalizedEntryType::SystemMessage,
+                            content,
+                            metadata: Some(
+                                serde_json::to_value(claude_json)
+                                    .unwrap_or(serde_json::Value::Null),
+                            ),
+                        });
+                    }
+                    None => {
+                        let content = "System message".to_string();
+                        entries.push(NormalizedEntry {
+                            timestamp: None,
+                            entry_type: NormalizedEntryType::SystemMessage,
+                            content,
+                            metadata: Some(
+                                serde_json::to_value(claude_json)
+                                    .unwrap_or(serde_json::Value::Null),
+                            ),
+                        });
+                    }
+                }
 
-                vec![NormalizedEntry {
-                    timestamp: None,
-                    entry_type: NormalizedEntryType::SystemMessage,
-                    content,
-                    metadata: Some(
-                        serde_json::to_value(claude_json).unwrap_or(serde_json::Value::Null),
-                    ),
-                }]
+                entries
             }
             ClaudeJson::Assistant { message, .. } => {
                 let mut entries = Vec::new();
@@ -1061,6 +1106,8 @@ pub enum ClaudeJson {
         cwd: Option<String>,
         tools: Option<Vec<serde_json::Value>>,
         model: Option<String>,
+        #[serde(default, rename = "apiKeySource")]
+        api_key_source: Option<String>,
     },
     #[serde(rename = "assistant")]
     Assistant {
@@ -1769,6 +1816,45 @@ mod tests {
         // ToolResult content items should be ignored (produce no entries) until proper support is added
         let entries = ClaudeLogProcessor::new().normalize_entries(&parsed, "");
         assert_eq!(entries.len(), 0);
+    }
+
+    #[test]
+    fn test_api_key_source_warning() {
+        // Test with ANTHROPIC_API_KEY - should generate warning
+        let system_with_env_key = r#"{"type":"system","subtype":"init","apiKeySource":"ANTHROPIC_API_KEY","session_id":"test123"}"#;
+        let parsed: ClaudeJson = serde_json::from_str(system_with_env_key).unwrap();
+        let entries = ClaudeLogProcessor::new().normalize_entries(&parsed, "");
+
+        assert_eq!(entries.len(), 1);
+        assert!(matches!(
+            entries[0].entry_type,
+            NormalizedEntryType::SystemMessage
+        ));
+        assert_eq!(
+            entries[0].content,
+            "⚠️ ANTHROPIC_API_KEY env variable detected, your Anthropic subscription is not being used"
+        );
+
+        // Test with managed API key source - should not generate warning
+        let system_with_managed_key = r#"{"type":"system","subtype":"init","apiKeySource":"/login managed key","session_id":"test123"}"#;
+        let parsed_managed: ClaudeJson = serde_json::from_str(system_with_managed_key).unwrap();
+        let entries_managed = ClaudeLogProcessor::new().normalize_entries(&parsed_managed, "");
+
+        assert_eq!(entries_managed.len(), 0); // No warning for managed key
+
+        // Test with other apiKeySource values - should not generate warning
+        let system_other_key = r#"{"type":"system","subtype":"init","apiKeySource":"OTHER_KEY","session_id":"test123"}"#;
+        let parsed_other: ClaudeJson = serde_json::from_str(system_other_key).unwrap();
+        let entries_other = ClaudeLogProcessor::new().normalize_entries(&parsed_other, "");
+
+        assert_eq!(entries_other.len(), 0); // No warning for other keys
+
+        // Test with missing apiKeySource - should not generate warning
+        let system_no_key = r#"{"type":"system","subtype":"init","session_id":"test123"}"#;
+        let parsed_no_key: ClaudeJson = serde_json::from_str(system_no_key).unwrap();
+        let entries_no_key = ClaudeLogProcessor::new().normalize_entries(&parsed_no_key, "");
+
+        assert_eq!(entries_no_key.len(), 0); // No warning when field is missing
     }
 
     #[test]
