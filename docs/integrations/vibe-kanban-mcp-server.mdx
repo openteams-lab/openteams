@@ -1,0 +1,115 @@
+---
+title: "Vibe Kanban MCP Server"
+description: "Configure the Vibe Kanban MCP server"
+---
+
+Vibe Kanban exposes a local MCP (Model Context Protocol) server, allowing you to manage projects and tasks from external MCP clients like Claude Desktop, Raycast, or even coding agents running within Vibe Kanban itself.
+
+<Note>
+This page covers connecting **external MCP clients** to Vibe Kanban's MCP server. For configuring MCP servers **within** Vibe Kanban for your coding agents, see the [MCP Server Configuration](/integrations/mcp-server-configuration) guide.
+</Note>
+
+<Info>
+Vibe Kanban's MCP server is **local-only** - it runs on your computer and can only be accessed by applications installed locally. It cannot be accessed via publicly accessible URLs.
+</Info>
+
+<video
+  controls
+  className="w-full aspect-video rounded-xl"
+  src="https://vkcdn.britannio.dev/vk-mcp-server.mp4"
+></video>
+
+## Setting Up MCP Integration
+
+### Option 1: Using the Web Interface
+
+This works if you're adding the Vibe Kanban MCP server to any [supported coding agent](/supported-coding-agents) **within** Vibe Kanban.
+
+1. In Vibe Kanban Settings, navigate to the "MCP Servers" page
+2. In the "Popular servers" section, click on the Vibe Kanban card
+3. Click the `Save Settings` button
+
+<Frame>
+<img src="/images/vk-mcp-server-config.jpeg" alt="MCP Servers configuration page showing how to add Vibe Kanban MCP server" />
+</Frame>
+
+### Option 2: Manual Configuration
+
+You can manually add the MCP server to your coding agent's configuration. Add the following configuration to your agent's MCP servers configuration:
+
+```json
+{
+  "mcpServers": {
+    "vibe_kanban": {
+      "command": "npx",
+      "args": ["-y", "vibe-kanban", "--mcp"]
+    }
+  }
+}
+```
+
+## Using MCP with Coding Agents
+
+Once you have the MCP server configured, you can leverage it to streamline your project planning workflow:
+
+1. **Plan Your Work**: Describe a large feature or project to your coding agent
+2. **Request Task Creation**: At the end of your task description, simply add "then turn this plan into tasks"
+3. **Automatic Task Generation**: Your coding agent will use the Vibe Kanban MCP server to automatically create structured tasks in your project
+
+## Example Usage
+
+### External Coding Agents
+
+```
+I need to build a user authentication system with the following features:
+- User registration with email validation
+- Login/logout functionality
+- Password reset capability
+- Session management
+- Protected routes
+
+Then turn this plan into tasks.
+```
+
+The coding agent will break this down into individual tasks and add them to your Vibe Kanban project automatically.
+
+### Internal Coding Agents (Within Vibe Kanban)
+
+A powerful workflow involves using coding agents within Vibe Kanban that are also connected to the Vibe Kanban MCP server:
+
+1. **Create a Planning Task**: Create a task in "plan mode" within Vibe Kanban
+2. **Explore and Plan**: The coding agent explores the codebase and develops a comprehensive plan
+3. **Generate Sub-Tasks**: Ask the coding agent to "create a series of individual tasks for this plan"
+4. **Automatic Population**: The agent uses the MCP server to populate individual tasks directly in the Vibe Kanban interface
+
+This creates a seamless workflow where high-level planning automatically generates actionable tasks in your project board.
+
+## Installation Instructions for MCP Clients
+
+### Raycast Example
+
+Raycast is a popular MCP client that can connect to Vibe Kanban's MCP server. Here's how to configure it:
+
+For complete Raycast MCP configuration details, see the [official Raycast MCP documentation](https://manual.raycast.com/model-context-protocol).
+
+<Tabs>
+<Tab title="Step 1: Open MCP Server Installer">
+<Frame>
+<img src="/images/vk-raycast-mcp-part-1.png" alt="Raycast MCP configuration - adding Vibe Kanban server" />
+</Frame>
+
+Configure the Vibe Kanban MCP server in Raycast by adding the server details.
+</Tab>
+
+<Tab title="Step 2: Supply Command">
+<Frame>
+<img src="/images/vk-raycast-mcp-part-2.png" alt="Raycast MCP configuration - server successfully added" />
+</Frame>
+
+Once configured, you'll see the Vibe Kanban MCP server listed and ready to use in Raycast.
+</Tab>
+</Tabs>
+
+<Note>
+Similar configuration steps apply to other MCP clients like Claude Desktop, VS Code with MCP extensions, or any custom MCP client implementations.
+</Note>

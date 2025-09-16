@@ -1,4 +1,8 @@
-# Install & Run Vibe Kanban
+---
+title: "Install & Run Vibe Kanban"
+description: "Complete installation guide for Vibe Kanban on macOS, Linux, and Windows"
+sidebarTitle: "Installation"
+---
 
 ## Supported Systems
 
@@ -8,30 +12,53 @@ We build and test Vibe Kanban on the following systems:
 - Linux
 - Windows
 
-## Pre-requisites
+## Prerequisites
 
-- Node.js
-- Coding agent authenticated
-  - All supported coding agents can now be used via npx (no separate installation required)
-  - You still need to authenticate with each coding agent outside of Vibe Kanban
-  - You can find authentication instructions for each coding agent on their respective [websites](./supported-coding-agents).
+Before installing Vibe Kanban, ensure you have:
 
-## Running Vibe Kanban
+- **Node.js**: Latest LTS version recommended
+- **Coding agent authentication**: Authenticate with your preferred coding agents outside of Vibe Kanban
 
-1. Open a terminal and run:
+<Info>
+All supported coding agents can be used via npx without separate installation. You can find authentication instructions for each coding agent on their respective [websites](./supported-coding-agents).
+</Info>
 
-```
-npx vibe-kanban
-```
+## Installation & Setup
 
-2. [Complete the onboarding steps](/docs/getting-started/onboarding) in the application
+<Steps>
+<Step title="Install and launch Vibe Kanban">
+  Open a terminal and run:
 
-3. [Configure Global Settings](/docs/getting-started/global-settings) to personalize your experience
+  ```bash
+  npx vibe-kanban
+  ```
 
-4. [Create a project](/docs/user-guide/creating-projects)
+  <Check>
+  The application will bind to a random free port, print the URL in the terminal, and automatically open in your default browser.
+  </Check>
+</Step>
 
-5. [Create tasks](/docs/user-guide/creating-tasks)
+<Step title="Complete initial setup">
+  Complete the setup dialogs to configure your coding agent and editor preferences. GitHub authentication is optional and can be configured later.
+</Step>
 
-6. Optional: [Set up MCP integration](/docs/user-guide/vibe-kanban-mcp-server) to streamline task creation with coding agents
+<Step title="Create your first project">
+  You'll land on an empty Projects page. Click "Create your first project" to set up your initial project.
+</Step>
 
-A note on ports: By default the application will bind to a random free port, print the URL in the terminal and attempt to open the link in the default browser. If you would like to use a fixed port you can optionally specify the `PORT` environment variable, so to force Vibe Kanban to start on port 8080 you would run `PORT=8080 npx vibe-kanban`.
+<Step title="Add tasks">
+  Start tracking your work by [creating tasks](/core-features/creating-tasks) within your project.
+</Step>
+
+<Step title="Optional: Configure GitHub integration">
+  Connect to GitHub in [Settings](/configuration-customisation/global-settings) to enable branch management and pull request creation.
+</Step>
+
+<Step title="Optional: Set up MCP integration">
+  Streamline task creation with coding agents by [setting up MCP integration](/integrations/vibe-kanban-mcp-server).
+</Step>
+</Steps>
+
+<Tip>
+To use a fixed port, specify the `PORT` environment variable: `PORT=8080 npx vibe-kanban`
+</Tip>

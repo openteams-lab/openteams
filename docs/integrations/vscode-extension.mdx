@@ -1,0 +1,163 @@
+---
+title: "VSCode Extension Integration"
+description: "Complete guide to using the Vibe Kanban extension with VSCode, Cursor, and Windsurf"
+---
+
+The Vibe Kanban VSCode extension brings task management directly into your IDE, providing seamless integration with logs, diffs, and process monitoring. This extension works with VSCode and popular forks including Cursor and Windsurf.
+
+<video
+  controls
+  className="w-full aspect-video rounded-xl"
+  src="https://vkcdn.britannio.dev/vk-ide-extension-light.mp4"
+></video>
+
+## Installation
+
+<Tabs>
+<Tab title="VSCode">
+Install directly from the Visual Studio Code Marketplace:
+
+<Card title="VSCode Marketplace" icon="download" href="https://marketplace.visualstudio.com/items?itemName=bloop.vibe-kanban">
+  Install the official Vibe Kanban extension for VSCode
+</Card>
+
+Alternatively, search for the extension ID in VSCode:
+1. Open VSCode
+2. Press `Ctrl+Shift+X` (Windows/Linux) or `Cmd+Shift+X` (macOS) to open Extensions
+3. Search for `@id:bloop.vibe-kanban`
+4. Click **Install**
+</Tab>
+
+<Tab title="Cursor">
+For Cursor, use the Open VSX Registry:
+
+<Card title="Open VSX Registry" icon="download" href="https://open-vsx.org/extension/bloop/vibe-kanban">
+  Install from Open VSX for Cursor compatibility
+</Card>
+
+<Tip>
+Since deeplinking from Open VSX doesn't work reliably in Cursor, the easiest installation method is searching by extension ID within the IDE.
+</Tip>
+
+**Installation Steps**:
+1. Open Cursor
+2. Open the Extensions panel
+3. Search for `@id:bloop.vibe-kanban`
+4. Install the extension
+</Tab>
+
+<Tab title="Windsurf">
+For Windsurf, use the Open VSX Registry:
+
+<Card title="Open VSX Registry" icon="download" href="https://open-vsx.org/extension/bloop/vibe-kanban">
+  Install from Open VSX for Windsurf compatibility
+</Card>
+
+<Tip>
+Since deeplinking from Open VSX doesn't work reliably in Windsurf, the easiest installation method is searching by extension ID within the IDE.
+</Tip>
+
+**Installation Steps**:
+1. Open Windsurf
+2. Open the Extensions panel
+3. Search for `@id:bloop.vibe-kanban`
+4. Install the extension
+</Tab>
+</Tabs>
+
+## Features
+
+The extension provides an integrated workspace view with three main components:
+
+### Logs View
+- List of task attempts for the current task
+- Agent steps performed in each task attempt
+
+### Diffs View  
+- Side-by-side comparison of code changes
+- Inline commenting and review capabilities
+
+### Processes View
+- Monitor running task processes
+- Process status indicators (running, completed, failed)
+
+### Task Management
+- **Task Iteration**: Continue iterating on the current ongoing task
+- **Status Updates**: Real-time task status synchronization
+
+## Usage Workflow
+
+<Steps>
+<Step title="Start a task in Vibe Kanban">
+  Navigate to your project's kanban board and create or select an existing task.
+</Step>
+
+<Step title="Open task in full screen">
+  Click on the task to open its detailed view, then switch to full screen mode for better visibility.
+</Step>
+
+<Step title="Launch IDE integration">
+  Click the **"Open in VSCode"**, **"Open in Cursor"**, or **"Open in Windsurf"** button depending on your preferred IDE.
+  
+  <Note>
+  The button text will reflect your editor choice configured in Vibe Kanban settings.
+  </Note>
+</Step>
+
+<Step title="Work in your IDE">
+  Your IDE will open in the task's dedicated worktree with the extension UI populated with:
+  - Current task context
+  - Real-time logs
+  - Code diffs
+  - Process monitoring
+</Step>
+</Steps>
+
+## Troubleshooting
+
+### Empty Extension UI
+
+**Problem**: The extension UI appears empty or shows no task information.
+
+**Solution**: Ensure you're working within a worktree created by a Vibe Kanban task.
+
+<Warning>
+The extension can only display task information when VSCode is opened in a directory that corresponds to an active Vibe Kanban task worktree.
+</Warning>
+
+**Steps to resolve**:
+1. Verify you opened VSCode through the "Open in [IDE]" button from a Vibe Kanban task
+2. Check that you're in the correct directory/worktree
+3. If the issue persists, restart your IDE and try the workflow again
+
+### Extension Not Loading
+
+**Problem**: The Vibe Kanban extension doesn't appear in your IDE.
+
+**Solutions**:
+- Verify the extension is installed by searching `@id:bloop.vibe-kanban` in Extensions
+- Restart your IDE after installation
+- Check that you're using a compatible IDE version
+- For Cursor/Windsurf users, ensure you installed from Open VSX Registry
+
+## Best Practices
+
+<Tip>
+**Workflow Optimization**: Always start tasks from the Vibe Kanban web interface before opening in your IDE to ensure proper context and worktree setup.
+</Tip>
+
+<Tip>
+**Performance**: Close unused IDE windows to reduce resource usage.
+</Tip>
+
+## Supported IDEs
+
+| IDE | Status | Installation Method |
+|-----|--------|-------------------|
+| **VSCode** | ✅ Fully Supported | VSCode Marketplace |
+| **Cursor** | ✅ Fully Supported | Open VSX Registry |  
+| **Windsurf** | ✅ Fully Supported | Open VSX Registry |
+
+<Info>
+The extension is designed to work with any VSCode-compatible editor. If you're using a different VSCode fork, try installing from Open VSX Registry using the extension ID `bloop.vibe-kanban`.
+</Info>

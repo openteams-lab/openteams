@@ -1,0 +1,114 @@
+---
+title: "Creating Tasks"
+description: "Learn how to create and manage tasks on your kanban board, including using templates, starting coding agents, and understanding task states"
+---
+
+<Frame>
+<img src="/images/screenshot-create-task.png" alt="Task creation interface showing Add Task button and form fields" />
+</Frame>
+
+After creating a project, add tasks by clicking the **plus (+) icon** in the top right of your project kanban page, or by using the keyboard shortcut **`c`**. Creating a task adds it to your kanban board without automatically starting a coding agent.
+
+## Using Templates
+
+<Frame>
+<img src="/images/screenshot-create-task-template-dropdown.png" alt="Template dropdown menu showing available global and project-specific templates" />
+</Frame>
+
+When adding a task, you can select from your saved templates:
+
+1. Click the **Use a template** dropdown
+2. Choose from available global or project templates
+3. The template automatically populates the task title and description
+
+<Note>
+Templates save time by reusing common task structures. Learn more about creating templates in the [Task Templates](/configuration-customisation/creating-task-templates) guide.
+</Note>
+
+## Starting Your First Task Attempt
+
+<Frame>
+<img src="/images/screenshot-create-task-attempt.png" alt="Task attempt creation dialog showing agent profile and variant selection options" />
+</Frame>
+
+To activate a coding agent on your task, create a task attempt:
+
+<Steps>
+<Step title="Select your agent profile">
+  Choose from available agents (e.g., CLAUDE_CODE, GEMINI, CODEX). Your default configuration from Settings is pre-selected.
+</Step>
+
+<Step title="Choose a variant">
+  If your selected agent has variants, pick the appropriate one (e.g., DEFAULT, PLAN).
+</Step>
+
+<Step title="Set the base branch">
+  Specify which branch the agent should work from. Your current branch is selected by default.
+</Step>
+</Steps>
+
+<Tip>
+Use **Create & Start** to add the task and immediately create a task attempt with your default settings in one action.
+</Tip>
+
+### What Happens During Execution
+
+1. **Setup Scripts Run**: Any setup script defined in your project settings runs automatically
+2. **Agent Execution**: The coding agent processes your task using the title and description  
+3. **Real-time Monitoring**: Watch progress through streaming logs in the task interface
+4. **Follow-up Questions**: Continue the conversation after execution to refine results
+
+Most tasks only need a single attempt. You'll only need additional attempts if you want to restart from scratch with different settings.
+
+<Note>
+For detailed task management after execution, see [Task Details Full Screen Mode](/core-features/task-details-full-screen). To understand when you might need multiple attempts, see [Creating Task Attempts](/core-features/creating-task-attempts).
+</Note>
+
+## Creating Tasks via MCP Clients
+
+<Warning>
+This is not the typical method for creating tasks but can be valuable for bulk task creation or migrating from other systems.
+</Warning>
+
+Tasks can also be created programmatically using coding agents or MCP (Model Context Protocol) clients such as Claude Desktop or Raycast. This approach is particularly useful for:
+
+- **Bulk task creation** based on existing data or project specifications
+- **Migration from other systems** like Linear, GitHub Issues, or Jira
+- **Automated task generation** from project plans or requirements documents
+
+<Tip>
+For detailed setup instructions and examples, see the [Vibe Kanban MCP Server](/integrations/vibe-kanban-mcp-server) documentation.
+</Tip>
+
+### Example MCP Task Creation
+
+Once configured with an MCP client, you can create multiple tasks from a project description:
+
+```
+I need to implement user authentication with:
+- Email/password registration
+- Login with session management  
+- Password reset functionality
+- Email verification
+- Protected route middleware
+
+Please create individual tasks for each component.
+```
+
+The MCP client will automatically generate structured tasks in your Vibe Kanban project based on this description.
+
+## Understanding Task Columns
+
+Tasks begin in the "To do" column and move automatically based on their progress:
+
+| Action | Column |
+|--------|---------|
+| Task created | To do |
+| Task attempt started | In Progress |
+| Task attempt completed (success or failure) | In Review |
+| Task attempt merged | Done |
+| PR merged on GitHub | Done |
+
+<Info>
+You can manually drag tasks between columns, but this won't trigger any functionality. Task movement is primarily driven by coding agent actions and GitHub integration (which polls every 60 seconds).
+</Info>
