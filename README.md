@@ -30,7 +30,7 @@ You can watch a video overview [here](https://youtu.be/TFT3KnZOOAk).
 
 ## Installation
 
-Make sure you have authenticated with your favourite coding agent. A full list of supported coding agents can be found in the [docs](https://vibekanban.com/). Then in your terminal run:
+Make sure you have authenticated with your favourite coding agent. A full list of supported coding agents can be found in the [docs](https://vibekanban.com/docs). Then in your terminal run:
 
 ```bash
 npx vibe-kanban
@@ -38,7 +38,7 @@ npx vibe-kanban
 
 ## Documentation
 
-Please head to the [website](https://vibekanban.com) for the latest documentation and user guides.
+Please head to the [website](https://vibekanban.com/docs) for the latest documentation and user guides.
 
 ## Support
 
