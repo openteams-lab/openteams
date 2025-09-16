@@ -32,7 +32,7 @@ const EXTERNAL_LINKS = [
   {
     label: 'Docs',
     icon: BookOpen,
-    href: 'https://vibekanban.com/',
+    href: 'https://vibekanban.com/docs',
   },
   {
     label: 'Support',
