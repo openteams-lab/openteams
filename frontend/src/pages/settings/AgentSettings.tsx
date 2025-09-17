@@ -41,6 +41,7 @@ export function AgentSettings() {
   // Local editor state (draft that may differ from server)
   const [localProfilesContent, setLocalProfilesContent] = useState('');
   const [profilesSuccess, setProfilesSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Form-based editor state
   const [useFormEditor, setUseFormEditor] = useState(true);
@@ -50,9 +51,6 @@ export function AgentSettings() {
     useState<string>('DEFAULT');
   const [localParsedProfiles, setLocalParsedProfiles] = useState<any>(null);
   const [isDirty, setIsDirty] = useState(false);
-
-  // After successful saves, we refresh the global system state
-  // so other parts of the app see new/updated profiles immediately.
 
   // Sync server state to local state when not dirty
   useEffect(() => {
@@ -163,6 +161,9 @@ export function AgentSettings() {
       return;
     }
 
+    // Clear any previous errors
+    setSaveError(null);
+
     try {
       // Validate that the configuration exists
       if (
@@ -220,10 +221,11 @@ export function AgentSettings() {
         setProfilesSuccess(true);
         setTimeout(() => setProfilesSuccess(false), 3000);
 
-        // Refresh global system so new profiles are available elsewhere
+        // Refresh global system so deleted configs are removed elsewhere
         reloadSystem();
       } catch (saveError: unknown) {
         console.error('Failed to save deletion to backend:', saveError);
+        setSaveError('Failed to delete configuration. Please try again.');
       }
     } catch (error) {
       console.error('Error deleting configuration:', error);
@@ -247,6 +249,9 @@ export function AgentSettings() {
   };
 
   const handleSaveProfiles = async () => {
+    // Clear any previous errors
+    setSaveError(null);
+
     try {
       const contentToSave =
         useFormEditor && localParsedProfiles
@@ -263,10 +268,11 @@ export function AgentSettings() {
         setLocalProfilesContent(contentToSave);
       }
 
-      // Ensure other parts of the app get the new profiles
+      // Refresh global system so new profiles are available elsewhere
       reloadSystem();
     } catch (err: unknown) {
       console.error('Failed to save profiles:', err);
+      setSaveError('Failed to save agent configurations. Please try again.');
     }
   };
 
@@ -292,6 +298,49 @@ export function AgentSettings() {
     };
 
     markDirty(updatedProfiles);
+  };
+
+  const handleExecutorConfigSave = async (formData: unknown) => {
+    if (!localParsedProfiles || !localParsedProfiles.executors) return;
+
+    // Clear any previous errors
+    setSaveError(null);
+
+    // Update the parsed profiles with the saved config
+    const updatedProfiles = {
+      ...localParsedProfiles,
+      executors: {
+        ...localParsedProfiles.executors,
+        [selectedExecutorType]: {
+          ...localParsedProfiles.executors[selectedExecutorType],
+          [selectedConfiguration]: {
+            [selectedExecutorType]: formData,
+          },
+        },
+      },
+    };
+
+    // Update state
+    setLocalParsedProfiles(updatedProfiles);
+
+    // Save the updated profiles directly
+    try {
+      const contentToSave = JSON.stringify(updatedProfiles, null, 2);
+
+      await saveProfiles(contentToSave);
+      setProfilesSuccess(true);
+      setIsDirty(false);
+      setTimeout(() => setProfilesSuccess(false), 3000);
+
+      // Update the local content as well
+      setLocalProfilesContent(contentToSave);
+
+      // Refresh global system so new profiles are available elsewhere
+      reloadSystem();
+    } catch (err: unknown) {
+      console.error('Failed to save profiles:', err);
+      setSaveError('Failed to save configuration. Please try again.');
+    }
   };
 
   if (profilesLoading) {
@@ -320,6 +369,12 @@ export function AgentSettings() {
           <AlertDescription className="font-medium">
             ✓ Executor configurations saved successfully!
           </AlertDescription>
+        </Alert>
+      )}
+
+      {saveError && (
+        <Alert variant="destructive">
+          <AlertDescription>{saveError}</AlertDescription>
         </Alert>
       )}
 
@@ -363,13 +418,13 @@ export function AgentSettings() {
                       <SelectValue placeholder="Select executor type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.keys(localParsedProfiles.executors)
-                        .sort((a, b) => a.localeCompare(b))
-                        .map((type) => (
+                      {Object.keys(localParsedProfiles.executors).map(
+                        (type) => (
                           <SelectItem key={type} value={type}>
                             {type}
                           </SelectItem>
-                        ))}
+                        )
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -397,16 +452,11 @@ export function AgentSettings() {
                         {Object.keys(
                           localParsedProfiles.executors[selectedExecutorType] ||
                             {}
-                        )
-                          .sort((a, b) => a.localeCompare(b))
-                          .map((configuration) => (
-                            <SelectItem
-                              key={configuration}
-                              value={configuration}
-                            >
-                              {configuration}
-                            </SelectItem>
-                          ))}
+                        ).map((configuration) => (
+                          <SelectItem key={configuration} value={configuration}>
+                            {configuration}
+                          </SelectItem>
+                        ))}
                         <SelectItem value="__create__">
                           Create new...
                         </SelectItem>
@@ -457,10 +507,10 @@ export function AgentSettings() {
                       formData
                     )
                   }
+                  onSave={handleExecutorConfigSave}
                   disabled={profilesSaving}
                   isSaving={profilesSaving}
                   isDirty={isDirty}
-                  hideSaveButton
                 />
               )}
             </div>
@@ -496,20 +546,22 @@ export function AgentSettings() {
         </CardContent>
       </Card>
 
-      {/* Sticky Save bar (used for both editors) */}
-      <div className="sticky bottom-0 z-10 bg-background/80 backdrop-blur-sm border-t py-4">
-        <div className="flex justify-end">
-          <Button
-            onClick={handleSaveProfiles}
-            disabled={!isDirty || profilesSaving || !!profilesError}
-          >
-            {profilesSaving && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Save Agent Configurations
-          </Button>
+      {/* Save button for JSON editor mode only */}
+      {!useFormEditor && (
+        <div className="sticky bottom-0 z-10 bg-background/80 backdrop-blur-sm border-t py-4">
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSaveProfiles}
+              disabled={!isDirty || profilesSaving || !!profilesError}
+            >
+              {profilesSaving && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Save Agent Configurations
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
