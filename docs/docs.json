@@ -85,6 +85,12 @@
       "vscode"
     ]
   },
+  "integrations": {
+    "posthog": {
+      "apiKey": "phc_tUHOX3YsGW4d9cEKyIvxjrFDHTRQ8nCfzG65McGZEuC",
+      "apiHost": "https://eu.i.posthog.com"
+    }
+  },
   "footer": {
     "socials": {
       "github": "https://github.com/BloopAI/vibe-kanban"
