@@ -14,6 +14,7 @@ interface DiffTabProps {
 function DiffTab({ selectedAttempt }: DiffTabProps) {
   const [loading, setLoading] = useState(true);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const [hasInitialized, setHasInitialized] = useState(false);
   const { diffs, error } = useDiffEntries(selectedAttempt?.id ?? null, true);
   const { fileCount, added, deleted } = useDiffSummary(
     selectedAttempt?.id ?? null
@@ -21,6 +22,7 @@ function DiffTab({ selectedAttempt }: DiffTabProps) {
 
   useEffect(() => {
     setLoading(true);
+    setHasInitialized(false);
   }, [selectedAttempt?.id]);
 
   useEffect(() => {
@@ -44,10 +46,10 @@ function DiffTab({ selectedAttempt }: DiffTabProps) {
     return () => clearTimeout(timer);
   }, [loading, diffs.length]);
 
-  // Default-collapse certain change kinds on first load
+  // Default-collapse certain change kinds on first load only
   useEffect(() => {
     if (diffs.length === 0) return;
-    if (collapsedIds.size > 0) return; // preserve user toggles if any
+    if (hasInitialized) return; // only run once per attempt
     const kindsToCollapse = new Set([
       'deleted',
       'renamed',
@@ -60,7 +62,8 @@ function DiffTab({ selectedAttempt }: DiffTabProps) {
         .map((d, i) => d.newPath || d.oldPath || String(i))
     );
     if (initial.size > 0) setCollapsedIds(initial);
-  }, [diffs, collapsedIds.size]);
+    setHasInitialized(true);
+  }, [diffs, hasInitialized]);
 
   const ids = useMemo(() => {
     return diffs.map((d, i) => d.newPath || d.oldPath || String(i));
