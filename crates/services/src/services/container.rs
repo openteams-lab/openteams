@@ -120,7 +120,7 @@ pub trait ContainerService {
 
         for attempt in attempts {
             if let Ok(processes) =
-                ExecutionProcess::find_by_task_attempt_id(&self.db().pool, attempt.id).await
+                ExecutionProcess::find_by_task_attempt_id(&self.db().pool, attempt.id, false).await
             {
                 for process in processes {
                     if process.status == ExecutionProcessStatus::Running {
@@ -147,7 +147,7 @@ pub trait ContainerService {
     async fn try_stop(&self, task_attempt: &TaskAttempt) {
         // stop all execution processes for this attempt
         if let Ok(processes) =
-            ExecutionProcess::find_by_task_attempt_id(&self.db().pool, task_attempt.id).await
+            ExecutionProcess::find_by_task_attempt_id(&self.db().pool, task_attempt.id, false).await
         {
             for process in processes {
                 if process.status == ExecutionProcessStatus::Running {

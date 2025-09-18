@@ -328,7 +328,7 @@ async fn has_running_processes_for_attempt(
     pool: &sqlx::SqlitePool,
     attempt_id: Uuid,
 ) -> Result<bool, ApiError> {
-    let processes = ExecutionProcess::find_by_task_attempt_id(pool, attempt_id).await?;
+    let processes = ExecutionProcess::find_by_task_attempt_id(pool, attempt_id, false).await?;
     Ok(processes.into_iter().any(|p| {
         matches!(
             p.status,
@@ -602,18 +602,21 @@ pub async fn set_follow_up_queue(
                 tokio::time::sleep(Duration::from_millis(1200)).await;
                 let pool = &deployment_clone.db().pool;
                 // Still no running process?
-                let running =
-                    match ExecutionProcess::find_by_task_attempt_id(pool, task_attempt_clone.id)
-                        .await
-                    {
-                        Ok(procs) => procs.into_iter().any(|p| {
-                            matches!(
-                                p.status,
-                                db::models::execution_process::ExecutionProcessStatus::Running
-                            )
-                        }),
-                        Err(_) => true, // assume running on error to avoid duplicate starts
-                    };
+                let running = match ExecutionProcess::find_by_task_attempt_id(
+                    pool,
+                    task_attempt_clone.id,
+                    false,
+                )
+                .await
+                {
+                    Ok(procs) => procs.into_iter().any(|p| {
+                        matches!(
+                            p.status,
+                            db::models::execution_process::ExecutionProcessStatus::Running
+                        )
+                    }),
+                    Err(_) => true, // assume running on error to avoid duplicate starts
+                };
                 if running {
                     return;
                 }

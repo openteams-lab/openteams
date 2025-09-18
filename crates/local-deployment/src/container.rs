@@ -1228,7 +1228,8 @@ impl LocalContainerService {
 
         // If anything is running for this attempt, bail
         let procs =
-            ExecutionProcess::find_by_task_attempt_id(&self.db.pool, ctx.task_attempt.id).await?;
+            ExecutionProcess::find_by_task_attempt_id(&self.db.pool, ctx.task_attempt.id, false)
+                .await?;
         if procs
             .iter()
             .any(|p| matches!(p.status, ExecutionProcessStatus::Running))
