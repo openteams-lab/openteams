@@ -440,8 +440,8 @@ impl TaskServer {
                     .into_iter()
                     .map(|task| TaskSummary {
                         id: task.id.to_string(),
-                        title: task.title,
-                        description: task.description,
+                        title: task.title.clone(),
+                        description: task.description.clone(),
                         status: task_status_to_string(&task.status),
                         created_at: task.created_at.to_rfc3339(),
                         updated_at: task.updated_at.to_rfc3339(),
