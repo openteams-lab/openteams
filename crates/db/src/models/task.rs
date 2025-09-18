@@ -31,18 +31,26 @@ pub struct Task {
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct TaskWithAttemptStatus {
-    pub id: Uuid,
-    pub project_id: Uuid,
-    pub title: String,
-    pub description: Option<String>,
-    pub status: TaskStatus,
-    pub parent_task_attempt: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    #[serde(flatten)]
+    #[ts(flatten)]
+    pub task: Task,
     pub has_in_progress_attempt: bool,
     pub has_merged_attempt: bool,
     pub last_attempt_failed: bool,
     pub executor: String,
+}
+
+impl std::ops::Deref for TaskWithAttemptStatus {
+    type Target = Task;
+    fn deref(&self) -> &Self::Target {
+        &self.task
+    }
+}
+
+impl std::ops::DerefMut for TaskWithAttemptStatus {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.task
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -139,14 +147,16 @@ ORDER BY t.created_at DESC"#,
         let tasks = records
             .into_iter()
             .map(|rec| TaskWithAttemptStatus {
-                id: rec.id,
-                project_id: rec.project_id,
-                title: rec.title,
-                description: rec.description,
-                status: rec.status,
-                parent_task_attempt: rec.parent_task_attempt,
-                created_at: rec.created_at,
-                updated_at: rec.updated_at,
+                task: Task {
+                    id: rec.id,
+                    project_id: rec.project_id,
+                    title: rec.title,
+                    description: rec.description,
+                    status: rec.status,
+                    parent_task_attempt: rec.parent_task_attempt,
+                    created_at: rec.created_at,
+                    updated_at: rec.updated_at,
+                },
                 has_in_progress_attempt: rec.has_in_progress_attempt != 0,
                 has_merged_attempt: false, // TODO use merges table
                 last_attempt_failed: rec.last_attempt_failed != 0,

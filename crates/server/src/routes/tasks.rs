@@ -195,14 +195,7 @@ pub async fn create_task_and_start(
 
     tracing::info!("Started execution process {}", execution_process.id);
     Ok(ResponseJson(ApiResponse::success(TaskWithAttemptStatus {
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        project_id: task.project_id,
-        status: task.status,
-        parent_task_attempt: task.parent_task_attempt,
-        created_at: task.created_at,
-        updated_at: task.updated_at,
+        task,
         has_in_progress_attempt: true,
         has_merged_attempt: false,
         last_attempt_failed: false,
