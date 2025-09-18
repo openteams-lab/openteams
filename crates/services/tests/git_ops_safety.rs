@@ -4,9 +4,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use git2::{Repository, build::CheckoutBuilder};
-use services::services::git::GitService;
-use services::services::git_cli::GitCli; // used only to set up sparse-checkout
+use git2::{PushOptions, Repository, build::CheckoutBuilder};
+use services::services::{
+    git::GitService,
+    git_cli::{GitCli, GitCliError},
+};
 use tempfile::TempDir;
 // Avoid direct git CLI usage in tests; exercise GitService instead.
 
@@ -59,6 +61,15 @@ fn configure_user(repo: &Repository) {
     let mut cfg = repo.config().unwrap();
     cfg.set_str("user.name", "Test User").unwrap();
     cfg.set_str("user.email", "test@example.com").unwrap();
+}
+
+fn push_ref(repo: &Repository, local: &str, remote: &str) {
+    let mut remote_handle = repo.find_remote("origin").unwrap();
+    let mut opts = PushOptions::new();
+    let spec = format!("+{local}:{remote}");
+    remote_handle
+        .push(&[spec.as_str()], Some(&mut opts))
+        .unwrap();
 }
 
 use services::services::git::DiffTarget;
@@ -217,6 +228,182 @@ fn setup_direct_conflict_repo(root: &TempDir) -> (PathBuf, PathBuf) {
     commit_all(&repo, "main change");
 
     (repo_path, worktree_path)
+}
+
+#[test]
+fn push_with_token_reports_non_fast_forward() {
+    let temp_dir = TempDir::new().unwrap();
+    let remote_path = temp_dir.path().join("remote.git");
+    Repository::init_bare(&remote_path).expect("init bare remote");
+    let remote_url = remote_path.to_str().expect("remote path str");
+
+    // Seed the bare repo with an initial main branch commit
+    let seed_path = temp_dir.path().join("seed");
+    let service = GitService::new();
+    service
+        .initialize_repo_with_main_branch(&seed_path)
+        .expect("init seed repo");
+    let seed_repo = Repository::open(&seed_path).expect("open seed repo");
+    configure_user(&seed_repo);
+    seed_repo.remote("origin", remote_url).expect("add remote");
+    push_ref(&seed_repo, "refs/heads/main", "refs/heads/main");
+    Repository::open_bare(&remote_path)
+        .expect("open bare remote")
+        .set_head("refs/heads/main")
+        .expect("set remote HEAD");
+
+    // Local clone that will attempt the push later
+    let local_path = temp_dir.path().join("local");
+    let local_repo = Repository::clone(remote_url, &local_path).expect("clone local");
+    configure_user(&local_repo);
+    checkout_branch(&local_repo, "main");
+    write_file(&local_path, "file.txt", "initial local\n");
+    commit_all(&local_repo, "initial local commit");
+    push_ref(&local_repo, "refs/heads/main", "refs/heads/main");
+
+    // Separate clone simulates someone else pushing first
+    let updater_path = temp_dir.path().join("updater");
+    let updater_repo = Repository::clone(remote_url, &updater_path).expect("clone updater");
+    configure_user(&updater_repo);
+    checkout_branch(&updater_repo, "main");
+    write_file(&updater_path, "file.txt", "upstream change\n");
+    commit_all(&updater_repo, "upstream commit");
+    push_ref(&updater_repo, "refs/heads/main", "refs/heads/main");
+
+    // Local branch diverges but has not fetched the updater's commit
+    write_file(&local_path, "file.txt", "local change\n");
+    commit_all(&local_repo, "local commit");
+    let remote = local_repo.find_remote("origin").expect("origin remote");
+    let remote_url_string = remote.url().expect("origin url").to_string();
+
+    let git_cli = GitCli::new();
+    let result = git_cli.push_with_token(&local_path, &remote_url_string, "main", "dummy-token");
+    match result {
+        Err(GitCliError::PushRejected(msg)) => {
+            let lower = msg.to_ascii_lowercase();
+            assert!(
+                lower.contains("failed to push some refs") || lower.contains("fetch first"),
+                "unexpected stderr: {msg}"
+            );
+        }
+        Err(other) => panic!("expected push rejected, got {other:?}"),
+        Ok(_) => panic!("push unexpectedly succeeded"),
+    }
+}
+
+#[test]
+fn fetch_with_token_missing_ref_returns_error() {
+    let temp_dir = TempDir::new().unwrap();
+    let remote_path = temp_dir.path().join("remote.git");
+    Repository::init_bare(&remote_path).expect("init bare remote");
+    let remote_url = remote_path.to_str().expect("remote path str");
+
+    let seed_path = temp_dir.path().join("seed");
+    let service = GitService::new();
+    service
+        .initialize_repo_with_main_branch(&seed_path)
+        .expect("init seed repo");
+    let seed_repo = Repository::open(&seed_path).expect("open seed repo");
+    configure_user(&seed_repo);
+    seed_repo.remote("origin", remote_url).expect("add remote");
+    push_ref(&seed_repo, "refs/heads/main", "refs/heads/main");
+    Repository::open_bare(&remote_path)
+        .expect("open bare remote")
+        .set_head("refs/heads/main")
+        .expect("set remote HEAD");
+
+    let local_path = temp_dir.path().join("local");
+    Repository::clone(remote_url, &local_path).expect("clone local");
+
+    let git_cli = GitCli::new();
+    let refspec = "+refs/heads/missing:refs/remotes/origin/missing";
+    let result =
+        git_cli.fetch_with_token_and_refspec(&local_path, remote_url, refspec, "dummy-token");
+    match result {
+        Err(GitCliError::CommandFailed(msg)) => {
+            assert!(
+                msg.to_ascii_lowercase()
+                    .contains("couldn't find remote ref"),
+                "unexpected stderr: {msg}"
+            );
+        }
+        Err(other) => panic!("expected command failed, got {other:?}"),
+        Ok(_) => panic!("fetch unexpectedly succeeded"),
+    }
+}
+
+#[test]
+fn push_and_fetch_roundtrip_updates_tracking_branch() {
+    let temp_dir = TempDir::new().unwrap();
+    let remote_path = temp_dir.path().join("remote.git");
+    Repository::init_bare(&remote_path).expect("init bare remote");
+    let remote_url = remote_path.to_str().expect("remote path str");
+
+    let seed_path = temp_dir.path().join("seed");
+    let service = GitService::new();
+    service
+        .initialize_repo_with_main_branch(&seed_path)
+        .expect("init seed repo");
+    let seed_repo = Repository::open(&seed_path).expect("open seed repo");
+    configure_user(&seed_repo);
+    seed_repo.remote("origin", remote_url).expect("add remote");
+    push_ref(&seed_repo, "refs/heads/main", "refs/heads/main");
+    Repository::open_bare(&remote_path)
+        .expect("open bare remote")
+        .set_head("refs/heads/main")
+        .expect("set remote HEAD");
+
+    let producer_path = temp_dir.path().join("producer");
+    let producer_repo = Repository::clone(remote_url, &producer_path).expect("clone producer");
+    configure_user(&producer_repo);
+    checkout_branch(&producer_repo, "main");
+
+    let consumer_path = temp_dir.path().join("consumer");
+    let consumer_repo = Repository::clone(remote_url, &consumer_path).expect("clone consumer");
+    configure_user(&consumer_repo);
+    checkout_branch(&consumer_repo, "main");
+    let old_oid = consumer_repo
+        .find_reference("refs/remotes/origin/main")
+        .expect("consumer tracking ref")
+        .target()
+        .expect("consumer tracking ref");
+
+    write_file(&producer_path, "file.txt", "new work\n");
+    commit_all(&producer_repo, "producer commit");
+
+    let remote = producer_repo.find_remote("origin").expect("origin remote");
+    let remote_url_string = remote.url().expect("origin url").to_string();
+
+    let git_cli = GitCli::new();
+    git_cli
+        .push_with_token(&producer_path, &remote_url_string, "main", "dummy-token")
+        .expect("push succeeded");
+
+    let new_oid = producer_repo
+        .head()
+        .expect("producer head")
+        .target()
+        .expect("producer head oid");
+    assert_ne!(old_oid, new_oid, "producer created new commit");
+
+    git_cli
+        .fetch_with_token_and_refspec(
+            &consumer_path,
+            &remote_url_string,
+            "+refs/heads/main:refs/remotes/origin/main",
+            "dummy-token",
+        )
+        .expect("fetch succeeded");
+
+    let updated_oid = consumer_repo
+        .find_reference("refs/remotes/origin/main")
+        .expect("updated tracking ref")
+        .target()
+        .expect("updated tracking ref");
+    assert_eq!(
+        updated_oid, new_oid,
+        "tracking branch advanced to remote head"
+    );
 }
 
 #[test]
