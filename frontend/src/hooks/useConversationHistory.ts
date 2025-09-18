@@ -55,14 +55,7 @@ export const useConversationHistory = ({
   const { executionProcesses: executionProcessesRaw } = useExecutionProcesses(
     attempt.id
   );
-  // Soft-deleted (dropped) are invisible in the the conversation history
-  const visibleExecutionProcesses = useMemo(
-    () => executionProcessesRaw?.filter((p) => !p.dropped) ?? [],
-    [executionProcessesRaw]
-  );
-  const executionProcesses = useRef<ExecutionProcess[]>(
-    visibleExecutionProcesses
-  );
+  const executionProcesses = useRef<ExecutionProcess[]>(executionProcessesRaw);
   const displayedExecutionProcesses = useRef<ExecutionProcessStateStore>({});
   const loadedInitialEntries = useRef(false);
   const lastRunningProcessId = useRef<string | null>(null);
@@ -73,8 +66,8 @@ export const useConversationHistory = ({
 
   // Keep executionProcesses up to date
   useEffect(() => {
-    executionProcesses.current = visibleExecutionProcesses;
-  }, [visibleExecutionProcesses]);
+    executionProcesses.current = executionProcessesRaw;
+  }, [executionProcessesRaw]);
 
   const loadEntriesForHistoricExecutionProcess = (
     executionProcess: ExecutionProcess
@@ -408,8 +401,8 @@ export const useConversationHistory = ({
 
   // Stable key for dependency arrays when process list changes
   const idListKey = useMemo(
-    () => visibleExecutionProcesses?.map((p) => p.id).join(','),
-    [visibleExecutionProcesses]
+    () => executionProcessesRaw?.map((p) => p.id).join(','),
+    [executionProcessesRaw]
   );
 
   // Initial load when attempt changes
@@ -459,11 +452,11 @@ export const useConversationHistory = ({
 
   // If an execution process is removed, remove it from the state
   useEffect(() => {
-    if (!visibleExecutionProcesses) return;
+    if (!executionProcessesRaw) return;
 
     const removedProcessIds = Object.keys(
       displayedExecutionProcesses.current
-    ).filter((id) => !visibleExecutionProcesses.some((p) => p.id === id));
+    ).filter((id) => !executionProcessesRaw.some((p) => p.id === id));
 
     removedProcessIds.forEach((id) => {
       delete displayedExecutionProcesses.current[id];

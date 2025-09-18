@@ -27,7 +27,7 @@ function ProcessesTab({ attemptId }: ProcessesTabProps) {
     isLoading: processesLoading,
     isConnected,
     error: processesError,
-  } = useExecutionProcesses(attemptId ?? '');
+  } = useExecutionProcesses(attemptId ?? '', { showSoftDeleted: true });
   const { selectedProcessId, setSelectedProcessId } = useProcessSelection();
   const [loadingProcessId, setLoadingProcessId] = useState<string | null>(null);
   const [localProcessDetails, setLocalProcessDetails] = useState<

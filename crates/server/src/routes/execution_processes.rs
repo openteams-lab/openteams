@@ -22,6 +22,9 @@ use crate::{DeploymentImpl, error::ApiError, middleware::load_execution_process_
 #[derive(Debug, Deserialize)]
 pub struct ExecutionProcessQuery {
     pub task_attempt_id: Uuid,
+    /// If true, include soft-deleted (dropped) processes in results/stream
+    #[serde(default)]
+    pub show_soft_deleted: Option<bool>,
 }
 
 pub async fn get_execution_processes(
@@ -29,8 +32,12 @@ pub async fn get_execution_processes(
     Query(query): Query<ExecutionProcessQuery>,
 ) -> Result<ResponseJson<ApiResponse<Vec<ExecutionProcess>>>, ApiError> {
     let pool = &deployment.db().pool;
-    let execution_processes =
-        ExecutionProcess::find_by_task_attempt_id(pool, query.task_attempt_id).await?;
+    let execution_processes = ExecutionProcess::find_by_task_attempt_id(
+        pool,
+        query.task_attempt_id,
+        query.show_soft_deleted.unwrap_or(false),
+    )
+    .await?;
 
     Ok(ResponseJson(ApiResponse::success(execution_processes)))
 }
@@ -189,8 +196,13 @@ pub async fn stream_execution_processes_ws(
     Query(query): Query<ExecutionProcessQuery>,
 ) -> impl IntoResponse {
     ws.on_upgrade(move |socket| async move {
-        if let Err(e) =
-            handle_execution_processes_ws(socket, deployment, query.task_attempt_id).await
+        if let Err(e) = handle_execution_processes_ws(
+            socket,
+            deployment,
+            query.task_attempt_id,
+            query.show_soft_deleted.unwrap_or(false),
+        )
+        .await
         {
             tracing::warn!("execution processes WS closed: {}", e);
         }
@@ -201,11 +213,12 @@ async fn handle_execution_processes_ws(
     socket: WebSocket,
     deployment: DeploymentImpl,
     task_attempt_id: uuid::Uuid,
+    show_soft_deleted: bool,
 ) -> anyhow::Result<()> {
     // Get the raw stream and convert LogMsg to WebSocket messages
     let mut stream = deployment
         .events()
-        .stream_execution_processes_for_attempt_raw(task_attempt_id)
+        .stream_execution_processes_for_attempt_raw(task_attempt_id, show_soft_deleted)
         .await?
         .map_ok(|msg| msg.to_ws_message_unchecked());
 

@@ -620,11 +620,16 @@ impl EventService {
     pub async fn stream_execution_processes_for_attempt_raw(
         &self,
         task_attempt_id: Uuid,
+        show_soft_deleted: bool,
     ) -> Result<futures::stream::BoxStream<'static, Result<LogMsg, std::io::Error>>, EventError>
     {
-        // Get initial snapshot of execution processes
-        let processes =
-            ExecutionProcess::find_by_task_attempt_id(&self.db.pool, task_attempt_id).await?;
+        // Get initial snapshot of execution processes (filtering at SQL level)
+        let processes = ExecutionProcess::find_by_task_attempt_id(
+            &self.db.pool,
+            task_attempt_id,
+            show_soft_deleted,
+        )
+        .await?;
 
         // Convert processes array to object keyed by process ID
         let processes_map: serde_json::Map<String, serde_json::Value> = processes
@@ -662,6 +667,9 @@ impl EventService {
                                             )
                                             && process.task_attempt_id == task_attempt_id
                                         {
+                                            if !show_soft_deleted && process.dropped {
+                                                return None;
+                                            }
                                             return Some(Ok(LogMsg::JsonPatch(patch)));
                                         }
                                     }
@@ -673,6 +681,11 @@ impl EventService {
                                             )
                                             && process.task_attempt_id == task_attempt_id
                                         {
+                                            if !show_soft_deleted && process.dropped {
+                                                let remove_patch =
+                                                    execution_process_patch::remove(process.id);
+                                                return Some(Ok(LogMsg::JsonPatch(remove_patch)));
+                                            }
                                             return Some(Ok(LogMsg::JsonPatch(patch)));
                                         }
                                     }
@@ -692,6 +705,11 @@ impl EventService {
                                 match &event_patch.value.record {
                                     RecordTypes::ExecutionProcess(process) => {
                                         if process.task_attempt_id == task_attempt_id {
+                                            if !show_soft_deleted && process.dropped {
+                                                let remove_patch =
+                                                    execution_process_patch::remove(process.id);
+                                                return Some(Ok(LogMsg::JsonPatch(remove_patch)));
+                                            }
                                             return Some(Ok(LogMsg::JsonPatch(patch)));
                                         }
                                     }
