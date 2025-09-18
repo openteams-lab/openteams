@@ -19,6 +19,7 @@ import TodoPanel from '@/components/tasks/TodoPanel';
 import { TabNavContext } from '@/contexts/TabNavigationContext';
 import { ProcessSelectionProvider } from '@/contexts/ProcessSelectionContext';
 import { ReviewProvider } from '@/contexts/ReviewProvider';
+import { EntriesProvider } from '@/contexts/EntriesContext';
 import { AttemptHeaderCard } from './AttemptHeaderCard';
 import { inIframe } from '@/vscode/bridge';
 import { TaskRelationshipViewer } from './TaskRelationshipViewer';
@@ -117,87 +118,136 @@ export function TaskDetailsPanel({
         <TabNavContext.Provider value={{ activeTab, setActiveTab }}>
           <ProcessSelectionProvider>
             <ReviewProvider>
-              {/* Backdrop - only on smaller screens (overlay mode) */}
-              {!hideBackdrop && (
+              <EntriesProvider>
+                {/* Backdrop - only on smaller screens (overlay mode) */}
+                {!hideBackdrop && (
+                  <div
+                    className={getBackdropClasses(isFullScreen || false)}
+                    onClick={onClose}
+                  />
+                )}
+
+                {/* Panel */}
                 <div
-                  className={getBackdropClasses(isFullScreen || false)}
-                  onClick={onClose}
-                />
-              )}
+                  className={
+                    className || getTaskPanelClasses(isFullScreen || false)
+                  }
+                >
+                  <div className={getTaskPanelInnerClasses()}>
+                    {!inIframe() && (
+                      <TaskDetailsHeader
+                        task={task}
+                        onClose={onClose}
+                        onEditTask={onEditTask}
+                        onDeleteTask={onDeleteTask}
+                        hideCloseButton={hideBackdrop}
+                        isFullScreen={isFullScreen}
+                      />
+                    )}
 
-              {/* Panel */}
-              <div
-                className={
-                  className || getTaskPanelClasses(isFullScreen || false)
-                }
-              >
-                <div className={getTaskPanelInnerClasses()}>
-                  {!inIframe() && (
-                    <TaskDetailsHeader
-                      task={task}
-                      onClose={onClose}
-                      onEditTask={onEditTask}
-                      onDeleteTask={onDeleteTask}
-                      hideCloseButton={hideBackdrop}
-                      isFullScreen={isFullScreen}
-                    />
-                  )}
+                    {isFullScreen ? (
+                      <div className="flex-1 min-h-0 flex">
+                        {/* Sidebar */}
+                        <aside
+                          className={`w-[28rem] shrink-0 border-r overflow-y-auto ${inIframe() ? 'hidden' : ''}`}
+                        >
+                          {/* Fullscreen sidebar shows title and description above edit/delete */}
+                          <div className="space-y-2 p-3">
+                            <TaskTitleDescription task={task} />
+                          </div>
 
-                  {isFullScreen ? (
-                    <div className="flex-1 min-h-0 flex">
-                      {/* Sidebar */}
-                      <aside
-                        className={`w-[28rem] shrink-0 border-r overflow-y-auto ${inIframe() ? 'hidden' : ''}`}
-                      >
-                        {/* Fullscreen sidebar shows title and description above edit/delete */}
-                        <div className="space-y-2 p-3">
-                          <TaskTitleDescription task={task} />
-                        </div>
+                          {/* Current Attempt / Actions */}
+                          <TaskDetailsToolbar
+                            task={task}
+                            projectId={projectId}
+                            projectHasDevScript={projectHasDevScript}
+                            forceCreateAttempt={forceCreateAttempt}
+                            onLeaveForceCreateAttempt={
+                              onLeaveForceCreateAttempt
+                            }
+                            attempts={attempts}
+                            selectedAttempt={selectedAttempt}
+                            setSelectedAttempt={setSelectedAttempt}
+                            // hide actions in sidebar; moved to header in fullscreen
+                          />
 
-                        {/* Current Attempt / Actions */}
-                        <TaskDetailsToolbar
-                          task={task}
-                          projectId={projectId}
-                          projectHasDevScript={projectHasDevScript}
-                          forceCreateAttempt={forceCreateAttempt}
-                          onLeaveForceCreateAttempt={onLeaveForceCreateAttempt}
-                          attempts={attempts}
-                          selectedAttempt={selectedAttempt}
-                          setSelectedAttempt={setSelectedAttempt}
-                          // hide actions in sidebar; moved to header in fullscreen
-                        />
+                          {/* Task Breakdown (TODOs) */}
+                          <TodoPanel />
 
-                        {/* Task Breakdown (TODOs) */}
-                        <TodoPanel selectedAttempt={selectedAttempt} />
+                          {/* Task Relationships */}
+                          <TaskRelationshipViewer
+                            selectedAttempt={selectedAttempt}
+                            onNavigateToTask={onNavigateToTask}
+                            task={task}
+                            tasksById={tasksById}
+                          />
+                        </aside>
 
-                        {/* Task Relationships */}
-                        <TaskRelationshipViewer
-                          selectedAttempt={selectedAttempt}
-                          onNavigateToTask={onNavigateToTask}
-                          task={task}
-                          tasksById={tasksById}
-                        />
-                      </aside>
+                        {/* Main content */}
+                        <main className="flex-1 min-h-0 min-w-0 flex flex-col">
+                          {selectedAttempt && (
+                            <>
+                              <TabNavigation
+                                activeTab={activeTab}
+                                setActiveTab={setActiveTab}
+                                selectedAttempt={selectedAttempt}
+                              />
 
-                      {/* Main content */}
-                      <main className="flex-1 min-h-0 min-w-0 flex flex-col">
-                        {selectedAttempt && (
+                              <div className="flex-1 flex flex-col min-h-0">
+                                {activeTab === 'diffs' ? (
+                                  <DiffTab selectedAttempt={selectedAttempt} />
+                                ) : activeTab === 'processes' ? (
+                                  <ProcessesTab
+                                    attemptId={selectedAttempt?.id}
+                                  />
+                                ) : (
+                                  <LogsTab selectedAttempt={selectedAttempt} />
+                                )}
+                              </div>
+
+                              <TaskFollowUpSection
+                                task={task}
+                                selectedAttemptId={selectedAttempt?.id}
+                                jumpToLogsTab={jumpToLogsTab}
+                              />
+                            </>
+                          )}
+                        </main>
+                      </div>
+                    ) : (
+                      <>
+                        {attempts.length === 0 ? (
+                          <TaskDetailsToolbar
+                            task={task}
+                            projectId={projectId}
+                            projectHasDevScript={projectHasDevScript}
+                            forceCreateAttempt={forceCreateAttempt}
+                            onLeaveForceCreateAttempt={
+                              onLeaveForceCreateAttempt
+                            }
+                            attempts={attempts}
+                            selectedAttempt={selectedAttempt}
+                            setSelectedAttempt={setSelectedAttempt}
+                            // hide actions in sidebar; moved to header in fullscreen
+                          />
+                        ) : (
                           <>
-                            <TabNavigation
-                              activeTab={activeTab}
-                              setActiveTab={setActiveTab}
+                            <AttemptHeaderCard
+                              attemptNumber={attemptNumber}
+                              totalAttempts={attempts.length}
                               selectedAttempt={selectedAttempt}
+                              task={task}
+                              projectId={projectId}
+                              // onCreateNewAttempt={() => {
+                              //   // TODO: Implement create new attempt
+                              //   console.log('Create new attempt');
+                              // }}
+                              onJumpToDiffFullScreen={jumpToDiffFullScreen}
                             />
 
-                            <div className="flex-1 flex flex-col min-h-0">
-                              {activeTab === 'diffs' ? (
-                                <DiffTab selectedAttempt={selectedAttempt} />
-                              ) : activeTab === 'processes' ? (
-                                <ProcessesTab attemptId={selectedAttempt?.id} />
-                              ) : (
-                                <LogsTab selectedAttempt={selectedAttempt} />
-                              )}
-                            </div>
+                            {selectedAttempt && (
+                              <LogsTab selectedAttempt={selectedAttempt} />
+                            )}
 
                             <TaskFollowUpSection
                               task={task}
@@ -206,52 +256,11 @@ export function TaskDetailsPanel({
                             />
                           </>
                         )}
-                      </main>
-                    </div>
-                  ) : (
-                    <>
-                      {attempts.length === 0 ? (
-                        <TaskDetailsToolbar
-                          task={task}
-                          projectId={projectId}
-                          projectHasDevScript={projectHasDevScript}
-                          forceCreateAttempt={forceCreateAttempt}
-                          onLeaveForceCreateAttempt={onLeaveForceCreateAttempt}
-                          attempts={attempts}
-                          selectedAttempt={selectedAttempt}
-                          setSelectedAttempt={setSelectedAttempt}
-                          // hide actions in sidebar; moved to header in fullscreen
-                        />
-                      ) : (
-                        <>
-                          <AttemptHeaderCard
-                            attemptNumber={attemptNumber}
-                            totalAttempts={attempts.length}
-                            selectedAttempt={selectedAttempt}
-                            task={task}
-                            projectId={projectId}
-                            // onCreateNewAttempt={() => {
-                            //   // TODO: Implement create new attempt
-                            //   console.log('Create new attempt');
-                            // }}
-                            onJumpToDiffFullScreen={jumpToDiffFullScreen}
-                          />
-
-                          {selectedAttempt && (
-                            <LogsTab selectedAttempt={selectedAttempt} />
-                          )}
-
-                          <TaskFollowUpSection
-                            task={task}
-                            selectedAttemptId={selectedAttempt?.id}
-                            jumpToLogsTab={jumpToLogsTab}
-                          />
-                        </>
-                      )}
-                    </>
-                  )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </EntriesProvider>
             </ReviewProvider>
           </ProcessSelectionProvider>
         </TabNavContext.Provider>
