@@ -73,6 +73,7 @@ export default defineConfig({
     fs: {
       allow: [path.resolve(__dirname, "."), path.resolve(__dirname, "..")],
     },
+    open: process.env.VITE_OPEN === "true",
   },
   build: { sourcemap: true },
 });
