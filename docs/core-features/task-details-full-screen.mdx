@@ -6,7 +6,7 @@ description: "Complete guide to using the task details full screen mode for deve
 
 ## Accessing Full Screen Mode
 
-Click the **Maximise** button (⛶) in the task details header to expand the view to occupy the full right side of your screen. Some task actions (like "View full diff") automatically switch to full screen mode for better visibility.
+Click the **Maximise** button (⛶) in the task details header to expand the view to occupy the full right side of your screen.
 
 <Frame>
 <img src="/images/vk-task-detail.jpeg" alt="Task details in full screen mode showing the complete interface with sidebar and tabs" />
@@ -46,7 +46,8 @@ The development server runs in a git worktree environment and streams all output
 Keep your task branch up-to-date with the latest changes from the base branch.
 
 - **Automatic Detection**: The rebase button appears when your branch is behind the base branch
-- **Conflict Handling**: Any merge conflicts are displayed in the Diffs tab
+
+For detailed guidance on handling rebase conflicts, see [Resolving Rebase Conflicts](/core-features/resolving-rebase-conflicts).
 
 #### Merge
 Integrate your completed work back into the base branch.
@@ -114,13 +115,13 @@ The Processes tab displays a timeline view of all running and completed processe
 
 ### Keyboard Shortcuts
 - **Escape**: Exit full screen mode and return to sidebar view
-- **Tab Navigation**: Use browser tab controls to switch between Logs, Diffs, and Processes
+- **n**: Create a new task attempt
 
 
 
 ## Exiting Full Screen Mode
 
-- Click the **Minimize** button in the header
+- Click the **Minimise** button in the header
 - Press **Escape** key
 - Click the **×** button to close the task panel entirely
 - Navigate to a different task or project
@@ -131,5 +132,6 @@ The interface gracefully transitions back to the compact sidebar view while pres
 
 - [Creating Task Attempts](/core-features/creating-task-attempts) - Learn about task attempt lifecycle
 - [Reviewing Code Changes](/core-features/reviewing-code-changes) - Deep dive into diff analysis  
+- [Resolving Rebase Conflicts](/core-features/resolving-rebase-conflicts) - Handle rebase conflicts and merge issues
 - [Creating Tasks](/core-features/creating-tasks) - Task creation and management
 - [Agent Configurations](/configuration-customisation/agent-configurations) - Customise AI agent behaviour
