@@ -9,6 +9,16 @@ pub use v5::{EditorConfig, EditorType, GitHubConfig, NotificationConfig, SoundFi
 
 use crate::services::config::versions::v5;
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, TS, Default)]
+#[ts(export)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum UiLanguage {
+    #[default]
+    Browser, // Detect from browser
+    En, // Force English
+    Ja, // Force Japanese
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Config {
     pub config_version: String,
@@ -25,6 +35,8 @@ pub struct Config {
     pub workspace_dir: Option<String>,
     pub last_app_version: Option<String>,
     pub show_release_notes: bool,
+    #[serde(default)]
+    pub language: UiLanguage,
 }
 
 impl Config {
@@ -79,6 +91,7 @@ impl Config {
             workspace_dir: old_config.workspace_dir,
             last_app_version: old_config.last_app_version,
             show_release_notes: old_config.show_release_notes,
+            language: UiLanguage::default(),
         })
     }
 }
@@ -121,6 +134,7 @@ impl Default for Config {
             workspace_dir: None,
             last_app_version: None,
             show_release_notes: false,
+            language: UiLanguage::default(),
         }
     }
 }

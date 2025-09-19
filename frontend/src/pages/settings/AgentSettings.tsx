@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Card,
   CardContent,
@@ -26,6 +27,7 @@ import { useUserSystem } from '@/components/config-provider';
 import { showModal } from '@/lib/modals';
 
 export function AgentSettings() {
+  const { t } = useTranslation('settings');
   // Use profiles hook for server state
   const {
     profilesContent: serverProfilesContent,
@@ -225,7 +227,7 @@ export function AgentSettings() {
         reloadSystem();
       } catch (saveError: unknown) {
         console.error('Failed to save deletion to backend:', saveError);
-        setSaveError('Failed to delete configuration. Please try again.');
+        setSaveError(t('settings.agents.errors.deleteFailed'));
       }
     } catch (error) {
       console.error('Error deleting configuration:', error);
@@ -272,7 +274,7 @@ export function AgentSettings() {
       reloadSystem();
     } catch (err: unknown) {
       console.error('Failed to save profiles:', err);
-      setSaveError('Failed to save agent configurations. Please try again.');
+      setSaveError(t('settings.agents.errors.saveFailed'));
     }
   };
 
@@ -339,7 +341,7 @@ export function AgentSettings() {
       reloadSystem();
     } catch (err: unknown) {
       console.error('Failed to save profiles:', err);
-      setSaveError('Failed to save configuration. Please try again.');
+      setSaveError(t('settings.agents.errors.saveConfigFailed'));
     }
   };
 
@@ -347,7 +349,7 @@ export function AgentSettings() {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Loading agent configurations...</span>
+        <span className="ml-2">{t('settings.agents.loading')}</span>
       </div>
     );
   }
@@ -367,7 +369,7 @@ export function AgentSettings() {
       {profilesSuccess && (
         <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
           <AlertDescription className="font-medium">
-            ✓ Executor configurations saved successfully!
+            {t('settings.agents.save.success')}
           </AlertDescription>
         </Alert>
       )}
@@ -380,11 +382,8 @@ export function AgentSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Coding Agent Configurations</CardTitle>
-          <CardDescription>
-            Customize the behavior of coding agents with different
-            configurations.
-          </CardDescription>
+          <CardTitle>{t('settings.agents.title')}</CardTitle>
+          <CardDescription>{t('settings.agents.description')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Editor type toggle */}
@@ -395,7 +394,9 @@ export function AgentSettings() {
               onCheckedChange={(checked) => setUseFormEditor(!checked)}
               disabled={profilesLoading || !localParsedProfiles}
             />
-            <Label htmlFor="use-form-editor">Edit JSON</Label>
+            <Label htmlFor="use-form-editor">
+              {t('settings.agents.editor.formLabel')}
+            </Label>
           </div>
 
           {useFormEditor &&
@@ -405,7 +406,9 @@ export function AgentSettings() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="executor-type">Agent</Label>
+                  <Label htmlFor="executor-type">
+                    {t('settings.agents.editor.agentLabel')}
+                  </Label>
                   <Select
                     value={selectedExecutorType}
                     onValueChange={(value) => {
@@ -415,7 +418,11 @@ export function AgentSettings() {
                     }}
                   >
                     <SelectTrigger id="executor-type">
-                      <SelectValue placeholder="Select executor type" />
+                      <SelectValue
+                        placeholder={t(
+                          'settings.agents.editor.agentPlaceholder'
+                        )}
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {Object.keys(localParsedProfiles.executors).map(
@@ -430,7 +437,9 @@ export function AgentSettings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="configuration">Configuration</Label>
+                  <Label htmlFor="configuration">
+                    {t('settings.agents.editor.configLabel')}
+                  </Label>
                   <div className="flex gap-2">
                     <Select
                       value={selectedConfiguration}
@@ -446,7 +455,11 @@ export function AgentSettings() {
                       }
                     >
                       <SelectTrigger id="configuration">
-                        <SelectValue placeholder="Select configuration" />
+                        <SelectValue
+                          placeholder={t(
+                            'settings.agents.editor.configPlaceholder'
+                          )}
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {Object.keys(
@@ -458,7 +471,7 @@ export function AgentSettings() {
                           </SelectItem>
                         ))}
                         <SelectItem value="__create__">
-                          Create new...
+                          {t('settings.agents.editor.createNew')}
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -480,11 +493,13 @@ export function AgentSettings() {
                           localParsedProfiles.executors[selectedExecutorType] ||
                             {}
                         ).length <= 1
-                          ? 'Cannot delete the last configuration'
-                          : `Delete ${selectedConfiguration}`
+                          ? t('settings.agents.editor.deleteTitle')
+                          : t('settings.agents.editor.deleteButton', {
+                              name: selectedConfiguration,
+                            })
                       }
                     >
-                      Delete
+                      {t('settings.agents.editor.deleteText')}
                     </Button>
                   </div>
                 </div>
@@ -519,12 +534,16 @@ export function AgentSettings() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="profiles-editor">
-                  Agent Configuration (JSON)
+                  {t('settings.agents.editor.jsonLabel')}
                 </Label>
                 <JSONEditor
                   id="profiles-editor"
-                  placeholder="Loading profiles..."
-                  value={profilesLoading ? 'Loading...' : localProfilesContent}
+                  placeholder={t('settings.agents.editor.jsonPlaceholder')}
+                  value={
+                    profilesLoading
+                      ? t('settings.agents.editor.jsonLoading')
+                      : localProfilesContent
+                  }
                   onChange={handleProfilesChange}
                   disabled={profilesLoading}
                   minHeight={300}
@@ -535,7 +554,7 @@ export function AgentSettings() {
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
                     <span className="font-medium">
-                      Configuration file location:
+                      {t('settings.agents.editor.pathLabel')}
                     </span>{' '}
                     <span className="font-mono text-xs">{profilesPath}</span>
                   </p>
@@ -546,22 +565,20 @@ export function AgentSettings() {
         </CardContent>
       </Card>
 
-      {/* Save button for JSON editor mode only */}
-      {!useFormEditor && (
-        <div className="sticky bottom-0 z-10 bg-background/80 backdrop-blur-sm border-t py-4">
-          <div className="flex justify-end">
-            <Button
-              onClick={handleSaveProfiles}
-              disabled={!isDirty || profilesSaving || !!profilesError}
-            >
-              {profilesSaving && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              Save Agent Configurations
-            </Button>
-          </div>
+      {/* Sticky Save bar (used for both editors) */}
+      <div className="sticky bottom-0 z-10 bg-background/80 backdrop-blur-sm border-t py-4">
+        <div className="flex justify-end">
+          <Button
+            onClick={handleSaveProfiles}
+            disabled={!isDirty || profilesSaving || !!profilesError}
+          >
+            {profilesSaving && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            {t('settings.agents.save.button')}
+          </Button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

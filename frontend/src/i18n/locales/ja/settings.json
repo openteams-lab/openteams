@@ -1,0 +1,171 @@
+{
+  "settings": {
+    "layout": {
+      "nav": {
+        "title": "設定",
+        "general": "一般",
+        "generalDesc": "テーマ、通知、および設定",
+        "agents": "エージェント",
+        "agentsDesc": "コーディングエージェントの設定",
+        "mcp": "MCPサーバー",
+        "mcpDesc": "モデルコンテキストプロトコルサーバー"
+      }
+    },
+    "general": {
+      "loading": "設定を読み込み中...",
+      "loadError": "設定の読み込みに失敗しました。",
+      "save": {
+        "button": "設定を保存",
+        "success": "✓ 設定が正常に保存されました！",
+        "error": "設定の保存に失敗しました"
+      },
+      "appearance": {
+        "title": "外観",
+        "description": "アプリケーションの見た目と操作感をカスタマイズします。",
+        "theme": {
+          "label": "テーマ",
+          "placeholder": "テーマを選択",
+          "helper": "お好みの色スキームを選択してください。"
+        },
+        "language": {
+          "label": "言語",
+          "placeholder": "言語を選択",
+          "helper": "お好みの言語を選択してください。ブラウザ設定では、システム言語に従います。"
+        }
+      },
+      "taskExecution": {
+        "title": "タスク実行",
+        "description": "タスクの実行と処理方法を設定します。",
+        "executor": {
+          "label": "デフォルトエージェント設定",
+          "placeholder": "プロファイルを選択",
+          "helper": "タスク試行を作成する際に使用するデフォルトエージェント設定を選択してください。"
+        },
+        "variant": "デフォルト"
+      },
+      "editor": {
+        "title": "エディター",
+        "description": "コード編集体験を設定します。",
+        "type": {
+          "label": "エディタータイプ",
+          "placeholder": "エディターを選択",
+          "helper": "お好みのコードエディターインターフェースを選択してください。"
+        }
+      },
+      "github": {
+        "title": "GitHub連携",
+        "connected": "{{username}}として接続中",
+        "connectButton": "GitHubアカウントを接続",
+        "manage": "管理",
+        "disconnect": "切断",
+        "helper": "GitHubアカウントを接続して、プライベートリポジトリへのアクセスと高度なGit操作を有効にします。"
+      },
+      "notifications": {
+        "title": "通知",
+        "description": "通知を受け取るタイミングと方法を制御します。",
+        "sound": {
+          "label": "音声通知",
+          "helper": "タスク試行の実行が完了したときに音を再生します。",
+          "fileLabel": "音声",
+          "filePlaceholder": "音声を選択",
+          "fileHelper": "タスク完了時に再生する音声を選択してください。音量ボタンをクリックしてプレビューできます。"
+        },
+        "push": {
+          "label": "プッシュ通知",
+          "helper": "タスク試行の実行が完了したときにシステム通知を表示します。"
+        }
+      },
+      "privacy": {
+        "title": "プライバシー",
+        "description": "匿名の使用データを共有してVibe-Kanbanの改善にご協力ください。",
+        "telemetry": {
+          "label": "テレメトリを有効化",
+          "helper": "アプリケーションの改善に役立つ匿名の使用イベント追跡を有効にします。プロンプトやプロジェクト情報は収集されません。"
+        }
+      },
+      "taskTemplates": {
+        "title": "タスクテンプレート",
+        "description": "すべてのプロジェクトで使用できるグローバルタスクテンプレートを管理します。"
+      },
+      "safety": {
+        "title": "安全性と免責事項",
+        "description": "安全警告とオンボーディングの承認をリセットします。",
+        "disclaimer": {
+          "title": "免責事項の承認",
+          "description": "安全免責事項をリセットします。",
+          "button": "リセット"
+        },
+        "onboarding": {
+          "title": "オンボーディング",
+          "description": "オンボーディングフローをリセットします。",
+          "button": "リセット"
+        }
+      }
+    },
+    "agents": {
+      "title": "コーディングエージェント設定",
+      "description": "コーディングエージェントの動作を異なる設定でカスタマイズします。",
+      "loading": "エージェント設定を読み込み中...",
+      "save": {
+        "button": "エージェント設定を保存",
+        "success": "✓ 実行設定が正常に保存されました！"
+      },
+      "editor": {
+        "formLabel": "JSONを編集",
+        "agentLabel": "エージェント",
+        "agentPlaceholder": "実行タイプを選択",
+        "configLabel": "設定",
+        "configPlaceholder": "設定を選択",
+        "createNew": "新規作成...",
+        "deleteTitle": "最後の設定は削除できません",
+        "deleteButton": "{{name}}を削除",
+        "deleteText": "削除",
+        "jsonLabel": "エージェント設定（JSON）",
+        "jsonPlaceholder": "プロファイルを読み込み中...",
+        "jsonLoading": "読み込み中...",
+        "pathLabel": "設定ファイルの場所："
+      },
+      "errors": {
+        "deleteFailed": "設定の削除に失敗しました。もう一度お試しください。",
+        "saveFailed": "エージェント設定の保存に失敗しました。もう一度お試しください。",
+        "saveConfigFailed": "設定の保存に失敗しました。もう一度お試しください。"
+      }
+    },
+    "mcp": {
+      "title": "MCPサーバー設定",
+      "description": "モデルコンテキストプロトコルサーバーを設定して、コーディングエージェントの機能をカスタムツールとリソースで拡張します。",
+      "loading": "MCP設定を読み込み中...",
+      "applying": "設定を適用中...",
+      "labels": {
+        "agent": "エージェント",
+        "agentPlaceholder": "実行器を選択",
+        "agentHelper": "MCPサーバーを設定するエージェントを選択してください。",
+        "serverConfig": "サーバー設定（JSON）",
+        "popularServers": "人気サーバー",
+        "serverHelper": "カードをクリックして、そのMCPサーバーを上記のJSONに挿入します。",
+        "saveLocation": "変更は次の場所に保存されます："
+      },
+      "loading": {
+        "jsonEditor": "読み込み中...",
+        "configuration": "現在のMCPサーバー設定を読み込み中..."
+      },
+      "errors": {
+        "loadFailed": "設定の読み込みに失敗しました。",
+        "invalidJson": "無効なJSON形式です",
+        "validationError": "検証エラー",
+        "saveFailed": "MCPサーバーの保存に失敗しました",
+        "applyFailed": "MCPサーバー設定の適用に失敗しました",
+        "addServerFailed": "事前設定サーバーの追加に失敗しました",
+        "mcpError": "MCP設定エラー：{{error}}",
+        "notSupported": "MCPはサポートされていません",
+        "supportMessage": "MCPサーバーを使用するには、MCP（Claude、Amp、Gemini、Codex、またはOpencode）をサポートする別の実行器を上記で選択してください。"
+      },
+      "save": {
+        "button": "MCP設定を保存",
+        "success": "設定が保存されました！",
+        "successMessage": "✓ MCP設定が正常に保存されました！",
+        "loading": "現在のMCPサーバー設定を読み込み中..."
+      }
+    }
+  }
+}

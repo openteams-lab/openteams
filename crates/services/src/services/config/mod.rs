@@ -21,6 +21,7 @@ pub type ThemeMode = versions::v6::ThemeMode;
 pub type SoundFile = versions::v6::SoundFile;
 pub type EditorType = versions::v6::EditorType;
 pub type GitHubConfig = versions::v6::GitHubConfig;
+pub type UiLanguage = versions::v6::UiLanguage;
 
 /// Will always return config, trying old schemas or eventually returning default
 pub async fn load_config_from_file(config_path: &PathBuf) -> Config {

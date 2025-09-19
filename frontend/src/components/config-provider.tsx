@@ -16,6 +16,7 @@ import {
 } from 'shared/types';
 import type { ExecutorConfig } from 'shared/types';
 import { configApi, githubAuthApi } from '../lib/api';
+import { updateLanguageFromConfig } from '../i18n/config';
 
 interface UserSystemState {
   config: Config | null;
@@ -97,6 +98,13 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
 
     loadUserSystem();
   }, []);
+
+  // Sync language with i18n when config changes
+  useEffect(() => {
+    if (config?.language) {
+      updateLanguageFromConfig(config.language);
+    }
+  }, [config?.language]);
 
   // Check GitHub token validity after config loads
   useEffect(() => {

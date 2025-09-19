@@ -1,0 +1,25 @@
+{
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "continue": "Continue",
+    "reset": "Reset",
+    "manage": "Manage",
+    "connect": "Connect",
+    "disconnect": "Disconnect"
+  },
+  "states": {
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "error": "Error",
+    "success": "Success"
+  },
+  "language": {
+    "en": "English",
+    "ja": "日本語",
+    "browserDefault": "Browser Default"
+  }
+}
