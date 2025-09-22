@@ -4,37 +4,43 @@ const { execSync, spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 
-// Detect true CPU arch on macOS (handles Rosetta)
-function getUnderlyingArch() {
+// Resolve effective arch for our published 64-bit binaries only.
+// Any ARM → arm64; anything else → x64. On macOS, handle Rosetta.
+function getEffectiveArch() {
   const platform = process.platform;
   const nodeArch = process.arch;
 
-  if (platform !== "darwin") {
-    return nodeArch;
-  }
+  if (platform === "darwin") {
+    // If Node itself is arm64, we’re natively on Apple silicon
+    if (nodeArch === "arm64") return "arm64";
 
-  // If Node itself is arm64, we’re natively on Apple silicon
-  if (nodeArch === "arm64") {
-    return "arm64";
-  }
-
-  // Otherwise check for Rosetta translation
-  try {
-    const translated = execSync("sysctl -in sysctl.proc_translated", {
-      encoding: "utf8",
-    }).trim();
-    if (translated === "1") {
-      return "arm64";
+    // Otherwise check for Rosetta translation
+    try {
+      const translated = execSync("sysctl -in sysctl.proc_translated", {
+        encoding: "utf8",
+      }).trim();
+      if (translated === "1") return "arm64";
+    } catch {
+      // sysctl key not present → assume true Intel
     }
-  } catch {
-    // sysctl key not present → assume true Intel
+    return "x64";
+  }
+
+  // Non-macOS: coerce to broad families we support
+  if (/arm/i.test(nodeArch)) return "arm64";
+
+  // On Windows with 32-bit Node (ia32), detect OS arch via env
+  if (platform === "win32") {
+    const pa = process.env.PROCESSOR_ARCHITECTURE || "";
+    const paw = process.env.PROCESSOR_ARCHITEW6432 || "";
+    if (/arm/i.test(pa) || /arm/i.test(paw)) return "arm64";
   }
 
   return "x64";
 }
 
 const platform = process.platform;
-const arch = getUnderlyingArch();
+const arch = getEffectiveArch();
 
 // Map to our build target names
 function getPlatformDir() {
