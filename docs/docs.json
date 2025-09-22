@@ -3,10 +3,7 @@
   "theme": "mint",
   "name": "Vibe Kanban",
   "description": "A kanban board for developers to track coding tasks with AI coding agents",
-  "banner": {
-    "content": "🎉 **Ultimate Agents Hackathon** - London, September 20th | £10k in prizes! [Register now](https://london.aitinkerers.org/p/ultimate-agents-hackathon-10k-total-prizes)",
-    "dismissible": true
-  },
+
   "colors": {
     "primary": "#000000",
     "light": "#fefefe",
