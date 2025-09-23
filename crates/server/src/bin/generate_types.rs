@@ -1,4 +1,4 @@
-use std::{env, fs, path::Path};
+use std::{collections::HashMap, env, fs, path::Path};
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
 use ts_rs::TS;
@@ -132,10 +132,7 @@ fn generate_types_content() -> String {
     format!("{HEADER}\n\n{body}")
 }
 
-fn write_schema<T: JsonSchema>(
-    name: &str,
-    schemas_dir: &std::path::Path,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn generate_json_schema<T: JsonSchema>() -> Result<String, serde_json::Error> {
     // Draft-07, inline everything (no $defs)
     let mut settings = SchemaSettings::draft07();
     settings.inline_subschemas = true;
@@ -145,34 +142,79 @@ fn write_schema<T: JsonSchema>(
 
     // Convert to JSON value to manipulate it
     let mut schema_value: serde_json::Value = serde_json::to_value(&schema)?;
-
     // Remove the title from root schema to prevent RJSF from creating an outer field container
     if let Some(obj) = schema_value.as_object_mut() {
         obj.remove("title");
     }
+    let formatted = serde_json::to_string_pretty(&schema_value)?;
+    Ok(formatted)
+}
 
-    let schema_json = serde_json::to_string_pretty(&schema_value)?;
-    std::fs::write(schemas_dir.join(format!("{name}.json")), schema_json)?;
+fn generate_schemas() -> Result<HashMap<&'static str, String>, serde_json::Error> {
+    // // Generate schemas for all executor types
+    println!("Generating JSON schemas…");
+    let schemas: HashMap<&str, String> = HashMap::from([
+        (
+            "amp",
+            generate_json_schema::<executors::executors::amp::Amp>()?,
+        ),
+        (
+            "claude_code",
+            generate_json_schema::<executors::executors::claude::ClaudeCode>()?,
+        ),
+        (
+            "gemini",
+            generate_json_schema::<executors::executors::gemini::Gemini>()?,
+        ),
+        (
+            "codex",
+            generate_json_schema::<executors::executors::codex::Codex>()?,
+        ),
+        (
+            "cursor",
+            generate_json_schema::<executors::executors::cursor::Cursor>()?,
+        ),
+        (
+            "opencode",
+            generate_json_schema::<executors::executors::opencode::Opencode>()?,
+        ),
+        (
+            "qwen_code",
+            generate_json_schema::<executors::executors::qwen::QwenCode>()?,
+        ),
+    ]);
+    println!(
+        "✅ JSON schemas generated. {} schemas created.",
+        schemas.len()
+    );
+    Ok(schemas)
+}
+
+fn write_schemas(
+    schemas_path: &Path,
+    schemas: HashMap<&str, String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    fs::create_dir_all(schemas_path)?;
+
+    for (name, content) in schemas {
+        let schema_file = schemas_path.join(format!("{}.json", name));
+        fs::write(&schema_file, content)?;
+        println!("✅ Generated schema: {}", schema_file.display());
+    }
+
     Ok(())
 }
 
-fn generate_schemas() -> Result<(), Box<dyn std::error::Error>> {
-    // Create schemas directory
-    let schemas_dir = Path::new("shared/schemas");
-    fs::create_dir_all(schemas_dir)?;
-
-    println!("Generating JSON schemas…");
-
-    // Generate schemas for all executor types
-    write_schema::<executors::executors::amp::Amp>("amp", schemas_dir)?;
-    write_schema::<executors::executors::claude::ClaudeCode>("claude_code", schemas_dir)?;
-    write_schema::<executors::executors::gemini::Gemini>("gemini", schemas_dir)?;
-    write_schema::<executors::executors::codex::Codex>("codex", schemas_dir)?;
-    write_schema::<executors::executors::cursor::Cursor>("cursor", schemas_dir)?;
-    write_schema::<executors::executors::opencode::Opencode>("opencode", schemas_dir)?;
-    write_schema::<executors::executors::qwen::QwenCode>("qwen_code", schemas_dir)?;
-
-    Ok(())
+fn schemas_up_to_date(schemas_path: &Path, schemas: &HashMap<&str, String>) -> bool {
+    for (name, expected_content) in schemas {
+        let schema_file = schemas_path.join(format!("{}.json", name));
+        let current_content = fs::read_to_string(&schema_file).unwrap_or_default();
+        if &current_content != expected_content {
+            eprintln!("❌ Schema shared/schemas/{}.json is not up to date.", name);
+            return false;
+        }
+    }
+    true
 }
 
 fn main() {
@@ -183,19 +225,37 @@ fn main() {
 
     println!("Generating TypeScript types…");
 
-    let generated = generate_types_content();
+    let generated_types = generate_types_content();
+    let schema_content = match generate_schemas() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("❌ Failed to generate JSON schemas: {}", e);
+            std::process::exit(1);
+        }
+    };
+
     let types_path = shared_path.join("types.ts");
+    let schemas_path = shared_path.join("schemas");
 
     if check_mode {
-        // Read the current file
+        // Check TypeScript types
         let current = fs::read_to_string(&types_path).unwrap_or_default();
-        if current == generated {
+        let types_up_to_date = if current == generated_types {
             println!("✅ shared/types.ts is up to date.");
+            true
+        } else {
+            eprintln!("❌ shared/types.ts is not up to date.");
+            false
+        };
+
+        // Check JSON schemas
+        let schemas_up_to_date = schemas_up_to_date(&schemas_path, &schema_content);
+
+        // Exit with appropriate code
+        if types_up_to_date && schemas_up_to_date {
             std::process::exit(0);
         } else {
-            eprintln!(
-                "❌ shared/types.ts is not up to date. Please run 'npm run generate-types' and commit the changes."
-            );
+            eprintln!("Please run 'npm run generate-types' and commit the changes.");
             std::process::exit(1);
         }
     } else {
@@ -206,14 +266,10 @@ fn main() {
         fs::create_dir_all(shared_path).expect("cannot create shared");
 
         // Write the file as before
-        fs::write(&types_path, generated).expect("unable to write types.ts");
+        fs::write(&types_path, generated_types).expect("unable to write types.ts");
         println!("✅ TypeScript types generated in shared/");
 
-        // Generate JSON schemas
-        if let Err(e) = generate_schemas() {
-            eprintln!("❌ Failed to generate schemas: {}", e);
-            std::process::exit(1);
-        }
+        write_schemas(&schemas_path, schema_content).expect("unable to write schemas");
 
         println!("✅ JSON schemas generated in shared/schemas/");
     }
