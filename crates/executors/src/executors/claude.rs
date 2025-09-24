@@ -1,4 +1,6 @@
-use std::{os::unix::fs::PermissionsExt, path::Path, process::Stdio, sync::Arc};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+use std::{path::Path, process::Stdio, sync::Arc};
 
 use async_trait::async_trait;
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
