@@ -247,9 +247,9 @@ pub trait Deployment: Clone + Send + Sync + 'static {
     /// Trigger background auto-setup of default projects for new users
     async fn trigger_auto_project_setup(&self) {
         // soft timeout to give the filesystem search a chance to complete
-        let soft_timeout_ms = 800;
+        let soft_timeout_ms = 2_000;
         // hard timeout to ensure the background task doesn't run indefinitely
-        let hard_timeout_ms = 1_000;
+        let hard_timeout_ms = 2_300;
         let project_count = Project::count(&self.db().pool).await.unwrap_or(0);
 
         // Only proceed if no projects exist
@@ -257,7 +257,7 @@ pub trait Deployment: Clone + Send + Sync + 'static {
             // Discover local git repositories
             if let Ok(repos) = self
                 .filesystem()
-                .list_common_git_repos(soft_timeout_ms, hard_timeout_ms, Some(3))
+                .list_common_git_repos(soft_timeout_ms, hard_timeout_ms, Some(4))
                 .await
             {
                 // Take first 3 repositories and create projects
@@ -282,19 +282,34 @@ pub trait Deployment: Clone + Send + Sync + 'static {
 
                     // Create project (ignore individual failures)
                     let project_id = Uuid::new_v4();
-                    if let Err(e) = Project::create(&self.db().pool, &create_data, project_id).await
-                    {
-                        tracing::warn!(
-                            "Failed to auto-create project '{}': {}",
-                            create_data.name,
-                            e
-                        );
-                    } else {
-                        tracing::info!(
-                            "Auto-created project '{}' from {}",
-                            create_data.name,
-                            create_data.git_repo_path
-                        );
+                    match Project::create(&self.db().pool, &create_data, project_id).await {
+                        Ok(project) => {
+                            tracing::info!(
+                                "Auto-created project '{}' from {}",
+                                create_data.name,
+                                create_data.git_repo_path
+                            );
+
+                            // Track project creation event
+                            self.track_if_analytics_allowed(
+                                "project_created",
+                                serde_json::json!({
+                                    "project_id": project.id.to_string(),
+                                    "use_existing_repo": create_data.use_existing_repo,
+                                    "has_setup_script": create_data.setup_script.is_some(),
+                                    "has_dev_script": create_data.dev_script.is_some(),
+                                    "source": "auto_setup",
+                                }),
+                            )
+                            .await;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to auto-create project '{}': {}",
+                                create_data.name,
+                                e
+                            );
+                        }
                     }
                 }
             }
