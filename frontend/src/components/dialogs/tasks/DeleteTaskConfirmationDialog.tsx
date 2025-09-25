@@ -94,4 +94,3 @@ const DeleteTaskConfirmationDialog =
   });
 
 export { DeleteTaskConfirmationDialog };
-export default DeleteTaskConfirmationDialog;
