@@ -22,6 +22,7 @@ import {
   useKeyOpenDetails,
   Scope,
   useKeyToggleFullscreen,
+  useKeyDeleteTask,
 } from '@/keyboard';
 
 import {
@@ -229,7 +230,6 @@ export function ProjectTasks() {
     },
     {
       scope: Scope.KANBAN,
-      when: !isFullscreen,
       preventDefault: true,
     }
   );
@@ -240,7 +240,6 @@ export function ProjectTasks() {
     },
     {
       scope: Scope.KANBAN,
-      when: !isFullscreen,
       preventDefault: true,
     }
   );
@@ -251,7 +250,6 @@ export function ProjectTasks() {
     },
     {
       scope: Scope.KANBAN,
-      when: !isFullscreen,
       preventDefault: true, // Prevent page scroll
     }
   );
@@ -262,12 +260,24 @@ export function ProjectTasks() {
     },
     {
       scope: Scope.KANBAN,
-      when: !isFullscreen,
       preventDefault: true, // Prevent page scroll
     }
   );
 
   useKeyOpenDetails(() => {}, { scope: Scope.KANBAN });
+
+  // Delete task shortcut
+  useKeyDeleteTask(
+    () => {
+      if (selectedTask) {
+        handleDeleteTask(selectedTask.id);
+      }
+    },
+    {
+      scope: Scope.KANBAN,
+      preventDefault: true,
+    }
+  );
 
   // Full screen
 

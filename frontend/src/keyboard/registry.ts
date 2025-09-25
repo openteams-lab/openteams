@@ -18,6 +18,7 @@ export enum Action {
   OPEN_DETAILS = 'open_details',
   SHOW_HELP = 'show_help',
   TOGGLE_FULLSCREEN = 'toggle_fullscreen',
+  DELETE_TASK = 'delete_task',
 }
 
 export interface KeyBinding {
@@ -87,28 +88,28 @@ export const keyBindings: KeyBinding[] = [
   },
   {
     action: Action.NAV_UP,
-    keys: 'up',
+    keys: ['up', 'k'],
     scopes: [Scope.KANBAN],
     description: 'Move up within column',
     group: 'Navigation',
   },
   {
     action: Action.NAV_DOWN,
-    keys: 'down',
+    keys: ['down', 'j'],
     scopes: [Scope.KANBAN],
     description: 'Move down within column',
     group: 'Navigation',
   },
   {
     action: Action.NAV_LEFT,
-    keys: 'left',
+    keys: ['left', 'h'],
     scopes: [Scope.KANBAN],
     description: 'Move to previous column',
     group: 'Navigation',
   },
   {
     action: Action.NAV_RIGHT,
-    keys: 'right',
+    keys: ['right', 'l'],
     scopes: [Scope.KANBAN],
     description: 'Move to next column',
     group: 'Navigation',
@@ -136,6 +137,15 @@ export const keyBindings: KeyBinding[] = [
     keys: 'enter',
     scopes: [Scope.KANBAN],
     description: 'Toggle fullscreen view',
+    group: 'Task Details',
+  },
+
+  // Task actions
+  {
+    action: Action.DELETE_TASK,
+    keys: 'd',
+    scopes: [Scope.KANBAN],
+    description: 'Delete selected task',
     group: 'Task Details',
   },
 ];

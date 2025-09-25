@@ -52,7 +52,7 @@ export const useKeySubmit = createSemanticHook(Action.SUBMIT);
 export const useKeyFocusSearch = createSemanticHook(Action.FOCUS_SEARCH);
 
 /**
- * Navigation actions - arrow keys
+ * Navigation actions - arrow keys and vim keys (hjkl)
  */
 export const useKeyNavUp = createSemanticHook(Action.NAV_UP);
 export const useKeyNavDown = createSemanticHook(Action.NAV_DOWN);
@@ -84,3 +84,11 @@ export const useKeyShowHelp = createSemanticHook(Action.SHOW_HELP);
 export const useKeyToggleFullscreen = createSemanticHook(
   Action.TOGGLE_FULLSCREEN
 );
+
+/**
+ * Delete task action - typically 'd' key
+ *
+ * @example
+ * useKeyDeleteTask(() => handleDeleteTask(selectedTask), { scope: Scope.KANBAN });
+ */
+export const useKeyDeleteTask = createSemanticHook(Action.DELETE_TASK);

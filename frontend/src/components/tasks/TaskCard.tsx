@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -45,6 +45,20 @@ export function TaskCard({
     onViewDetails(task);
   }, [task, onViewDetails]);
 
+  const localRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen || !localRef.current) return;
+    const el = localRef.current;
+    requestAnimationFrame(() => {
+      el.scrollIntoView({
+        block: 'center',
+        inline: 'nearest',
+        behavior: 'smooth',
+      });
+    });
+  }, [isOpen]);
+
   return (
     <KanbanCard
       key={task.id}
@@ -54,6 +68,7 @@ export function TaskCard({
       parent={status}
       onClick={handleClick}
       isOpen={isOpen}
+      forwardedRef={localRef}
     >
       <div className="flex flex-1 gap-2 items-center min-w-0">
         <h4 className="flex-1 min-w-0 line-clamp-2 font-light text-sm">
