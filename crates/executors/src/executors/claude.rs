@@ -739,7 +739,7 @@ impl ClaudeLogProcessor {
             ClaudeJson::User { session_id, .. } => session_id.clone(),
             ClaudeJson::ToolUse { session_id, .. } => session_id.clone(),
             ClaudeJson::ToolResult { session_id, .. } => session_id.clone(),
-            ClaudeJson::Result { .. } => None,
+            ClaudeJson::Result { session_id, .. } => session_id.clone(),
             ClaudeJson::Unknown { .. } => None,
         }
     }
@@ -868,9 +868,37 @@ impl ClaudeLogProcessor {
                 // TODO: Add proper ToolResult support to NormalizedEntry when the type system supports it
                 vec![]
             }
-            ClaudeJson::Result { .. } => {
-                // Skip result messages
-                vec![]
+            ClaudeJson::Result {
+                subtype: _,
+                is_error,
+                duration_ms: _,
+                result: _,
+                error: _,
+                num_turns: _,
+                ..
+            } => {
+                // Only handle Result messages for AmpResume strategy
+                if !matches!(self.strategy, HistoryStrategy::AmpResume) {
+                    return vec![];
+                }
+
+                // Determine if this is an error
+                let is_err = is_error.unwrap_or(false);
+
+                // Skip non-error results to avoid noise
+                if !is_err {
+                    return vec![];
+                }
+
+                vec![NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::ErrorMessage,
+                    content: serde_json::to_string(claude_json)
+                        .unwrap_or_else(|_| "error".to_string()),
+                    metadata: Some(
+                        serde_json::to_value(claude_json).unwrap_or(serde_json::Value::Null),
+                    ),
+                }]
             }
             ClaudeJson::Unknown { data } => {
                 vec![NormalizedEntry {
@@ -1265,10 +1293,20 @@ pub enum ClaudeJson {
     },
     #[serde(rename = "result")]
     Result {
+        #[serde(default)]
         subtype: Option<String>,
+        #[serde(default, alias = "isError")]
         is_error: Option<bool>,
+        #[serde(default, alias = "durationMs")]
         duration_ms: Option<u64>,
+        #[serde(default)]
         result: Option<serde_json::Value>,
+        #[serde(default)]
+        error: Option<String>,
+        #[serde(default, alias = "numTurns")]
+        num_turns: Option<u32>,
+        #[serde(default, alias = "sessionId")]
+        session_id: Option<String>,
     },
     // Catch-all for unknown message types
     #[serde(untagged)]
