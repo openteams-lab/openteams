@@ -1,6 +1,12 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { DragEndEvent, Modifier } from '@dnd-kit/core';
 import {
@@ -13,9 +19,12 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { type ReactNode, type Ref, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
+import { Plus } from 'lucide-react';
 import type { ClientRect } from '@dnd-kit/core';
 import type { Transform } from '@dnd-kit/utilities';
+import { Button } from '../../button';
 export type { DragEndEvent } from '@dnd-kit/core';
 
 export type Status = {
@@ -140,15 +149,20 @@ export type KanbanHeaderProps =
       name: Status['name'];
       color: Status['color'];
       className?: string;
+      onAddTask?: () => void;
     };
 
-export const KanbanHeader = (props: KanbanHeaderProps) =>
-  'children' in props ? (
-    props.children
-  ) : (
+export const KanbanHeader = (props: KanbanHeaderProps) => {
+  const { t } = useTranslation('tasks');
+
+  if ('children' in props) {
+    return props.children;
+  }
+
+  return (
     <Card
       className={cn(
-        'sticky top-0 z-20 flex shrink-0 items-center gap-2 p-3 border-b border-dashed',
+        'sticky top-0 z-20 flex shrink-0 items-center gap-2 p-3 border-b border-dashed flex gap-2',
         'bg-background',
         props.className
       )}
@@ -156,13 +170,32 @@ export const KanbanHeader = (props: KanbanHeaderProps) =>
         backgroundImage: `linear-gradient(hsl(var(${props.color}) / 0.03), hsl(var(${props.color}) / 0.03))`,
       }}
     >
-      <div
-        className="h-2 w-2 rounded-full"
-        style={{ backgroundColor: `hsl(var(${props.color}))` }}
-      />
-      <p className="m-0 text-sm">{props.name}</p>
+      <span className="flex-1 flex items-center gap-2">
+        <div
+          className="h-2 w-2 rounded-full"
+          style={{ backgroundColor: `hsl(var(${props.color}))` }}
+        />
+
+        <p className="m-0 text-sm">{props.name}</p>
+      </span>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              className="m-0 p-0 h-0 text-foreground/50 hover:text-foreground"
+              onClick={props.onAddTask}
+              aria-label={t('actions.addTask')}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{t('actions.addTask')}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </Card>
   );
+};
 
 function restrictToBoundingRectWithRightPadding(
   transform: Transform,
