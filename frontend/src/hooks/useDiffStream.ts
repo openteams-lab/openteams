@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { PatchType } from 'shared/types';
-import { useJsonPatchStream } from './useJsonPatchStream';
+import { useJsonPatchWsStream } from './useJsonPatchWsStream';
 
 interface DiffState {
   entries: Record<string, PatchType>;
@@ -17,7 +17,7 @@ export const useDiffStream = (
   enabled: boolean
 ): UseDiffStreamResult => {
   const endpoint = attemptId
-    ? `/api/task-attempts/${attemptId}/diff`
+    ? `/api/task-attempts/${attemptId}/diff/ws`
     : undefined;
 
   const initialData = useCallback(
@@ -27,7 +27,7 @@ export const useDiffStream = (
     []
   );
 
-  const { data, isConnected, error } = useJsonPatchStream(
+  const { data, isConnected, error } = useJsonPatchWsStream(
     endpoint,
     enabled && !!attemptId,
     initialData

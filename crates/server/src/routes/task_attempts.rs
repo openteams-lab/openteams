@@ -1,17 +1,14 @@
 use std::path::PathBuf;
 
 use axum::{
-    BoxError, Extension, Json, Router,
+    Extension, Json, Router,
     extract::{
         Query, State,
         ws::{WebSocket, WebSocketUpgrade},
     },
     http::StatusCode,
     middleware::from_fn_with_state,
-    response::{
-        IntoResponse, Json as ResponseJson, Sse,
-        sse::{Event, KeepAlive},
-    },
+    response::{IntoResponse, Json as ResponseJson},
     routing::{get, post},
 };
 use db::models::{
@@ -32,7 +29,6 @@ use executors::{
     },
     profile::ExecutorProfileId,
 };
-use futures_util::TryStreamExt;
 use git2::BranchType;
 use serde::{Deserialize, Serialize};
 use services::services::{
@@ -962,14 +958,50 @@ pub async fn replace_process(
     })))
 }
 
-pub async fn get_task_attempt_diff(
+#[axum::debug_handler]
+pub async fn stream_task_attempt_diff_ws(
+    ws: WebSocketUpgrade,
     Extension(task_attempt): Extension<TaskAttempt>,
     State(deployment): State<DeploymentImpl>,
-    // ) -> Result<ResponseJson<ApiResponse<Diff>>, ApiError> {
-) -> Result<Sse<impl futures_util::Stream<Item = Result<Event, BoxError>>>, ApiError> {
-    let stream = deployment.container().get_diff(&task_attempt).await?;
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| async move {
+        if let Err(e) = handle_task_attempt_diff_ws(socket, deployment, task_attempt).await {
+            tracing::warn!("diff WS closed: {}", e);
+        }
+    })
+}
 
-    Ok(Sse::new(stream.map_err(|e| -> BoxError { e.into() })).keep_alive(KeepAlive::default()))
+async fn handle_task_attempt_diff_ws(
+    socket: WebSocket,
+    deployment: DeploymentImpl,
+    task_attempt: TaskAttempt,
+) -> anyhow::Result<()> {
+    use futures_util::{SinkExt, StreamExt, TryStreamExt};
+    use utils::log_msg::LogMsg;
+
+    let mut stream = deployment
+        .container()
+        .stream_diff(&task_attempt)
+        .await?
+        .map_ok(|msg: LogMsg| msg.to_ws_message_unchecked());
+
+    let (mut sender, mut receiver) = socket.split();
+    tokio::spawn(async move { while let Some(Ok(_)) = receiver.next().await {} });
+
+    while let Some(item) = stream.next().await {
+        match item {
+            Ok(msg) => {
+                if sender.send(msg).await.is_err() {
+                    break;
+                }
+            }
+            Err(e) => {
+                tracing::error!("stream error: {}", e);
+                break;
+            }
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -1730,7 +1762,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route("/commit-compare", get(compare_commit_to_head))
         .route("/start-dev-server", post(start_dev_server))
         .route("/branch-status", get(get_task_attempt_branch_status))
-        .route("/diff", get(get_task_attempt_diff))
+        .route("/diff/ws", get(stream_task_attempt_diff_ws))
         .route("/merge", post(merge_task_attempt))
         .route("/push", post(push_task_attempt_branch))
         .route("/rebase", post(rebase_task_attempt))

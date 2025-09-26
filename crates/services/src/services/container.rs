@@ -6,7 +6,6 @@ use std::{
 
 use anyhow::{Error as AnyhowError, anyhow};
 use async_trait::async_trait;
-use axum::response::sse::Event;
 use db::{
     DBService,
     models::{
@@ -194,10 +193,11 @@ pub trait ContainerService {
         copy_files: &str,
     ) -> Result<(), ContainerError>;
 
-    async fn get_diff(
+    /// Stream diff updates as LogMsg for WebSocket endpoints.
+    async fn stream_diff(
         &self,
         task_attempt: &TaskAttempt,
-    ) -> Result<futures::stream::BoxStream<'static, Result<Event, std::io::Error>>, ContainerError>;
+    ) -> Result<futures::stream::BoxStream<'static, Result<LogMsg, std::io::Error>>, ContainerError>;
 
     /// Fetch the MsgStore for a given execution ID, panicking if missing.
     async fn get_msg_store_by_id(&self, uuid: &Uuid) -> Option<Arc<MsgStore>> {
