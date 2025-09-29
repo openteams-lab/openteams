@@ -1,14 +1,10 @@
 import {
   ExternalLink,
-  GitBranch as GitBranchIcon,
   GitFork,
-  GitPullRequest,
   History,
   Play,
   Plus,
-  RefreshCw,
   ScrollText,
-  Settings,
   StopCircle,
 } from 'lucide-react';
 import {
@@ -24,36 +20,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.tsx';
-import {
-  Dispatch,
-  SetStateAction,
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-  useEffect,
-} from 'react';
-import type {
-  GitBranch,
-  TaskAttempt,
-  TaskWithAttemptStatus,
-} from 'shared/types';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import type { TaskAttempt, TaskWithAttemptStatus } from 'shared/types';
 import { useBranchStatus, useOpenInEditor } from '@/hooks';
 import { useAttemptExecution } from '@/hooks/useAttemptExecution';
 import { useDevServer } from '@/hooks/useDevServer';
-import { useRebase } from '@/hooks/useRebase';
-import { useMerge } from '@/hooks/useMerge';
-import NiceModal from '@ebay/nice-modal-react';
-import { Err } from '@/lib/api';
-import type { GitOperationError } from 'shared/types';
-import { displayConflictOpLabel } from '@/lib/conflicts';
-import { usePush } from '@/hooks/usePush';
 import { useUserSystem } from '@/components/config-provider.tsx';
 
 import { writeClipboardViaBridge } from '@/vscode/bridge';
 import { useProcessSelection } from '@/contexts/ProcessSelectionContext';
 import { openTaskForm } from '@/lib/openTaskForm';
-import { showModal } from '@/lib/modals';
 
 // Helper function to get the display name for different editor types
 function getEditorDisplayName(editorType: string): string {
@@ -81,14 +57,9 @@ type Props = {
   task: TaskWithAttemptStatus;
   projectId: string;
   projectHasDevScript: boolean;
-  setError: Dispatch<SetStateAction<string | null>>;
-
-  selectedBranch: string | null;
   selectedAttempt: TaskAttempt;
   taskAttempts: TaskAttempt[];
-  creatingPR: boolean;
   handleEnterCreateAttemptMode: () => void;
-  branches: GitBranch[];
   setSelectedAttempt: (attempt: TaskAttempt | null) => void;
 };
 
@@ -96,13 +67,9 @@ function CurrentAttempt({
   task,
   projectId,
   projectHasDevScript,
-  setError,
-  selectedBranch,
   selectedAttempt,
   taskAttempts,
-  creatingPR,
   handleEnterCreateAttemptMode,
-  branches,
   setSelectedAttempt,
 }: Props) {
   const { config } = useUserSystem();
@@ -117,10 +84,6 @@ function CurrentAttempt({
     () => Boolean((branchStatus?.conflicted_files?.length ?? 0) > 0),
     [branchStatus?.conflicted_files]
   );
-  const conflictOpLabel = useMemo(
-    () => displayConflictOpLabel(branchStatus?.conflict_op),
-    [branchStatus?.conflict_op]
-  );
   const handleOpenInEditor = useOpenInEditor(selectedAttempt?.id);
   const { jumpToProcess } = useProcessSelection();
 
@@ -132,16 +95,8 @@ function CurrentAttempt({
     runningDevServer,
     latestDevServerProcess,
   } = useDevServer(selectedAttempt?.id);
-  const rebaseMutation = useRebase(selectedAttempt?.id, projectId);
-  const mergeMutation = useMerge(selectedAttempt?.id);
-  const pushMutation = usePush(selectedAttempt?.id);
 
-  const [merging, setMerging] = useState(false);
-  const [pushing, setPushing] = useState(false);
-  const [rebasing, setRebasing] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [mergeSuccess, setMergeSuccess] = useState(false);
-  const [pushSuccess, setPushSuccess] = useState(false);
 
   const handleViewDevServerLogs = () => {
     if (latestDevServerProcess) {
@@ -152,7 +107,8 @@ function CurrentAttempt({
   const handleCreateSubtaskClick = () => {
     openTaskForm({
       projectId,
-      initialBaseBranch: selectedAttempt.branch || selectedAttempt.base_branch,
+      initialBaseBranch:
+        selectedAttempt.branch || selectedAttempt.target_branch,
       parentTaskAttemptId: selectedAttempt.id,
     });
   };
@@ -167,106 +123,6 @@ function CurrentAttempt({
     [setSelectedAttempt]
   );
 
-  const handleMergeClick = async () => {
-    if (!projectId || !selectedAttempt?.id || !selectedAttempt?.task_id) return;
-
-    // Directly perform merge without checking branch status
-    await performMerge();
-  };
-
-  const handlePushClick = async () => {
-    try {
-      setPushing(true);
-      await pushMutation.mutateAsync();
-      setError(null); // Clear any previous errors on success
-      setPushSuccess(true);
-      setTimeout(() => setPushSuccess(false), 2000);
-    } catch (error: any) {
-      setError(error.message || 'Failed to push changes');
-    } finally {
-      setPushing(false);
-    }
-  };
-
-  const performMerge = async () => {
-    try {
-      setMerging(true);
-      await mergeMutation.mutateAsync();
-      setError(null); // Clear any previous errors on success
-      setMergeSuccess(true);
-      setTimeout(() => setMergeSuccess(false), 2000);
-    } catch (error) {
-      // @ts-expect-error it is type ApiError
-      setError(error.message || 'Failed to merge changes');
-    } finally {
-      setMerging(false);
-    }
-  };
-
-  const handleRebaseClick = async () => {
-    setRebasing(true);
-    await rebaseMutation
-      .mutateAsync(undefined)
-      .then(() => setError(null))
-      .catch((err: Err<GitOperationError>) => {
-        const data = err?.error;
-        const isConflict =
-          data?.type === 'merge_conflicts' ||
-          data?.type === 'rebase_in_progress';
-        if (!isConflict) setError(err.message || 'Failed to rebase branch');
-      });
-    setRebasing(false);
-  };
-
-  const handleRebaseWithNewBranch = async (newBaseBranch: string) => {
-    setRebasing(true);
-    await rebaseMutation
-      .mutateAsync(newBaseBranch)
-      .then(() => setError(null))
-      .catch((err: Err<GitOperationError>) => {
-        const data = err?.error;
-        const isConflict =
-          data?.type === 'merge_conflicts' ||
-          data?.type === 'rebase_in_progress';
-        if (!isConflict) setError(err.message || 'Failed to rebase branch');
-      });
-    setRebasing(false);
-  };
-
-  const handleRebaseDialogOpen = async () => {
-    try {
-      const result = await showModal<{
-        action: 'confirmed' | 'canceled';
-        branchName?: string;
-      }>('rebase-dialog', {
-        branches,
-        isRebasing: rebasing,
-      });
-
-      if (result.action === 'confirmed' && result.branchName) {
-        await handleRebaseWithNewBranch(result.branchName);
-      }
-    } catch (error) {
-      // User cancelled - do nothing
-    }
-  };
-
-  const handlePRButtonClick = async () => {
-    if (!projectId || !selectedAttempt?.id || !selectedAttempt?.task_id) return;
-
-    // If PR already exists, push to it
-    if (mergeInfo.hasOpenPR) {
-      await handlePushClick();
-      return;
-    }
-
-    NiceModal.show('create-pr', {
-      attempt: selectedAttempt,
-      task,
-      projectId,
-    });
-  };
-
   // Refresh branch status when a process completes (e.g., rebase resolved by agent)
   const prevRunningRef = useRef<boolean>(isAttemptRunning);
   useEffect(() => {
@@ -276,59 +132,11 @@ function CurrentAttempt({
     prevRunningRef.current = isAttemptRunning;
   }, [isAttemptRunning, selectedAttempt?.id, refetchBranchStatus]);
 
-  // Get display name for selected branch
-  const selectedBranchDisplayName = useMemo(() => {
-    if (!selectedBranch) return 'current';
-
-    // For remote branches, show just the branch name without the remote prefix
-    if (selectedBranch.includes('/')) {
-      const parts = selectedBranch.split('/');
-      return parts[parts.length - 1];
-    }
-    return selectedBranch;
-  }, [selectedBranch]);
-
   // Get display name for the configured editor
   const editorDisplayName = useMemo(() => {
     if (!config?.editor?.editor_type) return 'Editor';
     return getEditorDisplayName(config.editor.editor_type);
   }, [config?.editor?.editor_type]);
-
-  // Memoize merge status information to avoid repeated calculations
-  const mergeInfo = useMemo(() => {
-    if (!branchStatus?.merges)
-      return {
-        hasOpenPR: false,
-        openPR: null,
-        hasMergedPR: false,
-        mergedPR: null,
-        hasMerged: false,
-        latestMerge: null,
-      };
-
-    const openPR = branchStatus.merges.find(
-      (m) => m.type === 'pr' && m.pr_info.status === 'open'
-    );
-
-    const mergedPR = branchStatus.merges.find(
-      (m) => m.type === 'pr' && m.pr_info.status === 'merged'
-    );
-
-    const merges = branchStatus.merges.filter(
-      (m) =>
-        m.type === 'direct' ||
-        (m.type === 'pr' && m.pr_info.status === 'merged')
-    );
-
-    return {
-      hasOpenPR: !!openPR,
-      openPR,
-      hasMergedPR: !!mergedPR,
-      mergedPR,
-      hasMerged: merges.length > 0,
-      latestMerge: branchStatus.merges[0] || null, // Most recent merge
-    };
-  }, [branchStatus?.merges]);
 
   const handleCopyWorktreePath = useCallback(async () => {
     try {
@@ -340,171 +148,15 @@ function CurrentAttempt({
     }
   }, [selectedAttempt.container_ref]);
 
-  // Get status information for display
-  const getStatusInfo = useCallback(() => {
-    if (hasConflicts) {
-      return {
-        dotColor: 'bg-orange-500',
-        textColor: 'text-orange-700',
-        text: `${conflictOpLabel} conflicts`,
-        isClickable: false,
-      } as const;
-    }
-    if (branchStatus?.is_rebase_in_progress) {
-      return {
-        dotColor: 'bg-orange-500',
-        textColor: 'text-orange-700',
-        text: 'Rebase in progress',
-        isClickable: false,
-      } as const;
-    }
-    if (mergeInfo.hasMergedPR && mergeInfo.mergedPR?.type === 'pr') {
-      const prMerge = mergeInfo.mergedPR;
-      return {
-        dotColor: 'bg-green-500',
-        textColor: 'text-green-700',
-        text: `PR #${prMerge.pr_info.number} merged`,
-        isClickable: true,
-        onClick: () => window.open(prMerge.pr_info.url, '_blank'),
-      };
-    }
-    if (
-      mergeInfo.hasMerged &&
-      mergeInfo.latestMerge?.type === 'direct' &&
-      (branchStatus?.commits_ahead ?? 0) === 0
-    ) {
-      return {
-        dotColor: 'bg-green-500',
-        textColor: 'text-green-700',
-        text: `Merged`,
-        isClickable: false,
-      };
-    }
-
-    if (mergeInfo.hasOpenPR && mergeInfo.openPR?.type === 'pr') {
-      const prMerge = mergeInfo.openPR;
-      return {
-        dotColor: 'bg-blue-500',
-        textColor: 'text-blue-700 dark:text-blue-400',
-        text: `PR #${prMerge.pr_info.number}`,
-        isClickable: true,
-        onClick: () => window.open(prMerge.pr_info.url, '_blank'),
-      };
-    }
-
-    if ((branchStatus?.commits_behind ?? 0) > 0) {
-      return {
-        dotColor: 'bg-orange-500',
-        textColor: 'text-orange-700',
-        text: `Rebase needed${branchStatus?.has_uncommitted_changes ? ' (dirty)' : ''}`,
-        isClickable: false,
-      };
-    }
-
-    if ((branchStatus?.commits_ahead ?? 0) > 0) {
-      return {
-        dotColor: 'bg-yellow-500',
-        textColor: 'text-yellow-700',
-        text:
-          branchStatus?.commits_ahead === 1
-            ? `1 commit ahead${branchStatus?.has_uncommitted_changes ? ' (dirty)' : ''}`
-            : `${branchStatus?.commits_ahead} commits ahead${branchStatus?.has_uncommitted_changes ? ' (dirty)' : ''}`,
-        isClickable: false,
-      };
-    }
-
-    return {
-      dotColor: 'bg-gray-500',
-      textColor: 'text-gray-700',
-      text: `Up to date${branchStatus?.has_uncommitted_changes ? ' (dirty)' : ''}`,
-      isClickable: false,
-    };
-  }, [mergeInfo, branchStatus]);
-
   return (
     <div className="space-y-2 @container">
       {/* <div className="flex gap-6 items-start"> */}
-      <div className="grid grid-cols-2 gap-3 items-start @md:flex @md:items-start">
+      <div className="flex items-start">
         <div className="min-w-0">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Agent
           </div>
           <div className="text-sm font-medium">{selectedAttempt.executor}</div>
-        </div>
-
-        <div className="min-w-0">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Task Branch
-          </div>
-          <div className="flex items-center gap-1.5">
-            <GitBranchIcon className="h-3 w-3 text-muted-foreground" />
-            <span className="text-sm font-medium truncate">
-              {selectedAttempt.branch}
-            </span>
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            <span className="truncate">Base Branch</span>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={handleRebaseDialogOpen}
-                    disabled={rebasing || isAttemptRunning || hasConflicts}
-                    className="h-4 w-4 p-0 hover:bg-muted"
-                  >
-                    <Settings className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Change base branch</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <GitBranchIcon className="h-3 w-3 text-muted-foreground" />
-            <span className="text-sm font-medium truncate">
-              {branchStatus?.base_branch_name || selectedBranchDisplayName}
-            </span>
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Status
-          </div>
-          <div className="flex items-center gap-1.5">
-            {(() => {
-              const statusInfo = getStatusInfo();
-              return (
-                <>
-                  <div
-                    className={`h-2 w-2 ${statusInfo.dotColor} rounded-full`}
-                  />
-                  {statusInfo.isClickable ? (
-                    <button
-                      onClick={statusInfo.onClick}
-                      className={`text-sm font-medium ${statusInfo.textColor} hover:underline cursor-pointer`}
-                    >
-                      {statusInfo.text}
-                    </button>
-                  ) : (
-                    <span
-                      className={`text-sm font-medium ${statusInfo.textColor} truncate`}
-                      title={statusInfo.text}
-                    >
-                      {statusInfo.text}
-                    </span>
-                  )}
-                </>
-              );
-            })()}
-          </div>
         </div>
       </div>
 
@@ -546,9 +198,10 @@ function CurrentAttempt({
         </div>
       </div>
 
-      <div>
-        <div className="grid grid-cols-2 gap-3 @md:flex @md:flex-wrap @md:items-center">
-          <div className="flex gap-2 @md:flex-none">
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          {/* Column 1: Start Dev / View Logs */}
+          <div className="flex gap-1 flex-1">
             <Button
               variant={runningDevServer ? 'destructive' : 'outline'}
               size="xs"
@@ -568,7 +221,7 @@ function CurrentAttempt({
               ) : (
                 <>
                   <Play className="h-3 w-3" />
-                  Dev
+                  Start Dev
                 </>
               )}
             </Button>
@@ -582,7 +235,7 @@ function CurrentAttempt({
                       variant="outline"
                       size="xs"
                       onClick={handleViewDevServerLogs}
-                      className="gap-1"
+                      className="gap-1 px-2"
                     >
                       <ScrollText className="h-3 w-3" />
                     </Button>
@@ -594,81 +247,9 @@ function CurrentAttempt({
               </TooltipProvider>
             )}
           </div>
-          {/* Git Operations */}
-          {selectedAttempt && branchStatus && !mergeInfo.hasMergedPR && (
-            <>
-              {(branchStatus.commits_behind ?? 0) > 0 && (
-                <Button
-                  onClick={handleRebaseClick}
-                  disabled={rebasing || isAttemptRunning || hasConflicts}
-                  variant="outline"
-                  size="xs"
-                  className="border-orange-300 text-orange-700 hover:bg-orange-50 gap-1"
-                >
-                  <RefreshCw
-                    className={`h-3 w-3 ${rebasing ? 'animate-spin' : ''}`}
-                  />
-                  {rebasing ? 'Rebasing...' : `Rebase`}
-                </Button>
-              )}
-              <>
-                <Button
-                  onClick={handlePRButtonClick}
-                  disabled={
-                    creatingPR ||
-                    pushing ||
-                    Boolean((branchStatus.commits_behind ?? 0) > 0) ||
-                    isAttemptRunning ||
-                    hasConflicts ||
-                    (mergeInfo.hasOpenPR &&
-                      branchStatus.remote_commits_ahead === 0) ||
-                    ((branchStatus.commits_ahead ?? 0) === 0 &&
-                      (branchStatus.remote_commits_ahead ?? 0) === 0 &&
-                      !pushSuccess &&
-                      !mergeSuccess)
-                  }
-                  variant="outline"
-                  size="xs"
-                  className="border-blue-300  dark:border-blue-700 text-blue-700 dark:text-blue-500 hover:bg-blue-50 dark:hover:bg-transparent dark:hover:text-blue-400 dark:hover:border-blue-400 gap-1 min-w-[120px]"
-                >
-                  <GitPullRequest className="h-3 w-3" />
-                  {mergeInfo.hasOpenPR
-                    ? pushSuccess
-                      ? 'Pushed!'
-                      : pushing
-                        ? 'Pushing...'
-                        : branchStatus.remote_commits_ahead === 0
-                          ? 'Push to PR'
-                          : branchStatus.remote_commits_ahead === 1
-                            ? 'Push 1 commit'
-                            : `Push ${branchStatus.remote_commits_ahead || 0} commits`
-                    : creatingPR
-                      ? 'Creating...'
-                      : 'Create PR'}
-                </Button>
-                <Button
-                  onClick={handleMergeClick}
-                  disabled={
-                    mergeInfo.hasOpenPR ||
-                    merging ||
-                    hasConflicts ||
-                    Boolean((branchStatus.commits_behind ?? 0) > 0) ||
-                    isAttemptRunning ||
-                    ((branchStatus.commits_ahead ?? 0) === 0 &&
-                      !pushSuccess &&
-                      !mergeSuccess)
-                  }
-                  size="xs"
-                  className="bg-green-600 hover:bg-green-700 dark:bg-green-900 dark:hover:bg-green-700 gap-1 min-w-[120px]"
-                >
-                  <GitBranchIcon className="h-3 w-3" />
-                  {mergeSuccess ? 'Merged!' : merging ? 'Merging...' : 'Merge'}
-                </Button>
-              </>
-            </>
-          )}
 
-          <div className="flex gap-2 @md:flex-none">
+          {/* Column 2: New Attempt + History (shared flex-1) */}
+          <div className="flex gap-1 flex-1">
             {isStopping || isAttemptRunning ? (
               <Button
                 variant="destructive"
@@ -685,20 +266,25 @@ function CurrentAttempt({
                 variant="outline"
                 size="xs"
                 onClick={handleEnterCreateAttemptMode}
-                className="gap-1 flex-1"
+                className={`gap-1 ${taskAttempts.length > 1 ? 'flex-1' : 'flex-1'}`}
               >
                 <Plus className="h-4 w-4" />
                 New Attempt
               </Button>
             )}
-            {taskAttempts.length > 1 && (
+
+            {taskAttempts.length > 1 && !isStopping && !isAttemptRunning && (
               <DropdownMenu>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="xs" className="gap-1">
-                          <History className="h-3 w-4" />
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          className="gap-1 px-2"
+                        >
+                          <History className="h-3 w-3" />
                         </Button>
                       </DropdownMenuTrigger>
                     </TooltipTrigger>
@@ -731,11 +317,13 @@ function CurrentAttempt({
               </DropdownMenu>
             )}
           </div>
+
+          {/* Column 3: Create Subtask */}
           <Button
             onClick={handleCreateSubtaskClick}
             variant="outline"
             size="xs"
-            className="gap-1 min-w-[120px]"
+            className="gap-1 flex-1"
           >
             <GitFork className="h-3 w-3" />
             Create Subtask
