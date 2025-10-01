@@ -50,6 +50,9 @@ module.exports = {
               'style',
               'aria-describedby',
             ],
+            'jsx-components': {
+              exclude: ['code'],
+            },
           },
         ]
       : 'off',
