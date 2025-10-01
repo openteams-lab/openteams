@@ -13,6 +13,7 @@ type Props = {
   showLoadingOverlay: boolean;
   onCommandEnter?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onCommandShiftEnter?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onPasteFiles?: (files: File[]) => void;
   textareaClassName?: string;
 };
 
@@ -25,6 +26,7 @@ export function FollowUpEditorCard({
   showLoadingOverlay,
   onCommandEnter,
   onCommandShiftEnter,
+  onPasteFiles,
   textareaClassName,
 }: Props) {
   const { projectId } = useProject();
@@ -42,6 +44,7 @@ export function FollowUpEditorCard({
         maxRows={6}
         onCommandEnter={onCommandEnter}
         onCommandShiftEnter={onCommandShiftEnter}
+        onPasteFiles={onPasteFiles}
       />
       {showLoadingOverlay && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-background/60">

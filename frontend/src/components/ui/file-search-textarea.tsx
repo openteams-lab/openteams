@@ -21,6 +21,7 @@ interface FileSearchTextareaProps {
   maxRows?: number;
   onCommandEnter?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onCommandShiftEnter?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onPasteFiles?: (files: File[]) => void;
 }
 
 export function FileSearchTextarea({
@@ -34,6 +35,7 @@ export function FileSearchTextarea({
   onCommandEnter,
   onCommandShiftEnter,
   maxRows = 10,
+  onPasteFiles,
 }: FileSearchTextareaProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FileSearchResult[]>([]);
@@ -77,6 +79,34 @@ export function FileSearchTextarea({
     const debounceTimer = setTimeout(searchFiles, 300);
     return () => clearTimeout(debounceTimer);
   }, [searchQuery, projectId]);
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (!onPasteFiles) return;
+
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    const files: File[] = [];
+
+    if (clipboardData.files && clipboardData.files.length > 0) {
+      files.push(...Array.from(clipboardData.files));
+    } else if (clipboardData.items && clipboardData.items.length > 0) {
+      Array.from(clipboardData.items).forEach((item) => {
+        if (item.kind !== 'file') return;
+        const file = item.getAsFile();
+        if (file) files.push(file);
+      });
+    }
+
+    const imageFiles = files.filter((file) =>
+      file.type.toLowerCase().startsWith('image/')
+    );
+
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      onPasteFiles(imageFiles);
+    }
+  };
 
   // Handle text changes and detect @ symbol
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -258,6 +288,7 @@ export function FileSearchTextarea({
         onKeyDown={handleKeyDown}
         onCommandEnter={onCommandEnter}
         onCommandShiftEnter={onCommandShiftEnter}
+        onPaste={handlePaste}
       />
 
       {showDropdown &&
