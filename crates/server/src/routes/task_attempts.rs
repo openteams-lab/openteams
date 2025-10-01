@@ -1285,6 +1285,100 @@ pub async fn stop_task_attempt_execution(
     Ok(ResponseJson(ApiResponse::success(())))
 }
 
+#[derive(Debug, Serialize, TS)]
+pub struct AttachPrResponse {
+    pub pr_attached: bool,
+    pub pr_url: Option<String>,
+    pub pr_number: Option<i64>,
+    pub pr_status: Option<MergeStatus>,
+}
+
+pub async fn attach_existing_pr(
+    Extension(task_attempt): Extension<TaskAttempt>,
+    State(deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<AttachPrResponse>>, ApiError> {
+    let pool = &deployment.db().pool;
+
+    // Check if PR already attached
+    if let Some(Merge::Pr(pr_merge)) =
+        Merge::find_latest_by_task_attempt_id(pool, task_attempt.id).await?
+    {
+        return Ok(ResponseJson(ApiResponse::success(AttachPrResponse {
+            pr_attached: true,
+            pr_url: Some(pr_merge.pr_info.url.clone()),
+            pr_number: Some(pr_merge.pr_info.number),
+            pr_status: Some(pr_merge.pr_info.status.clone()),
+        })));
+    }
+
+    // Get GitHub token
+    let github_config = deployment.config().read().await.github.clone();
+    let Some(github_token) = github_config.token() else {
+        return Err(ApiError::GitHubService(GitHubServiceError::TokenInvalid));
+    };
+
+    // Get project and repo info
+    let Some(task) = task_attempt.parent_task(pool).await? else {
+        return Err(ApiError::TaskAttempt(TaskAttemptError::TaskNotFound));
+    };
+    let Some(project) = Project::find_by_id(pool, task.project_id).await? else {
+        return Err(ApiError::Project(ProjectError::ProjectNotFound));
+    };
+
+    let github_service = GitHubService::new(&github_token)?;
+    let repo_info = deployment
+        .git()
+        .get_github_repo_info(&project.git_repo_path)?;
+
+    // List all PRs for branch (open, closed, and merged)
+    let prs = github_service
+        .list_all_prs_for_branch(&repo_info, &task_attempt.branch)
+        .await?;
+
+    // Take the first PR (prefer open, but also accept merged/closed)
+    if let Some(pr_info) = prs.into_iter().next() {
+        // Save PR info to database
+        let merge = Merge::create_pr(
+            pool,
+            task_attempt.id,
+            &task_attempt.target_branch,
+            pr_info.number,
+            &pr_info.url,
+        )
+        .await?;
+
+        // Update status if not open
+        if !matches!(pr_info.status, MergeStatus::Open) {
+            Merge::update_status(
+                pool,
+                merge.id,
+                pr_info.status.clone(),
+                pr_info.merge_commit_sha.clone(),
+            )
+            .await?;
+        }
+
+        // If PR is merged, mark task as done
+        if matches!(pr_info.status, MergeStatus::Merged) {
+            Task::update_status(pool, task.id, TaskStatus::Done).await?;
+        }
+
+        Ok(ResponseJson(ApiResponse::success(AttachPrResponse {
+            pr_attached: true,
+            pr_url: Some(pr_info.url),
+            pr_number: Some(pr_info.number),
+            pr_status: Some(pr_info.status),
+        })))
+    } else {
+        Ok(ResponseJson(ApiResponse::success(AttachPrResponse {
+            pr_attached: false,
+            pr_url: None,
+            pr_number: None,
+            pr_status: None,
+        })))
+    }
+}
+
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     let task_attempt_id_router = Router::new()
         .route("/", get(get_task_attempt))
@@ -1307,6 +1401,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route("/rebase", post(rebase_task_attempt))
         .route("/conflicts/abort", post(abort_conflicts_task_attempt))
         .route("/pr", post(create_github_pr))
+        .route("/pr/attach", post(attach_existing_pr))
         .route("/open-editor", post(open_task_attempt_in_editor))
         .route("/delete-file", post(delete_task_attempt_file))
         .route("/children", get(get_task_attempt_children))
