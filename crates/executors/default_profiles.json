@@ -89,10 +89,16 @@
           "model": "auto"
         }
       },
-      "SONNET_4": {
+      "SONNET_4_5": {
         "CURSOR": {
           "force": true,
-          "model": "sonnet-4"
+          "model": "sonnet-4.5"
+        }
+      },
+      "SONNET_4_5_THINKING": {
+        "CURSOR": {
+          "force": true,
+          "model": "sonnet-4.5-thinking"
         }
       },
       "OPUS_4_1": {
