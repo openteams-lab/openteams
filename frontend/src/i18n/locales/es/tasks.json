@@ -87,5 +87,48 @@
       "mergeChanges": "Error al fusionar cambios",
       "rebaseBranch": "Error al hacer rebase de la rama"
     }
+  },
+  "preview": {
+    "troubleAlert": {
+      "title": "Tenemos problemas al previsualizar tu aplicación:",
+      "item1": "¿Se inició correctamente el servidor de desarrollo? Puede haber un error que necesites resolver, o quizás sea necesario instalar dependencias.",
+      "item2": "¿Tu servidor de desarrollo imprimió la URL y el puerto en la terminal en el formato",
+      "item2Suffix": "? (así es como sabemos que está funcionando)",
+      "item3": "¿Has instalado el Web Companion (requerido para hacer clic y editar)? Si no, por favor",
+      "item3Link": "sigue las instrucciones de instalación aquí"
+    },
+    "noServer": {
+      "title": "No hay servidor de desarrollo en ejecución",
+      "startPrompt": "Por favor inicia un servidor de desarrollo para ver la vista previa",
+      "setupPrompt": "Para usar la vista previa en vivo y la función de hacer clic y editar, por favor agrega un script de servidor de desarrollo a este proyecto.",
+      "companionPrompt": "Para la funcionalidad de clic y editar, agrega el complemento del navegador a tu proyecto.",
+      "companionLink": "Ver guía de instalación",
+      "startButton": "Iniciar Servidor de Desarrollo",
+      "editButton": "Editar Script de Desarrollo",
+      "stopAndEditButton": "Detener Servidor de Desarrollo y Resolver Problemas"
+    },
+    "devScript": {
+      "saveAndStart": "Guardar e Iniciar",
+      "saveOnly": "Solo Guardar",
+      "saveChanges": "Guardar Cambios",
+      "cancel": "Cancelar",
+      "errors": {
+        "notLoaded": "Proyecto no cargado",
+        "empty": "El script de desarrollo no puede estar vacío"
+      }
+    },
+    "logs": {
+      "title": "Registros del Servidor de Desarrollo",
+      "hide": "Ocultar",
+      "show": "Mostrar"
+    },
+    "iframe": {
+      "title": "Vista previa del servidor de desarrollo"
+    },
+    "toolbar": {
+      "refresh": "Actualizar vista previa",
+      "copyUrl": "Copiar URL",
+      "openInTab": "Abrir en nueva pestaña"
+    }
   }
 }
