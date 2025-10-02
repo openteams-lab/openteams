@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 //
 import { useReview } from '@/contexts/ReviewProvider';
 import { useClickedElements } from '@/contexts/ClickedElementsProvider';
+import { useEntries } from '@/contexts/EntriesContext';
 //
 import { VariantSelector } from '@/components/tasks/VariantSelector';
 import { FollowUpStatusRow } from '@/components/tasks/FollowUpStatusRow';
@@ -147,6 +148,19 @@ export function TaskFollowUpSection({
   const { activeRetryProcessId } = useRetryUi();
   const isRetryActive = !!activeRetryProcessId;
 
+  // Check if there's a pending approval - users shouldn't be able to type during approvals
+  const { entries } = useEntries();
+  const hasPendingApproval = useMemo(() => {
+    return entries.some((entry) => {
+      if (entry.type !== 'NORMALIZED_ENTRY') return false;
+      const entryType = entry.content.entry_type;
+      return (
+        entryType.type === 'tool_use' &&
+        entryType.status.status === 'pending_approval'
+      );
+    });
+  }, [entries]);
+
   // Autosave draft when editing
   const { isSaving, saveStatus } = useDraftAutosave({
     attemptId: selectedAttemptId,
@@ -199,6 +213,7 @@ export function TaskFollowUpSection({
     }
 
     if (isRetryActive) return false; // disable typing while retry editor is active
+    if (hasPendingApproval) return false; // disable typing during approval
     return true;
   }, [
     selectedAttemptId,
@@ -206,6 +221,7 @@ export function TaskFollowUpSection({
     isSendingFollowUp,
     branchStatus?.merges,
     isRetryActive,
+    hasPendingApproval,
   ]);
 
   const canSendFollowUp = useMemo(() => {
@@ -231,7 +247,8 @@ export function TaskFollowUpSection({
 
   const isDraftLocked =
     displayQueued || isQueuing || isUnqueuing || !!draft?.sending;
-  const isEditable = isDraftLoaded && !isDraftLocked && !isRetryActive;
+  const isEditable =
+    isDraftLoaded && !isDraftLocked && !isRetryActive && !hasPendingApproval;
 
   // When a process completes (e.g., agent resolved conflicts), refresh branch status promptly
   const prevRunningRef = useRef<boolean>(isAttemptRunning);
