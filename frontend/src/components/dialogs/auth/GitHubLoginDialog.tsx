@@ -57,9 +57,11 @@ const GitHubLoginDialog = NiceModal.create(() => {
           switch (poll_status) {
             case DevicePollStatus.SUCCESS:
               setPolling(false);
-              setDeviceState(null);
               setError(null);
               await reloadSystem();
+              modal.resolve(true);
+              modal.hide();
+              setDeviceState(null);
               break;
             case DevicePollStatus.AUTHORIZATION_PENDING:
               timer = setTimeout(poll, deviceState.interval * 1000);
