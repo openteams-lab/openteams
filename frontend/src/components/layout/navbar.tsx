@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { siDiscord } from 'simple-icons';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,6 +14,7 @@ import {
   Settings,
   BookOpen,
   MessageCircleQuestion,
+  MessageCircle,
   Menu,
   Plus,
 } from 'lucide-react';
@@ -23,6 +25,8 @@ import { openTaskForm } from '@/lib/openTaskForm';
 import { useProject } from '@/contexts/project-context';
 import { showProjectForm } from '@/lib/modals';
 import { useOpenProjectInEditor } from '@/hooks/useOpenProjectInEditor';
+
+const DISCORD_GUILD_ID = '1423630976524877857';
 
 const INTERNAL_NAV = [
   { label: 'Projects', icon: FolderOpen, to: '/projects' },
@@ -40,6 +44,11 @@ const EXTERNAL_LINKS = [
     icon: MessageCircleQuestion,
     href: 'https://github.com/BloopAI/vibe-kanban/issues',
   },
+  {
+    label: 'Discord',
+    icon: MessageCircle,
+    href: 'https://discord.gg/AC4nwVtJM3',
+  },
 ];
 
 export function Navbar() {
@@ -47,6 +56,36 @@ export function Navbar() {
   const { projectId, project } = useProject();
   const { query, setQuery, active, clear, registerInputRef } = useSearch();
   const handleOpenInEditor = useOpenProjectInEditor(project || null);
+  const [onlineCount, setOnlineCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchCount = async () => {
+      try {
+        const res = await fetch(
+          `https://discord.com/api/guilds/${DISCORD_GUILD_ID}/widget.json`,
+          { cache: 'no-store' }
+        );
+        if (!res.ok) return; // Widget disabled or temporary error; keep previous value
+        const data = await res.json();
+        if (!cancelled && typeof data?.presence_count === 'number') {
+          setOnlineCount(data.presence_count);
+        }
+      } catch {
+        // Network error; ignore and keep previous value
+      }
+    };
+
+    // Initial fetch + refresh every 60s
+    fetchCount();
+    const interval = setInterval(fetchCount, 60_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   const setSearchBarRef = useCallback(
     (node: HTMLInputElement | null) => {
@@ -78,10 +117,36 @@ export function Navbar() {
     <div className="border-b bg-background">
       <div className="w-full px-3">
         <div className="flex items-center h-12 py-2">
-          <div className="flex-1">
+          <div className="flex-1 flex items-center">
             <Link to="/projects">
               <Logo />
             </Link>
+            <a
+              href="https://discord.gg/AC4nwVtJM3"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Join our Discord"
+              className="hidden sm:inline-flex items-center ml-3 text-xs font-medium overflow-hidden border h-6"
+            >
+              <span className="bg-muted text-foreground flex items-center p-2 border-r">
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d={siDiscord.path} />
+                </svg>
+              </span>
+              <span
+                className=" h-full items-center flex p-2"
+                aria-live="polite"
+              >
+                {onlineCount !== null
+                  ? `${onlineCount.toLocaleString()} online`
+                  : 'online'}
+              </span>
+            </a>
           </div>
 
           <SearchBar
