@@ -1,7 +1,7 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-#[derive(Debug, Serialize, TS)]
+#[derive(Debug, Serialize, Deserialize, TS)]
 pub struct ApiResponse<T, E = T> {
     success: bool,
     data: Option<T>,
@@ -37,5 +37,20 @@ impl<T, E> ApiResponse<T, E> {
             error_data: Some(data),
             message: None,
         }
+    }
+
+    /// Returns true if the response was successful.
+    pub fn is_success(&self) -> bool {
+        self.success
+    }
+
+    /// Consumes the response and returns the data if present.
+    pub fn into_data(self) -> Option<T> {
+        self.data
+    }
+
+    /// Returns a reference to the error message if present.
+    pub fn message(&self) -> Option<&str> {
+        self.message.as_deref()
     }
 }

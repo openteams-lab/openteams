@@ -1,14 +1,16 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool, Type};
+use strum_macros::{Display, EnumString};
 use ts_rs::TS;
 use uuid::Uuid;
 
 use super::{project::Project, task_attempt::TaskAttempt};
 
-#[derive(Debug, Clone, Type, Serialize, Deserialize, PartialEq, TS)]
+#[derive(Debug, Clone, Type, Serialize, Deserialize, PartialEq, TS, EnumString, Display)]
 #[sqlx(type_name = "task_status", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "kebab_case")]
 pub enum TaskStatus {
     Todo,
     InProgress,
@@ -60,7 +62,7 @@ pub struct TaskRelationships {
     pub children: Vec<Task>,          // Tasks created by this attempt
 }
 
-#[derive(Debug, Deserialize, TS)]
+#[derive(Debug, Serialize, Deserialize, TS)]
 pub struct CreateTask {
     pub project_id: Uuid,
     pub title: String,
@@ -69,7 +71,23 @@ pub struct CreateTask {
     pub image_ids: Option<Vec<Uuid>>,
 }
 
-#[derive(Debug, Deserialize, TS)]
+impl CreateTask {
+    pub fn from_title_description(
+        project_id: Uuid,
+        title: String,
+        description: Option<String>,
+    ) -> Self {
+        Self {
+            project_id,
+            title,
+            description,
+            parent_task_attempt: None,
+            image_ids: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, TS)]
 pub struct UpdateTask {
     pub title: Option<String>,
     pub description: Option<String>,
