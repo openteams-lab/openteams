@@ -3,7 +3,7 @@
     "command": "npx",
     "args": [
       "-y",
-      "vibe-kanban",
+      "vibe-kanban@latest",
       "--mcp"
     ]
   },
@@ -41,3 +41,4 @@
     }
   }
 }
+

@@ -1,9 +1,11 @@
-use std::{future::Future, path::PathBuf};
+use std::{future::Future, path::PathBuf, str::FromStr};
 
 use db::models::{
     project::Project,
-    task::{CreateTask, Task, TaskStatus},
+    task::{CreateTask, Task, TaskStatus, TaskWithAttemptStatus, UpdateTask},
+    task_attempt::TaskAttempt,
 };
+use executors::{executors::BaseCodingAgent, profile::ExecutorProfileId};
 use rmcp::{
     ErrorData, ServerHandler,
     handler::server::tool::{Parameters, ToolRouter},
@@ -12,15 +14,16 @@ use rmcp::{
     },
     schemars, tool, tool_handler, tool_router,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json;
-use sqlx::SqlitePool;
 use uuid::Uuid;
+
+use crate::routes::task_attempts::CreateTaskAttemptBody;
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct CreateTaskRequest {
     #[schemars(description = "The ID of the project to create the task in. This is required!")]
-    pub project_id: String,
+    pub project_id: Uuid,
     #[schemars(description = "The title of the task")]
     pub title: String,
     #[schemars(description = "Optional description of the task")]
@@ -29,7 +32,6 @@ pub struct CreateTaskRequest {
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct CreateTaskResponse {
-    pub success: bool,
     pub task_id: String,
     pub message: String,
 }
@@ -54,9 +56,23 @@ pub struct ProjectSummary {
     pub updated_at: String,
 }
 
+impl ProjectSummary {
+    fn from_project(project: Project) -> Self {
+        Self {
+            id: project.id.to_string(),
+            name: project.name,
+            git_repo_path: project.git_repo_path,
+            setup_script: project.setup_script,
+            cleanup_script: project.cleanup_script,
+            dev_script: project.dev_script,
+            created_at: project.created_at.to_rfc3339(),
+            updated_at: project.updated_at.to_rfc3339(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ListProjectsResponse {
-    pub success: bool,
     pub projects: Vec<ProjectSummary>,
     pub count: usize,
 }
@@ -64,7 +80,7 @@ pub struct ListProjectsResponse {
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ListTasksRequest {
     #[schemars(description = "The ID of the project to list tasks from")]
-    pub project_id: String,
+    pub project_id: Uuid,
     #[schemars(
         description = "Optional status filter: 'todo', 'inprogress', 'inreview', 'done', 'cancelled'"
     )]
@@ -95,13 +111,41 @@ pub struct TaskSummary {
     pub last_attempt_failed: Option<bool>,
 }
 
+impl TaskSummary {
+    fn from_task(task: Task) -> Self {
+        Self {
+            id: task.id.to_string(),
+            title: task.title,
+            description: task.description,
+            status: task.status.to_string(),
+            created_at: task.created_at.to_rfc3339(),
+            updated_at: task.updated_at.to_rfc3339(),
+            has_in_progress_attempt: None,
+            has_merged_attempt: None,
+            last_attempt_failed: None,
+        }
+    }
+
+    fn from_task_with_status(task: TaskWithAttemptStatus) -> Self {
+        Self {
+            id: task.id.to_string(),
+            title: task.title.to_string(),
+            description: task.description.clone(),
+            status: task.status.to_string(),
+            created_at: task.created_at.to_rfc3339(),
+            updated_at: task.updated_at.to_rfc3339(),
+            has_in_progress_attempt: Some(task.has_in_progress_attempt),
+            has_merged_attempt: Some(task.has_merged_attempt),
+            last_attempt_failed: Some(task.last_attempt_failed),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ListTasksResponse {
-    pub success: bool,
     pub tasks: Vec<TaskSummary>,
     pub count: usize,
     pub project_id: String,
-    pub project_name: Option<String>,
     pub applied_filters: ListTasksFilters,
 }
 
@@ -111,33 +155,10 @@ pub struct ListTasksFilters {
     pub limit: i32,
 }
 
-fn parse_task_status(status_str: &str) -> Option<TaskStatus> {
-    match status_str.to_lowercase().as_str() {
-        "todo" => Some(TaskStatus::Todo),
-        "inprogress" | "in-progress" | "in_progress" => Some(TaskStatus::InProgress),
-        "inreview" | "in-review" | "in_review" => Some(TaskStatus::InReview),
-        "done" | "completed" => Some(TaskStatus::Done),
-        "cancelled" | "canceled" => Some(TaskStatus::Cancelled),
-        _ => None,
-    }
-}
-
-fn task_status_to_string(status: &TaskStatus) -> String {
-    match status {
-        TaskStatus::Todo => "todo".to_string(),
-        TaskStatus::InProgress => "in-progress".to_string(),
-        TaskStatus::InReview => "in-review".to_string(),
-        TaskStatus::Done => "done".to_string(),
-        TaskStatus::Cancelled => "cancelled".to_string(),
-    }
-}
-
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct UpdateTaskRequest {
-    #[schemars(description = "The ID of the project containing the task")]
-    pub project_id: String,
     #[schemars(description = "The ID of the task to update")]
-    pub task_id: String,
+    pub task_id: Uuid,
     #[schemars(description = "New title for the task")]
     pub title: Option<String>,
     #[schemars(description = "New description for the task")]
@@ -148,62 +169,138 @@ pub struct UpdateTaskRequest {
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct UpdateTaskResponse {
-    pub success: bool,
     pub message: String,
     pub task: Option<TaskSummary>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct DeleteTaskRequest {
-    #[schemars(description = "The ID of the project containing the task")]
-    pub project_id: String,
     #[schemars(description = "The ID of the task to delete")]
+    pub task_id: Uuid,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct StartTaskAttemptRequest {
+    #[schemars(description = "The ID of the task to start")]
+    pub task_id: Uuid,
+    #[schemars(
+        description = "The coding agent executor to run ('CLAUDE_CODE', 'CODEX', 'GEMINI', 'CURSOR', 'OPENCODE')"
+    )]
+    pub executor: String,
+    #[schemars(description = "Optional executor variant, if needed")]
+    pub variant: Option<String>,
+    #[schemars(description = "The base branch to use for the attempt")]
+    pub base_branch: String,
+}
+
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct StartTaskAttemptResponse {
+    pub message: String,
     pub task_id: String,
+    pub attempt_id: String,
 }
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct DeleteTaskResponse {
-    pub success: bool,
     pub message: String,
     pub deleted_task_id: Option<String>,
 }
 
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct SimpleTaskResponse {
-    pub success: bool,
-    pub message: String,
-    pub task_title: String,
-    pub new_status: Option<String>,
-}
-
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct GetTaskRequest {
-    #[schemars(description = "The ID of the project containing the task")]
-    pub project_id: String,
     #[schemars(description = "The ID of the task to retrieve")]
-    pub task_id: String,
+    pub task_id: Uuid,
 }
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct GetTaskResponse {
-    pub success: bool,
     pub task: Option<TaskSummary>,
     pub project_name: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct TaskServer {
-    pub pool: SqlitePool,
+    client: reqwest::Client,
+    base_url: String,
     tool_router: ToolRouter<TaskServer>,
 }
 
 impl TaskServer {
-    #[allow(dead_code)]
-    pub fn new(pool: SqlitePool) -> Self {
+    pub fn new(base_url: &str) -> Self {
         Self {
-            pool,
+            client: reqwest::Client::new(),
+            base_url: base_url.to_string(),
             tool_router: Self::tool_router(),
         }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiResponseEnvelope<T> {
+    success: bool,
+    data: Option<T>,
+    message: Option<String>,
+}
+
+impl TaskServer {
+    fn success<T: Serialize>(data: &T) -> Result<CallToolResult, ErrorData> {
+        Ok(CallToolResult::success(vec![Content::text(
+            serde_json::to_string_pretty(data)
+                .unwrap_or_else(|_| "Failed to serialize response".to_string()),
+        )]))
+    }
+
+    fn err_value(v: serde_json::Value) -> Result<CallToolResult, ErrorData> {
+        Ok(CallToolResult::error(vec![Content::text(
+            serde_json::to_string_pretty(&v)
+                .unwrap_or_else(|_| "Failed to serialize error".to_string()),
+        )]))
+    }
+
+    fn err<S: Into<String>>(msg: S, details: Option<S>) -> Result<CallToolResult, ErrorData> {
+        let mut v = serde_json::json!({"success": false, "error": msg.into()});
+        if let Some(d) = details {
+            v["details"] = serde_json::json!(d.into());
+        };
+        Self::err_value(v)
+    }
+
+    async fn send_json<T: DeserializeOwned>(
+        &self,
+        rb: reqwest::RequestBuilder,
+    ) -> Result<T, CallToolResult> {
+        let resp = rb
+            .send()
+            .await
+            .map_err(|e| Self::err("Failed to connect to VK API", Some(&e.to_string())).unwrap())?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            return Err(
+                Self::err(format!("VK API returned error status: {}", status), None).unwrap(),
+            );
+        }
+
+        let api_response = resp.json::<ApiResponseEnvelope<T>>().await.map_err(|e| {
+            Self::err("Failed to parse VK API response", Some(&e.to_string())).unwrap()
+        })?;
+
+        if !api_response.success {
+            let msg = api_response.message.as_deref().unwrap_or("Unknown error");
+            return Err(Self::err("VK API returned error", Some(msg)).unwrap());
+        }
+
+        api_response
+            .data
+            .ok_or_else(|| Self::err("VK API response missing data field", None).unwrap())
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!(
+            "{}/{}",
+            self.base_url.trim_end_matches('/'),
+            path.trim_start_matches('/')
+        )
     }
 }
 
@@ -220,129 +317,48 @@ impl TaskServer {
             description,
         }): Parameters<CreateTaskRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        // Parse project_id from string to UUID
-        let project_uuid = match Uuid::parse_str(&project_id) {
-            Ok(uuid) => uuid,
-            Err(_) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Invalid project ID format. Must be a valid UUID.",
-                    "project_id": project_id
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response)
-                        .unwrap_or_else(|_| "Invalid project ID format".to_string()),
-                )]));
-            }
+        let url = self.url("/api/tasks");
+        let task: Task = match self
+            .send_json(
+                self.client
+                    .post(&url)
+                    .json(&CreateTask::from_title_description(
+                        project_id,
+                        title,
+                        description,
+                    )),
+            )
+            .await
+        {
+            Ok(t) => t,
+            Err(e) => return Ok(e),
         };
 
-        // Check if project exists
-        match Project::exists(&self.pool, project_uuid).await {
-            Ok(false) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Project not found",
-                    "project_id": project_id
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response)
-                        .unwrap_or_else(|_| "Project not found".to_string()),
-                )]));
-            }
-            Err(e) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Failed to check project existence",
-                    "details": e.to_string(),
-                    "project_id": project_id
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response)
-                        .unwrap_or_else(|_| "Database error".to_string()),
-                )]));
-            }
-            Ok(true) => {}
-        }
-
-        let task_id = Uuid::new_v4();
-        let create_task_data = CreateTask {
-            project_id: project_uuid,
-            title: title.clone(),
-            description: description.clone(),
-            parent_task_attempt: None,
-            image_ids: None,
-        };
-
-        match Task::create(&self.pool, &create_task_data, task_id).await {
-            Ok(_task) => {
-                let success_response = CreateTaskResponse {
-                    success: true,
-                    task_id: task_id.to_string(),
-                    message: "Task created successfully".to_string(),
-                };
-                Ok(CallToolResult::success(vec![Content::text(
-                    serde_json::to_string_pretty(&success_response)
-                        .unwrap_or_else(|_| "Task created successfully".to_string()),
-                )]))
-            }
-            Err(e) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Failed to create task",
-                    "details": e.to_string(),
-                    "project_id": project_id,
-                    "title": title
-                });
-                Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response)
-                        .unwrap_or_else(|_| "Failed to create task".to_string()),
-                )]))
-            }
-        }
+        TaskServer::success(&CreateTaskResponse {
+            task_id: task.id.to_string(),
+            message: "Task created successfully".to_string(),
+        })
     }
 
     #[tool(description = "List all the available projects")]
     async fn list_projects(&self) -> Result<CallToolResult, ErrorData> {
-        match Project::find_all(&self.pool).await {
-            Ok(projects) => {
-                let count = projects.len();
-                let project_summaries: Vec<ProjectSummary> = projects
-                    .into_iter()
-                    .map(|project| ProjectSummary {
-                        id: project.id.to_string(),
-                        name: project.name,
-                        git_repo_path: project.git_repo_path,
-                        setup_script: project.setup_script,
-                        cleanup_script: project.cleanup_script,
-                        dev_script: project.dev_script,
-                        created_at: project.created_at.to_rfc3339(),
-                        updated_at: project.updated_at.to_rfc3339(),
-                    })
-                    .collect();
+        let url = self.url("/api/projects");
+        let projects: Vec<Project> = match self.send_json(self.client.get(&url)).await {
+            Ok(ps) => ps,
+            Err(e) => return Ok(e),
+        };
 
-                let response = ListProjectsResponse {
-                    success: true,
-                    projects: project_summaries,
-                    count,
-                };
+        let project_summaries: Vec<ProjectSummary> = projects
+            .into_iter()
+            .map(ProjectSummary::from_project)
+            .collect();
 
-                Ok(CallToolResult::success(vec![Content::text(
-                    serde_json::to_string_pretty(&response)
-                        .unwrap_or_else(|_| "Failed to serialize projects".to_string()),
-                )]))
-            }
-            Err(e) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Failed to retrieve projects",
-                    "details": e.to_string()
-                });
-                Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response)
-                        .unwrap_or_else(|_| "Database error".to_string()),
-                )]))
-            }
-        }
+        let response = ListProjectsResponse {
+            count: project_summaries.len(),
+            projects: project_summaries,
+        };
+
+        TaskServer::success(&response)
     }
 
     #[tool(
@@ -356,132 +372,120 @@ impl TaskServer {
             limit,
         }): Parameters<ListTasksRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let project_uuid = match Uuid::parse_str(&project_id) {
-            Ok(uuid) => uuid,
-            Err(_) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Invalid project ID format. Must be a valid UUID.",
-                    "project_id": project_id
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response)
-                        .unwrap_or_else(|_| "Invalid project ID format".to_string()),
-                )]));
-            }
-        };
-
         let status_filter = if let Some(ref status_str) = status {
-            match parse_task_status(status_str) {
-                Some(status) => Some(status),
-                None => {
-                    let error_response = serde_json::json!({
-                        "success": false,
-                        "error": "Invalid status filter. Valid values: 'todo', 'inprogress', 'inreview', 'done', 'cancelled'",
-                        "provided_status": status_str
-                    });
-                    return Ok(CallToolResult::error(vec![Content::text(
-                        serde_json::to_string_pretty(&error_response)
-                            .unwrap_or_else(|_| "Invalid status filter".to_string()),
-                    )]));
+            match TaskStatus::from_str(status_str) {
+                Ok(s) => Some(s),
+                Err(_) => {
+                    return Self::err(
+                        "Invalid status filter. Valid values: 'todo', 'in-progress', 'in-review', 'done', 'cancelled'".to_string(),
+                        Some(status_str.to_string()),
+                    );
                 }
             }
         } else {
             None
         };
 
-        let project = match Project::find_by_id(&self.pool, project_uuid).await {
-            Ok(Some(project)) => project,
-            Ok(None) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Project not found",
-                    "project_id": project_id
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response)
-                        .unwrap_or_else(|_| "Project not found".to_string()),
-                )]));
+        let url = self.url(&format!("/api/tasks?project_id={}", project_id));
+        let all_tasks: Vec<TaskWithAttemptStatus> =
+            match self.send_json(self.client.get(&url)).await {
+                Ok(t) => t,
+                Err(e) => return Ok(e),
+            };
+
+        let task_limit = limit.unwrap_or(50).max(0) as usize;
+        let filtered = all_tasks.into_iter().filter(|t| {
+            if let Some(ref want) = status_filter {
+                &t.status == want
+            } else {
+                true
             }
-            Err(e) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Failed to check project existence",
-                    "details": e.to_string(),
-                    "project_id": project_id
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response)
-                        .unwrap_or_else(|_| "Database error".to_string()),
-                )]));
+        });
+        let limited: Vec<TaskWithAttemptStatus> = filtered.take(task_limit).collect();
+
+        let task_summaries: Vec<TaskSummary> = limited
+            .into_iter()
+            .map(TaskSummary::from_task_with_status)
+            .collect();
+
+        let response = ListTasksResponse {
+            count: task_summaries.len(),
+            tasks: task_summaries,
+            project_id: project_id.to_string(),
+            applied_filters: ListTasksFilters {
+                status: status.clone(),
+                limit: task_limit as i32,
+            },
+        };
+
+        TaskServer::success(&response)
+    }
+
+    #[tool(description = "Start working on a task by creating and launching a new task attempt.")]
+    async fn start_task_attempt(
+        &self,
+        Parameters(StartTaskAttemptRequest {
+            task_id,
+            executor,
+            variant,
+            base_branch,
+        }): Parameters<StartTaskAttemptRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let base_branch = base_branch.trim().to_string();
+        if base_branch.is_empty() {
+            return Self::err("Base branch must not be empty.".to_string(), None::<String>);
+        }
+
+        let executor_trimmed = executor.trim();
+        if executor_trimmed.is_empty() {
+            return Self::err("Executor must not be empty.".to_string(), None::<String>);
+        }
+
+        let normalized_executor = executor_trimmed.replace('-', "_").to_ascii_uppercase();
+        let base_executor = match BaseCodingAgent::from_str(&normalized_executor) {
+            Ok(exec) => exec,
+            Err(_) => {
+                return Self::err(
+                    format!("Unknown executor '{executor_trimmed}'."),
+                    None::<String>,
+                );
             }
         };
 
-        let task_limit = limit.unwrap_or(50).clamp(1, 200); // Reasonable limits
-
-        let tasks_result =
-            Task::find_by_project_id_with_attempt_status(&self.pool, project_uuid).await;
-
-        match tasks_result {
-            Ok(tasks) => {
-                let filtered_tasks: Vec<_> = tasks
-                    .into_iter()
-                    .filter(|task| {
-                        if let Some(ref filter_status) = status_filter {
-                            &task.status == filter_status
-                        } else {
-                            true
-                        }
-                    })
-                    .take(task_limit as usize)
-                    .collect();
-
-                let task_summaries: Vec<TaskSummary> = filtered_tasks
-                    .into_iter()
-                    .map(|task| TaskSummary {
-                        id: task.id.to_string(),
-                        title: task.title.clone(),
-                        description: task.description.clone(),
-                        status: task_status_to_string(&task.status),
-                        created_at: task.created_at.to_rfc3339(),
-                        updated_at: task.updated_at.to_rfc3339(),
-                        has_in_progress_attempt: Some(task.has_in_progress_attempt),
-                        has_merged_attempt: Some(task.has_merged_attempt),
-                        last_attempt_failed: Some(task.last_attempt_failed),
-                    })
-                    .collect();
-
-                let count = task_summaries.len();
-                let response = ListTasksResponse {
-                    success: true,
-                    tasks: task_summaries,
-                    count,
-                    project_id: project_id.clone(),
-                    project_name: Some(project.name),
-                    applied_filters: ListTasksFilters {
-                        status: status.clone(),
-                        limit: task_limit,
-                    },
-                };
-
-                Ok(CallToolResult::success(vec![Content::text(
-                    serde_json::to_string_pretty(&response)
-                        .unwrap_or_else(|_| "Failed to serialize tasks".to_string()),
-                )]))
+        let variant = variant.and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
             }
-            Err(e) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Failed to retrieve tasks",
-                    "details": e.to_string(),
-                    "project_id": project_id
-                });
-                Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response)
-                        .unwrap_or_else(|_| "Database error".to_string()),
-                )]))
-            }
-        }
+        });
+
+        let executor_profile_id = ExecutorProfileId {
+            executor: base_executor,
+            variant,
+        };
+
+        let payload = CreateTaskAttemptBody {
+            task_id,
+            executor_profile_id,
+            base_branch,
+        };
+
+        let url = self.url("/api/task-attempts");
+        let attempt: TaskAttempt = match self.send_json(self.client.post(&url).json(&payload)).await
+        {
+            Ok(attempt) => attempt,
+            Err(e) => return Ok(e),
+        };
+
+        let response = StartTaskAttemptResponse {
+            message: "Task attempt started successfully".to_string(),
+            task_id: attempt.task_id.to_string(),
+            attempt_id: attempt.id.to_string(),
+        };
+
+        TaskServer::success(&response)
     }
 
     #[tool(
@@ -490,135 +494,46 @@ impl TaskServer {
     async fn update_task(
         &self,
         Parameters(UpdateTaskRequest {
-            project_id,
             task_id,
             title,
             description,
             status,
         }): Parameters<UpdateTaskRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let project_uuid = match Uuid::parse_str(&project_id) {
-            Ok(uuid) => uuid,
-            Err(_) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Invalid project ID format. Must be a valid UUID.",
-                    "project_id": project_id
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                )]));
-            }
-        };
-
-        let task_uuid = match Uuid::parse_str(&task_id) {
-            Ok(uuid) => uuid,
-            Err(_) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Invalid task ID format. Must be a valid UUID.",
-                    "task_id": task_id
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                )]));
-            }
-        };
-
-        let status_enum = if let Some(ref status_str) = status {
-            match parse_task_status(status_str) {
-                Some(status) => Some(status),
-                None => {
-                    let error_response = serde_json::json!({
-                        "success": false,
-                        "error": "Invalid status. Valid values: 'todo', 'inprogress', 'inreview', 'done', 'cancelled'",
-                        "provided_status": status_str
-                    });
-                    return Ok(CallToolResult::error(vec![Content::text(
-                        serde_json::to_string_pretty(&error_response).unwrap(),
-                    )]));
+        let status = if let Some(ref status_str) = status {
+            match TaskStatus::from_str(status_str) {
+                Ok(s) => Some(s),
+                Err(_) => {
+                    return Self::err(
+                        "Invalid status filter. Valid values: 'todo', 'in-progress', 'in-review', 'done', 'cancelled'".to_string(),
+                        Some(status_str.to_string()),
+                    );
                 }
             }
         } else {
             None
         };
 
-        let current_task =
-            match Task::find_by_id_and_project_id(&self.pool, task_uuid, project_uuid).await {
-                Ok(Some(task)) => task,
-                Ok(None) => {
-                    let error_response = serde_json::json!({
-                        "success": false,
-                        "error": "Task not found in the specified project",
-                        "task_id": task_id,
-                        "project_id": project_id
-                    });
-                    return Ok(CallToolResult::error(vec![Content::text(
-                        serde_json::to_string_pretty(&error_response).unwrap(),
-                    )]));
-                }
-                Err(e) => {
-                    let error_response = serde_json::json!({
-                        "success": false,
-                        "error": "Failed to retrieve task",
-                        "details": e.to_string()
-                    });
-                    return Ok(CallToolResult::error(vec![Content::text(
-                        serde_json::to_string_pretty(&error_response).unwrap(),
-                    )]));
-                }
-            };
+        let payload = UpdateTask {
+            title,
+            description,
+            status,
+            parent_task_attempt: None,
+            image_ids: None,
+        };
+        let url = self.url(&format!("/api/tasks/{}", task_id));
+        let updated_task: Task = match self.send_json(self.client.put(&url).json(&payload)).await {
+            Ok(t) => t,
+            Err(e) => return Ok(e),
+        };
 
-        let new_title = title.unwrap_or(current_task.title);
-        let new_description = description.or(current_task.description);
-        let new_status = status_enum.unwrap_or(current_task.status);
-        let new_parent_task_attempt = current_task.parent_task_attempt;
+        let summary = TaskSummary::from_task(updated_task);
+        let repsonse = UpdateTaskResponse {
+            message: "Task updated successfully".to_string(),
+            task: Some(summary),
+        };
 
-        match Task::update(
-            &self.pool,
-            task_uuid,
-            project_uuid,
-            new_title,
-            new_description,
-            new_status,
-            new_parent_task_attempt,
-        )
-        .await
-        {
-            Ok(updated_task) => {
-                let task_summary = TaskSummary {
-                    id: updated_task.id.to_string(),
-                    title: updated_task.title,
-                    description: updated_task.description,
-                    status: task_status_to_string(&updated_task.status),
-                    created_at: updated_task.created_at.to_rfc3339(),
-                    updated_at: updated_task.updated_at.to_rfc3339(),
-                    has_in_progress_attempt: None,
-                    has_merged_attempt: None,
-                    last_attempt_failed: None,
-                };
-
-                let response = UpdateTaskResponse {
-                    success: true,
-                    message: "Task updated successfully".to_string(),
-                    task: Some(task_summary),
-                };
-
-                Ok(CallToolResult::success(vec![Content::text(
-                    serde_json::to_string_pretty(&response).unwrap(),
-                )]))
-            }
-            Err(e) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Failed to update task",
-                    "details": e.to_string()
-                });
-                Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                )]))
-            }
-        }
+        TaskServer::success(&repsonse)
     }
 
     #[tool(
@@ -626,93 +541,22 @@ impl TaskServer {
     )]
     async fn delete_task(
         &self,
-        Parameters(DeleteTaskRequest {
-            project_id,
-            task_id,
-        }): Parameters<DeleteTaskRequest>,
+        Parameters(DeleteTaskRequest { task_id }): Parameters<DeleteTaskRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let project_uuid = match Uuid::parse_str(&project_id) {
-            Ok(uuid) => uuid,
-            Err(_) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Invalid project ID format"
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                )]));
-            }
-        };
-
-        let task_uuid = match Uuid::parse_str(&task_id) {
-            Ok(uuid) => uuid,
-            Err(_) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Invalid task ID format"
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                )]));
-            }
-        };
-
-        match Task::exists(&self.pool, task_uuid, project_uuid).await {
-            Ok(true) => {
-                // Delete the task
-                match Task::delete(&self.pool, task_uuid).await {
-                    Ok(rows_affected) => {
-                        if rows_affected > 0 {
-                            let response = DeleteTaskResponse {
-                                success: true,
-                                message: "Task deleted successfully".to_string(),
-                                deleted_task_id: Some(task_id),
-                            };
-                            Ok(CallToolResult::success(vec![Content::text(
-                                serde_json::to_string_pretty(&response).unwrap(),
-                            )]))
-                        } else {
-                            let error_response = serde_json::json!({
-                                "success": false,
-                                "error": "Task not found or already deleted"
-                            });
-                            Ok(CallToolResult::error(vec![Content::text(
-                                serde_json::to_string_pretty(&error_response).unwrap(),
-                            )]))
-                        }
-                    }
-                    Err(e) => {
-                        let error_response = serde_json::json!({
-                            "success": false,
-                            "error": "Failed to delete task",
-                            "details": e.to_string()
-                        });
-                        Ok(CallToolResult::error(vec![Content::text(
-                            serde_json::to_string_pretty(&error_response).unwrap(),
-                        )]))
-                    }
-                }
-            }
-            Ok(false) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Task not found in the specified project"
-                });
-                Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                )]))
-            }
-            Err(e) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Failed to check task existence",
-                    "details": e.to_string()
-                });
-                Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                )]))
-            }
+        let url = self.url(&format!("/api/tasks/{}", task_id));
+        if let Err(e) = self
+            .send_json::<serde_json::Value>(self.client.delete(&url))
+            .await
+        {
+            return Ok(e);
         }
+
+        let repsonse = DeleteTaskResponse {
+            message: "Task deleted successfully".to_string(),
+            deleted_task_id: Some(task_id.to_string()),
+        };
+
+        TaskServer::success(&repsonse)
     }
 
     #[tool(
@@ -720,85 +564,21 @@ impl TaskServer {
     )]
     async fn get_task(
         &self,
-        Parameters(GetTaskRequest {
-            project_id,
-            task_id,
-        }): Parameters<GetTaskRequest>,
+        Parameters(GetTaskRequest { task_id }): Parameters<GetTaskRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let project_uuid = match Uuid::parse_str(&project_id) {
-            Ok(uuid) => uuid,
-            Err(_) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Invalid project ID format"
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                )]));
-            }
+        let url = self.url(&format!("/api/tasks/{}", task_id));
+        let task: Task = match self.send_json(self.client.get(&url)).await {
+            Ok(t) => t,
+            Err(e) => return Ok(e),
         };
 
-        let task_uuid = match Uuid::parse_str(&task_id) {
-            Ok(uuid) => uuid,
-            Err(_) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Invalid task ID format"
-                });
-                return Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                )]));
-            }
+        let summary = TaskSummary::from_task(task);
+        let response = GetTaskResponse {
+            task: Some(summary),
+            project_name: None,
         };
 
-        let task_result =
-            Task::find_by_id_and_project_id(&self.pool, task_uuid, project_uuid).await;
-        let project_result = Project::find_by_id(&self.pool, project_uuid).await;
-
-        match (task_result, project_result) {
-            (Ok(Some(task)), Ok(Some(project))) => {
-                let task_summary = TaskSummary {
-                    id: task.id.to_string(),
-                    title: task.title,
-                    description: task.description,
-                    status: task_status_to_string(&task.status),
-                    created_at: task.created_at.to_rfc3339(),
-                    updated_at: task.updated_at.to_rfc3339(),
-                    has_in_progress_attempt: None,
-                    has_merged_attempt: None,
-                    last_attempt_failed: None,
-                };
-
-                let response = GetTaskResponse {
-                    success: true,
-                    task: Some(task_summary),
-                    project_name: Some(project.name),
-                };
-
-                Ok(CallToolResult::success(vec![Content::text(
-                    serde_json::to_string_pretty(&response).unwrap(),
-                )]))
-            }
-            (Ok(None), _) | (_, Ok(None)) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Task or project not found"
-                });
-                Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                )]))
-            }
-            (Err(e), _) | (_, Err(e)) => {
-                let error_response = serde_json::json!({
-                    "success": false,
-                    "error": "Failed to retrieve task or project",
-                    "details": e.to_string()
-                });
-                Ok(CallToolResult::error(vec![Content::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                )]))
-            }
-        }
+        TaskServer::success(&response)
     }
 }
 
@@ -814,7 +594,7 @@ impl ServerHandler for TaskServer {
                 name: "vibe-kanban".to_string(),
                 version: "1.0.0".to_string(),
             },
-            instructions: Some("A task and project management server. If you need to create or update tickets or tasks then use these tools. Most of them absolutely require that you pass the `project_id` of the project that you are currently working on. This should be provided to you. Call `list_tasks` to fetch the `task_ids` of all the tasks in a project`. TOOLS: 'list_projects', 'list_tasks', 'create_task', 'get_task', 'update_task', 'delete_task'. Make sure to pass `project_id` or `task_id` where required. You can use list tools to get the available ids.".to_string()),
+            instructions: Some("A task and project management server. If you need to create or update tickets or tasks then use these tools. Most of them absolutely require that you pass the `project_id` of the project that you are currently working on. This should be provided to you. Call `list_tasks` to fetch the `task_ids` of all the tasks in a project`. TOOLS: 'list_projects', 'list_tasks', 'create_task', 'start_task_attempt', 'get_task', 'update_task', 'delete_task'. Make sure to pass `project_id` or `task_id` where required. You can use list tools to get the available ids.".to_string()),
         }
     }
 }
