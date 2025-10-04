@@ -152,7 +152,7 @@ function MarkdownRenderer({
       },
       h2: {
         component: ({ children, ...props }: any) => (
-          <h2 {...props} className="text-baseleading-tight font-medium">
+          <h2 {...props} className="text-base leading-tight font-medium">
             {children}
           </h2>
         ),
@@ -244,7 +244,9 @@ function MarkdownRenderer({
         </div>
       )}
       <div className={className}>
-        <Markdown options={{ overrides }}>{content}</Markdown>
+        <Markdown options={{ overrides, disableParsingRawHTML: true }}>
+          {content}
+        </Markdown>
       </div>
     </div>
   );
