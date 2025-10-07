@@ -851,6 +851,17 @@ pub async fn open_task_attempt_in_editor(
                 task_attempt.id,
                 path.display()
             );
+
+            deployment
+                .track_if_analytics_allowed(
+                    "task_attempt_editor_opened",
+                    serde_json::json!({
+                        "attempt_id": task_attempt.id.to_string(),
+                        "editor_type": payload.as_ref().and_then(|req| req.editor_type.as_ref()),
+                    }),
+                )
+                .await;
+
             Ok(ResponseJson(ApiResponse::success(())))
         }
         Err(e) => {
@@ -1060,6 +1071,15 @@ pub async fn change_target_branch(
         &new_target_branch,
     )?;
 
+    deployment
+        .track_if_analytics_allowed(
+            "task_attempt_target_branch_changed",
+            serde_json::json!({
+                "attempt_id": task_attempt.id.to_string(),
+            }),
+        )
+        .await;
+
     Ok(ResponseJson(ApiResponse::success(
         ChangeTargetBranchResponse {
             new_target_branch,
@@ -1144,6 +1164,18 @@ pub async fn rebase_task_attempt(
             other => Err(ApiError::GitService(other)),
         };
     }
+
+    deployment
+        .track_if_analytics_allowed(
+            "task_attempt_rebased",
+            serde_json::json!({
+                "task_id": task.id.to_string(),
+                "project_id": ctx.project.id.to_string(),
+                "attempt_id": task_attempt.id.to_string(),
+            }),
+        )
+        .await;
+
     Ok(ResponseJson(ApiResponse::success(())))
 }
 
@@ -1271,6 +1303,17 @@ pub async fn start_dev_server(
         )));
     };
 
+    deployment
+        .track_if_analytics_allowed(
+            "dev_server_started",
+            serde_json::json!({
+                "task_id": task.id.to_string(),
+                "project_id": project.id.to_string(),
+                "attempt_id": task_attempt.id.to_string(),
+            }),
+        )
+        .await;
+
     Ok(ResponseJson(ApiResponse::success(())))
 }
 
@@ -1279,7 +1322,20 @@ pub async fn get_task_attempt_children(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<TaskRelationships>>, StatusCode> {
     match Task::find_relationships_for_attempt(&deployment.db().pool, &task_attempt).await {
-        Ok(relationships) => Ok(ResponseJson(ApiResponse::success(relationships))),
+        Ok(relationships) => {
+            deployment
+                .track_if_analytics_allowed(
+                    "task_attempt_children_viewed",
+                    serde_json::json!({
+                        "attempt_id": task_attempt.id.to_string(),
+                        "children_count": relationships.children.len(),
+                        "parent_count": if relationships.parent_task.is_some() { 1 } else { 0 },
+                    }),
+                )
+                .await;
+
+            Ok(ResponseJson(ApiResponse::success(relationships)))
+        }
         Err(e) => {
             tracing::error!(
                 "Failed to fetch relationships for task attempt {}: {}",
@@ -1296,6 +1352,16 @@ pub async fn stop_task_attempt_execution(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
     deployment.container().try_stop(&task_attempt).await;
+
+    deployment
+        .track_if_analytics_allowed(
+            "task_attempt_stopped",
+            serde_json::json!({
+                "attempt_id": task_attempt.id.to_string(),
+            }),
+        )
+        .await;
+
     Ok(ResponseJson(ApiResponse::success(())))
 }
 

@@ -24,7 +24,20 @@ pub async fn create_approval(
         .create_from_session(&deployment.db().pool, request)
         .await
     {
-        Ok(approval) => Ok(Json(approval)),
+        Ok(approval) => {
+            deployment
+                .track_if_analytics_allowed(
+                    "approval_created",
+                    serde_json::json!({
+                        "approval_id": approval.id,
+                        "tool_name": &approval.tool_name,
+                        "execution_process_id": approval.execution_process_id.to_string(),
+                    }),
+                )
+                .await;
+
+            Ok(Json(approval))
+        }
         Err(e) => {
             tracing::error!("Failed to create approval: {:?}", e);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
@@ -52,6 +65,18 @@ pub async fn respond_to_approval(
 
     match service.respond(&id, request).await {
         Ok((status, context)) => {
+            deployment
+                .track_if_analytics_allowed(
+                    "approval_responded",
+                    serde_json::json!({
+                        "approval_id": &id,
+                        "status": format!("{:?}", status),
+                        "tool_name": context.tool_name,
+                        "execution_process_id": context.execution_process_id.to_string(),
+                    }),
+                )
+                .await;
+
             if matches!(status, ApprovalStatus::Approved)
                 && context.tool_name == EXIT_PLAN_MODE_TOOL_NAME
             {
