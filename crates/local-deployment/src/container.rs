@@ -895,6 +895,10 @@ impl ContainerService for LocalContainerService {
         &self.git
     }
 
+    async fn git_branch_prefix(&self) -> String {
+        self.config.read().await.git_branch_prefix.clone()
+    }
+
     fn task_attempt_to_current_dir(&self, task_attempt: &TaskAttempt) -> PathBuf {
         PathBuf::from(task_attempt.container_ref.clone().unwrap_or_default())
     }
