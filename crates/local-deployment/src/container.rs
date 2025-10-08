@@ -1,16 +1,12 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     io,
     path::{Path, PathBuf},
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
+    sync::{Arc, atomic::AtomicUsize},
     time::Duration,
 };
 
 use anyhow::anyhow;
-use async_stream::try_stream;
 use async_trait::async_trait;
 use command_group::AsyncGroupChild;
 use db::{
@@ -40,14 +36,12 @@ use executors::{
     },
 };
 use futures::{FutureExt, StreamExt, TryStreamExt, stream::select};
-use notify::RecommendedWatcher;
-use notify_debouncer_full::{DebouncedEvent, Debouncer, RecommendedCache};
 use serde_json::json;
 use services::services::{
     analytics::AnalyticsContext,
     config::Config,
     container::{ContainerError, ContainerRef, ContainerService},
-    filesystem_watcher,
+    diff_stream::{self, DiffStreamHandle},
     git::{Commit, DiffTarget, GitService},
     image::ImageService,
     notification::NotificationService,
@@ -64,25 +58,6 @@ use uuid::Uuid;
 
 use crate::command;
 
-/// Stream wrapper that owns the filesystem watcher
-/// When this stream is dropped, the watcher is automatically cleaned up
-struct DiffStreamWithWatcher {
-    stream: futures::stream::BoxStream<'static, Result<LogMsg, std::io::Error>>,
-    _watcher: Option<Debouncer<RecommendedWatcher, RecommendedCache>>,
-}
-
-impl futures::Stream for DiffStreamWithWatcher {
-    type Item = Result<LogMsg, std::io::Error>;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        // Delegate to inner stream
-        std::pin::Pin::new(&mut self.stream).poll_next(cx)
-    }
-}
-
 #[derive(Clone)]
 pub struct LocalContainerService {
     db: DBService,
@@ -95,59 +70,6 @@ pub struct LocalContainerService {
 }
 
 impl LocalContainerService {
-    // Max cumulative content bytes allowed per diff stream
-    const MAX_CUMULATIVE_DIFF_BYTES: usize = 200 * 1024 * 1024; // 200MB
-
-    // Apply stream-level omit policy based on cumulative bytes.
-    // If adding this diff's contents exceeds the cap, strip contents and set stats.
-    fn apply_stream_omit_policy(
-        diff: &mut utils::diff::Diff,
-        sent_bytes: &Arc<AtomicUsize>,
-        stats_only: bool,
-    ) {
-        if stats_only {
-            Self::omit_diff_contents(diff);
-            return;
-        }
-
-        // Compute size of current diff payload
-        let mut size = 0usize;
-        if let Some(ref s) = diff.old_content {
-            size += s.len();
-        }
-        if let Some(ref s) = diff.new_content {
-            size += s.len();
-        }
-
-        if size == 0 {
-            return; // nothing to account
-        }
-
-        let current = sent_bytes.load(Ordering::Relaxed);
-        if current.saturating_add(size) > Self::MAX_CUMULATIVE_DIFF_BYTES {
-            Self::omit_diff_contents(diff);
-        } else {
-            // safe to include; account for it
-            let _ = sent_bytes.fetch_add(size, Ordering::Relaxed);
-        }
-    }
-
-    fn omit_diff_contents(diff: &mut utils::diff::Diff) {
-        if diff.additions.is_none()
-            && diff.deletions.is_none()
-            && (diff.old_content.is_some() || diff.new_content.is_some())
-        {
-            let old = diff.old_content.as_deref().unwrap_or("");
-            let new = diff.new_content.as_deref().unwrap_or("");
-            let (add, del) = utils::diff::compute_line_change_counts(old, new);
-            diff.additions = Some(add);
-            diff.deletions = Some(del);
-        }
-
-        diff.old_content = None;
-        diff.new_content = None;
-        diff.content_omitted = true;
-    }
     pub fn new(
         db: DBService,
         msg_stores: Arc<RwLock<HashMap<Uuid, Arc<MsgStore>>>>,
@@ -650,7 +572,7 @@ impl LocalContainerService {
         project_repo_path: &Path,
         merge_commit_id: &str,
         stats_only: bool,
-    ) -> Result<DiffStreamWithWatcher, ContainerError> {
+    ) -> Result<DiffStreamHandle, ContainerError> {
         let diffs = self.git().get_diffs(
             DiffTarget::Commit {
                 repo_path: project_repo_path,
@@ -663,7 +585,7 @@ impl LocalContainerService {
         let diffs: Vec<_> = diffs
             .into_iter()
             .map(|mut d| {
-                Self::apply_stream_omit_policy(&mut d, &cum, stats_only);
+                diff_stream::apply_stream_omit_policy(&mut d, &cum, stats_only);
                 d
             })
             .collect();
@@ -679,10 +601,7 @@ impl LocalContainerService {
         }))
         .boxed();
 
-        Ok(DiffStreamWithWatcher {
-            stream,
-            _watcher: None, // Merged diffs are static, no watcher needed
-        })
+        Ok(diff_stream::DiffStreamHandle::new(stream, None))
     }
 
     /// Create a live diff log stream for ongoing attempts for WebSocket
@@ -692,179 +611,14 @@ impl LocalContainerService {
         worktree_path: &Path,
         base_commit: &Commit,
         stats_only: bool,
-    ) -> Result<DiffStreamWithWatcher, ContainerError> {
-        // Get initial snapshot
-        let git_service = self.git().clone();
-        let initial_diffs = git_service.get_diffs(
-            DiffTarget::Worktree {
-                worktree_path,
-                base_commit,
-            },
-            None,
-        )?;
-
-        let cumulative = Arc::new(AtomicUsize::new(0));
-        let full_sent = Arc::new(std::sync::RwLock::new(HashSet::<String>::new()));
-        let initial_diffs: Vec<_> = initial_diffs
-            .into_iter()
-            .map(|mut d| {
-                Self::apply_stream_omit_policy(&mut d, &cumulative, stats_only);
-                d
-            })
-            .collect();
-
-        // Record which paths were sent with full content
-        {
-            let mut guard = full_sent.write().unwrap();
-            for d in &initial_diffs {
-                if !d.content_omitted {
-                    let p = GitService::diff_path(d);
-                    guard.insert(p);
-                }
-            }
-        }
-
-        let initial_stream = futures::stream::iter(initial_diffs.into_iter().map(|diff| {
-            let entry_index = GitService::diff_path(&diff);
-            let patch =
-                ConversationPatch::add_diff(escape_json_pointer_segment(&entry_index), diff);
-            Ok::<_, std::io::Error>(LogMsg::JsonPatch(patch))
-        }))
-        .boxed();
-
-        // Create live update stream
-        let worktree_path = worktree_path.to_path_buf();
-        let base_commit = base_commit.clone();
-        let worktree_path_for_spawn = worktree_path.clone();
-        let watcher_result = tokio::task::spawn_blocking(move || {
-            filesystem_watcher::async_watcher(worktree_path_for_spawn)
-        })
-        .await
-        .map_err(|e| io::Error::other(format!("Failed to spawn watcher setup: {e}")))?;
-        let (debouncer, mut rx, canonical_worktree_path) =
-            watcher_result.map_err(|e| io::Error::other(e.to_string()))?;
-
-        let live_stream = {
-            let git_service = git_service.clone();
-            let cumulative = Arc::clone(&cumulative);
-            let full_sent = Arc::clone(&full_sent);
-
-            try_stream! {
-                while let Some(result) = rx.next().await {
-                    match result {
-                        Ok(events) => {
-                            let changed_paths = Self::extract_changed_paths(&events, &canonical_worktree_path, &worktree_path);
-
-                            if !changed_paths.is_empty() {
-                                for msg in Self::process_file_changes(
-                                    &git_service,
-                                    &worktree_path,
-                                    &base_commit,
-                                    &changed_paths,
-                                    &cumulative,
-                                    &full_sent,
-                                    stats_only,
-                                ).map_err(|e| {
-                                    tracing::error!("Error processing file changes: {}", e);
-                                    io::Error::other(e.to_string())
-                                })? {
-                                    yield msg;
-                                }
-                            }
-                        }
-                        Err(errors) => {
-                            let error_msg = errors.iter()
-                                .map(|e| e.to_string())
-                                .collect::<Vec<_>>()
-                                .join("; ");
-                            tracing::error!("Filesystem watcher error: {}", error_msg);
-                            Err(io::Error::other(error_msg))?;
-                        }
-                    }
-                }
-            }
-        }.boxed();
-
-        let combined_stream = initial_stream.chain(live_stream).boxed();
-
-        Ok(DiffStreamWithWatcher {
-            stream: combined_stream,
-            _watcher: Some(debouncer),
-        })
-    }
-
-    /// Extract changed file paths from filesystem events
-    fn extract_changed_paths(
-        events: &[DebouncedEvent],
-        canonical_worktree_path: &Path,
-        worktree_path: &Path,
-    ) -> Vec<String> {
-        events
-            .iter()
-            .flat_map(|event| &event.paths)
-            .filter_map(|path| {
-                path.strip_prefix(canonical_worktree_path)
-                    .or_else(|_| path.strip_prefix(worktree_path))
-                    .ok()
-                    .map(|p| p.to_string_lossy().replace('\\', "/"))
-            })
-            .filter(|s| !s.is_empty())
-            .collect()
-    }
-
-    /// Process file changes and generate diff messages (for WS)
-    fn process_file_changes(
-        git_service: &GitService,
-        worktree_path: &Path,
-        base_commit: &Commit,
-        changed_paths: &[String],
-        cumulative_bytes: &Arc<AtomicUsize>,
-        full_sent_paths: &Arc<std::sync::RwLock<HashSet<String>>>,
-        stats_only: bool,
-    ) -> Result<Vec<LogMsg>, ContainerError> {
-        let path_filter: Vec<&str> = changed_paths.iter().map(|s| s.as_str()).collect();
-
-        let current_diffs = git_service.get_diffs(
-            DiffTarget::Worktree {
-                worktree_path,
-                base_commit,
-            },
-            Some(&path_filter),
-        )?;
-
-        let mut msgs = Vec::new();
-        let mut files_with_diffs = HashSet::new();
-
-        // Add/update files that have diffs
-        for mut diff in current_diffs {
-            let file_path = GitService::diff_path(&diff);
-            files_with_diffs.insert(file_path.clone());
-            // Apply stream-level omit policy (affects contents and stats)
-            Self::apply_stream_omit_policy(&mut diff, cumulative_bytes, stats_only);
-
-            if diff.content_omitted {
-                if full_sent_paths.read().unwrap().contains(&file_path) {
-                    continue;
-                }
-            } else {
-                let mut guard = full_sent_paths.write().unwrap();
-                guard.insert(file_path.clone());
-            }
-
-            let patch = ConversationPatch::add_diff(escape_json_pointer_segment(&file_path), diff);
-            msgs.push(LogMsg::JsonPatch(patch));
-        }
-
-        // Remove files that changed but no longer have diffs
-        for changed_path in changed_paths {
-            if !files_with_diffs.contains(changed_path) {
-                let patch =
-                    ConversationPatch::remove_diff(escape_json_pointer_segment(changed_path));
-                msgs.push(LogMsg::JsonPatch(patch));
-            }
-        }
-
-        Ok(msgs)
+    ) -> Result<DiffStreamHandle, ContainerError> {
+        diff_stream::create(
+            self.git().clone(),
+            worktree_path.to_path_buf(),
+            base_commit.clone(),
+            stats_only,
+        )
+        .map_err(|e| ContainerError::Other(anyhow!("{e}")))
     }
 }
 

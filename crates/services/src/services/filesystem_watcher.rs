@@ -46,27 +46,39 @@ fn build_gitignore_set(root: &Path) -> Result<Gitignore, FilesystemWatcherError>
     let mut builder = GitignoreBuilder::new(root);
 
     // Walk once to collect all .gitignore files under root
-    for result in WalkBuilder::new(root)
+    WalkBuilder::new(root)
         .follow_links(false)
         .hidden(false) // we *want* to see .gitignore
-        .standard_filters(false) // do not apply default ignores while walking
-        .git_ignore(false) // we'll add them manually
-        .git_exclude(false)
+        .filter_entry(|entry| {
+            // only recurse into directories and .gitignore files
+            entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false)
+                || entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|name| name == ".gitignore")
+        })
         .build()
-    {
-        let dir_entry = result?;
-        if dir_entry
-            .file_type()
-            .map(|ft| ft.is_file())
-            .unwrap_or(false)
-            && dir_entry
-                .path()
-                .file_name()
-                .is_some_and(|name| name == ".gitignore")
-        {
-            builder.add(dir_entry.path());
-        }
-    }
+        .try_for_each(|result| {
+            // everything that is not a directory and is named .gitignore
+            match result {
+                Ok(dir_entry) => {
+                    if !dir_entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                        builder.add(dir_entry.path());
+                    }
+                    Ok(())
+                }
+                Err(err)
+                    if err.io_error().is_some_and(|io_err| {
+                        io_err.kind() == std::io::ErrorKind::PermissionDenied
+                    }) =>
+                {
+                    // Skip entries we don't have permission to read
+                    tracing::warn!("Permission denied reading path: {}", err);
+                    Ok(())
+                }
+                Err(e) => Err(FilesystemWatcherError::Ignore(e)),
+            }
+        })?;
 
     // Optionally include repo-local excludes
     let info_exclude = root.join(".git/info/exclude");
