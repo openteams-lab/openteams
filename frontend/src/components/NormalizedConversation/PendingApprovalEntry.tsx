@@ -17,11 +17,12 @@ import {
 } from '@/components/ui/tooltip';
 import { approvalsApi } from '@/lib/api';
 import { Check, X } from 'lucide-react';
-import { Textarea } from '@/components/ui/textarea';
+import { FileSearchTextarea } from '@/components/ui/file-search-textarea';
 
 import { useHotkeysContext } from 'react-hotkeys-hook';
 import { TabNavContext } from '@/contexts/TabNavigationContext';
 import { useKeyApproveRequest, useKeyDenyApproval, Scope } from '@/keyboard';
+import { useProject } from '@/contexts/project-context';
 
 const DEFAULT_DENIAL_REASON = 'User denied this tool use request.';
 
@@ -129,6 +130,7 @@ function DenyReasonForm({
   onCancel,
   onSubmit,
   inputRef,
+  projectId,
 }: {
   isResponding: boolean;
   value: string;
@@ -136,16 +138,18 @@ function DenyReasonForm({
   onCancel: () => void;
   onSubmit: () => void;
   inputRef: React.RefObject<HTMLTextAreaElement>;
+  projectId?: string;
 }) {
   return (
     <div className="mt-3 bg-background px-3 py-3 text-sm">
-      <Textarea
+      <FileSearchTextarea
         ref={inputRef}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Let the agent know why this request was denied..."
+        onChange={onChange}
+        placeholder="Let the agent know why this request was denied... Type @ to search files."
         disabled={isResponding}
-        className="text-sm"
+        className="w-full bg-transparent border px-3 py-2 text-sm resize-none min-h-[80px] focus-visible:outline-none"
+        projectId={projectId}
       />
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
         <Button
@@ -177,6 +181,7 @@ const PendingApprovalEntry = ({
   const [denyReason, setDenyReason] = useState('');
 
   const denyReasonRef = useRef<HTMLTextAreaElement | null>(null);
+  const { projectId } = useProject();
 
   const { enableScope, disableScope, activeScopes } = useHotkeysContext();
   const tabNav = useContext(TabNavContext);
@@ -353,6 +358,7 @@ const PendingApprovalEntry = ({
                 onCancel={handleCancelDeny}
                 onSubmit={handleSubmitDeny}
                 inputRef={denyReasonRef}
+                projectId={projectId}
               />
             )}
           </TooltipProvider>
