@@ -63,7 +63,7 @@ pub async fn respond_to_approval(
 ) -> Result<Json<ApprovalStatus>, StatusCode> {
     let service = deployment.approvals();
 
-    match service.respond(&id, request).await {
+    match service.respond(&deployment.db().pool, &id, request).await {
         Ok((status, context)) => {
             deployment
                 .track_if_analytics_allowed(
@@ -79,19 +79,17 @@ pub async fn respond_to_approval(
 
             if matches!(status, ApprovalStatus::Approved)
                 && context.tool_name == EXIT_PLAN_MODE_TOOL_NAME
-            {
                 // If exiting plan mode, automatically start a new execution process with different
                 // permissions
-                if let Ok(ctx) = ExecutionProcess::load_context(
+                && let Ok(ctx) = ExecutionProcess::load_context(
                     &deployment.db().pool,
                     context.execution_process_id,
                 )
                 .await
-                    && let Err(e) = deployment.container().exit_plan_mode_tool(ctx).await
-                {
-                    tracing::error!("failed to exit plan mode: {:?}", e);
-                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
-                }
+                && let Err(e) = deployment.container().exit_plan_mode_tool(ctx).await
+            {
+                tracing::error!("failed to exit plan mode: {:?}", e);
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
             }
 
             Ok(Json(status))
