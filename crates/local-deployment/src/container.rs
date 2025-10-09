@@ -1061,10 +1061,10 @@ impl LocalContainerService {
                 {
                     let content = entry.content.trim();
                     if !content.is_empty() {
-                        // Truncate to reasonable size (4KB as Oracle suggested)
                         const MAX_SUMMARY_LENGTH: usize = 4096;
                         if content.len() > MAX_SUMMARY_LENGTH {
-                            return Some(format!("{}...", &content[..MAX_SUMMARY_LENGTH]));
+                            let truncated = truncate_to_char_boundary(content, MAX_SUMMARY_LENGTH);
+                            return Some(format!("{truncated}..."));
                         }
                         return Some(content.to_string());
                     }
@@ -1245,5 +1245,41 @@ impl LocalContainerService {
             Draft::clear_after_send(&self.db.pool, ctx.task_attempt.id, DraftType::FollowUp).await;
 
         Ok(())
+    }
+}
+
+fn truncate_to_char_boundary(content: &str, max_len: usize) -> &str {
+    if content.len() <= max_len {
+        return content;
+    }
+
+    let cutoff = content
+        .char_indices()
+        .map(|(idx, _)| idx)
+        .chain(std::iter::once(content.len()))
+        .take_while(|&idx| idx <= max_len)
+        .last()
+        .unwrap_or(0);
+
+    debug_assert!(content.is_char_boundary(cutoff));
+    &content[..cutoff]
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_truncate_to_char_boundary() {
+        use super::truncate_to_char_boundary;
+
+        let input = "a".repeat(10);
+        assert_eq!(truncate_to_char_boundary(&input, 7), "a".repeat(7));
+
+        let input = "hello world";
+        assert_eq!(truncate_to_char_boundary(input, input.len()), input);
+
+        let input = "🔥🔥🔥"; // each fire emoji is 4 bytes
+        assert_eq!(truncate_to_char_boundary(input, 5), "🔥");
+        assert_eq!(truncate_to_char_boundary(input, 3), "");
     }
 }
