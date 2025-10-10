@@ -2,6 +2,7 @@
 import {
   CommandExitStatus,
   ExecutionProcess,
+  ExecutionProcessStatus,
   ExecutorAction,
   NormalizedEntry,
   PatchType,
@@ -59,7 +60,7 @@ export const useConversationHistory = ({
   const executionProcesses = useRef<ExecutionProcess[]>(executionProcessesRaw);
   const displayedExecutionProcesses = useRef<ExecutionProcessStateStore>({});
   const loadedInitialEntries = useRef(false);
-  const lastRunningProcessId = useRef<string | null>(null);
+  const lastActiveProcessId = useRef<string | null>(null);
   const onEntriesUpdatedRef = useRef<OnEntriesUpdated | null>(null);
 
   const mergeIntoDisplayed = (
@@ -164,16 +165,16 @@ export const useConversationHistory = ({
     }
   };
 
-  const getRunningExecutionProcesses = (): ExecutionProcess | null => {
-    // Filter for running processes, excluding dev server and other non-agent processes
-    const runningProcesses = executionProcesses?.current.filter(
-      (p) => p.status === 'running' && p.run_reason !== 'devserver'
+  const getActiveAgentProcess = (): ExecutionProcess | null => {
+    const activeProcesses = executionProcesses?.current.filter(
+      (p) =>
+        p.status === ExecutionProcessStatus.running &&
+        p.run_reason !== 'devserver'
     );
-    // Only throw error if there are multiple agent processes running
-    if (runningProcesses.length > 1) {
-      console.error('More than one running execution process found');
+    if (activeProcesses.length > 1) {
+      console.error('More than one active execution process found');
     }
-    return runningProcesses[0] || null;
+    return activeProcesses[0] || null;
   };
 
   const flattenEntries = (
@@ -268,7 +269,7 @@ export const useConversationHistory = ({
           entries.push(...entriesExcludingUser);
           const isProcessRunning =
             getLiveExecutionProcess(p.executionProcess.id)?.status ===
-            'running';
+            ExecutionProcessStatus.running;
 
           if (isProcessRunning && !hasPendingApprovalEntry) {
             entries.push(loadingPatch);
@@ -303,7 +304,7 @@ export const useConversationHistory = ({
                 };
 
           const toolStatus: ToolStatus =
-            executionProcess?.status === 'running'
+            executionProcess?.status === ExecutionProcessStatus.running
               ? { status: 'created' }
               : exitCode === 0
                 ? { status: 'success' }
@@ -365,7 +366,7 @@ export const useConversationHistory = ({
     if (!executionProcesses?.current) return localDisplayedExecutionProcesses;
 
     for (const executionProcess of [...executionProcesses.current].reverse()) {
-      if (executionProcess.status === 'running') continue;
+      if (executionProcess.status === ExecutionProcessStatus.running) continue;
 
       const entries =
         await loadEntriesForHistoricExecutionProcess(executionProcess);
@@ -397,7 +398,10 @@ export const useConversationHistory = ({
     let anyUpdated = false;
     for (const executionProcess of [...executionProcesses.current].reverse()) {
       const current = displayedExecutionProcesses.current;
-      if (current[executionProcess.id] || executionProcess.status === 'running')
+      if (
+        current[executionProcess.id] ||
+        executionProcess.status === ExecutionProcessStatus.running
+      )
         continue;
 
       const entries =
@@ -429,14 +433,33 @@ export const useConversationHistory = ({
     addEntryType: AddEntryType,
     loading: boolean
   ) => {
-    // Flatten entries in chronological order of process start
     const entries = flattenEntriesForEmit(executionProcessState);
     onEntriesUpdatedRef.current?.(entries, addEntryType, loading);
   };
 
-  // Stable key for dependency arrays when process list changes
+  const ensureProcessVisible = (p: ExecutionProcess) => {
+    mergeIntoDisplayed((state) => {
+      if (!state[p.id]) {
+        state[p.id] = {
+          executionProcess: {
+            id: p.id,
+            created_at: p.created_at,
+            updated_at: p.updated_at,
+            executor_action: p.executor_action,
+          },
+          entries: [],
+        };
+      }
+    });
+  };
+
   const idListKey = useMemo(
     () => executionProcessesRaw?.map((p) => p.id).join(','),
+    [executionProcessesRaw]
+  );
+
+  const idStatusKey = useMemo(
+    () => executionProcessesRaw?.map((p) => `${p.id}:${p.status}`).join(','),
     [executionProcessesRaw]
   );
 
@@ -475,14 +498,23 @@ export const useConversationHistory = ({
     };
   }, [attempt.id, idListKey]); // include idListKey so new processes trigger reload
 
-  // Running processes
   useEffect(() => {
-    const runningProcess = getRunningExecutionProcesses();
-    if (runningProcess && lastRunningProcessId.current !== runningProcess.id) {
-      lastRunningProcessId.current = runningProcess.id;
-      loadRunningAndEmitWithBackoff(runningProcess);
+    const activeProcess = getActiveAgentProcess();
+    if (!activeProcess) return;
+
+    if (!displayedExecutionProcesses.current[activeProcess.id]) {
+      ensureProcessVisible(activeProcess);
+      emitEntries(displayedExecutionProcesses.current, 'running', false);
     }
-  }, [attempt.id, idListKey]);
+
+    if (
+      activeProcess.status === ExecutionProcessStatus.running &&
+      lastActiveProcessId.current !== activeProcess.id
+    ) {
+      lastActiveProcessId.current = activeProcess.id;
+      loadRunningAndEmitWithBackoff(activeProcess);
+    }
+  }, [attempt.id, idStatusKey]);
 
   // If an execution process is removed, remove it from the state
   useEffect(() => {
@@ -505,8 +537,7 @@ export const useConversationHistory = ({
   useEffect(() => {
     displayedExecutionProcesses.current = {};
     loadedInitialEntries.current = false;
-    lastRunningProcessId.current = null;
-    // Emit blank entries
+    lastActiveProcessId.current = null;
     emitEntries(displayedExecutionProcesses.current, 'initial', true);
   }, [attempt.id]);
 
