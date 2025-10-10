@@ -35,7 +35,8 @@
           "core-features/creating-task-attempts",
           "core-features/reviewing-code-changes",
           "core-features/resolving-rebase-conflicts",
-          "core-features/task-details-full-screen"
+          "core-features/task-details-full-screen",
+          "core-features/preview-mode"
         ]
       },
       {

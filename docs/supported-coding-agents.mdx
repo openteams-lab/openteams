@@ -7,6 +7,28 @@ Vibe Kanban integrates with a variety of coding agents. These agents are availab
 
 <AccordionGroup>
 
+<Accordion title="Claude Code" icon="code">
+**Anthropic's Claude Code**
+
+## Installation
+Claude Code is now available via npx - no separate installation required!
+
+## Authentication
+You need to authenticate with Claude Code outside of Vibe Kanban before using it. Please follow the authentication instructions on the [Claude Code GitHub page](https://github.com/anthropics/claude-code).
+</Accordion>
+
+<Accordion title="OpenAI Codex" icon="code">
+**OpenAI Codex integration**
+
+## Installation
+OpenAI Codex is now available via `npx` - no separate installation required!
+
+## Authentication
+You need to authenticate with OpenAI Codex outside of Vibe Kanban before using it. Please follow the authentication instructions from the [OpenAI help center](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan) to use Codex with your ChatGPT plan.
+
+Alternatively, Codex can be used via the OpenAI API by setting the `OPENAI_API_KEY` environment variable. For more details, see the [OpenAI documentation](https://developers.openai.com/codex/pricing/#use-an-openai-api-key)
+</Accordion>
+
 <Accordion title="Amp" icon="code">
 **Amp code completion agent**
 
@@ -17,14 +39,23 @@ Amp is now available via npx - no separate installation required!
 You need to authenticate with Amp outside of Vibe Kanban before using it. Please follow the authentication instructions on the [Amp Owner's Manual](https://ampcode.com/manual#install).
 </Accordion>
 
-<Accordion title="Claude Code" icon="code">
-**Anthropic's Claude Code**
+<Accordion title="GitHub Copilot" icon="code">
+**GitHub Copilot CLI**
 
 ## Installation
-Claude Code is now available via npx - no separate installation required!
+GitHub Copilot CLI is available via npm. Install it globally:
+
+```bash
+npm install -g @github/copilot
+```
+
+## Prerequisites
+- A GitHub Copilot subscription
+- Node.js version 22 or later
+- npm version 10 or later
 
 ## Authentication
-You need to authenticate with Claude Code outside of Vibe Kanban before using it. Please follow the authentication instructions on the [Claude Code GitHub page](https://github.com/anthropics/claude-code).
+When you first start Copilot CLI, you'll be prompted to authenticate. Follow the on-screen instructions to log in to your GitHub account using the `/login` command. For more details, see the [GitHub Copilot CLI documentation](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli).
 </Accordion>
 
 <Accordion title="Cursor CLI" icon="code">
@@ -135,15 +166,7 @@ When creating a Task Attempt, select the coding agent and configuration: choose 
 - Missing features (webSearch/think/image): switch to a model that supports the capability and update your CCR mapping (via UI or JSON config).
 </Accordion>
 
-<Accordion title="Codex" icon="code">
-**OpenAI Codex integration**
 
-## Installation
-OpenAI Codex is now available via `npx` - no separate installation required!
-
-## Authentication
-You need to configure your OpenAI API credentials before using Codex. Please set the `OPENAI_API_KEY` environment variable. For more details, see the [OpenAI documentation](https://platform.openai.com/docs/guides/code).
-</Accordion>
 
 <Accordion title="Gemini CLI" icon="code">
 **Google Gemini CLI**
@@ -155,14 +178,14 @@ Gemini CLI is now available via npx - no separate installation required!
 You need to authenticate with Gemini CLI outside of Vibe Kanban before using it. Please follow the authentication instructions on the [Gemini CLI GitHub page](https://github.com/google-gemini/gemini-cli).
 </Accordion>
 
-<Accordion title="SST OpenCode" icon="code">
+<Accordion title="OpenCode" icon="code">
 **SST's OpenCode**
 
 ## Installation
-SST OpenCode is now available via `npx` - no separate installation required!
+OpenCode is now available via `npx` - no separate installation required!
 
 ## Authentication
-You need to authenticate with SST OpenCode outside of Vibe Kanban before using it. Please follow the authentication instructions on the [SST OpenCode GitHub page](https://github.com/sst/opencode).
+You need to authenticate with OpenCode outside of Vibe Kanban before using it. Please follow the authentication instructions on the [OpenCode GitHub page](https://github.com/sst/opencode).
 </Accordion>
 
 <Accordion title="Qwen Code" icon="code">

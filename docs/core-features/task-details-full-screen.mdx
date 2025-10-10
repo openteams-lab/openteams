@@ -19,11 +19,11 @@ Full screen mode uses a two-column layout:
 ### Left Sidebar
 - **Task Information**: Title, description, and metadata
 - **Development Toolbar**: Primary development actions
-- **TODOs**: Task checklist and progress tracking  
+- **TODOs**: Task checklist and progress tracking
 - **Relationships**: Subtasks and parent task links
 
 ### Right Panel
-- **Tab Navigation**: Switch between Logs, Diffs, and Processes
+- **Tab Navigation**: Switch between Logs, Diffs, Processes, and Preview
 - **Content Area**: Active tab content with real-time updates
 - **Follow-up Section**: Additional context and actions
 
@@ -95,7 +95,7 @@ The Logs tab provides real-time streaming of coding agent activities and reasoni
 <img src="/images/vk-logs.png" alt="Logs tab showing real-time streaming of agent output and process events" />
 </Frame>
 
-#### Diffs Tab  
+#### Diffs Tab
 The Diffs tab provides a visual representation of all code changes made during task execution. It shows a git diff between your branch and the base branch, with syntax highlighting and language-aware code formatting. You can see a summary of added, modified, and deleted files with precise line-by-line change tracking and context.
 
 <Frame>
@@ -110,6 +110,21 @@ The Processes tab displays a timeline view of all running and completed processe
 <Frame>
 <img src="/images/vk-processes.png" alt="Processes tab showing timeline of running and completed processes with status tracking" />
 </Frame>
+
+#### Preview Tab
+The Preview tab provides an embedded browser experience for testing web applications directly within Vibe Kanban. When you start a development server, the tab automatically detects the URL and displays your running application in an embedded iframe. This eliminates the need to switch between your browser and Vibe Kanban during development.
+
+**Key features:**
+- **Embedded browser**: View your application running directly in the task interface
+- **Automatic URL detection**: Automatically detects development server URLs from process logs
+- **Component selection**: Use the Web Companion to select specific UI components for precise feedback
+- **Preview toolbar**: Refresh the preview, copy the URL, or open in a new browser tab
+
+<Frame>
+<img src="/images/preview-mode-overview.png" alt="Preview tab showing embedded web application with toolbar controls" />
+</Frame>
+
+For detailed setup instructions and usage guidance, see [Preview Mode](/core-features/preview-mode).
 
 ## Navigation & Controls
 
@@ -130,8 +145,9 @@ The interface gracefully transitions back to the compact sidebar view while pres
 
 ## Related Documentation
 
+- [Preview Mode](/core-features/preview-mode) - Embedded browser preview and component selection
 - [Creating Task Attempts](/core-features/creating-task-attempts) - Learn about task attempt lifecycle
-- [Reviewing Code Changes](/core-features/reviewing-code-changes) - Deep dive into diff analysis  
+- [Reviewing Code Changes](/core-features/reviewing-code-changes) - Deep dive into diff analysis
 - [Resolving Rebase Conflicts](/core-features/resolving-rebase-conflicts) - Handle rebase conflicts and merge issues
 - [Creating Tasks](/core-features/creating-tasks) - Task creation and management
 - [Agent Configurations](/configuration-customisation/agent-configurations) - Customise AI agent behaviour

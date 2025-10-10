@@ -35,30 +35,72 @@ This works if you're adding the Vibe Kanban MCP server to any [supported coding 
 
 ### Option 2: Manual Configuration
 
-You can manually add the MCP server to your coding agent's configuration. Add the following configuration to your agent's MCP servers configuration:
+You can manually add the MCP server to your coding agent's configuration. The exact syntax will depend on your coding agent or MCP client.
+
+Add the following configuration to your agent's MCP servers configuration:
 
 ```json
 {
   "mcpServers": {
     "vibe_kanban": {
       "command": "npx",
-      "args": ["-y", "vibe-kanban", "--mcp"]
+      "args": ["-y", "vibe-kanban@latest", "--mcp"]
     }
   }
 }
 ```
 
-## Using MCP with Coding Agents
+## Available MCP Tools
 
-Once you have the MCP server configured, you can leverage it to streamline your project planning workflow:
+The Vibe Kanban MCP server provides the following tools for managing projects, tasks, and task execution:
 
-1. **Plan Your Work**: Describe a large feature or project to your coding agent
+### Project Operations
+
+| Tool | Purpose | Required Parameters | Optional Parameters | Returns |
+|------|---------|-------------------|-------------------|---------|
+| `list_projects` | Fetch all projects | None | None | List of projects with metadata |
+
+### Task Management
+
+| Tool | Purpose | Required Parameters | Optional Parameters | Returns |
+|------|---------|-------------------|-------------------|---------|
+| `list_tasks` | List tasks in a project | `project_id` | `status`<br/>`limit` | List of tasks with execution state |
+| `create_task` | Create a new task | `project_id`<br/>`title` | `description` | Created task ID and confirmation |
+| `get_task` | Get task details | `task_id` | None | Full task information |
+| `update_task` | Update task details | `task_id` | `title`<br/>`description`<br/>`status` | Updated task information |
+| `delete_task` | Delete a task | `task_id` | None | Deletion confirmation |
+
+### Task Execution
+
+| Tool | Purpose | Required Parameters | Optional Parameters | Returns |
+|------|---------|-------------------|-------------------|---------|
+| `start_task_attempt` | Start working on a task with a coding agent | `task_id`<br/>`executor`<br/>`base_branch` | `variant` | Attempt ID and confirmation |
+
+### Supported Executors
+
+When using `start_task_attempt`, the following executors are supported (case-insensitive, accepts hyphens or underscores):
+
+- `claude-code` / `CLAUDE_CODE`
+- `amp` / `AMP`
+- `gemini` / `GEMINI`
+- `codex` / `CODEX`
+- `opencode` / `OPENCODE`
+- `cursor` / `CURSOR`
+- `qwen-code` / `QWEN_CODE`
+- `copilot` / `COPILOT`
+
+## Using the MCP Server
+
+Once you have the MCP server configured, you can leverage it to streamline your project planning and execution workflow:
+
+1. **Plan Your Work**: Describe a large feature or project to your MCP client
 2. **Request Task Creation**: At the end of your task description, simply add "then turn this plan into tasks"
-3. **Automatic Task Generation**: Your coding agent will use the Vibe Kanban MCP server to automatically create structured tasks in your project
+3. **Automatic Task Generation**: Your MCP client will use the Vibe Kanban MCP server to automatically create structured tasks in your project
+4. **Start Task Execution**: Use `start_task_attempt` to programmatically begin work on tasks with specific coding agents
 
 ## Example Usage
 
-### External Coding Agents
+### Planning and Task Creation
 
 ```
 I need to build a user authentication system with the following features:
@@ -71,15 +113,45 @@ I need to build a user authentication system with the following features:
 Then turn this plan into tasks.
 ```
 
-The coding agent will break this down into individual tasks and add them to your Vibe Kanban project automatically.
+Your MCP client will use the `create_task` tool to break this down into individual tasks and add them to your Vibe Kanban project automatically.
+
+### Starting Task Execution
+
+After tasks are created, you can start work on them programmatically:
+
+```
+Start working on the user registration task using Claude Code on the main branch.
+```
+
+Your MCP client will use the `start_task_attempt` tool with parameters like:
+```json
+{
+  "task_id": "123e4567-e89b-12d3-a456-426614174000",
+  "executor": "claude-code",
+  "base_branch": "main"
+}
+```
+
+This creates a new task attempt, generates a feature branch, and starts the coding agent in an isolated environment.
+
+### Complete Workflow Example
+
+```
+1. List all projects to find the project ID
+2. List todo tasks in the project
+3. Create a new task for "Add user profile page"
+4. Start a task attempt for the new task using Amp on the develop branch
+```
+
+Each step uses the appropriate MCP tool (`list_projects`, `list_tasks`, `create_task`, `start_task_attempt`) to manage the complete workflow from planning to execution.
 
 ### Internal Coding Agents (Within Vibe Kanban)
 
 A powerful workflow involves using coding agents within Vibe Kanban that are also connected to the Vibe Kanban MCP server:
 
-1. **Create a Planning Task**: Create a task in "plan mode" within Vibe Kanban
+1. **Create a Planning Task**: Create a task with a custom agent profile configured with a planning prompt. See [Agent Configurations](/configuration-customisation/agent-configurations) for details on creating custom profiles.
 2. **Explore and Plan**: The coding agent explores the codebase and develops a comprehensive plan
-3. **Generate Sub-Tasks**: Ask the coding agent to "create a series of individual tasks for this plan"
+3. **Generate Tasks**: Ask the coding agent to "create a series of individual tasks for this plan"
 4. **Automatic Population**: The agent uses the MCP server to populate individual tasks directly in the Vibe Kanban interface
 
 This creates a seamless workflow where high-level planning automatically generates actionable tasks in your project board.
