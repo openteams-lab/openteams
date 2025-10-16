@@ -1,30 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDevserverPreview } from '@/hooks/useDevserverPreview';
 import { useDevServer } from '@/hooks/useDevServer';
+import { useLogStream } from '@/hooks/useLogStream';
+import { useDevserverUrlFromLogs } from '@/hooks/useDevserverUrl';
 import { ClickToComponentListener } from '@/utils/previewBridge';
 import { useClickedElements } from '@/contexts/ClickedElementsProvider';
-import { TaskAttempt } from 'shared/types';
 import { Alert } from '@/components/ui/alert';
 import { useProject } from '@/contexts/project-context';
-import { DevServerLogsView } from './preview/DevServerLogsView';
-import { PreviewToolbar } from './preview/PreviewToolbar';
-import { NoServerContent } from './preview/NoServerContent';
-import { ReadyContent } from './preview/ReadyContent';
+import { DevServerLogsView } from '@/components/tasks/TaskDetails/preview/DevServerLogsView';
+import { PreviewToolbar } from '@/components/tasks/TaskDetails/preview/PreviewToolbar';
+import { NoServerContent } from '@/components/tasks/TaskDetails/preview/NoServerContent';
+import { ReadyContent } from '@/components/tasks/TaskDetails/preview/ReadyContent';
 
-interface PreviewTabProps {
-  selectedAttempt: TaskAttempt;
-  projectId: string;
-  projectHasDevScript: boolean;
-}
-
-export default function PreviewTab({
-  selectedAttempt,
-  projectId,
-  projectHasDevScript,
-}: PreviewTabProps) {
+export function PreviewPanel() {
   const [iframeError, setIframeError] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [loadingTimeFinished, setLoadingTimeFinished] = useState(false);
@@ -33,14 +25,13 @@ export default function PreviewTab({
   const [showLogs, setShowLogs] = useState(false);
   const listenerRef = useRef<ClickToComponentListener | null>(null);
 
-  // Hooks
   const { t } = useTranslation('tasks');
-  const { project } = useProject();
+  const { project, projectId } = useProject();
+  const { attemptId: rawAttemptId } = useParams<{ attemptId?: string }>();
 
-  const previewState = useDevserverPreview(selectedAttempt.id, {
-    projectHasDevScript,
-    projectId,
-  });
+  const attemptId =
+    rawAttemptId && rawAttemptId !== 'latest' ? rawAttemptId : undefined;
+  const projectHasDevScript = Boolean(project?.dev_script);
 
   const {
     start: startDevServer,
@@ -49,7 +40,16 @@ export default function PreviewTab({
     isStopping: isStoppingDevServer,
     runningDevServer,
     latestDevServerProcess,
-  } = useDevServer(selectedAttempt.id);
+  } = useDevServer(attemptId);
+
+  const logStream = useLogStream(latestDevServerProcess?.id ?? '');
+  const lastKnownUrl = useDevserverUrlFromLogs(logStream.logs);
+
+  const previewState = useDevserverPreview(attemptId, {
+    projectHasDevScript,
+    projectId: projectId!,
+    lastKnownUrl,
+  });
 
   const handleRefresh = () => {
     setIframeError(false);
@@ -67,7 +67,6 @@ export default function PreviewTab({
     }
   };
 
-  // Set up message listener when iframe is ready
   useEffect(() => {
     if (previewState.status !== 'ready' || !previewState.url || !addElement) {
       return;
@@ -104,7 +103,6 @@ export default function PreviewTab({
     startTimer();
   }, []);
 
-  // Auto-show help alert when having trouble loading preview
   useEffect(() => {
     if (
       loadingTimeFinished &&
@@ -123,8 +121,17 @@ export default function PreviewTab({
     runningDevServer,
   ]);
 
-  // Compute mode and unified logs handling
-  const mode = !runningDevServer ? 'noServer' : iframeError ? 'error' : 'ready';
+  const isPreviewReady =
+    previewState.status === 'ready' &&
+    Boolean(previewState.url) &&
+    !iframeError;
+  const mode = iframeError
+    ? 'error'
+    : isPreviewReady
+      ? 'ready'
+      : runningDevServer
+        ? 'searching'
+        : 'noServer';
   const toggleLogs = () => {
     setShowLogs((v) => !v);
   };
@@ -145,8 +152,19 @@ export default function PreviewTab({
     });
   };
 
+  if (!attemptId) {
+    return (
+      <div className="h-full flex items-center justify-center p-8">
+        <div className="text-center text-muted-foreground">
+          <p className="text-lg font-medium">{t('preview.title')}</p>
+          <p className="text-sm mt-2">{t('preview.selectAttempt')}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="h-full flex flex-col min-h-0">
       <div className={`flex-1 flex flex-col min-h-0`}>
         {mode === 'ready' ? (
           <>
@@ -155,6 +173,8 @@ export default function PreviewTab({
               url={previewState.url}
               onRefresh={handleRefresh}
               onCopyUrl={handleCopyUrl}
+              onStop={stopDevServer}
+              isStopping={isStoppingDevServer}
             />
             <ReadyContent
               url={previewState.url}
@@ -224,6 +244,8 @@ export default function PreviewTab({
           showLogs={showLogs}
           onToggle={toggleLogs}
           showToggleText
+          logs={logStream.logs}
+          error={logStream.error}
         />
       </div>
     </div>

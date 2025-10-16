@@ -1,17 +1,31 @@
 import { useDiffStream } from '@/hooks/useDiffStream';
 import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader } from '@/components/ui/loader';
 import { Button } from '@/components/ui/button';
 import DiffViewSwitch from '@/components/diff-view-switch';
 import DiffCard from '@/components/DiffCard';
 import { useDiffSummary } from '@/hooks/useDiffSummary';
+import { NewCardHeader } from '@/components/ui/new-card';
+import { ChevronsUp, ChevronsDown } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { TaskAttempt } from 'shared/types';
+import GitOperations, {
+  type GitOperationsInputs,
+} from '@/components/tasks/Toolbar/GitOperations.tsx';
 
-interface DiffTabProps {
+interface DiffsPanelProps {
   selectedAttempt: TaskAttempt | null;
+  gitOps?: GitOperationsInputs;
 }
 
-function DiffTab({ selectedAttempt }: DiffTabProps) {
+export function DiffsPanel({ selectedAttempt, gitOps }: DiffsPanelProps) {
+  const { t } = useTranslation('tasks');
   const [loading, setLoading] = useState(true);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -85,29 +99,15 @@ function DiffTab({ selectedAttempt }: DiffTabProps) {
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 m-4">
-        <div className="text-red-800 text-sm">Failed to load diff: {error}</div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader />
-      </div>
-    );
-  }
-
-  if (!loading && diffs.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-        No changes have been made yet
+        <div className="text-red-800 text-sm">
+          {t('diff.errorLoadingDiff', { error })}
+        </div>
       </div>
     );
   }
 
   return (
-    <DiffTabContent
+    <DiffsPanelContent
       diffs={diffs}
       fileCount={fileCount}
       added={added}
@@ -117,11 +117,14 @@ function DiffTab({ selectedAttempt }: DiffTabProps) {
       handleCollapseAll={handleCollapseAll}
       toggle={toggle}
       selectedAttempt={selectedAttempt}
+      gitOps={gitOps}
+      loading={loading}
+      t={t}
     />
   );
 }
 
-interface DiffTabContentProps {
+interface DiffsPanelContentProps {
   diffs: any[];
   fileCount: number;
   added: number;
@@ -131,9 +134,12 @@ interface DiffTabContentProps {
   handleCollapseAll: () => void;
   toggle: (id: string) => void;
   selectedAttempt: TaskAttempt | null;
+  gitOps?: GitOperationsInputs;
+  loading: boolean;
+  t: (key: string, params?: any) => string;
 }
 
-function DiffTabContent({
+function DiffsPanelContent({
   diffs,
   fileCount,
   added,
@@ -143,55 +149,90 @@ function DiffTabContent({
   handleCollapseAll,
   toggle,
   selectedAttempt,
-}: DiffTabContentProps) {
+  gitOps,
+  loading,
+  t,
+}: DiffsPanelContentProps) {
   return (
     <div className="h-full flex flex-col relative">
       {diffs.length > 0 && (
-        <div className="sticky top-0 bg-background border-b px-4 py-2 z-10">
-          <div className="flex items-center justify-between gap-4">
+        <NewCardHeader
+          className="sticky top-0 z-10"
+          actions={
+            <>
+              <DiffViewSwitch />
+              <div className="h-4 w-px bg-border" />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="icon"
+                      onClick={handleCollapseAll}
+                      aria-pressed={allCollapsed}
+                      aria-label={
+                        allCollapsed
+                          ? t('diff.expandAll')
+                          : t('diff.collapseAll')
+                      }
+                    >
+                      {allCollapsed ? (
+                        <ChevronsDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronsUp className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {allCollapsed ? t('diff.expandAll') : t('diff.collapseAll')}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </>
+          }
+        >
+          <div className="flex items-center">
             <span
-              className="text-xs font-mono whitespace-nowrap"
+              className="text-sm text-muted-foreground whitespace-nowrap"
               aria-live="polite"
-              style={{ color: 'hsl(var(--muted-foreground) / 0.7)' }}
             >
-              {fileCount} file{fileCount === 1 ? '' : 's'} changed,{' '}
-              <span style={{ color: 'hsl(var(--console-success))' }}>
+              {t('diff.filesChanged', { count: fileCount })}{' '}
+              <span className="text-green-600 dark:text-green-500">
                 +{added}
               </span>{' '}
-              <span style={{ color: 'hsl(var(--console-error))' }}>
-                -{deleted}
-              </span>
+              <span className="text-red-600 dark:text-red-500">-{deleted}</span>
             </span>
-            <div className="flex items-center gap-2">
-              <DiffViewSwitch />
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={handleCollapseAll}
-                className="shrink-0"
-              >
-                {allCollapsed ? 'Expand All' : 'Collapse All'}
-              </Button>
-            </div>
           </div>
+        </NewCardHeader>
+      )}
+      {gitOps && selectedAttempt && (
+        <div className="px-3">
+          <GitOperations selectedAttempt={selectedAttempt} {...gitOps} />
         </div>
       )}
-      <div className="flex-1 overflow-y-auto px-4">
-        {diffs.map((diff, idx) => {
-          const id = diff.newPath || diff.oldPath || String(idx);
-          return (
-            <DiffCard
-              key={id}
-              diff={diff}
-              expanded={!collapsedIds.has(id)}
-              onToggle={() => toggle(id)}
-              selectedAttempt={selectedAttempt}
-            />
-          );
-        })}
+      <div className="flex-1 overflow-y-auto px-3">
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader />
+          </div>
+        ) : diffs.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+            {t('diff.noChanges')}
+          </div>
+        ) : (
+          diffs.map((diff, idx) => {
+            const id = diff.newPath || diff.oldPath || String(idx);
+            return (
+              <DiffCard
+                key={id}
+                diff={diff}
+                expanded={!collapsedIds.has(id)}
+                onToggle={() => toggle(id)}
+                selectedAttempt={selectedAttempt}
+              />
+            );
+          })
+        )}
       </div>
     </div>
   );
 }
-
-export default DiffTab;

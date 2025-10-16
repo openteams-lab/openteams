@@ -7,6 +7,7 @@ import { VibeKanbanWebCompanion } from 'vibe-kanban-web-companion';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react';
 import NiceModal from '@ebay/nice-modal-react';
+import i18n from './i18n';
 // Import modal type definitions
 import './types/modals';
 // Import and register modals
@@ -31,7 +32,9 @@ import {
   ProjectFormDialog,
   ProjectEditorSelectionDialog,
   RestoreLogsDialog,
+  ViewProcessesDialog,
 } from './components/dialogs';
+import { CreateAttemptDialog } from './components/dialogs/tasks/CreateAttemptDialog';
 
 // Register modals
 NiceModal.register('github-login', GitHubLoginDialog);
@@ -54,6 +57,8 @@ NiceModal.register('delete-configuration', DeleteConfigurationDialog);
 NiceModal.register('project-form', ProjectFormDialog);
 NiceModal.register('project-editor-selection', ProjectEditorSelectionDialog);
 NiceModal.register('restore-logs', RestoreLogsDialog);
+NiceModal.register('view-processes', ViewProcessesDialog);
+NiceModal.register('create-attempt', CreateAttemptDialog);
 // Install VS Code iframe keyboard bridge when running inside an iframe
 import './vscode/bridge';
 
@@ -92,7 +97,10 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <Sentry.ErrorBoundary fallback={<p>An error has occurred</p>} showDialog>
+      <Sentry.ErrorBoundary
+        fallback={<p>{i18n.t('common:states.error')}</p>}
+        showDialog
+      >
         <ClickToComponent />
         <VibeKanbanWebCompanion />
         <App />

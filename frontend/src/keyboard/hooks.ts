@@ -76,16 +76,6 @@ export const useKeyOpenDetails = createSemanticHook(Action.OPEN_DETAILS);
 export const useKeyShowHelp = createSemanticHook(Action.SHOW_HELP);
 
 /**
- * Toggle fullscreen action - typically Cmd+Enter key
- *
- * @example
- * useKeyToggleFullscreen(() => toggleFullscreen(), { scope: Scope.TASK_PANEL });
- */
-export const useKeyToggleFullscreen = createSemanticHook(
-  Action.TOGGLE_FULLSCREEN
-);
-
-/**
  * Delete task action - typically 'd' key
  *
  * @example
@@ -152,3 +142,14 @@ export const useKeySubmitTaskAlt = createSemanticHook(Action.SUBMIT_TASK_ALT);
  * useKeySubmitComment(() => handleSave(), { scope: Scope.EDIT_COMMENT, when: hasContent });
  */
 export const useKeySubmitComment = createSemanticHook(Action.SUBMIT_COMMENT);
+
+/**
+ * Cycle view backward action - typically Cmd+Shift+Enter
+ * Cycle views backward in attempt area
+ *
+ * @example
+ * useKeyCycleViewBackward(() => cycleBackward(), { scope: Scope.KANBAN });
+ */
+export const useKeyCycleViewBackward = createSemanticHook(
+  Action.CYCLE_VIEW_BACKWARD
+);
