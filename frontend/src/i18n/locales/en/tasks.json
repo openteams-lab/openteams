@@ -240,5 +240,30 @@
     "createSubtask": "Create subtask",
     "task": "Task",
     "duplicate": "Duplicate"
+  },
+  "showcases": {
+    "taskPanel": {
+      "companion": {
+        "title": "Vibe Kanban Companion Point-and-Click",
+        "description": "Click any UI component in the preview window to select it precisely. The coding agent receives exact DOM selectors and component hierarchy, eliminating ambiguous feedback."
+      },
+      "installation": {
+        "title": "Dev Server & Companion Installation",
+        "description": "Set a dev server command for previews, with a setup script configurable in settings. Use a coding agent to automatically install the Vibe Kanban web companion."
+      },
+      "codeReview": {
+        "title": "Built-in Code Review",
+        "description": "Add line-specific comments directly in the diffs view with the plus icon. All feedback is collected and sent as a complete review to the coding agent."
+      },
+      "pullRequest": {
+        "title": "Create PR from Task",
+        "description": "Merge your changes or create pull requests directly from task attempts. The PR dialog pre-fills title and description from your task details for streamlined workflows."
+      }
+    },
+    "buttons": {
+      "previous": "Previous",
+      "next": "Next",
+      "finish": "Finish"
+    }
   }
 }
