@@ -116,7 +116,7 @@ export function ProjectTasks() {
     attemptId?: string;
   }>();
   const navigate = useNavigate();
-  const { enableScope, disableScope } = useHotkeysContext();
+  const { enableScope, disableScope, activeScopes } = useHotkeysContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const isXL = useMediaQuery('(min-width: 1280px)');
   const isMobile = !isXL;
@@ -383,6 +383,8 @@ export function ProjectTasks() {
   );
 
   // meta/ctrl+enter → open details or cycle forward
+  const isFollowUpReadyActive = activeScopes.includes(Scope.FOLLOW_UP_READY);
+
   useKeyOpenDetails(
     () => {
       if (isPanelOpen) {
@@ -391,7 +393,7 @@ export function ProjectTasks() {
         handleViewTaskDetails(selectedTask);
       }
     },
-    { scope: Scope.KANBAN }
+    { scope: Scope.KANBAN, when: () => !isFollowUpReadyActive }
   );
 
   // meta/ctrl+shift+enter → cycle backward
