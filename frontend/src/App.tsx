@@ -5,6 +5,7 @@ import i18n from '@/i18n';
 import { Projects } from '@/pages/projects';
 import { ProjectTasks } from '@/pages/project-tasks';
 import { NormalLayout } from '@/components/layout/NormalLayout';
+import { usePostHog } from 'posthog-js/react';
 
 import {
   AgentSettings,
@@ -37,7 +38,25 @@ import { ClickedElementsProvider } from './contexts/ClickedElementsProvider';
 const SentryRoutes = Sentry.withSentryReactRouterV6Routing(Routes);
 
 function AppContent() {
-  const { config, updateAndSaveConfig, loading } = useUserSystem();
+  const { config, analyticsUserId, updateAndSaveConfig, loading } =
+    useUserSystem();
+  const posthog = usePostHog();
+
+  // Handle opt-in/opt-out and user identification when config loads
+  useEffect(() => {
+    if (!posthog || !analyticsUserId) return;
+
+    const userOptedIn = config?.analytics_enabled !== false;
+
+    if (userOptedIn) {
+      posthog.opt_in_capturing();
+      posthog.identify(analyticsUserId);
+      console.log('[Analytics] Analytics enabled and user identified');
+    } else {
+      posthog.opt_out_capturing();
+      console.log('[Analytics] Analytics disabled by user preference');
+    }
+  }, [config?.analytics_enabled, analyticsUserId, posthog]);
 
   useEffect(() => {
     let cancelled = false;
