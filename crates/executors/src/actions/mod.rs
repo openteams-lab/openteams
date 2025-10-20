@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
@@ -10,7 +10,8 @@ use crate::{
         coding_agent_follow_up::CodingAgentFollowUpRequest,
         coding_agent_initial::CodingAgentInitialRequest, script::ScriptRequest,
     },
-    executors::{ExecutorError, SpawnedChild},
+    approvals::ExecutorApprovalService,
+    executors::{BaseCodingAgent, ExecutorError, SpawnedChild},
 };
 pub mod coding_agent_follow_up;
 pub mod coding_agent_initial;
@@ -43,17 +44,35 @@ impl ExecutorAction {
     pub fn next_action(&self) -> Option<&ExecutorAction> {
         self.next_action.as_deref()
     }
+
+    pub fn base_executor(&self) -> Option<BaseCodingAgent> {
+        match self.typ() {
+            ExecutorActionType::CodingAgentInitialRequest(request) => Some(request.base_executor()),
+            ExecutorActionType::CodingAgentFollowUpRequest(request) => {
+                Some(request.base_executor())
+            }
+            ExecutorActionType::ScriptRequest(_) => None,
+        }
+    }
 }
 
 #[async_trait]
 #[enum_dispatch(ExecutorActionType)]
 pub trait Executable {
-    async fn spawn(&self, current_dir: &Path) -> Result<SpawnedChild, ExecutorError>;
+    async fn spawn(
+        &self,
+        current_dir: &Path,
+        approvals: Arc<dyn ExecutorApprovalService>,
+    ) -> Result<SpawnedChild, ExecutorError>;
 }
 
 #[async_trait]
 impl Executable for ExecutorAction {
-    async fn spawn(&self, current_dir: &Path) -> Result<SpawnedChild, ExecutorError> {
-        self.typ.spawn(current_dir).await
+    async fn spawn(
+        &self,
+        current_dir: &Path,
+        approvals: Arc<dyn ExecutorApprovalService>,
+    ) -> Result<SpawnedChild, ExecutorError> {
+        self.typ.spawn(current_dir, approvals).await
     }
 }
