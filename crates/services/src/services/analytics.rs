@@ -77,6 +77,7 @@ impl AnalyticsService {
                 );
                 props.insert("version".to_string(), json!(env!("CARGO_PKG_VERSION")));
                 props.insert("device".to_string(), get_device_info());
+                props.insert("source".to_string(), json!("backend"));
             }
             payload["properties"] = event_properties;
         }

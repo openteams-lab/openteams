@@ -11,6 +11,7 @@ import {
 import type { LayoutMode } from '../layout/TasksLayout';
 import type { TaskAttempt, TaskWithAttemptStatus } from 'shared/types';
 import { ActionsDropdown } from '../ui/ActionsDropdown';
+import { usePostHog } from 'posthog-js/react';
 
 interface AttemptHeaderActionsProps {
   onClose: () => void;
@@ -28,6 +29,8 @@ export const AttemptHeaderActions = ({
   attempt,
 }: AttemptHeaderActionsProps) => {
   const { t } = useTranslation('tasks');
+  const posthog = usePostHog();
+
   return (
     <>
       {typeof mode !== 'undefined' && onModeChange && (
@@ -35,7 +38,34 @@ export const AttemptHeaderActions = ({
           <ToggleGroup
             type="single"
             value={mode ?? ''}
-            onValueChange={(v) => onModeChange((v as LayoutMode) || null)}
+            onValueChange={(v) => {
+              const newMode = (v as LayoutMode) || null;
+
+              // Track view navigation
+              if (newMode === 'preview') {
+                posthog?.capture('preview_navigated', {
+                  trigger: 'button',
+                  timestamp: new Date().toISOString(),
+                  source: 'frontend',
+                });
+              } else if (newMode === 'diffs') {
+                posthog?.capture('diffs_navigated', {
+                  trigger: 'button',
+                  timestamp: new Date().toISOString(),
+                  source: 'frontend',
+                });
+              } else if (newMode === null) {
+                // Closing the view (clicked active button)
+                posthog?.capture('view_closed', {
+                  trigger: 'button',
+                  from_view: mode ?? 'attempt',
+                  timestamp: new Date().toISOString(),
+                  source: 'frontend',
+                });
+              }
+
+              onModeChange(newMode);
+            }}
             className="inline-flex gap-4"
             aria-label="Layout mode"
           >

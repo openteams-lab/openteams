@@ -23,6 +23,7 @@ interface UserSystemState {
   environment: Environment | null;
   profiles: Record<string, ExecutorConfig> | null;
   capabilities: Record<string, BaseAgentCapability[]> | null;
+  analyticsUserId: string | null;
 }
 
 interface UserSystemContextType {
@@ -39,6 +40,7 @@ interface UserSystemContextType {
   environment: Environment | null;
   profiles: Record<string, ExecutorConfig> | null;
   capabilities: Record<string, BaseAgentCapability[]> | null;
+  analyticsUserId: string | null;
   setEnvironment: (env: Environment | null) => void;
   setProfiles: (profiles: Record<string, ExecutorConfig> | null) => void;
   setCapabilities: (caps: Record<string, BaseAgentCapability[]> | null) => void;
@@ -71,6 +73,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
     string,
     BaseAgentCapability[]
   > | null>(null);
+  const [analyticsUserId, setAnalyticsUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [githubTokenInvalid, setGithubTokenInvalid] = useState(false);
 
@@ -80,6 +83,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
         const userSystemInfo: UserSystemInfo = await configApi.getConfig();
         setConfig(userSystemInfo.config);
         setEnvironment(userSystemInfo.environment);
+        setAnalyticsUserId(userSystemInfo.analytics_user_id);
         setProfiles(
           userSystemInfo.executors as Record<string, ExecutorConfig> | null
         );
@@ -168,6 +172,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
       const userSystemInfo: UserSystemInfo = await configApi.getConfig();
       setConfig(userSystemInfo.config);
       setEnvironment(userSystemInfo.environment);
+      setAnalyticsUserId(userSystemInfo.analytics_user_id);
       setProfiles(
         userSystemInfo.executors as Record<string, ExecutorConfig> | null
       );
@@ -185,11 +190,12 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
   // Memoize context value to prevent unnecessary re-renders
   const value = useMemo<UserSystemContextType>(
     () => ({
-      system: { config, environment, profiles, capabilities },
+      system: { config, environment, profiles, capabilities, analyticsUserId },
       config,
       environment,
       profiles,
       capabilities,
+      analyticsUserId,
       updateConfig,
       saveConfig,
       updateAndSaveConfig,
@@ -205,6 +211,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
       environment,
       profiles,
       capabilities,
+      analyticsUserId,
       updateConfig,
       saveConfig,
       updateAndSaveConfig,

@@ -61,6 +61,7 @@ impl Environment {
 #[derive(Debug, Serialize, Deserialize, TS)]
 pub struct UserSystemInfo {
     pub config: Config,
+    pub analytics_user_id: String,
     #[serde(flatten)]
     pub profiles: ExecutorConfigs,
     pub environment: Environment,
@@ -77,6 +78,7 @@ async fn get_user_system_info(
 
     let user_system_info = UserSystemInfo {
         config: config.clone(),
+        analytics_user_id: deployment.user_id().to_string(),
         profiles: ExecutorConfigs::get_cached(),
         environment: Environment::new(),
         capabilities: {
