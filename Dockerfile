@@ -5,7 +5,12 @@ FROM node:24-alpine AS builder
 RUN apk add --no-cache \
     curl \
     build-base \
-    perl
+    perl \
+    llvm-dev \
+    clang-dev
+
+# Allow linking libclang on musl
+ENV RUSTFLAGS="-C target-feature=-crt-static"
 
 # Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -27,7 +32,7 @@ COPY . .
 
 # Build application
 RUN npm run generate-types
-RUN cd frontend && npm install && npm run build
+RUN cd frontend && pnpm run build
 RUN cargo build --release --bin server
 
 # Runtime stage
