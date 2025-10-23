@@ -430,7 +430,6 @@ function GitOperations({
                 mergeInfo.hasOpenPR ||
                 merging ||
                 hasConflictsCalculated ||
-                Boolean((branchStatus.commits_behind ?? 0) > 0) ||
                 isAttemptRunning ||
                 ((branchStatus.commits_ahead ?? 0) === 0 &&
                   !pushSuccess &&
@@ -449,7 +448,6 @@ function GitOperations({
               onClick={handlePRButtonClick}
               disabled={
                 pushing ||
-                Boolean((branchStatus.commits_behind ?? 0) > 0) ||
                 isAttemptRunning ||
                 hasConflictsCalculated ||
                 (mergeInfo.hasOpenPR &&
@@ -470,12 +468,7 @@ function GitOperations({
 
             <Button
               onClick={handleRebaseDialogOpen}
-              disabled={
-                rebasing ||
-                isAttemptRunning ||
-                hasConflictsCalculated ||
-                (branchStatus.commits_behind ?? 0) === 0
-              }
+              disabled={rebasing || isAttemptRunning || hasConflictsCalculated}
               variant="outline"
               size="xs"
               className="border-warning text-warning hover:bg-warning gap-1 shrink-0"
