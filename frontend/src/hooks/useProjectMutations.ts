@@ -17,6 +17,7 @@ export function useProjectMutations(options?: UseProjectMutationsOptions) {
     mutationFn: (data: CreateProject) => projectsApi.create(data),
     onSuccess: (project: Project) => {
       queryClient.setQueryData(['project', project.id], project);
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
       options?.onCreateSuccess?.(project);
     },
     onError: (err) => {
@@ -35,7 +36,15 @@ export function useProjectMutations(options?: UseProjectMutationsOptions) {
       data: UpdateProject;
     }) => projectsApi.update(projectId, data),
     onSuccess: (project: Project) => {
+      // Update single project cache
       queryClient.setQueryData(['project', project.id], project);
+
+      // Update the project in the projects list cache immediately
+      queryClient.setQueryData<Project[]>(['projects'], (old) => {
+        if (!old) return old;
+        return old.map((p) => (p.id === project.id ? project : p));
+      });
+
       options?.onUpdateSuccess?.(project);
     },
     onError: (err) => {
