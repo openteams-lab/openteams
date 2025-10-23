@@ -10,13 +10,15 @@ const ProcessSelectionContext =
 
 interface ProcessSelectionProviderProps {
   children: ReactNode;
+  initialProcessId?: string | null;
 }
 
 export function ProcessSelectionProvider({
   children,
+  initialProcessId = null,
 }: ProcessSelectionProviderProps) {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(
-    null
+    initialProcessId
   );
 
   const value = useMemo(

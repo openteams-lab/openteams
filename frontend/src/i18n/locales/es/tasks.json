@@ -7,6 +7,7 @@
     "createNewAttempt": "Create new attempt",
     "createSubtask": "Create subtask",
     "duplicate": "Duplicate",
+    "gitActions": "Acciones de Git",
     "openInIde": "Open attempt in IDE",
     "task": "Task",
     "viewProcesses": "View processes"
@@ -19,26 +20,31 @@
       "stopDevServer": "Detener servidor de desarrollo"
     },
     "agent": "Agent",
-    "clickToCopy": "Click to copy worktree path",
+    "clickToCopy": "Copiar ruta del worktree",
     "copied": "Copied!",
     "createSubtask": "Create Subtask",
     "diffs": "Diffs",
+    "gitActions": "Acciones de Git",
     "labels": {
       "agent": "Agente",
       "attempt": "Intento",
       "branch": "Rama",
-      "diffs": "Diferencias"
+      "diffs": "Diferencias",
+      "summaryAndActions": "Resumen y Acciones"
     },
     "newAttempt": "New Attempt",
     "openInEditor": "Open in {{editor}}",
     "path": "Path",
+    "pauseDev": "Pausar Dev",
     "preview": "Preview",
     "startDev": "Start Dev",
     "stopAttempt": "Stop Attempt",
     "stopDev": "Stop Dev",
     "stopping": "Stopping...",
     "viewDevLogs": "View dev server logs",
-    "viewHistory": "View attempt history"
+    "viewHistory": "View attempt history",
+    "tryAgain": "Try Again",
+    "devScriptMissingTooltip": "To start the dev server, add a dev script to this project"
   },
   "attemptHeaderActions": {
     "diffs": "Diffs",
@@ -108,6 +114,10 @@
     "pr": {
       "number": "PR #{{number}}",
       "open": "Open PR #{{number}}"
+    },
+    "actions": {
+      "title": "Acciones de Git",
+      "prMerged": "PR #{{number}} ya está fusionado"
     },
     "states": {
       "createPr": "Crear PR",

@@ -11,10 +11,11 @@ import { ProcessSelectionProvider } from '@/contexts/ProcessSelectionContext';
 
 export interface ViewProcessesDialogProps {
   attemptId: string;
+  initialProcessId?: string | null;
 }
 
 export const ViewProcessesDialog = NiceModal.create<ViewProcessesDialogProps>(
-  ({ attemptId }) => {
+  ({ attemptId, initialProcessId }) => {
     const { t } = useTranslation('tasks');
     const modal = useModal();
 
@@ -43,7 +44,7 @@ export const ViewProcessesDialog = NiceModal.create<ViewProcessesDialogProps>(
             <DialogTitle>{t('viewProcessesDialog.title')}</DialogTitle>
           </DialogHeader>
           <div className="h-[75vh] flex flex-col min-h-0 min-w-0">
-            <ProcessSelectionProvider>
+            <ProcessSelectionProvider initialProcessId={initialProcessId}>
               <ProcessesTab attemptId={attemptId} />
             </ProcessSelectionProvider>
           </div>

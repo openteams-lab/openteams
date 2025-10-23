@@ -7,6 +7,7 @@
     "createNewAttempt": "Create new attempt",
     "createSubtask": "Create subtask",
     "duplicate": "Duplicate",
+    "gitActions": "Git 작업",
     "openInIde": "Open attempt in IDE",
     "task": "Task",
     "viewProcesses": "View processes"
@@ -19,26 +20,31 @@
       "stopDevServer": "개발 서버 중지"
     },
     "agent": "Agent",
-    "clickToCopy": "Click to copy worktree path",
+    "clickToCopy": "작업 트리 경로 복사",
     "copied": "Copied!",
     "createSubtask": "Create Subtask",
     "diffs": "Diffs",
+    "gitActions": "Git 작업",
     "labels": {
       "agent": "에이전트",
       "attempt": "시도",
       "branch": "브랜치",
-      "diffs": "변경사항"
+      "diffs": "변경사항",
+      "summaryAndActions": "요약 및 작업"
     },
     "newAttempt": "New Attempt",
     "openInEditor": "Open in {{editor}}",
     "path": "Path",
+    "pauseDev": "Dev 일시정지",
     "preview": "Preview",
     "startDev": "Start Dev",
     "stopAttempt": "Stop Attempt",
     "stopDev": "Stop Dev",
     "stopping": "Stopping...",
     "viewDevLogs": "View dev server logs",
-    "viewHistory": "View attempt history"
+    "viewHistory": "View attempt history",
+    "tryAgain": "Try Again",
+    "devScriptMissingTooltip": "To start the dev server, add a dev script to this project"
   },
   "attemptHeaderActions": {
     "diffs": "Diffs",
@@ -108,6 +114,10 @@
     "pr": {
       "number": "PR #{{number}}",
       "open": "Open PR #{{number}}"
+    },
+    "actions": {
+      "title": "Git 작업",
+      "prMerged": "PR #{{number}}은(는) 이미 병합되었습니다"
     },
     "states": {
       "createPr": "PR 생성",
