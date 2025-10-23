@@ -159,14 +159,16 @@
       "attempt": "Attempt",
       "agent": "Agent",
       "branch": "Branch",
-      "diffs": "Diffs"
+      "diffs": "Diffs",
+      "summaryAndActions": "Summary & Actions"
     },
     "agent": "Agent",
     "path": "Path",
-    "openInEditor": "Open in {{editor}}",
+    "openInEditor": "See changes in {{editor}}",
     "copied": "Copied!",
-    "clickToCopy": "Click to copy worktree path",
+    "clickToCopy": "Copy worktree path",
     "stopDev": "Stop Dev",
+    "pauseDev": "Pause Dev",
     "startDev": "Start Dev",
     "viewDevLogs": "View dev server logs",
     "stopping": "Stopping...",
@@ -175,7 +177,10 @@
     "viewHistory": "View attempt history",
     "createSubtask": "Create Subtask",
     "preview": "Preview",
-    "diffs": "Diffs"
+    "diffs": "Diffs",
+    "gitActions": "Git Actions",
+    "tryAgain": "Try Again",
+    "devScriptMissingTooltip": "To start the dev server, add a dev script to this project"
   },
   "git": {
     "labels": {
@@ -213,6 +218,10 @@
     "pr": {
       "open": "Open PR #{{number}}",
       "number": "PR #{{number}}"
+    },
+    "actions": {
+      "title": "Git Actions",
+      "prMerged": "PR #{{number}} is already merged"
     }
   },
   "createAttemptDialog": {
@@ -238,6 +247,7 @@
     "viewProcesses": "View processes",
     "createNewAttempt": "Create new attempt",
     "createSubtask": "Create subtask",
+    "gitActions": "Git actions",
     "task": "Task",
     "duplicate": "Duplicate"
   },

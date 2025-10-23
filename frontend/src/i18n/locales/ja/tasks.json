@@ -7,6 +7,7 @@
     "createNewAttempt": "Create new attempt",
     "createSubtask": "Create subtask",
     "duplicate": "Duplicate",
+    "gitActions": "Gitアクション",
     "openInIde": "Open attempt in IDE",
     "task": "Task",
     "viewProcesses": "View processes"
@@ -19,26 +20,31 @@
       "stopDevServer": "開発サーバーを停止"
     },
     "agent": "Agent",
-    "clickToCopy": "Click to copy worktree path",
+    "clickToCopy": "ワークツリーパスをコピー",
     "copied": "Copied!",
     "createSubtask": "Create Subtask",
     "diffs": "Diffs",
+    "gitActions": "Gitアクション",
     "labels": {
       "agent": "エージェント",
       "attempt": "試行",
       "branch": "ブランチ",
-      "diffs": "差分"
+      "diffs": "差分",
+      "summaryAndActions": "概要とアクション"
     },
     "newAttempt": "New Attempt",
     "openInEditor": "Open in {{editor}}",
     "path": "Path",
+    "pauseDev": "Dev を一時停止",
     "preview": "Preview",
     "startDev": "Start Dev",
     "stopAttempt": "Stop Attempt",
     "stopDev": "Stop Dev",
     "stopping": "Stopping...",
     "viewDevLogs": "View dev server logs",
-    "viewHistory": "View attempt history"
+    "viewHistory": "View attempt history",
+    "tryAgain": "Try Again",
+    "devScriptMissingTooltip": "To start the dev server, add a dev script to this project"
   },
   "attemptHeaderActions": {
     "diffs": "Diffs",
@@ -108,6 +114,10 @@
     "pr": {
       "number": "PR #{{number}}",
       "open": "Open PR #{{number}}"
+    },
+    "actions": {
+      "title": "Gitアクション",
+      "prMerged": "PR #{{number}} は既にマージされています"
     },
     "states": {
       "createPr": "PRを作成",
