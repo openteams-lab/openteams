@@ -3,7 +3,9 @@
   "theme": "mint",
   "name": "Vibe Kanban",
   "description": "A kanban board for developers to track coding tasks with AI coding agents",
-
+  "appearance": {
+    "default": "light"
+  },
   "colors": {
     "primary": "#000000",
     "light": "#fefefe",
@@ -23,7 +25,22 @@
         "pages": [
           "index",
           "getting-started",
-          "supported-coding-agents"
+          {
+            "group": "Supported Coding Agents",
+            "expanded": true,
+            "pages": [
+              "supported-coding-agents",
+              "agents/claude-code",
+              "agents/openai-codex",
+              "agents/github-copilot",
+              "agents/gemini-cli",
+              "agents/amp",
+              "agents/cursor-cli",
+              "agents/opencode",
+              "agents/ccr",
+              "agents/qwen-code"
+            ]
+          }
         ]
       },
       {
@@ -31,12 +48,18 @@
         "pages": [
           "core-features/creating-projects",
           "core-features/creating-tasks",
-          "core-features/subtasks",
-          "core-features/creating-task-attempts",
+          "core-features/monitoring-task-execution",
+          "core-features/testing-your-application",
           "core-features/reviewing-code-changes",
-          "core-features/resolving-rebase-conflicts",
-          "core-features/task-details-full-screen",
-          "core-features/preview-mode"
+          "core-features/completing-a-task"
+        ]
+      },
+      {
+        "group": "Advanced Features",
+        "pages": [
+          "core-features/subtasks",
+          "core-features/new-task-attempts",
+          "core-features/resolving-rebase-conflicts"
         ]
       },
       {
@@ -96,7 +119,8 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/BloopAI/vibe-kanban"
+      "github": "https://github.com/BloopAI/vibe-kanban",
+      "x": "https://x.com/vibekanban"
     }
   }
 }
