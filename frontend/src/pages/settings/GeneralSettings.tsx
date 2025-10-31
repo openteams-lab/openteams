@@ -374,7 +374,8 @@ export function GeneralSettings() {
                           className="w-full h-10 px-2 flex items-center justify-between"
                         >
                           <span className="text-sm truncate flex-1 text-left">
-                            {currentProfileVariant?.variant || 'DEFAULT'}
+                            {currentProfileVariant?.variant ||
+                              t('settings.general.taskExecution.defaultLabel')}
                           </span>
                           <ChevronDown className="h-4 w-4 ml-1 flex-shrink-0" />
                         </Button>
@@ -475,7 +476,9 @@ export function GeneralSettings() {
               </Label>
               <Input
                 id="custom-command"
-                placeholder="e.g., code, subl, vim"
+                placeholder={t(
+                  'settings.general.editor.customCommand.placeholder'
+                )}
                 value={draft?.editor.custom_command || ''}
                 onChange={(e) =>
                   updateDraft({
@@ -490,6 +493,62 @@ export function GeneralSettings() {
                 {t('settings.general.editor.customCommand.helper')}
               </p>
             </div>
+          )}
+
+          {(draft?.editor.editor_type === EditorType.VS_CODE ||
+            draft?.editor.editor_type === EditorType.CURSOR ||
+            draft?.editor.editor_type === EditorType.WINDSURF) && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="remote-ssh-host">
+                  {t('settings.general.editor.remoteSsh.host.label')}
+                </Label>
+                <Input
+                  id="remote-ssh-host"
+                  placeholder={t(
+                    'settings.general.editor.remoteSsh.host.placeholder'
+                  )}
+                  value={draft?.editor.remote_ssh_host || ''}
+                  onChange={(e) =>
+                    updateDraft({
+                      editor: {
+                        ...draft!.editor,
+                        remote_ssh_host: e.target.value || null,
+                      },
+                    })
+                  }
+                />
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.general.editor.remoteSsh.host.helper')}
+                </p>
+              </div>
+
+              {draft?.editor.remote_ssh_host && (
+                <div className="space-y-2">
+                  <Label htmlFor="remote-ssh-user">
+                    {t('settings.general.editor.remoteSsh.user.label')}
+                  </Label>
+                  <Input
+                    id="remote-ssh-user"
+                    placeholder={t(
+                      'settings.general.editor.remoteSsh.user.placeholder'
+                    )}
+                    value={draft?.editor.remote_ssh_user || ''}
+                    onChange={(e) =>
+                      updateDraft({
+                        editor: {
+                          ...draft!.editor,
+                          remote_ssh_user: e.target.value || null,
+                        },
+                      })
+                    }
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings.general.editor.remoteSsh.user.helper')}
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -550,7 +609,7 @@ export function GeneralSettings() {
             <Input
               id="github-token"
               type="password"
-              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+              placeholder={t('settings.general.github.pat.placeholder')}
               value={draft?.github.pat || ''}
               onChange={(e) =>
                 updateDraft({
