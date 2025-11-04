@@ -45,6 +45,8 @@
     "viewDevLogs": "View dev server logs",
     "viewHistory": "View attempt history",
     "tryAgain": "Try Again",
+    "runSetup": "설정 실행",
+    "setupHelpText": "{{agent}}이(가) 올바르게 설정되지 않았습니다. '설정 실행'을 클릭하여 설치하고 로그인하세요.",
     "devScriptMissingTooltip": "To start the dev server, add a dev script to this project"
   },
   "attemptHeaderActions": {

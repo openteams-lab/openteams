@@ -1,3 +1,4 @@
+pub mod cursor_setup;
 pub mod drafts;
 pub mod util;
 
@@ -27,7 +28,8 @@ use executors::{
         coding_agent_follow_up::CodingAgentFollowUpRequest,
         script::{ScriptContext, ScriptRequest, ScriptRequestLanguage},
     },
-    profile::ExecutorProfileId,
+    executors::{CodingAgent, ExecutorError},
+    profile::{ExecutorConfigs, ExecutorProfileId},
 };
 use git2::BranchType;
 use serde::{Deserialize, Serialize};
@@ -141,6 +143,14 @@ impl CreateTaskAttemptBody {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize, TS)]
+pub struct RunAgentSetupRequest {
+    pub executor_profile_id: ExecutorProfileId,
+}
+
+#[derive(Debug, Serialize, TS)]
+pub struct RunAgentSetupResponse {}
+
 #[axum::debug_handler]
 pub async fn create_task_attempt(
     State(deployment): State<DeploymentImpl>,
@@ -192,6 +202,35 @@ pub async fn create_task_attempt(
     tracing::info!("Created attempt for task {}", task.id);
 
     Ok(ResponseJson(ApiResponse::success(task_attempt)))
+}
+
+#[axum::debug_handler]
+pub async fn run_agent_setup(
+    Extension(task_attempt): Extension<TaskAttempt>,
+    State(deployment): State<DeploymentImpl>,
+    Json(payload): Json<RunAgentSetupRequest>,
+) -> Result<ResponseJson<ApiResponse<RunAgentSetupResponse>>, ApiError> {
+    let executor_profile_id = payload.executor_profile_id;
+    let config = ExecutorConfigs::get_cached();
+    let coding_agent = config.get_coding_agent_or_default(&executor_profile_id);
+    match coding_agent {
+        CodingAgent::CursorAgent(_) => {
+            cursor_setup::run_cursor_setup(&deployment, &task_attempt).await?;
+        }
+        _ => return Err(ApiError::Executor(ExecutorError::SetupHelperNotSupported)),
+    }
+
+    deployment
+        .track_if_analytics_allowed(
+            "agent_setup_script_executed",
+            serde_json::json!({
+                "executor_profile_id": executor_profile_id.to_string(),
+                "attempt_id": task_attempt.id.to_string(),
+            }),
+        )
+        .await;
+
+    Ok(ResponseJson(ApiResponse::success(RunAgentSetupResponse {})))
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -1476,6 +1515,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     let task_attempt_id_router = Router::new()
         .route("/", get(get_task_attempt))
         .route("/follow-up", post(follow_up))
+        .route("/run-agent-setup", post(run_agent_setup))
         .route(
             "/draft",
             get(drafts::get_draft)

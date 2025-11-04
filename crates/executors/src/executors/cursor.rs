@@ -22,14 +22,15 @@ use crate::{
     command::{CmdOverrides, CommandBuilder, apply_overrides},
     executors::{AppendPrompt, ExecutorError, SpawnedChild, StandardCodingAgentExecutor},
     logs::{
-        ActionType, FileChange, NormalizedEntry, NormalizedEntryType, TodoItem, ToolStatus,
+        ActionType, FileChange, NormalizedEntry, NormalizedEntryError, NormalizedEntryType,
+        TodoItem, ToolStatus,
         plain_text_processor::PlainTextLogProcessor,
-        stderr_processor::normalize_stderr_logs,
         utils::{ConversationPatch, EntryIndexProvider},
     },
 };
 
 mod mcp;
+const CURSOR_AUTH_REQUIRED_MSG: &str = "Authentication required. Please run 'cursor-agent login' first, or set CURSOR_API_KEY environment variable.";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS, JsonSchema)]
 pub struct CursorAgent {
@@ -46,9 +47,13 @@ pub struct CursorAgent {
 }
 
 impl CursorAgent {
+    pub fn base_command() -> &'static str {
+        "cursor-agent"
+    }
+
     fn build_command_builder(&self) -> CommandBuilder {
         let mut builder =
-            CommandBuilder::new("cursor-agent").params(["-p", "--output-format=stream-json"]);
+            CommandBuilder::new(Self::base_command()).params(["-p", "--output-format=stream-json"]);
 
         if self.force.unwrap_or(false) {
             builder = builder.extend_params(["--force"]);
@@ -68,6 +73,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
         mcp::ensure_mcp_server_trust(self, current_dir).await;
 
         let command_parts = self.build_command_builder().build_initial()?;
+
         let (executable_path, args) = command_parts.into_resolved().await?;
 
         let combined_prompt = self.append_prompt.combine_prompt(prompt);
@@ -128,24 +134,55 @@ impl StandardCodingAgentExecutor for CursorAgent {
     fn normalize_logs(&self, msg_store: Arc<MsgStore>, worktree_path: &Path) {
         let entry_index_provider = EntryIndexProvider::start_from(&msg_store);
 
-        normalize_stderr_logs(msg_store.clone(), entry_index_provider.clone());
+        // Custom stderr processor for Cursor that detects login errors
+        let msg_store_stderr = msg_store.clone();
+        let entry_index_provider_stderr = entry_index_provider.clone();
+        tokio::spawn(async move {
+            let mut stderr = msg_store_stderr.stderr_chunked_stream();
+            let mut processor = PlainTextLogProcessor::builder()
+                .normalized_entry_producer(Box::new(|content: String| {
+                    let content = strip_ansi_escapes::strip_str(&content);
+
+                    NormalizedEntry {
+                        timestamp: None,
+                        entry_type: NormalizedEntryType::ErrorMessage {
+                            error_type: NormalizedEntryError::Other,
+                        },
+                        content,
+                        metadata: None,
+                    }
+                }))
+                .time_gap(Duration::from_secs(2))
+                .index_provider(entry_index_provider_stderr.clone())
+                .build();
+
+            while let Some(Ok(chunk)) = stderr.next().await {
+                let content = strip_ansi_escapes::strip_str(&chunk);
+                if content.contains(CURSOR_AUTH_REQUIRED_MSG) {
+                    let error_message = NormalizedEntry {
+                        timestamp: None,
+                        entry_type: NormalizedEntryType::ErrorMessage {
+                            error_type: NormalizedEntryError::SetupRequired,
+                        },
+                        content: content.to_string(),
+                        metadata: None,
+                    };
+                    let id = entry_index_provider_stderr.next();
+                    msg_store_stderr
+                        .push_patch(ConversationPatch::add_normalized_entry(id, error_message));
+                } else {
+                    // Always emit error message
+                    for patch in processor.process(chunk) {
+                        msg_store_stderr.push_patch(patch);
+                    }
+                }
+            }
+        });
 
         // Process Cursor stdout JSONL with typed serde models
         let current_dir = worktree_path.to_path_buf();
         tokio::spawn(async move {
             let mut lines = msg_store.stdout_lines_stream();
-
-            // Cursor agent doesn't use STDERR. Everything comes through STDOUT, both JSONL and raw error output.
-            let mut error_plaintext_processor = PlainTextLogProcessor::builder()
-                .normalized_entry_producer(Box::new(|content: String| NormalizedEntry {
-                    timestamp: None,
-                    entry_type: NormalizedEntryType::ErrorMessage,
-                    content,
-                    metadata: None,
-                }))
-                .time_gap(Duration::from_secs(2)) // Break messages if they are 2 seconds apart
-                .index_provider(entry_index_provider.clone())
-                .build();
 
             // Assistant streaming coalescer state
             let mut model_reported = false;
@@ -167,21 +204,17 @@ impl StandardCodingAgentExecutor for CursorAgent {
                 let cursor_json: CursorJson = match serde_json::from_str(&line) {
                     Ok(cursor_json) => cursor_json,
                     Err(_) => {
-                        // Not valid JSON, treat as raw error output
-                        let line = strip_ansi_escapes::strip_str(line);
-                        let line = strip_cursor_ascii_art_banner(line);
-                        if line.trim().is_empty() {
-                            continue; // Skip empty lines after stripping Noise
-                        }
+                        // Handle non-JSON output as raw system message
+                        if !line.is_empty() {
+                            let entry = NormalizedEntry {
+                                timestamp: None,
+                                entry_type: NormalizedEntryType::SystemMessage,
+                                content: line.to_string(),
+                                metadata: None,
+                            };
 
-                        // Provide a useful sign-in message if needed
-                        let line = if line == "Press any key to sign in..." {
-                            "Please sign in to Cursor Agent CLI using `cursor-agent login` or set the CURSOR_API_KEY environment variable.".to_string()
-                        } else {
-                            line
-                        };
-
-                        for patch in error_plaintext_processor.process(line + "\n") {
+                            let patch_id = entry_index_provider.next();
+                            let patch = ConversationPatch::add_normalized_entry(patch_id, entry);
                             msg_store.push_patch(patch);
                         }
                         continue;
@@ -446,38 +479,6 @@ impl StandardCodingAgentExecutor for CursorAgent {
         resolve_executable_path("cursor-agent").await.is_some()
     }
 }
-
-fn strip_cursor_ascii_art_banner(line: String) -> String {
-    static BANNER_LINES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
-    let banner_lines = BANNER_LINES.get_or_init(|| {
-        r#"            +i":;;
-        [?+<l,",::;;;I
-      {[]_~iI"":::;;;;II
-  )){↗↗↗↗↗↗↗↗↗↗↗↗↗↗↗↗↗↗↗↗↗ll          …  Cursor Agent
-  11{[#M##M##M#########*ppll
-  11}[]-+############oppqqIl
-  1}[]_+<il;,####bpqqqqwIIII
-  []?_~<illi_++qqwwwwww;IIII
-  ]?-+~>i~{??--wwwwwww;;;III
-  -_+]>{{{}}[[[mmmmmm_<_:;;I
-  r\\|||(()))))mmmm)1)111{?_
-   t/\\\\\|||(|ZZZ||\\\/tf^
-        ttttt/tZZfff^>
-            ^^^O>>
-              >>"#
-        .lines()
-        .map(str::to_string)
-        .collect()
-    });
-
-    for banner_line in banner_lines {
-        if line.starts_with(banner_line) {
-            return line.replacen(banner_line, "", 1).trim().to_string();
-        }
-    }
-    line
-}
-
 /* ===========================
 Typed Cursor JSON structures
 =========================== */
