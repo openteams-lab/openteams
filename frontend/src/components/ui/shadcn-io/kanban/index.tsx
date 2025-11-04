@@ -53,7 +53,7 @@ export const KanbanBoard = ({ id, children, className }: KanbanBoardProps) => {
   return (
     <div
       className={cn(
-        'flex h-full min-h-40 flex-col',
+        'flex min-h-40 flex-col',
         isOver ? 'outline-primary' : 'outline-black',
         className
       )}
@@ -203,7 +203,6 @@ function restrictToBoundingRectWithRightPadding(
   boundingRect: ClientRect,
   rightPadding: number
 ): Transform {
-  console.log(rect, boundingRect);
   const value = {
     ...transform,
   };
@@ -283,7 +282,7 @@ export const KanbanProvider = ({
     >
       <div
         className={cn(
-          'inline-grid grid-flow-col auto-cols-[minmax(200px,400px)] divide-x border-x h-full',
+          'inline-grid grid-flow-col auto-cols-[minmax(200px,400px)] divide-x border-x items-stretch min-h-full',
           className
         )}
       >
