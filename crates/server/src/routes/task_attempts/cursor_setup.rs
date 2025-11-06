@@ -13,6 +13,8 @@ use executors::{
     executors::cursor::CursorAgent,
 };
 use services::services::container::ContainerService;
+use shlex::try_quote;
+use utils::shell::UnixShell;
 
 use crate::{error::ApiError, routes::task_attempts::ensure_worktree_path};
 
@@ -55,8 +57,9 @@ async fn get_setup_helper_action() -> Result<ExecutorAction, ApiError> {
     #[cfg(unix)]
     {
         let base_command = CursorAgent::base_command();
-        // First action: Install
-        let install_script = format!(
+
+        // Install script with PATH setup
+        let mut install_script = format!(
             r#"#!/bin/bash
 set -e
 if ! command -v {base_command} &> /dev/null; then
@@ -65,18 +68,33 @@ if ! command -v {base_command} &> /dev/null; then
     echo "Installation complete!"
 else
     echo "Cursor CLI already installed"
-fi
-"#
+fi"#
         );
+        let shell = UnixShell::current_shell();
+        if let Some(config_file) = shell.config_file()
+            && let Ok(config_file_str) = try_quote(config_file.to_string_lossy().as_ref())
+        {
+            install_script.push_str(&format!(
+                r#"
+            echo "Setting up PATH..."
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> {config_file_str}
+            "#
+            ));
+        }
 
         let install_request = ScriptRequest {
             script: install_script,
             language: ScriptRequestLanguage::Bash,
             context: ScriptContext::SetupScript,
         };
-
         // Second action (chained): Login
-        let login_script = format!("{base_command} login");
+        let login_script = format!(
+            r#"#!/bin/bash
+set -e
+export PATH="$HOME/.local/bin:$PATH"
+{base_command} login
+"#
+        );
         let login_request = ScriptRequest {
             script: login_script,
             language: ScriptRequestLanguage::Bash,
