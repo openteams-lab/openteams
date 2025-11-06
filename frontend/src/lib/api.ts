@@ -47,6 +47,8 @@ import {
   RebaseTaskAttemptRequest,
   ChangeTargetBranchRequest,
   ChangeTargetBranchResponse,
+  RenameBranchRequest,
+  RenameBranchResponse,
   RunAgentSetupRequest,
   RunAgentSetupResponse,
 } from 'shared/types';
@@ -545,6 +547,23 @@ export const attemptsApi = {
       }
     );
     return handleApiResponse<ChangeTargetBranchResponse>(response);
+  },
+
+  renameBranch: async (
+    attemptId: string,
+    newBranchName: string
+  ): Promise<RenameBranchResponse> => {
+    const payload: RenameBranchRequest = {
+      new_branch_name: newBranchName,
+    };
+    const response = await makeRequest(
+      `/api/task-attempts/${attemptId}/rename-branch`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }
+    );
+    return handleApiResponse<RenameBranchResponse>(response);
   },
 
   abortConflicts: async (attemptId: string): Promise<void> => {

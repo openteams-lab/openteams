@@ -264,8 +264,19 @@
     "createNewAttempt": "Create new attempt",
     "createSubtask": "Create subtask",
     "gitActions": "Git actions",
+    "editBranchName": "Edit branch name",
     "task": "Task",
     "duplicate": "Duplicate"
+  },
+  "editBranchName": {
+    "dialog": {
+      "title": "Edit Branch Name",
+      "description": "Enter a new name for the branch. Cannot rename if an open PR exists.",
+      "branchNameLabel": "Branch Name",
+      "placeholder": "e.g., feature/my-branch",
+      "renaming": "Renaming...",
+      "action": "Rename Branch"
+    }
   },
   "showcases": {
     "taskPanel": {
