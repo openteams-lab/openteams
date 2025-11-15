@@ -958,16 +958,20 @@ export function ProjectTasks() {
           {({ logs, followUp }) => (
             <>
               <GitErrorBanner />
-              <div className="flex-1 min-h-0 flex flex-col">{logs}</div>
+              <div className="flex-1 min-h-0 flex flex-col">
+                <div className="flex-1 min-h-0 flex flex-col">{logs}</div>
 
-              <div className="shrink-0 border-t">
-                <div className="mx-auto w-full max-w-[50rem]">
-                  <TodoPanel />
+                <div className="shrink-0 border-t">
+                  <div className="mx-auto w-full max-w-[50rem]">
+                    <TodoPanel />
+                  </div>
                 </div>
-              </div>
 
-              <div className="shrink-0 border-t">
-                <div className="mx-auto w-full max-w-[50rem]">{followUp}</div>
+                <div className="min-h-0 max-h-[50%] border-t overflow-hidden">
+                  <div className="mx-auto w-full max-w-[50rem] h-full min-h-0">
+                    {followUp}
+                  </div>
+                </div>
               </div>
             </>
           )}
