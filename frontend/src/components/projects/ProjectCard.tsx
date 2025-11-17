@@ -26,7 +26,7 @@ import { useEffect, useRef } from 'react';
 import { useOpenProjectInEditor } from '@/hooks/useOpenProjectInEditor';
 import { useNavigateWithSearch } from '@/hooks';
 import { projectsApi } from '@/lib/api';
-import { showLinkProject } from '@/lib/modals';
+import { LinkProjectDialog } from '@/components/dialogs/projects/LinkProjectDialog';
 import { useTranslation } from 'react-i18next';
 import { useProjectMutations } from '@/hooks/useProjectMutations';
 
@@ -94,7 +94,7 @@ function ProjectCard({
 
   const handleLinkProject = async () => {
     try {
-      await showLinkProject({
+      await LinkProjectDialog.show({
         projectId: project.id,
         projectName: project.name,
       });

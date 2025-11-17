@@ -16,6 +16,7 @@ import { useAuthStatus } from '@/hooks/auth/useAuthStatus';
 import { useUserSystem } from '@/components/config-provider';
 import type { ProfileResponse } from 'shared/types';
 import { useTranslation } from 'react-i18next';
+import { defineModal, type NoProps } from '@/lib/modals';
 
 type OAuthProvider = 'github' | 'google';
 
@@ -25,7 +26,7 @@ type OAuthState =
   | { type: 'success'; profile: ProfileResponse }
   | { type: 'error'; message: string };
 
-const OAuthDialog = NiceModal.create(() => {
+const OAuthDialogImpl = NiceModal.create<NoProps>(() => {
   const modal = useModal();
   const { t } = useTranslation('common');
   const { reloadSystem } = useUserSystem();
@@ -303,4 +304,6 @@ const OAuthDialog = NiceModal.create(() => {
   );
 });
 
-export { OAuthDialog };
+export const OAuthDialog = defineModal<void, ProfileResponse | null>(
+  OAuthDialogImpl
+);

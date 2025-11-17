@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Project } from 'shared/types';
-import { showProjectForm } from '@/lib/modals';
+import { ProjectFormDialog } from '@/components/dialogs/projects/ProjectFormDialog';
 import { projectsApi } from '@/lib/api';
 import { AlertCircle, Loader2, Plus } from 'lucide-react';
 import ProjectCard from '@/components/projects/ProjectCard.tsx';
@@ -37,7 +37,7 @@ export function ProjectList() {
 
   const handleCreateProject = async () => {
     try {
-      const result = await showProjectForm();
+      const result = await ProjectFormDialog.show({});
       if (result === 'saved') {
         fetchProjects();
       }

@@ -22,8 +22,9 @@ import type {
   TaskAttempt,
   TaskWithAttemptStatus,
 } from 'shared/types';
-import NiceModal from '@ebay/nice-modal-react';
-import { showModal } from '@/lib/modals';
+import { ChangeTargetBranchDialog } from '@/components/dialogs/tasks/ChangeTargetBranchDialog';
+import { RebaseDialog } from '@/components/dialogs/tasks/RebaseDialog';
+import { CreatePRDialog } from '@/components/dialogs/tasks/CreatePRDialog';
 import { useTranslation } from 'react-i18next';
 import { useGitOperations } from '@/hooks/useGitOperations';
 
@@ -75,10 +76,7 @@ function GitOperations({
 
   const handleChangeTargetBranchDialogOpen = async () => {
     try {
-      const result = await showModal<{
-        action: 'confirmed' | 'canceled';
-        branchName: string;
-      }>('change-target-branch-dialog', {
+      const result = await ChangeTargetBranchDialog.show({
         branches,
         isChangingTargetBranch: isChangingTargetBranch,
       });
@@ -194,11 +192,7 @@ function GitOperations({
   const handleRebaseDialogOpen = async () => {
     try {
       const defaultTargetBranch = selectedAttempt.target_branch;
-      const result = await showModal<{
-        action: 'confirmed' | 'canceled';
-        branchName?: string;
-        upstreamBranch?: string;
-      }>('rebase-dialog', {
+      const result = await RebaseDialog.show({
         branches,
         isRebasing: rebasing,
         initialTargetBranch: defaultTargetBranch,
@@ -226,7 +220,7 @@ function GitOperations({
       return;
     }
 
-    NiceModal.show('create-pr', {
+    CreatePRDialog.show({
       attempt: selectedAttempt,
       task,
       projectId,

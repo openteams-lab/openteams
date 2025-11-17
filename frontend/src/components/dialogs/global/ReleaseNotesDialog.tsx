@@ -11,10 +11,11 @@ import { AlertCircle, ExternalLink } from 'lucide-react';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { useTheme } from '@/components/theme-provider';
 import { getActualTheme } from '@/utils/theme';
+import { defineModal, type NoProps } from '@/lib/modals';
 
 const RELEASE_NOTES_BASE_URL = 'https://vibekanban.com/release-notes';
 
-export const ReleaseNotesDialog = NiceModal.create(() => {
+const ReleaseNotesDialogImpl = NiceModal.create<NoProps>(() => {
   const modal = useModal();
   const [iframeError, setIframeError] = useState(false);
   const { theme } = useTheme();
@@ -98,3 +99,7 @@ export const ReleaseNotesDialog = NiceModal.create(() => {
     </Dialog>
   );
 });
+
+export const ReleaseNotesDialog = defineModal<void, void>(
+  ReleaseNotesDialogImpl
+);

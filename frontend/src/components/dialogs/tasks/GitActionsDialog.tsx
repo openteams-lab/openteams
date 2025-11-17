@@ -24,6 +24,7 @@ import type {
   TaskWithAttemptStatus,
 } from 'shared/types';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
+import { defineModal } from '@/lib/modals';
 
 export interface GitActionsDialogProps {
   attemptId: string;
@@ -97,7 +98,7 @@ function GitActionsDialogContent({
   );
 }
 
-export const GitActionsDialog = NiceModal.create<GitActionsDialogProps>(
+const GitActionsDialogImpl = NiceModal.create<GitActionsDialogProps>(
   ({ attemptId, task, projectId: providedProjectId }) => {
     const modal = useModal();
     const { t } = useTranslation('tasks');
@@ -158,4 +159,8 @@ export const GitActionsDialog = NiceModal.create<GitActionsDialogProps>(
       </Dialog>
     );
   }
+);
+
+export const GitActionsDialog = defineModal<GitActionsDialogProps, void>(
+  GitActionsDialogImpl
 );
