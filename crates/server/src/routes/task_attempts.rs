@@ -695,6 +695,31 @@ pub async fn merge_task_attempt(
     .await?;
     Task::update_status(pool, ctx.task.id, TaskStatus::Done).await?;
 
+    // Stop any running dev servers for this task attempt
+    let dev_servers =
+        ExecutionProcess::find_running_dev_servers_by_task_attempt(pool, task_attempt.id).await?;
+
+    for dev_server in dev_servers {
+        tracing::info!(
+            "Stopping dev server {} for completed task attempt {}",
+            dev_server.id,
+            task_attempt.id
+        );
+
+        if let Err(e) = deployment
+            .container()
+            .stop_execution(&dev_server, ExecutionProcessStatus::Killed)
+            .await
+        {
+            tracing::error!(
+                "Failed to stop dev server {} for task attempt {}: {}",
+                dev_server.id,
+                task_attempt.id,
+                e
+            );
+        }
+    }
+
     // Try broadcast update to other users in organization
     if let Ok(publisher) = deployment.share_publisher() {
         if let Err(err) = publisher.update_shared_task_by_id(ctx.task.id).await {
