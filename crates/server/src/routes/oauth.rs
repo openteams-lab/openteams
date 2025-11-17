@@ -171,6 +171,18 @@ async fn handoff_complete(
     // Fetch and cache the user's profile
     let _ = deployment.get_login_status().await;
 
+    if let Some(profile) = deployment.auth_context().cached_profile().await
+        && let Some(analytics) = deployment.analytics()
+    {
+        analytics.track_event(
+            deployment.user_id(),
+            "$identify",
+            Some(serde_json::json!({
+                "email": profile.email,
+            })),
+        );
+    }
+
     // Start remote sync if not already running
     {
         let handle_guard = deployment.share_sync_handle().lock().await;
