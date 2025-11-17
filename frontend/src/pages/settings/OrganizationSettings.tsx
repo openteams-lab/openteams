@@ -25,15 +25,12 @@ import { useOrganizationMutations } from '@/hooks/useOrganizationMutations';
 import { useUserSystem } from '@/components/config-provider';
 import { useAuth } from '@/hooks/auth/useAuth';
 import { LoginRequiredPrompt } from '@/components/dialogs/shared/LoginRequiredPrompt';
-import NiceModal from '@ebay/nice-modal-react';
-import {
-  InviteMemberDialog,
-  type InviteMemberResult,
-} from '@/components/dialogs/org/InviteMemberDialog';
-import {
-  CreateOrganizationDialog,
-  type CreateOrganizationResult,
-} from '@/components/dialogs/org/CreateOrganizationDialog';
+import { CreateOrganizationDialog } from '@/components/dialogs/org/CreateOrganizationDialog';
+import { InviteMemberDialog } from '@/components/dialogs/org/InviteMemberDialog';
+import type {
+  InviteMemberResult,
+  CreateOrganizationResult,
+} from '@/components/dialogs';
 import { MemberListItem } from '@/components/org/MemberListItem';
 import { PendingInvitationItem } from '@/components/org/PendingInvitationItem';
 import { RemoteProjectItem } from '@/components/org/RemoteProjectItem';
@@ -176,9 +173,8 @@ export function OrganizationSettings() {
 
   const handleCreateOrganization = async () => {
     try {
-      const result: CreateOrganizationResult = await NiceModal.show(
-        CreateOrganizationDialog
-      );
+      const result: CreateOrganizationResult =
+        await CreateOrganizationDialog.show();
 
       if (result.action === 'created' && result.organizationId) {
         // No need to refetch - the mutation hook handles cache invalidation
@@ -195,10 +191,9 @@ export function OrganizationSettings() {
     if (!selectedOrgId) return;
 
     try {
-      const result: InviteMemberResult = await NiceModal.show(
-        InviteMemberDialog,
-        { organizationId: selectedOrgId }
-      );
+      const result: InviteMemberResult = await InviteMemberDialog.show({
+        organizationId: selectedOrgId,
+      });
 
       if (result.action === 'invited') {
         // No need to refetch - the mutation hook handles cache invalidation

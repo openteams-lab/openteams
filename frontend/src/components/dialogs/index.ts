@@ -1,6 +1,9 @@
 // Global app dialogs
 export { DisclaimerDialog } from './global/DisclaimerDialog';
-export { OnboardingDialog } from './global/OnboardingDialog';
+export {
+  OnboardingDialog,
+  type OnboardingResult,
+} from './global/OnboardingDialog';
 export { ReleaseNotesDialog } from './global/ReleaseNotesDialog';
 export { OAuthDialog } from './global/OAuthDialog';
 
@@ -70,6 +73,10 @@ export {
   type ViewProcessesDialogProps,
 } from './tasks/ViewProcessesDialog';
 export {
+  ViewRelatedTasksDialog,
+  type ViewRelatedTasksDialogProps,
+} from './tasks/ViewRelatedTasksDialog';
+export {
   GitActionsDialog,
   type GitActionsDialogProps,
 } from './tasks/GitActionsDialog';
@@ -81,6 +88,14 @@ export {
   StopShareTaskDialog,
   type StopShareTaskDialogProps,
 } from './tasks/StopShareTaskDialog';
+export {
+  EditBranchNameDialog,
+  type EditBranchNameDialogResult,
+} from './tasks/EditBranchNameDialog';
+export { CreateAttemptDialog } from './tasks/CreateAttemptDialog';
+
+// Auth dialogs
+export { GhCliSetupDialog } from './auth/GhCliSetupDialog';
 
 // Settings dialogs
 export {

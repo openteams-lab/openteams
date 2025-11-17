@@ -1,8 +1,7 @@
 import { useCallback, type ComponentProps } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LogIn, type LucideIcon } from 'lucide-react';
-import NiceModal from '@ebay/nice-modal-react';
-import { OAuthDialog } from '@/components/dialogs';
+import { OAuthDialog } from '@/components/dialogs/global/OAuthDialog';
 
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -38,7 +37,7 @@ export function LoginRequiredPrompt({
       onAction();
       return;
     }
-    void NiceModal.show(OAuthDialog);
+    void OAuthDialog.show();
   }, [onAction]);
 
   const Icon = icon ?? LogIn;

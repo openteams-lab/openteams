@@ -10,12 +10,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
+import { defineModal } from '@/lib/modals';
+import { OAuthDialog } from '@/components/dialogs/global/OAuthDialog';
+import { LinkProjectDialog } from '@/components/dialogs/projects/LinkProjectDialog';
 import { useTranslation } from 'react-i18next';
 import { useUserSystem } from '@/components/config-provider';
 import { Link as LinkIcon, Loader2 } from 'lucide-react';
 import type { TaskWithAttemptStatus } from 'shared/types';
 import { LoginRequiredPrompt } from '@/components/dialogs/shared/LoginRequiredPrompt';
-import { LinkProjectDialog } from '@/components/dialogs/projects/LinkProjectDialog';
 import { useAuth } from '@/hooks';
 import { useProject } from '@/contexts/project-context';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
@@ -24,7 +26,7 @@ export interface ShareDialogProps {
   task: TaskWithAttemptStatus;
 }
 
-const ShareDialog = NiceModal.create<ShareDialogProps>(({ task }) => {
+const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
   const modal = useModal();
   const { t } = useTranslation('tasks');
   const { loading: systemLoading } = useUserSystem();
@@ -67,7 +69,7 @@ const ShareDialog = NiceModal.create<ShareDialogProps>(({ task }) => {
       modal.hide();
     } catch (err) {
       if (getStatus(err) === 401) {
-        void NiceModal.show('oauth');
+        void OAuthDialog.show();
         return;
       }
       setShareError(getReadableError(err));
@@ -77,7 +79,7 @@ const ShareDialog = NiceModal.create<ShareDialogProps>(({ task }) => {
   const handleLinkProject = () => {
     if (!project) return;
 
-    void NiceModal.show(LinkProjectDialog, {
+    void LinkProjectDialog.show({
       projectId: project.id,
       projectName: project.name,
     });
@@ -169,4 +171,6 @@ const ShareDialog = NiceModal.create<ShareDialogProps>(({ task }) => {
   );
 });
 
-export { ShareDialog };
+export const ShareDialog = defineModal<ShareDialogProps, boolean>(
+  ShareDialogImpl
+);

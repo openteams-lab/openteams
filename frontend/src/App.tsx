@@ -31,9 +31,11 @@ import { ThemeMode } from 'shared/types';
 import * as Sentry from '@sentry/react';
 import { Loader } from '@/components/ui/loader';
 
-import NiceModal from '@ebay/nice-modal-react';
-import { OnboardingResult } from './components/dialogs/global/OnboardingDialog';
+import { DisclaimerDialog } from '@/components/dialogs/global/DisclaimerDialog';
+import { OnboardingDialog } from '@/components/dialogs/global/OnboardingDialog';
+import { ReleaseNotesDialog } from '@/components/dialogs/global/ReleaseNotesDialog';
 import { ClickedElementsProvider } from './contexts/ClickedElementsProvider';
+import NiceModal from '@ebay/nice-modal-react';
 
 const SentryRoutes = Sentry.withSentryReactRouterV6Routing(Routes);
 
@@ -64,17 +66,17 @@ function AppContent() {
     const showNextStep = async () => {
       // 1) Disclaimer - first step
       if (!config.disclaimer_acknowledged) {
-        await NiceModal.show('disclaimer');
+        await DisclaimerDialog.show();
         if (!cancelled) {
           await updateAndSaveConfig({ disclaimer_acknowledged: true });
         }
-        await NiceModal.hide('disclaimer');
+        DisclaimerDialog.hide();
         return;
       }
 
       // 2) Onboarding - configure executor and editor
       if (!config.onboarding_acknowledged) {
-        const result: OnboardingResult = await NiceModal.show('onboarding');
+        const result = await OnboardingDialog.show();
         if (!cancelled) {
           await updateAndSaveConfig({
             onboarding_acknowledged: true,
@@ -82,17 +84,17 @@ function AppContent() {
             editor: result.editor,
           });
         }
-        await NiceModal.hide('onboarding');
+        OnboardingDialog.hide();
         return;
       }
 
       // 3) Release notes - last step
       if (config.show_release_notes) {
-        await NiceModal.show('release-notes');
+        await ReleaseNotesDialog.show();
         if (!cancelled) {
           await updateAndSaveConfig({ show_release_notes: false });
         }
-        await NiceModal.hide('release-notes');
+        ReleaseNotesDialog.hide();
         return;
       }
     };
