@@ -10,10 +10,13 @@ use thiserror::Error;
 use ts_rs::TS;
 use utils::diff::{Diff, DiffChangeKind, FileDiffDetails};
 
-// Import for file ranking functionality
+mod cli;
+
+use cli::{ChangeType, StatusDiffEntry, StatusDiffOptions};
+pub use cli::{GitCli, GitCliError};
+
 use super::file_ranker::FileStat;
-use super::git_cli::{ChangeType, GitCli, GitCliError, StatusDiffEntry, StatusDiffOptions};
-use crate::services::github_service::GitHubRepoInfo;
+use crate::services::github::GitHubRepoInfo;
 
 #[derive(Debug, Error)]
 pub enum GitServiceError {
@@ -1032,23 +1035,6 @@ impl GitService {
         Ok(oid)
     }
 
-    /// Get the author name and email for the given commit OID (hex)
-    pub fn get_commit_author(
-        &self,
-        repo_path: &Path,
-        commit_sha: &str,
-    ) -> Result<(Option<String>, Option<String>), GitServiceError> {
-        let repo = self.open_repo(repo_path)?;
-        let oid = git2::Oid::from_str(commit_sha)
-            .map_err(|_| GitServiceError::InvalidRepository("Invalid commit SHA".into()))?;
-        let commit = repo.find_commit(oid)?;
-        let author = commit.author();
-        Ok((
-            author.name().map(|s| s.to_string()),
-            author.email().map(|s| s.to_string()),
-        ))
-    }
-
     /// Get the subject/summary line for a given commit OID
     pub fn get_commit_subject(
         &self,
@@ -1084,7 +1070,7 @@ impl GitService {
         &self,
         worktree_path: &Path,
     ) -> Result<(usize, usize), GitServiceError> {
-        let cli = super::git_cli::GitCli::new();
+        let cli = GitCli::new();
         let st = cli
             .get_worktree_status(worktree_path)
             .map_err(|e| GitServiceError::InvalidRepository(format!("git status failed: {e}")))?;
@@ -1095,8 +1081,8 @@ impl GitService {
     pub fn get_worktree_status(
         &self,
         worktree_path: &Path,
-    ) -> Result<super::git_cli::WorktreeStatus, GitServiceError> {
-        let cli = super::git_cli::GitCli::new();
+    ) -> Result<cli::WorktreeStatus, GitServiceError> {
+        let cli = GitCli::new();
         cli.get_worktree_status(worktree_path)
             .map_err(|e| GitServiceError::InvalidRepository(format!("git status failed: {e}")))
     }
@@ -1155,36 +1141,13 @@ impl GitService {
             // Avoid clobbering uncommitted changes unless explicitly forced
             self.check_worktree_clean(&repo)?;
         }
-        let cli = super::git_cli::GitCli::new();
+        let cli = GitCli::new();
         cli.git(worktree_path, ["reset", "--hard", commit_sha])
             .map_err(|e| {
                 GitServiceError::InvalidRepository(format!("git reset --hard failed: {e}"))
             })?;
         // Reapply sparse-checkout if configured (non-fatal)
         let _ = cli.git(worktree_path, ["sparse-checkout", "reapply"]);
-        Ok(())
-    }
-
-    /// Convenience: Get author of HEAD commit
-    pub fn get_head_author(
-        &self,
-        repo_path: &Path,
-    ) -> Result<(Option<String>, Option<String>), GitServiceError> {
-        let head = self.get_head_info(repo_path)?;
-        self.get_commit_author(repo_path, &head.oid)
-    }
-
-    /// Configure local user identity for committing via CLI
-    pub fn configure_user(
-        &self,
-        repo_path: &Path,
-        name: &str,
-        email: &str,
-    ) -> Result<(), GitServiceError> {
-        let repo = self.open_repo(repo_path)?;
-        let mut cfg = repo.config()?;
-        cfg.set_str("user.name", name)?;
-        cfg.set_str("user.email", email)?;
         Ok(())
     }
 
@@ -1229,6 +1192,26 @@ impl GitService {
         Ok(())
     }
 
+    /// Remove a worktree
+    pub fn remove_worktree(
+        &self,
+        repo_path: &Path,
+        worktree_path: &Path,
+        force: bool,
+    ) -> Result<(), GitServiceError> {
+        let git = GitCli::new();
+        git.worktree_remove(repo_path, worktree_path, force)
+            .map_err(|e| GitServiceError::InvalidRepository(e.to_string()))?;
+        Ok(())
+    }
+
+    pub fn prune_worktrees(&self, repo_path: &Path) -> Result<(), GitServiceError> {
+        let git = GitCli::new();
+        git.worktree_prune(repo_path)
+            .map_err(|e| GitServiceError::InvalidRepository(e.to_string()))?;
+        Ok(())
+    }
+
     /// Set or add a remote URL
     pub fn set_remote(
         &self,
@@ -1243,25 +1226,6 @@ impl GitService {
                 repo.remote(name, url)?;
             }
         }
-        Ok(())
-    }
-
-    /// Stage a specific path (wrapper over git add)
-    pub fn add_path(&self, repo_path: &Path, path: &str) -> Result<(), GitServiceError> {
-        let git = GitCli::new();
-        git.git(repo_path, ["add", path])
-            .map(|_| ())
-            .map_err(|e| GitServiceError::InvalidRepository(e.to_string()))
-    }
-
-    /// Detach HEAD to the current commit (for testing commit on detached HEAD)
-    pub fn detach_head_current(&self, repo_path: &Path) -> Result<(), GitServiceError> {
-        let repo = self.open_repo(repo_path)?;
-        let oid = repo
-            .head()?
-            .target()
-            .ok_or_else(|| GitServiceError::InvalidRepository("HEAD has no target".into()))?;
-        repo.set_head_detached(oid)?;
         Ok(())
     }
 
@@ -1961,42 +1925,3 @@ impl GitService {
         Ok(stats)
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use tempfile::TempDir;
-
-//     use super::*;
-
-//     fn create_test_repo() -> (TempDir, Repository) {
-//         let temp_dir = TempDir::new().unwrap();
-//         let repo = Repository::init(temp_dir.path()).unwrap();
-
-//         // Configure the repository
-//         let mut config = repo.config().unwrap();
-//         config.set_str("user.name", "Test User").unwrap();
-//         config.set_str("user.email", "test@example.com").unwrap();
-
-//         (temp_dir, repo)
-//     }
-
-//     #[test]
-//     fn test_git_service_creation() {
-//         let (temp_dir, _repo) = create_test_repo();
-//         let _git_service = GitService::new(temp_dir.path()).unwrap();
-//     }
-
-//     #[test]
-//     fn test_invalid_repository_path() {
-//         let result = GitService::new("/nonexistent/path");
-//         assert!(result.is_err());
-//     }
-
-//     #[test]
-//     fn test_default_branch_name() {
-//         let (temp_dir, _repo) = create_test_repo();
-//         let git_service = GitService::new(temp_dir.path()).unwrap();
-//         let branch_name = git_service.get_default_branch_name().unwrap();
-//         assert_eq!(branch_name, "main");
-//     }
-// }
