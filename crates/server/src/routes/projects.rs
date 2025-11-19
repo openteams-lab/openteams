@@ -182,6 +182,15 @@ async fn apply_remote_project_link(
     let current_user_id = current_profile.as_ref().map(|p| p.user_id);
     link_shared_tasks_to_project(pool, current_user_id, project_id, remote_project.id).await?;
 
+    deployment
+        .track_if_analytics_allowed(
+            "project_linked_to_remote",
+            serde_json::json!({
+                "project_id": project_id.to_string(),
+            }),
+        )
+        .await;
+
     Ok(updated_project)
 }
 
