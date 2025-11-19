@@ -14,12 +14,10 @@ import {
   CreateTag,
   DirectoryListResponse,
   DirectoryEntry,
-  EditorType,
   ExecutionProcess,
   GitBranch,
   Project,
   CreateProject,
-  RepositoryInfo,
   SearchResult,
   ShareTaskResponse,
   Task,
@@ -68,10 +66,12 @@ import {
   Invitation,
   RemoteProject,
   ListInvitationsResponse,
+  CommitCompareResult,
+  OpenEditorResponse,
+  OpenEditorRequest,
 } from 'shared/types';
 
 // Re-export types for convenience
-export type { RepositoryInfo } from 'shared/types';
 export type {
   UpdateFollowUpDraftRequest,
   UpdateRetryFollowUpDraftRequest,
@@ -105,16 +105,6 @@ const makeRequest = async (url: string, options: RequestInit = {}) => {
     headers,
   });
 };
-
-export interface FollowUpResponse {
-  message: string;
-  actual_attempt_id: string;
-  created_new_attempt: boolean;
-}
-
-export interface OpenEditorResponse {
-  url: string | null;
-}
 
 export type Ok<T> = { success: true; data: T };
 export type Err<E> = { success: false; error: E | undefined; message?: string };
@@ -272,16 +262,11 @@ export const projectsApi = {
 
   openEditor: async (
     id: string,
-    editorType?: EditorType
+    data: OpenEditorRequest
   ): Promise<OpenEditorResponse> => {
-    const requestBody: { editor_type?: EditorType } = {};
-    if (editorType) requestBody.editor_type = editorType;
-
     const response = await makeRequest(`/api/projects/${id}/open-editor`, {
       method: 'POST',
-      body: JSON.stringify(
-        Object.keys(requestBody).length > 0 ? requestBody : null
-      ),
+      body: JSON.stringify(data),
     });
     return handleApiResponse<OpenEditorResponse>(response);
   },
@@ -340,11 +325,6 @@ export const projectsApi = {
 
 // Task Management APIs
 export const tasksApi = {
-  getAll: async (projectId: string): Promise<TaskWithAttemptStatus[]> => {
-    const response = await makeRequest(`/api/tasks?project_id=${projectId}`);
-    return handleApiResponse<TaskWithAttemptStatus[]>(response);
-  },
-
   getById: async (taskId: string): Promise<Task> => {
     const response = await makeRequest(`/api/tasks/${taskId}`);
     return handleApiResponse<Task>(response);
@@ -452,26 +432,6 @@ export const attemptsApi = {
     return handleApiResponse<void>(response);
   },
 
-  replaceProcess: async (
-    attemptId: string,
-    data: {
-      process_id: string;
-      prompt: string;
-      variant?: string | null;
-      force_when_dirty?: boolean;
-      perform_git_reset?: boolean;
-    }
-  ): Promise<unknown> => {
-    const response = await makeRequest(
-      `/api/task-attempts/${attemptId}/replace-process`,
-      {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }
-    );
-    return handleApiResponse(response);
-  },
-
   followUp: async (
     attemptId: string,
     data: CreateFollowUpAttempt
@@ -557,37 +517,15 @@ export const attemptsApi = {
     return handleApiResponse<DraftResponse>(response);
   },
 
-  deleteFile: async (
-    attemptId: string,
-    fileToDelete: string
-  ): Promise<void> => {
-    const response = await makeRequest(
-      `/api/task-attempts/${attemptId}/delete-file?file_path=${encodeURIComponent(
-        fileToDelete
-      )}`,
-      {
-        method: 'POST',
-      }
-    );
-    return handleApiResponse<void>(response);
-  },
-
   openEditor: async (
     attemptId: string,
-    editorType?: EditorType,
-    filePath?: string
+    data: OpenEditorRequest
   ): Promise<OpenEditorResponse> => {
-    const requestBody: { editor_type?: EditorType; file_path?: string } = {};
-    if (editorType) requestBody.editor_type = editorType;
-    if (filePath) requestBody.file_path = filePath;
-
     const response = await makeRequest(
       `/api/task-attempts/${attemptId}/open-editor`,
       {
         method: 'POST',
-        body: JSON.stringify(
-          Object.keys(requestBody).length > 0 ? requestBody : null
-        ),
+        body: JSON.stringify(data),
       }
     );
     return handleApiResponse<OpenEditorResponse>(response);
@@ -717,13 +655,7 @@ export const commitsApi = {
   compareToHead: async (
     attemptId: string,
     sha: string
-  ): Promise<{
-    head_oid: string;
-    target_oid: string;
-    ahead_from_head: number;
-    behind_from_head: number;
-    is_linear: boolean;
-  }> => {
+  ): Promise<CommitCompareResult> => {
     const response = await makeRequest(
       `/api/task-attempts/${attemptId}/commit-compare?sha=${encodeURIComponent(
         sha
@@ -735,15 +667,6 @@ export const commitsApi = {
 
 // Execution Process APIs
 export const executionProcessesApi = {
-  getExecutionProcesses: async (
-    attemptId: string
-  ): Promise<ExecutionProcess[]> => {
-    const response = await makeRequest(
-      `/api/execution-processes?task_attempt_id=${attemptId}`
-    );
-    return handleApiResponse<ExecutionProcess[]>(response);
-  },
-
   getDetails: async (processId: string): Promise<ExecutionProcess> => {
     const response = await makeRequest(`/api/execution-processes/${processId}`);
     return handleApiResponse<ExecutionProcess>(response);
@@ -794,14 +717,6 @@ export const configApi = {
   },
 };
 
-// GitHub APIs (only available in cloud mode)
-export const githubApi = {
-  listRepositories: async (page: number = 1): Promise<RepositoryInfo[]> => {
-    const response = await makeRequest(`/api/github/repositories?page=${page}`);
-    return handleApiResponse<RepositoryInfo[]>(response);
-  },
-};
-
 // Task Tags APIs (all tags are global)
 export const tagsApi = {
   list: async (params?: TagSearchParams): Promise<Tag[]> => {
@@ -810,11 +725,6 @@ export const tagsApi = {
       : '';
     const response = await makeRequest(`/api/tags${queryParam}`);
     return handleApiResponse<Tag[]>(response);
-  },
-
-  get: async (tagId: string): Promise<Tag> => {
-    const response = await makeRequest(`/api/tags/${tagId}`);
-    return handleApiResponse<Tag>(response);
   },
 
   create: async (data: CreateTag): Promise<Tag> => {
