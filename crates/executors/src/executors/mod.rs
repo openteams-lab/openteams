@@ -18,7 +18,7 @@ use crate::{
     command::CommandBuildError,
     executors::{
         amp::Amp, claude::ClaudeCode, codex::Codex, copilot::Copilot, cursor::CursorAgent,
-        gemini::Gemini, opencode::Opencode, qwen::QwenCode,
+        droid::Droid, gemini::Gemini, opencode::Opencode, qwen::QwenCode,
     },
     mcp_config::McpConfig,
 };
@@ -29,6 +29,7 @@ pub mod claude;
 pub mod codex;
 pub mod copilot;
 pub mod cursor;
+pub mod droid;
 pub mod gemini;
 pub mod opencode;
 pub mod qwen;
@@ -95,6 +96,7 @@ pub enum CodingAgent {
     CursorAgent,
     QwenCode,
     Copilot,
+    Droid,
 }
 
 impl CodingAgent {
@@ -125,6 +127,14 @@ impl CodingAgent {
                 self.preconfigured_mcp(),
                 false,
             ),
+            Self::Droid(_) => McpConfig::new(
+                vec!["mcpServers".to_string()],
+                serde_json::json!({
+                    "mcpServers": {}
+                }),
+                self.preconfigured_mcp(),
+                false,
+            ),
             _ => McpConfig::new(
                 vec!["mcpServers".to_string()],
                 serde_json::json!({
@@ -142,11 +152,12 @@ impl CodingAgent {
 
     pub fn capabilities(&self) -> Vec<BaseAgentCapability> {
         match self {
-            Self::ClaudeCode(_) => vec![BaseAgentCapability::SessionFork],
-            Self::Amp(_) => vec![BaseAgentCapability::SessionFork],
-            Self::Codex(_) => vec![BaseAgentCapability::SessionFork],
-            Self::Gemini(_) => vec![BaseAgentCapability::SessionFork],
-            Self::QwenCode(_) => vec![BaseAgentCapability::SessionFork],
+            Self::ClaudeCode(_)
+            | Self::Amp(_)
+            | Self::Codex(_)
+            | Self::Gemini(_)
+            | Self::QwenCode(_)
+            | Self::Droid(_) => vec![BaseAgentCapability::SessionFork],
             Self::CursorAgent(_) => vec![BaseAgentCapability::SetupHelper],
             Self::Opencode(_) | Self::Copilot(_) => vec![],
         }
