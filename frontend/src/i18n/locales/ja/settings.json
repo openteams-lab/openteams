@@ -228,6 +228,15 @@
         "button": "エージェント設定を保存",
         "success": "✓ 実行設定が正常に保存されました！"
       },
+      "availability": {
+        "checking": "確認中...",
+        "loginDetected": "最近の使用を検出",
+        "loginDetectedTooltip": "このエージェントの最近の認証情報が見つかりました",
+        "installationFound": "以前の使用を検出",
+        "installationFoundTooltip": "エージェント設定が見つかりました。使用するにはログインが必要な場合があります。",
+        "notFound": "見つかりません",
+        "notFoundTooltip": "以前の使用が検出されませんでした。エージェントにはインストールやログインが必要な場合があります。"
+      },
       "editor": {
         "formLabel": "JSONを編集",
         "agentLabel": "エージェント",

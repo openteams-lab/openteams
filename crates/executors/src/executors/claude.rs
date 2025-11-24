@@ -22,7 +22,7 @@ use crate::{
     approvals::ExecutorApprovalService,
     command::{CmdOverrides, CommandBuilder, CommandParts, apply_overrides},
     executors::{
-        AppendPrompt, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
+        AppendPrompt, AvailabilityInfo, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
         codex::client::LogWriter,
     },
     logs::{
@@ -192,6 +192,23 @@ impl StandardCodingAgentExecutor for ClaudeCode {
     // MCP configuration methods
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
         dirs::home_dir().map(|home| home.join(".claude.json"))
+    }
+
+    fn get_availability_info(&self) -> AvailabilityInfo {
+        let auth_file_path = dirs::home_dir().map(|home| home.join(".claude.json"));
+
+        if let Some(path) = auth_file_path
+            && let Some(timestamp) = std::fs::metadata(&path)
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+        {
+            return AvailabilityInfo::LoginDetected {
+                last_auth_timestamp: timestamp,
+            };
+        }
+        AvailabilityInfo::NotFound
     }
 }
 

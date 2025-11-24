@@ -164,6 +164,24 @@ impl CodingAgent {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
+#[ts(export)]
+pub enum AvailabilityInfo {
+    LoginDetected { last_auth_timestamp: i64 },
+    InstallationFound,
+    NotFound,
+}
+
+impl AvailabilityInfo {
+    pub fn is_available(&self) -> bool {
+        matches!(
+            self,
+            AvailabilityInfo::LoginDetected { .. } | AvailabilityInfo::InstallationFound
+        )
+    }
+}
+
 #[async_trait]
 #[enum_dispatch(CodingAgent)]
 pub trait StandardCodingAgentExecutor {
@@ -185,10 +203,17 @@ pub trait StandardCodingAgentExecutor {
         Err(ExecutorError::SetupHelperNotSupported)
     }
 
-    async fn check_availability(&self) -> bool {
-        self.default_mcp_config_path()
+    fn get_availability_info(&self) -> AvailabilityInfo {
+        let config_files_found = self
+            .default_mcp_config_path()
             .map(|path| path.exists())
-            .unwrap_or(false)
+            .unwrap_or(false);
+
+        if config_files_found {
+            AvailabilityInfo::InstallationFound
+        } else {
+            AvailabilityInfo::NotFound
+        }
     }
 }
 

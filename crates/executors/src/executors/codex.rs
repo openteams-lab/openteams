@@ -33,7 +33,7 @@ use crate::{
     approvals::ExecutorApprovalService,
     command::{CmdOverrides, CommandBuilder, CommandParts, apply_overrides},
     executors::{
-        AppendPrompt, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
+        AppendPrompt, AvailabilityInfo, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
         codex::{jsonrpc::ExitSignalSender, normalize_logs::Error},
     },
     stdout_dup::create_stdout_pipe_writer,
@@ -163,6 +163,34 @@ impl StandardCodingAgentExecutor for Codex {
 
     fn default_mcp_config_path(&self) -> Option<PathBuf> {
         dirs::home_dir().map(|home| home.join(".codex").join("config.toml"))
+    }
+
+    fn get_availability_info(&self) -> AvailabilityInfo {
+        if let Some(timestamp) = dirs::home_dir()
+            .and_then(|home| std::fs::metadata(home.join(".codex").join("auth.json")).ok())
+            .and_then(|m| m.modified().ok())
+            .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs() as i64)
+        {
+            return AvailabilityInfo::LoginDetected {
+                last_auth_timestamp: timestamp,
+            };
+        }
+
+        let mcp_config_found = self
+            .default_mcp_config_path()
+            .map(|p| p.exists())
+            .unwrap_or(false);
+
+        let installation_indicator_found = dirs::home_dir()
+            .map(|home| home.join(".codex").join("version.json").exists())
+            .unwrap_or(false);
+
+        if mcp_config_found || installation_indicator_found {
+            AvailabilityInfo::InstallationFound
+        } else {
+            AvailabilityInfo::NotFound
+        }
     }
 }
 

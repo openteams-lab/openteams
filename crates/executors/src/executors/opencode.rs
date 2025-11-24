@@ -21,7 +21,7 @@ use workspace_utils::{msg_store::MsgStore, path::make_path_relative};
 use crate::{
     command::{CmdOverrides, CommandBuilder, apply_overrides},
     executors::{
-        AppendPrompt, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
+        AppendPrompt, AvailabilityInfo, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
         opencode::share_bridge::Bridge as ShareBridge,
     },
     logs::{
@@ -308,6 +308,23 @@ impl StandardCodingAgentExecutor for Opencode {
         #[cfg(not(unix))]
         {
             dirs::config_dir().map(|config| config.join("opencode").join("opencode.json"))
+        }
+    }
+
+    fn get_availability_info(&self) -> AvailabilityInfo {
+        let mcp_config_found = self
+            .default_mcp_config_path()
+            .map(|p| p.exists())
+            .unwrap_or(false);
+
+        let installation_indicator_found = dirs::config_dir()
+            .map(|config| config.join("opencode").exists())
+            .unwrap_or(false);
+
+        if mcp_config_found || installation_indicator_found {
+            AvailabilityInfo::InstallationFound
+        } else {
+            AvailabilityInfo::NotFound
         }
     }
 }
