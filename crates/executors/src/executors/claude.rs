@@ -59,6 +59,8 @@ pub struct ClaudeCode {
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dangerously_skip_permissions: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disable_api_key: Option<bool>,
     #[serde(flatten)]
     pub cmd: CmdOverrides,
 
@@ -230,6 +232,12 @@ impl ClaudeCode {
             .stderr(Stdio::piped())
             .current_dir(current_dir)
             .args(&args);
+
+        // Remove ANTHROPIC_API_KEY if disable_api_key is enabled
+        if self.disable_api_key.unwrap_or(false) {
+            command.env_remove("ANTHROPIC_API_KEY");
+            tracing::info!("ANTHROPIC_API_KEY removed from environment");
+        }
 
         let mut child = command.group_spawn()?;
         let child_stdout = child.inner().stdout.take().ok_or_else(|| {
@@ -444,7 +452,7 @@ impl ClaudeLogProcessor {
                     timestamp: None,
                     entry_type: NormalizedEntryType::ErrorMessage { error_type: NormalizedEntryError::Other,
                     },
-                    content: "Claude Code + ANTHROPIC_API_KEY detected. Usage will be billed via Anthropic pay-as-you-go instead of your Claude subscription.".to_string(),
+                    content: "Claude Code + ANTHROPIC_API_KEY detected. Usage will be billed via Anthropic pay-as-you-go instead of your Claude subscription. If this is unintended, please select the `disable_api_key` checkbox in the conding-agent-configurations settings page.".to_string(),
                     metadata: None,
                 })
             }
@@ -1987,6 +1995,7 @@ mod tests {
                 additional_params: None,
             },
             approvals_service: None,
+            disable_api_key: None,
         };
         let msg_store = Arc::new(MsgStore::new());
         let current_dir = std::path::PathBuf::from("/tmp/test-worktree");
@@ -2260,7 +2269,7 @@ mod tests {
         ));
         assert_eq!(
             entries[0].content,
-            "Claude Code + ANTHROPIC_API_KEY detected. Usage will be billed via Anthropic pay-as-you-go instead of your Claude subscription."
+            "Claude Code + ANTHROPIC_API_KEY detected. Usage will be billed via Anthropic pay-as-you-go instead of your Claude subscription. If this is unintended, please select the `disable_api_key` checkbox in the conding-agent-configurations settings page."
         );
 
         // Test with managed API key source - should not generate warning
