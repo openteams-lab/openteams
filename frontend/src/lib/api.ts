@@ -5,7 +5,6 @@ import {
   ApiResponse,
   BranchStatus,
   Config,
-  CommitInfo,
   CreateFollowUpAttempt,
   EditorType,
   CreateGitHubPrRequest,
@@ -32,13 +31,10 @@ import {
   UpdateTask,
   UpdateTag,
   UserSystemInfo,
-  UpdateRetryFollowUpDraftRequest,
   McpServerQuery,
   UpdateMcpServersBody,
   GetMcpServerResponse,
   ImageResponse,
-  DraftResponse,
-  UpdateFollowUpDraftRequest,
   GitOperationError,
   ApprovalResponse,
   RebaseTaskAttemptRequest,
@@ -73,13 +69,12 @@ import {
   OpenEditorResponse,
   OpenEditorRequest,
   CreatePrError,
+  Scratch,
+  ScratchType,
+  CreateScratch,
+  UpdateScratch,
   PushError,
-} from 'shared/types';
-
-// Re-export types for convenience
-export type {
-  UpdateFollowUpDraftRequest,
-  UpdateRetryFollowUpDraftRequest,
+  QueueStatus,
 } from 'shared/types';
 
 class ApiError<E = unknown> extends Error {
@@ -465,63 +460,6 @@ export const attemptsApi = {
     return handleApiResponse<RunAgentSetupResponse>(response);
   },
 
-  getDraft: async (
-    attemptId: string,
-    type: 'follow_up' | 'retry'
-  ): Promise<DraftResponse> => {
-    const response = await makeRequest(
-      `/api/task-attempts/${attemptId}/draft?type=${encodeURIComponent(type)}`
-    );
-    return handleApiResponse<DraftResponse>(response);
-  },
-
-  saveDraft: async (
-    attemptId: string,
-    type: 'follow_up' | 'retry',
-    data: UpdateFollowUpDraftRequest | UpdateRetryFollowUpDraftRequest
-  ): Promise<DraftResponse> => {
-    const response = await makeRequest(
-      `/api/task-attempts/${attemptId}/draft?type=${encodeURIComponent(type)}`,
-      {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }
-    );
-    return handleApiResponse<DraftResponse>(response);
-  },
-
-  deleteDraft: async (
-    attemptId: string,
-    type: 'follow_up' | 'retry'
-  ): Promise<void> => {
-    const response = await makeRequest(
-      `/api/task-attempts/${attemptId}/draft?type=${encodeURIComponent(type)}`,
-      { method: 'DELETE' }
-    );
-    return handleApiResponse<void>(response);
-  },
-
-  setDraftQueue: async (
-    attemptId: string,
-    queued: boolean,
-    expectedQueued?: boolean,
-    expectedVersion?: number,
-    type: 'follow_up' | 'retry' = 'follow_up'
-  ): Promise<DraftResponse> => {
-    const response = await makeRequest(
-      `/api/task-attempts/${attemptId}/draft/queue?type=${encodeURIComponent(type)}`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          queued,
-          expected_queued: expectedQueued,
-          expected_version: expectedVersion,
-        }),
-      }
-    );
-    return handleApiResponse<DraftResponse>(response);
-  },
-
   openEditor: async (
     attemptId: string,
     data: OpenEditorRequest
@@ -659,14 +597,6 @@ export const attemptsApi = {
 
 // Extra helpers
 export const commitsApi = {
-  getInfo: async (attemptId: string, sha: string): Promise<CommitInfo> => {
-    const response = await makeRequest(
-      `/api/task-attempts/${attemptId}/commit-info?sha=${encodeURIComponent(
-        sha
-      )}`
-    );
-    return handleApiResponse<CommitInfo>(response);
-  },
   compareToHead: async (
     attemptId: string,
     sha: string
@@ -880,6 +810,38 @@ export const imagesApi = {
     return handleApiResponse<ImageResponse>(response);
   },
 
+  /**
+   * Upload an image for a task attempt and immediately copy it to the container.
+   * Returns the image with a file_path that can be used in markdown.
+   */
+  uploadForAttempt: async (
+    attemptId: string,
+    file: File
+  ): Promise<ImageResponse> => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(
+      `/api/task-attempts/${attemptId}/images/upload`,
+      {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new ApiError(
+        `Failed to upload image: ${errorText}`,
+        response.status,
+        response
+      );
+    }
+
+    return handleApiResponse<ImageResponse>(response);
+  },
+
   delete: async (imageId: string): Promise<void> => {
     const response = await makeRequest(`/api/images/${imageId}`, {
       method: 'DELETE',
@@ -1050,5 +1012,88 @@ export const organizationsApi = {
       method: 'DELETE',
     });
     return handleApiResponse<void>(response);
+  },
+};
+
+// Scratch API
+export const scratchApi = {
+  create: async (
+    scratchType: ScratchType,
+    id: string,
+    data: CreateScratch
+  ): Promise<Scratch> => {
+    const response = await makeRequest(`/api/scratch/${scratchType}/${id}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<Scratch>(response);
+  },
+
+  get: async (scratchType: ScratchType, id: string): Promise<Scratch> => {
+    const response = await makeRequest(`/api/scratch/${scratchType}/${id}`);
+    return handleApiResponse<Scratch>(response);
+  },
+
+  update: async (
+    scratchType: ScratchType,
+    id: string,
+    data: UpdateScratch
+  ): Promise<void> => {
+    const response = await makeRequest(`/api/scratch/${scratchType}/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<void>(response);
+  },
+
+  delete: async (scratchType: ScratchType, id: string): Promise<void> => {
+    const response = await makeRequest(`/api/scratch/${scratchType}/${id}`, {
+      method: 'DELETE',
+    });
+    return handleApiResponse<void>(response);
+  },
+
+  getStreamUrl: (scratchType: ScratchType, id: string): string =>
+    `/api/scratch/${scratchType}/${id}/stream/ws`,
+};
+
+// Queue API for task attempt follow-up messages
+export const queueApi = {
+  /**
+   * Queue a follow-up message to be executed when current execution finishes
+   */
+  queue: async (
+    attemptId: string,
+    data: { message: string; variant: string | null }
+  ): Promise<QueueStatus> => {
+    const response = await makeRequest(
+      `/api/task-attempts/${attemptId}/queue`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<QueueStatus>(response);
+  },
+
+  /**
+   * Cancel a queued follow-up message
+   */
+  cancel: async (attemptId: string): Promise<QueueStatus> => {
+    const response = await makeRequest(
+      `/api/task-attempts/${attemptId}/queue`,
+      {
+        method: 'DELETE',
+      }
+    );
+    return handleApiResponse<QueueStatus>(response);
+  },
+
+  /**
+   * Get the current queue status for a task attempt
+   */
+  getStatus: async (attemptId: string): Promise<QueueStatus> => {
+    const response = await makeRequest(`/api/task-attempts/${attemptId}/queue`);
+    return handleApiResponse<QueueStatus>(response);
   },
 };

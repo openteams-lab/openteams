@@ -1,7 +1,8 @@
 pub mod codex_setup;
 pub mod cursor_setup;
-pub mod drafts;
 pub mod gh_cli_setup;
+pub mod images;
+pub mod queue;
 pub mod util;
 
 use axum::{
@@ -16,10 +17,10 @@ use axum::{
     routing::{get, post},
 };
 use db::models::{
-    draft::{Draft, DraftType},
     execution_process::{ExecutionProcess, ExecutionProcessRunReason, ExecutionProcessStatus},
     merge::{Merge, MergeStatus, PrMerge, PullRequestInfo},
     project::{Project, ProjectError},
+    scratch::{Scratch, ScratchType},
     task::{Task, TaskRelationships, TaskStatus},
     task_attempt::{CreateTaskAttempt, TaskAttempt, TaskAttemptError},
 };
@@ -49,10 +50,7 @@ use crate::{
     DeploymentImpl,
     error::ApiError,
     middleware::load_task_attempt_middleware,
-    routes::task_attempts::{
-        gh_cli_setup::GhCliSetupError,
-        util::{ensure_worktree_path, handle_images_for_prompt},
-    },
+    routes::task_attempts::{gh_cli_setup::GhCliSetupError, util::ensure_worktree_path},
 };
 
 #[derive(Debug, Deserialize, Serialize, TS)]
@@ -215,7 +213,6 @@ pub async fn run_agent_setup(
 pub struct CreateFollowUpAttempt {
     pub prompt: String,
     pub variant: Option<String>,
-    pub image_ids: Option<Vec<Uuid>>,
     pub retry_process_id: Option<Uuid>,
     pub force_when_dirty: Option<bool>,
     pub perform_git_reset: Option<bool>,
@@ -309,9 +306,6 @@ pub async fn follow_up(
 
         // Soft-drop the target process and all later processes
         let _ = ExecutionProcess::drop_at_and_after(pool, task_attempt.id, proc_id).await?;
-
-        // Best-effort: clear any retry draft for this attempt
-        let _ = Draft::clear_after_send(pool, task_attempt.id, DraftType::Retry).await;
     }
 
     let latest_session_id = ExecutionProcess::find_latest_session_id_by_task_attempt(
@@ -320,11 +314,7 @@ pub async fn follow_up(
     )
     .await?;
 
-    let mut prompt = payload.prompt;
-    if let Some(image_ids) = &payload.image_ids {
-        prompt = handle_images_for_prompt(&deployment, &task_attempt, task.id, image_ids, &prompt)
-            .await?;
-    }
+    let prompt = payload.prompt;
 
     let cleanup_action = deployment
         .container()
@@ -356,13 +346,21 @@ pub async fn follow_up(
         )
         .await?;
 
-    // Clear drafts post-send:
-    // - If this was a retry send, the retry draft has already been cleared above.
-    // - Otherwise, clear the follow-up draft to avoid.
-    if payload.retry_process_id.is_none() {
-        let _ =
-            Draft::clear_after_send(&deployment.db().pool, task_attempt.id, DraftType::FollowUp)
-                .await;
+    // Clear the draft follow-up scratch on successful spawn
+    // This ensures the scratch is wiped even if the user navigates away quickly
+    if let Err(e) = Scratch::delete(
+        &deployment.db().pool,
+        task_attempt.id,
+        &ScratchType::DraftFollowUp,
+    )
+    .await
+    {
+        // Log but don't fail the request - scratch deletion is best-effort
+        tracing::debug!(
+            "Failed to delete draft follow-up scratch for attempt {}: {}",
+            task_attempt.id,
+            e
+        );
     }
 
     Ok(ResponseJson(ApiResponse::success(execution_process)))
@@ -432,32 +430,8 @@ async fn handle_task_attempt_diff_ws(
 }
 
 #[derive(Debug, Serialize, TS)]
-pub struct CommitInfo {
-    pub sha: String,
-    pub subject: String,
-}
-
-pub async fn get_commit_info(
-    Extension(task_attempt): Extension<TaskAttempt>,
-    State(deployment): State<DeploymentImpl>,
-    Query(params): Query<std::collections::HashMap<String, String>>,
-) -> Result<ResponseJson<ApiResponse<CommitInfo>>, ApiError> {
-    let Some(sha) = params.get("sha").cloned() else {
-        return Err(ApiError::TaskAttempt(TaskAttemptError::ValidationError(
-            "Missing sha param".to_string(),
-        )));
-    };
-    let wt_buf = ensure_worktree_path(&deployment, &task_attempt).await?;
-    let wt = wt_buf.as_path();
-    let subject = deployment.git().get_commit_subject(wt, &sha)?;
-    Ok(ResponseJson(ApiResponse::success(CommitInfo {
-        sha,
-        subject,
-    })))
-}
-
-#[derive(Debug, Serialize, TS)]
 pub struct CommitCompareResult {
+    pub subject: String,
     pub head_oid: String,
     pub target_oid: String,
     pub ahead_from_head: usize,
@@ -477,6 +451,7 @@ pub async fn compare_commit_to_head(
     };
     let wt_buf = ensure_worktree_path(&deployment, &task_attempt).await?;
     let wt = wt_buf.as_path();
+    let subject = deployment.git().get_commit_subject(wt, &target_oid)?;
     let head_info = deployment.git().get_head_info(wt)?;
     let (ahead_from_head, behind_from_head) =
         deployment
@@ -484,6 +459,7 @@ pub async fn compare_commit_to_head(
             .ahead_behind_commits_by_oid(wt, &head_info.oid, &target_oid)?;
     let is_linear = behind_from_head == 0;
     Ok(ResponseJson(ApiResponse::success(CommitCompareResult {
+        subject,
         head_oid: head_info.oid,
         target_oid,
         ahead_from_head,
@@ -1574,14 +1550,6 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route("/follow-up", post(follow_up))
         .route("/run-agent-setup", post(run_agent_setup))
         .route("/gh-cli-setup", post(gh_cli_setup_handler))
-        .route(
-            "/draft",
-            get(drafts::get_draft)
-                .put(drafts::save_draft)
-                .delete(drafts::delete_draft),
-        )
-        .route("/draft/queue", post(drafts::set_draft_queue))
-        .route("/commit-info", get(get_commit_info))
         .route("/commit-compare", get(compare_commit_to_head))
         .route("/start-dev-server", post(start_dev_server))
         .route("/branch-status", get(get_task_attempt_branch_status))
@@ -1605,7 +1573,9 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
 
     let task_attempts_router = Router::new()
         .route("/", get(get_task_attempts).post(create_task_attempt))
-        .nest("/{id}", task_attempt_id_router);
+        .nest("/{id}", task_attempt_id_router)
+        .nest("/{id}/images", images::router(deployment))
+        .nest("/{id}/queue", queue::router(deployment));
 
     Router::new().nest("/task-attempts", task_attempts_router)
 }
