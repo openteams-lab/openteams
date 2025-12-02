@@ -20,7 +20,6 @@ use services::services::{
     auth::AuthContext,
     config::{Config, ConfigError},
     container::{ContainerError, ContainerService},
-    drafts::DraftsService,
     events::{EventError, EventService},
     file_search_cache::FileSearchCache,
     filesystem::{FilesystemError, FilesystemService},
@@ -28,6 +27,7 @@ use services::services::{
     git::{GitService, GitServiceError},
     image::{ImageError, ImageService},
     pr_monitor::PrMonitorService,
+    queued_message::QueuedMessageService,
     share::{RemoteSync, RemoteSyncHandle, ShareConfig, SharePublisher},
     worktree_manager::WorktreeError,
 };
@@ -100,7 +100,7 @@ pub trait Deployment: Clone + Send + Sync + 'static {
 
     fn approvals(&self) -> &Approvals;
 
-    fn drafts(&self) -> &DraftsService;
+    fn queued_message_service(&self) -> &QueuedMessageService;
 
     fn auth_context(&self) -> &AuthContext;
 
