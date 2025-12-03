@@ -26,7 +26,6 @@ import {
   Tag,
   TagSearchParams,
   TaskWithAttemptStatus,
-  AssignSharedTaskResponse,
   UpdateProject,
   UpdateTask,
   UpdateTag,
@@ -74,10 +73,14 @@ import {
   CreateScratch,
   UpdateScratch,
   PushError,
+  TokenResponse,
+  CurrentUserResponse,
+  SharedTaskResponse,
+  SharedTaskDetails,
   QueueStatus,
 } from 'shared/types';
 
-class ApiError<E = unknown> extends Error {
+export class ApiError<E = unknown> extends Error {
   public status?: number;
   public error_data?: E;
 
@@ -149,7 +152,9 @@ const handleApiResponseAsResult = async <T, E>(
   return { success: true, data: result.data as T };
 };
 
-const handleApiResponse = async <T, E = T>(response: Response): Promise<T> => {
+export const handleApiResponse = async <T, E = T>(
+  response: Response
+): Promise<T> => {
   if (!response.ok) {
     let errorMessage = `Request failed with status ${response.status}`;
 
@@ -372,11 +377,10 @@ export const tasksApi = {
 
   reassign: async (
     sharedTaskId: string,
-    data: { new_assignee_user_id: string | null; version?: number | null }
-  ): Promise<AssignSharedTaskResponse> => {
+    data: { new_assignee_user_id: string | null }
+  ): Promise<SharedTaskResponse> => {
     const payload = {
       new_assignee_user_id: data.new_assignee_user_id,
-      version: data.version ?? null,
     };
 
     const response = await makeRequest(
@@ -387,7 +391,7 @@ export const tasksApi = {
       }
     );
 
-    return handleApiResponse<AssignSharedTaskResponse>(response);
+    return handleApiResponse<SharedTaskResponse>(response);
   },
 
   unshare: async (sharedTaskId: string): Promise<void> => {
@@ -395,6 +399,14 @@ export const tasksApi = {
       method: 'DELETE',
     });
     return handleApiResponse<void>(response);
+  },
+
+  linkToLocal: async (data: SharedTaskDetails): Promise<Task | null> => {
+    const response = await makeRequest(`/api/shared-tasks/link-to-local`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<Task | null>(response);
   },
 };
 
@@ -650,7 +662,7 @@ export const fileSystemApi = {
 // Config APIs (backwards compatible)
 export const configApi = {
   getConfig: async (): Promise<UserSystemInfo> => {
-    const response = await makeRequest('/api/info');
+    const response = await makeRequest('/api/info', { cache: 'no-store' });
     return handleApiResponse<UserSystemInfo>(response);
   },
   saveConfig: async (config: Config): Promise<Config> => {
@@ -893,7 +905,9 @@ export const oauthApi = {
   },
 
   status: async (): Promise<StatusResponse> => {
-    const response = await makeRequest('/api/auth/status');
+    const response = await makeRequest('/api/auth/status', {
+      cache: 'no-store',
+    });
     return handleApiResponse<StatusResponse>(response);
   },
 
@@ -908,6 +922,19 @@ export const oauthApi = {
         response
       );
     }
+  },
+
+  /** Returns the current access token for the remote server (auto-refreshes if needed) */
+  getToken: async (): Promise<TokenResponse | null> => {
+    const response = await makeRequest('/api/auth/token');
+    if (!response.ok) return null;
+    return handleApiResponse<TokenResponse>(response);
+  },
+
+  /** Returns the user ID of the currently authenticated user */
+  getCurrentUser: async (): Promise<CurrentUserResponse> => {
+    const response = await makeRequest('/api/auth/user');
+    return handleApiResponse<CurrentUserResponse>(response);
   },
 };
 

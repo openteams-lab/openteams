@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE shared_tasks AS t\n        SET title       = COALESCE($2, t.title),\n            description = COALESCE($3, t.description),\n            status      = COALESCE($4, t.status),\n            version     = t.version + 1,\n            updated_at  = NOW()\n        WHERE t.id = $1\n          AND t.version = COALESCE($5, t.version)\n          AND t.assignee_user_id = $6\n          AND t.deleted_at IS NULL\n        RETURNING\n            t.id                AS \"id!\",\n            t.organization_id   AS \"organization_id!: Uuid\",\n            t.project_id        AS \"project_id!\",\n            t.creator_user_id   AS \"creator_user_id?: Uuid\",\n            t.assignee_user_id  AS \"assignee_user_id?: Uuid\",\n            t.deleted_by_user_id AS \"deleted_by_user_id?: Uuid\",\n            t.title             AS \"title!\",\n            t.description       AS \"description?\",\n            t.status            AS \"status!: TaskStatus\",\n            t.version           AS \"version!\",\n            t.deleted_at        AS \"deleted_at?\",\n            t.shared_at         AS \"shared_at?\",\n            t.created_at        AS \"created_at!\",\n            t.updated_at        AS \"updated_at!\"\n        ",
+  "query": "\n        UPDATE shared_tasks AS t\n        SET title       = COALESCE($2, t.title),\n            description = COALESCE($3, t.description),\n            status      = COALESCE($4, t.status),\n            updated_at  = NOW()\n        WHERE t.id = $1\n          AND t.assignee_user_id = $5\n          AND t.deleted_at IS NULL\n        RETURNING\n            t.id                AS \"id!\",\n            t.organization_id   AS \"organization_id!: Uuid\",\n            t.project_id        AS \"project_id!\",\n            t.creator_user_id   AS \"creator_user_id?: Uuid\",\n            t.assignee_user_id  AS \"assignee_user_id?: Uuid\",\n            t.deleted_by_user_id AS \"deleted_by_user_id?: Uuid\",\n            t.title             AS \"title!\",\n            t.description       AS \"description?\",\n            t.status            AS \"status!: TaskStatus\",\n            t.deleted_at        AS \"deleted_at?\",\n            t.shared_at         AS \"shared_at?\",\n            t.created_at        AS \"created_at!\",\n            t.updated_at        AS \"updated_at!\"\n        ",
   "describe": {
     "columns": [
       {
@@ -52,8 +52,8 @@
             "kind": {
               "Enum": [
                 "todo",
-                "in-progress",
-                "in-review",
+                "inprogress",
+                "inreview",
                 "done",
                 "cancelled"
               ]
@@ -63,26 +63,21 @@
       },
       {
         "ordinal": 9,
-        "name": "version!",
-        "type_info": "Int8"
-      },
-      {
-        "ordinal": 10,
         "name": "deleted_at?",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 11,
+        "ordinal": 10,
         "name": "shared_at?",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 12,
+        "ordinal": 11,
         "name": "created_at!",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 13,
+        "ordinal": 12,
         "name": "updated_at!",
         "type_info": "Timestamptz"
       }
@@ -98,15 +93,14 @@
             "kind": {
               "Enum": [
                 "todo",
-                "in-progress",
-                "in-review",
+                "inprogress",
+                "inreview",
                 "done",
                 "cancelled"
               ]
             }
           }
         },
-        "Int8",
         "Uuid"
       ]
     },
@@ -120,12 +114,11 @@
       false,
       true,
       false,
-      false,
       true,
       true,
       false,
       false
     ]
   },
-  "hash": "1d691b943af2d90feaace911403fbb158839b4359f91fd5c05166ecee82b13a8"
+  "hash": "338507619ddbadce5d40bc58a7d9eb95bbeee3ade4d5abb9140aefe5673ea071"
 }

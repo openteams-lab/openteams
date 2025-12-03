@@ -3,7 +3,6 @@ use std::sync::Arc;
 use sqlx::PgPool;
 
 use crate::{
-    activity::ActivityBroker,
     auth::{JwtService, OAuthHandoffService, OAuthTokenValidator, ProviderRegistry},
     config::RemoteServerConfig,
     mail::Mailer,
@@ -12,34 +11,34 @@ use crate::{
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
-    pub broker: ActivityBroker,
     pub config: RemoteServerConfig,
     pub jwt: Arc<JwtService>,
     pub mailer: Arc<dyn Mailer>,
     pub server_public_base_url: String,
-    pub handoff: Arc<OAuthHandoffService>,
-    pub oauth_token_validator: Arc<OAuthTokenValidator>,
+    pub http_client: reqwest::Client,
+    handoff: Arc<OAuthHandoffService>,
+    oauth_token_validator: Arc<OAuthTokenValidator>,
 }
 
 impl AppState {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         pool: PgPool,
-        broker: ActivityBroker,
         config: RemoteServerConfig,
         jwt: Arc<JwtService>,
         handoff: Arc<OAuthHandoffService>,
         oauth_token_validator: Arc<OAuthTokenValidator>,
         mailer: Arc<dyn Mailer>,
         server_public_base_url: String,
+        http_client: reqwest::Client,
     ) -> Self {
         Self {
             pool,
-            broker,
             config,
             jwt,
             mailer,
             server_public_base_url,
+            http_client,
             handoff,
             oauth_token_validator,
         }
@@ -47,10 +46,6 @@ impl AppState {
 
     pub fn pool(&self) -> &PgPool {
         &self.pool
-    }
-
-    pub fn broker(&self) -> &ActivityBroker {
-        &self.broker
     }
 
     pub fn config(&self) -> &RemoteServerConfig {
