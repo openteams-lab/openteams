@@ -554,6 +554,8 @@ pub enum CursorJson {
         duration_ms: Option<u64>,
         #[serde(default)]
         result: Option<serde_json::Value>,
+        #[serde(default)]
+        session_id: Option<String>,
     },
     #[serde(other)]
     Unknown,
@@ -562,12 +564,12 @@ pub enum CursorJson {
 impl CursorJson {
     pub fn extract_session_id(&self) -> Option<String> {
         match self {
-            CursorJson::System { session_id, .. } => session_id.clone(),
+            CursorJson::System { .. } => None, // session might not have been initialized yet
             CursorJson::User { session_id, .. } => session_id.clone(),
             CursorJson::Assistant { session_id, .. } => session_id.clone(),
             CursorJson::Thinking { session_id, .. } => session_id.clone(),
             CursorJson::ToolCall { session_id, .. } => session_id.clone(),
-            CursorJson::Result { .. } => None,
+            CursorJson::Result { session_id, .. } => session_id.clone(),
             CursorJson::Unknown => None,
         }
     }
@@ -1240,10 +1242,10 @@ mod tests {
 
     #[test]
     fn test_session_id_extraction_from_system_line() {
-        // Ensure we can parse and find session_id from a system JSON line
+        // System messages no longer extract session_id
         let system_line = r#"{"type":"system","subtype":"init","session_id":"abc-xyz","model":"Claude 4 Sonnet"}"#;
         let parsed: CursorJson = serde_json::from_str(system_line).unwrap();
-        assert_eq!(parsed.extract_session_id().as_deref(), Some("abc-xyz"));
+        assert_eq!(parsed.extract_session_id().as_deref(), None);
     }
 
     #[test]

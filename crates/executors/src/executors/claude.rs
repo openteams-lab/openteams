@@ -429,13 +429,13 @@ impl ClaudeLogProcessor {
     /// Extract session ID from Claude JSON
     fn extract_session_id(claude_json: &ClaudeJson) -> Option<String> {
         match claude_json {
-            ClaudeJson::System { session_id, .. } => session_id.clone(),
+            ClaudeJson::System { .. } => None, // session might not have been initialized yet
             ClaudeJson::Assistant { session_id, .. } => session_id.clone(),
             ClaudeJson::User { session_id, .. } => session_id.clone(),
             ClaudeJson::ToolUse { session_id, .. } => session_id.clone(),
             ClaudeJson::ToolResult { session_id, .. } => session_id.clone(),
-            ClaudeJson::StreamEvent { session_id, .. } => session_id.clone(),
             ClaudeJson::Result { session_id, .. } => session_id.clone(),
+            ClaudeJson::StreamEvent { .. } => None, // session might not have been initialized yet
             ClaudeJson::ApprovalResponse { .. } => None,
             ClaudeJson::Unknown { .. } => None,
         }
@@ -1832,10 +1832,8 @@ mod tests {
             r#"{"type":"system","subtype":"init","session_id":"abc123","model":"claude-sonnet-4"}"#;
         let parsed: ClaudeJson = serde_json::from_str(system_json).unwrap();
 
-        assert_eq!(
-            ClaudeLogProcessor::extract_session_id(&parsed),
-            Some("abc123".to_string())
-        );
+        // System messages no longer extract session_id
+        assert_eq!(ClaudeLogProcessor::extract_session_id(&parsed), None);
 
         let entries = normalize(&parsed, "");
         assert_eq!(entries.len(), 0);
@@ -2030,10 +2028,8 @@ mod tests {
         let system_json = r#"{"type":"system","session_id":"test-session-123"}"#;
         let parsed: ClaudeJson = serde_json::from_str(system_json).unwrap();
 
-        assert_eq!(
-            ClaudeLogProcessor::extract_session_id(&parsed),
-            Some("test-session-123".to_string())
-        );
+        // System messages no longer extract session_id
+        assert_eq!(ClaudeLogProcessor::extract_session_id(&parsed), None);
 
         let tool_use_json =
             r#"{"type":"tool_use","tool_name":"read","input":{},"session_id":"another-session"}"#;
