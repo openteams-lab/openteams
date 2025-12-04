@@ -252,13 +252,17 @@ impl ClaudeCode {
         let permission_mode = self.permission_mode();
         let hooks = self.get_hooks();
 
+        // Create interrupt channel for graceful shutdown
+        let (interrupt_tx, interrupt_rx) = tokio::sync::oneshot::channel::<()>();
+
         // Spawn task to handle the SDK client with control protocol
         let prompt_clone = combined_prompt.clone();
         let approvals_clone = self.approvals_service.clone();
         tokio::spawn(async move {
             let log_writer = LogWriter::new(new_stdout);
             let client = ClaudeAgentClient::new(log_writer.clone(), approvals_clone);
-            let protocol_peer = ProtocolPeer::spawn(child_stdin, child_stdout, client.clone());
+            let protocol_peer =
+                ProtocolPeer::spawn(child_stdin, child_stdout, client.clone(), interrupt_rx);
 
             // Initialize control protocol
             if let Err(e) = protocol_peer.initialize(hooks).await {
@@ -285,6 +289,7 @@ impl ClaudeCode {
         Ok(SpawnedChild {
             child,
             exit_signal: None,
+            interrupt_sender: Some(interrupt_tx),
         })
     }
 }
