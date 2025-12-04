@@ -6,9 +6,22 @@ import {
   Clock,
   X,
   Paperclip,
+  Terminal,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 //
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ScratchType, type TaskWithAttemptStatus } from 'shared/types';
@@ -42,7 +55,7 @@ import { useTranslation } from 'react-i18next';
 import { useScratch } from '@/hooks/useScratch';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { useQueueStatus } from '@/hooks/useQueueStatus';
-import { imagesApi } from '@/lib/api';
+import { imagesApi, attemptsApi } from '@/lib/api';
 
 interface TaskFollowUpSectionProps {
   task: TaskWithAttemptStatus;
@@ -54,7 +67,7 @@ export function TaskFollowUpSection({
   selectedAttemptId,
 }: TaskFollowUpSectionProps) {
   const { t } = useTranslation('tasks');
-  const { projectId } = useProject();
+  const { projectId, project } = useProject();
 
   const { isAttemptRunning, stopExecution, isStopping, processes } =
     useAttemptExecution(selectedAttemptId, task.id);
@@ -351,6 +364,29 @@ export function TaskFollowUpSection({
     localMessage,
   ]);
   const isEditable = !isRetryActive && !hasPendingApproval;
+
+  // Script availability
+  const hasSetupScript = Boolean(project?.setup_script);
+  const hasCleanupScript = Boolean(project?.cleanup_script);
+  const hasAnyScript = hasSetupScript || hasCleanupScript;
+
+  const handleRunSetupScript = useCallback(async () => {
+    if (!selectedAttemptId || isAttemptRunning || !hasSetupScript) return;
+    try {
+      await attemptsApi.runSetupScript(selectedAttemptId);
+    } catch (error) {
+      console.error('Failed to run setup script:', error);
+    }
+  }, [selectedAttemptId, isAttemptRunning, hasSetupScript]);
+
+  const handleRunCleanupScript = useCallback(async () => {
+    if (!selectedAttemptId || isAttemptRunning || !hasCleanupScript) return;
+    try {
+      await attemptsApi.runCleanupScript(selectedAttemptId);
+    } catch (error) {
+      console.error('Failed to run cleanup script:', error);
+    }
+  }, [selectedAttemptId, isAttemptRunning, hasCleanupScript]);
 
   // Handler to queue the current message for execution after agent finishes
   const handleQueueMessage = useCallback(async () => {
@@ -684,6 +720,73 @@ export function TaskFollowUpSection({
           >
             <Paperclip className="h-4 w-4" />
           </Button>
+
+          {/* Scripts dropdown - only show if project has any scripts */}
+          {hasAnyScript && (
+            <DropdownMenu>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isAttemptRunning}
+                        aria-label="Run scripts"
+                      >
+                        <Terminal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  {isAttemptRunning && (
+                    <TooltipContent side="bottom">
+                      {t('followUp.scriptsDisabledWhileRunning')}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+              <DropdownMenuContent align="end">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <DropdownMenuItem
+                          disabled={!hasSetupScript}
+                          onClick={handleRunSetupScript}
+                        >
+                          {t('followUp.runSetupScript')}
+                        </DropdownMenuItem>
+                      </span>
+                    </TooltipTrigger>
+                    {!hasSetupScript && (
+                      <TooltipContent side="left">
+                        {t('followUp.noSetupScript')}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <DropdownMenuItem
+                          disabled={!hasCleanupScript}
+                          onClick={handleRunCleanupScript}
+                        >
+                          {t('followUp.runCleanupScript')}
+                        </DropdownMenuItem>
+                      </span>
+                    </TooltipTrigger>
+                    {!hasCleanupScript && (
+                      <TooltipContent side="left">
+                        {t('followUp.noCleanupScript')}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {isAttemptRunning ? (
             <div className="flex items-center gap-2">
