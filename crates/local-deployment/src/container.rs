@@ -64,7 +64,7 @@ use utils::{
 };
 use uuid::Uuid;
 
-use crate::command;
+use crate::{command, copy};
 
 #[derive(Clone)]
 pub struct LocalContainerService {
@@ -1196,40 +1196,19 @@ impl ContainerService for LocalContainerService {
         target_dir: &Path,
         copy_files: &str,
     ) -> Result<(), ContainerError> {
-        let files: Vec<&str> = copy_files
-            .split(',')
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .collect();
+        let source_dir = source_dir.to_path_buf();
+        let target_dir = target_dir.to_path_buf();
+        let copy_files = copy_files.to_string();
 
-        for file_path in files {
-            let source_file = source_dir.join(file_path);
-            let target_file = target_dir.join(file_path);
-
-            // Create parent directories if needed
-            if let Some(parent) = target_file.parent()
-                && !parent.exists()
-            {
-                std::fs::create_dir_all(parent).map_err(|e| {
-                    ContainerError::Other(anyhow!("Failed to create directory {parent:?}: {e}"))
-                })?;
-            }
-
-            // Copy the file
-            if source_file.exists() {
-                std::fs::copy(&source_file, &target_file).map_err(|e| {
-                    ContainerError::Other(anyhow!(
-                        "Failed to copy file {source_file:?} to {target_file:?}: {e}"
-                    ))
-                })?;
-                tracing::info!("Copied file {:?} to worktree", file_path);
-            } else {
-                return Err(ContainerError::Other(anyhow!(
-                    "File {source_file:?} does not exist in the project directory"
-                )));
-            }
-        }
-        Ok(())
+        tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            tokio::task::spawn_blocking(move || {
+                copy::copy_project_files_impl(&source_dir, &target_dir, &copy_files)
+            }),
+        )
+        .await
+        .map_err(|_| ContainerError::Other(anyhow!("Copy project files timed out after 30s")))?
+        .map_err(|e| ContainerError::Other(anyhow!("Copy files task failed: {e}")))?
     }
 
     async fn kill_all_running_processes(&self) -> Result<(), ContainerError> {
@@ -1252,7 +1231,6 @@ impl ContainerService for LocalContainerService {
         Ok(())
     }
 }
-
 fn success_exit_status() -> std::process::ExitStatus {
     #[cfg(unix)]
     {
