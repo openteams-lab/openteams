@@ -25,12 +25,10 @@ const TaskAttemptPanel = ({
   }
 
   return (
-    <EntriesProvider key={attempt.id}>
+    <EntriesProvider>
       <RetryUiProvider attemptId={attempt.id}>
         {children({
-          logs: (
-            <VirtualizedList key={attempt.id} attempt={attempt} task={task} />
-          ),
+          logs: <VirtualizedList attempt={attempt} task={task} />,
           followUp: (
             <TaskFollowUpSection task={task} selectedAttemptId={attempt.id} />
           ),
