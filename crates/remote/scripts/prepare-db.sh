@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Create a temporary data directory
+CHECK_MODE="${1:-}"
+
+# For --check mode, run offline without database (just verify .sqlx cache)
+if [ "$CHECK_MODE" = "--check" ]; then
+  echo "➤ Checking SQLx data (offline mode)..."
+  SQLX_OFFLINE=true cargo sqlx prepare --check
+  echo "✅ sqlx check complete"
+  exit 0
+fi
+
+# For prepare mode, need a running PostgreSQL instance
 DATA_DIR="$(mktemp -d /tmp/sqlxpg.XXXXXX)"
 PORT=54329
 
@@ -34,9 +44,9 @@ pg_ctl -D "$DATA_DIR" -m fast -w stop > /dev/null
 echo "➤ Cleaning up..."
 rm -rf "$DATA_DIR"
 
-echo "✅ sqlx prepare complete using a temporary Postgres instance"
-
 echo "Killing existing Postgres instance on port $PORT"
 pids=$(lsof -t -i :"$PORT" 2>/dev/null || true)
 [ -n "$pids" ] && kill $pids 2>/dev/null || true
 sleep 1
+
+echo "✅ sqlx prepare complete"
