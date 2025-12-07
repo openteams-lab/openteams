@@ -18,7 +18,7 @@ use workspace_utils::stream_lines::LinesStreamExt;
 
 use super::{AcpClient, SessionManager};
 use crate::{
-    command::CommandParts,
+    command::{CmdOverrides, CommandParts},
     env::ExecutionEnv,
     executors::{ExecutorError, ExecutorExitResult, SpawnedChild, acp::AcpEvent},
 };
@@ -56,6 +56,7 @@ impl AcpAgentHarness {
         prompt: String,
         command_parts: CommandParts,
         env: &ExecutionEnv,
+        cmd_overrides: &CmdOverrides,
     ) -> Result<SpawnedChild, ExecutorError> {
         let (program_path, args) = command_parts.into_resolved().await?;
         let mut command = Command::new(program_path);
@@ -68,8 +69,9 @@ impl AcpAgentHarness {
             .args(&args)
             .env("NODE_NO_WARNINGS", "1");
 
-        // Apply environment variables
-        env.apply_to_command(&mut command);
+        env.clone()
+            .with_profile(cmd_overrides)
+            .apply_to_command(&mut command);
 
         let mut child = command.group_spawn()?;
 
@@ -98,6 +100,7 @@ impl AcpAgentHarness {
         session_id: &str,
         command_parts: CommandParts,
         env: &ExecutionEnv,
+        cmd_overrides: &CmdOverrides,
     ) -> Result<SpawnedChild, ExecutorError> {
         let (program_path, args) = command_parts.into_resolved().await?;
         let mut command = Command::new(program_path);
@@ -110,8 +113,9 @@ impl AcpAgentHarness {
             .args(&args)
             .env("NODE_NO_WARNINGS", "1");
 
-        // Apply environment variables
-        env.apply_to_command(&mut command);
+        env.clone()
+            .with_profile(cmd_overrides)
+            .apply_to_command(&mut command);
 
         let mut child = command.group_spawn()?;
 
