@@ -123,14 +123,29 @@ pub trait ContainerService {
     /// A context is finalized when
     /// - Always when the execution process has failed or been killed
     /// - Never when the run reason is DevServer
+    /// - Never when a setup script has no next_action (parallel mode)
     /// - The next action is None (no follow-up actions)
     fn should_finalize(&self, ctx: &ExecutionContext) -> bool {
+        // Never finalize DevServer processes
         if matches!(
             ctx.execution_process.run_reason,
             ExecutionProcessRunReason::DevServer
         ) {
             return false;
         }
+
+        // Never finalize setup scripts without a next_action (parallel mode).
+        // In sequential mode, setup scripts have next_action pointing to coding agent,
+        // so they won't finalize anyway (handled by next_action.is_none() check below).
+        let action = ctx.execution_process.executor_action().unwrap();
+        if matches!(
+            ctx.execution_process.run_reason,
+            ExecutionProcessRunReason::SetupScript
+        ) && action.next_action.is_none()
+        {
+            return false;
+        }
+
         // Always finalize failed or killed executions, regardless of next action
         if matches!(
             ctx.execution_process.status,
@@ -138,12 +153,9 @@ pub trait ContainerService {
         ) {
             return true;
         }
+
         // Otherwise, finalize only if no next action
-        ctx.execution_process
-            .executor_action()
-            .unwrap()
-            .next_action
-            .is_none()
+        action.next_action.is_none()
     }
 
     /// Finalize task execution by updating status to InReview and sending notifications
@@ -670,32 +682,74 @@ pub trait ContainerService {
 
         let prompt = task.to_prompt();
 
-        let cleanup_action = self.cleanup_action(project.cleanup_script);
+        let cleanup_action = self.cleanup_action(project.cleanup_script.clone());
 
         // Choose whether to execute the setup_script or coding agent first
         let execution_process = if let Some(setup_script) = project.setup_script {
-            let executor_action = ExecutorAction::new(
-                ExecutorActionType::ScriptRequest(ScriptRequest {
-                    script: setup_script,
-                    language: ScriptRequestLanguage::Bash,
-                    context: ScriptContext::SetupScript,
-                }),
-                // once the setup script is done, run the initial coding agent request
-                Some(Box::new(ExecutorAction::new(
+            if project.parallel_setup_script {
+                // PARALLEL EXECUTION: Start setup script and coding agent independently
+                // Setup script runs without next_action (it completes on its own)
+                let setup_action = ExecutorAction::new(
+                    ExecutorActionType::ScriptRequest(ScriptRequest {
+                        script: setup_script,
+                        language: ScriptRequestLanguage::Bash,
+                        context: ScriptContext::SetupScript,
+                    }),
+                    None, // No chaining - runs independently
+                );
+
+                // Start setup script (ignore errors - coding agent will start regardless)
+                if let Err(e) = self
+                    .start_execution(
+                        &task_attempt,
+                        &setup_action,
+                        &ExecutionProcessRunReason::SetupScript,
+                    )
+                    .await
+                {
+                    tracing::warn!(?e, "Failed to start setup script in parallel mode");
+                }
+
+                // Start coding agent independently with cleanup as next_action
+                let coding_action = ExecutorAction::new(
                     ExecutorActionType::CodingAgentInitialRequest(CodingAgentInitialRequest {
                         prompt,
                         executor_profile_id: executor_profile_id.clone(),
                     }),
                     cleanup_action,
-                ))),
-            );
+                );
 
-            self.start_execution(
-                &task_attempt,
-                &executor_action,
-                &ExecutionProcessRunReason::SetupScript,
-            )
-            .await?
+                self.start_execution(
+                    &task_attempt,
+                    &coding_action,
+                    &ExecutionProcessRunReason::CodingAgent,
+                )
+                .await?
+            } else {
+                // SEQUENTIAL EXECUTION: Setup script runs first, then coding agent
+                let executor_action = ExecutorAction::new(
+                    ExecutorActionType::ScriptRequest(ScriptRequest {
+                        script: setup_script,
+                        language: ScriptRequestLanguage::Bash,
+                        context: ScriptContext::SetupScript,
+                    }),
+                    // once the setup script is done, run the initial coding agent request
+                    Some(Box::new(ExecutorAction::new(
+                        ExecutorActionType::CodingAgentInitialRequest(CodingAgentInitialRequest {
+                            prompt,
+                            executor_profile_id: executor_profile_id.clone(),
+                        }),
+                        cleanup_action,
+                    ))),
+                );
+
+                self.start_execution(
+                    &task_attempt,
+                    &executor_action,
+                    &ExecutionProcessRunReason::SetupScript,
+                )
+                .await?
+            }
         } else {
             let executor_action = ExecutorAction::new(
                 ExecutorActionType::CodingAgentInitialRequest(CodingAgentInitialRequest {
