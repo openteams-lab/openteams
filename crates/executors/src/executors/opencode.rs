@@ -154,8 +154,9 @@ impl StandardCodingAgentExecutor for Opencode {
             .env("OPENCODE_AUTO_SHARE", "1")
             .env("OPENCODE_API", bridge.base_url.clone());
 
-        // Apply environment variables
-        env.apply_to_command(&mut command);
+        env.clone()
+            .with_profile(&self.cmd)
+            .apply_to_command(&mut command);
 
         let mut child = match command.group_spawn() {
             Ok(c) => c,
@@ -224,8 +225,9 @@ impl StandardCodingAgentExecutor for Opencode {
             .env("OPENCODE_AUTO_SHARE", "1")
             .env("OPENCODE_API", bridge.base_url.clone());
 
-        // Apply environment variables
-        env.apply_to_command(&mut command);
+        env.clone()
+            .with_profile(&self.cmd)
+            .apply_to_command(&mut command);
 
         let mut child = match command.group_spawn() {
             Ok(c) => c,

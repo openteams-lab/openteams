@@ -65,8 +65,9 @@ impl StandardCodingAgentExecutor for Amp {
             .current_dir(current_dir)
             .args(&args);
 
-        // Apply environment variables
-        env.apply_to_command(&mut command);
+        env.clone()
+            .with_profile(&self.cmd)
+            .apply_to_command(&mut command);
 
         let mut child = command.group_spawn()?;
 
@@ -137,8 +138,9 @@ impl StandardCodingAgentExecutor for Amp {
             .current_dir(current_dir)
             .args(&continue_args);
 
-        // Apply environment variables
-        env.apply_to_command(&mut command);
+        env.clone()
+            .with_profile(&self.cmd)
+            .apply_to_command(&mut command);
 
         let mut child = command.group_spawn()?;
 
