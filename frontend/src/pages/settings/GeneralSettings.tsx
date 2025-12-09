@@ -21,7 +21,13 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Volume2 } from 'lucide-react';
-import { EditorType, SoundFile, ThemeMode, UiLanguage } from 'shared/types';
+import {
+  DEFAULT_PR_DESCRIPTION_PROMPT,
+  EditorType,
+  SoundFile,
+  ThemeMode,
+  UiLanguage,
+} from 'shared/types';
 import { getLanguageOptions } from '@/i18n/languages';
 
 import { toPrettyCase } from '@/utils/string';
@@ -453,6 +459,75 @@ export function GeneralSettings() {
                   </code>
                 </>
               )}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.general.pullRequests.title')}</CardTitle>
+          <CardDescription>
+            {t('settings.general.pullRequests.description')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="pr-auto-description"
+              checked={draft?.pr_auto_description_enabled ?? false}
+              onCheckedChange={(checked: boolean) =>
+                updateDraft({ pr_auto_description_enabled: checked })
+              }
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="pr-auto-description" className="cursor-pointer">
+                {t('settings.general.pullRequests.autoDescription.label')}
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.general.pullRequests.autoDescription.helper')}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="use-custom-prompt"
+              checked={draft?.pr_auto_description_prompt != null}
+              onCheckedChange={(checked: boolean) => {
+                if (checked) {
+                  updateDraft({
+                    pr_auto_description_prompt: DEFAULT_PR_DESCRIPTION_PROMPT,
+                  });
+                } else {
+                  updateDraft({ pr_auto_description_prompt: null });
+                }
+              }}
+            />
+            <Label htmlFor="use-custom-prompt" className="cursor-pointer">
+              {t('settings.general.pullRequests.customPrompt.useCustom')}
+            </Label>
+          </div>
+          <div className="space-y-2">
+            <textarea
+              id="pr-custom-prompt"
+              className={`flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                draft?.pr_auto_description_prompt == null
+                  ? 'opacity-50 cursor-not-allowed'
+                  : ''
+              }`}
+              value={
+                draft?.pr_auto_description_prompt ??
+                DEFAULT_PR_DESCRIPTION_PROMPT
+              }
+              disabled={draft?.pr_auto_description_prompt == null}
+              onChange={(e) =>
+                updateDraft({
+                  pr_auto_description_prompt: e.target.value,
+                })
+              }
+            />
+            <p className="text-sm text-muted-foreground">
+              {t('settings.general.pullRequests.customPrompt.helper')}
             </p>
           </div>
         </CardContent>

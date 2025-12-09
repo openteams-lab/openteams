@@ -135,6 +135,18 @@
           }
         }
       },
+      "pullRequests": {
+        "title": "プルリクエスト",
+        "description": "PR作成の動作を設定",
+        "autoDescription": {
+          "label": "デフォルトでPR説明を自動生成",
+          "helper": "有効にすると、AIエージェントがPR作成後に自動的にタイトルと説明を更新します。"
+        },
+        "customPrompt": {
+          "useCustom": "カスタムプロンプトを使用",
+          "helper": "PR説明生成時のAIエージェント用カスタムプロンプト。{pr_number}と{pr_url}をプレースホルダーとして使用できます。"
+        }
+      },
       "notifications": {
         "title": "通知",
         "description": "通知を受け取るタイミングと方法を制御します。",

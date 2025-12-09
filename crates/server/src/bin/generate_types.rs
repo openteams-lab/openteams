@@ -1,6 +1,7 @@
 use std::{collections::HashMap, env, fs, path::Path};
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
+use server::routes::task_attempts::pr::DEFAULT_PR_DESCRIPTION_PROMPT;
 use ts_rs::TS;
 
 fn generate_types_content() -> String {
@@ -103,7 +104,7 @@ fn generate_types_content() -> String {
         server::routes::shared_tasks::AssignSharedTaskRequest::decl(),
         server::routes::tasks::ShareTaskResponse::decl(),
         server::routes::tasks::CreateAndStartTaskRequest::decl(),
-        server::routes::task_attempts::CreateGitHubPrRequest::decl(),
+        server::routes::task_attempts::pr::CreateGitHubPrRequest::decl(),
         server::routes::images::ImageResponse::decl(),
         server::routes::images::ImageMetadata::decl(),
         server::routes::task_attempts::CreateTaskAttemptBody::decl(),
@@ -113,12 +114,12 @@ fn generate_types_content() -> String {
         server::routes::task_attempts::RebaseTaskAttemptRequest::decl(),
         server::routes::task_attempts::GitOperationError::decl(),
         server::routes::task_attempts::PushError::decl(),
-        server::routes::task_attempts::CreatePrError::decl(),
+        server::routes::task_attempts::pr::CreatePrError::decl(),
         server::routes::task_attempts::BranchStatus::decl(),
         server::routes::task_attempts::RunScriptError::decl(),
-        server::routes::task_attempts::AttachPrResponse::decl(),
-        server::routes::task_attempts::PrCommentsResponse::decl(),
-        server::routes::task_attempts::GetPrCommentsError::decl(),
+        server::routes::task_attempts::pr::AttachPrResponse::decl(),
+        server::routes::task_attempts::pr::PrCommentsResponse::decl(),
+        server::routes::task_attempts::pr::GetPrCommentsError::decl(),
         services::services::github::UnifiedPrComment::decl(),
         services::services::filesystem::DirectoryEntry::decl(),
         services::services::filesystem::DirectoryListResponse::decl(),
@@ -198,7 +199,16 @@ fn generate_types_content() -> String {
         .collect::<Vec<_>>()
         .join("\n\n");
 
-    format!("{HEADER}\n\n{body}")
+    // Append exported constants
+    let prompt_escaped = DEFAULT_PR_DESCRIPTION_PROMPT
+        .replace('\\', "\\\\")
+        .replace('`', "\\`");
+    let constants = format!(
+        "export const DEFAULT_PR_DESCRIPTION_PROMPT = `{}`;",
+        prompt_escaped
+    );
+
+    format!("{HEADER}\n\n{body}\n\n{constants}")
 }
 
 fn generate_json_schema<T: JsonSchema>() -> Result<String, serde_json::Error> {

@@ -135,6 +135,18 @@
           }
         }
       },
+      "pullRequests": {
+        "title": "풀 리퀘스트",
+        "description": "PR 생성 동작 구성",
+        "autoDescription": {
+          "label": "기본적으로 PR 설명 자동 생성",
+          "helper": "활성화하면 AI 에이전트가 PR 생성 후 자동으로 제목과 설명을 업데이트합니다."
+        },
+        "customPrompt": {
+          "useCustom": "사용자 정의 프롬프트 사용",
+          "helper": "PR 설명 생성 시 AI 에이전트용 사용자 정의 프롬프트. {pr_number}와 {pr_url}을 플레이스홀더로 사용하세요."
+        }
+      },
       "notifications": {
         "title": "알림",
         "description": "알림을 받는 시기와 방법을 제어하세요.",

@@ -135,6 +135,18 @@
           }
         }
       },
+      "pullRequests": {
+        "title": "Pull Requests",
+        "description": "Configura el comportamiento de creación de PR",
+        "autoDescription": {
+          "label": "Auto-generar descripción de PR por defecto",
+          "helper": "Cuando está habilitado, el agente de IA actualizará automáticamente el título y la descripción del PR después de la creación."
+        },
+        "customPrompt": {
+          "useCustom": "Usar prompt personalizado",
+          "helper": "Prompt personalizado para el agente de IA al generar descripciones de PR. Usa {pr_number} y {pr_url} como marcadores de posición."
+        }
+      },
       "notifications": {
         "title": "Notificaciones",
         "description": "Controla cuándo y cómo recibes notificaciones.",
