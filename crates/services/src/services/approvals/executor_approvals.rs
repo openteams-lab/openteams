@@ -7,19 +7,26 @@ use serde_json::Value;
 use utils::approvals::{ApprovalRequest, ApprovalStatus, CreateApprovalRequest};
 use uuid::Uuid;
 
-use crate::services::approvals::Approvals;
+use crate::services::{approvals::Approvals, notification::NotificationService};
 
 pub struct ExecutorApprovalBridge {
     approvals: Approvals,
     db: DBService,
+    notification_service: NotificationService,
     execution_process_id: Uuid,
 }
 
 impl ExecutorApprovalBridge {
-    pub fn new(approvals: Approvals, db: DBService, execution_process_id: Uuid) -> Arc<Self> {
+    pub fn new(
+        approvals: Approvals,
+        db: DBService,
+        notification_service: NotificationService,
+        execution_process_id: Uuid,
+    ) -> Arc<Self> {
         Arc::new(Self {
             approvals,
             db,
+            notification_service,
             execution_process_id,
         })
     }
@@ -49,6 +56,14 @@ impl ExecutorApprovalService for ExecutorApprovalBridge {
             .create_with_waiter(request)
             .await
             .map_err(ExecutorApprovalError::request_failed)?;
+
+        // Play notification sound when approval is needed
+        self.notification_service
+            .notify(
+                "Approval Needed",
+                &format!("Tool '{}' requires approval", tool_name),
+            )
+            .await;
 
         let status = waiter.clone().await;
 
