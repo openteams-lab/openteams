@@ -1,52 +1,32 @@
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
-use db::models::execution_process::{ExecutionContext, ExecutionProcessStatus};
+use tokio::sync::RwLock;
 use utils;
 
-use crate::services::config::SoundFile;
+use crate::services::config::{Config, NotificationConfig, SoundFile};
 
 /// Service for handling cross-platform notifications including sound alerts and push notifications
 #[derive(Debug, Clone)]
-pub struct NotificationService {}
-use crate::services::config::NotificationConfig;
+pub struct NotificationService {
+    config: Arc<RwLock<Config>>,
+}
 
 /// Cache for WSL root path from PowerShell
 static WSL_ROOT_PATH_CACHE: OnceLock<Option<String>> = OnceLock::new();
 
 impl NotificationService {
-    pub async fn notify_execution_halted(mut config: NotificationConfig, ctx: &ExecutionContext) {
-        // If the process was intentionally killed by user, suppress sound
-        if matches!(ctx.execution_process.status, ExecutionProcessStatus::Killed) {
-            config.sound_enabled = false;
-        }
-
-        let title = format!("Task Complete: {}", ctx.task.title);
-        let message = match ctx.execution_process.status {
-            ExecutionProcessStatus::Completed => format!(
-                "✅ '{}' completed successfully\nBranch: {:?}\nExecutor: {}",
-                ctx.task.title, ctx.task_attempt.branch, ctx.task_attempt.executor
-            ),
-            ExecutionProcessStatus::Failed => format!(
-                "❌ '{}' execution failed\nBranch: {:?}\nExecutor: {}",
-                ctx.task.title, ctx.task_attempt.branch, ctx.task_attempt.executor
-            ),
-            ExecutionProcessStatus::Killed => format!(
-                "🛑 '{}' execution cancelled by user\nBranch: {:?}\nExecutor: {}",
-                ctx.task.title, ctx.task_attempt.branch, ctx.task_attempt.executor
-            ),
-            _ => {
-                tracing::warn!(
-                    "Tried to notify attempt completion for {} but process is still running!",
-                    ctx.task_attempt.id
-                );
-                return;
-            }
-        };
-        Self::notify(config, &title, &message).await;
+    pub fn new(config: Arc<RwLock<Config>>) -> Self {
+        Self { config }
     }
 
     /// Send both sound and push notifications if enabled
-    pub async fn notify(config: NotificationConfig, title: &str, message: &str) {
+    pub async fn notify(&self, title: &str, message: &str) {
+        let config = self.config.read().await.notifications.clone();
+        Self::send_notification(&config, title, message).await;
+    }
+
+    /// Internal method to send notifications with a given config
+    async fn send_notification(config: &NotificationConfig, title: &str, message: &str) {
         if config.sound_enabled {
             Self::play_sound_notification(&config.sound_file).await;
         }

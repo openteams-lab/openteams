@@ -41,7 +41,6 @@ use utils::{
 use uuid::Uuid;
 
 use crate::services::{
-    config::Config,
     git::{GitService, GitServiceError},
     notification::NotificationService,
     share::SharePublisher,
@@ -78,6 +77,8 @@ pub trait ContainerService {
     fn git(&self) -> &GitService;
 
     fn share_publisher(&self) -> Option<&SharePublisher>;
+
+    fn notification_service(&self) -> &NotificationService;
 
     fn task_attempt_to_current_dir(&self, task_attempt: &TaskAttempt) -> PathBuf;
 
@@ -161,7 +162,6 @@ pub trait ContainerService {
     /// Finalize task execution by updating status to InReview and sending notifications
     async fn finalize_task(
         &self,
-        config: &Arc<RwLock<Config>>,
         share_publisher: Option<&SharePublisher>,
         ctx: &ExecutionContext,
     ) {
@@ -181,8 +181,31 @@ pub trait ContainerService {
                 tracing::error!("Failed to update task status to InReview: {e}");
             }
         }
-        let notify_cfg = config.read().await.notifications.clone();
-        NotificationService::notify_execution_halted(notify_cfg, ctx).await;
+
+        // Skip notification if process was intentionally killed by user
+        if matches!(ctx.execution_process.status, ExecutionProcessStatus::Killed) {
+            return;
+        }
+
+        let title = format!("Task Complete: {}", ctx.task.title);
+        let message = match ctx.execution_process.status {
+            ExecutionProcessStatus::Completed => format!(
+                "✅ '{}' completed successfully\nBranch: {:?}\nExecutor: {}",
+                ctx.task.title, ctx.task_attempt.branch, ctx.task_attempt.executor
+            ),
+            ExecutionProcessStatus::Failed => format!(
+                "❌ '{}' execution failed\nBranch: {:?}\nExecutor: {}",
+                ctx.task.title, ctx.task_attempt.branch, ctx.task_attempt.executor
+            ),
+            _ => {
+                tracing::warn!(
+                    "Tried to notify attempt completion for {} but process is still running!",
+                    ctx.task_attempt.id
+                );
+                return;
+            }
+        };
+        self.notification_service().notify(&title, &message).await;
     }
 
     /// Cleanup executions marked as running in the db, call at startup
