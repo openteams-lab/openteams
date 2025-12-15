@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod github_app;
 pub mod identity_errors;
 pub mod invitations;
 pub mod oauth;
@@ -6,6 +7,7 @@ pub mod oauth_accounts;
 pub mod organization_members;
 pub mod organizations;
 pub mod projects;
+pub mod reviews;
 pub mod tasks;
 pub mod users;
 

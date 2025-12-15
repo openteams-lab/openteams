@@ -13,6 +13,105 @@ pub struct RemoteServerConfig {
     pub electric_url: String,
     pub electric_secret: Option<SecretString>,
     pub electric_role_password: Option<SecretString>,
+    pub r2: Option<R2Config>,
+    pub review_worker_base_url: Option<String>,
+    pub github_app: Option<GitHubAppConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct R2Config {
+    pub access_key_id: String,
+    pub secret_access_key: SecretString,
+    pub endpoint: String,
+    pub bucket: String,
+    pub presign_expiry_secs: u64,
+}
+
+impl R2Config {
+    pub fn from_env() -> Result<Option<Self>, ConfigError> {
+        let access_key_id = match env::var("R2_ACCESS_KEY_ID") {
+            Ok(v) => v,
+            Err(_) => {
+                tracing::info!("R2_ACCESS_KEY_ID not set, R2 storage disabled");
+                return Ok(None);
+            }
+        };
+
+        tracing::info!("R2_ACCESS_KEY_ID is set, checking other R2 env vars");
+
+        let secret_access_key = env::var("R2_SECRET_ACCESS_KEY")
+            .map_err(|_| ConfigError::MissingVar("R2_SECRET_ACCESS_KEY"))?;
+
+        let endpoint = env::var("R2_REVIEW_ENDPOINT")
+            .map_err(|_| ConfigError::MissingVar("R2_REVIEW_ENDPOINT"))?;
+
+        let bucket = env::var("R2_REVIEW_BUCKET")
+            .map_err(|_| ConfigError::MissingVar("R2_REVIEW_BUCKET"))?;
+
+        let presign_expiry_secs = env::var("R2_PRESIGN_EXPIRY_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(3600);
+
+        tracing::info!(endpoint = %endpoint, bucket = %bucket, "R2 config loaded successfully");
+
+        Ok(Some(Self {
+            access_key_id,
+            secret_access_key: SecretString::new(secret_access_key.into()),
+            endpoint,
+            bucket,
+            presign_expiry_secs,
+        }))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GitHubAppConfig {
+    pub app_id: u64,
+    pub private_key: SecretString, // Base64-encoded PEM
+    pub webhook_secret: SecretString,
+    pub app_slug: String,
+}
+
+impl GitHubAppConfig {
+    pub fn from_env() -> Result<Option<Self>, ConfigError> {
+        let app_id = match env::var("GITHUB_APP_ID") {
+            Ok(v) => v,
+            Err(_) => {
+                tracing::info!("GITHUB_APP_ID not set, GitHub App integration disabled");
+                return Ok(None);
+            }
+        };
+
+        let app_id: u64 = app_id
+            .parse()
+            .map_err(|_| ConfigError::InvalidVar("GITHUB_APP_ID"))?;
+
+        tracing::info!("GITHUB_APP_ID is set, checking other GitHub App env vars");
+
+        let private_key = env::var("GITHUB_APP_PRIVATE_KEY")
+            .map_err(|_| ConfigError::MissingVar("GITHUB_APP_PRIVATE_KEY"))?;
+
+        // Validate that the private key is valid base64
+        BASE64_STANDARD
+            .decode(private_key.as_bytes())
+            .map_err(|_| ConfigError::InvalidVar("GITHUB_APP_PRIVATE_KEY"))?;
+
+        let webhook_secret = env::var("GITHUB_APP_WEBHOOK_SECRET")
+            .map_err(|_| ConfigError::MissingVar("GITHUB_APP_WEBHOOK_SECRET"))?;
+
+        let app_slug =
+            env::var("GITHUB_APP_SLUG").map_err(|_| ConfigError::MissingVar("GITHUB_APP_SLUG"))?;
+
+        tracing::info!(app_id = %app_id, app_slug = %app_slug, "GitHub App config loaded successfully");
+
+        Ok(Some(Self {
+            app_id,
+            private_key: SecretString::new(private_key.into()),
+            webhook_secret: SecretString::new(webhook_secret.into()),
+            app_slug,
+        }))
+    }
 }
 
 #[derive(Debug, Error)]
@@ -49,6 +148,12 @@ impl RemoteServerConfig {
             .ok()
             .map(|s| SecretString::new(s.into()));
 
+        let r2 = R2Config::from_env()?;
+
+        let review_worker_base_url = env::var("REVIEW_WORKER_BASE_URL").ok();
+
+        let github_app = GitHubAppConfig::from_env()?;
+
         Ok(Self {
             database_url,
             listen_addr,
@@ -57,6 +162,9 @@ impl RemoteServerConfig {
             electric_url,
             electric_secret,
             electric_role_password,
+            r2,
+            review_worker_base_url,
+            github_app,
         })
     }
 }

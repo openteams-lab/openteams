@@ -12,7 +12,9 @@ use crate::{
     },
     config::RemoteServerConfig,
     db,
+    github_app::GitHubAppService,
     mail::LoopsMailer,
+    r2::R2Service,
     routes,
 };
 
@@ -84,7 +86,44 @@ impl Server {
             )
         })?;
 
-        let http_client = reqwest::Client::new();
+        let r2 = config.r2.as_ref().map(R2Service::new);
+        if r2.is_some() {
+            tracing::info!("R2 storage service initialized");
+        } else {
+            tracing::warn!(
+                "R2 storage service not configured. Set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_REVIEW_ENDPOINT, and R2_REVIEW_BUCKET to enable."
+            );
+        }
+
+        let http_client = reqwest::Client::builder()
+            .user_agent("VibeKanbanRemote/1.0")
+            .build()
+            .context("failed to create HTTP client")?;
+
+        let github_app = match &config.github_app {
+            Some(github_config) => {
+                match GitHubAppService::new(github_config, http_client.clone()) {
+                    Ok(service) => {
+                        tracing::info!(
+                            app_slug = %github_config.app_slug,
+                            "GitHub App service initialized"
+                        );
+                        Some(Arc::new(service))
+                    }
+                    Err(e) => {
+                        tracing::error!(?e, "Failed to initialize GitHub App service");
+                        None
+                    }
+                }
+            }
+            None => {
+                tracing::info!(
+                    "GitHub App not configured. Set GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_WEBHOOK_SECRET, and GITHUB_APP_SLUG to enable."
+                );
+                None
+            }
+        };
+
         let state = AppState::new(
             pool.clone(),
             config.clone(),
@@ -94,6 +133,8 @@ impl Server {
             mailer,
             server_public_base_url,
             http_client,
+            r2,
+            github_app,
         );
 
         let router = routes::router(state);

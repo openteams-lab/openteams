@@ -1,7 +1,7 @@
 services:
   remote-db:
     image: postgres:16-alpine
-    command: ["postgres", "-c", "wal_level=logical"]
+    command: [ "postgres", "-c", "wal_level=logical" ]
     environment:
       POSTGRES_DB: remote
       POSTGRES_USER: remote
@@ -57,6 +57,15 @@ services:
       VITE_APP_BASE_URL: http://localhost:3000
       VITE_API_BASE_URL: http://localhost:3000
       ELECTRIC_ROLE_PASSWORD: ${ELECTRIC_ROLE_PASSWORD:?set in .env.remote}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_REVIEW_ENDPOINT: ${R2_REVIEW_ENDPOINT:-}
+      R2_REVIEW_BUCKET: ${R2_REVIEW_BUCKET:-}
+      REVIEW_WORKER_BASE_URL: ${REVIEW_WORKER_BASE_URL:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+      GITHUB_APP_WEBHOOK_SECRET: ${GITHUB_APP_WEBHOOK_SECRET:-}
+      GITHUB_APP_SLUG: ${GITHUB_APP_SLUG:-}
     ports:
       - "127.0.0.1:3000:8081"
     restart: unless-stopped
