@@ -5,7 +5,9 @@ use sqlx::PgPool;
 use crate::{
     auth::{JwtService, OAuthHandoffService, OAuthTokenValidator, ProviderRegistry},
     config::RemoteServerConfig,
+    github_app::GitHubAppService,
     mail::Mailer,
+    r2::R2Service,
 };
 
 #[derive(Clone)]
@@ -18,6 +20,8 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     handoff: Arc<OAuthHandoffService>,
     oauth_token_validator: Arc<OAuthTokenValidator>,
+    r2: Option<R2Service>,
+    github_app: Option<Arc<GitHubAppService>>,
 }
 
 impl AppState {
@@ -31,6 +35,8 @@ impl AppState {
         mailer: Arc<dyn Mailer>,
         server_public_base_url: String,
         http_client: reqwest::Client,
+        r2: Option<R2Service>,
+        github_app: Option<Arc<GitHubAppService>>,
     ) -> Self {
         Self {
             pool,
@@ -41,6 +47,8 @@ impl AppState {
             http_client,
             handoff,
             oauth_token_validator,
+            r2,
+            github_app,
         }
     }
 
@@ -66,5 +74,13 @@ impl AppState {
 
     pub fn oauth_token_validator(&self) -> Arc<OAuthTokenValidator> {
         Arc::clone(&self.oauth_token_validator)
+    }
+
+    pub fn r2(&self) -> Option<&R2Service> {
+        self.r2.as_ref()
+    }
+
+    pub fn github_app(&self) -> Option<&GitHubAppService> {
+        self.github_app.as_deref()
     }
 }
