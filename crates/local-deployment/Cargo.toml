@@ -1,6 +1,6 @@
 [package]
 name = "local-deployment"
-version = "0.0.134"
+version = "0.0.135"
 edition = "2024"
 
 [dependencies]
