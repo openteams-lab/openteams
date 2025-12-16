@@ -6,7 +6,11 @@ use thiserror::Error;
 use ts_rs::TS;
 use uuid::Uuid;
 
-use super::{project::Project, task::Task};
+use super::{
+    attempt_repo::{AttemptRepo, RepoWithTargetBranch},
+    project::Project,
+    task::Task,
+};
 
 #[derive(Debug, Error)]
 pub enum TaskAttemptError {
@@ -20,6 +24,13 @@ pub enum TaskAttemptError {
     ValidationError(String),
     #[error("Branch not found: {0}")]
     BranchNotFound(String),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ContainerInfo {
+    pub attempt_id: Uuid,
+    pub task_id: Uuid,
+    pub project_id: Uuid,
 }
 
 #[derive(Debug, Clone, Type, Serialize, Deserialize, PartialEq, TS)]
@@ -37,14 +48,11 @@ pub enum TaskAttemptStatus {
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
 pub struct TaskAttempt {
     pub id: Uuid,
-    pub task_id: Uuid,                 // Foreign key to Task
-    pub container_ref: Option<String>, // Path to a worktree (local), or cloud container id
-    pub branch: String,                // Git branch name for this task attempt
-    pub target_branch: String,         // Target branch for this attempt
-    pub executor: String, // Name of the base coding agent to use ("AMP", "CLAUDE_CODE",
-    // "GEMINI", etc.)
-    pub worktree_deleted: bool, // Flag indicating if worktree has been cleaned up
-    pub setup_completed_at: Option<DateTime<Utc>>, // When setup script was last completed
+    pub task_id: Uuid,
+    pub container_ref: Option<String>,
+    pub branch: String,
+    pub executor: String,
+    pub setup_completed_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -77,12 +85,12 @@ pub struct TaskAttemptContext {
     pub task_attempt: TaskAttempt,
     pub task: Task,
     pub project: Project,
+    pub attempt_repos: Vec<RepoWithTargetBranch>,
 }
 
 #[derive(Debug, Deserialize, TS)]
 pub struct CreateTaskAttempt {
     pub executor: BaseCodingAgent,
-    pub base_branch: String,
     pub branch: String,
 }
 
@@ -103,9 +111,7 @@ impl TaskAttempt {
                               task_id AS "task_id!: Uuid",
                               container_ref,
                               branch,
-                              target_branch,
                               executor AS "executor!",
-                              worktree_deleted AS "worktree_deleted!: bool",
                               setup_completed_at AS "setup_completed_at: DateTime<Utc>",
                               created_at AS "created_at!: DateTime<Utc>",
                               updated_at AS "updated_at!: DateTime<Utc>"
@@ -123,9 +129,7 @@ impl TaskAttempt {
                               task_id AS "task_id!: Uuid",
                               container_ref,
                               branch,
-                              target_branch,
                               executor AS "executor!",
-                              worktree_deleted AS "worktree_deleted!: bool",
                               setup_completed_at AS "setup_completed_at: DateTime<Utc>",
                               created_at AS "created_at!: DateTime<Utc>",
                               updated_at AS "updated_at!: DateTime<Utc>"
@@ -147,16 +151,13 @@ impl TaskAttempt {
         task_id: Uuid,
         project_id: Uuid,
     ) -> Result<TaskAttemptContext, TaskAttemptError> {
-        // Single query with JOIN validation to ensure proper relationships
         let task_attempt = sqlx::query_as!(
             TaskAttempt,
             r#"SELECT  ta.id                AS "id!: Uuid",
                        ta.task_id           AS "task_id!: Uuid",
                        ta.container_ref,
                        ta.branch,
-                       ta.target_branch,
                        ta.executor AS "executor!",
-                       ta.worktree_deleted  AS "worktree_deleted!: bool",
                        ta.setup_completed_at AS "setup_completed_at: DateTime<Utc>",
                        ta.created_at        AS "created_at!: DateTime<Utc>",
                        ta.updated_at        AS "updated_at!: DateTime<Utc>"
@@ -181,10 +182,14 @@ impl TaskAttempt {
             .await?
             .ok_or(TaskAttemptError::ProjectNotFound)?;
 
+        let attempt_repos =
+            AttemptRepo::find_repos_with_target_branch_for_attempt(pool, attempt_id).await?;
+
         Ok(TaskAttemptContext {
             task_attempt,
             task,
             project,
+            attempt_repos,
         })
     }
 
@@ -206,13 +211,12 @@ impl TaskAttempt {
         Ok(())
     }
 
-    /// Helper function to mark a worktree as deleted in the database
-    pub async fn mark_worktree_deleted(
+    pub async fn clear_container_ref(
         pool: &SqlitePool,
         attempt_id: Uuid,
     ) -> Result<(), sqlx::Error> {
         sqlx::query!(
-            "UPDATE task_attempts SET worktree_deleted = TRUE, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE task_attempts SET container_ref = NULL, updated_at = datetime('now') WHERE id = ?",
             attempt_id
         )
         .execute(pool)
@@ -227,9 +231,7 @@ impl TaskAttempt {
                        task_id           AS "task_id!: Uuid",
                        container_ref,
                        branch,
-                       target_branch,
                        executor AS "executor!",
-                       worktree_deleted  AS "worktree_deleted!: bool",
                        setup_completed_at AS "setup_completed_at: DateTime<Utc>",
                        created_at        AS "created_at!: DateTime<Utc>",
                        updated_at        AS "updated_at!: DateTime<Utc>"
@@ -248,9 +250,7 @@ impl TaskAttempt {
                        task_id           AS "task_id!: Uuid",
                        container_ref,
                        branch,
-                       target_branch,
                        executor AS "executor!",
-                       worktree_deleted  AS "worktree_deleted!: bool",
                        setup_completed_at AS "setup_completed_at: DateTime<Utc>",
                        created_at        AS "created_at!: DateTime<Utc>",
                        updated_at        AS "updated_at!: DateTime<Utc>"
@@ -260,19 +260,6 @@ impl TaskAttempt {
         )
         .fetch_optional(pool)
         .await
-    }
-
-    pub async fn find_by_worktree_deleted(
-        pool: &SqlitePool,
-    ) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
-        let records = sqlx::query!(
-        r#"SELECT id as "id!: Uuid", container_ref FROM task_attempts WHERE worktree_deleted = FALSE"#,
-        )
-        .fetch_all(pool).await?;
-        Ok(records
-            .into_iter()
-            .filter_map(|r| r.container_ref.map(|path| (r.id, path)))
-            .collect())
     }
 
     pub async fn container_ref_exists(
@@ -289,27 +276,31 @@ impl TaskAttempt {
         Ok(result.exists)
     }
 
-    /// Find task attempts that are expired (72+ hours since last activity) and eligible for worktree cleanup
-    /// Activity includes: execution completion, task attempt updates (including worktree recreation),
-    /// and any attempts that are currently in progress
+    /// Find task attempts that are expired (72+ hours since last activity) and eligible for workspace cleanup
     pub async fn find_expired_for_cleanup(
         pool: &SqlitePool,
-    ) -> Result<Vec<(Uuid, String, String)>, sqlx::Error> {
-        let records = sqlx::query!(
+    ) -> Result<Vec<TaskAttempt>, sqlx::Error> {
+        sqlx::query_as!(
+            TaskAttempt,
             r#"
-            SELECT ta.id as "attempt_id!: Uuid", ta.container_ref, p.git_repo_path as "git_repo_path!"
+            SELECT
+                ta.id as "id!: Uuid",
+                ta.task_id as "task_id!: Uuid",
+                ta.container_ref,
+                ta.branch as "branch!",
+                ta.executor as "executor!",
+                ta.setup_completed_at as "setup_completed_at: DateTime<Utc>",
+                ta.created_at as "created_at!: DateTime<Utc>",
+                ta.updated_at as "updated_at!: DateTime<Utc>"
             FROM task_attempts ta
             LEFT JOIN execution_processes ep ON ta.id = ep.task_attempt_id AND ep.completed_at IS NOT NULL
-            JOIN tasks t ON ta.task_id = t.id
-            JOIN projects p ON t.project_id = p.id
-            WHERE ta.worktree_deleted = FALSE
-                -- Exclude attempts with any running processes (in progress)
+            WHERE ta.container_ref IS NOT NULL
                 AND ta.id NOT IN (
                     SELECT DISTINCT ep2.task_attempt_id
                     FROM execution_processes ep2
                     WHERE ep2.completed_at IS NULL
                 )
-            GROUP BY ta.id, ta.container_ref, p.git_repo_path, ta.updated_at
+            GROUP BY ta.id, ta.container_ref, ta.updated_at
             HAVING datetime('now', '-72 hours') > datetime(
                 MAX(
                     CASE
@@ -327,15 +318,7 @@ impl TaskAttempt {
             "#
         )
         .fetch_all(pool)
-        .await?;
-
-        Ok(records
-            .into_iter()
-            .filter_map(|r| {
-                r.container_ref
-                    .map(|path| (r.attempt_id, path, r.git_repo_path))
-            })
-            .collect())
+        .await
     }
 
     pub async fn create(
@@ -344,40 +327,20 @@ impl TaskAttempt {
         id: Uuid,
         task_id: Uuid,
     ) -> Result<Self, TaskAttemptError> {
-        // let prefixed_id = format!("vibe-kanban-{}", attempt_id);
-        // Insert the record into the database
         Ok(sqlx::query_as!(
             TaskAttempt,
-            r#"INSERT INTO task_attempts (id, task_id, container_ref, branch, target_branch, executor, worktree_deleted, setup_completed_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-               RETURNING id as "id!: Uuid", task_id as "task_id!: Uuid", container_ref, branch, target_branch, executor as "executor!",  worktree_deleted as "worktree_deleted!: bool", setup_completed_at as "setup_completed_at: DateTime<Utc>", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
+            r#"INSERT INTO task_attempts (id, task_id, container_ref, branch, executor, setup_completed_at)
+               VALUES ($1, $2, $3, $4, $5, $6)
+               RETURNING id as "id!: Uuid", task_id as "task_id!: Uuid", container_ref, branch, executor as "executor!", setup_completed_at as "setup_completed_at: DateTime<Utc>", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
             id,
             task_id,
-            Option::<String>::None, // Container isn't known yet
+            Option::<String>::None,
             data.branch,
-            data.base_branch, // Target branch is same as base branch during creation
             data.executor,
-            false, // worktree_deleted is false during creation
-            Option::<DateTime<Utc>>::None // setup_completed_at is None during creation
+            Option::<DateTime<Utc>>::None
         )
         .fetch_one(pool)
         .await?)
-    }
-
-    pub async fn update_target_branch(
-        pool: &SqlitePool,
-        attempt_id: Uuid,
-        new_target_branch: &str,
-    ) -> Result<(), TaskAttemptError> {
-        sqlx::query!(
-            "UPDATE task_attempts SET target_branch = $1, updated_at = datetime('now') WHERE id = $2",
-            new_target_branch,
-            attempt_id,
-        )
-        .execute(pool)
-        .await?;
-
-        Ok(())
     }
 
     pub async fn update_branch_name(
@@ -396,61 +359,10 @@ impl TaskAttempt {
         Ok(())
     }
 
-    pub async fn update_target_branch_for_children_of_attempt(
-        pool: &SqlitePool,
-        parent_attempt_id: Uuid,
-        old_branch: &str,
-        new_branch: &str,
-    ) -> Result<u64, TaskAttemptError> {
-        let result = sqlx::query!(
-            r#"UPDATE task_attempts
-               SET target_branch = $3, updated_at = datetime('now')
-               WHERE target_branch = $2
-                 AND task_id IN (
-                   SELECT id FROM tasks 
-                   WHERE parent_task_attempt = $1
-                 )"#,
-            parent_attempt_id,
-            old_branch,
-            new_branch
-        )
-        .execute(pool)
-        .await?;
-
-        Ok(result.rows_affected())
-    }
-
-    /// Find a task attempt by its branch name within a project.
-    /// Returns the most recently created attempt if multiple exist with the same branch.
-    pub async fn find_by_branch(
-        pool: &SqlitePool,
-        project_id: Uuid,
-        branch: &str,
-    ) -> Result<Option<TaskAttempt>, sqlx::Error> {
-        sqlx::query_as!(
-            TaskAttempt,
-            r#"SELECT ta.id as "id!: Uuid", ta.task_id as "task_id!: Uuid",
-                      ta.container_ref, ta.branch, ta.target_branch,
-                      ta.executor as "executor!", ta.worktree_deleted as "worktree_deleted!: bool",
-                      ta.setup_completed_at as "setup_completed_at: DateTime<Utc>",
-                      ta.created_at as "created_at!: DateTime<Utc>",
-                      ta.updated_at as "updated_at!: DateTime<Utc>"
-               FROM task_attempts ta
-               JOIN tasks t ON ta.task_id = t.id
-               WHERE t.project_id = ? AND ta.branch = ?
-               ORDER BY ta.created_at DESC
-               LIMIT 1"#,
-            project_id,
-            branch
-        )
-        .fetch_optional(pool)
-        .await
-    }
-
     pub async fn resolve_container_ref(
         pool: &SqlitePool,
         container_ref: &str,
-    ) -> Result<(Uuid, Uuid, Uuid), sqlx::Error> {
+    ) -> Result<ContainerInfo, sqlx::Error> {
         let result = sqlx::query!(
             r#"SELECT ta.id as "attempt_id!: Uuid",
                       ta.task_id as "task_id!: Uuid",
@@ -464,6 +376,10 @@ impl TaskAttempt {
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
 
-        Ok((result.attempt_id, result.task_id, result.project_id))
+        Ok(ContainerInfo {
+            attempt_id: result.attempt_id,
+            task_id: result.task_id,
+            project_id: result.project_id,
+        })
     }
 }

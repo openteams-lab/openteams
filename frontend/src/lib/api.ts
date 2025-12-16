@@ -3,7 +3,6 @@
 import {
   ApprovalStatus,
   ApiResponse,
-  BranchStatus,
   Config,
   CreateFollowUpAttempt,
   EditorType,
@@ -15,9 +14,17 @@ import {
   DirectoryListResponse,
   DirectoryEntry,
   ExecutionProcess,
+  ExecutionProcessRepoState,
   GitBranch,
   Project,
+  ProjectRepo,
+  Repo,
+  RepoWithTargetBranch,
+  RepositoryBranches,
+  ProjectBranchesResponse,
   CreateProject,
+  CreateProjectRepo,
+  UpdateProjectRepo,
   SearchResult,
   ShareTaskResponse,
   Task,
@@ -65,7 +72,6 @@ import {
   Invitation,
   RemoteProject,
   ListInvitationsResponse,
-  CommitCompareResult,
   OpenEditorResponse,
   OpenEditorRequest,
   CreatePrError,
@@ -80,6 +86,10 @@ import {
   SharedTaskDetails,
   QueueStatus,
   PrCommentsResponse,
+  MergeTaskAttemptRequest,
+  PushTaskAttemptRequest,
+  RepoBranchStatus,
+  AbortConflictsRequest,
 } from 'shared/types';
 
 export class ApiError<E = unknown> extends Error {
@@ -278,9 +288,10 @@ export const projectsApi = {
     return handleApiResponse<OpenEditorResponse>(response);
   },
 
-  getBranches: async (id: string): Promise<GitBranch[]> => {
+  getBranches: async (id: string): Promise<RepositoryBranches[]> => {
     const response = await makeRequest(`/api/projects/${id}/branches`);
-    return handleApiResponse<GitBranch[]>(response);
+    const data = await handleApiResponse<ProjectBranchesResponse>(response);
+    return data.repositories;
   },
 
   searchFiles: async (
@@ -327,6 +338,65 @@ export const projectsApi = {
       method: 'DELETE',
     });
     return handleApiResponse<Project>(response);
+  },
+
+  getRepositories: async (projectId: string): Promise<Repo[]> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/repositories`
+    );
+    return handleApiResponse<Repo[]>(response);
+  },
+
+  addRepository: async (
+    projectId: string,
+    data: CreateProjectRepo
+  ): Promise<Repo> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/repositories`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<Repo>(response);
+  },
+
+  deleteRepository: async (
+    projectId: string,
+    repoId: string
+  ): Promise<void> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/repositories/${repoId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    return handleApiResponse<void>(response);
+  },
+
+  getRepository: async (
+    projectId: string,
+    repoId: string
+  ): Promise<ProjectRepo> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/repositories/${repoId}`
+    );
+    return handleApiResponse<ProjectRepo>(response);
+  },
+
+  updateRepository: async (
+    projectId: string,
+    repoId: string,
+    data: UpdateProjectRepo
+  ): Promise<ProjectRepo> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/repositories/${repoId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<ProjectRepo>(response);
   },
 };
 
@@ -488,35 +558,52 @@ export const attemptsApi = {
     return handleApiResponse<OpenEditorResponse>(response);
   },
 
-  getBranchStatus: async (attemptId: string): Promise<BranchStatus> => {
+  getBranchStatus: async (attemptId: string): Promise<RepoBranchStatus[]> => {
     const response = await makeRequest(
       `/api/task-attempts/${attemptId}/branch-status`
     );
-    return handleApiResponse<BranchStatus>(response);
+    return handleApiResponse<RepoBranchStatus[]>(response);
   },
 
-  merge: async (attemptId: string): Promise<void> => {
+  getRepos: async (attemptId: string): Promise<RepoWithTargetBranch[]> => {
+    const response = await makeRequest(`/api/task-attempts/${attemptId}/repos`);
+    return handleApiResponse<RepoWithTargetBranch[]>(response);
+  },
+
+  merge: async (
+    attemptId: string,
+    data: MergeTaskAttemptRequest
+  ): Promise<void> => {
     const response = await makeRequest(
       `/api/task-attempts/${attemptId}/merge`,
       {
         method: 'POST',
+        body: JSON.stringify(data),
       }
     );
     return handleApiResponse<void>(response);
   },
 
-  push: async (attemptId: string): Promise<Result<void, PushError>> => {
+  push: async (
+    attemptId: string,
+    data: PushTaskAttemptRequest
+  ): Promise<Result<void, PushError>> => {
     const response = await makeRequest(`/api/task-attempts/${attemptId}/push`, {
       method: 'POST',
+      body: JSON.stringify(data),
     });
     return handleApiResponseAsResult<void, PushError>(response);
   },
 
-  forcePush: async (attemptId: string): Promise<Result<void, PushError>> => {
+  forcePush: async (
+    attemptId: string,
+    data: PushTaskAttemptRequest
+  ): Promise<Result<void, PushError>> => {
     const response = await makeRequest(
       `/api/task-attempts/${attemptId}/push/force`,
       {
         method: 'POST',
+        body: JSON.stringify(data),
       }
     );
     return handleApiResponseAsResult<void, PushError>(response);
@@ -567,11 +654,15 @@ export const attemptsApi = {
     return handleApiResponse<RenameBranchResponse>(response);
   },
 
-  abortConflicts: async (attemptId: string): Promise<void> => {
+  abortConflicts: async (
+    attemptId: string,
+    data: AbortConflictsRequest
+  ): Promise<void> => {
     const response = await makeRequest(
       `/api/task-attempts/${attemptId}/conflicts/abort`,
       {
         method: 'POST',
+        body: JSON.stringify(data),
       }
     );
     return handleApiResponse<void>(response);
@@ -636,26 +727,14 @@ export const attemptsApi = {
     );
   },
 
-  getPrComments: async (attemptId: string): Promise<PrCommentsResponse> => {
+  getPrComments: async (
+    attemptId: string,
+    repoId: string
+  ): Promise<PrCommentsResponse> => {
     const response = await makeRequest(
-      `/api/task-attempts/${attemptId}/pr/comments`
+      `/api/task-attempts/${attemptId}/pr/comments?repo_id=${encodeURIComponent(repoId)}`
     );
     return handleApiResponse<PrCommentsResponse>(response);
-  },
-};
-
-// Extra helpers
-export const commitsApi = {
-  compareToHead: async (
-    attemptId: string,
-    sha: string
-  ): Promise<CommitCompareResult> => {
-    const response = await makeRequest(
-      `/api/task-attempts/${attemptId}/commit-compare?sha=${encodeURIComponent(
-        sha
-      )}`
-    );
-    return handleApiResponse(response);
   },
 };
 
@@ -664,6 +743,15 @@ export const executionProcessesApi = {
   getDetails: async (processId: string): Promise<ExecutionProcess> => {
     const response = await makeRequest(`/api/execution-processes/${processId}`);
     return handleApiResponse<ExecutionProcess>(response);
+  },
+
+  getRepoStates: async (
+    processId: string
+  ): Promise<ExecutionProcessRepoState[]> => {
+    const response = await makeRequest(
+      `/api/execution-processes/${processId}/repo-states`
+    );
+    return handleApiResponse<ExecutionProcessRepoState[]>(response);
   },
 
   stopExecutionProcess: async (processId: string): Promise<void> => {
@@ -693,6 +781,36 @@ export const fileSystemApi = {
       `/api/filesystem/git-repos${queryParam}`
     );
     return handleApiResponse<DirectoryEntry[]>(response);
+  },
+};
+
+// Repo APIs
+export const repoApi = {
+  register: async (data: {
+    path: string;
+    display_name?: string;
+  }): Promise<Repo> => {
+    const response = await makeRequest('/api/repos', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<Repo>(response);
+  },
+
+  getBranches: async (repoId: string): Promise<GitBranch[]> => {
+    const response = await makeRequest(`/api/repos/${repoId}/branches`);
+    return handleApiResponse<GitBranch[]>(response);
+  },
+
+  init: async (data: {
+    parent_path: string;
+    folder_name: string;
+  }): Promise<Repo> => {
+    const response = await makeRequest('/api/repos/init', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<Repo>(response);
   },
 };
 

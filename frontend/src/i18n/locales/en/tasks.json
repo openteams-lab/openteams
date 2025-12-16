@@ -44,6 +44,21 @@
       }
     }
   },
+  "repos": {
+    "changeRepo": {
+      "dialog": {
+        "title": "Change Repository",
+        "description": "Choose a repository for git operations.",
+        "label": "Repository",
+        "placeholder": "Select a repository",
+        "action": "Change Repository"
+      }
+    },
+    "selector": {
+      "placeholder": "Select repository",
+      "empty": "No repositories available"
+    }
+  },
   "preview": {
     "title": "Preview",
     "selectAttempt": "Select an attempt to see preview",
@@ -265,6 +280,19 @@
     "error": "Failed to create attempt. Please try again.",
     "creating": "Creating...",
     "start": "Start"
+  },
+  "repoBranchSelector": {
+    "label": "Base branch"
+  },
+  "attemptRepoSelector": {
+    "label": "Repositories",
+    "addButton": "Add",
+    "empty": "No repositories selected. Add at least one repository.",
+    "selectBranch": "Select branch",
+    "addRepo": {
+      "title": "Select Git Repository",
+      "description": "Choose a git repository to add to this attempt"
+    }
   },
   "viewProcessesDialog": {
     "title": "Execution processes"

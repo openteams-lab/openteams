@@ -13,7 +13,9 @@ use axum::{
     routing::{delete, get, post, put},
 };
 use db::models::{
+    attempt_repo::{AttemptRepo, CreateAttemptRepo},
     image::TaskImage,
+    repo::Repo,
     task::{CreateTask, Task, TaskWithAttemptStatus, UpdateTask},
     task_attempt::{CreateTaskAttempt, TaskAttempt},
 };
@@ -22,16 +24,17 @@ use executors::profile::ExecutorProfileId;
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use services::services::{
-    container::ContainerService,
-    share::ShareError,
-    worktree_manager::{WorktreeCleanup, WorktreeManager},
+    container::ContainerService, share::ShareError, workspace_manager::WorkspaceManager,
 };
 use sqlx::Error as SqlxError;
 use ts_rs::TS;
 use utils::{api::oauth::LoginStatus, response::ApiResponse};
 use uuid::Uuid;
 
-use crate::{DeploymentImpl, error::ApiError, middleware::load_task_middleware};
+use crate::{
+    DeploymentImpl, error::ApiError, middleware::load_task_middleware,
+    routes::task_attempts::AttemptRepoInput,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TaskQuery {
@@ -140,26 +143,25 @@ pub async fn create_task(
 pub struct CreateAndStartTaskRequest {
     pub task: CreateTask,
     pub executor_profile_id: ExecutorProfileId,
-    pub base_branch: String,
+    pub repos: Vec<AttemptRepoInput>,
 }
 
 pub async fn create_task_and_start(
     State(deployment): State<DeploymentImpl>,
     Json(payload): Json<CreateAndStartTaskRequest>,
 ) -> Result<ResponseJson<ApiResponse<TaskWithAttemptStatus>>, ApiError> {
+    if payload.repos.is_empty() {
+        return Err(ApiError::BadRequest(
+            "At least one repository is required".to_string(),
+        ));
+    }
+
     let pool = &deployment.db().pool;
 
-    // Resolve parent from branch if applicable
-    let task_payload = payload
-        .task
-        .clone()
-        .with_parent_from_branch(pool, &payload.base_branch)
-        .await?;
-
     let task_id = Uuid::new_v4();
-    let task = Task::create(pool, &task_payload, task_id).await?;
+    let task = Task::create(pool, &payload.task, task_id).await?;
 
-    if let Some(image_ids) = &task_payload.image_ids {
+    if let Some(image_ids) = &payload.task.image_ids {
         TaskImage::associate_many_dedup(pool, task.id, image_ids).await?;
     }
 
@@ -170,10 +172,11 @@ pub async fn create_task_and_start(
                 "task_id": task.id.to_string(),
                 "project_id": task.project_id,
                 "has_description": task.description.is_some(),
-                "has_images": task_payload.image_ids.is_some(),
+                "has_images": payload.task.image_ids.is_some(),
             }),
         )
         .await;
+
     let attempt_id = Uuid::new_v4();
     let git_branch_name = deployment
         .container()
@@ -184,13 +187,23 @@ pub async fn create_task_and_start(
         pool,
         &CreateTaskAttempt {
             executor: payload.executor_profile_id.executor,
-            base_branch: payload.base_branch,
             branch: git_branch_name,
         },
         attempt_id,
         task.id,
     )
     .await?;
+
+    let attempt_repos: Vec<CreateAttemptRepo> = payload
+        .repos
+        .iter()
+        .map(|r| CreateAttemptRepo {
+            repo_id: r.repo_id,
+            target_branch: r.target_branch.clone(),
+        })
+        .collect();
+    AttemptRepo::create_many(&deployment.db().pool, task_attempt.id, &attempt_repos).await?;
+
     let is_attempt_running = deployment
         .container()
         .start_attempt(&task_attempt, payload.executor_profile_id.clone())
@@ -217,7 +230,6 @@ pub async fn create_task_and_start(
     Ok(ResponseJson(ApiResponse::success(TaskWithAttemptStatus {
         task,
         has_in_progress_attempt: is_attempt_running,
-        has_merged_attempt: false,
         last_attempt_failed: false,
         executor: task_attempt.executor,
     })))
@@ -300,31 +312,22 @@ pub async fn delete_task(
         return Err(ApiError::Conflict("Task has running execution processes. Please wait for them to complete or stop them first.".to_string()));
     }
 
+    let pool = &deployment.db().pool;
+
     // Gather task attempts data needed for background cleanup
-    let attempts = TaskAttempt::fetch_all(&deployment.db().pool, Some(task.id))
+    let attempts = TaskAttempt::fetch_all(pool, Some(task.id))
         .await
         .map_err(|e| {
             tracing::error!("Failed to fetch task attempts for task {}: {}", task.id, e);
             ApiError::TaskAttempt(e)
         })?;
 
-    // Gather cleanup data before deletion
-    let project = task
-        .parent_project(&deployment.db().pool)
-        .await?
-        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
+    let repositories = AttemptRepo::find_unique_repos_for_task(pool, task.id).await?;
 
-    let cleanup_args: Vec<WorktreeCleanup> = attempts
+    // Collect workspace directories that need cleanup
+    let workspace_dirs: Vec<PathBuf> = attempts
         .iter()
-        .filter_map(|attempt| {
-            attempt
-                .container_ref
-                .as_ref()
-                .map(|worktree_path| WorktreeCleanup {
-                    worktree_path: PathBuf::from(worktree_path),
-                    git_repo_path: Some(project.git_repo_path.clone()),
-                })
-        })
+        .filter_map(|attempt| attempt.container_ref.as_ref().map(PathBuf::from))
         .collect();
 
     if let Some(shared_task_id) = task.shared_task_id {
@@ -335,7 +338,7 @@ pub async fn delete_task(
     }
 
     // Use a transaction to ensure atomicity: either all operations succeed or all are rolled back
-    let mut tx = deployment.db().pool.begin().await?;
+    let mut tx = pool.begin().await?;
 
     // Nullify parent_task_attempt for all child tasks before deletion
     // This breaks parent-child relationships to avoid foreign key constraint violations
@@ -374,27 +377,39 @@ pub async fn delete_task(
         )
         .await;
 
-    // Spawn background worktree cleanup task
     let task_id = task.id;
+    let pool = pool.clone();
     tokio::spawn(async move {
-        let span = tracing::info_span!("background_worktree_cleanup", task_id = %task_id);
-        let _enter = span.enter();
-
         tracing::info!(
-            "Starting background cleanup for task {} ({} worktrees)",
+            "Starting background cleanup for task {} ({} workspaces, {} repos)",
             task_id,
-            cleanup_args.len()
+            workspace_dirs.len(),
+            repositories.len()
         );
 
-        if let Err(e) = WorktreeManager::batch_cleanup_worktrees(&cleanup_args).await {
-            tracing::error!(
-                "Background worktree cleanup failed for task {}: {}",
-                task_id,
-                e
-            );
-        } else {
-            tracing::info!("Background cleanup completed for task {}", task_id);
+        for workspace_dir in &workspace_dirs {
+            if let Err(e) = WorkspaceManager::cleanup_workspace(workspace_dir, &repositories).await
+            {
+                tracing::error!(
+                    "Background workspace cleanup failed for task {} at {}: {}",
+                    task_id,
+                    workspace_dir.display(),
+                    e
+                );
+            }
         }
+
+        match Repo::delete_orphaned(&pool).await {
+            Ok(count) if count > 0 => {
+                tracing::info!("Deleted {} orphaned repo records", count);
+            }
+            Err(e) => {
+                tracing::error!("Failed to delete orphaned repos: {}", e);
+            }
+            _ => {}
+        }
+
+        tracing::info!("Background cleanup completed for task {}", task_id);
     });
 
     // Return 202 Accepted to indicate deletion was scheduled

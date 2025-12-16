@@ -5,7 +5,8 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use db::models::{
-    execution_process::ExecutionProcessError, project::ProjectError, scratch::ScratchError,
+    execution_process::ExecutionProcessError, project::ProjectError,
+    project_repo::ProjectRepoError, repo::RepoError, scratch::ScratchError,
     task_attempt::TaskAttemptError,
 };
 use deployment::{DeploymentError, RemoteClientNotConfigured};
@@ -17,7 +18,9 @@ use services::services::{
     git::GitServiceError,
     github::GitHubServiceError,
     image::ImageError,
+    project::ProjectServiceError,
     remote_client::RemoteClientError,
+    repo::RepoError as RepoServiceError,
     share::ShareError,
     worktree_manager::WorktreeError,
 };
@@ -29,6 +32,8 @@ use utils::response::ApiResponse;
 pub enum ApiError {
     #[error(transparent)]
     Project(#[from] ProjectError),
+    #[error(transparent)]
+    Repo(#[from] RepoError),
     #[error(transparent)]
     TaskAttempt(#[from] TaskAttemptError),
     #[error(transparent)]
@@ -93,6 +98,7 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status_code, error_type) = match &self {
             ApiError::Project(_) => (StatusCode::INTERNAL_SERVER_ERROR, "ProjectError"),
+            ApiError::Repo(_) => (StatusCode::INTERNAL_SERVER_ERROR, "ProjectRepoError"),
             ApiError::TaskAttempt(_) => (StatusCode::INTERNAL_SERVER_ERROR, "TaskAttemptError"),
             ApiError::ScratchError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "ScratchError"),
             ApiError::ExecutionProcess(err) => match err {
@@ -300,6 +306,83 @@ impl From<ShareError> for ApiError {
                 ApiError::Conflict("Invalid organization ID format".to_string())
             }
             ShareError::RemoteClientError(err) => ApiError::Conflict(err.to_string()),
+        }
+    }
+}
+
+impl From<ProjectServiceError> for ApiError {
+    fn from(err: ProjectServiceError) -> Self {
+        match err {
+            ProjectServiceError::Database(db_err) => ApiError::Database(db_err),
+            ProjectServiceError::Io(io_err) => ApiError::Io(io_err),
+            ProjectServiceError::Project(proj_err) => ApiError::Project(proj_err),
+            ProjectServiceError::Share(share_err) => ApiError::from(share_err),
+            ProjectServiceError::PathNotFound(path) => {
+                ApiError::BadRequest(format!("Path does not exist: {}", path.display()))
+            }
+            ProjectServiceError::PathNotDirectory(path) => {
+                ApiError::BadRequest(format!("Path is not a directory: {}", path.display()))
+            }
+            ProjectServiceError::NotGitRepository(path) => {
+                ApiError::BadRequest(format!("Path is not a git repository: {}", path.display()))
+            }
+            ProjectServiceError::DuplicateGitRepoPath => ApiError::Conflict(
+                "A project with this git repository path already exists".to_string(),
+            ),
+            ProjectServiceError::DuplicateRepositoryName => ApiError::Conflict(
+                "A repository with this name already exists in the project".to_string(),
+            ),
+            ProjectServiceError::RepositoryNotFound => {
+                ApiError::BadRequest("Repository not found".to_string())
+            }
+            ProjectServiceError::GitError(msg) => {
+                ApiError::BadRequest(format!("Git operation failed: {}", msg))
+            }
+            ProjectServiceError::RemoteClient(msg) => {
+                ApiError::BadRequest(format!("Remote client error: {}", msg))
+            }
+        }
+    }
+}
+
+impl From<RepoServiceError> for ApiError {
+    fn from(err: RepoServiceError) -> Self {
+        match err {
+            RepoServiceError::Database(db_err) => ApiError::Database(db_err),
+            RepoServiceError::Io(io_err) => ApiError::Io(io_err),
+            RepoServiceError::PathNotFound(path) => {
+                ApiError::BadRequest(format!("Path does not exist: {}", path.display()))
+            }
+            RepoServiceError::PathNotDirectory(path) => {
+                ApiError::BadRequest(format!("Path is not a directory: {}", path.display()))
+            }
+            RepoServiceError::NotGitRepository(path) => {
+                ApiError::BadRequest(format!("Path is not a git repository: {}", path.display()))
+            }
+            RepoServiceError::NotFound => ApiError::BadRequest("Repository not found".to_string()),
+            RepoServiceError::DirectoryAlreadyExists(path) => {
+                ApiError::BadRequest(format!("Directory already exists: {}", path.display()))
+            }
+            RepoServiceError::Git(git_err) => {
+                ApiError::BadRequest(format!("Git error: {}", git_err))
+            }
+            RepoServiceError::InvalidFolderName(name) => {
+                ApiError::BadRequest(format!("Invalid folder name: {}", name))
+            }
+        }
+    }
+}
+
+impl From<ProjectRepoError> for ApiError {
+    fn from(err: ProjectRepoError) -> Self {
+        match err {
+            ProjectRepoError::Database(db_err) => ApiError::Database(db_err),
+            ProjectRepoError::NotFound => {
+                ApiError::BadRequest("Repository not found in project".to_string())
+            }
+            ProjectRepoError::AlreadyExists => {
+                ApiError::Conflict("Repository already exists in project".to_string())
+            }
         }
     }
 }

@@ -4,17 +4,24 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::Error as AnyhowError;
+use anyhow::{Error as AnyhowError, anyhow};
 use async_trait::async_trait;
 use db::{
     DBService,
     models::{
+        attempt_repo::AttemptRepo,
         execution_process::{
             CreateExecutionProcess, ExecutionContext, ExecutionProcess, ExecutionProcessRunReason,
             ExecutionProcessStatus,
         },
         execution_process_logs::ExecutionProcessLogs,
+        execution_process_repo_state::{
+            CreateExecutionProcessRepoState, ExecutionProcessRepoState,
+        },
         executor_session::{CreateExecutorSession, ExecutorSession},
+        project::{Project, UpdateProject},
+        project_repo::{ProjectRepo, ProjectRepoWithName},
+        repo::Repo,
         task::{Task, TaskStatus},
         task_attempt::{TaskAttempt, TaskAttemptError},
     },
@@ -44,6 +51,7 @@ use crate::services::{
     git::{GitService, GitServiceError},
     notification::NotificationService,
     share::SharePublisher,
+    workspace_manager::WorkspaceError,
     worktree_manager::WorktreeError,
 };
 pub type ContainerRef = String;
@@ -58,6 +66,8 @@ pub enum ContainerError {
     ExecutorError(#[from] ExecutorError),
     #[error(transparent)]
     Worktree(#[from] WorktreeError),
+    #[error(transparent)]
+    Workspace(#[from] WorkspaceError),
     #[error("Io error: {0}")]
     Io(#[from] std::io::Error),
     #[error("Failed to kill process: {0}")]
@@ -86,10 +96,7 @@ pub trait ContainerService {
 
     async fn kill_all_running_processes(&self) -> Result<(), ContainerError>;
 
-    async fn delete(&self, task_attempt: &TaskAttempt) -> Result<(), ContainerError> {
-        self.try_stop(task_attempt, true).await;
-        self.delete_inner(task_attempt).await
-    }
+    async fn delete(&self, task_attempt: &TaskAttempt) -> Result<(), ContainerError>;
 
     /// Check if a task has any running execution processes
     async fn has_running_processes(&self, task_id: Uuid) -> Result<bool, ContainerError> {
@@ -222,19 +229,29 @@ pub trait ContainerService {
                 );
                 continue;
             }
-            // Capture after-head commit OID (best-effort)
-            if let Ok(Some(task_attempt)) =
-                TaskAttempt::find_by_id(&self.db().pool, process.task_attempt_id).await
-                && let Some(container_ref) = task_attempt.container_ref
+            // Capture after-head commit OID per repository
+            if let Ok(ctx) = ExecutionProcess::load_context(&self.db().pool, process.id).await
+                && let Some(ref container_ref) = ctx.task_attempt.container_ref
             {
-                let wt = std::path::PathBuf::from(container_ref);
-                if let Ok(head) = self.git().get_head_info(&wt) {
-                    let _ = ExecutionProcess::update_after_head_commit(
-                        &self.db().pool,
-                        process.id,
-                        &head.oid,
-                    )
-                    .await;
+                let workspace_root = PathBuf::from(container_ref);
+                for repo in &ctx.repos {
+                    let repo_path = workspace_root.join(&repo.name);
+                    if let Ok(head) = self.git().get_head_info(&repo_path)
+                        && let Err(err) = ExecutionProcessRepoState::update_after_head_commit(
+                            &self.db().pool,
+                            process.id,
+                            repo.id,
+                            &head.oid,
+                        )
+                        .await
+                    {
+                        tracing::warn!(
+                            "Failed to update after_head_commit for repo {} on process {}: {}",
+                            repo.id,
+                            process.id,
+                            err
+                        );
+                    }
                 }
             }
             // Process marked as failed
@@ -288,8 +305,7 @@ pub trait ContainerService {
 
             // Fallback to base branch commit OID
             if before.is_none() {
-                let repo_path =
-                    std::path::Path::new(row.git_repo_path.as_deref().unwrap_or_default());
+                let repo_path = std::path::Path::new(row.repo_path.as_deref().unwrap_or_default());
                 match self
                     .git()
                     .get_branch_oid(repo_path, row.target_branch.as_str())
@@ -307,8 +323,13 @@ pub trait ContainerService {
             }
 
             if let Some(before_oid) = before
-                && let Err(e) =
-                    ExecutionProcess::update_before_head_commit(pool, row.id, &before_oid).await
+                && let Err(e) = ExecutionProcessRepoState::update_before_head_commit(
+                    pool,
+                    row.id,
+                    row.repo_id,
+                    &before_oid,
+                )
+                .await
             {
                 tracing::warn!(
                     "Backfill: Failed to update before_head_commit for process {}: {}",
@@ -321,17 +342,158 @@ pub trait ContainerService {
         Ok(())
     }
 
-    fn cleanup_action(&self, cleanup_script: Option<String>) -> Option<Box<ExecutorAction>> {
-        cleanup_script.map(|script| {
-            Box::new(ExecutorAction::new(
+    /// Backfill repo names that were migrated with a sentinel placeholder.
+    /// Also backfills dev_script for single-repo projects to prepend cd prefix.
+    async fn backfill_repo_names(&self) -> Result<(), ContainerError> {
+        let pool = &self.db().pool;
+        let repos = Repo::list_needing_name_fix(pool).await?;
+
+        if repos.is_empty() {
+            return Ok(());
+        }
+
+        tracing::info!("Backfilling {} repo names", repos.len());
+
+        for repo in repos {
+            let name = repo
+                .path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(&repo.id.to_string())
+                .to_string();
+
+            Repo::update_name(pool, repo.id, &name, &name).await?;
+
+            // Also update dev_script for single-repo projects
+            let project_repos = ProjectRepo::find_by_repo_id(pool, repo.id).await?;
+            for pr in project_repos {
+                let all_repos = ProjectRepo::find_by_project_id(pool, pr.project_id).await?;
+                if all_repos.len() == 1
+                    && let Some(project) = Project::find_by_id(pool, pr.project_id).await?
+                    && let Some(old_script) = &project.dev_script
+                    && !old_script.is_empty()
+                {
+                    let new_script = format!("cd ./{} && {}", name, old_script);
+                    Project::update(
+                        pool,
+                        pr.project_id,
+                        &UpdateProject {
+                            name: None,
+                            dev_script: Some(new_script),
+                        },
+                    )
+                    .await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn cleanup_actions_for_repos(&self, repos: &[ProjectRepoWithName]) -> Option<ExecutorAction> {
+        let repos_with_cleanup: Vec<_> = repos
+            .iter()
+            .filter(|r| r.cleanup_script.is_some())
+            .collect();
+
+        if repos_with_cleanup.is_empty() {
+            return None;
+        }
+
+        let mut iter = repos_with_cleanup.iter();
+        let first = iter.next()?;
+        let mut root_action = ExecutorAction::new(
+            ExecutorActionType::ScriptRequest(ScriptRequest {
+                script: first.cleanup_script.clone().unwrap(),
+                language: ScriptRequestLanguage::Bash,
+                context: ScriptContext::CleanupScript,
+                working_dir: Some(first.repo_name.clone()),
+            }),
+            None,
+        );
+
+        for repo in iter {
+            root_action = root_action.append_action(ExecutorAction::new(
                 ExecutorActionType::ScriptRequest(ScriptRequest {
-                    script,
+                    script: repo.cleanup_script.clone().unwrap(),
                     language: ScriptRequestLanguage::Bash,
                     context: ScriptContext::CleanupScript,
+                    working_dir: Some(repo.repo_name.clone()),
                 }),
                 None,
-            ))
+            ));
+        }
+
+        Some(root_action)
+    }
+
+    fn setup_actions_for_repos(&self, repos: &[ProjectRepoWithName]) -> Option<ExecutorAction> {
+        let repos_with_setup: Vec<_> = repos.iter().filter(|r| r.setup_script.is_some()).collect();
+
+        if repos_with_setup.is_empty() {
+            return None;
+        }
+
+        let mut iter = repos_with_setup.iter();
+        let first = iter.next()?;
+        let mut root_action = ExecutorAction::new(
+            ExecutorActionType::ScriptRequest(ScriptRequest {
+                script: first.setup_script.clone().unwrap(),
+                language: ScriptRequestLanguage::Bash,
+                context: ScriptContext::SetupScript,
+                working_dir: Some(first.repo_name.clone()),
+            }),
+            None,
+        );
+
+        for repo in iter {
+            root_action = root_action.append_action(ExecutorAction::new(
+                ExecutorActionType::ScriptRequest(ScriptRequest {
+                    script: repo.setup_script.clone().unwrap(),
+                    language: ScriptRequestLanguage::Bash,
+                    context: ScriptContext::SetupScript,
+                    working_dir: Some(repo.repo_name.clone()),
+                }),
+                None,
+            ));
+        }
+
+        Some(root_action)
+    }
+
+    fn setup_action_for_repo(repo: &ProjectRepoWithName) -> Option<ExecutorAction> {
+        repo.setup_script.as_ref().map(|script| {
+            ExecutorAction::new(
+                ExecutorActionType::ScriptRequest(ScriptRequest {
+                    script: script.clone(),
+                    language: ScriptRequestLanguage::Bash,
+                    context: ScriptContext::SetupScript,
+                    working_dir: Some(repo.repo_name.clone()),
+                }),
+                None,
+            )
         })
+    }
+
+    fn build_sequential_setup_chain(
+        repos: &[&ProjectRepoWithName],
+        next_action: ExecutorAction,
+    ) -> ExecutorAction {
+        let mut chained = next_action;
+        for repo in repos.iter().rev() {
+            if let Some(script) = &repo.setup_script {
+                chained = ExecutorAction::new(
+                    ExecutorActionType::ScriptRequest(ScriptRequest {
+                        script: script.clone(),
+                        language: ScriptRequestLanguage::Bash,
+                        context: ScriptContext::SetupScript,
+                        working_dir: Some(repo.repo_name.clone()),
+                    }),
+                    Some(Box::new(chained)),
+                );
+            }
+        }
+        chained
     }
 
     async fn try_stop(&self, task_attempt: &TaskAttempt, include_dev_server: bool) {
@@ -360,8 +522,6 @@ pub trait ContainerService {
             }
         }
     }
-
-    async fn delete_inner(&self, task_attempt: &TaskAttempt) -> Result<(), ContainerError>;
 
     async fn ensure_container_exists(
         &self,
@@ -692,97 +852,64 @@ pub trait ContainerService {
             .await?
             .ok_or(SqlxError::RowNotFound)?;
 
-        // // Get latest version of task attempt
+        let project_repos =
+            ProjectRepo::find_by_project_id_with_names(&self.db().pool, project.id).await?;
+
         let task_attempt = TaskAttempt::find_by_id(&self.db().pool, task_attempt.id)
             .await?
             .ok_or(SqlxError::RowNotFound)?;
 
         let prompt = task.to_prompt();
 
-        let cleanup_action = self.cleanup_action(project.cleanup_script.clone());
+        let repos_with_setup: Vec<_> = project_repos
+            .iter()
+            .filter(|pr| pr.setup_script.is_some())
+            .collect();
 
-        // Choose whether to execute the setup_script or coding agent first
-        let execution_process = if let Some(setup_script) = project.setup_script {
-            if project.parallel_setup_script {
-                // PARALLEL EXECUTION: Start setup script and coding agent independently
-                // Setup script runs without next_action (it completes on its own)
-                let setup_action = ExecutorAction::new(
-                    ExecutorActionType::ScriptRequest(ScriptRequest {
-                        script: setup_script,
-                        language: ScriptRequestLanguage::Bash,
-                        context: ScriptContext::SetupScript,
-                    }),
-                    None, // No chaining - runs independently
-                );
+        let all_parallel = repos_with_setup.iter().all(|pr| pr.parallel_setup_script);
 
-                // Start setup script (ignore errors - coding agent will start regardless)
-                if let Err(e) = self
-                    .start_execution(
-                        &task_attempt,
-                        &setup_action,
-                        &ExecutionProcessRunReason::SetupScript,
-                    )
-                    .await
+        let cleanup_action = self.cleanup_actions_for_repos(&project_repos);
+
+        let coding_action = ExecutorAction::new(
+            ExecutorActionType::CodingAgentInitialRequest(CodingAgentInitialRequest {
+                prompt,
+                executor_profile_id: executor_profile_id.clone(),
+            }),
+            cleanup_action.map(Box::new),
+        );
+
+        let execution_process = if all_parallel {
+            // All parallel: start each setup independently, then start coding agent
+            for repo in &repos_with_setup {
+                if let Some(action) = Self::setup_action_for_repo(repo)
+                    && let Err(e) = self
+                        .start_execution(
+                            &task_attempt,
+                            &action,
+                            &ExecutionProcessRunReason::SetupScript,
+                        )
+                        .await
                 {
                     tracing::warn!(?e, "Failed to start setup script in parallel mode");
                 }
-
-                // Start coding agent independently with cleanup as next_action
-                let coding_action = ExecutorAction::new(
-                    ExecutorActionType::CodingAgentInitialRequest(CodingAgentInitialRequest {
-                        prompt,
-                        executor_profile_id: executor_profile_id.clone(),
-                    }),
-                    cleanup_action,
-                );
-
-                self.start_execution(
-                    &task_attempt,
-                    &coding_action,
-                    &ExecutionProcessRunReason::CodingAgent,
-                )
-                .await?
-            } else {
-                // SEQUENTIAL EXECUTION: Setup script runs first, then coding agent
-                let executor_action = ExecutorAction::new(
-                    ExecutorActionType::ScriptRequest(ScriptRequest {
-                        script: setup_script,
-                        language: ScriptRequestLanguage::Bash,
-                        context: ScriptContext::SetupScript,
-                    }),
-                    // once the setup script is done, run the initial coding agent request
-                    Some(Box::new(ExecutorAction::new(
-                        ExecutorActionType::CodingAgentInitialRequest(CodingAgentInitialRequest {
-                            prompt,
-                            executor_profile_id: executor_profile_id.clone(),
-                        }),
-                        cleanup_action,
-                    ))),
-                );
-
-                self.start_execution(
-                    &task_attempt,
-                    &executor_action,
-                    &ExecutionProcessRunReason::SetupScript,
-                )
-                .await?
             }
-        } else {
-            let executor_action = ExecutorAction::new(
-                ExecutorActionType::CodingAgentInitialRequest(CodingAgentInitialRequest {
-                    prompt,
-                    executor_profile_id: executor_profile_id.clone(),
-                }),
-                cleanup_action,
-            );
-
             self.start_execution(
                 &task_attempt,
-                &executor_action,
+                &coding_action,
                 &ExecutionProcessRunReason::CodingAgent,
             )
             .await?
+        } else {
+            // Any sequential: chain ALL setups → coding agent via next_action
+            let main_action = Self::build_sequential_setup_chain(&repos_with_setup, coding_action);
+            self.start_execution(
+                &task_attempt,
+                &main_action,
+                &ExecutionProcessRunReason::SetupScript,
+            )
+            .await?
         };
+
         Ok(execution_process)
     }
 
@@ -813,15 +940,32 @@ pub trait ContainerService {
             }
         }
         // Create new execution process record
-        // Capture current HEAD as the "before" commit for this execution
-        let before_head_commit = {
-            if let Some(container_ref) = &task_attempt.container_ref {
-                let wt = std::path::Path::new(container_ref);
-                self.git().get_head_info(wt).ok().map(|h| h.oid)
-            } else {
-                None
-            }
-        };
+        // Capture current HEAD per repository as the "before" commit for this execution
+        let repositories =
+            AttemptRepo::find_repos_for_attempt(&self.db().pool, task_attempt.id).await?;
+        if repositories.is_empty() {
+            return Err(ContainerError::Other(anyhow!(
+                "Attempt has no repositories configured"
+            )));
+        }
+
+        let workspace_root = task_attempt
+            .container_ref
+            .as_ref()
+            .map(std::path::PathBuf::from)
+            .ok_or_else(|| ContainerError::Other(anyhow!("Container ref not found")))?;
+
+        let mut repo_states = Vec::with_capacity(repositories.len());
+        for repo in &repositories {
+            let repo_path = workspace_root.join(&repo.name);
+            let before_head_commit = self.git().get_head_info(&repo_path).ok().map(|h| h.oid);
+            repo_states.push(CreateExecutionProcessRepoState {
+                repo_id: repo.id,
+                before_head_commit,
+                after_head_commit: None,
+                merge_commit: None,
+            });
+        }
         let create_execution_process = CreateExecutionProcess {
             task_attempt_id: task_attempt.id,
             executor_action: executor_action.clone(),
@@ -832,7 +976,7 @@ pub trait ContainerService {
             &self.db().pool,
             &create_execution_process,
             Uuid::new_v4(),
-            before_head_commit.as_deref(),
+            &repo_states,
         )
         .await?;
 

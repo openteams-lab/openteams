@@ -12,15 +12,29 @@ export type SharedTask = { id: string, organization_id: string, project_id: stri
 
 export type UserData = { user_id: string, first_name: string | null, last_name: string | null, username: string | null, };
 
-export type Project = { id: string, name: string, git_repo_path: string, setup_script: string | null, dev_script: string | null, cleanup_script: string | null, copy_files: string | null, parallel_setup_script: boolean, remote_project_id: string | null, created_at: Date, updated_at: Date, };
+export type Project = { id: string, name: string, dev_script: string | null, remote_project_id: string | null, created_at: Date, updated_at: Date, };
 
-export type CreateProject = { name: string, git_repo_path: string, use_existing_repo: boolean, setup_script: string | null, dev_script: string | null, cleanup_script: string | null, copy_files: string | null, parallel_setup_script: boolean | null, };
+export type CreateProject = { name: string, repositories: Array<CreateProjectRepo>, };
 
-export type UpdateProject = { name: string | null, git_repo_path: string | null, setup_script: string | null, dev_script: string | null, cleanup_script: string | null, copy_files: string | null, parallel_setup_script: boolean | null, };
+export type UpdateProject = { name: string | null, dev_script: string | null, };
 
 export type SearchResult = { path: string, is_file: boolean, match_type: SearchMatchType, };
 
 export type SearchMatchType = "FileName" | "DirectoryName" | "FullPath";
+
+export type Repo = { id: string, path: string, name: string, display_name: string, created_at: Date, updated_at: Date, };
+
+export type ProjectRepo = { id: string, project_id: string, repo_id: string, setup_script: string | null, cleanup_script: string | null, copy_files: string | null, parallel_setup_script: boolean, };
+
+export type CreateProjectRepo = { display_name: string, git_repo_path: string, };
+
+export type UpdateProjectRepo = { setup_script: string | null, cleanup_script: string | null, copy_files: string | null, parallel_setup_script: boolean | null, };
+
+export type AttemptRepo = { id: string, attempt_id: string, repo_id: string, target_branch: string, created_at: Date, updated_at: Date, };
+
+export type CreateAttemptRepo = { repo_id: string, target_branch: string, };
+
+export type RepoWithTargetBranch = { target_branch: string, id: string, path: string, name: string, display_name: string, created_at: Date, updated_at: Date, };
 
 export type Tag = { id: string, tag_name: string, content: string, created_at: string, updated_at: string, };
 
@@ -32,7 +46,7 @@ export type TaskStatus = "todo" | "inprogress" | "inreview" | "done" | "cancelle
 
 export type Task = { id: string, project_id: string, title: string, description: string | null, status: TaskStatus, parent_task_attempt: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
 
-export type TaskWithAttemptStatus = { has_in_progress_attempt: boolean, has_merged_attempt: boolean, last_attempt_failed: boolean, executor: string, id: string, project_id: string, title: string, description: string | null, status: TaskStatus, parent_task_attempt: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
+export type TaskWithAttemptStatus = { has_in_progress_attempt: boolean, last_attempt_failed: boolean, executor: string, id: string, project_id: string, title: string, description: string | null, status: TaskStatus, parent_task_attempt: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
 
 export type TaskRelationships = { parent_task: Task | null, current_attempt: TaskAttempt, children: Array<Task>, };
 
@@ -56,17 +70,9 @@ export type Image = { id: string, file_path: string, original_name: string, mime
 
 export type CreateImage = { file_path: string, original_name: string, mime_type: string | null, size_bytes: bigint, hash: string, };
 
-export type TaskAttempt = { id: string, task_id: string, container_ref: string | null, branch: string, target_branch: string, executor: string, worktree_deleted: boolean, setup_completed_at: string | null, created_at: string, updated_at: string, };
+export type TaskAttempt = { id: string, task_id: string, container_ref: string | null, branch: string, executor: string, setup_completed_at: string | null, created_at: string, updated_at: string, };
 
-export type ExecutionProcess = { id: string, task_attempt_id: string, run_reason: ExecutionProcessRunReason, executor_action: ExecutorAction, 
-/**
- * Git HEAD commit OID captured before the process starts
- */
-before_head_commit: string | null, 
-/**
- * Git HEAD commit OID captured after the process ends
- */
-after_head_commit: string | null, status: ExecutionProcessStatus, exit_code: bigint | null, 
+export type ExecutionProcess = { id: string, task_attempt_id: string, run_reason: ExecutionProcessRunReason, executor_action: ExecutorAction, status: ExecutionProcessStatus, exit_code: bigint | null, 
 /**
  * dropped: true if this process is excluded from the current
  * history view (due to restore/trimming). Hidden from logs/timeline;
@@ -78,11 +84,13 @@ export enum ExecutionProcessStatus { running = "running", completed = "completed
 
 export type ExecutionProcessRunReason = "setupscript" | "cleanupscript" | "codingagent" | "devserver";
 
+export type ExecutionProcessRepoState = { id: string, execution_process_id: string, repo_id: string, before_head_commit: string | null, after_head_commit: string | null, merge_commit: string | null, created_at: Date, updated_at: Date, };
+
 export type Merge = { "type": "direct" } & DirectMerge | { "type": "pr" } & PrMerge;
 
-export type DirectMerge = { id: string, task_attempt_id: string, merge_commit: string, target_branch_name: string, created_at: string, };
+export type DirectMerge = { id: string, task_attempt_id: string, repo_id: string, merge_commit: string, target_branch_name: string, created_at: string, };
 
-export type PrMerge = { id: string, task_attempt_id: string, created_at: string, target_branch_name: string, pr_info: PullRequestInfo, };
+export type PrMerge = { id: string, task_attempt_id: string, repo_id: string, created_at: string, target_branch_name: string, pr_info: PullRequestInfo, };
 
 export type MergeStatus = "open" | "merged" | "closed" | "unknown";
 
@@ -168,6 +176,10 @@ export type CreateRemoteProjectRequest = { organization_id: string, name: string
 
 export type LinkToExistingRequest = { remote_project_id: string, };
 
+export type RegisterRepoRequest = { path: string, display_name: string | null, };
+
+export type InitRepoRequest = { parent_path: string, folder_name: string, };
+
 export type TagSearchParams = { search: string | null, };
 
 export type TokenResponse = { access_token: string, expires_at: string | null, };
@@ -194,17 +206,23 @@ export type CheckAgentAvailabilityQuery = { executor: BaseCodingAgent, };
 
 export type CurrentUserResponse = { user_id: string, };
 
+export type RepositoryBranches = { repository_id: string, repository_name: string, branches: Array<GitBranch>, };
+
+export type ProjectBranchesResponse = { repositories: Array<RepositoryBranches>, };
+
 export type CreateFollowUpAttempt = { prompt: string, variant: string | null, retry_process_id: string | null, force_when_dirty: boolean | null, perform_git_reset: boolean | null, };
 
-export type ChangeTargetBranchRequest = { new_target_branch: string, };
+export type ChangeTargetBranchRequest = { repo_id: string, new_target_branch: string, };
 
-export type ChangeTargetBranchResponse = { new_target_branch: string, status: [number, number], };
+export type ChangeTargetBranchResponse = { repo_id: string, new_target_branch: string, status: [number, number], };
+
+export type MergeTaskAttemptRequest = { repo_id: string, };
+
+export type PushTaskAttemptRequest = { repo_id: string, };
 
 export type RenameBranchRequest = { new_branch_name: string, };
 
 export type RenameBranchResponse = { branch: string, };
-
-export type CommitCompareResult = { subject: string, head_oid: string, target_oid: string, ahead_from_head: number, behind_from_head: number, is_linear: boolean, };
 
 export type OpenEditorRequest = { editor_type: string | null, file_path: string | null, };
 
@@ -214,19 +232,17 @@ export type AssignSharedTaskRequest = { new_assignee_user_id: string | null, };
 
 export type ShareTaskResponse = { shared_task_id: string, };
 
-export type CreateAndStartTaskRequest = { task: CreateTask, executor_profile_id: ExecutorProfileId, base_branch: string, };
+export type CreateAndStartTaskRequest = { task: CreateTask, executor_profile_id: ExecutorProfileId, repos: Array<AttemptRepoInput>, };
 
-export type CreateGitHubPrRequest = { title: string, body: string | null, target_branch: string | null, draft: boolean | null, auto_generate_description: boolean, };
+export type CreateGitHubPrRequest = { title: string, body: string | null, target_branch: string | null, draft: boolean | null, repo_id: string, auto_generate_description: boolean, };
 
 export type ImageResponse = { id: string, file_path: string, original_name: string, mime_type: string | null, size_bytes: bigint, hash: string, created_at: string, updated_at: string, };
 
 export type ImageMetadata = { exists: boolean, file_name: string | null, path: string | null, size_bytes: bigint | null, format: string | null, proxy_url: string | null, };
 
-export type CreateTaskAttemptBody = { task_id: string, 
-/**
- * Executor profile specification
- */
-executor_profile_id: ExecutorProfileId, base_branch: string, };
+export type CreateTaskAttemptBody = { task_id: string, executor_profile_id: ExecutorProfileId, repos: Array<AttemptRepoInput>, };
+
+export type AttemptRepoInput = { repo_id: string, target_branch: string, };
 
 export type RunAgentSetupRequest = { executor_profile_id: ExecutorProfileId, };
 
@@ -234,7 +250,9 @@ export type RunAgentSetupResponse = Record<string, never>;
 
 export type GhCliSetupError = "BREW_MISSING" | "SETUP_HELPER_NOT_SUPPORTED" | { "OTHER": { message: string, } };
 
-export type RebaseTaskAttemptRequest = { old_base_branch: string | null, new_base_branch: string | null, };
+export type RebaseTaskAttemptRequest = { repo_id: string, old_base_branch: string | null, new_base_branch: string | null, };
+
+export type AbortConflictsRequest = { repo_id: string, };
 
 export type GitOperationError = { "type": "merge_conflicts", message: string, op: ConflictOp, } | { "type": "rebase_in_progress" };
 
@@ -260,11 +278,29 @@ export type RunScriptError = { "type": "no_script_configured" } | { "type": "pro
 
 export type AttachPrResponse = { pr_attached: boolean, pr_url: string | null, pr_number: bigint | null, pr_status: MergeStatus | null, };
 
+export type AttachExistingPrRequest = { repo_id: string, };
+
 export type PrCommentsResponse = { comments: Array<UnifiedPrComment>, };
 
 export type GetPrCommentsError = { "type": "no_pr_attached" } | { "type": "github_cli_not_installed" } | { "type": "github_cli_not_logged_in" };
 
+export type GetPrCommentsQuery = { repo_id: string, };
+
 export type UnifiedPrComment = { "comment_type": "general", id: string, author: string, author_association: string, body: string, created_at: string, url: string, } | { "comment_type": "review", id: bigint, author: string, author_association: string, body: string, created_at: string, url: string, path: string, line: bigint | null, diff_hunk: string, };
+
+export type RepoBranchStatus = { repo_id: string, repo_name: string, commits_behind: number | null, commits_ahead: number | null, has_uncommitted_changes: boolean | null, head_oid: string | null, uncommitted_count: number | null, untracked_count: number | null, target_branch_name: string, remote_commits_behind: number | null, remote_commits_ahead: number | null, merges: Array<Merge>, 
+/**
+ * True if a `git rebase` is currently in progress in this worktree
+ */
+is_rebase_in_progress: boolean, 
+/**
+ * Current conflict operation if any
+ */
+conflict_op: ConflictOp | null, 
+/**
+ * List of files currently in conflicted (unmerged) state
+ */
+conflicted_files: Array<string>, };
 
 export type DirectoryEntry = { name: string, path: string, is_directory: boolean, is_git_repo: boolean, last_modified: bigint | null, };
 
@@ -320,7 +356,12 @@ export type ExecutorActionType = { "type": "CodingAgentInitialRequest" } & Codin
 
 export type ScriptContext = "SetupScript" | "CleanupScript" | "DevServer" | "ToolInstallScript";
 
-export type ScriptRequest = { script: string, language: ScriptRequestLanguage, context: ScriptContext, };
+export type ScriptRequest = { script: string, language: ScriptRequestLanguage, context: ScriptContext, 
+/**
+ * Optional relative path to execute the script in (relative to container_ref).
+ * If None, uses the container_ref directory directly.
+ */
+working_dir: string | null, };
 
 export type ScriptRequestLanguage = "Bash";
 

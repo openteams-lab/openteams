@@ -27,6 +27,7 @@ import {
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ScratchType, type TaskWithAttemptStatus } from 'shared/types';
 import { useBranchStatus } from '@/hooks';
+import { useAttemptRepo } from '@/hooks/useAttemptRepo';
 import { useAttemptExecution } from '@/hooks/useAttemptExecution';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { cn } from '@/lib/utils';
@@ -70,12 +71,25 @@ export function TaskFollowUpSection({
   selectedAttemptId,
 }: TaskFollowUpSectionProps) {
   const { t } = useTranslation('tasks');
-  const { projectId, project } = useProject();
+  const { projectId } = useProject();
 
   const { isAttemptRunning, stopExecution, isStopping, processes } =
     useAttemptExecution(selectedAttemptId, task.id);
   const { data: branchStatus, refetch: refetchBranchStatus } =
     useBranchStatus(selectedAttemptId);
+  const { repos, selectedRepoId } = useAttemptRepo(selectedAttemptId);
+
+  const getSelectedRepoId = useCallback(() => {
+    return selectedRepoId ?? repos[0]?.id;
+  }, [selectedRepoId, repos]);
+
+  const repoWithConflicts = useMemo(
+    () =>
+      branchStatus?.find(
+        (r) => r.is_rebase_in_progress || (r.conflicted_files?.length ?? 0) > 0
+      ),
+    [branchStatus]
+  );
   const { branch: attemptBranch, refetch: refetchAttemptBranch } =
     useAttemptBranch(selectedAttemptId);
   const { profiles } = useUserSystem();
@@ -98,20 +112,15 @@ export function TaskFollowUpSection({
 
   // Non-editable conflict resolution instructions (derived, like review comments)
   const conflictResolutionInstructions = useMemo(() => {
-    const hasConflicts = (branchStatus?.conflicted_files?.length ?? 0) > 0;
-    if (!hasConflicts) return null;
+    if (!repoWithConflicts?.conflicted_files?.length) return null;
     return buildResolveConflictsInstructions(
       attemptBranch,
-      branchStatus?.target_branch_name,
-      branchStatus?.conflicted_files || [],
-      branchStatus?.conflict_op ?? null
+      repoWithConflicts.target_branch_name,
+      repoWithConflicts.conflicted_files,
+      repoWithConflicts.conflict_op ?? null,
+      repoWithConflicts.repo_name
     );
-  }, [
-    attemptBranch,
-    branchStatus?.target_branch_name,
-    branchStatus?.conflicted_files,
-    branchStatus?.conflict_op,
-  ]);
+  }, [attemptBranch, repoWithConflicts]);
 
   // Editor state (persisted via scratch)
   const {
@@ -324,16 +333,6 @@ export function TaskFollowUpSection({
       return false;
     }
 
-    // Check if PR is merged - if so, block follow-ups
-    if (branchStatus?.merges) {
-      const mergedPR = branchStatus.merges.find(
-        (m) => m.type === 'pr' && m.pr_info.status === 'merged'
-      );
-      if (mergedPR) {
-        return false;
-      }
-    }
-
     if (isRetryActive) return false; // disable typing while retry editor is active
     if (hasPendingApproval) return false; // disable typing during approval
     // Note: isQueued no longer blocks typing - editing auto-cancels the queue
@@ -342,7 +341,6 @@ export function TaskFollowUpSection({
     selectedAttemptId,
     processes.length,
     isSendingFollowUp,
-    branchStatus?.merges,
     isRetryActive,
     hasPendingApproval,
   ]);
@@ -368,28 +366,25 @@ export function TaskFollowUpSection({
   ]);
   const isEditable = !isRetryActive && !hasPendingApproval;
 
-  // Script availability
-  const hasSetupScript = Boolean(project?.setup_script);
-  const hasCleanupScript = Boolean(project?.cleanup_script);
-  const hasAnyScript = hasSetupScript || hasCleanupScript;
+  const hasAnyScript = true;
 
   const handleRunSetupScript = useCallback(async () => {
-    if (!selectedAttemptId || isAttemptRunning || !hasSetupScript) return;
+    if (!selectedAttemptId || isAttemptRunning) return;
     try {
       await attemptsApi.runSetupScript(selectedAttemptId);
     } catch (error) {
       console.error('Failed to run setup script:', error);
     }
-  }, [selectedAttemptId, isAttemptRunning, hasSetupScript]);
+  }, [selectedAttemptId, isAttemptRunning]);
 
   const handleRunCleanupScript = useCallback(async () => {
-    if (!selectedAttemptId || isAttemptRunning || !hasCleanupScript) return;
+    if (!selectedAttemptId || isAttemptRunning) return;
     try {
       await attemptsApi.runCleanupScript(selectedAttemptId);
     } catch (error) {
       console.error('Failed to run cleanup script:', error);
     }
-  }, [selectedAttemptId, isAttemptRunning, hasCleanupScript]);
+  }, [selectedAttemptId, isAttemptRunning]);
 
   // Handler to queue the current message for execution after agent finishes
   const handleQueueMessage = useCallback(async () => {
@@ -533,9 +528,12 @@ export function TaskFollowUpSection({
   // Handler for GitHub comments insertion
   const handleGitHubCommentClick = useCallback(async () => {
     if (!selectedAttemptId) return;
+    const repoId = getSelectedRepoId();
+    if (!repoId) return;
 
     const result = await GitHubCommentsDialog.show({
       attemptId: selectedAttemptId,
+      repoId,
     });
     if (result.comments.length > 0) {
       // Build markdown for all selected comments
@@ -577,7 +575,7 @@ export function TaskFollowUpSection({
         });
       }
     }
-  }, [selectedAttemptId]);
+  }, [selectedAttemptId, getSelectedRepoId]);
 
   // Stable onChange handler for WYSIWYGEditor
   const handleEditorChange = useCallback(
@@ -816,44 +814,12 @@ export function TaskFollowUpSection({
                 </Tooltip>
               </TooltipProvider>
               <DropdownMenuContent align="end">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <DropdownMenuItem
-                          disabled={!hasSetupScript}
-                          onClick={handleRunSetupScript}
-                        >
-                          {t('followUp.runSetupScript')}
-                        </DropdownMenuItem>
-                      </span>
-                    </TooltipTrigger>
-                    {!hasSetupScript && (
-                      <TooltipContent side="left">
-                        {t('followUp.noSetupScript')}
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </TooltipProvider>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <DropdownMenuItem
-                          disabled={!hasCleanupScript}
-                          onClick={handleRunCleanupScript}
-                        >
-                          {t('followUp.runCleanupScript')}
-                        </DropdownMenuItem>
-                      </span>
-                    </TooltipTrigger>
-                    {!hasCleanupScript && (
-                      <TooltipContent side="left">
-                        {t('followUp.noCleanupScript')}
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </TooltipProvider>
+                <DropdownMenuItem onClick={handleRunSetupScript}>
+                  {t('followUp.runSetupScript')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleRunCleanupScript}>
+                  {t('followUp.runCleanupScript')}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}

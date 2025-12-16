@@ -41,7 +41,6 @@ pub struct TaskWithAttemptStatus {
     #[ts(flatten)]
     pub task: Task,
     pub has_in_progress_attempt: bool,
-    pub has_merged_attempt: bool,
     pub last_attempt_failed: bool,
     pub executor: String,
 }
@@ -78,6 +77,22 @@ pub struct CreateTask {
 }
 
 impl CreateTask {
+    pub fn from_title_description(
+        project_id: Uuid,
+        title: String,
+        description: Option<String>,
+    ) -> Self {
+        Self {
+            project_id,
+            title,
+            description,
+            status: Some(TaskStatus::Todo),
+            parent_task_attempt: None,
+            image_ids: None,
+            shared_task_id: None,
+        }
+    }
+
     pub fn from_shared_task(
         project_id: Uuid,
         title: String,
@@ -94,23 +109,6 @@ impl CreateTask {
             image_ids: None,
             shared_task_id: Some(shared_task_id),
         }
-    }
-
-    /// Resolves parent_task_attempt from base_branch if not already set.
-    /// If base_branch matches an existing task attempt's branch, sets that as parent.
-    pub async fn with_parent_from_branch(
-        mut self,
-        pool: &SqlitePool,
-        base_branch: &str,
-    ) -> Result<Self, sqlx::Error> {
-        // Only resolve if parent not already set (explicit parent takes precedence)
-        if self.parent_task_attempt.is_none()
-            && let Some(parent) =
-                TaskAttempt::find_by_branch(pool, self.project_id, base_branch).await?
-        {
-            self.parent_task_attempt = Some(parent.id);
-        }
-        Ok(self)
     }
 }
 
@@ -205,7 +203,6 @@ ORDER BY t.created_at DESC"#,
                     updated_at: rec.updated_at,
                 },
                 has_in_progress_attempt: rec.has_in_progress_attempt != 0,
-                has_merged_attempt: false, // TODO use merges table
                 last_attempt_failed: rec.last_attempt_failed != 0,
                 executor: rec.executor,
             })

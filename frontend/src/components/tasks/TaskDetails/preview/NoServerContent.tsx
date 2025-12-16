@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import {
   Play,
   Edit3,
@@ -18,8 +19,9 @@ import {
   ScriptPlaceholderContext,
 } from '@/utils/scriptPlaceholders';
 import { useUserSystem } from '@/components/ConfigProvider';
-import { useProjectMutations } from '@/hooks/useProjectMutations';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
+import { useProjectMutations } from '@/hooks/useProjectMutations';
+import { projectsApi } from '@/lib/api';
 import {
   COMPANION_INSTALL_TASK_TITLE,
   COMPANION_INSTALL_TASK_DESCRIPTION,
@@ -48,16 +50,17 @@ export function NoServerContent({
   const [isEditingExistingScript, setIsEditingExistingScript] = useState(false);
   const { system, config } = useUserSystem();
 
-  const { updateProject } = useProjectMutations({
-    onUpdateSuccess: () => {
-      setIsEditingExistingScript(false);
-    },
-    onUpdateError: (err) => {
-      setSaveError((err as Error)?.message || 'Failed to save dev script');
-    },
-  });
-
   const { createAndStart } = useTaskMutations(project?.id);
+  const { updateProject } = useProjectMutations();
+
+  const { data: projectRepos = [] } = useQuery({
+    queryKey: ['projectRepositories', project?.id],
+    queryFn: () =>
+      project?.id
+        ? projectsApi.getRepositories(project.id)
+        : Promise.resolve([]),
+    enabled: !!project?.id,
+  });
 
   // Create strategy-based placeholders
   const placeholders = system.environment
@@ -85,23 +88,16 @@ export function NoServerContent({
     }
 
     updateProject.mutate(
-      {
-        projectId: project.id,
-        data: {
-          name: project.name,
-          git_repo_path: project.git_repo_path,
-          setup_script: project.setup_script ?? null,
-          dev_script: script,
-          cleanup_script: project.cleanup_script ?? null,
-          copy_files: project.copy_files ?? null,
-          parallel_setup_script: project.parallel_setup_script ?? null,
-        },
-      },
+      { projectId: project.id, data: { name: null, dev_script: script } },
       {
         onSuccess: () => {
+          setIsEditingExistingScript(false);
           if (startAfterSave) {
             startDevServer();
           }
+        },
+        onError: (err) => {
+          setSaveError((err as Error)?.message || 'Failed to save dev script');
         },
       }
     );
@@ -122,7 +118,12 @@ export function NoServerContent({
   };
 
   const handleInstallCompanion = () => {
-    if (!project || !config) return;
+    if (!project || !config || projectRepos.length === 0) return;
+
+    const repos = projectRepos.map((repo) => ({
+      repo_id: repo.id,
+      target_branch: 'main',
+    }));
 
     createAndStart.mutate({
       task: {
@@ -135,7 +136,7 @@ export function NoServerContent({
         shared_task_id: null,
       },
       executor_profile_id: config.executor_profile,
-      base_branch: 'main',
+      repos,
     });
   };
 

@@ -1,7 +1,6 @@
 export { useBranchStatus } from './useBranchStatus';
 export { useAttemptExecution } from './useAttemptExecution';
 export { useOpenInEditor } from './useOpenInEditor';
-export { useProjectBranches } from './useProjectBranches';
 export { useTaskAttempt } from './useTaskAttempt';
 export { useTaskImages } from './useTaskImages';
 export { useImageUpload } from './useImageUpload';
@@ -18,6 +17,8 @@ export { useGitOperations } from './useGitOperations';
 export { useTask } from './useTask';
 export { useAttempt } from './useAttempt';
 export { useBranches } from './useBranches';
+export { useRepoBranchSelection } from './useRepoBranchSelection';
+export type { RepoBranchConfig } from './useRepoBranchSelection';
 export { useTaskAttempts } from './useTaskAttempts';
 export { useAuth } from './auth/useAuth';
 export { useAuthMutations } from './auth/useAuthMutations';

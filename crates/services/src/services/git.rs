@@ -152,6 +152,10 @@ impl GitService {
         Self {}
     }
 
+    pub fn is_branch_name_valid(&self, name: &str) -> bool {
+        git2::Branch::name_is_valid(name).unwrap_or(false)
+    }
+
     /// Open the repository
     fn open_repo(&self, repo_path: &Path) -> Result<Repository, GitServiceError> {
         Repository::open(repo_path).map_err(GitServiceError::from)
@@ -1164,6 +1168,19 @@ impl GitService {
     ) -> Result<(), GitServiceError> {
         let git = GitCli::new();
         git.worktree_remove(repo_path, worktree_path, force)
+            .map_err(|e| GitServiceError::InvalidRepository(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Move a worktree to a new location
+    pub fn move_worktree(
+        &self,
+        repo_path: &Path,
+        old_path: &Path,
+        new_path: &Path,
+    ) -> Result<(), GitServiceError> {
+        let git = GitCli::new();
+        git.worktree_move(repo_path, old_path, new_path)
             .map_err(|e| GitServiceError::InvalidRepository(e.to_string()))?;
         Ok(())
     }
