@@ -15,11 +15,15 @@ import {
   getGitHubAppStatus,
   getGitHubAppInstallUrl,
   disconnectGitHubApp,
+  updateRepositoryReviewEnabled,
+  fetchGitHubAppRepositories,
+  bulkUpdateRepositoryReviewEnabled,
   type Organization,
   type OrganizationMemberWithProfile,
   type OrganizationInvitation,
   type MemberRole,
   type GitHubAppStatus,
+  type GitHubAppRepository,
 } from "../api";
 
 export default function OrganizationPage() {
@@ -41,6 +45,12 @@ export default function OrganizationPage() {
   const [githubAppError, setGithubAppError] = useState<string | null>(null);
   const [showGithubDisconnectConfirm, setShowGithubDisconnectConfirm] = useState(false);
   const [githubAppSuccess, setGithubAppSuccess] = useState<string | null>(null);
+  const [repoToggleLoading, setRepoToggleLoading] = useState<string | null>(null);
+  const [repositories, setRepositories] = useState<GitHubAppRepository[]>([]);
+  const [reposLoading, setReposLoading] = useState(false);
+  const [repoSearch, setRepoSearch] = useState("");
+  const [repoFilter, setRepoFilter] = useState<"all" | "enabled" | "disabled">("all");
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   // Edit name state
   const [isEditingName, setIsEditingName] = useState(false);
@@ -118,6 +128,10 @@ export default function OrganizationPage() {
         try {
           const ghStatus = await getGitHubAppStatus(orgId);
           setGithubAppStatus(ghStatus);
+          // If installed, load repos asynchronously
+          if (ghStatus.installed) {
+            loadRepositories(orgId);
+          }
         } catch {
           // GitHub App may not be configured on the server
           setGithubAppStatus(null);
@@ -266,6 +280,64 @@ export default function OrganizationPage() {
       setGithubAppLoading(false);
     }
   };
+
+  const loadRepositories = async (organizationId: string) => {
+    setReposLoading(true);
+    try {
+      const repos = await fetchGitHubAppRepositories(organizationId);
+      setRepositories(repos);
+    } catch (e) {
+      setGithubAppError(e instanceof Error ? e.message : "Failed to load repositories");
+    } finally {
+      setReposLoading(false);
+    }
+  };
+
+  const handleToggleRepoReview = async (repoId: string, enabled: boolean) => {
+    if (!orgId) return;
+
+    setRepoToggleLoading(repoId);
+
+    try {
+      const updatedRepo = await updateRepositoryReviewEnabled(orgId, repoId, enabled);
+      setRepositories((prev) =>
+        prev.map((r) =>
+          r.id === repoId ? { ...r, review_enabled: updatedRepo.review_enabled } : r,
+        ),
+      );
+    } catch (e) {
+      setGithubAppError(e instanceof Error ? e.message : "Failed to update repository");
+    } finally {
+      setRepoToggleLoading(null);
+    }
+  };
+
+  const handleBulkToggle = async (enabled: boolean) => {
+    if (!orgId) return;
+
+    setBulkLoading(true);
+    try {
+      await bulkUpdateRepositoryReviewEnabled(orgId, enabled);
+      setRepositories((prev) =>
+        prev.map((r) => ({ ...r, review_enabled: enabled })),
+      );
+    } catch (e) {
+      setGithubAppError(e instanceof Error ? e.message : "Failed to update repositories");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const filteredRepositories = repositories
+    .filter((repo) =>
+      repo.repo_full_name.toLowerCase().includes(repoSearch.toLowerCase()),
+    )
+    .filter((repo) => {
+      if (repoFilter === "enabled") return repo.review_enabled;
+      if (repoFilter === "disabled") return !repo.review_enabled;
+      return true;
+    })
+    .sort((a, b) => a.repo_full_name.localeCompare(b.repo_full_name));
 
   if (loading) {
     return (
@@ -687,41 +759,118 @@ export default function OrganizationPage() {
                   </span>
                 </div>
 
-                <div className="text-sm text-gray-600 mb-4">
-                  {githubAppStatus.installation.repository_selection === "all" ? (
-                    <p>All repositories are being monitored.</p>
+                {/* Repository section */}
+                <div className="mb-4">
+                  {reposLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          fill="none"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      Loading repositories...
+                    </div>
                   ) : (
-                    <p>
-                      {githubAppStatus.repositories.length} selected{" "}
-                      {githubAppStatus.repositories.length === 1
-                        ? "repository"
-                        : "repositories"}{" "}
-                      being monitored.
-                    </p>
+                    <>
+                      <div className="text-sm text-gray-600 mb-3">
+                        <p>
+                          {repositories.filter((r) => r.review_enabled).length} of{" "}
+                          {repositories.length}{" "}
+                          {repositories.length === 1 ? "repository" : "repositories"}{" "}
+                          have reviews enabled.
+                        </p>
+                      </div>
+
+                      {repositories.length > 0 && (
+                        <>
+                          {/* Search, filter, and bulk actions */}
+                          <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                            <input
+                              type="text"
+                              placeholder="Search repositories..."
+                              value={repoSearch}
+                              onChange={(e) => setRepoSearch(e.target.value)}
+                              className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+                            />
+                            <select
+                              value={repoFilter}
+                              onChange={(e) => setRepoFilter(e.target.value as "all" | "enabled" | "disabled")}
+                              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300"
+                            >
+                              <option value="all">All</option>
+                              <option value="enabled">Enabled</option>
+                              <option value="disabled">Disabled</option>
+                            </select>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleBulkToggle(true)}
+                                disabled={bulkLoading}
+                                className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50"
+                              >
+                                Enable All
+                              </button>
+                              <button
+                                onClick={() => handleBulkToggle(false)}
+                                disabled={bulkLoading}
+                                className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                              >
+                                Disable All
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Repository list */}
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {filteredRepositories.length === 0 ? (
+                              <p className="text-sm text-gray-500 py-2">
+                                No repositories match "{repoSearch}"
+                              </p>
+                            ) : (
+                              filteredRepositories.map((repo) => (
+                                <div
+                                  key={repo.id}
+                                  className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
+                                >
+                                  <span className="text-sm text-gray-700 truncate flex-1 mr-3">
+                                    {repo.repo_full_name}
+                                  </span>
+                                  <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={repo.review_enabled}
+                                      onChange={(e) =>
+                                        handleToggleRepoReview(repo.id, e.target.checked)
+                                      }
+                                      disabled={repoToggleLoading === repo.id || bulkLoading}
+                                      className="sr-only peer"
+                                    />
+                                    <div
+                                      className={`w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500 ${repoToggleLoading === repo.id || bulkLoading ? "opacity-50" : ""}`}
+                                    ></div>
+                                    <span className="ml-2 text-xs text-gray-500 whitespace-nowrap">
+                                      {repo.review_enabled ? "On" : "Off"}
+                                    </span>
+                                  </label>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
-
-                {/* Repository list (if selected) */}
-                {githubAppStatus.installation.repository_selection === "selected" &&
-                  githubAppStatus.repositories.length > 0 && (
-                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs font-medium text-gray-500 mb-2">
-                        Monitored repositories:
-                      </p>
-                      <div className="space-y-1">
-                        {githubAppStatus.repositories.slice(0, 5).map((repo) => (
-                          <p key={repo.id} className="text-sm text-gray-700">
-                            {repo.repo_full_name}
-                          </p>
-                        ))}
-                        {githubAppStatus.repositories.length > 5 && (
-                          <p className="text-xs text-gray-500">
-                            +{githubAppStatus.repositories.length - 5} more
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
 
                 {/* Disconnect section */}
                 {showGithubDisconnectConfirm ? (

@@ -4,7 +4,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
-    routing::{delete, get, post},
+    routing::{delete, get, patch, post},
 };
 use chrono::{Duration, Utc};
 use secrecy::ExposeSecret;
@@ -41,6 +41,18 @@ pub fn protected_router() -> Router<AppState> {
         )
         .route("/organizations/{org_id}/github-app/status", get(get_status))
         .route("/organizations/{org_id}/github-app", delete(uninstall))
+        .route(
+            "/organizations/{org_id}/github-app/repositories",
+            get(fetch_repositories),
+        )
+        .route(
+            "/organizations/{org_id}/github-app/repositories/review-enabled",
+            patch(bulk_update_review_enabled),
+        )
+        .route(
+            "/organizations/{org_id}/github-app/repositories/{repo_id}/review-enabled",
+            patch(update_repo_review_enabled),
+        )
         .route("/debug/pr-review/trigger", post(trigger_pr_review))
 }
 
@@ -75,6 +87,7 @@ pub struct RepositoryDetails {
     pub id: String,
     pub github_repo_id: i64,
     pub repo_full_name: String,
+    pub review_enabled: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -92,6 +105,16 @@ pub struct TriggerPrReviewRequest {
 #[derive(Debug, Serialize)]
 pub struct TriggerPrReviewResponse {
     pub review_id: Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateRepoReviewEnabledRequest {
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BulkUpdateReviewEnabledResponse {
+    pub updated_count: u64,
 }
 
 // ========== Protected Route Handlers ==========
@@ -189,6 +212,7 @@ pub async fn get_status(
 
     match installation {
         Some(inst) => {
+            // Return cached repos from DB (fast) - use GET /repositories to fetch fresh data
             let repositories = gh_repo.get_repositories(inst.id).await.map_err(|e| {
                 error!(?e, "Failed to get repositories");
                 ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
@@ -211,6 +235,7 @@ pub async fn get_status(
                         id: r.id.to_string(),
                         github_repo_id: r.github_repo_id,
                         repo_full_name: r.repo_full_name,
+                        review_enabled: r.review_enabled,
                     })
                     .collect(),
             }))
@@ -253,6 +278,185 @@ pub async fn uninstall(
 
     info!(org_id = %org_id, user_id = %ctx.user.id, "GitHub App installation removed");
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// PATCH /v1/organizations/:org_id/github-app/repositories/:repo_id/review-enabled
+/// Toggle whether a repository should trigger PR reviews
+pub async fn update_repo_review_enabled(
+    State(state): State<AppState>,
+    axum::extract::Extension(ctx): axum::extract::Extension<RequestContext>,
+    Path((org_id, repo_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<UpdateRepoReviewEnabledRequest>,
+) -> Result<impl IntoResponse, ErrorResponse> {
+    // Check user is admin of organization
+    let org_repo = OrganizationRepository::new(state.pool());
+    org_repo
+        .assert_admin(org_id, ctx.user.id)
+        .await
+        .map_err(|e| match e {
+            IdentityError::PermissionDenied => {
+                ErrorResponse::new(StatusCode::FORBIDDEN, "Admin access required")
+            }
+            IdentityError::NotFound => {
+                ErrorResponse::new(StatusCode::NOT_FOUND, "Organization not found")
+            }
+            _ => ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "Database error"),
+        })?;
+
+    // Get installation for this org
+    let gh_repo = GitHubAppRepository2::new(state.pool());
+    let installation = gh_repo
+        .get_by_organization(org_id)
+        .await
+        .map_err(|_| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "Database error"))?
+        .ok_or_else(|| ErrorResponse::new(StatusCode::NOT_FOUND, "GitHub App not installed"))?;
+
+    // Update the repository
+    let updated = gh_repo
+        .update_repository_review_enabled(repo_id, installation.id, payload.enabled)
+        .await
+        .map_err(|e| {
+            error!(?e, "Failed to update repository review_enabled");
+            match e {
+                crate::db::github_app::GitHubAppDbError::NotFound => {
+                    ErrorResponse::new(StatusCode::NOT_FOUND, "Repository not found")
+                }
+                _ => ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "Database error"),
+            }
+        })?;
+
+    info!(
+        org_id = %org_id,
+        repo_id = %repo_id,
+        review_enabled = payload.enabled,
+        "Repository review_enabled updated"
+    );
+
+    Ok(Json(RepositoryDetails {
+        id: updated.id.to_string(),
+        github_repo_id: updated.github_repo_id,
+        repo_full_name: updated.repo_full_name,
+        review_enabled: updated.review_enabled,
+    }))
+}
+
+/// GET /v1/organizations/:org_id/github-app/repositories
+/// Fetches repositories from GitHub API, syncs to DB, and returns the list
+pub async fn fetch_repositories(
+    State(state): State<AppState>,
+    axum::extract::Extension(ctx): axum::extract::Extension<RequestContext>,
+    Path(org_id): Path<Uuid>,
+) -> Result<impl IntoResponse, ErrorResponse> {
+    // Check user is member of organization
+    let org_repo = OrganizationRepository::new(state.pool());
+    org_repo
+        .assert_membership(org_id, ctx.user.id)
+        .await
+        .map_err(|e| match e {
+            IdentityError::PermissionDenied | IdentityError::NotFound => {
+                ErrorResponse::new(StatusCode::FORBIDDEN, "Access denied")
+            }
+            _ => ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "Database error"),
+        })?;
+
+    let gh_repo = GitHubAppRepository2::new(state.pool());
+
+    let installation = gh_repo
+        .get_by_organization(org_id)
+        .await
+        .map_err(|_| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "Database error"))?
+        .ok_or_else(|| ErrorResponse::new(StatusCode::NOT_FOUND, "GitHub App not installed"))?;
+
+    // Fetch repos from GitHub API and sync to DB
+    let github_app = state.github_app().ok_or_else(|| {
+        ErrorResponse::new(StatusCode::NOT_IMPLEMENTED, "GitHub App not configured")
+    })?;
+
+    match github_app
+        .list_installation_repos(installation.github_installation_id)
+        .await
+    {
+        Ok(repos) => {
+            let repo_data: Vec<(i64, String)> =
+                repos.into_iter().map(|r| (r.id, r.full_name)).collect();
+            if let Err(e) = gh_repo.sync_repositories(installation.id, &repo_data).await {
+                warn!(?e, "Failed to sync repositories from GitHub API");
+            }
+        }
+        Err(e) => {
+            warn!(?e, "Failed to fetch repositories from GitHub API");
+            // Continue with cached data
+        }
+    }
+
+    // Return the (now updated) list from DB
+    let repositories = gh_repo
+        .get_repositories(installation.id)
+        .await
+        .map_err(|e| {
+            error!(?e, "Failed to get repositories");
+            ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+        })?;
+
+    Ok(Json(
+        repositories
+            .into_iter()
+            .map(|r| RepositoryDetails {
+                id: r.id.to_string(),
+                github_repo_id: r.github_repo_id,
+                repo_full_name: r.repo_full_name,
+                review_enabled: r.review_enabled,
+            })
+            .collect::<Vec<_>>(),
+    ))
+}
+
+/// PATCH /v1/organizations/:org_id/github-app/repositories/review-enabled
+/// Bulk toggle review_enabled for all repositories
+pub async fn bulk_update_review_enabled(
+    State(state): State<AppState>,
+    axum::extract::Extension(ctx): axum::extract::Extension<RequestContext>,
+    Path(org_id): Path<Uuid>,
+    Json(payload): Json<UpdateRepoReviewEnabledRequest>,
+) -> Result<impl IntoResponse, ErrorResponse> {
+    // Check user is admin of organization
+    let org_repo = OrganizationRepository::new(state.pool());
+    org_repo
+        .assert_admin(org_id, ctx.user.id)
+        .await
+        .map_err(|e| match e {
+            IdentityError::PermissionDenied => {
+                ErrorResponse::new(StatusCode::FORBIDDEN, "Admin access required")
+            }
+            IdentityError::NotFound => {
+                ErrorResponse::new(StatusCode::NOT_FOUND, "Organization not found")
+            }
+            _ => ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "Database error"),
+        })?;
+
+    let gh_repo = GitHubAppRepository2::new(state.pool());
+    let installation = gh_repo
+        .get_by_organization(org_id)
+        .await
+        .map_err(|_| ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "Database error"))?
+        .ok_or_else(|| ErrorResponse::new(StatusCode::NOT_FOUND, "GitHub App not installed"))?;
+
+    let updated_count = gh_repo
+        .set_all_repositories_review_enabled(installation.id, payload.enabled)
+        .await
+        .map_err(|e| {
+            error!(?e, "Failed to bulk update review_enabled");
+            ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+        })?;
+
+    info!(
+        org_id = %org_id,
+        review_enabled = payload.enabled,
+        updated_count,
+        "Bulk updated repository review_enabled"
+    );
+
+    Ok(Json(BulkUpdateReviewEnabledResponse { updated_count }))
 }
 
 // ========== Public Route Handlers ==========
@@ -634,6 +838,21 @@ async fn handle_pull_request_event(
     // Check if installation is suspended
     if installation.suspended_at.is_some() {
         info!(installation_id, "Installation is suspended, ignoring PR");
+        return StatusCode::OK.into_response();
+    }
+
+    // Check if this repository has reviews enabled
+    let github_repo_id = payload["repository"]["id"].as_i64().unwrap_or(0);
+    let is_review_enabled = gh_repo
+        .is_repository_review_enabled(installation.id, github_repo_id)
+        .await
+        .unwrap_or(true); // Default to true if lookup fails
+
+    if !is_review_enabled {
+        info!(
+            installation_id,
+            github_repo_id, repo_owner, repo_name, "Repository has reviews disabled, ignoring PR"
+        );
         return StatusCode::OK.into_response();
     }
 

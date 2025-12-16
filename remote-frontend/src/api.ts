@@ -494,6 +494,7 @@ export type GitHubAppRepository = {
   id: string;
   github_repo_id: number;
   repo_full_name: string;
+  review_enabled: boolean;
 };
 
 export type GitHubAppStatus = {
@@ -540,4 +541,56 @@ export async function disconnectGitHubApp(orgId: string): Promise<void> {
     const error = await res.json().catch(() => ({}));
     throw new Error(error.error || `Failed to disconnect GitHub App (${res.status})`);
   }
+}
+
+export async function updateRepositoryReviewEnabled(
+  orgId: string,
+  repoId: string,
+  enabled: boolean,
+): Promise<GitHubAppRepository> {
+  const res = await authenticatedFetch(
+    `${API_BASE}/v1/organizations/${orgId}/github-app/repositories/${repoId}/review-enabled`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    },
+  );
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to update repository (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function fetchGitHubAppRepositories(
+  orgId: string,
+): Promise<GitHubAppRepository[]> {
+  const res = await authenticatedFetch(
+    `${API_BASE}/v1/organizations/${orgId}/github-app/repositories`,
+  );
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to fetch repositories (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function bulkUpdateRepositoryReviewEnabled(
+  orgId: string,
+  enabled: boolean,
+): Promise<{ updated_count: number }> {
+  const res = await authenticatedFetch(
+    `${API_BASE}/v1/organizations/${orgId}/github-app/repositories/review-enabled`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    },
+  );
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to update repositories (${res.status})`);
+  }
+  return res.json();
 }
