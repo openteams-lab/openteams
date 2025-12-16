@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink, GitPullRequest } from 'lucide-react';
 import {
@@ -12,41 +11,28 @@ import GitOperations from '@/components/tasks/Toolbar/GitOperations';
 import { useTaskAttempt } from '@/hooks/useTaskAttempt';
 import { useBranchStatus, useAttemptExecution } from '@/hooks';
 import { useAttemptRepo } from '@/hooks/useAttemptRepo';
-import { useProject } from '@/contexts/ProjectContext';
 import { ExecutionProcessesProvider } from '@/contexts/ExecutionProcessesContext';
 import {
   GitOperationsProvider,
   useGitOperationsError,
 } from '@/contexts/GitOperationsContext';
-import { projectsApi } from '@/lib/api';
-import type {
-  GitBranch,
-  Merge,
-  RepositoryBranches,
-  TaskAttempt,
-  TaskWithAttemptStatus,
-} from 'shared/types';
+import type { Merge, TaskAttempt, TaskWithAttemptStatus } from 'shared/types';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal } from '@/lib/modals';
 
 export interface GitActionsDialogProps {
   attemptId: string;
   task?: TaskWithAttemptStatus;
-  projectId?: string;
 }
 
 interface GitActionsDialogContentProps {
   attempt: TaskAttempt;
   task: TaskWithAttemptStatus;
-  projectId: string;
-  branches: GitBranch[];
 }
 
 function GitActionsDialogContent({
   attempt,
   task,
-  projectId,
-  branches,
 }: GitActionsDialogContentProps) {
   const { t } = useTranslation('tasks');
   const { data: branchStatus } = useBranchStatus(attempt.id);
@@ -96,9 +82,7 @@ function GitActionsDialogContent({
       <GitOperations
         selectedAttempt={attempt}
         task={task}
-        projectId={projectId}
         branchStatus={branchStatus ?? null}
-        branches={branches}
         isAttemptRunning={isAttemptRunning}
         selectedBranch={getSelectedRepoStatus()?.target_branch_name ?? null}
         layout="vertical"
@@ -108,34 +92,11 @@ function GitActionsDialogContent({
 }
 
 const GitActionsDialogImpl = NiceModal.create<GitActionsDialogProps>(
-  ({ attemptId, task, projectId: providedProjectId }) => {
+  ({ attemptId, task }) => {
     const modal = useModal();
     const { t } = useTranslation('tasks');
-    const { project } = useProject();
 
-    const effectiveProjectId = providedProjectId ?? project?.id;
     const { data: attempt } = useTaskAttempt(attemptId);
-    const { selectedRepoId } = useAttemptRepo(attemptId);
-
-    const [repoBranches, setRepoBranches] = useState<RepositoryBranches[]>([]);
-    const [loadingBranches, setLoadingBranches] = useState(true);
-
-    useEffect(() => {
-      if (!effectiveProjectId) return;
-      setLoadingBranches(true);
-      projectsApi
-        .getBranches(effectiveProjectId)
-        .then(setRepoBranches)
-        .catch(() => setRepoBranches([]))
-        .finally(() => setLoadingBranches(false));
-    }, [effectiveProjectId]);
-
-    const branches = useMemo(
-      () =>
-        repoBranches.find((r) => r.repository_id === selectedRepoId)
-          ?.branches ?? [],
-      [repoBranches, selectedRepoId]
-    );
 
     const handleOpenChange = (open: boolean) => {
       if (!open) {
@@ -143,8 +104,7 @@ const GitActionsDialogImpl = NiceModal.create<GitActionsDialogProps>(
       }
     };
 
-    const isLoading =
-      !attempt || !effectiveProjectId || loadingBranches || !task;
+    const isLoading = !attempt || !task;
 
     return (
       <Dialog open={modal.visible} onOpenChange={handleOpenChange}>
@@ -163,12 +123,7 @@ const GitActionsDialogImpl = NiceModal.create<GitActionsDialogProps>(
                 key={attempt.id}
                 attemptId={attempt.id}
               >
-                <GitActionsDialogContent
-                  attempt={attempt}
-                  task={task}
-                  projectId={effectiveProjectId}
-                  branches={branches}
-                />
+                <GitActionsDialogContent attempt={attempt} task={task} />
               </ExecutionProcessesProvider>
             </GitOperationsProvider>
           )}

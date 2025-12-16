@@ -31,11 +31,11 @@ import RepoBranchSelector from '@/components/tasks/RepoBranchSelector';
 import { ExecutorProfileSelector } from '@/components/settings';
 import { useUserSystem } from '@/components/ConfigProvider';
 import {
-  useBranches,
   useTaskImages,
   useImageUpload,
   useTaskMutations,
-  type RepoBranchConfig,
+  useProjectRepos,
+  useRepoBranchSelection,
 } from '@/hooks';
 import {
   useKeySubmitTask,
@@ -50,8 +50,6 @@ import type {
   ExecutorProfileId,
   ImageResponse,
 } from 'shared/types';
-import { projectsApi } from '@/lib/api';
-import { useQuery } from '@tanstack/react-query';
 
 interface Task {
   id: string;
@@ -104,43 +102,20 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
   const [showDiscardWarning, setShowDiscardWarning] = useState(false);
   const forceCreateOnlyRef = useRef(false);
 
-  const { data: repoBranches, isLoading: branchesLoading } =
-    useBranches(projectId);
   const { data: taskImages } = useTaskImages(
     editMode ? props.task.id : undefined
   );
-  const { data: projectRepos = [] } = useQuery({
-    queryKey: ['projectRepositories', projectId],
-    queryFn: () => projectsApi.getRepositories(projectId),
+  const { data: projectRepos = [] } = useProjectRepos(projectId, {
     enabled: modal.visible,
   });
-
-  const repoBranchConfigs = useMemo((): RepoBranchConfig[] => {
-    return projectRepos.map((repo) => {
-      const repoBranchData = repoBranches?.find(
-        (rb) => rb.repository_id === repo.id
-      );
-      const branches = repoBranchData?.branches ?? [];
-
-      let targetBranch: string | null = null;
-      const initialBranch =
-        mode === 'subtask' ? props.initialBaseBranch : undefined;
-
-      if (initialBranch && branches.some((b) => b.name === initialBranch)) {
-        targetBranch = initialBranch;
-      } else {
-        const currentBranch = branches.find((b) => b.is_current);
-        targetBranch = currentBranch?.name ?? branches[0]?.name ?? null;
-      }
-
-      return {
-        repoId: repo.id,
-        repoDisplayName: repo.display_name,
-        targetBranch,
-        branches,
-      };
+  const initialBranch =
+    mode === 'subtask' ? props.initialBaseBranch : undefined;
+  const { configs: repoBranchConfigs, isLoading: branchesLoading } =
+    useRepoBranchSelection({
+      repos: projectRepos,
+      initialBranch,
+      enabled: modal.visible && projectRepos.length > 0,
     });
-  }, [projectRepos, repoBranches, mode, props]);
 
   const defaultRepoBranches = useMemo((): RepoBranch[] => {
     return repoBranchConfigs

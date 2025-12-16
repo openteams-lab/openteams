@@ -18,6 +18,7 @@ import {
   useAttempt,
   useRepoBranchSelection,
   useTaskAttempts,
+  useProjectRepos,
 } from '@/hooks';
 import { useProject } from '@/contexts/ProjectContext';
 import { useUserSystem } from '@/components/ConfigProvider';
@@ -66,17 +67,19 @@ const CreateAttemptDialogImpl = NiceModal.create<CreateAttemptDialogProps>(
       { enabled: modal.visible && !!parentAttemptId }
     );
 
+    const { data: projectRepos = [], isLoading: isLoadingRepos } =
+      useProjectRepos(projectId, { enabled: modal.visible });
+
     const {
       configs: repoBranchConfigs,
-      projectRepos,
       isLoading: isLoadingBranches,
       setRepoBranch,
       getAttemptRepoInputs,
       reset: resetBranchSelection,
     } = useRepoBranchSelection({
-      projectId,
+      repos: projectRepos,
       initialBranch: parentAttempt?.branch,
-      enabled: modal.visible,
+      enabled: modal.visible && projectRepos.length > 0,
     });
 
     const latestAttempt = useMemo(() => {
@@ -118,6 +121,7 @@ const CreateAttemptDialogImpl = NiceModal.create<CreateAttemptDialogProps>(
     const effectiveProfile = userSelectedProfile ?? defaultProfile;
 
     const isLoadingInitial =
+      isLoadingRepos ||
       isLoadingBranches ||
       isLoadingAttempts ||
       isLoadingTask ||

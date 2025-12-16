@@ -19,7 +19,6 @@ import { useCallback, useMemo, useState } from 'react';
 import type {
   RepoBranchStatus,
   Merge,
-  GitBranch,
   TaskAttempt,
   TaskWithAttemptStatus,
 } from 'shared/types';
@@ -30,13 +29,12 @@ import { CreatePRDialog } from '@/components/dialogs/tasks/CreatePRDialog';
 import { useTranslation } from 'react-i18next';
 import { useAttemptRepo } from '@/hooks/useAttemptRepo';
 import { useGitOperations } from '@/hooks/useGitOperations';
+import { useRepoBranches } from '@/hooks';
 
 interface GitOperationsProps {
   selectedAttempt: TaskAttempt;
   task: TaskWithAttemptStatus;
-  projectId: string;
   branchStatus: RepoBranchStatus[] | null;
-  branches: GitBranch[];
   isAttemptRunning: boolean;
   selectedBranch: string | null;
   layout?: 'horizontal' | 'vertical';
@@ -47,19 +45,18 @@ export type GitOperationsInputs = Omit<GitOperationsProps, 'selectedAttempt'>;
 function GitOperations({
   selectedAttempt,
   task,
-  projectId,
   branchStatus,
-  branches,
   isAttemptRunning,
   selectedBranch,
   layout = 'horizontal',
 }: GitOperationsProps) {
   const { t } = useTranslation('tasks');
 
-  const git = useGitOperations(selectedAttempt.id, projectId);
   const { repos, selectedRepoId, setSelectedRepoId } = useAttemptRepo(
     selectedAttempt.id
   );
+  const git = useGitOperations(selectedAttempt.id, selectedRepoId ?? undefined);
+  const { data: branches = [] } = useRepoBranches(selectedRepoId);
   const isChangingTargetBranch = git.states.changeTargetBranchPending;
 
   // Local state for git operations
@@ -256,7 +253,6 @@ function GitOperations({
     CreatePRDialog.show({
       attempt: selectedAttempt,
       task,
-      projectId,
       repoId: getSelectedRepoId(),
     });
   };

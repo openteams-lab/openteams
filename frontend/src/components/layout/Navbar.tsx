@@ -27,7 +27,7 @@ import { openTaskForm } from '@/lib/openTaskForm';
 import { useProject } from '@/contexts/ProjectContext';
 import { useOpenProjectInEditor } from '@/hooks/useOpenProjectInEditor';
 import { OpenInIdeButton } from '@/components/ide/OpenInIdeButton';
-import { useBranches } from '@/hooks/useBranches';
+import { useProjectRepos } from '@/hooks';
 import { useDiscordOnlineCount } from '@/hooks/useDiscordOnlineCount';
 import { useTranslation } from 'react-i18next';
 import { Switch } from '@/components/ui/switch';
@@ -80,7 +80,7 @@ export function Navbar() {
   const { data: onlineCount } = useDiscordOnlineCount();
   const { loginStatus, reloadSystem } = useUserSystem();
 
-  const { data: repos } = useBranches(projectId);
+  const { data: repos } = useProjectRepos(projectId);
   const isSingleRepoProject = repos?.length === 1;
 
   const setSearchBarRef = useCallback(

@@ -24,12 +24,11 @@ import {
 import { Project } from 'shared/types';
 import { useEffect, useRef } from 'react';
 import { useOpenProjectInEditor } from '@/hooks/useOpenProjectInEditor';
-import { useNavigateWithSearch } from '@/hooks';
+import { useNavigateWithSearch, useProjectRepos } from '@/hooks';
 import { projectsApi } from '@/lib/api';
 import { LinkProjectDialog } from '@/components/dialogs/projects/LinkProjectDialog';
 import { useTranslation } from 'react-i18next';
 import { useProjectMutations } from '@/hooks/useProjectMutations';
-import { useBranches } from '@/hooks/useBranches';
 
 type Props = {
   project: Project;
@@ -51,7 +50,7 @@ function ProjectCard({
   const handleOpenInEditor = useOpenProjectInEditor(project);
   const { t } = useTranslation('projects');
 
-  const { data: repos } = useBranches(project.id);
+  const { data: repos } = useProjectRepos(project.id);
   const isSingleRepoProject = repos?.length === 1;
 
   const { unlinkProject } = useProjectMutations({

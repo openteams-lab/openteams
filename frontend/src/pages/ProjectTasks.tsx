@@ -6,12 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, Plus, X } from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
 import { tasksApi } from '@/lib/api';
-import type {
-  GitBranch,
-  TaskAttempt,
-  RepoBranchStatus,
-  RepositoryBranches,
-} from 'shared/types';
+import type { TaskAttempt, RepoBranchStatus } from 'shared/types';
 import { openTaskForm } from '@/lib/openTaskForm';
 import { FeatureShowcaseDialog } from '@/components/dialogs/global/FeatureShowcaseDialog';
 import { showcases } from '@/config/showcases';
@@ -24,8 +19,6 @@ import { useTaskAttempts } from '@/hooks/useTaskAttempts';
 import { useTaskAttempt } from '@/hooks/useTaskAttempt';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useBranchStatus, useAttemptExecution } from '@/hooks';
-import { useAttemptRepo } from '@/hooks/useAttemptRepo';
-import { projectsApi } from '@/lib/api';
 import { paths } from '@/lib/paths';
 import { ExecutionProcessesProvider } from '@/contexts/ExecutionProcessesContext';
 import { ClickedElementsProvider } from '@/contexts/ClickedElementsProvider';
@@ -108,15 +101,11 @@ function GitErrorBanner() {
 function DiffsPanelContainer({
   attempt,
   selectedTask,
-  projectId,
   branchStatus,
-  branches,
 }: {
   attempt: TaskAttempt | null;
   selectedTask: TaskWithAttemptStatus | null;
-  projectId: string;
   branchStatus: RepoBranchStatus[] | null;
-  branches: GitBranch[];
 }) {
   const { isAttemptRunning } = useAttemptExecution(attempt?.id);
 
@@ -127,9 +116,7 @@ function DiffsPanelContainer({
         attempt && selectedTask
           ? {
               task: selectedTask,
-              projectId,
               branchStatus: branchStatus ?? null,
-              branches,
               isAttemptRunning,
               selectedBranch: branchStatus?.[0]?.target_branch_name ?? null,
             }
@@ -297,23 +284,6 @@ export function ProjectTasks() {
   const { data: attempt } = useTaskAttempt(effectiveAttemptId);
 
   const { data: branchStatus } = useBranchStatus(attempt?.id);
-  const { selectedRepoId } = useAttemptRepo(attempt?.id);
-  const [repoBranches, setRepoBranches] = useState<RepositoryBranches[]>([]);
-
-  useEffect(() => {
-    if (!projectId) return;
-    projectsApi
-      .getBranches(projectId)
-      .then(setRepoBranches)
-      .catch(() => setRepoBranches([]));
-  }, [projectId]);
-
-  const branches = useMemo(
-    () =>
-      repoBranches.find((r) => r.repository_id === selectedRepoId)?.branches ??
-      [],
-    [repoBranches, selectedRepoId]
-  );
 
   const rawMode = searchParams.get('view') as LayoutMode;
   const mode: LayoutMode =
@@ -1028,9 +998,7 @@ export function ProjectTasks() {
           <DiffsPanelContainer
             attempt={attempt}
             selectedTask={selectedTask}
-            projectId={projectId!}
             branchStatus={branchStatus ?? null}
-            branches={branches}
           />
         )}
       </div>
