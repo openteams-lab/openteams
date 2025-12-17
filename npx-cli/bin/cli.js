@@ -77,7 +77,7 @@ function showProgress(downloaded, total) {
   const percent = total ? Math.round((downloaded / total) * 100) : 0;
   const mb = (downloaded / (1024 * 1024)).toFixed(1);
   const totalMb = total ? (total / (1024 * 1024)).toFixed(1) : "?";
-  process.stdout.write(`\r   Downloading: ${mb}MB / ${totalMb}MB (${percent}%)`);
+  process.stderr.write(`\r   Downloading: ${mb}MB / ${totalMb}MB (${percent}%)`);
 }
 
 async function extractAndRun(baseName, launch) {
@@ -98,10 +98,10 @@ async function extractAndRun(baseName, launch) {
 
   // Download if not cached
   if (!fs.existsSync(zipPath)) {
-    console.log(`Downloading ${baseName}...`);
+    console.error(`Downloading ${baseName}...`);
     try {
       await ensureBinary(platformDir, baseName, showProgress);
-      console.log(""); // newline after progress
+      console.error(""); // newline after progress
     } catch (err) {
       console.error(`\nDownload failed: ${err.message}`);
       process.exit(1);
@@ -141,21 +141,23 @@ async function extractAndRun(baseName, launch) {
 async function main() {
   fs.mkdirSync(versionCacheDir, { recursive: true });
 
-  // Non-blocking update check
-  getLatestVersion()
-    .then((latest) => {
-      if (latest && latest !== CLI_VERSION) {
-        setTimeout(() => {
-          console.log(`\nUpdate available: ${CLI_VERSION} -> ${latest}`);
-          console.log(`Run: npx vibe-kanban@latest`);
-        }, 2000);
-      }
-    })
-    .catch(() => {});
-
   const args = process.argv.slice(2);
   const isMcpMode = args.includes("--mcp");
   const isReviewMode = args[0] === "review";
+
+  // Non-blocking update check (skip in MCP mode to avoid stdout pollution)
+  if (!isMcpMode) {
+    getLatestVersion()
+      .then((latest) => {
+        if (latest && latest !== CLI_VERSION) {
+          setTimeout(() => {
+            console.log(`\nUpdate available: ${CLI_VERSION} -> ${latest}`);
+            console.log(`Run: npx vibe-kanban@latest`);
+          }, 2000);
+        }
+      })
+      .catch(() => {});
+  }
 
   if (isMcpMode) {
     await extractAndRun("vibe-kanban-mcp", (bin) => {
