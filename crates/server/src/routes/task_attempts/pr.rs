@@ -6,12 +6,13 @@ use axum::{
     response::Json as ResponseJson,
 };
 use db::models::{
-    attempt_repo::AttemptRepo,
     execution_process::{ExecutionProcess, ExecutionProcessRunReason},
     merge::{Merge, MergeStatus},
     repo::{Repo, RepoError},
+    session::{CreateSession, Session},
     task::{Task, TaskStatus},
-    task_attempt::{TaskAttempt, TaskAttemptError},
+    workspace::{Workspace, WorkspaceError},
+    workspace_repo::WorkspaceRepo,
 };
 use deployment::Deployment;
 use executors::actions::{
@@ -100,7 +101,7 @@ Use `gh pr edit` to update the PR."#;
 
 async fn trigger_pr_description_follow_up(
     deployment: &DeploymentImpl,
-    task_attempt: &TaskAttempt,
+    workspace: &Workspace,
     pr_number: i64,
     pr_url: &str,
 ) -> Result<(), ApiError> {
@@ -119,39 +120,57 @@ async fn trigger_pr_description_follow_up(
     drop(config); // Release the lock before async operations
 
     // Get executor profile from the latest coding agent process
-    let executor_profile_id = ExecutionProcess::latest_executor_profile_for_attempt(
+    let executor_profile_id = ExecutionProcess::latest_executor_profile_for_workspace(
         &deployment.db().pool,
-        task_attempt.id,
+        workspace.id,
     )
     .await?;
 
-    // Get latest session ID if one exists
-    let latest_session_id = ExecutionProcess::find_latest_session_id_by_task_attempt(
+    // Get latest agent session ID if one exists (for coding agent continuity)
+    let latest_agent_session_id = ExecutionProcess::find_latest_agent_session_id_by_workspace(
         &deployment.db().pool,
-        task_attempt.id,
+        workspace.id,
     )
     .await?;
 
     // Build the action type (follow-up if session exists, otherwise initial)
-    let action_type = if let Some(session_id) = latest_session_id {
+    let action_type = if let Some(agent_session_id) = latest_agent_session_id {
         ExecutorActionType::CodingAgentFollowUpRequest(CodingAgentFollowUpRequest {
             prompt,
-            session_id,
-            executor_profile_id,
+            session_id: agent_session_id,
+            executor_profile_id: executor_profile_id.clone(),
         })
     } else {
         ExecutorActionType::CodingAgentInitialRequest(CodingAgentInitialRequest {
             prompt,
-            executor_profile_id,
+            executor_profile_id: executor_profile_id.clone(),
         })
     };
 
     let action = ExecutorAction::new(action_type, None);
 
+    // Get or create a session for this follow-up
+    let session =
+        match Session::find_latest_by_workspace_id(&deployment.db().pool, workspace.id).await? {
+            Some(s) => s,
+            None => {
+                Session::create(
+                    &deployment.db().pool,
+                    &CreateSession {
+                        executor: Some(executor_profile_id.to_string()),
+                    },
+                    Uuid::new_v4(),
+                    workspace.id,
+                )
+                .await?
+            }
+        };
+
     deployment
         .container()
         .start_execution(
-            task_attempt,
+            workspace,
+            &session,
             &action,
             &ExecutionProcessRunReason::CodingAgent,
         )
@@ -161,18 +180,18 @@ async fn trigger_pr_description_follow_up(
 }
 
 pub async fn create_github_pr(
-    Extension(task_attempt): Extension<TaskAttempt>,
+    Extension(workspace): Extension<Workspace>,
     State(deployment): State<DeploymentImpl>,
     Json(request): Json<CreateGitHubPrRequest>,
 ) -> Result<ResponseJson<ApiResponse<String, CreatePrError>>, ApiError> {
     let pool = &deployment.db().pool;
 
-    let attempt_repo =
-        AttemptRepo::find_by_attempt_and_repo_id(pool, task_attempt.id, request.repo_id)
+    let workspace_repo =
+        WorkspaceRepo::find_by_workspace_and_repo_id(pool, workspace.id, request.repo_id)
             .await?
             .ok_or(RepoError::NotFound)?;
 
-    let repo = Repo::find_by_id(pool, attempt_repo.repo_id)
+    let repo = Repo::find_by_id(pool, workspace_repo.repo_id)
         .await?
         .ok_or(RepoError::NotFound)?;
 
@@ -180,12 +199,12 @@ pub async fn create_github_pr(
     let target_branch = if let Some(branch) = request.target_branch {
         branch
     } else {
-        attempt_repo.target_branch.clone()
+        workspace_repo.target_branch.clone()
     };
 
     let container_ref = deployment
         .container()
-        .ensure_container_exists(&task_attempt)
+        .ensure_container_exists(&workspace)
         .await?;
     let workspace_path = PathBuf::from(&container_ref);
     let worktree_path = workspace_path.join(repo.name);
@@ -218,7 +237,7 @@ pub async fn create_github_pr(
     // Push the branch to GitHub first
     if let Err(e) = deployment
         .git()
-        .push_to_github(&worktree_path, &task_attempt.branch, false)
+        .push_to_github(&worktree_path, &workspace.branch, false)
     {
         tracing::error!("Failed to push branch to GitHub: {}", e);
         match e {
@@ -259,7 +278,7 @@ pub async fn create_github_pr(
     let pr_request = CreatePrRequest {
         title: request.title.clone(),
         body: request.body.clone(),
-        head_branch: task_attempt.branch.clone(),
+        head_branch: workspace.branch.clone(),
         base_branch: norm_target_branch_name.clone(),
         draft: request.draft,
     };
@@ -270,18 +289,18 @@ pub async fn create_github_pr(
     let github_service = GitHubService::new()?;
     match github_service.create_pr(&repo_info, &pr_request).await {
         Ok(pr_info) => {
-            // Update the task attempt with PR information
+            // Update the workspace with PR information
             if let Err(e) = Merge::create_pr(
                 pool,
-                task_attempt.id,
-                attempt_repo.repo_id,
+                workspace.id,
+                workspace_repo.repo_id,
                 &norm_target_branch_name,
                 pr_info.number,
                 &pr_info.url,
             )
             .await
             {
-                tracing::error!("Failed to update task attempt PR status: {}", e);
+                tracing::error!("Failed to update workspace PR status: {}", e);
             }
 
             // Auto-open PR in browser
@@ -292,7 +311,7 @@ pub async fn create_github_pr(
                 .track_if_analytics_allowed(
                     "github_pr_created",
                     serde_json::json!({
-                        "attempt_id": task_attempt.id.to_string(),
+                        "workspace_id": workspace.id.to_string(),
                     }),
                 )
                 .await;
@@ -301,7 +320,7 @@ pub async fn create_github_pr(
             if request.auto_generate_description
                 && let Err(e) = trigger_pr_description_follow_up(
                     &deployment,
-                    &task_attempt,
+                    &workspace,
                     pr_info.number,
                     &pr_info.url,
                 )
@@ -309,7 +328,7 @@ pub async fn create_github_pr(
             {
                 tracing::warn!(
                     "Failed to trigger PR description follow-up for attempt {}: {}",
-                    task_attempt.id,
+                    workspace.id,
                     e
                 );
             }
@@ -319,7 +338,7 @@ pub async fn create_github_pr(
         Err(e) => {
             tracing::error!(
                 "Failed to create GitHub PR for attempt {}: {}",
-                task_attempt.id,
+                workspace.id,
                 e
             );
             match &e {
@@ -336,29 +355,28 @@ pub async fn create_github_pr(
 }
 
 pub async fn attach_existing_pr(
-    Extension(task_attempt): Extension<TaskAttempt>,
+    Extension(workspace): Extension<Workspace>,
     State(deployment): State<DeploymentImpl>,
     Json(request): Json<AttachExistingPrRequest>,
 ) -> Result<ResponseJson<ApiResponse<AttachPrResponse>>, ApiError> {
     let pool = &deployment.db().pool;
 
-    let task = task_attempt
+    let task = workspace
         .parent_task(pool)
         .await?
-        .ok_or(ApiError::TaskAttempt(TaskAttemptError::TaskNotFound))?;
+        .ok_or(ApiError::Workspace(WorkspaceError::TaskNotFound))?;
 
-    let attempt_repo =
-        AttemptRepo::find_by_attempt_and_repo_id(pool, task_attempt.id, request.repo_id)
+    let workspace_repo =
+        WorkspaceRepo::find_by_workspace_and_repo_id(pool, workspace.id, request.repo_id)
             .await?
             .ok_or(RepoError::NotFound)?;
 
-    let repo = Repo::find_by_id(pool, attempt_repo.repo_id)
+    let repo = Repo::find_by_id(pool, workspace_repo.repo_id)
         .await?
         .ok_or(RepoError::NotFound)?;
 
     // Check if PR already attached for this repo
-    let merges =
-        Merge::find_by_task_attempt_and_repo_id(pool, task_attempt.id, request.repo_id).await?;
+    let merges = Merge::find_by_workspace_and_repo_id(pool, workspace.id, request.repo_id).await?;
     if let Some(Merge::Pr(pr_merge)) = merges.into_iter().next() {
         return Ok(ResponseJson(ApiResponse::success(AttachPrResponse {
             pr_attached: true,
@@ -373,7 +391,7 @@ pub async fn attach_existing_pr(
 
     // List all PRs for branch (open, closed, and merged)
     let prs = github_service
-        .list_all_prs_for_branch(&repo_info, &task_attempt.branch)
+        .list_all_prs_for_branch(&repo_info, &workspace.branch)
         .await?;
 
     // Take the first PR (prefer open, but also accept merged/closed)
@@ -381,9 +399,9 @@ pub async fn attach_existing_pr(
         // Save PR info to database
         let merge = Merge::create_pr(
             pool,
-            task_attempt.id,
-            attempt_repo.repo_id,
-            &attempt_repo.target_branch,
+            workspace.id,
+            workspace_repo.repo_id,
+            &workspace_repo.target_branch,
             pr_info.number,
             &pr_info.url,
         )
@@ -438,25 +456,24 @@ pub async fn attach_existing_pr(
 }
 
 pub async fn get_pr_comments(
-    Extension(task_attempt): Extension<TaskAttempt>,
+    Extension(workspace): Extension<Workspace>,
     State(deployment): State<DeploymentImpl>,
     Query(query): Query<GetPrCommentsQuery>,
 ) -> Result<ResponseJson<ApiResponse<PrCommentsResponse, GetPrCommentsError>>, ApiError> {
     let pool = &deployment.db().pool;
 
     // Look up the specific repo using the multi-repo pattern
-    let attempt_repo =
-        AttemptRepo::find_by_attempt_and_repo_id(pool, task_attempt.id, query.repo_id)
+    let workspace_repo =
+        WorkspaceRepo::find_by_workspace_and_repo_id(pool, workspace.id, query.repo_id)
             .await?
             .ok_or(RepoError::NotFound)?;
 
-    let repo = Repo::find_by_id(pool, attempt_repo.repo_id)
+    let repo = Repo::find_by_id(pool, workspace_repo.repo_id)
         .await?
         .ok_or(RepoError::NotFound)?;
 
     // Find the merge/PR for this specific repo
-    let merges =
-        Merge::find_by_task_attempt_and_repo_id(pool, task_attempt.id, query.repo_id).await?;
+    let merges = Merge::find_by_workspace_and_repo_id(pool, workspace.id, query.repo_id).await?;
 
     // Ensure there's an attached PR for this repo
     let pr_info = match merges.into_iter().next() {
@@ -482,7 +499,7 @@ pub async fn get_pr_comments(
         Err(e) => {
             tracing::error!(
                 "Failed to fetch PR comments for attempt {}, PR #{}: {}",
-                task_attempt.id,
+                workspace.id,
                 pr_info.number,
                 e
             );

@@ -26,7 +26,6 @@ import {
   SearchResult,
   ShareTaskResponse,
   Task,
-  TaskAttempt,
   TaskRelationships,
   Tag,
   TagSearchParams,
@@ -88,7 +87,11 @@ import {
   PushTaskAttemptRequest,
   RepoBranchStatus,
   AbortConflictsRequest,
+  Session,
+  Workspace,
 } from 'shared/types';
+import type { WorkspaceWithSession } from '@/types/attempt';
+import { createWorkspaceWithSession } from '@/types/attempt';
 
 export class ApiError<E = unknown> extends Error {
   public status?: number;
@@ -464,6 +467,16 @@ export const tasksApi = {
   },
 };
 
+// Sessions API
+export const sessionsApi = {
+  getByWorkspace: async (workspaceId: string): Promise<Session[]> => {
+    const response = await makeRequest(
+      `/api/sessions?workspace_id=${workspaceId}`
+    );
+    return handleApiResponse<Session[]>(response);
+  },
+};
+
 // Task Attempts APIs
 export const attemptsApi = {
   getChildren: async (attemptId: string): Promise<TaskRelationships> => {
@@ -473,22 +486,32 @@ export const attemptsApi = {
     return handleApiResponse<TaskRelationships>(response);
   },
 
-  getAll: async (taskId: string): Promise<TaskAttempt[]> => {
+  getAll: async (taskId: string): Promise<Workspace[]> => {
     const response = await makeRequest(`/api/task-attempts?task_id=${taskId}`);
-    return handleApiResponse<TaskAttempt[]>(response);
+    return handleApiResponse<Workspace[]>(response);
   },
 
-  get: async (attemptId: string): Promise<TaskAttempt> => {
+  get: async (attemptId: string): Promise<Workspace> => {
     const response = await makeRequest(`/api/task-attempts/${attemptId}`);
-    return handleApiResponse<TaskAttempt>(response);
+    return handleApiResponse<Workspace>(response);
   },
 
-  create: async (data: CreateTaskAttemptBody): Promise<TaskAttempt> => {
+  /** Get workspace with executor from latest session (for components that need executor) */
+  getWithSession: async (attemptId: string): Promise<WorkspaceWithSession> => {
+    const [workspace, sessions] = await Promise.all([
+      attemptsApi.get(attemptId),
+      sessionsApi.getByWorkspace(attemptId),
+    ]);
+    const executor = sessions[0]?.executor ?? 'unknown';
+    return createWorkspaceWithSession(workspace, executor);
+  },
+
+  create: async (data: CreateTaskAttemptBody): Promise<Workspace> => {
     const response = await makeRequest(`/api/task-attempts`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    return handleApiResponse<TaskAttempt>(response);
+    return handleApiResponse<Workspace>(response);
   },
 
   stop: async (attemptId: string): Promise<void> => {

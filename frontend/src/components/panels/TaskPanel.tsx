@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { useProject } from '@/contexts/ProjectContext';
-import { useTaskAttempts } from '@/hooks/useTaskAttempts';
-import { useTaskAttempt } from '@/hooks/useTaskAttempt';
+import { useTaskAttemptsWithSessions } from '@/hooks/useTaskAttempts';
+import { useTaskAttemptWithSession } from '@/hooks/useTaskAttempt';
 import { useNavigateWithSearch } from '@/hooks';
 import { paths } from '@/lib/paths';
-import type { TaskWithAttemptStatus, TaskAttempt } from 'shared/types';
+import type { TaskWithAttemptStatus } from 'shared/types';
+import type { WorkspaceWithSession } from '@/types/attempt';
 import { NewCardContent } from '../ui/new-card';
 import { Button } from '../ui/button';
 import { PlusIcon } from 'lucide-react';
@@ -25,11 +26,10 @@ const TaskPanel = ({ task }: TaskPanelProps) => {
     data: attempts = [],
     isLoading: isAttemptsLoading,
     isError: isAttemptsError,
-  } = useTaskAttempts(task?.id);
+  } = useTaskAttemptsWithSessions(task?.id);
 
-  const { data: parentAttempt, isLoading: isParentLoading } = useTaskAttempt(
-    task?.parent_task_attempt || undefined
-  );
+  const { data: parentAttempt, isLoading: isParentLoading } =
+    useTaskAttemptWithSession(task?.parent_workspace_id || undefined);
 
   const formatTimeAgo = (iso: string) => {
     const d = new Date(iso);
@@ -76,7 +76,7 @@ const TaskPanel = ({ task }: TaskPanelProps) => {
   const titleContent = `# ${task.title || 'Task'}`;
   const descriptionContent = task.description || '';
 
-  const attemptColumns: ColumnDef<TaskAttempt>[] = [
+  const attemptColumns: ColumnDef<WorkspaceWithSession>[] = [
     {
       id: 'executor',
       header: '',
@@ -109,7 +109,7 @@ const TaskPanel = ({ task }: TaskPanelProps) => {
           </div>
 
           <div className="mt-6 flex-shrink-0 space-y-4">
-            {task.parent_task_attempt && (
+            {task.parent_workspace_id && (
               <DataTable
                 data={parentAttempt ? [parentAttempt] : []}
                 columns={attemptColumns}

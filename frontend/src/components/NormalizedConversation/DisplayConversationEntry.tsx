@@ -3,12 +3,12 @@ import WYSIWYGEditor from '@/components/ui/wysiwyg';
 import {
   ActionType,
   NormalizedEntry,
-  TaskAttempt,
   ToolStatus,
   type NormalizedEntryType,
   type TaskWithAttemptStatus,
   type JsonValue,
 } from 'shared/types.ts';
+import type { WorkspaceWithSession } from '@/types/attempt';
 import type { ProcessStartPayload } from '@/types/logs';
 import FileChangeRenderer from './FileChangeRenderer';
 import { useExpandable } from '@/stores/useExpandableStore';
@@ -40,7 +40,7 @@ type Props = {
   expansionKey: string;
   diffDeletable?: boolean;
   executionProcessId?: string;
-  taskAttempt?: TaskAttempt;
+  taskAttempt?: WorkspaceWithSession;
   task?: TaskWithAttemptStatus;
 };
 

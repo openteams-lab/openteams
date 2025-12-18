@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, Plus, X } from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
 import { tasksApi } from '@/lib/api';
-import type { TaskAttempt, RepoBranchStatus } from 'shared/types';
+import type { RepoBranchStatus, Workspace } from 'shared/types';
 import { openTaskForm } from '@/lib/openTaskForm';
 import { FeatureShowcaseDialog } from '@/components/dialogs/global/FeatureShowcaseDialog';
 import { showcases } from '@/config/showcases';
@@ -16,7 +16,7 @@ import { usePostHog } from 'posthog-js/react';
 import { useSearch } from '@/contexts/SearchContext';
 import { useProject } from '@/contexts/ProjectContext';
 import { useTaskAttempts } from '@/hooks/useTaskAttempts';
-import { useTaskAttempt } from '@/hooks/useTaskAttempt';
+import { useTaskAttemptWithSession } from '@/hooks/useTaskAttempt';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useBranchStatus, useAttemptExecution } from '@/hooks';
 import { paths } from '@/lib/paths';
@@ -103,7 +103,7 @@ function DiffsPanelContainer({
   selectedTask,
   branchStatus,
 }: {
-  attempt: TaskAttempt | null;
+  attempt: Workspace | null;
   selectedTask: TaskWithAttemptStatus | null;
   branchStatus: RepoBranchStatus[] | null;
 }) {
@@ -282,7 +282,7 @@ export function ProjectTasks() {
 
   const effectiveAttemptId = attemptId === 'latest' ? undefined : attemptId;
   const isTaskView = !!taskId && !effectiveAttemptId;
-  const { data: attempt } = useTaskAttempt(effectiveAttemptId);
+  const { data: attempt } = useTaskAttemptWithSession(effectiveAttemptId);
 
   const { data: branchStatus } = useBranchStatus(attempt?.id);
 
@@ -761,7 +761,7 @@ export function ProjectTasks() {
           title: task.title,
           description: task.description,
           status: newStatus,
-          parent_task_attempt: task.parent_task_attempt,
+          parent_workspace_id: task.parent_workspace_id,
           image_ids: null,
         });
       } catch (err) {
