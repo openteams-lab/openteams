@@ -5,7 +5,7 @@ use db::models::{
     repo::Repo,
     tag::Tag,
     task::{CreateTask, Task, TaskStatus, TaskWithAttemptStatus, UpdateTask},
-    task_attempt::{TaskAttempt, TaskAttemptContext},
+    workspace::{Workspace, WorkspaceContext},
 };
 use executors::{executors::BaseCodingAgent, profile::ExecutorProfileId};
 use regex::Regex;
@@ -23,7 +23,7 @@ use uuid::Uuid;
 
 use crate::routes::{
     containers::ContainerQuery,
-    task_attempts::{AttemptRepoInput, CreateTaskAttemptBody},
+    task_attempts::{CreateTaskAttemptBody, WorkspaceRepoInput},
 };
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -208,7 +208,7 @@ pub struct DeleteTaskRequest {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct McpAttemptRepoInput {
+pub struct McpWorkspaceRepoInput {
     #[schemars(description = "The repository ID")]
     pub repo_id: Uuid,
     #[schemars(description = "The base branch for this repository")]
@@ -216,7 +216,7 @@ pub struct McpAttemptRepoInput {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct StartTaskAttemptRequest {
+pub struct StartWorkspaceSessionRequest {
     #[schemars(description = "The ID of the task to start")]
     pub task_id: Uuid,
     #[schemars(
@@ -226,13 +226,13 @@ pub struct StartTaskAttemptRequest {
     #[schemars(description = "Optional executor variant, if needed")]
     pub variant: Option<String>,
     #[schemars(description = "Base branch for each repository in the project")]
-    pub repos: Vec<McpAttemptRepoInput>,
+    pub repos: Vec<McpWorkspaceRepoInput>,
 }
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct StartTaskAttemptResponse {
+pub struct StartWorkspaceSessionResponse {
     pub task_id: String,
-    pub attempt_id: String,
+    pub workspace_id: String,
 }
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -265,7 +265,7 @@ pub struct McpRepoContext {
     pub repo_id: Uuid,
     #[schemars(description = "The name of the repository")]
     pub repo_name: String,
-    #[schemars(description = "The target branch for this repository in this attempt")]
+    #[schemars(description = "The target branch for this repository in this workspace")]
     pub target_branch: String,
 }
 
@@ -274,11 +274,12 @@ pub struct McpContext {
     pub project_id: Uuid,
     pub task_id: Uuid,
     pub task_title: String,
-    pub attempt_id: Uuid,
-    pub attempt_branch: String,
-    #[schemars(description = "Repository info and target branches for each repo in this attempt")]
-    pub attempt_repos: Vec<McpRepoContext>,
-    pub executor: String,
+    pub workspace_id: Uuid,
+    pub workspace_branch: String,
+    #[schemars(
+        description = "Repository info and target branches for each repo in this workspace"
+    )]
+    pub workspace_repos: Vec<McpRepoContext>,
 }
 
 impl TaskServer {
@@ -327,7 +328,7 @@ impl TaskServer {
             return None;
         }
 
-        let api_response: ApiResponseEnvelope<TaskAttemptContext> = response.json().await.ok()?;
+        let api_response: ApiResponseEnvelope<WorkspaceContext> = response.json().await.ok()?;
 
         if !api_response.success {
             return None;
@@ -336,8 +337,8 @@ impl TaskServer {
         let ctx = api_response.data?;
 
         // Map RepoWithTargetBranch to McpRepoContext
-        let attempt_repos: Vec<McpRepoContext> = ctx
-            .attempt_repos
+        let workspace_repos: Vec<McpRepoContext> = ctx
+            .workspace_repos
             .into_iter()
             .map(|rwb| McpRepoContext {
                 repo_id: rwb.repo.id,
@@ -350,10 +351,9 @@ impl TaskServer {
             project_id: ctx.project.id,
             task_id: ctx.task.id,
             task_title: ctx.task.title,
-            attempt_id: ctx.task_attempt.id,
-            attempt_branch: ctx.task_attempt.branch,
-            attempt_repos,
-            executor: ctx.task_attempt.executor,
+            workspace_id: ctx.workspace.id,
+            workspace_branch: ctx.workspace.branch,
+            workspace_repos,
         })
     }
 }
@@ -482,7 +482,7 @@ impl TaskServer {
 #[tool_router]
 impl TaskServer {
     #[tool(
-        description = "Return project, task, and attempt metadata for the current task attempt context."
+        description = "Return project, task, and workspace metadata for the current workspace session context."
     )]
     async fn get_context(&self) -> Result<CallToolResult, ErrorData> {
         // Context was fetched at startup and cached
@@ -640,15 +640,17 @@ impl TaskServer {
         TaskServer::success(&response)
     }
 
-    #[tool(description = "Start working on a task by creating and launching a new task attempt.")]
-    async fn start_task_attempt(
+    #[tool(
+        description = "Start working on a task by creating and launching a new workspace session."
+    )]
+    async fn start_workspace_session(
         &self,
-        Parameters(StartTaskAttemptRequest {
+        Parameters(StartWorkspaceSessionRequest {
             task_id,
             executor,
             variant,
             repos,
-        }): Parameters<StartTaskAttemptRequest>,
+        }): Parameters<StartWorkspaceSessionRequest>,
     ) -> Result<CallToolResult, ErrorData> {
         if repos.is_empty() {
             return Self::err(
@@ -687,9 +689,9 @@ impl TaskServer {
             variant,
         };
 
-        let attempt_repos: Vec<AttemptRepoInput> = repos
+        let workspace_repos: Vec<WorkspaceRepoInput> = repos
             .into_iter()
-            .map(|r| AttemptRepoInput {
+            .map(|r| WorkspaceRepoInput {
                 repo_id: r.repo_id,
                 target_branch: r.base_branch,
             })
@@ -698,19 +700,19 @@ impl TaskServer {
         let payload = CreateTaskAttemptBody {
             task_id,
             executor_profile_id,
-            repos: attempt_repos,
+            repos: workspace_repos,
         };
 
         let url = self.url("/api/task-attempts");
-        let attempt: TaskAttempt = match self.send_json(self.client.post(&url).json(&payload)).await
+        let workspace: Workspace = match self.send_json(self.client.post(&url).json(&payload)).await
         {
-            Ok(attempt) => attempt,
+            Ok(workspace) => workspace,
             Err(e) => return Ok(e),
         };
 
-        let response = StartTaskAttemptResponse {
-            task_id: attempt.task_id.to_string(),
-            attempt_id: attempt.id.to_string(),
+        let response = StartWorkspaceSessionResponse {
+            task_id: workspace.task_id.to_string(),
+            workspace_id: workspace.id.to_string(),
         };
 
         TaskServer::success(&response)
@@ -752,7 +754,7 @@ impl TaskServer {
             title,
             description: expanded_description,
             status,
-            parent_task_attempt: None,
+            parent_workspace_id: None,
             image_ids: None,
         };
         let url = self.url(&format!("/api/tasks/{}", task_id));
@@ -811,9 +813,9 @@ impl TaskServer {
 #[tool_handler]
 impl ServerHandler for TaskServer {
     fn get_info(&self) -> ServerInfo {
-        let mut instruction = "A task and project management server. If you need to create or update tickets or tasks then use these tools. Most of them absolutely require that you pass the `project_id` of the project that you are currently working on. You can get project ids by using `list projects`. Call `list_tasks` to fetch the `task_ids` of all the tasks in a project`.. TOOLS: 'list_projects', 'list_tasks', 'create_task', 'start_task_attempt', 'get_task', 'update_task', 'delete_task', 'list_repos'. Make sure to pass `project_id` or `task_id` where required. You can use list tools to get the available ids.".to_string();
+        let mut instruction = "A task and project management server. If you need to create or update tickets or tasks then use these tools. Most of them absolutely require that you pass the `project_id` of the project that you are currently working on. You can get project ids by using `list projects`. Call `list_tasks` to fetch the `task_ids` of all the tasks in a project`.. TOOLS: 'list_projects', 'list_tasks', 'create_task', 'start_workspace_session', 'get_task', 'update_task', 'delete_task', 'list_repos'. Make sure to pass `project_id` or `task_id` where required. You can use list tools to get the available ids.".to_string();
         if self.context.is_some() {
-            let context_instruction = "Use 'get_context' to fetch project/task/attempt metadata for the active Vibe Kanban attempt when available.";
+            let context_instruction = "Use 'get_context' to fetch project/task/workspace metadata for the active Vibe Kanban workspace session when available.";
             instruction = format!("{} {}", context_instruction, instruction);
         }
 

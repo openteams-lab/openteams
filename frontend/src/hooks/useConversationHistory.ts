@@ -6,8 +6,8 @@ import {
   ExecutorAction,
   NormalizedEntry,
   PatchType,
-  TaskAttempt,
   ToolStatus,
+  Workspace,
 } from 'shared/types';
 import { useExecutionProcessesContext } from '@/contexts/ExecutionProcessesContext';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -41,7 +41,7 @@ type ExecutionProcessState = {
 type ExecutionProcessStateStore = Record<string, ExecutionProcessState>;
 
 interface UseConversationHistoryParams {
-  attempt: TaskAttempt;
+  attempt: Workspace;
   onEntriesUpdated: OnEntriesUpdated;
 }
 

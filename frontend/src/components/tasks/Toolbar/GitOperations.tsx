@@ -19,8 +19,8 @@ import { useCallback, useMemo, useState } from 'react';
 import type {
   RepoBranchStatus,
   Merge,
-  TaskAttempt,
   TaskWithAttemptStatus,
+  Workspace,
 } from 'shared/types';
 import { ChangeTargetBranchDialog } from '@/components/dialogs/tasks/ChangeTargetBranchDialog';
 import RepoSelector from '@/components/tasks/RepoSelector';
@@ -32,7 +32,7 @@ import { useGitOperations } from '@/hooks/useGitOperations';
 import { useRepoBranches } from '@/hooks';
 
 interface GitOperationsProps {
-  selectedAttempt: TaskAttempt;
+  selectedAttempt: Workspace;
   task: TaskWithAttemptStatus;
   branchStatus: RepoBranchStatus[] | null;
   isAttemptRunning: boolean;

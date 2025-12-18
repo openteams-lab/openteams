@@ -17,9 +17,9 @@ import {
   useTask,
   useAttempt,
   useRepoBranchSelection,
-  useTaskAttempts,
   useProjectRepos,
 } from '@/hooks';
+import { useTaskAttemptsWithSessions } from '@/hooks/useTaskAttempts';
 import { useProject } from '@/contexts/ProjectContext';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { paths } from '@/lib/paths';
@@ -52,7 +52,7 @@ const CreateAttemptDialogImpl = NiceModal.create<CreateAttemptDialogProps>(
       useState<ExecutorProfileId | null>(null);
 
     const { data: attempts = [], isLoading: isLoadingAttempts } =
-      useTaskAttempts(taskId, {
+      useTaskAttemptsWithSessions(taskId, {
         enabled: modal.visible,
         refetchInterval: 5000,
       });
@@ -61,7 +61,7 @@ const CreateAttemptDialogImpl = NiceModal.create<CreateAttemptDialogProps>(
       enabled: modal.visible,
     });
 
-    const parentAttemptId = task?.parent_task_attempt ?? undefined;
+    const parentAttemptId = task?.parent_workspace_id ?? undefined;
     const { data: parentAttempt, isLoading: isLoadingParent } = useAttempt(
       parentAttemptId,
       { enabled: modal.visible && !!parentAttemptId }
@@ -74,7 +74,7 @@ const CreateAttemptDialogImpl = NiceModal.create<CreateAttemptDialogProps>(
       configs: repoBranchConfigs,
       isLoading: isLoadingBranches,
       setRepoBranch,
-      getAttemptRepoInputs,
+      getWorkspaceRepoInputs,
       reset: resetBranchSelection,
     } = useRepoBranchSelection({
       repos: projectRepos,
@@ -147,7 +147,7 @@ const CreateAttemptDialogImpl = NiceModal.create<CreateAttemptDialogProps>(
       )
         return;
       try {
-        const repos = getAttemptRepoInputs();
+        const repos = getWorkspaceRepoInputs();
 
         await createAttempt({
           profile: effectiveProfile,

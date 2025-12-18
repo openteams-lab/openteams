@@ -14,13 +14,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import type { TaskAttempt, Diff, DiffChangeKind } from 'shared/types';
+import type { Diff, DiffChangeKind } from 'shared/types';
+import type { Workspace } from 'shared/types';
 import GitOperations, {
   type GitOperationsInputs,
 } from '@/components/tasks/Toolbar/GitOperations.tsx';
 
 interface DiffsPanelProps {
-  selectedAttempt: TaskAttempt | null;
+  selectedAttempt: Workspace | null;
   gitOps?: GitOperationsInputs;
 }
 
@@ -151,7 +152,7 @@ interface DiffsPanelContentProps {
   allCollapsed: boolean;
   handleCollapseAll: () => void;
   toggle: (id: string) => void;
-  selectedAttempt: TaskAttempt | null;
+  selectedAttempt: Workspace | null;
   gitOps?: GitOperationsInputs;
   loading: boolean;
   t: (key: string, params?: Record<string, unknown>) => string;

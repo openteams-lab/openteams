@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use db::models::{repo::Repo, task_attempt::TaskAttempt};
+use db::models::{repo::Repo, workspace::Workspace as DbWorkspace};
 use sqlx::{Pool, Sqlite};
 use thiserror::Error;
 use tracing::{debug, error, info, warn};
@@ -44,9 +44,9 @@ pub struct RepoWorktree {
     pub worktree_path: PathBuf,
 }
 
-/// A workspace containing worktrees for all project repos
+/// A container directory holding worktrees for all project repos
 #[derive(Debug, Clone)]
-pub struct Workspace {
+pub struct WorktreeContainer {
     pub workspace_dir: PathBuf,
     pub worktrees: Vec<RepoWorktree>,
 }
@@ -60,7 +60,7 @@ impl WorkspaceManager {
         workspace_dir: &Path,
         repos: &[RepoWorkspaceInput],
         branch_name: &str,
-    ) -> Result<Workspace, WorkspaceError> {
+    ) -> Result<WorktreeContainer, WorkspaceError> {
         if repos.is_empty() {
             return Err(WorkspaceError::NoRepositories);
         }
@@ -131,7 +131,7 @@ impl WorkspaceManager {
             created_worktrees.len()
         );
 
-        Ok(Workspace {
+        Ok(WorktreeContainer {
             workspace_dir: workspace_dir.to_path_buf(),
             worktrees: created_worktrees,
         })
@@ -328,7 +328,7 @@ impl WorkspaceManager {
             }
 
             let workspace_path_str = path.to_string_lossy().to_string();
-            if let Ok(false) = TaskAttempt::container_ref_exists(db, &workspace_path_str).await {
+            if let Ok(false) = DbWorkspace::container_ref_exists(db, &workspace_path_str).await {
                 info!("Found orphaned workspace: {}", workspace_path_str);
                 if let Err(e) = Self::cleanup_workspace_without_repos(&path).await {
                     error!(

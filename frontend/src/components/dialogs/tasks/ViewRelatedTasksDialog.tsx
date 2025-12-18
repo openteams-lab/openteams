@@ -12,12 +12,13 @@ import { PlusIcon } from 'lucide-react';
 import { openTaskForm } from '@/lib/openTaskForm';
 import { useTaskRelationships } from '@/hooks/useTaskRelationships';
 import { DataTable, type ColumnDef } from '@/components/ui/table/data-table';
-import type { Task, TaskAttempt } from 'shared/types';
+import type { Task } from 'shared/types';
+import type { Workspace } from 'shared/types';
 
 export interface ViewRelatedTasksDialogProps {
   attemptId: string;
   projectId: string;
-  attempt: TaskAttempt | null;
+  attempt: Workspace | null;
   onNavigateToTask?: (taskId: string) => void;
 }
 
