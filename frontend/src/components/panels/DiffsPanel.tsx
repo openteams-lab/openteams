@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import type { TaskAttempt, Diff } from 'shared/types';
+import type { TaskAttempt, Diff, DiffChangeKind } from 'shared/types';
 import GitOperations, {
   type GitOperationsInputs,
 } from '@/components/tasks/Toolbar/GitOperations.tsx';
@@ -24,59 +24,81 @@ interface DiffsPanelProps {
   gitOps?: GitOperationsInputs;
 }
 
+type DiffCollapseDefaults = Record<DiffChangeKind, boolean>;
+
+const DEFAULT_DIFF_COLLAPSE_DEFAULTS: DiffCollapseDefaults = {
+  added: false,
+  deleted: true,
+  modified: false,
+  renamed: true,
+  copied: true,
+  permissionChange: true,
+};
+
+const DEFAULT_COLLAPSE_MAX_LINES = 200;
+
+const exceedsMaxLineCount = (d: Diff, maxLines: number): boolean => {
+  if (d.additions != null || d.deletions != null)
+    return (d.additions ?? 0) + (d.deletions ?? 0) > maxLines;
+
+  return true;
+};
+
+const getDiffId = ({ diff, index }: { diff: Diff; index: number }) =>
+  `${diff.newPath || diff.oldPath || index}`;
+
 export function DiffsPanel({ selectedAttempt, gitOps }: DiffsPanelProps) {
   const { t } = useTranslation('tasks');
-  const [loading, setLoading] = useState(true);
+  const [loadingState, setLoadingState] = useState<
+    'loading' | 'loaded' | 'timed-out'
+  >('loading');
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
   const { diffs, error } = useDiffStream(selectedAttempt?.id ?? null, true);
   const { fileCount, added, deleted } = useDiffSummary(
     selectedAttempt?.id ?? null
   );
 
-  useEffect(() => {
-    setLoading(true);
-    setHasInitialized(false);
-  }, [selectedAttempt?.id]);
-
-  useEffect(() => {
-    if (diffs.length > 0 && loading) {
-      setLoading(false);
-    }
-  }, [diffs, loading]);
-
   // If no diffs arrive within 3 seconds, stop showing the spinner
   useEffect(() => {
-    if (!loading) return;
-    const timer = setTimeout(() => {
-      if (diffs.length === 0) {
-        setLoading(false);
-      }
-    }, 3000);
+    if (loadingState !== 'loading') return;
+    const timer = setTimeout(() => setLoadingState('timed-out'), 3000);
     return () => clearTimeout(timer);
-  }, [loading, diffs.length]);
+  }, [loadingState]);
 
-  // Default-collapse certain change kinds on first load only
-  useEffect(() => {
-    if (diffs.length === 0) return;
-    if (hasInitialized) return; // only run once per attempt
-    const kindsToCollapse = new Set([
-      'deleted',
-      'renamed',
-      'copied',
-      'permissionChange',
-    ]);
-    const initial = new Set(
-      diffs
-        .filter((d) => kindsToCollapse.has(d.change))
-        .map((d, i) => d.newPath || d.oldPath || String(i))
-    );
-    if (initial.size > 0) setCollapsedIds(initial);
-    setHasInitialized(true);
-  }, [diffs, hasInitialized]);
+  if (diffs.length > 0 && loadingState === 'loading') {
+    setLoadingState('loaded');
+  }
+
+  if (diffs.length > 0) {
+    const newDiffs = diffs
+      .map((d, index) => ({ diff: d, index }))
+      .filter((d) => {
+        const id = getDiffId(d);
+        return !processedIds.has(id);
+      });
+
+    if (newDiffs.length > 0) {
+      const newIds = newDiffs.map(getDiffId);
+      const toCollapse = newDiffs
+        .filter(
+          ({ diff }) =>
+            DEFAULT_DIFF_COLLAPSE_DEFAULTS[diff.change] ||
+            exceedsMaxLineCount(diff, DEFAULT_COLLAPSE_MAX_LINES)
+        )
+        .map(getDiffId);
+
+      setProcessedIds((prev) => new Set([...prev, ...newIds]));
+      if (toCollapse.length > 0) {
+        setCollapsedIds((prev) => new Set([...prev, ...toCollapse]));
+      }
+    }
+  }
+
+  const loading = loadingState === 'loading';
 
   const ids = useMemo(() => {
-    return diffs.map((d, i) => d.newPath || d.oldPath || String(i));
+    return diffs.map((d, i) => getDiffId({ diff: d, index: i }));
   }, [diffs]);
 
   const toggle = useCallback((id: string) => {
