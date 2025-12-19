@@ -37,6 +37,7 @@ interface ProjectFormState {
   name: string;
   dev_script: string;
   dev_script_working_dir: string;
+  default_agent_working_dir: string;
 }
 
 interface RepoScriptsFormState {
@@ -51,6 +52,7 @@ function projectToFormState(project: Project): ProjectFormState {
     name: project.name,
     dev_script: project.dev_script ?? '',
     dev_script_working_dir: project.dev_script_working_dir ?? '',
+    default_agent_working_dir: project.default_agent_working_dir ?? '',
   };
 }
 
@@ -393,6 +395,8 @@ export function ProjectSettings() {
         name: draft.name.trim(),
         dev_script: draft.dev_script.trim() || null,
         dev_script_working_dir: draft.dev_script_working_dir.trim() || null,
+        default_agent_working_dir:
+          draft.default_agent_working_dir.trim() || null,
       };
 
       updateProject.mutate({
@@ -603,6 +607,26 @@ export function ProjectSettings() {
                 />
                 <p className="text-sm text-muted-foreground">
                   {t('settings.projects.scripts.devWorkingDir.helper')}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="agent-working-dir">
+                  {t('settings.projects.scripts.agentWorkingDir.label')}
+                </Label>
+                <Input
+                  id="agent-working-dir"
+                  value={draft.default_agent_working_dir}
+                  onChange={(e) =>
+                    updateDraft({ default_agent_working_dir: e.target.value })
+                  }
+                  placeholder={t(
+                    'settings.projects.scripts.agentWorkingDir.placeholder'
+                  )}
+                  className="font-mono"
+                />
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.projects.scripts.agentWorkingDir.helper')}
                 </p>
               </div>
 
