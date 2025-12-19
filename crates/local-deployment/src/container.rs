@@ -20,7 +20,6 @@ use db::{
         project_repo::ProjectRepo,
         repo::Repo,
         scratch::{DraftFollowUpData, Scratch, ScratchType},
-        session::{CreateSession, Session},
         task::{Task, TaskStatus},
         workspace::Workspace,
         workspace_repo::WorkspaceRepo,
@@ -742,13 +741,13 @@ impl LocalContainerService {
         ctx: &ExecutionContext,
         queued_data: &DraftFollowUpData,
     ) -> Result<ExecutionProcess, ContainerError> {
-        // Get executor profile from the latest CodingAgent process
-        let initial_executor_profile_id = ExecutionProcess::latest_executor_profile_for_workspace(
-            &self.db.pool,
-            ctx.workspace.id,
-        )
-        .await
-        .map_err(|e| ContainerError::Other(anyhow!("Failed to get executor profile: {e}")))?;
+        // Get executor profile from the latest CodingAgent process in this session
+        let initial_executor_profile_id =
+            ExecutionProcess::latest_executor_profile_for_session(&self.db.pool, ctx.session.id)
+                .await
+                .map_err(|e| {
+                    ContainerError::Other(anyhow!("Failed to get executor profile: {e}"))
+                })?;
 
         let executor_profile_id = ExecutorProfileId {
             executor: initial_executor_profile_id.executor,
@@ -756,9 +755,9 @@ impl LocalContainerService {
         };
 
         // Get latest agent session ID for session continuity (from coding agent turns)
-        let latest_agent_session_id = ExecutionProcess::find_latest_agent_session_id_by_workspace(
+        let latest_agent_session_id = ExecutionProcess::find_latest_coding_agent_turn_session_id(
             &self.db.pool,
-            ctx.workspace.id,
+            ctx.session.id,
         )
         .await?;
 
@@ -781,20 +780,9 @@ impl LocalContainerService {
 
         let action = ExecutorAction::new(action_type, cleanup_action.map(Box::new));
 
-        // Create a new session for this follow-up
-        let session = Session::create(
-            &self.db.pool,
-            &CreateSession {
-                executor: Some(executor_profile_id.to_string()),
-            },
-            Uuid::new_v4(),
-            ctx.workspace.id,
-        )
-        .await?;
-
         self.start_execution(
             &ctx.workspace,
-            &session,
+            &ctx.session,
             &action,
             &ExecutionProcessRunReason::CodingAgent,
         )
