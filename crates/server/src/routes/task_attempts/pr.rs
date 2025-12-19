@@ -146,17 +146,25 @@ async fn trigger_pr_description_follow_up(
     )
     .await?;
 
+    let working_dir = workspace
+        .agent_working_dir
+        .as_ref()
+        .filter(|dir| !dir.is_empty())
+        .cloned();
+
     // Build the action type (follow-up if session exists, otherwise initial)
     let action_type = if let Some(agent_session_id) = latest_agent_session_id {
         ExecutorActionType::CodingAgentFollowUpRequest(CodingAgentFollowUpRequest {
             prompt,
             session_id: agent_session_id,
             executor_profile_id: executor_profile_id.clone(),
+            working_dir: working_dir.clone(),
         })
     } else {
         ExecutorActionType::CodingAgentInitialRequest(CodingAgentInitialRequest {
             prompt,
             executor_profile_id: executor_profile_id.clone(),
+            working_dir,
         })
     };
 
