@@ -1,6 +1,6 @@
 [package]
 name = "utils"
-version = "0.0.140"
+version = "0.0.141"
 edition = "2024"
 
 [dependencies]
