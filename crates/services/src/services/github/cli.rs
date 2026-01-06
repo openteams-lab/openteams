@@ -6,6 +6,7 @@
 
 use std::{
     ffi::{OsStr, OsString},
+    io::Write,
     path::Path,
     process::Command,
 };
@@ -14,6 +15,7 @@ use chrono::{DateTime, Utc};
 use db::models::merge::{MergeStatus, PullRequestInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tempfile::NamedTempFile;
 use thiserror::Error;
 use ts_rs::TS;
 use utils::shell::resolve_executable_path_blocking;
@@ -154,15 +156,20 @@ impl GhCli {
     }
 
     /// Run `gh pr create` and parse the response.
-    ///
-    /// TODO: support writing the body to a temp file (`--body-file`) for large/multi-line
-    /// content and expand stdout/stderr mapping into richer error variants.
     pub fn create_pr(
         &self,
         request: &CreatePrRequest,
         repo_info: &GitHubRepoInfo,
     ) -> Result<PullRequestInfo, GhCliError> {
-        let mut args: Vec<OsString> = Vec::with_capacity(12);
+        // Write body to temp file to avoid shell escaping and length issues
+        let body = request.body.as_deref().unwrap_or("");
+        let mut body_file = NamedTempFile::new()
+            .map_err(|e| GhCliError::CommandFailed(format!("Failed to create temp file: {e}")))?;
+        body_file
+            .write_all(body.as_bytes())
+            .map_err(|e| GhCliError::CommandFailed(format!("Failed to write body: {e}")))?;
+
+        let mut args: Vec<OsString> = Vec::with_capacity(14);
         args.push(OsString::from("pr"));
         args.push(OsString::from("create"));
         args.push(OsString::from("--repo"));
@@ -176,10 +183,8 @@ impl GhCli {
         args.push(OsString::from(&request.base_branch));
         args.push(OsString::from("--title"));
         args.push(OsString::from(&request.title));
-
-        let body = request.body.as_deref().unwrap_or("");
-        args.push(OsString::from("--body"));
-        args.push(OsString::from(body));
+        args.push(OsString::from("--body-file"));
+        args.push(body_file.path().as_os_str().to_os_string());
 
         if request.draft.unwrap_or(false) {
             args.push(OsString::from("--draft"));
@@ -358,7 +363,6 @@ impl GhCli {
                 "Failed to parse gh pr view --json comments response: {err}; raw: {raw}"
             ))
         })?;
-
         let comments_arr = value
             .get("comments")
             .and_then(|v| v.as_array())
@@ -367,7 +371,6 @@ impl GhCli {
                     "gh pr view --json comments response missing 'comments' array: {value:#?}"
                 ))
             })?;
-
         comments_arr
             .iter()
             .map(|item| {
