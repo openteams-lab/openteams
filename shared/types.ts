@@ -18,7 +18,11 @@ export type CreateProject = { name: string, repositories: Array<CreateProjectRep
 
 export type UpdateProject = { name: string | null, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, };
 
-export type SearchResult = { path: string, is_file: boolean, match_type: SearchMatchType, };
+export type SearchResult = { path: string, is_file: boolean, match_type: SearchMatchType, 
+/**
+ * Ranking score based on git history (higher = more recently/frequently edited)
+ */
+score: bigint, };
 
 export type SearchMatchType = "FileName" | "DirectoryName" | "FullPath";
 
@@ -56,9 +60,13 @@ export type UpdateTask = { title: string | null, description: string | null, sta
 
 export type DraftFollowUpData = { message: string, variant: string | null, };
 
-export type ScratchPayload = { "type": "DRAFT_TASK", "data": string } | { "type": "DRAFT_FOLLOW_UP", "data": DraftFollowUpData };
+export type DraftWorkspaceData = { message: string, project_id: string | null, repos: Array<DraftWorkspaceRepo>, selected_profile: ExecutorProfileId | null, };
 
-export enum ScratchType { DRAFT_TASK = "DRAFT_TASK", DRAFT_FOLLOW_UP = "DRAFT_FOLLOW_UP" }
+export type DraftWorkspaceRepo = { repo_id: string, target_branch: string, };
+
+export type ScratchPayload = { "type": "DRAFT_TASK", "data": string } | { "type": "DRAFT_FOLLOW_UP", "data": DraftFollowUpData } | { "type": "DRAFT_WORKSPACE", "data": DraftWorkspaceData };
+
+export enum ScratchType { DRAFT_TASK = "DRAFT_TASK", DRAFT_FOLLOW_UP = "DRAFT_FOLLOW_UP", DRAFT_WORKSPACE = "DRAFT_WORKSPACE" }
 
 export type Scratch = { id: string, payload: ScratchPayload, created_at: string, updated_at: string, };
 
@@ -70,7 +78,9 @@ export type Image = { id: string, file_path: string, original_name: string, mime
 
 export type CreateImage = { file_path: string, original_name: string, mime_type: string | null, size_bytes: bigint, hash: string, };
 
-export type Workspace = { id: string, task_id: string, container_ref: string | null, branch: string, agent_working_dir: string | null, setup_completed_at: string | null, created_at: string, updated_at: string, };
+export type Workspace = { id: string, task_id: string, container_ref: string | null, branch: string, agent_working_dir: string | null, setup_completed_at: string | null, created_at: string, updated_at: string, archived: boolean, pinned: boolean, name: string | null, };
+
+export type WorkspaceWithStatus = { is_running: boolean, is_errored: boolean, id: string, task_id: string, container_ref: string | null, branch: string, agent_working_dir: string | null, setup_completed_at: string | null, created_at: string, updated_at: string, archived: boolean, pinned: boolean, name: string | null, };
 
 export type Session = { id: string, workspace_id: string, executor: string | null, created_at: string, updated_at: string, };
 
@@ -274,6 +284,8 @@ conflicted_files: Array<string>, };
 
 export type RunScriptError = { "type": "no_script_configured" } | { "type": "process_already_running" };
 
+export type DeleteWorkspaceError = { "type": "has_running_processes" };
+
 export type AttachPrResponse = { pr_attached: boolean, pr_url: string | null, pr_number: bigint | null, pr_status: MergeStatus | null, };
 
 export type AttachExistingPrRequest = { repo_id: string, };
@@ -299,6 +311,50 @@ conflict_op: ConflictOp | null,
  * List of files currently in conflicted (unmerged) state
  */
 conflicted_files: Array<string>, };
+
+export type UpdateWorkspace = { archived: boolean | null, pinned: boolean | null, name: string | null, };
+
+export type WorkspaceSummaryRequest = { archived: boolean, };
+
+export type WorkspaceSummary = { workspace_id: string, 
+/**
+ * Session ID of the latest execution process
+ */
+latest_session_id: string | null, 
+/**
+ * Is a tool approval currently pending?
+ */
+has_pending_approval: boolean, 
+/**
+ * Number of files with changes
+ */
+files_changed: number | null, 
+/**
+ * Total lines added across all files
+ */
+lines_added: number | null, 
+/**
+ * Total lines removed across all files
+ */
+lines_removed: number | null, 
+/**
+ * When the latest execution process completed
+ */
+latest_process_completed_at?: string, 
+/**
+ * Status of the latest execution process
+ */
+latest_process_status: ExecutionProcessStatus | null, 
+/**
+ * Is a dev server currently running?
+ */
+has_running_dev_server: boolean, 
+/**
+ * Does this workspace have unseen coding agent turns?
+ */
+has_unseen_turns: boolean, };
+
+export type WorkspaceSummaryResponse = { summaries: Array<WorkspaceSummary>, };
 
 export type DirectoryEntry = { name: string, path: string, is_directory: boolean, is_git_repo: boolean, last_modified: bigint | null, };
 

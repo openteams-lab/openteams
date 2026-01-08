@@ -1,4 +1,15 @@
 {
+  "gitPanel": {
+    "create": {
+      "warnings": {
+        "noReposSelected": "请至少选择一个仓库以开始"
+      }
+    },
+    "advanced": {
+      "workingBranch": "工作分支",
+      "placeholder": "例如：Acme Corp"
+    }
+  },
   "loading": "加载任务中...",
   "empty": {
     "noTasks": "未找到此项目的任务。",
@@ -106,7 +117,17 @@
     "logs": {
       "title": "开发服务器日志",
       "hide": "隐藏",
-      "show": "显示"
+      "show": "显示",
+      "label": "日志",
+      "viewFull": "查看完整日志"
+    },
+    "noDevScript": "未配置开发脚本",
+    "noDevScriptHint": "在项目设置中添加开发脚本以启用预览。",
+    "browser": {
+      "title": "开发服务器预览",
+      "startButton": "启动开发服务器",
+      "stopButton": "停止",
+      "startingButton": "启动"
     },
     "iframe": {
       "title": "开发服务器预览"
@@ -141,6 +162,7 @@
     "noAttempts": "还没有尝试"
   },
   "processes": {
+    "noLogsAvailable": "没有可用的日志",
     "selectAttempt": "选择尝试以查看执行进程。",
     "errorLoadingUpdates": "加载进程的实时更新失败。",
     "reconnecting": "重新连接中...",
@@ -193,6 +215,21 @@
   "todos": {
     "title_one": "待办事项（{{count}}）",
     "title_other": "待办事项（{{count}}）"
+  },
+  "projects": {
+    "create": {
+      "dialog": {
+        "title": "创建项目",
+        "description": "输入新项目的名称。"
+      },
+      "form": {
+        "nameLabel": "名称",
+        "namePlaceholder": "我的项目"
+      },
+      "errors": {
+        "createFailed": "创建项目失败"
+      }
+    }
   },
   "attempt": {
     "actions": {
@@ -275,15 +312,47 @@
     },
     "pr": {
       "open": "打开 PR #{{number}}",
-      "number": "PR #{{number}}"
+      "number": "PR #{{number}}",
+      "merged": "已合并PR #{{prNumber}}"
     },
     "actions": {
       "title": "Git 操作",
+      "changeTarget": "更改目标",
       "prMerged": "PR #{{number}} 已合并",
       "loginRequired": {
         "title": "登录以管理 git 操作",
         "description": "登录 Vibe Kanban，以便您可以推送分支、合并更改或为此任务打开拉取请求。",
         "action": "登录"
+      }
+    },
+    "mergeDialog": {
+      "title": "合并更改",
+      "description": "这将把您的更改合并到目标分支。您确定要继续吗？"
+    },
+    "createRepo": {
+      "dialog": {
+        "title": "创建新仓库",
+        "description": "初始化新的git仓库"
+      },
+      "form": {
+        "nameLabel": "名称",
+        "namePlaceholder": "my-project",
+        "locationLabel": "位置",
+        "locationPlaceholder": "当前目录"
+      },
+      "browseDialog": {
+        "title": "选择父目录",
+        "description": "选择创建新仓库的位置"
+      },
+      "errors": {
+        "nameRequired": "仓库名称是必填的",
+        "createFailed": "创建仓库失败"
+      },
+      "buttons": {
+        "createRepository": "创建仓库"
+      },
+      "states": {
+        "creating": "创建中..."
       }
     }
   },
@@ -314,7 +383,8 @@
   "attemptHeaderActions": {
     "preview": "预览",
     "diffs": "差异",
-    "relatedTasks": "相关任务"
+    "relatedTasks": "相关任务",
+    "tryNewUI": "试用新界面"
   },
   "actionsMenu": {
     "attempt": "尝试",
@@ -517,5 +587,71 @@
     "buttons": {
       "retry": "重试"
     }
+  },
+  "conversation": {
+    "you": "你",
+    "thinking": "思考中",
+    "todo": "待办",
+    "todos": "待办事项",
+    "completed": "已完成",
+    "incomplete": "未完成",
+    "pending": "待处理",
+    "inProgress": "进行中",
+    "skipped": "已跳过",
+    "error": "错误",
+    "retry": "重试",
+    "showMore": "显示更多",
+    "showLess": "收起",
+    "actions": {
+      "cancel": "取消",
+      "submitFeedback": "提交反馈",
+      "stop": "停止",
+      "stopping": "停止中",
+      "loading": "加载中",
+      "send": "发送",
+      "sending": "发送中",
+      "queue": "加入队列",
+      "cancelQueue": "取消队列",
+      "requestChanges": "请求更改",
+      "approve": "批准",
+      "clearReviewComments": "清除审查评论",
+      "edit": "编辑消息"
+    },
+    "approval": {
+      "conflictWarning": "冲突文件需要手动解决",
+      "conflicts_one": "{{count}}个冲突",
+      "conflicts_other": "{{count}}个冲突"
+    },
+    "sessions": {
+      "newSession": "新会话",
+      "latest": "最新",
+      "previous": "上一个",
+      "label": "会话",
+      "noPreviousSessions": "没有以前的会话"
+    },
+    "reviewComments": {
+      "count_one": "{{count}} 条审查评论将被包含",
+      "count_other": "{{count}} 条审查评论将被包含"
+    },
+    "workspace": {
+      "create": "创建",
+      "creating": "创建中..."
+    },
+    "fileEntry": {
+      "created": "已创建",
+      "modified": "已修改",
+      "deleted": "已删除",
+      "renamed": "已重命名"
+    },
+    "script": {
+      "running": "运行中...",
+      "exitCode": "退出代码: {{code}}",
+      "completedSuccessfully": "成功完成",
+      "clickToViewLogs": "点击查看日志"
+    },
+    "executors": "执行器",
+    "updatedTodos": "更新的待办事项",
+    "viewInChangesPanel": "在更改面板中查看",
+    "unableToRenderDiff": "无法显示差异。"
   }
 }
