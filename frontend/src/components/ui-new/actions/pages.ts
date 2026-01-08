@@ -1,0 +1,179 @@
+import type { Icon } from '@phosphor-icons/react';
+import { type ActionDefinition, type ActionVisibilityContext } from './index';
+import { Actions } from './index';
+
+// Define page IDs first to avoid circular reference
+export type PageId =
+  | 'root'
+  | 'workspaceActions'
+  | 'diffOptions'
+  | 'viewOptions'
+  | 'gitActions';
+
+// Items that can appear inside a group
+export type CommandBarGroupItem =
+  | { type: 'action'; action: ActionDefinition }
+  | { type: 'page'; pageId: PageId; label: string; icon: Icon }
+  | { type: 'childPages'; id: PageId };
+
+// Group container with label and nested items
+export interface CommandBarGroup {
+  type: 'group';
+  label: string;
+  items: CommandBarGroupItem[];
+}
+
+// Top-level items in a page are groups
+export type CommandBarItem = CommandBarGroup;
+
+// Resolved types (after childPages expansion)
+export type ResolvedGroupItem =
+  | { type: 'action'; action: ActionDefinition }
+  | { type: 'page'; pageId: PageId; label: string; icon: Icon };
+
+export interface ResolvedGroup {
+  label: string;
+  items: ResolvedGroupItem[];
+}
+
+export interface CommandBarPage {
+  id: string;
+  title?: string; // Optional heading shown in command bar
+  items: CommandBarItem[];
+  // Optional: parent page for back button navigation
+  parent?: PageId;
+  // Optional visibility condition - if omitted, page is always visible
+  isVisible?: (ctx: ActionVisibilityContext) => boolean;
+}
+
+export const Pages: Record<PageId, CommandBarPage> = {
+  // Root page - shown when opening via CMD+K
+  root: {
+    id: 'root',
+    items: [
+      {
+        type: 'group',
+        label: 'Actions',
+        items: [
+          { type: 'action', action: Actions.NewWorkspace },
+          { type: 'action', action: Actions.OpenInIDE },
+          { type: 'action', action: Actions.CopyPath },
+          // { type: 'action', action: Actions.ToggleDevServer },
+          { type: 'action', action: Actions.OpenInOldUI },
+          { type: 'childPages', id: 'workspaceActions' },
+          { type: 'childPages', id: 'gitActions' },
+        ],
+      },
+      {
+        type: 'group',
+        label: 'View',
+        items: [
+          { type: 'childPages', id: 'viewOptions' },
+          { type: 'childPages', id: 'diffOptions' },
+        ],
+      },
+      {
+        type: 'group',
+        label: 'General',
+        items: [{ type: 'action', action: Actions.Settings }],
+      },
+    ],
+  },
+
+  // Workspace actions page - shown when clicking three-dots on a workspace
+  workspaceActions: {
+    id: 'workspace-actions',
+    title: 'Workspace Actions',
+    parent: 'root',
+    isVisible: (ctx) => ctx.hasWorkspace,
+    items: [
+      {
+        type: 'group',
+        label: 'Workspace',
+        items: [
+          { type: 'action', action: Actions.DuplicateWorkspace },
+          { type: 'action', action: Actions.PinWorkspace },
+          { type: 'action', action: Actions.ArchiveWorkspace },
+          { type: 'action', action: Actions.DeleteWorkspace },
+        ],
+      },
+    ],
+  },
+
+  // Diff options page - shown when changes panel is visible
+  diffOptions: {
+    id: 'diff-options',
+    title: 'Diff Options',
+    parent: 'root',
+    isVisible: (ctx) => ctx.isChangesMode,
+    items: [
+      {
+        type: 'group',
+        label: 'Display',
+        items: [
+          { type: 'action', action: Actions.ToggleDiffViewMode },
+          { type: 'action', action: Actions.ToggleWrapLines },
+          { type: 'action', action: Actions.ToggleIgnoreWhitespace },
+          { type: 'action', action: Actions.ToggleAllDiffs },
+        ],
+      },
+    ],
+  },
+
+  // View options page - layout panel controls
+  viewOptions: {
+    id: 'view-options',
+    title: 'View Options',
+    parent: 'root',
+    items: [
+      {
+        type: 'group',
+        label: 'Panels',
+        items: [
+          { type: 'action', action: Actions.ToggleSidebar },
+          { type: 'action', action: Actions.ToggleMainPanel },
+          { type: 'action', action: Actions.ToggleGitPanel },
+          { type: 'action', action: Actions.ToggleChangesMode },
+          { type: 'action', action: Actions.ToggleLogsMode },
+          { type: 'action', action: Actions.TogglePreviewMode },
+        ],
+      },
+    ],
+  },
+
+  // Git actions page - git operations
+  gitActions: {
+    id: 'git-actions',
+    title: 'Git Actions',
+    parent: 'root',
+    isVisible: (ctx) => ctx.hasWorkspace && ctx.hasGitRepos,
+    items: [
+      {
+        type: 'group',
+        label: 'Git',
+        items: [
+          { type: 'action', action: Actions.GitCreatePR },
+          { type: 'action', action: Actions.GitMerge },
+          { type: 'action', action: Actions.GitRebase },
+          { type: 'action', action: Actions.GitChangeTarget },
+        ],
+      },
+    ],
+  },
+};
+
+// Get all actions from a specific page
+export function getPageActions(pageId: PageId): ActionDefinition[] {
+  const page = Pages[pageId];
+  const actions: ActionDefinition[] = [];
+
+  for (const group of page.items) {
+    for (const item of group.items) {
+      if (item.type === 'action') {
+        actions.push(item.action);
+      }
+    }
+  }
+
+  return actions;
+}
