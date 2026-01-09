@@ -6,7 +6,7 @@ import {
   Config,
   CreateFollowUpAttempt,
   EditorType,
-  CreateGitHubPrRequest,
+  CreatePrApiRequest,
   CreateTask,
   CreateAndStartTaskRequest,
   CreateTaskAttemptBody,
@@ -71,7 +71,7 @@ import {
   ListInvitationsResponse,
   OpenEditorResponse,
   OpenEditorRequest,
-  CreatePrError,
+  PrError,
   Scratch,
   ScratchType,
   CreateScratch,
@@ -718,13 +718,13 @@ export const attemptsApi = {
 
   createPR: async (
     attemptId: string,
-    data: CreateGitHubPrRequest
-  ): Promise<Result<string, CreatePrError>> => {
+    data: CreatePrApiRequest
+  ): Promise<Result<string, PrError>> => {
     const response = await makeRequest(`/api/task-attempts/${attemptId}/pr`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    return handleApiResponseAsResult<string, CreatePrError>(response);
+    return handleApiResponseAsResult<string, PrError>(response);
   },
 
   startDevServer: async (attemptId: string): Promise<void> => {

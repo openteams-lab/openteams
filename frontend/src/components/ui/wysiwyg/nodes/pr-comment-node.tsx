@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { NodeKey, SerializedLexicalNode, Spread } from 'lexical';
-import { GitHubCommentCard } from '@/components/ui/github-comment-card';
+import { PrCommentCard } from '@/components/ui/pr-comment-card';
 import {
   createDecoratorNode,
   type DecoratorNodeConfig,
@@ -17,19 +17,19 @@ export interface NormalizedComment {
   author: string;
   body: string;
   created_at: string;
-  url: string;
+  url?: string | null;
   // Review-specific (optional)
   path?: string;
   line?: number | null;
-  diff_hunk?: string;
+  diff_hunk?: string | null;
 }
 
-export type SerializedGitHubCommentNode = Spread<
+export type SerializedPrCommentNode = Spread<
   NormalizedComment,
   SerializedLexicalNode
 >;
 
-function GitHubCommentComponent({
+function PrCommentComponent({
   data,
   onDoubleClickEdit,
 }: {
@@ -41,14 +41,16 @@ function GitHubCommentComponent({
     (event: React.MouseEvent) => {
       event.preventDefault();
       event.stopPropagation();
-      // Open GitHub URL in new tab
-      window.open(data.url, '_blank', 'noopener,noreferrer');
+      // Open URL in new tab if available
+      if (data.url) {
+        window.open(data.url, '_blank', 'noopener,noreferrer');
+      }
     },
     [data.url]
   );
 
   return (
-    <GitHubCommentCard
+    <PrCommentCard
       author={data.author}
       body={data.body}
       createdAt={data.created_at}
@@ -72,23 +74,22 @@ const config: DecoratorNodeConfig<NormalizedComment> = {
     serialize: (data) => JSON.stringify(data, null, 2),
     deserialize: (content) => JSON.parse(content),
     validate: (data) =>
-      !!(data.id && data.comment_type && data.author && data.body && data.url),
+      !!(data.id && data.comment_type && data.author && data.body),
   },
-  component: GitHubCommentComponent,
+  component: PrCommentComponent,
   exportDOM: (data) => {
     const span = document.createElement('span');
-    span.setAttribute('data-github-comment-id', data.id);
-    span.textContent = `GitHub comment by @${data.author}: ${data.body}`;
+    span.setAttribute('data-pr-comment-id', data.id);
+    span.textContent = `PR comment by @${data.author}: ${data.body}`;
     return span;
   },
 };
 
 const result = createDecoratorNode(config);
 
-export const GitHubCommentNode = result.Node;
-export type GitHubCommentNodeInstance =
-  GeneratedDecoratorNode<NormalizedComment>;
-export const $createGitHubCommentNode = result.createNode;
-export const $isGitHubCommentNode = result.isNode;
-export const [GITHUB_COMMENT_EXPORT_TRANSFORMER, GITHUB_COMMENT_TRANSFORMER] =
+export const PrCommentNode = result.Node;
+export type PrCommentNodeInstance = GeneratedDecoratorNode<NormalizedComment>;
+export const $createPrCommentNode = result.createNode;
+export const $isPrCommentNode = result.isNode;
+export const [PR_COMMENT_EXPORT_TRANSFORMER, PR_COMMENT_TRANSFORMER] =
   result.transformers;

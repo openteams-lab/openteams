@@ -1,8 +1,7 @@
 //! Minimal helpers around the GitHub CLI (`gh`).
 //!
-//! This module deliberately mirrors the ergonomics of `git_cli.rs` so we can
-//! plug in the GitHub CLI for operations the REST client does not cover well.
-//! Future work will flesh out richer error handling and testing.
+//! This module provides low-level access to the GitHub CLI for operations
+//! the REST client does not cover well.
 
 use std::{
     ffi::{OsStr, OsString},
@@ -13,55 +12,80 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use db::models::merge::{MergeStatus, PullRequestInfo};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde::Deserialize;
 use tempfile::NamedTempFile;
 use thiserror::Error;
-use ts_rs::TS;
 use utils::shell::resolve_executable_path_blocking;
 
-use crate::services::github::{CreatePrRequest, GitHubRepoInfo};
+use crate::services::git_host::types::{
+    CreatePrRequest, PrComment, PrCommentAuthor, PrReviewComment, ReviewCommentUser,
+};
 
-/// Author information for a PR comment
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-pub struct PrCommentAuthor {
-    pub login: String,
+#[derive(Debug, Clone)]
+pub struct GitHubRepoInfo {
+    pub owner: String,
+    pub repo_name: String,
 }
 
-/// A single comment on a GitHub PR
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PrComment {
-    pub id: String,
-    pub author: PrCommentAuthor,
-    pub author_association: String,
-    pub body: String,
-    pub created_at: DateTime<Utc>,
-    pub url: String,
+struct GhCommentResponse {
+    id: String,
+    author: Option<GhUserLogin>,
+    #[serde(default)]
+    author_association: String,
+    #[serde(default)]
+    body: String,
+    created_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    url: String,
 }
 
-/// User information for a review comment (from API response)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-pub struct ReviewCommentUser {
-    pub login: String,
+#[derive(Deserialize)]
+struct GhCommentsWrapper {
+    comments: Vec<GhCommentResponse>,
 }
 
-/// An inline review comment on a GitHub PR (from gh api)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-pub struct PrReviewComment {
-    pub id: i64,
-    pub user: ReviewCommentUser,
-    pub body: String,
-    pub created_at: DateTime<Utc>,
-    pub html_url: String,
-    pub path: String,
-    pub line: Option<i64>,
-    pub side: Option<String>,
-    pub diff_hunk: String,
-    pub author_association: String,
+#[derive(Deserialize)]
+struct GhUserLogin {
+    login: Option<String>,
 }
 
-/// High-level errors originating from the GitHub CLI.
+#[derive(Deserialize)]
+struct GhReviewCommentResponse {
+    id: i64,
+    user: Option<GhUserLogin>,
+    #[serde(default)]
+    body: String,
+    created_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    html_url: String,
+    #[serde(default)]
+    path: String,
+    line: Option<i64>,
+    side: Option<String>,
+    #[serde(default)]
+    diff_hunk: String,
+    #[serde(default)]
+    author_association: String,
+}
+
+#[derive(Deserialize)]
+struct GhMergeCommit {
+    oid: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GhPrResponse {
+    number: i64,
+    url: String,
+    #[serde(default)]
+    state: String,
+    merged_at: Option<DateTime<Utc>>,
+    merge_commit: Option<GhMergeCommit>,
+}
+
 #[derive(Debug, Error)]
 pub enum GhCliError {
     #[error("GitHub CLI (`gh`) executable not found or not runnable")]
@@ -74,7 +98,6 @@ pub enum GhCliError {
     UnexpectedOutput(String),
 }
 
-/// Newtype wrapper for invoking the `gh` command.
 #[derive(Debug, Clone, Default)]
 pub struct GhCli;
 
@@ -132,6 +155,7 @@ impl GhCli {
         Err(GhCliError::CommandFailed(stderr))
     }
 
+    /// Get repository info (owner and name) from a local repository path.
     pub fn get_repo_info(&self, repo_path: &Path) -> Result<GitHubRepoInfo, GhCliError> {
         let raw = self.run(["repo", "view", "--json", "owner,name"], Some(repo_path))?;
 
@@ -159,7 +183,8 @@ impl GhCli {
     pub fn create_pr(
         &self,
         request: &CreatePrRequest,
-        repo_info: &GitHubRepoInfo,
+        owner: &str,
+        repo_name: &str,
     ) -> Result<PullRequestInfo, GhCliError> {
         // Write body to temp file to avoid shell escaping and length issues
         let body = request.body.as_deref().unwrap_or("");
@@ -173,10 +198,7 @@ impl GhCli {
         args.push(OsString::from("pr"));
         args.push(OsString::from("create"));
         args.push(OsString::from("--repo"));
-        args.push(OsString::from(format!(
-            "{}/{}",
-            repo_info.owner, repo_info.repo_name
-        )));
+        args.push(OsString::from(format!("{}/{}", owner, repo_name)));
         args.push(OsString::from("--head"));
         args.push(OsString::from(&request.head_branch));
         args.push(OsString::from("--base"));
@@ -325,101 +347,96 @@ impl GhCli {
     }
 
     fn parse_pr_view(raw: &str) -> Result<PullRequestInfo, GhCliError> {
-        let value: Value = serde_json::from_str(raw.trim()).map_err(|err| {
+        let pr: GhPrResponse = serde_json::from_str(raw.trim()).map_err(|err| {
             GhCliError::UnexpectedOutput(format!(
                 "Failed to parse gh pr view response: {err}; raw: {raw}"
             ))
         })?;
-        Self::extract_pr_info(&value).ok_or_else(|| {
-            GhCliError::UnexpectedOutput(format!(
-                "gh pr view response missing required fields: {value:#?}"
-            ))
-        })
+        Ok(Self::pr_response_to_info(pr))
     }
 
     fn parse_pr_list(raw: &str) -> Result<Vec<PullRequestInfo>, GhCliError> {
-        let value: Value = serde_json::from_str(raw.trim()).map_err(|err| {
+        let prs: Vec<GhPrResponse> = serde_json::from_str(raw.trim()).map_err(|err| {
             GhCliError::UnexpectedOutput(format!(
                 "Failed to parse gh pr list response: {err}; raw: {raw}"
             ))
         })?;
-        let arr = value.as_array().ok_or_else(|| {
-            GhCliError::UnexpectedOutput(format!("gh pr list response is not an array: {value:#?}"))
-        })?;
-        arr.iter()
-            .map(|item| {
-                Self::extract_pr_info(item).ok_or_else(|| {
-                    GhCliError::UnexpectedOutput(format!(
-                        "gh pr list item missing required fields: {item:#?}"
-                    ))
-                })
-            })
-            .collect()
+        Ok(prs.into_iter().map(Self::pr_response_to_info).collect())
     }
 
-    fn parse_pr_comments(raw: &str) -> Result<Vec<PrComment>, GhCliError> {
-        let value: Value = serde_json::from_str(raw.trim()).map_err(|err| {
-            GhCliError::UnexpectedOutput(format!(
-                "Failed to parse gh pr view --json comments response: {err}; raw: {raw}"
-            ))
-        })?;
-        let comments_arr = value
-            .get("comments")
-            .and_then(|v| v.as_array())
-            .ok_or_else(|| {
-                GhCliError::UnexpectedOutput(format!(
-                    "gh pr view --json comments response missing 'comments' array: {value:#?}"
-                ))
-            })?;
-        comments_arr
-            .iter()
-            .map(|item| {
-                serde_json::from_value(item.clone()).map_err(|err| {
-                    GhCliError::UnexpectedOutput(format!(
-                        "Failed to parse PR comment: {err}; item: {item:#?}"
-                    ))
-                })
-            })
-            .collect()
-    }
-
-    fn parse_pr_review_comments(raw: &str) -> Result<Vec<PrReviewComment>, GhCliError> {
-        serde_json::from_str(raw.trim()).map_err(|err| {
-            GhCliError::UnexpectedOutput(format!(
-                "Failed to parse review comments API response: {err}; raw: {raw}"
-            ))
-        })
-    }
-
-    fn extract_pr_info(value: &Value) -> Option<PullRequestInfo> {
-        let number = value.get("number")?.as_i64()?;
-        let url = value.get("url")?.as_str()?.to_string();
-        let state = value
-            .get("state")
-            .and_then(Value::as_str)
-            .unwrap_or("OPEN")
-            .to_string();
-        let merged_at = value
-            .get("mergedAt")
-            .and_then(Value::as_str)
-            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&Utc));
-        let merge_commit_sha = value
-            .get("mergeCommit")
-            .and_then(|v| v.get("oid"))
-            .and_then(Value::as_str)
-            .map(|s| s.to_string());
-        Some(PullRequestInfo {
-            number,
-            url,
+    fn pr_response_to_info(pr: GhPrResponse) -> PullRequestInfo {
+        let state = if pr.state.is_empty() {
+            "OPEN"
+        } else {
+            &pr.state
+        };
+        PullRequestInfo {
+            number: pr.number,
+            url: pr.url,
             status: match state.to_ascii_uppercase().as_str() {
                 "OPEN" => MergeStatus::Open,
                 "MERGED" => MergeStatus::Merged,
                 "CLOSED" => MergeStatus::Closed,
                 _ => MergeStatus::Unknown,
             },
-            merged_at,
-            merge_commit_sha,
-        })
+            merged_at: pr.merged_at,
+            merge_commit_sha: pr.merge_commit.and_then(|c| c.oid),
+        }
+    }
+
+    fn parse_pr_comments(raw: &str) -> Result<Vec<PrComment>, GhCliError> {
+        let wrapper: GhCommentsWrapper = serde_json::from_str(raw.trim()).map_err(|err| {
+            GhCliError::UnexpectedOutput(format!(
+                "Failed to parse gh pr view --json comments response: {err}; raw: {raw}"
+            ))
+        })?;
+
+        Ok(wrapper
+            .comments
+            .into_iter()
+            .map(|c| PrComment {
+                id: c.id,
+                author: PrCommentAuthor {
+                    login: c
+                        .author
+                        .and_then(|a| a.login)
+                        .unwrap_or_else(|| "unknown".to_string()),
+                },
+                author_association: c.author_association,
+                body: c.body,
+                created_at: c.created_at.unwrap_or_else(Utc::now),
+                url: c.url,
+            })
+            .collect())
+    }
+
+    fn parse_pr_review_comments(raw: &str) -> Result<Vec<PrReviewComment>, GhCliError> {
+        let items: Vec<GhReviewCommentResponse> =
+            serde_json::from_str(raw.trim()).map_err(|err| {
+                GhCliError::UnexpectedOutput(format!(
+                    "Failed to parse review comments API response: {err}; raw: {raw}"
+                ))
+            })?;
+
+        Ok(items
+            .into_iter()
+            .map(|c| PrReviewComment {
+                id: c.id,
+                user: ReviewCommentUser {
+                    login: c
+                        .user
+                        .and_then(|u| u.login)
+                        .unwrap_or_else(|| "unknown".to_string()),
+                },
+                body: c.body,
+                created_at: c.created_at.unwrap_or_else(Utc::now),
+                html_url: c.html_url,
+                path: c.path,
+                line: c.line,
+                side: c.side,
+                diff_hunk: c.diff_hunk,
+                author_association: c.author_association,
+            })
+            .collect())
     }
 }

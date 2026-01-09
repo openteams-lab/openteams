@@ -24,7 +24,9 @@ use serde::{Deserialize, Serialize};
 use services::services::{
     container::ContainerService,
     git::{GitCliError, GitServiceError},
-    github::{CreatePrRequest, GitHubService, GitHubServiceError, UnifiedPrComment},
+    git_host::{
+        self, CreatePrRequest, GitHostError, GitHostProvider, ProviderKind, UnifiedPrComment,
+    },
 };
 use ts_rs::TS;
 use utils::response::ApiResponse;
@@ -33,7 +35,7 @@ use uuid::Uuid;
 use crate::{DeploymentImpl, error::ApiError};
 
 #[derive(Debug, Deserialize, Serialize, TS)]
-pub struct CreateGitHubPrRequest {
+pub struct CreatePrApiRequest {
     pub title: String,
     pub body: Option<String>,
     pub target_branch: Option<String>,
@@ -46,12 +48,13 @@ pub struct CreateGitHubPrRequest {
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[ts(tag = "type", rename_all = "snake_case")]
-pub enum CreatePrError {
-    GithubCliNotInstalled,
-    GithubCliNotLoggedIn,
+pub enum PrError {
+    CliNotInstalled { provider: ProviderKind },
+    CliNotLoggedIn { provider: ProviderKind },
     GitCliNotLoggedIn,
     GitCliNotInstalled,
     TargetBranchNotFound { branch: String },
+    UnsupportedProvider,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -77,8 +80,8 @@ pub struct PrCommentsResponse {
 #[ts(tag = "type", rename_all = "snake_case")]
 pub enum GetPrCommentsError {
     NoPrAttached,
-    GithubCliNotInstalled,
-    GithubCliNotLoggedIn,
+    CliNotInstalled { provider: ProviderKind },
+    CliNotLoggedIn { provider: ProviderKind },
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -86,7 +89,7 @@ pub struct GetPrCommentsQuery {
     pub repo_id: Uuid,
 }
 
-pub const DEFAULT_PR_DESCRIPTION_PROMPT: &str = r#"Update the GitHub PR that was just created with a better title and description.
+pub const DEFAULT_PR_DESCRIPTION_PROMPT: &str = r#"Update the PR that was just created with a better title and description.
 The PR number is #{pr_number} and the URL is {pr_url}.
 
 Analyze the changes in this branch and write:
@@ -97,7 +100,7 @@ Analyze the changes in this branch and write:
    - Any important implementation details
    - At the end, include a note: "This PR was written using [Vibe Kanban](https://vibekanban.com)"
 
-Use `gh pr edit` to update the PR."#;
+Use the appropriate CLI tool to update the PR (gh pr edit for GitHub, az repos pr update for Azure DevOps)."#;
 
 async fn trigger_pr_description_follow_up(
     deployment: &DeploymentImpl,
@@ -190,11 +193,11 @@ async fn trigger_pr_description_follow_up(
     Ok(())
 }
 
-pub async fn create_github_pr(
+pub async fn create_pr(
     Extension(workspace): Extension<Workspace>,
     State(deployment): State<DeploymentImpl>,
-    Json(request): Json<CreateGitHubPrRequest>,
-) -> Result<ResponseJson<ApiResponse<String, CreatePrError>>, ApiError> {
+    Json(request): Json<CreatePrApiRequest>,
+) -> Result<ResponseJson<ApiResponse<String, PrError>>, ApiError> {
     let pool = &deployment.db().pool;
 
     let workspace_repo =
@@ -206,7 +209,7 @@ pub async fn create_github_pr(
         .await?
         .ok_or(RepoError::NotFound)?;
 
-    let repo_path = repo.path;
+    let repo_path = repo.path.clone();
     let target_branch = if let Some(branch) = request.target_branch {
         branch
     } else {
@@ -218,7 +221,7 @@ pub async fn create_github_pr(
         .ensure_container_exists(&workspace)
         .await?;
     let workspace_path = PathBuf::from(&container_ref);
-    let worktree_path = workspace_path.join(repo.name);
+    let worktree_path = workspace_path.join(&repo.name);
 
     match deployment
         .git()
@@ -226,40 +229,40 @@ pub async fn create_github_pr(
     {
         Ok(false) => {
             return Ok(ResponseJson(ApiResponse::error_with_data(
-                CreatePrError::TargetBranchNotFound {
+                PrError::TargetBranchNotFound {
                     branch: target_branch.clone(),
                 },
             )));
         }
         Err(GitServiceError::GitCLI(GitCliError::AuthFailed(_))) => {
             return Ok(ResponseJson(ApiResponse::error_with_data(
-                CreatePrError::GitCliNotLoggedIn,
+                PrError::GitCliNotLoggedIn,
             )));
         }
         Err(GitServiceError::GitCLI(GitCliError::NotAvailable)) => {
             return Ok(ResponseJson(ApiResponse::error_with_data(
-                CreatePrError::GitCliNotInstalled,
+                PrError::GitCliNotInstalled,
             )));
         }
         Err(e) => return Err(ApiError::GitService(e)),
         Ok(true) => {}
     }
 
-    // Push the branch to GitHub first
+    // Push the branch to remote first
     if let Err(e) = deployment
         .git()
-        .push_to_github(&worktree_path, &workspace.branch, false)
+        .push_to_remote(&worktree_path, &workspace.branch, false)
     {
-        tracing::error!("Failed to push branch to GitHub: {}", e);
+        tracing::error!("Failed to push branch to remote: {}", e);
         match e {
             GitServiceError::GitCLI(GitCliError::AuthFailed(_)) => {
                 return Ok(ResponseJson(ApiResponse::error_with_data(
-                    CreatePrError::GitCliNotLoggedIn,
+                    PrError::GitCliNotLoggedIn,
                 )));
             }
             GitServiceError::GitCLI(GitCliError::NotAvailable) => {
                 return Ok(ResponseJson(ApiResponse::error_with_data(
-                    CreatePrError::GitCliNotInstalled,
+                    PrError::GitCliNotInstalled,
                 )));
             }
             _ => return Err(ApiError::GitService(e)),
@@ -285,7 +288,29 @@ pub async fn create_github_pr(
     } else {
         target_branch
     };
-    // Create the PR using GitHub service
+
+    let remote_url = deployment
+        .git()
+        .get_remote_url_from_branch_or_default(&repo_path, &workspace.branch)?;
+
+    let git_host = match git_host::GitHostService::from_url(&remote_url) {
+        Ok(host) => host,
+        Err(GitHostError::UnsupportedProvider) => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                PrError::UnsupportedProvider,
+            )));
+        }
+        Err(GitHostError::CliNotInstalled { provider }) => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                PrError::CliNotInstalled { provider },
+            )));
+        }
+        Err(e) => return Err(ApiError::GitHost(e)),
+    };
+
+    let provider = git_host.provider_kind();
+
+    // Create the PR
     let pr_request = CreatePrRequest {
         title: request.title.clone(),
         body: request.body.clone(),
@@ -293,9 +318,11 @@ pub async fn create_github_pr(
         base_branch: norm_target_branch_name.clone(),
         draft: request.draft,
     };
-    let github_service = GitHubService::new()?;
-    let repo_info = github_service.get_repo_info(&repo_path).await?;
-    match github_service.create_pr(&repo_info, &pr_request).await {
+
+    match git_host
+        .create_pr(&repo_path, &remote_url, &pr_request)
+        .await
+    {
         Ok(pr_info) => {
             // Update the workspace with PR information
             if let Err(e) = Merge::create_pr(
@@ -315,11 +342,13 @@ pub async fn create_github_pr(
             if let Err(e) = utils::browser::open_browser(&pr_info.url).await {
                 tracing::warn!("Failed to open PR in browser: {}", e);
             }
+
             deployment
                 .track_if_analytics_allowed(
-                    "github_pr_created",
+                    "pr_created",
                     serde_json::json!({
                         "workspace_id": workspace.id.to_string(),
+                        "provider": format!("{:?}", provider),
                     }),
                 )
                 .await;
@@ -345,18 +374,21 @@ pub async fn create_github_pr(
         }
         Err(e) => {
             tracing::error!(
-                "Failed to create GitHub PR for attempt {}: {}",
+                "Failed to create PR for attempt {} using {:?}: {}",
                 workspace.id,
+                provider,
                 e
             );
             match &e {
-                GitHubServiceError::GhCliNotInstalled(_) => Ok(ResponseJson(
-                    ApiResponse::error_with_data(CreatePrError::GithubCliNotInstalled),
+                GitHostError::CliNotInstalled { provider } => Ok(ResponseJson(
+                    ApiResponse::error_with_data(PrError::CliNotInstalled {
+                        provider: *provider,
+                    }),
                 )),
-                GitHubServiceError::AuthFailed(_) => Ok(ResponseJson(
-                    ApiResponse::error_with_data(CreatePrError::GithubCliNotLoggedIn),
-                )),
-                _ => Err(ApiError::GitHubService(e)),
+                GitHostError::AuthFailed(_) => Ok(ResponseJson(ApiResponse::error_with_data(
+                    PrError::CliNotLoggedIn { provider },
+                ))),
+                _ => Err(ApiError::GitHost(e)),
             }
         }
     }
@@ -366,7 +398,7 @@ pub async fn attach_existing_pr(
     Extension(workspace): Extension<Workspace>,
     State(deployment): State<DeploymentImpl>,
     Json(request): Json<AttachExistingPrRequest>,
-) -> Result<ResponseJson<ApiResponse<AttachPrResponse>>, ApiError> {
+) -> Result<ResponseJson<ApiResponse<AttachPrResponse, PrError>>, ApiError> {
     let pool = &deployment.db().pool;
 
     let task = workspace
@@ -394,13 +426,45 @@ pub async fn attach_existing_pr(
         })));
     }
 
-    let github_service = GitHubService::new()?;
-    let repo_info = github_service.get_repo_info(&repo.path).await?;
+    let remote_url = deployment
+        .git()
+        .get_remote_url_from_branch_or_default(&repo.path, &workspace_repo.target_branch)?;
+
+    let git_host = match git_host::GitHostService::from_url(&remote_url) {
+        Ok(host) => host,
+        Err(GitHostError::UnsupportedProvider) => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                PrError::UnsupportedProvider,
+            )));
+        }
+        Err(GitHostError::CliNotInstalled { provider }) => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                PrError::CliNotInstalled { provider },
+            )));
+        }
+        Err(e) => return Err(ApiError::GitHost(e)),
+    };
+
+    let provider = git_host.provider_kind();
 
     // List all PRs for branch (open, closed, and merged)
-    let prs = github_service
-        .list_all_prs_for_branch(&repo_info, &workspace.branch)
-        .await?;
+    let prs = match git_host
+        .list_prs_for_branch(&repo.path, &remote_url, &workspace.branch)
+        .await
+    {
+        Ok(prs) => prs,
+        Err(GitHostError::CliNotInstalled { provider }) => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                PrError::CliNotInstalled { provider },
+            )));
+        }
+        Err(GitHostError::AuthFailed(_)) => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                PrError::CliNotLoggedIn { provider },
+            )));
+        }
+        Err(e) => return Err(ApiError::GitHost(e)),
+    };
 
     // Take the first PR (prefer open, but also accept merged/closed)
     if let Some(pr_info) = prs.into_iter().next() {
@@ -496,12 +560,24 @@ pub async fn get_pr_comments(
         }
     };
 
-    let github_service = GitHubService::new()?;
-    let repo_info = github_service.get_repo_info(&repo.path).await?;
+    let remote_url = deployment
+        .git()
+        .get_remote_url_from_branch_or_default(&repo.path, &workspace_repo.target_branch)?;
 
-    // Fetch comments from GitHub
-    match github_service
-        .get_pr_comments(&repo_info, pr_info.number)
+    let git_host = match git_host::GitHostService::from_url(&remote_url) {
+        Ok(host) => host,
+        Err(GitHostError::CliNotInstalled { provider }) => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                GetPrCommentsError::CliNotInstalled { provider },
+            )));
+        }
+        Err(e) => return Err(ApiError::GitHost(e)),
+    };
+
+    let provider = git_host.provider_kind();
+
+    match git_host
+        .get_pr_comments(&repo.path, &remote_url, pr_info.number)
         .await
     {
         Ok(comments) => Ok(ResponseJson(ApiResponse::success(PrCommentsResponse {
@@ -515,13 +591,15 @@ pub async fn get_pr_comments(
                 e
             );
             match &e {
-                GitHubServiceError::GhCliNotInstalled(_) => Ok(ResponseJson(
-                    ApiResponse::error_with_data(GetPrCommentsError::GithubCliNotInstalled),
+                GitHostError::CliNotInstalled { provider } => Ok(ResponseJson(
+                    ApiResponse::error_with_data(GetPrCommentsError::CliNotInstalled {
+                        provider: *provider,
+                    }),
                 )),
-                GitHubServiceError::AuthFailed(_) => Ok(ResponseJson(
-                    ApiResponse::error_with_data(GetPrCommentsError::GithubCliNotLoggedIn),
-                )),
-                _ => Err(ApiError::GitHubService(e)),
+                GitHostError::AuthFailed(_) => Ok(ResponseJson(ApiResponse::error_with_data(
+                    GetPrCommentsError::CliNotLoggedIn { provider },
+                ))),
+                _ => Err(ApiError::GitHost(e)),
             }
         }
     }
