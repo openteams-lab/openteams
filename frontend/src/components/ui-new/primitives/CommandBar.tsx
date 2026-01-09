@@ -1,4 +1,4 @@
-import { CaretLeftIcon, CopyIcon } from '@phosphor-icons/react';
+import { CaretLeftIcon, CopyIcon, FolderIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import {
   Command,
@@ -68,7 +68,7 @@ export function CommandBar({
 
   return (
     <Command
-      className="rounded-sm border border-border"
+      className="rounded-sm border border-border [&_[cmdk-group-heading]]:px-base [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-low [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-half [&_[cmdk-input-wrapper]_svg]:h-4 [&_[cmdk-input-wrapper]_svg]:w-4 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-base [&_[cmdk-item]]:py-half"
       loop
       filter={(value, search) => {
         // Always show the back option
@@ -109,6 +109,17 @@ export function CommandBar({
                   >
                     <IconComponent className="h-4 w-4" weight="regular" />
                     <span>{item.label}</span>
+                  </CommandItem>
+                );
+              } else if (item.type === 'repo') {
+                return (
+                  <CommandItem
+                    key={item.repo.id}
+                    value={`${item.repo.id} ${item.repo.display_name}`}
+                    onSelect={() => onSelect(item)}
+                  >
+                    <FolderIcon className="h-4 w-4" weight="regular" />
+                    <span>{item.repo.display_name}</span>
                   </CommandItem>
                 );
               } else if (item.type === 'action') {
