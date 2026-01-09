@@ -94,7 +94,7 @@ export function RepoCard({
         <div className="flex items-center justify-center">
           <CrosshairIcon className="size-icon-sm text-low" weight="bold" />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex">
           <DropdownMenu>
             <DropdownMenuTriggerButton
               label={targetBranch}
@@ -117,6 +117,24 @@ export function RepoCard({
                   </DropdownMenuItem>
                 </>
               )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex items-center justify-center p-1.5 rounded hover:bg-tertiary text-low hover:text-base transition-colors"
+                title="Repo actions"
+              >
+                <ArrowSquareOutIcon className="size-icon-base" weight="bold" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem icon={CopyIcon} onClick={onCopyPath}>
+                {tCommon('actions.copyPath')}
+              </DropdownMenuItem>
+              <DropdownMenuItem icon={CodeIcon} onClick={onOpenInEditor}>
+                {tCommon('actions.openInIde')}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -155,56 +173,49 @@ export function RepoCard({
 
       {/* PR status row */}
       {prNumber && (
-        <div className="flex items-center gap-half">
+        <div className="flex items-center gap-half my-base">
           {prStatus === 'merged' ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100/70 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
-              <CheckCircleIcon className="size-icon-xs" weight="fill" />
-              {t('git.pr.merged', { prNumber })}
-            </span>
+            prUrl ? (
+              <button
+                onClick={() => window.open(prUrl, '_blank')}
+                className="inline-flex items-center gap-half px-base py-half rounded-sm bg-panel text-success hover:bg-tertiary text-sm font-medium transition-colors"
+              >
+                <CheckCircleIcon className="size-icon-xs" weight="fill" />
+                {t('git.pr.merged', { prNumber })}
+                <ArrowSquareOutIcon className="size-icon-xs" weight="bold" />
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-half px-base py-half rounded-sm bg-panel text-success text-sm font-medium">
+                <CheckCircleIcon className="size-icon-xs" weight="fill" />
+                {t('git.pr.merged', { prNumber })}
+              </span>
+            )
           ) : prUrl ? (
             <button
               onClick={() => window.open(prUrl, '_blank')}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100/60 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 hover:underline text-sm font-medium"
+              className="inline-flex items-center gap-half px-base py-half rounded-sm bg-panel text-normal hover:bg-tertiary text-sm font-medium transition-colors"
             >
               <GitPullRequestIcon className="size-icon-xs" weight="fill" />
-              {t('git.pr.open', { prNumber })}
+              {t('git.pr.open', { number: prNumber })}
               <ArrowSquareOutIcon className="size-icon-xs" weight="bold" />
             </button>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100/60 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 text-sm font-medium">
+            <span className="inline-flex items-center gap-half px-base py-half rounded-sm bg-panel text-normal text-sm font-medium">
               <GitPullRequestIcon className="size-icon-xs" weight="fill" />
-              {t('git.pr.open', { prNumber })}
+              {t('git.pr.open', { number: prNumber })}
             </span>
           )}
         </div>
       )}
 
       {/* Actions row */}
-      <div className="flex items-center gap-half">
+      <div className="my-base">
         <SplitButton
           options={repoActionOptions}
           selectedValue={selectedAction}
           onSelectionChange={setSelectedAction}
           onAction={(action) => onActionsClick?.(action)}
         />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="flex items-center justify-center p-1.5 rounded hover:bg-tertiary text-low hover:text-base transition-colors"
-              title="Repo actions"
-            >
-              <ArrowSquareOutIcon className="size-icon-base" weight="bold" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem icon={CopyIcon} onClick={onCopyPath}>
-              {tCommon('actions.copyPath')}
-            </DropdownMenuItem>
-            <DropdownMenuItem icon={CodeIcon} onClick={onOpenInEditor}>
-              {tCommon('actions.openInIde')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </CollapsibleSection>
   );
