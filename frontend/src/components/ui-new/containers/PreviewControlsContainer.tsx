@@ -5,6 +5,7 @@ import { usePreviewUrl } from '../hooks/usePreviewUrl';
 import { useLogStream } from '@/hooks/useLogStream';
 import { useLayoutStore } from '@/stores/useLayoutStore';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
+import { ScriptFixerDialog } from '@/components/dialogs/scripts/ScriptFixerDialog';
 
 interface PreviewControlsContainerProps {
   attemptId?: string;
@@ -88,9 +89,28 @@ export function PreviewControlsContainer({
     }
   }, [urlInfo?.url]);
 
+  const handleFixScript = useCallback(() => {
+    if (!attemptId || repos.length === 0) return;
+
+    // Get session ID from the latest dev server process
+    const sessionId = devServerProcesses[0]?.session_id;
+
+    ScriptFixerDialog.show({
+      scriptType: 'dev_server',
+      repos,
+      workspaceId: attemptId,
+      sessionId,
+      initialRepoId: repos.length === 1 ? repos[0].id : undefined,
+    });
+  }, [attemptId, repos, devServerProcesses]);
+
   const hasDevScript = repos.some(
     (repo) => repo.dev_server_script && repo.dev_server_script.trim() !== ''
   );
+
+  // Only show "Fix Script" button when the latest dev server process failed
+  const latestDevServerFailed =
+    devServerProcesses.length > 0 && devServerProcesses[0]?.status === 'failed';
 
   // Don't render if no repos have dev server scripts configured
   if (!hasDevScript) {
@@ -111,6 +131,11 @@ export function PreviewControlsContainer({
       onRefresh={handleRefresh}
       onCopyUrl={handleCopyUrl}
       onOpenInNewTab={handleOpenInNewTab}
+      onFixScript={
+        attemptId && repos.length > 0 && latestDevServerFailed
+          ? handleFixScript
+          : undefined
+      }
       isStarting={isStarting}
       isStopping={isStopping}
       isServerRunning={runningDevServers.length > 0}

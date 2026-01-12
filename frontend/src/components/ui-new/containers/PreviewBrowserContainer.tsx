@@ -6,6 +6,7 @@ import { useLogStream } from '@/hooks/useLogStream';
 import { useLayoutStore } from '@/stores/useLayoutStore';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
 import { useNavigate } from 'react-router-dom';
+import { ScriptFixerDialog } from '@/components/dialogs/scripts/ScriptFixerDialog';
 
 interface PreviewBrowserContainerProps {
   attemptId?: string;
@@ -20,7 +21,7 @@ export function PreviewBrowserContainer({
   const previewRefreshKey = useLayoutStore((s) => s.previewRefreshKey);
   const { repos } = useWorkspaceContext();
 
-  const { start, isStarting, runningDevServers } =
+  const { start, isStarting, runningDevServers, devServerProcesses } =
     usePreviewDevServer(attemptId);
 
   const primaryDevServer = runningDevServers[0];
@@ -44,6 +45,21 @@ export function PreviewBrowserContainer({
     }
   };
 
+  const handleFixDevScript = useCallback(() => {
+    if (!attemptId || repos.length === 0) return;
+
+    // Get session ID from the latest dev server process
+    const sessionId = devServerProcesses[0]?.session_id;
+
+    ScriptFixerDialog.show({
+      scriptType: 'dev_server',
+      repos,
+      workspaceId: attemptId,
+      sessionId,
+      initialRepoId: repos.length === 1 ? repos[0].id : undefined,
+    });
+  }, [attemptId, repos, devServerProcesses]);
+
   return (
     <PreviewBrowser
       url={iframeUrl}
@@ -52,6 +68,9 @@ export function PreviewBrowserContainer({
       isServerRunning={runningDevServers.length > 0}
       repos={repos}
       handleEditDevScript={handleEditDevScript}
+      handleFixDevScript={
+        attemptId && repos.length > 0 ? handleFixDevScript : undefined
+      }
       className={className}
     />
   );
