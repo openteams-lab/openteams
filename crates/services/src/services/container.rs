@@ -766,6 +766,17 @@ pub trait ContainerService {
                         );
                     }
                 }
+                #[cfg(feature = "qa-mode")]
+                ExecutorActionType::ReviewRequest(_request) => {
+                    let executor = QaMockExecutor;
+                    executor.normalize_logs(temp_store.clone(), &current_dir);
+                }
+                #[cfg(not(feature = "qa-mode"))]
+                ExecutorActionType::ReviewRequest(request) => {
+                    let executor = ExecutorConfigs::get_cached()
+                        .get_coding_agent_or_default(&request.executor_profile_id);
+                    executor.normalize_logs(temp_store.clone(), &current_dir);
+                }
                 _ => {
                     tracing::debug!(
                         "Executor action doesn't support log normalization: {:?}",
@@ -1029,7 +1040,10 @@ pub trait ContainerService {
             ExecutorActionType::CodingAgentFollowUpRequest(follow_up_request) => {
                 Some(follow_up_request.prompt.clone())
             }
-            _ => None,
+            ExecutorActionType::ReviewRequest(review_request) => {
+                Some(review_request.prompt.clone())
+            }
+            ExecutorActionType::ScriptRequest(_) => None,
         } {
             let create_coding_agent_turn = CreateCodingAgentTurn {
                 execution_process_id: execution_process.id,
@@ -1117,6 +1131,10 @@ pub trait ContainerService {
                     &request.executor_profile_id,
                     request.effective_dir(&workspace_root),
                 )),
+                ExecutorActionType::ReviewRequest(request) => Some((
+                    &request.executor_profile_id,
+                    request.effective_dir(&workspace_root),
+                )),
                 _ => None,
             }
         {
@@ -1160,13 +1178,15 @@ pub trait ContainerService {
             }
             (
                 ExecutorActionType::CodingAgentInitialRequest(_)
-                | ExecutorActionType::CodingAgentFollowUpRequest(_),
+                | ExecutorActionType::CodingAgentFollowUpRequest(_)
+                | ExecutorActionType::ReviewRequest(_),
                 ExecutorActionType::ScriptRequest(_),
             ) => ExecutionProcessRunReason::CleanupScript,
             (
                 _,
                 ExecutorActionType::CodingAgentFollowUpRequest(_)
-                | ExecutorActionType::CodingAgentInitialRequest(_),
+                | ExecutorActionType::CodingAgentInitialRequest(_)
+                | ExecutorActionType::ReviewRequest(_),
             ) => ExecutionProcessRunReason::CodingAgent,
         };
 
