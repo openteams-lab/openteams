@@ -27,6 +27,8 @@ use db::{
 };
 #[cfg(feature = "qa-mode")]
 use executors::executors::qa_mock::QaMockExecutor;
+#[cfg(not(feature = "qa-mode"))]
+use executors::profile::ExecutorConfigs;
 use executors::{
     actions::{
         ExecutorAction, ExecutorActionType,
@@ -35,7 +37,7 @@ use executors::{
     },
     executors::{ExecutorError, StandardCodingAgentExecutor},
     logs::{NormalizedEntry, NormalizedEntryError, NormalizedEntryType, utils::ConversationPatch},
-    profile::{ExecutorConfigs, ExecutorProfileId},
+    profile::ExecutorProfileId,
 };
 use futures::{StreamExt, future};
 use sqlx::Error as SqlxError;
@@ -1104,6 +1106,7 @@ pub trait ContainerService {
 
         // Start processing normalised logs for executor requests and follow ups
         let workspace_root = self.workspace_to_current_dir(workspace);
+        #[cfg_attr(feature = "qa-mode", allow(unused_variables))]
         if let Some(msg_store) = self.get_msg_store_by_id(&execution_process.id).await
             && let Some((executor_profile_id, working_dir)) = match executor_action.typ() {
                 ExecutorActionType::CodingAgentInitialRequest(request) => Some((
