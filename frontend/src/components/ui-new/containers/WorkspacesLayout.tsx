@@ -27,7 +27,10 @@ import { NavbarContainer } from '@/components/ui-new/containers/NavbarContainer'
 import { PreviewBrowserContainer } from '@/components/ui-new/containers/PreviewBrowserContainer';
 import { PreviewControlsContainer } from '@/components/ui-new/containers/PreviewControlsContainer';
 import { useRenameBranch } from '@/hooks/useRenameBranch';
+import { usePush } from '@/hooks/usePush';
 import { repoApi } from '@/lib/api';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
+import { ForcePushDialog } from '@/components/dialogs/git/ForcePushDialog';
 import { useDiffStream } from '@/hooks/useDiffStream';
 import { useTask } from '@/hooks/useTask';
 import { useAttemptRepo } from '@/hooks/useAttemptRepo';
@@ -53,6 +56,8 @@ interface GitPanelContainerProps {
   onBranchNameChange: (name: string) => void;
 }
 
+type PushState = 'idle' | 'pending' | 'success' | 'error';
+
 function GitPanelContainer({
   selectedWorkspace,
   repos,
@@ -60,6 +65,101 @@ function GitPanelContainer({
   onBranchNameChange,
 }: GitPanelContainerProps) {
   const { executeAction } = useActions();
+
+  // Track push state per repo: idle, pending, success, or error
+  const [pushStates, setPushStates] = useState<Record<string, PushState>>({});
+  const pushStatesRef = useRef<Record<string, PushState>>({});
+  pushStatesRef.current = pushStates;
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentPushRepoRef = useRef<string | null>(null);
+
+  // Reset push-related state when the selected workspace changes to avoid
+  // leaking push state across workspaces with repos that share the same ID.
+  useEffect(() => {
+    setPushStates({});
+    pushStatesRef.current = {};
+    currentPushRepoRef.current = null;
+
+    if (successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current);
+      successTimeoutRef.current = null;
+    }
+  }, [selectedWorkspace?.id]);
+  // Use push hook for direct API access with proper error handling
+  const pushMutation = usePush(
+    selectedWorkspace?.id,
+    // onSuccess
+    () => {
+      const repoId = currentPushRepoRef.current;
+      if (!repoId) return;
+      setPushStates((prev) => ({ ...prev, [repoId]: 'success' }));
+      // Clear success state after 2 seconds
+      successTimeoutRef.current = setTimeout(() => {
+        setPushStates((prev) => ({ ...prev, [repoId]: 'idle' }));
+      }, 2000);
+    },
+    // onError
+    async (err, errorData) => {
+      const repoId = currentPushRepoRef.current;
+      if (!repoId) return;
+
+      // Handle force push required - show confirmation dialog
+      if (errorData?.type === 'force_push_required' && selectedWorkspace?.id) {
+        setPushStates((prev) => ({ ...prev, [repoId]: 'idle' }));
+        await ForcePushDialog.show({
+          attemptId: selectedWorkspace.id,
+          repoId,
+        });
+        return;
+      }
+
+      // Show error state and dialog for other errors
+      setPushStates((prev) => ({ ...prev, [repoId]: 'error' }));
+      const message =
+        err instanceof Error ? err.message : 'Failed to push changes';
+      ConfirmDialog.show({
+        title: 'Error',
+        message,
+        confirmText: 'OK',
+        showCancelButton: false,
+        variant: 'destructive',
+      });
+      // Clear error state after 3 seconds
+      successTimeoutRef.current = setTimeout(() => {
+        setPushStates((prev) => ({ ...prev, [repoId]: 'idle' }));
+      }, 3000);
+    }
+  );
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Compute repoInfos with push button state
+  const repoInfosWithPushButton = useMemo(
+    () =>
+      repoInfos.map((repo) => {
+        const state = pushStates[repo.id] ?? 'idle';
+        const hasUnpushedCommits =
+          repo.prStatus === 'open' && (repo.remoteCommitsAhead ?? 0) > 0;
+        // Show push button if there are unpushed commits OR if we're in a push flow
+        // (pending/success/error states keep the button visible for feedback)
+        const isInPushFlow = state !== 'idle';
+        return {
+          ...repo,
+          showPushButton: hasUnpushedCommits && !isInPushFlow,
+          isPushPending: state === 'pending',
+          isPushSuccess: state === 'success',
+          isPushError: state === 'error',
+        };
+      }),
+    [repoInfos, pushStates]
+  );
 
   // Handle copying repo path to clipboard
   const handleCopyPath = useCallback(
@@ -100,6 +200,7 @@ function GitPanelContainer({
         merge: Actions.GitMerge,
         rebase: Actions.GitRebase,
         'change-target': Actions.GitChangeTarget,
+        push: Actions.GitPush,
       };
 
       const actionDef = actionMap[action];
@@ -111,12 +212,33 @@ function GitPanelContainer({
     [selectedWorkspace, executeAction]
   );
 
+  // Handle push button click - use mutation for proper state tracking
+  const handlePushClick = useCallback(
+    (repoId: string) => {
+      // Use ref to check current state to avoid stale closure
+      if (pushStatesRef.current[repoId] === 'pending') return;
+
+      // Clear any existing timeout
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = null;
+      }
+
+      // Track which repo we're pushing
+      currentPushRepoRef.current = repoId;
+      setPushStates((prev) => ({ ...prev, [repoId]: 'pending' }));
+      pushMutation.mutate({ repo_id: repoId });
+    },
+    [pushMutation]
+  );
+
   return (
     <GitPanel
-      repos={repoInfos}
+      repos={repoInfosWithPushButton}
       workingBranchName={selectedWorkspace?.branch ?? ''}
       onWorkingBranchNameChange={onBranchNameChange}
       onActionsClick={handleActionsClick}
+      onPushClick={handlePushClick}
       onOpenInEditor={handleOpenInEditor}
       onCopyPath={handleCopyPath}
       onAddRepo={() => console.log('Add repo clicked')}
@@ -256,6 +378,7 @@ export function WorkspacesLayout() {
           name: repo.display_name || repo.name,
           targetBranch: repo.target_branch || 'main',
           commitsAhead: repoStatus?.commits_ahead ?? 0,
+          remoteCommitsAhead: repoStatus?.remote_commits_ahead ?? 0,
           filesChanged: diffStats.filesChanged,
           linesAdded: diffStats.linesAdded,
           linesRemoved: diffStats.linesRemoved,
