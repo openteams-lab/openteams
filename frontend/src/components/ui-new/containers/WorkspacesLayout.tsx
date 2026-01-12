@@ -495,26 +495,6 @@ export function WorkspacesLayout() {
     [setFileTreeHeight]
   );
 
-  // Handle pane resize end
-  const handlePaneResize = useCallback(
-    (sizes: number[]) => {
-      // sizes[0] = sidebar, sizes[1] = main, sizes[2] = changes/logs panel, sizes[3] = git panel
-      if (sizes[0] !== undefined) setSidebarWidth(sizes[0]);
-      if (sizes[3] !== undefined) setGitPanelWidth(sizes[3]);
-
-      const total = sizes.reduce((sum, s) => sum + (s ?? 0), 0);
-      if (total > 0) {
-        // Store changes/logs panel as percentage of TOTAL container width
-        const centerPaneWidth = sizes[2];
-        if (centerPaneWidth !== undefined) {
-          const percent = Math.round((centerPaneWidth / total) * 100);
-          setChangesPanelWidth(`${percent}%`);
-        }
-      }
-    },
-    [setSidebarWidth, setGitPanelWidth, setChangesPanelWidth]
-  );
-
   // Navigate to logs panel and select a specific process
   const handleViewProcessInPanel = useCallback(
     (processId: string) => {
@@ -698,23 +678,39 @@ export function WorkspacesLayout() {
     />
   );
 
+  // Handle inner pane resize (main, changes/logs, git panel)
+  const handleInnerPaneResize = useCallback(
+    (sizes: number[]) => {
+      // sizes[0] = main (no persistence needed, uses LayoutPriority.High)
+      // sizes[1] = changes/logs panel
+      // sizes[2] = git panel
+      if (sizes[2] !== undefined) setGitPanelWidth(sizes[2]);
+
+      const total = sizes.reduce((sum, s) => sum + (s ?? 0), 0);
+      if (total > 0) {
+        const centerPaneWidth = sizes[1];
+        if (centerPaneWidth !== undefined) {
+          const percent = Math.round((centerPaneWidth / total) * 100);
+          setChangesPanelWidth(`${percent}%`);
+        }
+      }
+    },
+    [setGitPanelWidth, setChangesPanelWidth]
+  );
+
+  // Handle outer pane resize (sidebar only)
+  const handleOuterPaneResize = useCallback(
+    (sizes: number[]) => {
+      if (sizes[0] !== undefined) setSidebarWidth(sizes[0]);
+    },
+    [setSidebarWidth]
+  );
+
   // Render layout content (create mode or workspace mode)
   const renderContent = () => {
-    const allotmentContent = (
-      <Allotment
-        ref={allotmentRef}
-        className="flex-1 min-h-0"
-        onDragEnd={handlePaneResize}
-      >
-        <Allotment.Pane
-          minSize={300}
-          preferredSize={sidebarWidth}
-          maxSize={600}
-          visible={isSidebarVisible}
-        >
-          <div className="h-full overflow-hidden">{renderSidebar()}</div>
-        </Allotment.Pane>
-
+    // Inner Allotment with panes 2-4 (main, changes/logs, git panel)
+    const innerAllotment = (
+      <Allotment onDragEnd={handleInnerPaneResize}>
         <Allotment.Pane
           visible={isMainPanelVisible}
           priority={LayoutPriority.High}
@@ -791,29 +787,49 @@ export function WorkspacesLayout() {
       </Allotment>
     );
 
-    if (isCreateMode) {
-      return (
-        <CreateModeProvider
-          initialProjectId={lastWorkspaceTask?.project_id}
-          initialRepos={lastWorkspaceRepos}
-        >
-          <ReviewProvider attemptId={selectedWorkspace?.id}>
-            {allotmentContent}
-          </ReviewProvider>
-        </CreateModeProvider>
-      );
-    }
-
-    return (
+    // Wrap inner Allotment with providers
+    const wrappedInnerContent = isCreateMode ? (
+      <CreateModeProvider
+        initialProjectId={lastWorkspaceTask?.project_id}
+        initialRepos={lastWorkspaceRepos}
+      >
+        <ReviewProvider attemptId={selectedWorkspace?.id}>
+          {innerAllotment}
+        </ReviewProvider>
+      </CreateModeProvider>
+    ) : (
       <ExecutionProcessesProvider
         key={`${selectedWorkspace?.id}-${selectedSessionId}`}
         attemptId={selectedWorkspace?.id}
         sessionId={selectedSessionId}
       >
         <ReviewProvider attemptId={selectedWorkspace?.id}>
-          {allotmentContent}
+          {innerAllotment}
         </ReviewProvider>
       </ExecutionProcessesProvider>
+    );
+
+    return (
+      <Allotment
+        ref={allotmentRef}
+        className="flex-1 min-h-0"
+        onDragEnd={handleOuterPaneResize}
+      >
+        {/* Sidebar pane - OUTSIDE providers, won't remount on workspace switch */}
+        <Allotment.Pane
+          minSize={300}
+          preferredSize={sidebarWidth}
+          maxSize={600}
+          visible={isSidebarVisible}
+        >
+          <div className="h-full overflow-hidden">{renderSidebar()}</div>
+        </Allotment.Pane>
+
+        {/* Container for provider-wrapped inner content */}
+        <Allotment.Pane priority={LayoutPriority.High}>
+          {wrappedInnerContent}
+        </Allotment.Pane>
+      </Allotment>
     );
   };
 
