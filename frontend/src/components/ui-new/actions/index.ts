@@ -33,6 +33,9 @@ import {
   PencilSimpleIcon,
   ArrowUpIcon,
   HighlighterIcon,
+  ListIcon,
+  MegaphoneIcon,
+  QuestionIcon,
 } from '@phosphor-icons/react';
 import { useDiffViewStore } from '@/stores/useDiffViewStore';
 import { useUiPreferencesStore } from '@/stores/useUiPreferencesStore';
@@ -50,6 +53,8 @@ import { CreatePRDialog } from '@/components/dialogs/tasks/CreatePRDialog';
 import { getIdeName } from '@/components/ide/IdeIcon';
 import { EditorSelectionDialog } from '@/components/dialogs/tasks/EditorSelectionDialog';
 import { StartReviewDialog } from '@/components/dialogs/tasks/StartReviewDialog';
+import posthog from 'posthog-js';
+import { WorkspacesGuideDialog } from '@/components/ui-new/dialogs/WorkspacesGuideDialog';
 
 // Mirrored sidebar icon for right sidebar toggle
 const RightSidebarIcon: Icon = forwardRef<SVGSVGElement, IconProps>(
@@ -367,6 +372,40 @@ export const Actions = {
     },
   },
 
+  Feedback: {
+    id: 'feedback',
+    label: 'Give Feedback',
+    icon: MegaphoneIcon,
+    requiresTarget: false,
+    execute: () => {
+      posthog.displaySurvey('019bb6e8-3d36-0000-1806-7330cd3c727e');
+    },
+  },
+
+  WorkspacesGuide: {
+    id: 'workspaces-guide',
+    label: 'Workspaces Guide',
+    icon: QuestionIcon,
+    requiresTarget: false,
+    execute: async () => {
+      await WorkspacesGuideDialog.show();
+    },
+  },
+
+  OpenCommandBar: {
+    id: 'open-command-bar',
+    label: 'Open Command Bar',
+    icon: ListIcon,
+    requiresTarget: false,
+    execute: async () => {
+      // Dynamic import to avoid circular dependency (pages.ts imports Actions)
+      const { CommandBarDialog } = await import(
+        '@/components/ui-new/dialogs/CommandBarDialog'
+      );
+      CommandBarDialog.show();
+    },
+  },
+
   // === Diff View Actions ===
   ToggleDiffViewMode: {
     id: 'toggle-diff-view-mode',
@@ -533,9 +572,7 @@ export const Actions = {
       // Fetch task lazily to get project_id
       const task = await tasksApi.getById(workspace.task_id);
       if (task?.project_id) {
-        ctx.navigate(
-          `/projects/${task.project_id}/tasks/${workspace.task_id}/attempts/${workspace.id}`
-        );
+        ctx.navigate(`/projects/${task.project_id}/tasks/${workspace.task_id}`);
       } else {
         ctx.navigate('/');
       }
@@ -907,7 +944,11 @@ export type NavbarItem = ActionDefinition | typeof NavbarDivider;
 
 // Navbar action groups define which actions appear in each section
 export const NavbarActionGroups = {
-  left: [Actions.ArchiveWorkspace, Actions.OpenInOldUI] as ActionDefinition[],
+  left: [
+    Actions.OpenInOldUI,
+    NavbarDivider,
+    Actions.ArchiveWorkspace,
+  ] as ActionDefinition[],
   right: [
     Actions.ToggleDiffViewMode,
     Actions.ToggleAllDiffs,
@@ -918,6 +959,11 @@ export const NavbarActionGroups = {
     Actions.ToggleLogsMode,
     Actions.TogglePreviewMode,
     Actions.ToggleGitPanel,
+    NavbarDivider,
+    Actions.OpenCommandBar,
+    Actions.Feedback,
+    Actions.WorkspacesGuide,
+    Actions.Settings,
   ] as NavbarItem[],
 };
 
