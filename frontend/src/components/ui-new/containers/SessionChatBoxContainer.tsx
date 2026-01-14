@@ -28,6 +28,10 @@ import {
   SessionChatBox,
   type ExecutionStatus,
 } from '../primitives/SessionChatBox';
+import {
+  useUiPreferencesStore,
+  RIGHT_MAIN_PANEL_MODES,
+} from '@/stores/useUiPreferencesStore';
 import { Actions, type ActionDefinition } from '../actions';
 import {
   isActionVisible,
@@ -65,8 +69,6 @@ interface SessionChatBoxContainerProps {
   linesAdded?: number;
   /** Number of lines removed */
   linesRemoved?: number;
-  /** Callback to view code changes (toggle ChangesPanel) */
-  onViewCode?: () => void;
   /** Available sessions for this workspace */
   sessions?: Session[];
   /** Called when a session is selected */
@@ -87,7 +89,6 @@ export function SessionChatBoxContainer({
   filesChanged,
   linesAdded,
   linesRemoved,
-  onViewCode,
   sessions = [],
   onSelectSession,
   projectId,
@@ -101,6 +102,15 @@ export function SessionChatBoxContainer({
 
   const { executeAction } = useActions();
   const actionCtx = useActionVisibilityContext();
+  const { rightMainPanelMode, setRightMainPanelMode } = useUiPreferencesStore();
+
+  const handleViewCode = useCallback(() => {
+    setRightMainPanelMode(
+      rightMainPanelMode === RIGHT_MAIN_PANEL_MODES.CHANGES
+        ? null
+        : RIGHT_MAIN_PANEL_MODES.CHANGES
+    );
+  }, [rightMainPanelMode, setRightMainPanelMode]);
 
   // Get entries early to extract pending approval for scratch key
   const { entries } = useEntries();
@@ -578,8 +588,8 @@ export function SessionChatBoxContainer({
           filesChanged: 0,
           linesAdded: 0,
           linesRemoved: 0,
-          onViewCode: undefined,
         }}
+        onViewCode={handleViewCode}
       />
     );
   }
@@ -587,6 +597,7 @@ export function SessionChatBoxContainer({
   return (
     <SessionChatBox
       status={status}
+      onViewCode={handleViewCode}
       workspaceId={workspaceId}
       projectId={projectId}
       editor={{
@@ -621,7 +632,6 @@ export function SessionChatBoxContainer({
         filesChanged,
         linesAdded,
         linesRemoved,
-        onViewCode,
         hasConflicts,
         conflictedFilesCount,
       }}
