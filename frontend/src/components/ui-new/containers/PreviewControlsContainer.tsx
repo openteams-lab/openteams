@@ -7,19 +7,19 @@ import {
   RIGHT_MAIN_PANEL_MODES,
 } from '@/stores/useUiPreferencesStore';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
+import { useLogsPanel } from '@/contexts/LogsPanelContext';
 
 interface PreviewControlsContainerProps {
   attemptId?: string;
-  onViewProcessInPanel?: (processId: string) => void;
   className?: string;
 }
 
 export function PreviewControlsContainer({
   attemptId,
-  onViewProcessInPanel,
   className,
 }: PreviewControlsContainerProps) {
   const { repos } = useWorkspaceContext();
+  const { viewProcessInPanel } = useLogsPanel();
   const setRightMainPanelMode = useUiPreferencesStore(
     (s) => s.setRightMainPanelMode
   );
@@ -41,17 +41,14 @@ export function PreviewControlsContainer({
 
   const { logs, error: logsError } = useLogStream(activeProcess?.id ?? '');
 
-  const handleViewFullLogs = useCallback(
-    (processId?: string) => {
-      const targetId = processId ?? activeProcess?.id;
-      if (targetId && onViewProcessInPanel) {
-        onViewProcessInPanel(targetId);
-      } else {
-        setRightMainPanelMode(RIGHT_MAIN_PANEL_MODES.LOGS);
-      }
-    },
-    [activeProcess?.id, onViewProcessInPanel, setRightMainPanelMode]
-  );
+  const handleViewFullLogs = useCallback(() => {
+    const targetId = activeProcess?.id;
+    if (targetId) {
+      viewProcessInPanel(targetId);
+    } else {
+      setRightMainPanelMode(RIGHT_MAIN_PANEL_MODES.LOGS);
+    }
+  }, [activeProcess?.id, viewProcessInPanel, setRightMainPanelMode]);
 
   const handleTabChange = useCallback((processId: string) => {
     setActiveProcessId(processId);
