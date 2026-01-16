@@ -35,17 +35,21 @@ const DEFAULT_WORKSPACE_PANEL_STATE: WorkspacePanelState = {
 export const PERSIST_KEYS = {
   // Sidebar sections
   workspacesSidebarArchived: 'workspaces-sidebar-archived',
-  // Git panel sections
+  // Right panel sections
   gitAdvancedSettings: 'git-advanced-settings',
   gitPanelRepositories: 'git-panel-repositories',
   gitPanelProject: 'git-panel-project',
   gitPanelAddRepositories: 'git-panel-add-repositories',
+  rightPanelprocesses: 'right-panel-processes',
+  rightPanelPreview: 'right-panel-preview',
   // Process panel sections
   processesSection: 'processes-section',
   // Changes panel sections
   changesSection: 'changes-section',
   // Preview panel sections
   devServerSection: 'dev-server-section',
+  // Terminal panel section
+  terminalSection: 'terminal-section',
   // GitHub comments toggle
   showGitHubComments: 'show-github-comments',
   // Panel sizes
@@ -66,8 +70,11 @@ export type PersistKey =
   | typeof PERSIST_KEYS.processesSection
   | typeof PERSIST_KEYS.changesSection
   | typeof PERSIST_KEYS.devServerSection
+  | typeof PERSIST_KEYS.terminalSection
   | typeof PERSIST_KEYS.showGitHubComments
   | typeof PERSIST_KEYS.rightMainPanel
+  | typeof PERSIST_KEYS.rightPanelprocesses
+  | typeof PERSIST_KEYS.rightPanelPreview
   | `repo-card-${string}`
   | `diff:${string}`
   | `edit:${string}`
@@ -90,6 +97,7 @@ type State = {
   // Global layout state (applies across all workspaces)
   isLeftSidebarVisible: boolean;
   isRightSidebarVisible: boolean;
+  isTerminalVisible: boolean;
   previewRefreshKey: number;
 
   // Workspace-specific panel state
@@ -108,6 +116,8 @@ type State = {
   toggleLeftSidebar: () => void;
   toggleLeftMainPanel: (workspaceId?: string) => void;
   toggleRightSidebar: () => void;
+  toggleTerminal: () => void;
+  setTerminalVisible: (value: boolean) => void;
   toggleRightMainPanelMode: (
     mode: RightMainPanelMode,
     workspaceId?: string
@@ -141,6 +151,7 @@ export const useUiPreferencesStore = create<State>()(
       // Global layout state
       isLeftSidebarVisible: true,
       isRightSidebarVisible: true,
+      isTerminalVisible: true,
       previewRefreshKey: 0,
 
       // Workspace-specific panel state
@@ -200,6 +211,11 @@ export const useUiPreferencesStore = create<State>()(
 
       toggleRightSidebar: () =>
         set((s) => ({ isRightSidebarVisible: !s.isRightSidebarVisible })),
+
+      toggleTerminal: () =>
+        set((s) => ({ isTerminalVisible: !s.isTerminalVisible })),
+
+      setTerminalVisible: (value) => set({ isTerminalVisible: value }),
 
       toggleRightMainPanelMode: (mode, workspaceId) => {
         if (!workspaceId) return;
@@ -306,6 +322,7 @@ export const useUiPreferencesStore = create<State>()(
         // Global layout (persist sidebar visibility)
         isLeftSidebarVisible: state.isLeftSidebarVisible,
         isRightSidebarVisible: state.isRightSidebarVisible,
+        isTerminalVisible: state.isTerminalVisible,
         // Workspace-specific panel state (persisted)
         workspacePanelStates: state.workspacePanelStates,
       }),
@@ -408,6 +425,7 @@ export function useWorkspacePanelState(workspaceId: string | undefined) {
   const isRightSidebarVisible = useUiPreferencesStore(
     (s) => s.isRightSidebarVisible
   );
+  const isTerminalVisible = useUiPreferencesStore((s) => s.isTerminalVisible);
 
   // Actions from store
   const toggleRightMainPanelMode = useUiPreferencesStore(
@@ -445,9 +463,10 @@ export function useWorkspacePanelState(workspaceId: string | undefined) {
     rightMainPanelMode: wsState.rightMainPanelMode,
     isLeftMainPanelVisible: wsState.isLeftMainPanelVisible,
 
-    // Global state (sidebars)
+    // Global state (sidebars and terminal)
     isLeftSidebarVisible,
     isRightSidebarVisible,
+    isTerminalVisible,
 
     // Workspace-specific actions
     toggleRightMainPanelMode: toggleRightMainPanelModeForWorkspace,
