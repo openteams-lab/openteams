@@ -22,6 +22,24 @@ pub fn get_shell_command() -> (String, &'static str) {
     }
 }
 
+/// Returns the path to an interactive shell for the current platform.
+/// Used for spawning PTY sessions.
+///
+/// On Windows, prefers PowerShell if available, falling back to cmd.exe.
+/// On Unix, returns the user's configured shell from $SHELL.
+pub async fn get_interactive_shell() -> PathBuf {
+    if cfg!(windows) {
+        // Prefer PowerShell if available, fall back to cmd.exe
+        if let Some(powershell) = resolve_executable_path("powershell.exe").await {
+            powershell
+        } else {
+            PathBuf::from("cmd.exe")
+        }
+    } else {
+        UnixShell::current_shell().path().to_path_buf()
+    }
+}
+
 /// Resolve an executable by name, falling back to a refreshed PATH if needed.
 ///
 /// The search order is:
