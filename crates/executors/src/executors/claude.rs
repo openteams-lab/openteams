@@ -18,7 +18,7 @@ use workspace_utils::{
 };
 
 use self::{
-    client::{AUTO_APPROVE_CALLBACK_ID, ClaudeAgentClient},
+    client::{AUTO_APPROVE_CALLBACK_ID, ClaudeAgentClient, STOP_GIT_CHECK_CALLBACK_ID},
     protocol::ProtocolPeer,
     types::{ControlRequestType, ControlResponseType, PermissionMode},
 };
@@ -128,10 +128,23 @@ impl ClaudeCode {
         }
     }
 
-    pub fn get_hooks(&self) -> Option<serde_json::Value> {
+    pub fn get_hooks(&self, commit_reminder: bool) -> Option<serde_json::Value> {
+        let mut hooks = serde_json::Map::new();
+
+        if commit_reminder {
+            hooks.insert(
+                "Stop".to_string(),
+                serde_json::json!([{
+                    "hookCallbackIds": [STOP_GIT_CHECK_CALLBACK_ID]
+                }]),
+            );
+        }
+
+        // Add PreToolUse hooks based on plan/approvals settings
         if self.plan.unwrap_or(false) {
-            Some(serde_json::json!({
-                "PreToolUse": [
+            hooks.insert(
+                "PreToolUse".to_string(),
+                serde_json::json!([
                     {
                         "matcher": "^ExitPlanMode$",
                         "hookCallbackIds": ["tool_approval"],
@@ -140,20 +153,21 @@ impl ClaudeCode {
                         "matcher": "^(?!ExitPlanMode$).*",
                         "hookCallbackIds": [AUTO_APPROVE_CALLBACK_ID],
                     }
-                ]
-            }))
+                ]),
+            );
         } else if self.approvals.unwrap_or(false) {
-            Some(serde_json::json!({
-                "PreToolUse": [
+            hooks.insert(
+                "PreToolUse".to_string(),
+                serde_json::json!([
                     {
                         "matcher": "^(?!(Glob|Grep|NotebookRead|Read|Task|TodoWrite)$).*",
                         "hookCallbackIds": ["tool_approval"],
                     }
-                ]
-            }))
-        } else {
-            None
+                ]),
+            );
         }
+
+        Some(serde_json::Value::Object(hooks))
     }
 }
 
@@ -271,7 +285,7 @@ impl ClaudeCode {
 
         let new_stdout = create_stdout_pipe_writer(&mut child)?;
         let permission_mode = self.permission_mode();
-        let hooks = self.get_hooks();
+        let hooks = self.get_hooks(env.commit_reminder);
 
         // Create interrupt channel for graceful shutdown
         let (interrupt_tx, interrupt_rx) = tokio::sync::oneshot::channel::<()>();
@@ -279,9 +293,10 @@ impl ClaudeCode {
         // Spawn task to handle the SDK client with control protocol
         let prompt_clone = combined_prompt.clone();
         let approvals_clone = self.approvals_service.clone();
+        let repo_context = env.repo_context.clone();
         tokio::spawn(async move {
             let log_writer = LogWriter::new(new_stdout);
-            let client = ClaudeAgentClient::new(log_writer.clone(), approvals_clone);
+            let client = ClaudeAgentClient::new(log_writer.clone(), approvals_clone, repo_context);
             let protocol_peer =
                 ProtocolPeer::spawn(child_stdin, child_stdout, client.clone(), interrupt_rx);
 
@@ -880,7 +895,11 @@ impl ClaudeLogProcessor {
                     }
                 }
             }
-            ClaudeJson::User { message, .. } => {
+            ClaudeJson::User {
+                message,
+                is_synthetic,
+                ..
+            } => {
                 if matches!(self.strategy, HistoryStrategy::AmpResume)
                     && message
                         .content
@@ -905,6 +924,21 @@ impl ClaudeLogProcessor {
                                 metadata: Some(
                                     serde_json::to_value(item).unwrap_or(serde_json::Value::Null),
                                 ),
+                            };
+                            let id = entry_index_provider.next();
+                            patches.push(ConversationPatch::add_normalized_entry(id, entry));
+                        }
+                    }
+                }
+
+                if *is_synthetic {
+                    for item in &message.content {
+                        if let ClaudeContentItem::Text { text } = item {
+                            let entry = NormalizedEntry {
+                                timestamp: None,
+                                entry_type: NormalizedEntryType::SystemMessage,
+                                content: text.clone(),
+                                metadata: None,
                             };
                             let id = entry_index_provider.next();
                             patches.push(ConversationPatch::add_normalized_entry(id, entry));
@@ -1470,6 +1504,8 @@ pub enum ClaudeJson {
     User {
         message: ClaudeMessage,
         session_id: Option<String>,
+        #[serde(default, rename = "isSynthetic")]
+        is_synthetic: bool,
     },
     ToolUse {
         tool_name: String,
