@@ -193,8 +193,9 @@ export const useJsonPatchWsStream = <T extends object>(
         retryTimerRef.current = null;
       }
       finishedRef.current = false;
-      // Preserve data during reconnection attempts - only clear on unmount/disable
-      // Data will be refreshed when the new connection receives its initial snapshot
+      dataRef.current = undefined;
+      setData(undefined);
+      setIsInitialized(false);
     };
   }, [
     endpoint,
@@ -204,15 +205,6 @@ export const useJsonPatchWsStream = <T extends object>(
     deduplicatePatches,
     retryNonce,
   ]);
-
-  // Clear data when the stream is disabled (separate effect to avoid clearing on reconnect)
-  useEffect(() => {
-    if (!enabled) {
-      dataRef.current = undefined;
-      setData(undefined);
-      setIsInitialized(false);
-    }
-  }, [enabled]);
 
   return { data, isConnected, isInitialized, error };
 };

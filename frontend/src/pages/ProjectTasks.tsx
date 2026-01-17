@@ -152,7 +152,6 @@ export function ProjectTasks() {
 
   const {
     projectId,
-    project,
     isLoading: projectLoading,
     error: projectError,
   } = useProject();
@@ -846,8 +845,7 @@ export function ProjectTasks() {
 
   const isInitialTasksLoad = isLoading && tasks.length === 0;
 
-  // Only show full-page error if we have no project data at all
-  if (projectError && !project) {
+  if (projectError) {
     return (
       <div className="p-4">
         <Alert>
@@ -1087,18 +1085,15 @@ export function ProjectTasks() {
     </GitOperationsProvider>
   );
 
-  const connectionError =
-    streamError || (projectError && project ? projectError.message : null);
-
   return (
     <div className="h-full flex flex-col">
-      {connectionError && (
+      {streamError && (
         <Alert className="w-full z-30 xl:sticky xl:top-0">
           <AlertTitle className="flex items-center gap-2">
             <AlertTriangle size="16" />
             {t('common:states.reconnecting')}
           </AlertTitle>
-          <AlertDescription>{connectionError}</AlertDescription>
+          <AlertDescription>{streamError}</AlertDescription>
         </Alert>
       )}
 
