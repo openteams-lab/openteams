@@ -156,7 +156,9 @@
     "noResults": "No matching files",
     "title": "Files",
     "showGitHubComments": "Show GitHub comments",
-    "hideGitHubComments": "Hide GitHub comments"
+    "hideGitHubComments": "Hide GitHub comments",
+    "prevGitHubComment": "Previous file with comments",
+    "nextGitHubComment": "Next file with comments"
   },
   "sections": {
     "changes": "Changes",
@@ -199,7 +201,8 @@
   "comments": {
     "addReviewComment": "Add Review Comment",
     "addPlaceholder": "Add a comment...",
-    "editPlaceholder": "Edit comment..."
+    "editPlaceholder": "Edit comment...",
+    "copyToReview": "Copy to review"
   },
   "confirm": {
     "defaultConfirm": "Confirm",

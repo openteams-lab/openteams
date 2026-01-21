@@ -156,7 +156,9 @@
     "noResults": "No hay archivos coincidentes",
     "title": "Archivos",
     "showGitHubComments": "Mostrar comentarios de GitHub",
-    "hideGitHubComments": "Ocultar comentarios de GitHub"
+    "hideGitHubComments": "Ocultar comentarios de GitHub",
+    "prevGitHubComment": "Archivo anterior con comentarios",
+    "nextGitHubComment": "Siguiente archivo con comentarios"
   },
   "sections": {
     "changes": "Cambios",
@@ -199,7 +201,8 @@
   "comments": {
     "addReviewComment": "Agregar comentario de revisión",
     "addPlaceholder": "Agregar un comentario...",
-    "editPlaceholder": "Editar comentario..."
+    "editPlaceholder": "Editar comentario...",
+    "copyToReview": "Copiar a revisión"
   },
   "confirm": {
     "defaultConfirm": "Confirmar",
