@@ -16,14 +16,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::{
     io::{AsyncWrite, AsyncWriteExt, BufWriter},
-    sync::{Mutex as AsyncMutex, mpsc, oneshot},
+    sync::{Mutex as AsyncMutex, mpsc, mpsc::error::TryRecvError, oneshot},
 };
 use tokio_util::sync::CancellationToken;
-use workspace_utils::approvals::ApprovalStatus;
+use workspace_utils::{approvals::ApprovalStatus, git};
 
 use super::{slash_commands, types::OpencodeExecutorEvent};
 use crate::{
     approvals::{ExecutorApprovalError, ExecutorApprovalService},
+    env::RepoContext,
     executors::{
         ExecutorError,
         opencode::{OpencodeServer, models::maybe_emit_token_usage},
@@ -85,6 +86,8 @@ pub struct RunConfig {
     /// Cache key for model context windows. Should be derived from configuration
     /// that affects available models (e.g., env vars, base command).
     pub models_cache_key: String,
+    pub commit_reminder: bool,
+    pub repo_context: RepoContext,
 }
 
 /// Generate a cryptographically secure random password for OpenCode server auth.
@@ -373,9 +376,56 @@ async fn run_session_inner(
         return Ok(());
     }
 
+    if let Err(err) = prompt_result {
+        event_handle.abort();
+        return Err(err);
+    }
+
+    // Handle commit reminder if enabled
+    if config.commit_reminder && !cancel.is_cancelled() {
+        let uncommitted_changes =
+            git::check_uncommitted_changes(&config.repo_context.repo_paths()).await;
+        if !uncommitted_changes.is_empty() {
+            let reminder_prompt = format!(
+                "There are uncommitted changes. Please stage and commit them now with a descriptive commit message.{}",
+                uncommitted_changes
+            );
+
+            tracing::debug!("Sending commit reminder prompt to OpenCode session");
+
+            // Log as system message so it's visible in the UI (user_message gets filtered out)
+            let _ = log_writer
+                .log_event(&OpencodeExecutorEvent::SystemMessage {
+                    content: reminder_prompt.clone(),
+                })
+                .await;
+
+            let reminder_fut = Box::pin(prompt(
+                &client,
+                &config.base_url,
+                &config.directory,
+                &session_id,
+                &reminder_prompt,
+                model,
+                config.model_variant.clone(),
+                config.agent.clone(),
+            ));
+            let reminder_result =
+                run_request_with_control(reminder_fut, &mut control_rx, cancel.clone()).await;
+
+            if let Err(e) = reminder_result {
+                // Log but don't fail the session on commit reminder errors
+                tracing::warn!("Commit reminder prompt failed: {e}");
+            }
+        }
+    }
+
+    if cancel.is_cancelled() {
+        send_abort(&client, &config.base_url, &config.directory, &session_id).await;
+    }
+
     event_handle.abort();
 
-    prompt_result?;
     log_writer.log_event(&OpencodeExecutorEvent::Done).await?;
 
     Ok(())
@@ -413,6 +463,26 @@ where
 {
     let mut idle_seen = false;
     let mut session_error: Option<String> = None;
+
+    // Drain queued idles so only idles after this request count.
+    loop {
+        match control_rx.try_recv() {
+            Ok(ControlEvent::Idle) => continue,
+            Ok(ControlEvent::AuthRequired { message }) => {
+                return Err(ExecutorError::AuthRequired(message));
+            }
+            Ok(ControlEvent::SessionError { message }) => {
+                append_session_error(&mut session_error, message);
+            }
+            Ok(ControlEvent::Disconnected) if !cancel.is_cancelled() => {
+                return Err(ExecutorError::Io(io::Error::other(
+                    "OpenCode event stream disconnected before request started",
+                )));
+            }
+            Ok(ControlEvent::Disconnected) => return Ok(()),
+            Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => break,
+        }
+    }
 
     let request_result = loop {
         tokio::select! {
@@ -1140,7 +1210,13 @@ pub async fn spawn_event_listener(config: EventListenerConfig, initial_resp: req
         .await;
 
         match outcome {
-            Ok(EventStreamOutcome::Idle) | Ok(EventStreamOutcome::Terminal) => return,
+            Ok(EventStreamOutcome::Idle) => {
+                // Keep listening - there may be more prompts (e.g., commit reminder)
+                // The task will be aborted by event_handle.abort() when done
+                resp = None;
+                continue;
+            }
+            Ok(EventStreamOutcome::Terminal) => return,
             Ok(EventStreamOutcome::Disconnected) | Err(_) => {
                 attempt += 1;
                 if attempt >= max_attempts {
