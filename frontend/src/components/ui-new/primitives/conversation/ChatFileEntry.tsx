@@ -6,7 +6,11 @@ import { useTheme } from '@/components/ThemeProvider';
 import { getActualTheme } from '@/utils/theme';
 import { ToolStatus } from 'shared/types';
 import { ToolStatusDot } from './ToolStatusDot';
-import { DiffViewBody, useDiffData, type DiffInput } from './DiffViewCard';
+import {
+  DiffViewBody,
+  useDiffData,
+  type DiffInput,
+} from './PierreConversationDiff';
 
 interface ChatFileEntryProps {
   filename: string;
@@ -114,8 +118,8 @@ export function ChatFileEntry({
         {/* Diff body - shown when expanded */}
         {expanded && (
           <DiffViewBody
-            diffFile={diffData.diffFile}
-            diffData={diffData.diffData}
+            fileDiffMetadata={diffData.fileDiffMetadata}
+            unifiedDiff={diffData.unifiedDiff}
             isValid={diffData.isValid}
             hideLineNumbers={diffData.hideLineNumbers}
             theme={actualTheme}
