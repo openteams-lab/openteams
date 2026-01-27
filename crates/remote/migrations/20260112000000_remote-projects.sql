@@ -80,6 +80,7 @@ CREATE TABLE issues (
 
     -- Parent Issue (Self-referential)
     parent_issue_id UUID REFERENCES issues(id) ON DELETE SET NULL,
+    parent_issue_sort_order DOUBLE PRECISION,
 
     -- Extension Metadata (JSONB for flexibility)
     extension_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -176,6 +177,7 @@ CREATE TABLE issue_comments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
     author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    parent_id UUID REFERENCES issue_comments(id) ON DELETE SET NULL,
 
     message TEXT NOT NULL,
 
@@ -227,6 +229,7 @@ CREATE INDEX idx_issues_status_id ON issues(status_id);
 CREATE INDEX idx_issues_parent_issue_id ON issues(parent_issue_id);
 CREATE INDEX idx_issues_simple_id ON issues(simple_id);
 CREATE INDEX idx_issue_comments_issue_id ON issue_comments(issue_id);
+CREATE INDEX idx_issue_comments_parent_id ON issue_comments(parent_id);
 
 CREATE INDEX idx_notifications_user_unseen
     ON notifications (user_id, seen)
