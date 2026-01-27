@@ -7,6 +7,7 @@
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
+use uuid::Uuid;
 
 use crate::{
     db::{
@@ -117,6 +118,7 @@ crate::define_entity!(
         completed_at: Option<DateTime<Utc>>,
         sort_order: f64,
         parent_issue_id: Option<uuid::Uuid>,
+        parent_issue_sort_order: Option<f64>,
         extension_metadata: Value,
     ],
 );
@@ -201,7 +203,7 @@ crate::define_entity!(
         params: ["issue_id"],
         url: "/shape/issue/{issue_id}/comments",
     },
-    fields: [message: String],
+    fields: [message: String, parent_id: Option<Uuid>],
 );
 
 // =============================================================================
