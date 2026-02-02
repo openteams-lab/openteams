@@ -1,11 +1,14 @@
+mod analytics;
 mod app;
 mod auth;
+mod billing;
 pub mod config;
 pub mod db;
 pub mod entities;
 pub mod entity;
 pub mod github_app;
 pub mod mail;
+mod middleware;
 pub mod mutation_types;
 pub mod r2;
 pub mod routes;
@@ -15,6 +18,7 @@ mod state;
 use std::{env, sync::OnceLock};
 
 pub use app::Server;
+pub use billing::{BillingCheckError, BillingService};
 use sentry_tracing::{EventFilter, SentryLayer};
 pub use state::AppState;
 use tracing::Level;

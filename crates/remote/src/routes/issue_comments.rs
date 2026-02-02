@@ -6,11 +6,17 @@ use axum::{
 use tracing::instrument;
 use uuid::Uuid;
 
-use super::{error::ErrorResponse, organization_members::ensure_issue_access};
+use super::{
+    error::{ErrorResponse, db_error},
+    organization_members::ensure_issue_access,
+};
 use crate::{
     AppState,
     auth::RequestContext,
-    db::issue_comments::{IssueComment, IssueCommentRepository},
+    db::{
+        issue_comments::{IssueComment, IssueCommentRepository},
+        organization_members::{MemberRole, check_user_role},
+    },
     define_mutation_router,
     entities::{
         CreateIssueCommentRequest, ListIssueCommentsQuery, ListIssueCommentsResponse,
@@ -83,7 +89,9 @@ async fn create_issue_comment(
     Extension(ctx): Extension<RequestContext>,
     Json(payload): Json<CreateIssueCommentRequest>,
 ) -> Result<Json<MutationResponse<IssueComment>>, ErrorResponse> {
-    ensure_issue_access(state.pool(), ctx.user.id, payload.issue_id).await?;
+    let organization_id = ensure_issue_access(state.pool(), ctx.user.id, payload.issue_id).await?;
+
+    let is_reply = payload.parent_id.is_some();
 
     let response = IssueCommentRepository::create(
         state.pool(),
@@ -96,8 +104,21 @@ async fn create_issue_comment(
     .await
     .map_err(|error| {
         tracing::error!(?error, "failed to create issue comment");
-        ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "internal server error")
+        db_error(error, "failed to create issue comment")
     })?;
+
+    if let Some(analytics) = state.analytics() {
+        analytics.track(
+            ctx.user.id,
+            "issue_comment_created",
+            serde_json::json!({
+                "comment_id": response.data.id,
+                "issue_id": response.data.issue_id,
+                "organization_id": organization_id,
+                "is_reply": is_reply,
+            }),
+        );
+    }
 
     Ok(Json(response))
 }
@@ -124,14 +145,27 @@ async fn update_issue_comment(
         })?
         .ok_or_else(|| ErrorResponse::new(StatusCode::NOT_FOUND, "issue comment not found"))?;
 
-    if comment.author_id != ctx.user.id {
+    let organization_id = ensure_issue_access(state.pool(), ctx.user.id, comment.issue_id).await?;
+
+    let is_author = comment
+        .author_id
+        .map(|id| id == ctx.user.id)
+        .unwrap_or(false);
+    let is_admin = check_user_role(state.pool(), organization_id, ctx.user.id)
+        .await
+        .map_err(|error| {
+            tracing::error!(?error, "failed to check user role");
+            ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "internal server error")
+        })?
+        .map(|role| role == MemberRole::Admin)
+        .unwrap_or(false);
+
+    if !is_author && !is_admin {
         return Err(ErrorResponse::new(
             StatusCode::FORBIDDEN,
-            "you are not the author of this comment",
+            "you do not have permission to edit this comment",
         ));
     }
-
-    ensure_issue_access(state.pool(), ctx.user.id, comment.issue_id).await?;
 
     let response = IssueCommentRepository::update(state.pool(), issue_comment_id, payload.message)
         .await
@@ -164,14 +198,27 @@ async fn delete_issue_comment(
         })?
         .ok_or_else(|| ErrorResponse::new(StatusCode::NOT_FOUND, "issue comment not found"))?;
 
-    if comment.author_id != ctx.user.id {
+    let organization_id = ensure_issue_access(state.pool(), ctx.user.id, comment.issue_id).await?;
+
+    let is_author = comment
+        .author_id
+        .map(|id| id == ctx.user.id)
+        .unwrap_or(false);
+    let is_admin = check_user_role(state.pool(), organization_id, ctx.user.id)
+        .await
+        .map_err(|error| {
+            tracing::error!(?error, "failed to check user role");
+            ErrorResponse::new(StatusCode::INTERNAL_SERVER_ERROR, "internal server error")
+        })?
+        .map(|role| role == MemberRole::Admin)
+        .unwrap_or(false);
+
+    if !is_author && !is_admin {
         return Err(ErrorResponse::new(
             StatusCode::FORBIDDEN,
-            "you are not the author of this comment",
+            "you do not have permission to delete this comment",
         ));
     }
-
-    ensure_issue_access(state.pool(), ctx.user.id, comment.issue_id).await?;
 
     let response = IssueCommentRepository::delete(state.pool(), issue_comment_id)
         .await

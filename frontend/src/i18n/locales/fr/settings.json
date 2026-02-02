@@ -23,7 +23,9 @@
         "mcp": "Serveurs MCP",
         "mcpDesc": "Serveurs Model Context Protocol",
         "organizations": "Paramètres de l'organisation",
-        "organizationsDesc": "Gérer les membres et les permissions de l'organisation"
+        "organizationsDesc": "Gérer les membres et les permissions de l'organisation",
+        "remote-projects": "Projets distants",
+        "remote-projectsDesc": "Gérer les projets synchronisés dans le cloud"
       }
     },
     "general": {
@@ -322,6 +324,10 @@
         "noResults": "Aucune configuration correspondante",
         "noConfigs": "Aucune configuration disponible",
         "selectConfig": "Sélectionnez une configuration dans la barre latérale pour afficher et modifier ses paramètres."
+      },
+      "deleteConfigDialog": {
+        "title": "Supprimer la configuration ?",
+        "description": "Cela supprimera définitivement \"{{configName}}\" de l'exécuteur {{executorType}}. Cette action est irréversible."
       }
     },
     "mcp": {
