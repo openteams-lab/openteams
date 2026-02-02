@@ -2,6 +2,7 @@ import { useMemo, useCallback } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { RepoAction } from '@/components/ui-new/primitives/RepoCard';
+import type { IssuePriority } from 'shared/remote-types';
 
 export const RIGHT_MAIN_PANEL_MODES = {
   CHANGES: 'changes',
@@ -11,6 +12,10 @@ export const RIGHT_MAIN_PANEL_MODES = {
 
 export type RightMainPanelMode =
   (typeof RIGHT_MAIN_PANEL_MODES)[keyof typeof RIGHT_MAIN_PANEL_MODES];
+
+export type LayoutMode = 'workspaces' | 'kanban' | 'migrate';
+
+export type KanbanViewMode = 'kanban' | 'list';
 
 export type ContextBarPosition =
   | 'top-left'
@@ -29,6 +34,32 @@ export type WorkspacePanelState = {
 const DEFAULT_WORKSPACE_PANEL_STATE: WorkspacePanelState = {
   rightMainPanelMode: null,
   isLeftMainPanelVisible: true,
+};
+
+// Kanban filter state
+export type KanbanSortField =
+  | 'sort_order'
+  | 'priority'
+  | 'created_at'
+  | 'updated_at'
+  | 'title';
+
+export type KanbanFilterState = {
+  searchQuery: string;
+  priorities: IssuePriority[];
+  assigneeIds: string[]; // 'unassigned' for issues with no assignee
+  tagIds: string[];
+  sortField: KanbanSortField;
+  sortDirection: 'asc' | 'desc';
+};
+
+const DEFAULT_KANBAN_FILTER_STATE: KanbanFilterState = {
+  searchQuery: '',
+  priorities: [],
+  assigneeIds: [],
+  tagIds: [],
+  sortField: 'sort_order',
+  sortDirection: 'asc',
 };
 
 // Centralized persist keys for type safety
@@ -60,6 +91,9 @@ export const PERSIST_KEYS = {
   showGitHubComments: 'show-github-comments',
   // Panel sizes
   rightMainPanel: 'right-main-panel',
+  kanbanLeftPanel: 'kanban-left-panel',
+  // Kanban issue panel sections
+  kanbanIssueSubIssues: 'kanban-issue-sub-issues',
   // Dynamic keys (use helper functions)
   repoCard: (repoId: string) => `repo-card-${repoId}` as const,
 } as const;
@@ -86,6 +120,8 @@ export type PersistKey =
   | typeof PERSIST_KEYS.rightMainPanel
   | typeof PERSIST_KEYS.rightPanelprocesses
   | typeof PERSIST_KEYS.rightPanelPreview
+  | typeof PERSIST_KEYS.kanbanLeftPanel
+  | typeof PERSIST_KEYS.kanbanIssueSubIssues
   | `repo-card-${string}`
   | `diff:${string}`
   | `edit:${string}`
@@ -96,7 +132,8 @@ export type PersistKey =
   | `user:${string}`
   | `system:${string}`
   | `error:${string}`
-  | `entry:${string}`;
+  | `entry:${string}`
+  | `list-section-${string}`;
 
 type State = {
   // UI preferences
@@ -107,13 +144,23 @@ type State = {
   collapsedPaths: Record<string, string[]>;
 
   // Global layout state (applies across all workspaces)
+  layoutMode: LayoutMode;
   isLeftSidebarVisible: boolean;
   isRightSidebarVisible: boolean;
   isTerminalVisible: boolean;
   previewRefreshKey: number;
+  // Note: Kanban issue panel state (selectedKanbanIssueId, createMode, etc.)
+  // is now derived from URL via useKanbanNavigation hook
 
   // Workspace-specific panel state
   workspacePanelStates: Record<string, WorkspacePanelState>;
+
+  // Kanban filter state
+  kanbanFilters: KanbanFilterState;
+
+  // Kanban view mode state
+  kanbanViewMode: KanbanViewMode;
+  listViewStatusFilter: string | null;
 
   // UI preferences actions
   setRepoAction: (repoId: string, action: RepoAction) => void;
@@ -125,11 +172,15 @@ type State = {
   setCollapsedPaths: (key: string, paths: string[]) => void;
 
   // Layout actions
+  setLayoutMode: (mode: LayoutMode) => void;
+  toggleLayoutMode: () => void;
   toggleLeftSidebar: () => void;
   toggleLeftMainPanel: (workspaceId?: string) => void;
   toggleRightSidebar: () => void;
   toggleTerminal: () => void;
   setTerminalVisible: (value: boolean) => void;
+  // Note: Kanban panel actions (openKanbanIssuePanel, closeKanbanIssuePanel, etc.)
+  // are now handled by navigation via useKanbanNavigation hook
   toggleRightMainPanelMode: (
     mode: RightMainPanelMode,
     workspaceId?: string
@@ -148,6 +199,18 @@ type State = {
     workspaceId: string,
     state: Partial<WorkspacePanelState>
   ) => void;
+
+  // Kanban filter actions
+  setKanbanSearchQuery: (query: string) => void;
+  setKanbanPriorities: (priorities: IssuePriority[]) => void;
+  setKanbanAssignees: (assigneeIds: string[]) => void;
+  setKanbanTags: (tagIds: string[]) => void;
+  setKanbanSort: (field: KanbanSortField, direction: 'asc' | 'desc') => void;
+  clearKanbanFilters: () => void;
+
+  // Kanban view mode actions
+  setKanbanViewMode: (mode: KanbanViewMode) => void;
+  setListViewStatusFilter: (statusId: string | null) => void;
 };
 
 export const useUiPreferencesStore = create<State>()(
@@ -161,6 +224,7 @@ export const useUiPreferencesStore = create<State>()(
       collapsedPaths: {},
 
       // Global layout state
+      layoutMode: 'workspaces' as LayoutMode,
       isLeftSidebarVisible: true,
       isRightSidebarVisible: true,
       isTerminalVisible: true,
@@ -168,6 +232,13 @@ export const useUiPreferencesStore = create<State>()(
 
       // Workspace-specific panel state
       workspacePanelStates: {},
+
+      // Kanban filter state
+      kanbanFilters: DEFAULT_KANBAN_FILTER_STATE,
+
+      // Kanban view mode state
+      kanbanViewMode: 'kanban' as KanbanViewMode,
+      listViewStatusFilter: null,
 
       // UI preferences actions
       setRepoAction: (repoId, action) =>
@@ -196,6 +267,11 @@ export const useUiPreferencesStore = create<State>()(
         set((s) => ({ collapsedPaths: { ...s.collapsedPaths, [key]: paths } })),
 
       // Layout actions
+      setLayoutMode: (mode) => set({ layoutMode: mode }),
+      toggleLayoutMode: () =>
+        set((s) => ({
+          layoutMode: s.layoutMode === 'workspaces' ? 'kanban' : 'workspaces',
+        })),
       toggleLeftSidebar: () =>
         set((s) => ({ isLeftSidebarVisible: !s.isLeftSidebarVisible })),
 
@@ -321,6 +397,45 @@ export const useUiPreferencesStore = create<State>()(
           },
         });
       },
+
+      // Kanban filter actions
+      setKanbanSearchQuery: (query) =>
+        set((s) => ({
+          kanbanFilters: { ...s.kanbanFilters, searchQuery: query },
+        })),
+
+      setKanbanPriorities: (priorities) =>
+        set((s) => ({
+          kanbanFilters: { ...s.kanbanFilters, priorities },
+        })),
+
+      setKanbanAssignees: (assigneeIds) =>
+        set((s) => ({
+          kanbanFilters: { ...s.kanbanFilters, assigneeIds },
+        })),
+
+      setKanbanTags: (tagIds) =>
+        set((s) => ({
+          kanbanFilters: { ...s.kanbanFilters, tagIds },
+        })),
+
+      setKanbanSort: (field, direction) =>
+        set((s) => ({
+          kanbanFilters: {
+            ...s.kanbanFilters,
+            sortField: field,
+            sortDirection: direction,
+          },
+        })),
+
+      clearKanbanFilters: () =>
+        set({ kanbanFilters: DEFAULT_KANBAN_FILTER_STATE }),
+
+      // Kanban view mode actions
+      setKanbanViewMode: (mode) => set({ kanbanViewMode: mode }),
+
+      setListViewStatusFilter: (statusId) =>
+        set({ listViewStatusFilter: statusId }),
     }),
     {
       name: 'ui-preferences',
@@ -332,11 +447,14 @@ export const useUiPreferencesStore = create<State>()(
         paneSizes: state.paneSizes,
         collapsedPaths: state.collapsedPaths,
         // Global layout (persist sidebar visibility)
+        layoutMode: state.layoutMode,
         isLeftSidebarVisible: state.isLeftSidebarVisible,
         isRightSidebarVisible: state.isRightSidebarVisible,
         isTerminalVisible: state.isTerminalVisible,
+        // Note: Kanban panel state is derived from URL via useKanbanNavigation
         // Workspace-specific panel state (persisted)
         workspacePanelStates: state.workspacePanelStates,
+        // Note: Kanban filters and view mode are NOT persisted - they reset on page reload
       }),
     }
   )

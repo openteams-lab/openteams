@@ -56,7 +56,6 @@ import {
   ListOrganizationsResponse,
   OrganizationMemberWithProfile,
   ListMembersResponse,
-  RemoteProjectMembersResponse,
   CreateOrganizationRequest,
   CreateOrganizationResponse,
   CreateInvitationRequest,
@@ -92,6 +91,8 @@ import {
   CreateWorkspaceFromPrBody,
   CreateWorkspaceFromPrResponse,
   CreateFromPrError,
+  MigrationRequest,
+  MigrationResponse,
 } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { createWorkspaceWithSession } from '@/types/attempt';
@@ -253,15 +254,6 @@ export const projectsApi = {
       body: JSON.stringify(data),
     });
     return handleApiResponse<Project>(response);
-  },
-
-  getRemoteMembers: async (
-    projectId: string
-  ): Promise<RemoteProjectMembersResponse> => {
-    const response = await makeRequest(
-      `/api/projects/${projectId}/remote/members`
-    );
-    return handleApiResponse<RemoteProjectMembersResponse>(response);
   },
 
   delete: async (id: string): Promise<void> => {
@@ -493,16 +485,27 @@ export const attemptsApi = {
     return handleApiResponse<void>(response);
   },
 
-  searchFiles: async (
+  linkToIssue: async (
     workspaceId: string,
-    query: string,
-    mode?: string
-  ): Promise<SearchResult[]> => {
-    const modeParam = mode ? `&mode=${encodeURIComponent(mode)}` : '';
+    projectId: string,
+    issueId: string
+  ): Promise<void> => {
     const response = await makeRequest(
-      `/api/task-attempts/${workspaceId}/search?q=${encodeURIComponent(query)}${modeParam}`
+      `/api/task-attempts/${workspaceId}/link`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ project_id: projectId, issue_id: issueId }),
+      }
     );
-    return handleApiResponse<SearchResult[]>(response);
+    return handleApiResponse<void>(response);
+  },
+
+  unlinkFromIssue: async (workspaceId: string): Promise<void> => {
+    const response = await makeRequest(
+      `/api/task-attempts/${workspaceId}/unlink`,
+      { method: 'POST' }
+    );
+    return handleApiResponse<void>(response);
   },
 
   runAgentSetup: async (
@@ -1167,6 +1170,15 @@ export const oauthApi = {
   },
 };
 
+/**
+ * @deprecated Use `tokenManager.getToken()` from '@/lib/auth/tokenManager' instead.
+ * This function does not handle 401 responses or token refresh coordination.
+ */
+export async function getCachedToken(): Promise<string | null> {
+  const { tokenManager } = await import('./auth/tokenManager');
+  return tokenManager.getToken();
+}
+
 // Organizations API
 export const organizationsApi = {
   getMembers: async (
@@ -1355,5 +1367,34 @@ export const queueApi = {
   getStatus: async (sessionId: string): Promise<QueueStatus> => {
     const response = await makeRequest(`/api/sessions/${sessionId}/queue`);
     return handleApiResponse<QueueStatus>(response);
+  },
+};
+
+// Migration API
+export const migrationApi = {
+  start: async (data: MigrationRequest): Promise<MigrationResponse> => {
+    const response = await makeRequest('/api/migration/start', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<MigrationResponse>(response);
+  },
+};
+
+// Search API (multi-repo file search)
+export const searchApi = {
+  searchFiles: async (
+    repoIds: string[],
+    query: string,
+    mode?: SearchMode,
+    options?: RequestInit
+  ): Promise<SearchResult[]> => {
+    const repoIdsParam = repoIds.join(',');
+    const modeParam = mode ? `&mode=${encodeURIComponent(mode)}` : '';
+    const response = await makeRequest(
+      `/api/search?q=${encodeURIComponent(query)}&repo_ids=${encodeURIComponent(repoIdsParam)}${modeParam}`,
+      options
+    );
+    return handleApiResponse<SearchResult[]>(response);
   },
 };
