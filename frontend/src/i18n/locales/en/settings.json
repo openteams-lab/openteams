@@ -168,6 +168,18 @@
           "helper": "Custom prompt for the AI agent when generating PR descriptions. Use {pr_number} and {pr_url} as placeholders."
         }
       },
+      "commits": {
+        "title": "Commits",
+        "description": "Configure commit behavior for task attempts",
+        "reminder": {
+          "label": "Commit reminder",
+          "helper": "Prompt supported agents to commit changes before stopping."
+        },
+        "customPrompt": {
+          "useCustom": "Use custom prompt",
+          "helper": "Custom prompt for the commit reminder. The git status will be appended automatically."
+        }
+      },
       "notifications": {
         "title": "Notifications",
         "description": "Control when and how you receive notifications.",
@@ -267,10 +279,6 @@
         "workspaces": {
           "label": "Enable Workspaces Beta",
           "helper": "Use the new workspaces interface when viewing task attempts. Tasks will open in task view first, and attempts will open in the new workspaces view."
-        },
-        "commitReminder": {
-          "label": "Commit reminder",
-          "helper": "Prompt supported agents to commit changes before stopping."
         }
       }
     },
