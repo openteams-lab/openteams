@@ -727,6 +727,20 @@ export const attemptsApi = {
     );
   },
 
+  runArchiveScript: async (
+    attemptId: string
+  ): Promise<Result<ExecutionProcess, RunScriptError>> => {
+    const response = await makeRequest(
+      `/api/task-attempts/${attemptId}/run-archive-script`,
+      {
+        method: 'POST',
+      }
+    );
+    return handleApiResponseAsResult<ExecutionProcess, RunScriptError>(
+      response
+    );
+  },
+
   getPrComments: async (
     attemptId: string,
     repoId: string

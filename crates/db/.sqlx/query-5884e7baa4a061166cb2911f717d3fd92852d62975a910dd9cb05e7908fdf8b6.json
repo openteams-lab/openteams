@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: Uuid\",\n                      path,\n                      name,\n                      display_name,\n                      setup_script,\n                      cleanup_script,\n                      copy_files,\n                      parallel_setup_script as \"parallel_setup_script!: bool\",\n                      dev_server_script,\n                      default_target_branch,\n                      default_working_dir,\n                      created_at as \"created_at!: DateTime<Utc>\",\n                      updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM repos\n               WHERE id = $1",
+  "query": "SELECT id as \"id!: Uuid\",\n                      path,\n                      name,\n                      display_name,\n                      setup_script,\n                      cleanup_script,\n                      archive_script,\n                      copy_files,\n                      parallel_setup_script as \"parallel_setup_script!: bool\",\n                      dev_server_script,\n                      default_target_branch,\n                      default_working_dir,\n                      created_at as \"created_at!: DateTime<Utc>\",\n                      updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM repos\n               WHERE name = '__NEEDS_BACKFILL__'",
   "describe": {
     "columns": [
       {
@@ -34,49 +34,55 @@
         "type_info": "Text"
       },
       {
-        "name": "copy_files",
+        "name": "archive_script",
         "ordinal": 6,
         "type_info": "Text"
       },
       {
-        "name": "parallel_setup_script!: bool",
+        "name": "copy_files",
         "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "parallel_setup_script!: bool",
+        "ordinal": 8,
         "type_info": "Integer"
       },
       {
         "name": "dev_server_script",
-        "ordinal": 8,
-        "type_info": "Text"
-      },
-      {
-        "name": "default_target_branch",
         "ordinal": 9,
         "type_info": "Text"
       },
       {
-        "name": "default_working_dir",
+        "name": "default_target_branch",
         "ordinal": 10,
         "type_info": "Text"
       },
       {
-        "name": "created_at!: DateTime<Utc>",
+        "name": "default_working_dir",
         "ordinal": 11,
         "type_info": "Text"
       },
       {
-        "name": "updated_at!: DateTime<Utc>",
+        "name": "created_at!: DateTime<Utc>",
         "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 13,
         "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 0
     },
     "nullable": [
       true,
       false,
       false,
       false,
+      true,
       true,
       true,
       true,
@@ -88,5 +94,5 @@
       false
     ]
   },
-  "hash": "a5a71a557372df5c6aed878030f84f813284e88cbc9db2b6225e1a95affe72d5"
+  "hash": "5884e7baa4a061166cb2911f717d3fd92852d62975a910dd9cb05e7908fdf8b6"
 }
