@@ -109,7 +109,7 @@
     "banner": "開發模式 - 這是開發版本"
   },
   "oauth": {
-    "title": "登入 Vibe Kanban",
+    "title": "登入 agent-chatgroup",
     "description": "登入以加入組織並與團隊共享任務",
     "continueWithGitHub": "使用 GitHub 繼續",
     "continueWithGoogle": "使用 Google 繼續",
@@ -259,7 +259,7 @@
   },
   "betaWorkspaces": {
     "title": "試用新介面",
-    "intro": "我們從頭重建了 Vibe Kanban 的介面，您已獲邀試用。",
+    "intro": "我們從頭重建了 agent-chatgroup 的介面，您已獲邀試用。",
     "newUiDescription": "新介面針對日常工作進行最佳化：管理代理、預覽變更和審查程式碼。它還解鎖了舊介面中無法使用的功能：",
     "newFeatures": {
       "multiRepo": "同時編輯多個儲存庫",
@@ -280,7 +280,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "歡迎",
-      "content": "歡迎使用 Workspaces，這是 Vibe Kanban 的全新設計介面。我們正在向部分使用者推出以獲取早期回饋。您可以隨時透過導覽列中的回饋圖示分享您的想法。"
+      "content": "歡迎使用 Workspaces，這是 agent-chatgroup 的全新設計介面。我們正在向部分使用者推出以獲取早期回饋。您可以隨時透過導覽列中的回饋圖示分享您的想法。"
     },
     "commandBar": {
       "title": "命令列",

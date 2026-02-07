@@ -1480,6 +1480,36 @@ export const chatApi = {
     return handleApiResponse<void>(response);
   },
 
+  uploadChatAttachments: async (
+    sessionId: string,
+    files: File[],
+    senderHandle?: string
+  ): Promise<ChatMessage> => {
+    const form = new FormData();
+    files.forEach((file) => {
+      form.append('file', file, file.name);
+    });
+    if (senderHandle) {
+      form.append('sender_handle', senderHandle);
+    }
+
+    const response = await fetch(
+      `/api/chat/sessions/${sessionId}/messages/upload`,
+      {
+        method: 'POST',
+        body: form,
+      }
+    );
+    return handleApiResponse<ChatMessage>(response);
+  },
+
+  getChatAttachmentUrl: (
+    sessionId: string,
+    messageId: string,
+    attachmentId: string
+  ): string =>
+    `/api/chat/sessions/${sessionId}/messages/${messageId}/attachments/${attachmentId}`,
+
   listMessages: async (
     sessionId: string,
     limit?: number

@@ -1,17 +1,17 @@
----
+﻿---
 title: "Global Settings"
 description: "Configure application-wide settings including themes, agents, and more"
 sidebarTitle: "Settings"
 ---
 
 <Note>
-A redesigned Settings experience is available in <Badge color="orange">Beta</Badge>. Access it from the Workspaces UI via the navbar or command bar. [Learn more →](/settings-beta)
+A redesigned Settings experience is available in <Badge color="orange">Beta</Badge>. Access it from the Workspaces UI via the navbar or command bar. [Learn more 鈫抅(/settings-beta)
 </Note>
 
-You can configure application-wide settings via the **Settings** page. To access it, click the ⚙️ icon in the sidebar or select "Settings" from the top-right menu.
+You can configure application-wide settings via the **Settings** page. To access it, click the 鈿欙笍 icon in the sidebar or select "Settings" from the top-right menu.
 
 <Frame>
-<img src="/images/vk-settings.png" alt="Vibe Kanban global settings page showing theme options, agent configuration, and settings" />
+<img src="/images/vk-settings.png" alt="agent-chatgroup global settings page showing theme options, agent configuration, and settings" />
 </Frame>
 
 ## Themes
@@ -46,17 +46,17 @@ Choose from various supported editors:
 ### Remote SSH Configuration
 
 <Frame>
-<img src="/images/vk-editor-ssh.png" alt="Vibe Kanban settings editor section showing ssh configuration options." />
+<img src="/images/vk-editor-ssh.png" alt="agent-chatgroup settings editor section showing ssh configuration options." />
 </Frame>
 
-When running Vibe Kanban on a remote server (e.g., accessed via Cloudflare tunnel, ngrok, or as a systemctl service), you can configure VSCode-based editors to open projects via SSH instead of assuming localhost.
+When running agent-chatgroup on a remote server (e.g., accessed via Cloudflare tunnel, ngrok, or as a systemctl service), you can configure VSCode-based editors to open projects via SSH instead of assuming localhost.
 
 This feature is available for **VS Code**, **Cursor**, and **Windsurf** editors.
 
 #### When to Use Remote SSH
 
 Enable remote SSH configuration when:
-- Vibe Kanban runs on a remote server (VPS, cloud instance, etc.)
+- agent-chatgroup runs on a remote server (VPS, cloud instance, etc.)
 - You access the web UI through a tunnel or reverse proxy
 - Your code files are on a different machine than your browser
 - You want your local editor to connect to the remote server via SSH
@@ -107,7 +107,7 @@ Toggle sound effects and push notifications to stay informed about task status c
 
 ## Telemetry
 
-Enable or disable telemetry data collection to help improve Vibe Kanban.
+Enable or disable telemetry data collection to help improve agent-chatgroup.
 
 ## Task Tags
 
@@ -119,7 +119,7 @@ Manage global task tags to accelerate task creation across all projects. Task ta
 
 ## Agent Settings (Profiles & Variants)
 
-Define and customise agent variants under **Settings → Agents**. Variants let you maintain multiple configurations for the same agent (for example, a Claude Code "PLAN" variant).
+Define and customise agent variants under **Settings 鈫?Agents**. Variants let you maintain multiple configurations for the same agent (for example, a Claude Code "PLAN" variant).
 
 <Card title="Agent Profiles & Variants" icon="robot" href="/configuration-customisation/agent-configurations">
   Detailed guide with examples for configuring agent variants
@@ -148,3 +148,4 @@ Manage acknowledgments and reset options for onboarding, safety disclaimers, and
 - **Onboarding**: Reset the onboarding process to rerun the initial setup.
 - **Safety Disclaimer**: Reset or review the safety disclaimer prompt.
 - **Telemetry Notice**: Reset or review the telemetry data collection acknowledgment.
+

@@ -1,5 +1,5 @@
 {
-  "name": "vibe-kanban",
+  "name": "agent-chatgroup",
   "private": true,
   "version": "0.1.4",
   "type": "module",
@@ -120,3 +120,4 @@
     "vite": "^5.0.8"
   }
 }
+

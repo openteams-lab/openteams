@@ -1,4 +1,4 @@
-use std::{
+﻿use std::{
     fs::{self, OpenOptions},
     io::{self, Result, Write},
     path::PathBuf,
@@ -20,7 +20,7 @@ impl SessionManager {
         let namespace = namespace.into();
         let mut vk_dir = dirs::home_dir()
             .ok_or_else(|| io::Error::other("Could not determine home directory"))?
-            .join(".vibe-kanban");
+            .join(".agent-chatgroup");
 
         if cfg!(debug_assertions) {
             vk_dir = vk_dir.join("dev");
@@ -179,3 +179,4 @@ pub struct SessionMetadata {
     pub parent_session: Option<String>,
     pub tags: Vec<String>,
 }
+

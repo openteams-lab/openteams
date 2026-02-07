@@ -1,4 +1,4 @@
-use std::{path::Path, str::FromStr};
+﻿use std::{path::Path, str::FromStr};
 
 use executors::{command::CommandBuilder, executors::ExecutorError};
 use serde::{Deserialize, Serialize};
@@ -150,7 +150,7 @@ impl EditorConfig {
 
         let vscode_dir = path.join(".vscode");
         let extensions_file = vscode_dir.join("extensions.json");
-        const EXTENSION_ID: &str = "bloop.vibe-kanban";
+        const EXTENSION_ID: &str = "bloop.agent-chatgroup";
 
         let mut json: serde_json::Value = if extensions_file.exists() {
             match std::fs::read_to_string(&extensions_file) {
@@ -260,3 +260,4 @@ impl EditorConfig {
         }
     }
 }
+

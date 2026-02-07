@@ -1,4 +1,4 @@
-services:
+﻿services:
   remote-db:
     image: postgres:16-alpine
     command: [ "postgres", "-c", "wal_level=logical" ]
@@ -61,7 +61,7 @@ services:
       GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:?set in .env.remote}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:?set in .env.remote}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:?set in .env.remote}
-      VIBEKANBAN_REMOTE_JWT_SECRET: ${VIBEKANBAN_REMOTE_JWT_SECRET:?set in .env.remote}
+      AGENT_CHATGROUP_REMOTE_JWT_SECRET: ${AGENT_CHATGROUP_REMOTE_JWT_SECRET:?set in .env.remote}
       LOOPS_EMAIL_API_KEY: ${LOOPS_EMAIL_API_KEY:?set in .env.remote}
       SERVER_PUBLIC_BASE_URL: http://localhost:3000
       VITE_APP_BASE_URL: http://localhost:3000
@@ -95,3 +95,4 @@ services:
 volumes:
   remote-db-data:
   electric-data:
+

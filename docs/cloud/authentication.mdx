@@ -1,16 +1,16 @@
----
+﻿---
 title: "Authentication"
 description: "Sign in with GitHub or Google and manage your sessions"
 ---
 
-Vibe Kanban Cloud uses OAuth authentication, allowing you to sign in with your existing GitHub or Google account instead of creating a new password.
+agent-chatgroup Cloud uses OAuth authentication, allowing you to sign in with your existing GitHub or Google account instead of creating a new password.
 
 ## How Authentication Works
 
 <Info>
 **What is OAuth?**
 
-OAuth is a secure way to sign in to applications using accounts you already have. When you click "Sign in with GitHub", you're redirected to GitHub to confirm you want to allow Vibe Kanban access. GitHub then tells Vibe Kanban who you are, without Vibe Kanban ever seeing your GitHub password.
+OAuth is a secure way to sign in to applications using accounts you already have. When you click "Sign in with GitHub", you're redirected to GitHub to confirm you want to allow agent-chatgroup access. GitHub then tells agent-chatgroup who you are, without agent-chatgroup ever seeing your GitHub password.
 </Info>
 
 ### The Sign-In Flow
@@ -28,17 +28,17 @@ OAuth is a secure way to sign in to applications using accounts you already have
   You'll be redirected to GitHub or Google. If you're not already logged in there, you'll need to log in first.
 
 
-  Click **Authorize** (GitHub) or **Allow** (Google) to grant Vibe Kanban access.
+  Click **Authorize** (GitHub) or **Allow** (Google) to grant agent-chatgroup access.
 </Step>
 
 <Step title="Redirected Back">
-  After authorising, you're automatically redirected back to Vibe Kanban and signed in.
+  After authorising, you're automatically redirected back to agent-chatgroup and signed in.
 </Step>
 </Steps>
 
-### What Vibe Kanban Can Access
+### What agent-chatgroup Can Access
 
-When you authorise Vibe Kanban, it only requests minimal permissions:
+When you authorise agent-chatgroup, it only requests minimal permissions:
 
 | Provider | Access Granted |
 |----------|----------------|
@@ -46,7 +46,7 @@ When you authorise Vibe Kanban, it only requests minimal permissions:
 | **Google** | Your basic profile (name, email, avatar) |
 
 <Info>
-Vibe Kanban **cannot**:
+agent-chatgroup **cannot**:
 - Access your private repositories (unless you grant additional permissions later)
 - Post on your behalf
 - Change your account settings
@@ -99,7 +99,7 @@ Currently, there's no way to sign out of all devices at once. If you need to rev
 1. Go to your OAuth provider's settings:
    - **GitHub:** [github.com/settings/applications](https://github.com/settings/applications)
    - **Google:** [myaccount.google.com/permissions](https://myaccount.google.com/permissions)
-2. Find "Vibe Kanban Cloud" and revoke access
+2. Find "agent-chatgroup Cloud" and revoke access
 3. All sessions will be invalidated
 
 ## Multiple Accounts
@@ -121,16 +121,16 @@ To switch to a different account:
 
 If you need to sign in with a different GitHub/Google account than the one your browser remembers:
 
-1. Sign out of Vibe Kanban
+1. Sign out of agent-chatgroup
 2. Go to the provider's website (github.com or google.com)
 3. Sign out there
-4. Return to Vibe Kanban and sign in - you'll be prompted to log in to the provider
+4. Return to agent-chatgroup and sign in - you'll be prompted to log in to the provider
 
 ## Security Best Practices
 
 <CardGroup cols={2}>
 <Card title="Use a strong provider password" icon="lock">
-  Your Vibe Kanban security depends on your GitHub/Google account security. Use a strong, unique password.
+  Your agent-chatgroup security depends on your GitHub/Google account security. Use a strong, unique password.
 </Card>
 
 <Card title="Enable 2FA on your provider" icon="shield-check">
@@ -169,17 +169,17 @@ If you need to sign in with a different GitHub/Google account than the one your 
 
 **Solution:**
 1. Try again and click "Authorize" or "Allow"
-2. If you're part of a GitHub organisation with app restrictions, ask your admin to approve Vibe Kanban
+2. If you're part of a GitHub organisation with app restrictions, ask your admin to approve agent-chatgroup
 </Accordion>
 
 <Accordion title="Signed in as wrong account">
 **Problem:** You're signed in with the wrong GitHub/Google account.
 
 **Solution:**
-1. Sign out of Vibe Kanban
+1. Sign out of agent-chatgroup
 2. Go to github.com or google.com and sign out there
 3. Sign in to the correct account on the provider
-4. Return to Vibe Kanban and sign in
+4. Return to agent-chatgroup and sign in
 </Accordion>
 
 <Accordion title="Session expired unexpectedly">
@@ -195,7 +195,7 @@ Simply sign in again. If it keeps happening, check if the server is restarting f
 </Accordion>
 
 <Accordion title="Can't sign in after revoking access">
-**Problem:** You revoked Vibe Kanban's access on GitHub/Google and now can't sign in.
+**Problem:** You revoked agent-chatgroup's access on GitHub/Google and now can't sign in.
 
 **Solution:**
 Just sign in again - you'll be prompted to re-authorise the application.
@@ -206,3 +206,4 @@ Just sign in again - you'll be prompted to re-authorise the application.
 
 - [Getting Started](/cloud/getting-started) - Initial setup including OAuth app creation
 - [Team Members](/cloud/team-members) - Managing user access within your organisation
+

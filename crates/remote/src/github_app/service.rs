@@ -1,4 +1,4 @@
-use reqwest::Client;
+﻿use reqwest::Client;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
@@ -9,7 +9,7 @@ use tracing::{debug, info, warn};
 use super::jwt::{GitHubAppJwt, JwtError};
 use crate::config::GitHubAppConfig;
 
-const USER_AGENT: &str = "VibeKanbanRemote/1.0";
+const USER_AGENT: &str = "AgentChatgroupRemote/1.0";
 const GITHUB_API_BASE: &str = "https://api.github.com";
 
 #[derive(Debug, Error)]
@@ -451,3 +451,4 @@ impl GitHubAppService {
         Ok(pr)
     }
 }
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   createContext,
   useContext,
   ReactNode,
@@ -49,9 +49,9 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   // Centralized page title management
   useEffect(() => {
     if (project) {
-      document.title = `${project.name} | vibe-kanban`;
+      document.title = `${project.name} | agent-chatgroup`;
     } else {
-      document.title = 'vibe-kanban';
+      document.title = 'agent-chatgroup';
     }
   }, [project]);
 
@@ -67,3 +67,4 @@ export function useProject(): ProjectContextValue {
   }
   return context;
 }
+

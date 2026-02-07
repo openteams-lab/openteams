@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+﻿use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -10,7 +10,7 @@ use thiserror::Error;
 use tracing::info;
 use url::Url;
 
-const USER_AGENT: &str = "VibeKanbanRemote/1.0";
+const USER_AGENT: &str = "AgentChatgroupRemote/1.0";
 
 const TOKEN_EXPIRATION_LEEWAY_SECONDS: i64 = 20;
 pub const VALIDATE_TOKEN_MAX_RETRIES: u32 = 3;
@@ -690,3 +690,4 @@ impl AuthorizationProvider for GoogleOAuthProvider {
         }
     }
 }
+

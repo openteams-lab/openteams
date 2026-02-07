@@ -1,4 +1,4 @@
----
+﻿---
 title: "Agent Profiles & Configuration"
 description: "Configure and customise coding agent variants with different settings for planning, models, and sandbox permissions"
 ---
@@ -6,12 +6,12 @@ description: "Configure and customise coding agent variants with different setti
 Agent profiles let you define multiple named variants for each supported coding agent. Variants capture configuration differences like planning mode, model choice, and sandbox permissions that you can quickly select when creating attempts.
 
 <Info>
-Agent profiles are used throughout Vibe Kanban wherever agents run: onboarding, default settings, attempt creation, and follow-ups.
+Agent profiles are used throughout agent-chatgroup wherever agents run: onboarding, default settings, attempt creation, and follow-ups.
 </Info>
 
 ## Configuration Access
 
-You can configure agent profiles in two ways through Settings → Agents:
+You can configure agent profiles in two ways through Settings 鈫?Agents:
 
 <Tabs>
 <Tab title="Form Editor">
@@ -32,7 +32,7 @@ You can configure agent profiles in two ways through Settings → Agents:
 </Tabs>
 
 <Note>
-The configuration page displays the exact file path where your settings are stored. Vibe Kanban saves only your overrides whilst preserving built-in defaults.
+The configuration page displays the exact file path where your settings are stored. agent-chatgroup saves only your overrides whilst preserving built-in defaults.
 </Note>
 
 ## Configuration Structure
@@ -90,7 +90,7 @@ The profiles configuration uses a JSON structure with an `executors` object cont
   Skip permission prompts (use with caution)
   </ParamField>
 
-  [View full CLI reference →](https://docs.anthropic.com/en/docs/claude-code/cli-reference#cli-flags)
+  [View full CLI reference 鈫抅(https://docs.anthropic.com/en/docs/claude-code/cli-reference#cli-flags)
 </Tab>
 
 <Tab title="GEMINI">
@@ -102,7 +102,7 @@ The profiles configuration uses a JSON structure with an `executors` object cont
   Run without confirmations
   </ParamField>
 
-  [View full CLI reference →](https://google-gemini.github.io/gemini-cli/)
+  [View full CLI reference 鈫抅(https://google-gemini.github.io/gemini-cli/)
 </Tab>
 
 <Tab title="AMP">
@@ -110,7 +110,7 @@ The profiles configuration uses a JSON structure with an `executors` object cont
   Allow all actions without restrictions (unsafe)
   </ParamField>
 
-  [View full documentation →](https://ampcode.com/manual#cli)
+  [View full documentation 鈫抅(https://ampcode.com/manual#cli)
 </Tab>
 
 <Tab title="CODEX">
@@ -130,7 +130,7 @@ The profiles configuration uses a JSON structure with an `executors` object cont
   Summary style: `"auto"`, `"concise"`, `"detailed"`, or `"none"`
   </ParamField>
 
-  [View full documentation →](https://github.com/openai/codex)
+  [View full documentation 鈫抅(https://github.com/openai/codex)
 </Tab>
 
 <Tab title="CURSOR">
@@ -142,7 +142,7 @@ The profiles configuration uses a JSON structure with an `executors` object cont
   Specify model to use
   </ParamField>
 
-  [View full CLI reference →](https://docs.cursor.com/en/cli/reference/parameters)
+  [View full CLI reference 鈫抅(https://docs.cursor.com/en/cli/reference/parameters)
 </Tab>
 
 <Tab title="OPENCODE">
@@ -154,7 +154,7 @@ The profiles configuration uses a JSON structure with an `executors` object cont
   Choose agent type
   </ParamField>
 
-  [View full documentation →](https://opencode.ai/docs/cli/#flags-1)
+  [View full documentation 鈫抅(https://opencode.ai/docs/cli/#flags-1)
 </Tab>
 
 <Tab title="QWEN_CODE">
@@ -162,7 +162,7 @@ The profiles configuration uses a JSON structure with an `executors` object cont
   Run without confirmations
   </ParamField>
 
-  [View full documentation →](https://qwenlm.github.io/qwen-code-docs/en/cli/index)
+  [View full documentation 鈫抅(https://qwenlm.github.io/qwen-code-docs/en/cli/index)
 </Tab>
 
 <Tab title="DROID">
@@ -178,7 +178,7 @@ The profiles configuration uses a JSON structure with an `executors` object cont
   Reasoning depth: `"off"`, `"low"`, `"medium"`, or `"high"`
   </ParamField>
 
-  [View full documentation →](https://docs.factory.ai/factory-cli/getting-started/overview)
+  [View full documentation 鈫抅(https://docs.factory.ai/factory-cli/getting-started/overview)
 </Tab>
 </Tabs>
 
@@ -206,7 +206,7 @@ Options prefixed with "dangerously_" bypass safety confirmations and can perform
 
 <CardGroup cols={2}>
 <Card title="Default Configuration" icon="gear">
-  Set your default agent and variant in **Settings → General → Default Agent Configuration** for consistent behaviour across all attempts.
+  Set your default agent and variant in **Settings 鈫?General 鈫?Default Agent Configuration** for consistent behaviour across all attempts.
 </Card>
 
 <Card title="Per-Attempt Selection" icon="rocket">
@@ -217,15 +217,17 @@ Options prefixed with "dangerously_" bypass safety confirmations and can perform
 ## Related Configuration
 
 <Note>
-MCP (Model Context Protocol) servers are configured separately under **Settings → MCP Servers** but work alongside agent profiles to extend functionality.
+MCP (Model Context Protocol) servers are configured separately under **Settings 鈫?MCP Servers** but work alongside agent profiles to extend functionality.
 </Note>
 
 <CardGroup cols={2}>
 <Card title="MCP Server Configuration" icon="server" href="/integrations/mcp-server-configuration">
-  Configure MCP servers within Vibe Kanban for your coding agents
+  Configure MCP servers within agent-chatgroup for your coding agents
 </Card>
 
-<Card title="Vibe Kanban MCP Server" icon="plug" href="/integrations/vibe-kanban-mcp-server">
-  Connect external MCP clients to Vibe Kanban's MCP server
+<Card title="agent-chatgroup MCP Server" icon="plug" href="/integrations/agent-chatgroup-mcp-server">
+  Connect external MCP clients to agent-chatgroup's MCP server
 </Card>
 </CardGroup>
+
+

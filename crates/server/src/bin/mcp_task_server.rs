@@ -1,4 +1,4 @@
-use rmcp::{ServiceExt, transport::stdio};
+﻿use rmcp::{ServiceExt, transport::stdio};
 use server::mcp::task_server::TaskServer;
 use tracing_subscriber::{EnvFilter, prelude::*};
 use utils::{
@@ -51,7 +51,7 @@ fn main() -> anyhow::Result<()> {
                         })?
                     }
                     Err(_) => {
-                        let port = read_port_file("vibe-kanban").await?;
+                        let port = read_port_file("agent-chatgroup").await?;
                         tracing::info!("[MCP] Using port from port file: {}", port);
                         port
                     }
@@ -76,3 +76,4 @@ fn main() -> anyhow::Result<()> {
             Ok(())
         })
 }
+

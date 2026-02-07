@@ -1,4 +1,4 @@
----
+﻿---
 title: "Agent Profiles & Configuration"
 description: "Create reusable agent configurations with custom settings for planning mode, model selection, and permission levels that you can quickly switch between when creating task attempts"
 ---
@@ -8,7 +8,7 @@ This is the new Settings UI currently in <Badge color="orange">Beta</Badge>. It 
 </Note>
 
 <Info>
-Agent profiles are used throughout Vibe Kanban wherever agents run: onboarding, default settings, attempt creation, and follow-ups. The default configuration appears pre-selected in the agent dropdown in the chat input.
+Agent profiles are used throughout agent-chatgroup wherever agents run: onboarding, default settings, attempt creation, and follow-ups. The default configuration appears pre-selected in the agent dropdown in the chat input.
 </Info>
 
 ## Common Use Cases
@@ -60,7 +60,7 @@ Controls how much computational effort the model spends "thinking" before respon
 
 ## Configuration Access
 
-Access agent profiles via **Settings → Agents** in the Workspaces UI.
+Access agent profiles via **Settings 鈫?Agents** in the Workspaces UI.
 
 <Frame>
 <img src="/images/settings-beta-agents.png" alt="Agent configuration form editor interface with finder-style layout" />
@@ -130,7 +130,7 @@ Click the **Default** badge next to a configuration to make it the default for t
   Skip permission prompts (use with caution)
   </ParamField>
 
-  [View full CLI reference →](https://docs.anthropic.com/en/docs/claude-code/cli-reference#cli-flags)
+  [View full CLI reference 鈫抅(https://docs.anthropic.com/en/docs/claude-code/cli-reference#cli-flags)
 </Tab>
 
 <Tab title="GEMINI">
@@ -142,7 +142,7 @@ Click the **Default** badge next to a configuration to make it the default for t
   Run without confirmations
   </ParamField>
 
-  [View full CLI reference →](https://google-gemini.github.io/gemini-cli/)
+  [View full CLI reference 鈫抅(https://google-gemini.github.io/gemini-cli/)
 </Tab>
 
 <Tab title="AMP">
@@ -150,7 +150,7 @@ Click the **Default** badge next to a configuration to make it the default for t
   Allow all actions without restrictions (unsafe)
   </ParamField>
 
-  [View full documentation →](https://ampcode.com/manual#cli)
+  [View full documentation 鈫抅(https://ampcode.com/manual#cli)
 </Tab>
 
 <Tab title="CODEX">
@@ -170,7 +170,7 @@ Click the **Default** badge next to a configuration to make it the default for t
   Summary style: `"auto"`, `"concise"`, `"detailed"`, or `"none"`
   </ParamField>
 
-  [View full documentation →](https://github.com/openai/codex)
+  [View full documentation 鈫抅(https://github.com/openai/codex)
 </Tab>
 
 <Tab title="CURSOR">
@@ -182,7 +182,7 @@ Click the **Default** badge next to a configuration to make it the default for t
   Specify model to use
   </ParamField>
 
-  [View full CLI reference →](https://docs.cursor.com/en/cli/reference/parameters)
+  [View full CLI reference 鈫抅(https://docs.cursor.com/en/cli/reference/parameters)
 </Tab>
 
 <Tab title="OPENCODE">
@@ -194,7 +194,7 @@ Click the **Default** badge next to a configuration to make it the default for t
   Choose agent type
   </ParamField>
 
-  [View full documentation →](https://opencode.ai/docs/cli/#flags-1)
+  [View full documentation 鈫抅(https://opencode.ai/docs/cli/#flags-1)
 </Tab>
 
 <Tab title="QWEN_CODE">
@@ -202,7 +202,7 @@ Click the **Default** badge next to a configuration to make it the default for t
   Run without confirmations
   </ParamField>
 
-  [View full documentation →](https://qwenlm.github.io/qwen-code-docs/en/cli/index)
+  [View full documentation 鈫抅(https://qwenlm.github.io/qwen-code-docs/en/cli/index)
 </Tab>
 
 <Tab title="DROID">
@@ -218,7 +218,7 @@ Click the **Default** badge next to a configuration to make it the default for t
   Reasoning depth: `"off"`, `"low"`, `"medium"`, or `"high"`
   </ParamField>
 
-  [View full documentation →](https://docs.factory.ai/factory-cli/getting-started/overview)
+  [View full documentation 鈫抅(https://docs.factory.ai/factory-cli/getting-started/overview)
 </Tab>
 </Tabs>
 
@@ -244,7 +244,7 @@ Once configured, your agent variants appear in the chat input toolbar, allowing 
 
 <CardGroup cols={2}>
 <Card title="Default Configuration" icon="gear">
-  Set your default agent and variant in **Settings → General → Default Coding Agent** for consistent behaviour across all attempts.
+  Set your default agent and variant in **Settings 鈫?General 鈫?Default Coding Agent** for consistent behaviour across all attempts.
 </Card>
 
 <Card title="Per-Attempt Selection" icon="rocket">
@@ -255,15 +255,16 @@ Once configured, your agent variants appear in the chat input toolbar, allowing 
 ## Related Configuration
 
 <Note>
-MCP (Model Context Protocol) servers are configured separately under **Settings → MCP Servers** but work alongside agent profiles to extend functionality.
+MCP (Model Context Protocol) servers are configured separately under **Settings 鈫?MCP Servers** but work alongside agent profiles to extend functionality.
 </Note>
 
 <CardGroup cols={2}>
 <Card title="Connecting MCP Servers" icon="server" href="/settings-beta/mcp-servers">
-  Configure MCP servers within Vibe Kanban for your coding agents
+  Configure MCP servers within agent-chatgroup for your coding agents
 </Card>
 
 <Card title="Classic Agent Configuration" icon="code" href="/configuration-customisation/agent-configurations">
   Use the classic settings for JSON-based agent configuration
 </Card>
 </CardGroup>
+

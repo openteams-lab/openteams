@@ -1,4 +1,4 @@
----
+﻿---
 title: "Repositories"
 description: "Add and manage repositories within your workspaces"
 ---
@@ -11,7 +11,7 @@ Repositories are the codebases you work with inside a workspace. Each workspace 
 
 ## How Repositories Work in Workspaces
 
-When you add a repository to a workspace, Vibe Kanban creates a **git worktree** - a separate working directory linked to your repository.
+When you add a repository to a workspace, agent-chatgroup creates a **git worktree** - a separate working directory linked to your repository.
 
 <AccordionGroup>
 <Accordion title="What is a git worktree?">
@@ -23,7 +23,7 @@ A **git worktree** is a git feature that lets you have multiple working director
 - You can have multiple workspaces working on different features simultaneously
 - Switching between workspaces doesn't require stashing or committing
 
-**Where worktrees are stored:** In the `.vibe-kanban-workspaces` directory (configurable in Settings).
+**Where worktrees are stored:** In the `.agent-chatgroup-workspaces` directory (configurable in Settings).
 </Accordion>
 
 <Accordion title="What is 'independent git state'?">
@@ -199,3 +199,5 @@ Removing a repository doesn't delete any code or branches. It only removes the r
 - [Creating Workspaces](/workspaces/creating-workspaces) - Setting up new workspaces with repositories
 - [Git Operations](/workspaces/git-operations) - Detailed guide to git commands
 - [Multi-Repo & Sessions](/workspaces/multi-repo-sessions) - Working across multiple repositories
+
+

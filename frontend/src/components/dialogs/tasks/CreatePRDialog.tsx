@@ -1,4 +1,4 @@
-import {
+﻿import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -81,7 +81,7 @@ const CreatePRDialogImpl = NiceModal.create<CreatePRDialogProps>(
         return;
       }
 
-      setPrTitle(`${task.title} (vibe-kanban)`);
+      setPrTitle(`${task.title} (agent-chatgroup)`);
       setPrBody(task.description || '');
       setError(null);
       setGhCliHelp(null);
@@ -401,3 +401,4 @@ export const CreatePRDialog = defineModal<
   CreatePRDialogProps,
   CreatePRDialogResult
 >(CreatePRDialogImpl);
+

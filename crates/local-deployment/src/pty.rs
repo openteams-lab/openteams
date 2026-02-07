@@ -80,7 +80,7 @@ impl PtyService {
                 // cmd.exe: no special args needed
             } else {
                 // Unix shells
-                cmd.env("VIBE_KANBAN_TERMINAL", "1");
+                cmd.env("AGENT_CHATGROUP_TERMINAL", "1");
 
                 if shell_name == "bash" {
                     cmd.env("PROMPT_COMMAND", r#"PS1='$ '; unset PROMPT_COMMAND"#);

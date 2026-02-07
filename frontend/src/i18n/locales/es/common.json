@@ -112,7 +112,7 @@
     "banner": "Modo de Desarrollo - Esta es una compilación de desarrollo"
   },
   "oauth": {
-    "title": "Iniciar sesión en Vibe Kanban",
+    "title": "Iniciar sesión en agent-chatgroup",
     "description": "Inicia sesión para unirte a organizaciones y compartir tareas con tu equipo",
     "continueWithGitHub": "Continuar con GitHub",
     "continueWithGoogle": "Continuar con Google",
@@ -259,7 +259,7 @@
   },
   "betaWorkspaces": {
     "title": "Prueba la nueva interfaz",
-    "intro": "Hemos reconstruido la interfaz de Vibe Kanban desde cero, y has sido invitado a probarla.",
+    "intro": "Hemos reconstruido la interfaz de agent-chatgroup desde cero, y has sido invitado a probarla.",
     "newUiDescription": "La nueva interfaz está optimizada para el trabajo diario: gestionar agentes, previsualizar cambios y revisar código. También desbloquea funciones que no están disponibles en la interfaz anterior:",
     "newFeatures": {
       "multiRepo": "Edita múltiples repositorios al mismo tiempo",
@@ -280,7 +280,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "Bienvenido",
-      "content": "Bienvenido a Workspaces, una interfaz rediseñada para Vibe Kanban. Estamos lanzando esto a usuarios seleccionados para recibir comentarios tempranos. Comparte tus opiniones en cualquier momento usando el ícono de comentarios en la barra de navegación."
+      "content": "Bienvenido a Workspaces, una interfaz rediseñada para agent-chatgroup. Estamos lanzando esto a usuarios seleccionados para recibir comentarios tempranos. Comparte tus opiniones en cualquier momento usando el ícono de comentarios en la barra de navegación."
     },
     "commandBar": {
       "title": "Barra de comandos",

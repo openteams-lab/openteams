@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "remote"
 version = "0.1.0"
 edition = "2024"
@@ -14,7 +14,7 @@ vk-billing = ["dep:billing"]
 
 [dependencies]
 # private crate for billing functionality
-billing = { git = "ssh://git@github.com/BloopAI/vibe-kanban-private", branch = "main", package = "billing", optional = true }
+billing = { git = "ssh://git@github.com/BloopAI/agent-chatgroup-private", branch = "main", package = "billing", optional = true }
 
 anyhow = "1.0"
 axum = { version = "0.8.4", features = ["macros", "multipart", "ws"] }
@@ -57,3 +57,4 @@ flate2 = "1.0"
 paste = "1.0"
 
 [workspace]
+

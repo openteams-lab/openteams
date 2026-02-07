@@ -1,4 +1,4 @@
-# Rust
+﻿# Rust
 target/
 **/*.rs.bk
 
@@ -72,8 +72,8 @@ remote-frontend/dist
 build-npm-package-codesign.sh
 
 npx-cli/dist
-npx-cli/vibe-kanban-*
-vibe-kanban-*.tgz
+npx-cli/agent-chatgroup-*
+agent-chatgroup-*.tgz
 
 # Development ports file
 .dev-ports.json
@@ -82,11 +82,14 @@ dev_assets
 /frontend/.env.sentry-build-plugin
 .ssh
 
-vibe-kanban-cloud/
+agent-chatgroup-cloud/
 
 .jj
 .sisyphus/
 
 # Run artifacts
+.runs/
+.context/
 runs/
 context/
+

@@ -1,43 +1,43 @@
-# Vibe Kanban
+﻿# agent-chatgroup
 
 > A visual project management tool for developers that integrates with git repositories and coding agents like Claude Code and Amp.
 
 ## Quick Start
 
-Run vibe kanban instantly without installation:
+Run agent-chatgroup instantly without installation:
 
 ```bash
-npx vibe-kanban
+npx agent-chatgroup
 ```
 
 This will launch the application locally and open it in your browser automatically.
 
-## What is Vibe Kanban?
+## What is agent-chatgroup?
 
-Vibe Kanban is a modern project management tool designed specifically for developers. It helps you organize your coding projects with kanban-style task management while providing powerful integrations with git repositories and AI coding agents.
+agent-chatgroup is a modern project management tool designed specifically for developers. It helps you organize your coding projects with kanban-style task management while providing powerful integrations with git repositories and AI coding agents.
 
-### ✨ Key Features
+### 鉁?Key Features
 
-**🗂️ Project Management**
+**馃梻锔?Project Management**
 - Add git repositories as projects (existing or create new ones)
 - Automatic git integration and repository validation
 - Project search functionality across all files
 - Custom setup and development scripts per project
 
-**📋 Task Management**
+**馃搵 Task Management**
 - Create and manage tasks with kanban-style boards
 - Task status tracking (Todo, In Progress, Done)
 - Rich task descriptions and notes
 - Task execution with multiple AI agents
 
-**🤖 AI Agent Integration**
+**馃 AI Agent Integration**
 - **Claude**: Advanced AI coding assistant
 - **Amp**: Powerful development agent
 - **Echo**: Simple testing/debugging agent
 - Create tasks and immediately start agent execution
 - Follow-up task execution for iterative development
 
-**⚡ Development Workflow**
+**鈿?Development Workflow**
 - Create isolated git worktrees for each task attempt
 - View diffs of changes made by agents
 - Merge successful changes back to main branch
@@ -45,7 +45,7 @@ Vibe Kanban is a modern project management tool designed specifically for develo
 - Manual file editing and deletion
 - Integrated development server support
 
-**🎛️ Developer Tools**
+**馃帥锔?Developer Tools**
 - Browse and validate git repositories from filesystem
 - Open task worktrees in your preferred editor (VS Code, Cursor, Windsurf, IntelliJ, Zed)
 - Real-time execution monitoring and process control
@@ -62,7 +62,7 @@ Vibe Kanban is a modern project management tool designed specifically for develo
 
 ## Core Functionality
 
-Vibe Kanban provides a complete project management experience with these key capabilities:
+agent-chatgroup provides a complete project management experience with these key capabilities:
 
 **Project Repository Management**
 - Full CRUD operations for managing coding projects
@@ -97,7 +97,7 @@ Vibe Kanban provides a complete project management experience with these key cap
 
 ## Configuration
 
-Vibe Kanban supports customization through its configuration system:
+agent-chatgroup supports customization through its configuration system:
 
 - **Editor Integration**: Choose your preferred code editor
 - **Sound Notifications**: Customize completion sounds
@@ -126,24 +126,24 @@ Vibe Kanban supports customization through its configuration system:
 
 ## Use Cases
 
-**🔧 Bug Fixes**
+**馃敡 Bug Fixes**
 - Create a task describing the bug
 - Let an AI agent analyze and fix the issue
 - Review the proposed changes
 - Merge if satisfied, or provide follow-up instructions
 
-**✨ Feature Development**
+**鉁?Feature Development**
 - Break down features into manageable tasks
 - Use agents for initial implementation
 - Iterate with follow-up executions
 - Test using integrated development servers
 
-**🚀 Project Setup**
+**馃殌 Project Setup**
 - Bootstrap new projects with AI assistance
 - Set up development environments
 - Configure build and deployment scripts
 
-**📚 Code Documentation**
+**馃摎 Code Documentation**
 - Generate documentation for existing code
 - Create README files and API documentation
 - Maintain up-to-date project information
@@ -153,7 +153,9 @@ Vibe Kanban supports customization through its configuration system:
 **Ready to supercharge your development workflow?**
 
 ```bash
-npx vibe-kanban
+npx agent-chatgroup
 ```
 
 *Start managing your projects with the power of AI coding agents today!*
+
+

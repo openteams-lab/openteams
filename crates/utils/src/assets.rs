@@ -1,4 +1,4 @@
-use directories::ProjectDirs;
+﻿use directories::ProjectDirs;
 use rust_embed::RustEmbed;
 
 const PROJECT_ROOT: &str = env!("CARGO_MANIFEST_DIR");
@@ -7,7 +7,7 @@ pub fn asset_dir() -> std::path::PathBuf {
     let path = if cfg!(debug_assertions) {
         std::path::PathBuf::from(PROJECT_ROOT).join("../../dev_assets")
     } else {
-        ProjectDirs::from("ai", "bloop", "vibe-kanban")
+        ProjectDirs::from("ai", "bloop", "agent-chatgroup")
             .expect("OS didn't give us a home directory")
             .data_dir()
             .to_path_buf()
@@ -19,9 +19,9 @@ pub fn asset_dir() -> std::path::PathBuf {
     }
 
     path
-    // ✔ macOS → ~/Library/Application Support/MyApp
-    // ✔ Linux → ~/.local/share/myapp   (respects XDG_DATA_HOME)
-    // ✔ Windows → %APPDATA%\Example\MyApp
+    // 鉁?macOS 鈫?~/Library/Application Support/MyApp
+    // 鉁?Linux 鈫?~/.local/share/myapp   (respects XDG_DATA_HOME)
+    // 鉁?Windows 鈫?%APPDATA%\Example\MyApp
 }
 
 pub fn config_path() -> std::path::PathBuf {
@@ -43,3 +43,4 @@ pub struct SoundAssets;
 #[derive(RustEmbed)]
 #[folder = "../../assets/scripts"]
 pub struct ScriptAssets;
+

@@ -1,4 +1,4 @@
-use std::env;
+﻿use std::env;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use secrecy::SecretString;
@@ -202,8 +202,8 @@ pub struct AuthConfig {
 
 impl AuthConfig {
     fn from_env() -> Result<Self, ConfigError> {
-        let jwt_secret = env::var("VIBEKANBAN_REMOTE_JWT_SECRET")
-            .map_err(|_| ConfigError::MissingVar("VIBEKANBAN_REMOTE_JWT_SECRET"))?;
+        let jwt_secret = env::var("AGENT_CHATGROUP_REMOTE_JWT_SECRET")
+            .map_err(|_| ConfigError::MissingVar("AGENT_CHATGROUP_REMOTE_JWT_SECRET"))?;
         validate_jwt_secret(&jwt_secret)?;
         let jwt_secret = SecretString::new(jwt_secret.into());
 
@@ -266,11 +266,12 @@ impl AuthConfig {
 fn validate_jwt_secret(secret: &str) -> Result<(), ConfigError> {
     let decoded = BASE64_STANDARD
         .decode(secret.as_bytes())
-        .map_err(|_| ConfigError::InvalidVar("VIBEKANBAN_REMOTE_JWT_SECRET"))?;
+        .map_err(|_| ConfigError::InvalidVar("AGENT_CHATGROUP_REMOTE_JWT_SECRET"))?;
 
     if decoded.len() < 32 {
-        return Err(ConfigError::InvalidVar("VIBEKANBAN_REMOTE_JWT_SECRET"));
+        return Err(ConfigError::InvalidVar("AGENT_CHATGROUP_REMOTE_JWT_SECRET"));
     }
 
     Ok(())
 }
+
