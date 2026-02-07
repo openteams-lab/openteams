@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    path::PathBuf,
+    path::{Component, PathBuf},
     str::FromStr,
     sync::{
         Arc,
@@ -42,7 +42,7 @@ use tokio_util::io::ReaderStream;
 use ts_rs::TS;
 use utils::{assets::asset_dir, log_msg::LogMsg, msg_store::MsgStore};
 use uuid::Uuid;
-use crate::services::chat::ChatServiceError;
+use crate::services::chat::{self, ChatServiceError};
 
 const DIFF_PREVIEW_LIMIT: usize = 4000;
 const UNTRACKED_FILE_LIMIT: u64 = 1024 * 1024;
@@ -56,6 +56,23 @@ struct ContextSnapshot {
     jsonl: String,
     workspace_path: PathBuf,
     run_path: PathBuf,
+}
+
+struct ReferenceAttachment {
+    name: String,
+    mime_type: Option<String>,
+    size_bytes: i64,
+    kind: String,
+    local_path: String,
+}
+
+struct ReferenceContext {
+    message_id: Uuid,
+    sender_label: String,
+    sender_type: ChatSenderType,
+    created_at: String,
+    content: String,
+    attachments: Vec<ReferenceAttachment>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -218,12 +235,12 @@ impl ChatRunner {
                 .clone()
                 .unwrap_or_else(|| self.build_workspace_path(session_id, agent_id));
             fs::create_dir_all(&workspace_path).await?;
-            fs::create_dir_all(PathBuf::from(&workspace_path).join("runs")).await?;
+            fs::create_dir_all(PathBuf::from(&workspace_path).join(".runs")).await?;
 
             let run_index = ChatRun::next_run_index(&self.db.pool, session_agent_id).await?;
             let run_id = Uuid::new_v4();
             let run_dir = PathBuf::from(&workspace_path)
-                .join("runs")
+                .join(".runs")
                 .join(format!("run_{:04}", run_index));
             fs::create_dir_all(&run_dir).await?;
 
@@ -235,11 +252,20 @@ impl ChatRunner {
             let context_snapshot = self
                 .build_context_snapshot(session_id, &workspace_path, &run_dir)
                 .await?;
+            let context_dir = context_snapshot
+                .workspace_path
+                .parent()
+                .map(|path| path.to_path_buf())
+                .unwrap_or_else(|| PathBuf::from(&workspace_path));
+            let reference_context = self
+                .build_reference_context(session_id, source_message, &context_dir)
+                .await?;
             let prompt = self.build_prompt(
                 &agent,
                 source_message,
                 &context_snapshot.jsonl,
                 &context_snapshot.workspace_path,
+                reference_context.as_ref(),
             );
             fs::write(&input_path, &prompt).await?;
 
@@ -438,6 +464,28 @@ impl ChatRunner {
             return None;
         }
 
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(workspace_path)
+            .args(["status", "--porcelain"])
+            .output()
+            .await
+            .ok()?;
+
+        if !status.status.success() {
+            return None;
+        }
+
+        let status_text = String::from_utf8_lossy(&status.stdout);
+        let has_tracked_changes = status_text.lines().any(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && !trimmed.starts_with("??")
+        });
+
+        if !has_tracked_changes {
+            return None;
+        }
+
         let output = Command::new("git")
             .arg("-C")
             .arg(workspace_path)
@@ -550,7 +598,7 @@ impl ChatRunner {
             jsonl.push('\n');
         }
 
-        let context_dir = PathBuf::from(workspace_path).join("context");
+        let context_dir = PathBuf::from(workspace_path).join(".context");
         fs::create_dir_all(&context_dir).await?;
         let context_path = context_dir.join("messages.jsonl");
         fs::write(&context_path, jsonl.as_bytes()).await?;
@@ -565,12 +613,93 @@ impl ChatRunner {
         })
     }
 
+    async fn build_reference_context(
+        &self,
+        session_id: Uuid,
+        source_message: &ChatMessage,
+        context_dir: &PathBuf,
+    ) -> Result<Option<ReferenceContext>, ChatRunnerError> {
+        let Some(reference_id) =
+            chat::extract_reference_message_id(&source_message.meta.0)
+        else {
+            return Ok(None);
+        };
+
+        let Some(reference) = ChatMessage::find_by_id(&self.db.pool, reference_id).await? else {
+            return Ok(None);
+        };
+
+        if reference.session_id != session_id {
+            return Ok(None);
+        }
+
+        let sender_label = reference
+            .meta
+            .0
+            .get("sender")
+            .and_then(|value| value.get("label"))
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        let attachments = chat::extract_attachments(&reference.meta.0);
+        let mut reference_attachments = Vec::new();
+
+        if !attachments.is_empty() {
+            let reference_dir = context_dir
+                .join("references")
+                .join(reference_id.to_string());
+            fs::create_dir_all(&reference_dir).await?;
+
+            for attachment in attachments {
+                let relative = PathBuf::from(&attachment.relative_path);
+                if relative.is_absolute()
+                    || relative
+                        .components()
+                        .any(|component| matches!(component, Component::ParentDir))
+                {
+                    continue;
+                }
+
+                let source_path = asset_dir().join(&relative);
+                let file_name = source_path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().to_string())
+                    .unwrap_or_else(|| attachment.name.clone());
+                let dest_path = reference_dir.join(&file_name);
+                let local_path = if fs::copy(&source_path, &dest_path).await.is_ok() {
+                    dest_path.to_string_lossy().to_string()
+                } else {
+                    source_path.to_string_lossy().to_string()
+                };
+
+                reference_attachments.push(ReferenceAttachment {
+                    name: attachment.name,
+                    mime_type: attachment.mime_type,
+                    size_bytes: attachment.size_bytes,
+                    kind: attachment.kind,
+                    local_path,
+                });
+            }
+        }
+
+        Ok(Some(ReferenceContext {
+            message_id: reference.id,
+            sender_label,
+            sender_type: reference.sender_type,
+            created_at: reference.created_at.to_rfc3339(),
+            content: reference.content,
+            attachments: reference_attachments,
+        }))
+    }
+
     fn build_prompt(
         &self,
         agent: &ChatAgent,
         message: &ChatMessage,
         context_jsonl: &str,
         context_path: &PathBuf,
+        reference: Option<&ReferenceContext>,
     ) -> String {
         let mut prompt = String::new();
         prompt.push_str("[ENVELOPE]\n");
@@ -589,13 +718,40 @@ impl ChatRunner {
         }
 
         prompt.push_str("[GROUP_CONTEXT]\n");
-        prompt.push_str("All group messages in JSONL format (oldest to newest).\n");
+        prompt.push_str("Historical group chat messages (oldest to newest) in JSONL format.\n");
         prompt.push_str(&format!(
             "context_path={}\n",
             context_path.to_string_lossy()
         ));
         prompt.push_str(context_jsonl);
         prompt.push_str("\n[/GROUP_CONTEXT]\n\n");
+
+        if let Some(reference) = reference {
+            prompt.push_str("[REFERENCE_MESSAGE]\n");
+            prompt.push_str(
+                "User referenced the following historical group chat message. Prioritize it.\n",
+            );
+            prompt.push_str(&format!("reference_id={}\n", reference.message_id));
+            prompt.push_str(&format!("reference_sender={}\n", reference.sender_label));
+            prompt.push_str(&format!("reference_sender_type={:?}\n", reference.sender_type));
+            prompt.push_str(&format!("reference_created_at={}\n", reference.created_at));
+            if !reference.attachments.is_empty() {
+                prompt.push_str("reference_attachments:\n");
+                for attachment in &reference.attachments {
+                    prompt.push_str(&format!(
+                        "- name={} kind={} size_bytes={} mime_type={} local_path={}\n",
+                        attachment.name,
+                        attachment.kind,
+                        attachment.size_bytes,
+                        attachment.mime_type.as_deref().unwrap_or("unknown"),
+                        attachment.local_path
+                    ));
+                }
+            }
+            prompt.push_str("reference_content:\n");
+            prompt.push_str(reference.content.trim());
+            prompt.push_str("\n[/REFERENCE_MESSAGE]\n\n");
+        }
 
         prompt.push_str("[USER_MESSAGE]\n");
         prompt.push_str(message.content.trim());

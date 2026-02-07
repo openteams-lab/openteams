@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next';
+﻿import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Play,
@@ -160,12 +160,12 @@ export function NoServerContent({
                 variant="outline"
               >
                 {createAndStart.isPending
-                  ? 'Creating task…'
+                  ? 'Creating task...'
                   : 'Install companion automatically'}
               </Button>
               <div>
                 <a
-                  href="https://github.com/BloopAI/vibe-kanban-web-companion"
+                  href="https://github.com/BloopAI/agent-chatgroup-web-companion"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
@@ -181,3 +181,4 @@ export function NoServerContent({
     </div>
   );
 }
+

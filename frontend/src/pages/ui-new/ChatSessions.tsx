@@ -1,12 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   CaretRightIcon,
   ChatsTeardropIcon,
+  PencilSimpleIcon,
+  PaperclipIcon,
   PaperPlaneRightIcon,
   PlusIcon,
   UsersIcon,
+  ArrowsOutSimpleIcon,
+  ArrowsInSimpleIcon,
   XIcon,
 } from '@phosphor-icons/react';
 import {
@@ -16,9 +27,12 @@ import {
   ChatSessionStatus,
   ChatSessionAgent,
   ChatSessionAgentState,
+  BaseCodingAgent,
+  type AvailabilityInfo,
+  type JsonValue,
   type ChatStreamEvent,
 } from 'shared/types';
-import { chatApi } from '@/lib/api';
+import { chatApi, configApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
@@ -58,6 +72,15 @@ type DiffMeta = {
   truncated: boolean;
   available: boolean;
   untrackedFiles: string[];
+};
+
+type ChatAttachment = {
+  id: string;
+  name: string;
+  mime_type?: string | null;
+  size_bytes?: number;
+  kind?: string;
+  relative_path?: string;
 };
 
 const mentionRegex = /(^|\s)@([a-zA-Z0-9_-]*)$/;
@@ -168,6 +191,49 @@ function extractDiffMeta(meta: unknown): DiffMeta {
   return { runId, preview, truncated, available, untrackedFiles };
 }
 
+function extractReferenceId(meta: unknown): string | null {
+  if (!meta || typeof meta !== 'object') return null;
+  const raw = meta as {
+    reference?: { message_id?: unknown };
+    reference_message_id?: unknown;
+  };
+  if (raw.reference && typeof raw.reference === 'object') {
+    const value = raw.reference.message_id;
+    if (typeof value === 'string') return value;
+  }
+  return typeof raw.reference_message_id === 'string'
+    ? raw.reference_message_id
+    : null;
+}
+
+function extractAttachments(meta: unknown): ChatAttachment[] {
+  if (!meta || typeof meta !== 'object') return [];
+  const raw = meta as { attachments?: unknown };
+  if (!Array.isArray(raw.attachments)) return [];
+  return raw.attachments
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => item as ChatAttachment)
+    .filter((item) => typeof item.id === 'string');
+}
+
+function formatBytes(value?: number | null) {
+  if (!value || value <= 0) return '';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  const decimals = size >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${size.toFixed(decimals)} ${units[unitIndex]}`;
+}
+
+function truncateText(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 1)}…`;
+}
+
 type DiffFileEntry = {
   path: string;
   patch: string;
@@ -216,6 +282,8 @@ export function ChatSessions() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const promptFileInputRef = useRef<HTMLInputElement | null>(null);
   const { profiles, loginStatus } = useUserSystem();
   const { theme } = useTheme();
   const actualTheme = getActualTheme(theme);
@@ -287,6 +355,15 @@ export function ChatSessions() {
   });
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(
+    null
+  );
+  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [agentAvailability, setAgentAvailability] = useState<
+    Record<string, AvailabilityInfo | null>
+  >({});
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   const [streamingRuns, setStreamingRuns] = useState<Record<string, StreamRun>>(
     {}
   );
@@ -309,6 +386,9 @@ export function ChatSessions() {
   const [newMemberWorkspace, setNewMemberWorkspace] = useState('');
   const [memberError, setMemberError] = useState<string | null>(null);
   const [isSavingMember, setIsSavingMember] = useState(false);
+  const [isPromptEditorOpen, setIsPromptEditorOpen] = useState(false);
+  const [promptFileError, setPromptFileError] = useState<string | null>(null);
+  const [promptFileLoading, setPromptFileLoading] = useState(false);
   const [logRunId, setLogRunId] = useState<string | null>(null);
   const [logContent, setLogContent] = useState('');
   const [logLoading, setLogLoading] = useState(false);
@@ -328,16 +408,27 @@ export function ChatSessions() {
       { loading: boolean; error: string | null; content: string | null; open: boolean }
     >
   >({});
+  const [diffViewerRunId, setDiffViewerRunId] = useState<string | null>(null);
+  const [diffViewerUntracked, setDiffViewerUntracked] = useState<string[]>([]);
+  const [diffViewerHasDiff, setDiffViewerHasDiff] = useState(false);
+  const [diffViewerOpen, setDiffViewerOpen] = useState(false);
+  const [diffViewerFullscreen, setDiffViewerFullscreen] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [titleError, setTitleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeSessionId) {
       setMessages(messagesData);
     } else {
-      setMessages([]);
-    }
-  }, [messagesData, activeSessionId]);
+    setMessages([]);
+  }
+}, [messagesData, activeSessionId]);
 
-  useEffect(() => {
+useEffect(() => {
+    setReplyToMessage(null);
+    setIsUploadingAttachments(false);
+    setAttachmentError(null);
     setStreamingRuns({});
     setAgentStates({});
     setSelectedMentions([]);
@@ -358,6 +449,16 @@ export function ChatSessions() {
     setClock(Date.now());
     setRunDiffs({});
     setUntrackedContent({});
+    setDiffViewerRunId(null);
+    setDiffViewerUntracked([]);
+    setDiffViewerHasDiff(false);
+    setDiffViewerOpen(false);
+    setDiffViewerFullscreen(false);
+    setIsEditingTitle(false);
+    setTitleError(null);
+    setIsPromptEditorOpen(false);
+    setPromptFileError(null);
+    setPromptFileLoading(false);
   }, [activeSessionId]);
 
   const availableRunnerTypes = useMemo(() => {
@@ -368,6 +469,37 @@ export function ChatSessions() {
     }
     return baseList;
   }, [editingMember, profiles]);
+
+  const isRunnerAvailable = useCallback(
+    (runner: string) => {
+      const info = agentAvailability[runner];
+      return (
+        info?.type === 'LOGIN_DETECTED' ||
+        info?.type === 'INSTALLATION_FOUND'
+      );
+    },
+    [agentAvailability]
+  );
+
+  const enabledRunnerTypes = useMemo(
+    () => availableRunnerTypes.filter((runner) => isRunnerAvailable(runner)),
+    [availableRunnerTypes, isRunnerAvailable]
+  );
+
+  const availabilityLabel = useCallback(
+    (runner: string) => {
+      const info = agentAvailability[runner];
+      if (!info) return isCheckingAvailability ? ' (checking)' : ' (unavailable)';
+      if (
+        info.type === 'LOGIN_DETECTED' ||
+        info.type === 'INSTALLATION_FOUND'
+      ) {
+        return '';
+      }
+      return ' (not installed)';
+    },
+    [agentAvailability, isCheckingAvailability]
+  );
 
   const senderHandle = useMemo(() => {
     if (loginStatus?.status === 'loggedin') {
@@ -381,10 +513,57 @@ export function ChatSessions() {
   }, [loginStatus]);
 
   useEffect(() => {
-    if (!newMemberRunnerType && availableRunnerTypes.length > 0) {
-      setNewMemberRunnerType(availableRunnerTypes[0]);
+    let cancelled = false;
+    const run = async () => {
+      setIsCheckingAvailability(true);
+      const knownAgents = new Set(Object.values(BaseCodingAgent));
+      const results = await Promise.all(
+        availableRunnerTypes.map(async (runner) => {
+          if (!knownAgents.has(runner as BaseCodingAgent)) {
+            return [runner, null] as const;
+          }
+          try {
+            const info = await configApi.checkAgentAvailability(
+              runner as BaseCodingAgent
+            );
+            return [runner, info] as const;
+          } catch (error) {
+            console.warn('Failed to check agent availability', error);
+            return [runner, null] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      const next: Record<string, AvailabilityInfo | null> = {};
+      results.forEach(([runner, info]) => {
+        next[runner] = info;
+      });
+      setAgentAvailability(next);
+      setIsCheckingAvailability(false);
+    };
+
+    if (availableRunnerTypes.length > 0) {
+      run();
+    } else {
+      setAgentAvailability({});
+      setIsCheckingAvailability(false);
     }
-  }, [availableRunnerTypes, newMemberRunnerType]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [availableRunnerTypes]);
+
+  useEffect(() => {
+    if (editingMember) return;
+    if (enabledRunnerTypes.length === 0) {
+      setNewMemberRunnerType('');
+      return;
+    }
+    if (!newMemberRunnerType || !isRunnerAvailable(newMemberRunnerType)) {
+      setNewMemberRunnerType(enabledRunnerTypes[0]);
+    }
+  }, [editingMember, enabledRunnerTypes, isRunnerAvailable, newMemberRunnerType]);
 
   useEffect(() => {
     setAgentStates((prev) => {
@@ -520,12 +699,32 @@ export function ChatSessions() {
       ),
     [messages]
   );
+  const messageById = useMemo(
+    () => new Map(messageList.map((message) => [message.id, message])),
+    [messageList]
+  );
 
   const createSessionMutation = useMutation({
     mutationFn: () => chatApi.createSession({ title: null }),
     onSuccess: (session) => {
       queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
       navigate(`/chat/${session.id}`);
+    },
+  });
+
+  const updateSessionMutation = useMutation({
+    mutationFn: (params: { sessionId: string; title: string | null }) =>
+      chatApi.updateSession(params.sessionId, {
+        title: params.title,
+        status: null,
+        summary_text: null,
+        archive_ref: null,
+      }),
+    onSuccess: (session) => {
+      queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
+      setTitleDraft(session.title ?? '');
+      setIsEditingTitle(false);
+      setTitleError(null);
     },
   });
 
@@ -546,12 +745,14 @@ export function ChatSessions() {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (params: { sessionId: string; content: string }) =>
+    mutationFn: async (params: {
+      sessionId: string;
+      content: string;
+      meta?: JsonValue;
+    }) =>
       chatApi.createMessage(
         params.sessionId,
-        chatApi.buildCreateMessageRequest(params.content, {
-          sender_handle: senderHandle,
-        })
+        chatApi.buildCreateMessageRequest(params.content, params.meta ?? null)
       ),
     onSuccess: (message) => {
       upsertMessage(message);
@@ -573,18 +774,77 @@ export function ChatSessions() {
     const content = [mentionPrefix, trimmed].filter(Boolean).join(' ').trim();
     if (!content) return;
 
+    const meta: JsonValue = {
+      sender_handle: senderHandle,
+      ...(replyToMessage
+        ? { reference: { message_id: replyToMessage.id } }
+        : {}),
+    };
+
     try {
       await sendMessageMutation.mutateAsync({
         sessionId: activeSessionId,
         content,
+        meta,
       });
 
       setDraft('');
       setSelectedMentions([]);
       setMentionQuery(null);
+      setReplyToMessage(null);
       inputRef.current?.focus();
     } catch (error) {
       console.warn('Failed to send chat message', error);
+    }
+  };
+
+  const handleAttachmentUpload = async (files: FileList | File[]) => {
+    if (!activeSessionId || isArchived) return;
+    const list = Array.from(files);
+    if (list.length === 0) return;
+    setIsUploadingAttachments(true);
+    setAttachmentError(null);
+    try {
+      const message = await chatApi.uploadChatAttachments(
+        activeSessionId,
+        list,
+        senderHandle
+      );
+      upsertMessage(message);
+      queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
+    } catch (error) {
+      console.warn('Failed to upload attachments', error);
+      setAttachmentError('Unable to upload attachments.');
+    } finally {
+      setIsUploadingAttachments(false);
+    }
+  };
+
+  const handleAttachmentInputChange = (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    if (event.target.files) {
+      handleAttachmentUpload(event.target.files);
+    }
+    event.target.value = '';
+  };
+
+  const handlePromptFileChange = async (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPromptFileLoading(true);
+    setPromptFileError(null);
+    try {
+      const text = await file.text();
+      setNewMemberPrompt(text);
+    } catch (error) {
+      console.warn('Failed to read prompt file', error);
+      setPromptFileError('Unable to read the file.');
+    } finally {
+      setPromptFileLoading(false);
+      event.target.value = '';
     }
   };
 
@@ -620,6 +880,39 @@ export function ChatSessions() {
     for (const agent of agents) map.set(agent.id, agent);
     return map;
   }, [agents]);
+
+  const getMessageSenderLabel = useCallback(
+    (message: ChatMessage) => {
+      if (message.sender_type === ChatSenderType.user) return 'You';
+      if (message.sender_type === ChatSenderType.agent) {
+        if (message.sender_id) {
+          return agentById.get(message.sender_id)?.name ?? 'Agent';
+        }
+        return 'Agent';
+      }
+      return 'System';
+    },
+    [agentById]
+  );
+
+  const getReferencePreview = useCallback(
+    (message: ChatMessage) => {
+      const attachments = extractAttachments(message.meta);
+      const trimmed = message.content.trim();
+      if (trimmed) return truncateText(trimmed, 140);
+      if (attachments.length > 0) {
+        const names = attachments
+          .map((item) => item.name)
+          .filter(Boolean)
+          .slice(0, 3);
+        const suffix =
+          attachments.length > 3 ? ` and ${attachments.length - 3} more` : '';
+        return `Attachment: ${names.join(', ')}${suffix}`;
+      }
+      return 'Referenced message';
+    },
+    []
+  );
 
   const sessionMembers = useMemo<SessionMember[]>(() => {
     return sessionAgents
@@ -754,6 +1047,13 @@ export function ChatSessions() {
     () => sessions.find((session) => session.id === activeSessionId),
     [sessions, activeSessionId]
   );
+
+  useEffect(() => {
+    setTitleDraft(activeSession?.title ?? '');
+    setIsEditingTitle(false);
+    setTitleError(null);
+  }, [activeSession?.id]);
+
   const isArchived =
     activeSession?.status === ChatSessionStatus.archived;
 
@@ -790,6 +1090,11 @@ export function ChatSessions() {
 
     if (!runnerType) {
       setMemberError('Choose a base coding agent.');
+      return;
+    }
+
+    if (!isRunnerAvailable(runnerType)) {
+      setMemberError('Selected coding agent is not available locally.');
       return;
     }
 
@@ -906,6 +1211,9 @@ export function ChatSessions() {
     setNewMemberPrompt(member.agent.system_prompt ?? '');
     setNewMemberWorkspace(member.sessionAgent.workspace_path ?? '');
     setMemberError(null);
+    setIsPromptEditorOpen(false);
+    setPromptFileError(null);
+    setPromptFileLoading(false);
     setIsAddMemberOpen(true);
   };
 
@@ -938,6 +1246,26 @@ export function ChatSessions() {
     }
   };
 
+  const handleSaveTitle = async () => {
+    if (!activeSessionId) return;
+    const trimmed = titleDraft.trim();
+    try {
+      await updateSessionMutation.mutateAsync({
+        sessionId: activeSessionId,
+        title: trimmed.length > 0 ? trimmed : null,
+      });
+    } catch (error) {
+      console.warn('Failed to update session title', error);
+      setTitleError('Unable to update session name.');
+    }
+  };
+
+  const handleCancelTitleEdit = () => {
+    setTitleDraft(activeSession?.title ?? '');
+    setIsEditingTitle(false);
+    setTitleError(null);
+  };
+
   const handleLoadLog = async (runId: string) => {
     setLogRunId(runId);
     setLogLoading(true);
@@ -952,6 +1280,26 @@ export function ChatSessions() {
     } finally {
       setLogLoading(false);
     }
+  };
+
+  const handleOpenDiffViewer = (
+    runId: string,
+    untracked: string[],
+    hasDiff: boolean
+  ) => {
+    setDiffViewerRunId(runId);
+    setDiffViewerUntracked(untracked);
+    setDiffViewerHasDiff(hasDiff);
+    setDiffViewerOpen(true);
+    setDiffViewerFullscreen(false);
+    if (runId && hasDiff) {
+      handleLoadDiff(runId);
+    }
+  };
+
+  const handleCloseDiffViewer = () => {
+    setDiffViewerOpen(false);
+    setDiffViewerFullscreen(false);
   };
 
   const handleLoadDiff = async (runId: string) => {
@@ -1038,7 +1386,12 @@ export function ChatSessions() {
     !!activeSessionId &&
     !isArchived &&
     (draft.trim().length > 0 || selectedMentions.length > 0) &&
-    !sendMessageMutation.isPending;
+    !sendMessageMutation.isPending &&
+    !isUploadingAttachments;
+  const diffViewerRun = diffViewerRunId ? runDiffs[diffViewerRunId] : null;
+  const DiffViewerIcon = diffViewerFullscreen
+    ? ArrowsInSimpleIcon
+    : ArrowsOutSimpleIcon;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1055,7 +1408,7 @@ export function ChatSessions() {
   }, [workspaceAgentId]);
 
   return (
-    <div className="relative flex h-full min-h-0 bg-primary">
+    <div className="relative flex h-full min-h-0 bg-primary overflow-hidden pt-16">
       <aside className="w-72 border-r border-border flex flex-col min-h-0">
         <div className="px-base py-base border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-half text-normal font-medium">
@@ -1143,12 +1496,67 @@ export function ChatSessions() {
         </div>
       </aside>
 
-      <section className="flex-1 min-w-0 flex flex-col">
+      <section className="flex-1 min-w-0 min-h-0 flex flex-col">
         <header className="px-base py-half border-b border-border flex items-center justify-between">
-          <div>
-            <div className="text-sm text-normal font-medium truncate">
-              {activeSession?.title || 'Untitled session'}
-            </div>
+          <div className="min-w-0">
+            {!isEditingTitle && (
+              <div className="flex items-center gap-half">
+                <div className="text-sm text-normal font-medium truncate">
+                  {activeSession?.title || 'Untitled session'}
+                </div>
+                {activeSession && (
+                  <button
+                    type="button"
+                    className="text-low hover:text-normal"
+                    onClick={() => {
+                      setIsEditingTitle(true);
+                      setTitleError(null);
+                    }}
+                    aria-label="Edit session name"
+                  >
+                    <PencilSimpleIcon className="size-icon-xs" />
+                  </button>
+                )}
+              </div>
+            )}
+            {isEditingTitle && (
+              <div className="flex items-center gap-half flex-wrap">
+                <input
+                  value={titleDraft}
+                  onChange={(event) => setTitleDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleSaveTitle();
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      handleCancelTitleEdit();
+                    }
+                  }}
+                  placeholder="Session name"
+                  disabled={updateSessionMutation.isPending}
+                  className={cn(
+                    'w-[240px] max-w-full rounded-sm border border-border bg-panel px-base py-half',
+                    'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
+                  )}
+                />
+                <PrimaryButton
+                  value="Save"
+                  onClick={handleSaveTitle}
+                  disabled={updateSessionMutation.isPending}
+                />
+                <PrimaryButton
+                  variant="tertiary"
+                  value="Cancel"
+                  onClick={handleCancelTitleEdit}
+                  disabled={updateSessionMutation.isPending}
+                />
+              </div>
+            )}
+            {titleError && (
+              <div className="text-xs text-error">{titleError}</div>
+            )}
             {activeSession && (
               <div className="text-xs text-low">
                 Created {formatDateShortWithTime(activeSession.created_at)}
@@ -1211,6 +1619,11 @@ export function ChatSessions() {
                 ? agentById.get(message.sender_id)?.name ?? 'Agent'
                 : null;
             const diffMeta = isAgent ? extractDiffMeta(message.meta) : null;
+            const attachments = extractAttachments(message.meta);
+            const referenceId = extractReferenceId(message.meta);
+            const referenceMessage = referenceId
+              ? messageById.get(referenceId)
+              : null;
             const toneKey = isUser
               ? 'user'
               : message.sender_id ?? agentName ?? 'agent';
@@ -1229,6 +1642,7 @@ export function ChatSessions() {
             return (
               <div
                 key={message.id}
+                id={`chat-message-${message.id}`}
                 className={cn('flex', isUser ? 'justify-end' : 'justify-start')}
               >
                 <ChatEntryContainer
@@ -1236,9 +1650,20 @@ export function ChatSessions() {
                   title={isUser ? 'You' : agentName ?? 'Agent'}
                   expanded
                   headerRight={
-                    <span className="text-xs text-low">
-                      {formatDateShortWithTime(message.created_at)}
-                    </span>
+                    <div className="flex items-center gap-half text-xs text-low">
+                      <button
+                        type="button"
+                        className={cn(
+                          'text-brand hover:text-brand-hover',
+                          isArchived && 'pointer-events-none opacity-50'
+                        )}
+                        onClick={() => setReplyToMessage(message)}
+                        disabled={isArchived}
+                      >
+                        引用
+                      </button>
+                      <span>{formatDateShortWithTime(message.created_at)}</span>
+                    </div>
                   }
                   className={cn(
                     'max-w-[720px] w-full md:w-[80%] shadow-sm rounded-2xl',
@@ -1250,157 +1675,135 @@ export function ChatSessions() {
                     borderColor: tone.border,
                   }}
                 >
-                  <ChatMarkdown content={message.content} />
-                  {(diffMeta?.available ||
-                    (diffMeta?.untrackedFiles ?? []).length > 0) &&
-                    diffMeta.runId && (
-                      <div className="mt-half border border-border rounded-sm bg-secondary/70 p-base text-xs text-normal">
-                        <details
-                          onToggle={(event) => {
-                            const target = event.currentTarget as HTMLDetailsElement;
-                            if (
-                              target.open &&
-                              diffMeta.available &&
-                              diffMeta.runId
-                            ) {
-                              handleLoadDiff(diffMeta.runId);
+                  {referenceId && (
+                    <div className="mb-half border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
+                      <div className="flex items-center justify-between gap-base">
+                        <span className="font-medium text-normal">
+                          Replying to{' '}
+                          {referenceMessage
+                            ? getMessageSenderLabel(referenceMessage)
+                            : 'message'}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-brand hover:text-brand-hover"
+                          onClick={() => {
+                            if (referenceMessage) {
+                              const element = document.getElementById(
+                                `chat-message-${referenceMessage.id}`
+                              );
+                              element?.scrollIntoView({ behavior: 'smooth' });
                             }
                           }}
                         >
-                          <summary className="cursor-pointer select-none">
-                            Code changes
-                          </summary>
-                          {diffMeta.available && (
-                            <div className="mt-half space-y-half">
-                              {runDiffs[diffMeta.runId]?.loading && (
-                                <div className="text-xs text-low">
-                                  Loading diff...
-                                </div>
-                              )}
-                              {runDiffs[diffMeta.runId]?.error && (
-                                <div className="text-xs text-error">
-                                  {runDiffs[diffMeta.runId]?.error}
-                                </div>
-                              )}
-                              {!runDiffs[diffMeta.runId]?.loading &&
-                                runDiffs[diffMeta.runId]?.files.length === 0 &&
-                                !runDiffs[diffMeta.runId]?.error && (
-                                  <div className="text-xs text-low">
-                                    No tracked diff available.
-                                  </div>
-                                )}
-                              {runDiffs[diffMeta.runId]?.files?.map((file) => (
-                                <details
-                                  key={`${diffMeta.runId}-${file.path}`}
-                                  className="border border-border rounded-sm bg-panel"
-                                >
-                                  <summary className="flex items-center justify-between px-base py-half cursor-pointer text-xs text-normal">
-                                    <span className="font-ibm-plex-mono">
-                                      {file.path}
-                                    </span>
-                                    <span className="text-xs text-low">
-                                      {file.additions > 0 && (
-                                        <span className="text-success">
-                                          +{file.additions}
-                                        </span>
-                                      )}
-                                      {file.additions > 0 &&
-                                        file.deletions > 0 &&
-                                        ' '}
-                                      {file.deletions > 0 && (
-                                        <span className="text-error">
-                                          -{file.deletions}
-                                        </span>
-                                      )}
-                                    </span>
-                                  </summary>
-                                  <div className="border-t border-border">
-                                    <DiffViewBody
-                                      fileDiffMetadata={null}
-                                      unifiedDiff={file.patch}
-                                      isValid={file.patch.trim().length > 0}
-                                      hideLineNumbers={false}
-                                      theme={actualTheme}
-                                      wrapText={false}
-                                      modeOverride="split"
-                                    />
-                                  </div>
-                                </details>
-                              ))}
-                              <div className="mt-half">
-                                <button
-                                  type="button"
-                                  className="text-brand hover:text-brand-hover"
-                                  onClick={() =>
-                                    window.open(
-                                      chatApi.getRunDiffUrl(diffMeta.runId!),
-                                      '_blank',
-                                      'noopener,noreferrer'
-                                    )
-                                  }
-                                >
-                                  Open raw diff
-                                </button>
-                              </div>
+                          View
+                        </button>
+                      </div>
+                      <div className="mt-half">
+                        {referenceMessage
+                          ? getReferencePreview(referenceMessage)
+                          : 'Referenced message unavailable.'}
+                      </div>
+                      {referenceMessage &&
+                        extractAttachments(referenceMessage.meta).length > 0 && (
+                          <div className="mt-half text-xs text-low">
+                            Attachments:{' '}
+                            {extractAttachments(referenceMessage.meta)
+                              .map((item) => item.name)
+                              .filter(Boolean)
+                              .slice(0, 3)
+                              .join(', ')}
+                          </div>
+                        )}
+                    </div>
+                  )}
+                  <ChatMarkdown content={message.content} />
+                  {attachments.length > 0 && (
+                    <div className="mt-half space-y-half">
+                      {attachments.map((attachment) => {
+                        const attachmentUrl =
+                          activeSessionId && attachment.id
+                            ? chatApi.getChatAttachmentUrl(
+                                activeSessionId,
+                                message.id,
+                                attachment.id
+                              )
+                            : '#';
+                        const isImage =
+                          attachment.kind === 'image' ||
+                          (attachment.mime_type ?? '').startsWith('image/');
+                        return (
+                          <div
+                            key={attachment.id}
+                            className="border border-border rounded-sm bg-panel px-base py-half text-xs text-normal"
+                          >
+                            <div className="flex items-center justify-between gap-base">
+                              <span className="font-ibm-plex-mono break-all">
+                                {attachment.name}
+                              </span>
+                              <a
+                                className="text-brand hover:text-brand-hover"
+                                href={attachmentUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Open
+                              </a>
                             </div>
-                          )}
-                          {diffMeta.untrackedFiles.length > 0 && (
-                            <div className="mt-base space-y-half">
+                            {attachment.size_bytes && (
                               <div className="text-xs text-low">
-                                Untracked files
+                                {formatBytes(attachment.size_bytes)}
                               </div>
-                              {diffMeta.untrackedFiles.map((path) => {
-                                const key = `${diffMeta.runId}:${path}`;
-                                const entry = untrackedContent[key];
-                                return (
-                                  <div
-                                    key={key}
-                                    className="border border-border rounded-sm bg-panel px-base py-half"
-                                  >
-                                    <div className="flex items-center justify-between text-xs">
-                                      <span className="font-ibm-plex-mono break-all">
-                                        {path}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        className="text-brand hover:text-brand-hover"
-                                        onClick={() =>
-                                          handleToggleUntracked(
-                                            diffMeta.runId!,
-                                            path
-                                          )
-                                        }
-                                      >
-                                        {entry?.open ? 'Hide' : 'View'}
-                                      </button>
-                                    </div>
-                                    {entry?.open && (
-                                      <div className="mt-half">
-                                        {entry.loading && (
-                                          <div className="text-xs text-low">
-                                            Loading file...
-                                          </div>
-                                        )}
-                                        {entry.error && (
-                                          <div className="text-xs text-error">
-                                            {entry.error}
-                                          </div>
-                                        )}
-                                        {!entry.loading &&
-                                          !entry.error &&
-                                          entry.content && (
-                                            <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-xs font-ibm-plex-mono text-normal">
-                                              {entry.content}
-                                            </pre>
-                                          )}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </details>
+                            )}
+                            {isImage && attachmentUrl !== '#' && (
+                              <img
+                                src={attachmentUrl}
+                                alt={attachment.name}
+                                loading="lazy"
+                                className="mt-half max-h-56 w-auto rounded-sm border border-border"
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {(diffMeta?.available ||
+                    (diffMeta?.untrackedFiles ?? []).length > 0) &&
+                    diffMeta.runId && (
+                      <div className="mt-half border border-border rounded-sm bg-secondary/70 px-base py-half text-xs text-normal">
+                        <div className="flex items-center justify-between gap-base">
+                          <span>Code changes</span>
+                          <button
+                            type="button"
+                            className="text-brand hover:text-brand-hover"
+                            onClick={() =>
+                              handleOpenDiffViewer(
+                                diffMeta.runId!,
+                                diffMeta.untrackedFiles,
+                                diffMeta.available
+                              )
+                            }
+                          >
+                            View changes
+                          </button>
+                        </div>
+                        {diffMeta.available && runDiffs[diffMeta.runId]?.loading && (
+                          <div className="mt-half text-xs text-low">
+                            Loading diff...
+                          </div>
+                        )}
+                        {diffMeta.available && runDiffs[diffMeta.runId]?.error && (
+                          <div className="mt-half text-xs text-error">
+                            {runDiffs[diffMeta.runId]?.error}
+                          </div>
+                        )}
+                        {diffMeta.untrackedFiles.length > 0 && (
+                          <div className="mt-half text-xs text-low">
+                            {diffMeta.untrackedFiles.length} untracked file
+                            {diffMeta.untrackedFiles.length === 1 ? '' : 's'}
+                          </div>
+                        )}
                       </div>
                     )}
                 </ChatEntryContainer>
@@ -1516,6 +1919,30 @@ export function ChatSessions() {
             )}
           </div>
 
+          {replyToMessage && (
+            <div className="border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
+              <div className="flex items-center justify-between gap-base">
+                <span className="font-medium text-normal">
+                  Replying to {getMessageSenderLabel(replyToMessage)}
+                </span>
+                <button
+                  type="button"
+                  className="text-brand hover:text-brand-hover"
+                  onClick={() => setReplyToMessage(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+              <div className="mt-half">
+                {getReferencePreview(replyToMessage)}
+              </div>
+            </div>
+          )}
+
+          {attachmentError && (
+            <div className="text-xs text-error">{attachmentError}</div>
+          )}
+
           <div className="relative">
             <textarea
               ref={inputRef}
@@ -1532,11 +1959,11 @@ export function ChatSessions() {
                   ? 'This session is archived and read-only.'
                   : 'Type your message and @mention agents...'
               }
-              rows={3}
+              rows={8}
               disabled={isArchived || !activeSessionId}
               className={cn(
-                'w-full resize-none rounded-sm border border-border bg-panel',
-                'px-base py-half text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand',
+                'w-full resize-none rounded-sm border border-border bg-panel min-h-[240px]',
+                'px-base py-base text-sm text-normal leading-relaxed focus:outline-none focus:ring-1 focus:ring-brand',
                 isArchived && 'opacity-60 cursor-not-allowed'
               )}
             />
@@ -1560,10 +1987,34 @@ export function ChatSessions() {
             )}
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-low">
-              Press Enter to send, Shift+Enter for new line.
-            </span>
+          <div className="flex items-center justify-between gap-base">
+            <div className="flex items-center gap-half text-xs text-low">
+              <button
+                type="button"
+                className={cn(
+                  'flex items-center justify-center rounded-sm border border-border bg-panel px-2 py-1',
+                  'text-low hover:text-normal hover:border-border/80',
+                  (isArchived || !activeSessionId || isUploadingAttachments) &&
+                    'pointer-events-none opacity-50'
+                )}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isArchived || !activeSessionId || isUploadingAttachments}
+              >
+                <PaperclipIcon className="size-icon-xs" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleAttachmentInputChange}
+              />
+              <span>
+                {isUploadingAttachments
+                  ? 'Uploading attachments...'
+                  : 'Press Enter to send, Shift+Enter for new line.'}
+              </span>
+            </div>
             <PrimaryButton
               value="Send"
               actionIcon={
@@ -1585,12 +2036,12 @@ export function ChatSessions() {
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-base space-y-base">
           {!activeSessionId && (
-            <div className="text-xs text-low">
+            <div className="text-xs text-low mt-base">
               Select a session to manage AI members.
             </div>
           )}
           {activeSessionId && sessionMembers.length === 0 && (
-            <div className="text-xs text-low">
+            <div className="text-xs text-low mt-base">
               No AI members yet. Add one below to enable @mentions.
             </div>
           )}
@@ -1678,6 +2129,8 @@ export function ChatSessions() {
                   setNewMemberName('');
                   setNewMemberPrompt('');
                   setNewMemberWorkspace('');
+                  setIsPromptEditorOpen(false);
+                  setPromptFileError(null);
                 }}
                 disabled={!activeSessionId || isArchived}
               >
@@ -1712,20 +2165,52 @@ export function ChatSessions() {
                     onChange={(event) =>
                       setNewMemberRunnerType(event.target.value)
                     }
+                    disabled={
+                      isCheckingAvailability || enabledRunnerTypes.length === 0
+                    }
                     className={cn(
                       'w-full rounded-sm border border-border bg-panel px-base py-half',
                       'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
                     )}
                   >
+                    {enabledRunnerTypes.length === 0 && (
+                      <option value="">
+                        {isCheckingAvailability
+                          ? 'Checking agents...'
+                          : 'No local agents detected'}
+                      </option>
+                    )}
                     {availableRunnerTypes.map((runner) => (
-                      <option key={runner} value={runner}>
+                      <option
+                        key={runner}
+                        value={runner}
+                        disabled={!isRunnerAvailable(runner)}
+                      >
                         {toPrettyCase(runner)}
+                        {availabilityLabel(runner)}
                       </option>
                     ))}
                   </select>
+                  {enabledRunnerTypes.length === 0 && !isCheckingAvailability && (
+                    <div className="text-xs text-error">
+                      No installed code agents detected on this machine.
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-half">
-                  <label className="text-xs text-low">System prompt</label>
+                  <div className="flex items-center justify-between gap-base">
+                    <label className="text-xs text-low">System prompt</label>
+                    <button
+                      type="button"
+                      className="text-xs text-brand hover:text-brand-hover"
+                      onClick={() => {
+                        setIsPromptEditorOpen(true);
+                        setPromptFileError(null);
+                      }}
+                    >
+                      Expand
+                    </button>
+                  </div>
                   <textarea
                     value={newMemberPrompt}
                     onChange={(event) =>
@@ -1764,6 +2249,8 @@ export function ChatSessions() {
                       setIsAddMemberOpen(false);
                       setMemberError(null);
                       setEditingMember(null);
+                      setIsPromptEditorOpen(false);
+                      setPromptFileError(null);
                     }}
                     disabled={isSavingMember}
                   />
@@ -1893,6 +2380,250 @@ export function ChatSessions() {
           </div>
         </div>
       </div>
+
+      {diffViewerOpen && diffViewerRunId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={handleCloseDiffViewer}
+        >
+          <div
+            className={cn(
+              'bg-primary border border-border shadow-xl flex flex-col overflow-hidden',
+              diffViewerFullscreen
+                ? 'w-full h-full rounded-none'
+                : 'w-[92vw] h-[85vh] max-w-[1200px] rounded-xl'
+            )}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border px-base py-half">
+              <div>
+                <div className="text-sm text-normal font-medium">
+                  Code changes
+                </div>
+                <div className="text-xs text-low">
+                  Run {diffViewerRunId.slice(0, 8)}
+                </div>
+              </div>
+              <div className="flex items-center gap-half">
+                <button
+                  type="button"
+                  className="text-low hover:text-normal"
+                  onClick={() =>
+                    setDiffViewerFullscreen((prev) => !prev)
+                  }
+                  aria-label={
+                    diffViewerFullscreen ? 'Exit full screen' : 'Full screen'
+                  }
+                >
+                  <DiffViewerIcon className="size-icon-sm" />
+                </button>
+                <button
+                  type="button"
+                  className="text-low hover:text-normal"
+                  onClick={handleCloseDiffViewer}
+                  aria-label="Close diff viewer"
+                >
+                  <XIcon className="size-icon-sm" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-base space-y-base">
+              {diffViewerHasDiff ? (
+                <>
+                  {diffViewerRun?.loading && (
+                    <div className="text-xs text-low">Loading diff...</div>
+                  )}
+                  {diffViewerRun?.error && (
+                    <div className="text-xs text-error">
+                      {diffViewerRun.error}
+                    </div>
+                  )}
+                  {!diffViewerRun?.loading &&
+                    !diffViewerRun?.error &&
+                    diffViewerRun?.files?.length === 0 && (
+                      <div className="text-xs text-low">
+                        No tracked diff available.
+                      </div>
+                    )}
+                  {diffViewerRun?.files?.map((file) => (
+                    <div
+                      key={`${diffViewerRunId}-${file.path}`}
+                      className="border border-border rounded-sm bg-panel"
+                    >
+                      <div className="flex items-center justify-between px-base py-half text-xs text-normal border-b border-border">
+                        <span className="font-ibm-plex-mono break-all">
+                          {file.path}
+                        </span>
+                        <span className="text-xs text-low">
+                          {file.additions > 0 && (
+                            <span className="text-success">
+                              +{file.additions}
+                            </span>
+                          )}
+                          {file.additions > 0 && file.deletions > 0 && ' '}
+                          {file.deletions > 0 && (
+                            <span className="text-error">
+                              -{file.deletions}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <DiffViewBody
+                        fileDiffMetadata={null}
+                        unifiedDiff={file.patch}
+                        isValid={file.patch.trim().length > 0}
+                        hideLineNumbers={false}
+                        theme={actualTheme}
+                        wrapText={false}
+                        modeOverride="split"
+                      />
+                    </div>
+                  ))}
+                  <div>
+                    <button
+                      type="button"
+                      className="text-brand hover:text-brand-hover text-xs"
+                      onClick={() =>
+                        window.open(
+                          chatApi.getRunDiffUrl(diffViewerRunId),
+                          '_blank',
+                          'noopener,noreferrer'
+                        )
+                      }
+                    >
+                      Open raw diff
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-xs text-low">
+                  No tracked diff available.
+                </div>
+              )}
+              {diffViewerUntracked.length > 0 && (
+                <div className="space-y-half">
+                  <div className="text-xs text-low">Untracked files</div>
+                  {diffViewerUntracked.map((path) => {
+                    const key = `${diffViewerRunId}:${path}`;
+                    const entry = untrackedContent[key];
+                    return (
+                      <div
+                        key={key}
+                        className="border border-border rounded-sm bg-panel px-base py-half"
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-ibm-plex-mono break-all">
+                            {path}
+                          </span>
+                          <button
+                            type="button"
+                            className="text-brand hover:text-brand-hover"
+                            onClick={() =>
+                              handleToggleUntracked(diffViewerRunId, path)
+                            }
+                          >
+                            {entry?.open ? 'Hide' : 'View'}
+                          </button>
+                        </div>
+                        {entry?.open && (
+                          <div className="mt-half">
+                            {entry.loading && (
+                              <div className="text-xs text-low">
+                                Loading file...
+                              </div>
+                            )}
+                            {entry.error && (
+                              <div className="text-xs text-error">
+                                {entry.error}
+                              </div>
+                            )}
+                            {!entry.loading &&
+                              !entry.error &&
+                              entry.content && (
+                                <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-xs font-ibm-plex-mono text-normal">
+                                  {entry.content}
+                                </pre>
+                              )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPromptEditorOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setIsPromptEditorOpen(false)}
+        >
+          <div
+            className="bg-primary border border-border shadow-xl flex flex-col overflow-hidden w-[92vw] h-[80vh] max-w-[1200px] rounded-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border px-base py-half">
+              <div>
+                <div className="text-sm text-normal font-medium">
+                  System Prompt
+                </div>
+                <div className="text-xs text-low">
+                  Edit the AI member system prompt
+                </div>
+              </div>
+              <button
+                type="button"
+                className="text-low hover:text-normal"
+                onClick={() => setIsPromptEditorOpen(false)}
+                aria-label="Close prompt editor"
+              >
+                <XIcon className="size-icon-sm" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden p-base flex flex-col gap-base">
+              <textarea
+                value={newMemberPrompt}
+                onChange={(event) => setNewMemberPrompt(event.target.value)}
+                placeholder="Describe how this AI member should behave."
+                className={cn(
+                  'flex-1 w-full resize-none rounded-sm border border-border bg-panel',
+                  'px-base py-base text-sm text-normal leading-relaxed focus:outline-none focus:ring-1 focus:ring-brand'
+                )}
+              />
+              <div className="flex items-center justify-between gap-base">
+                <div className="flex items-center gap-half text-xs text-low">
+                  <button
+                    type="button"
+                    className="text-brand hover:text-brand-hover"
+                    onClick={() => promptFileInputRef.current?.click()}
+                    disabled={promptFileLoading}
+                  >
+                    Attach text file
+                  </button>
+                  <input
+                    ref={promptFileInputRef}
+                    type="file"
+                    accept=".txt,.md,.prompt,text/plain"
+                    className="hidden"
+                    onChange={handlePromptFileChange}
+                  />
+                  {promptFileLoading && <span>Loading file...</span>}
+                  {promptFileError && (
+                    <span className="text-error">{promptFileError}</span>
+                  )}
+                </div>
+                <PrimaryButton
+                  value="Done"
+                  onClick={() => setIsPromptEditorOpen(false)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

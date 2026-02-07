@@ -1,19 +1,19 @@
-{
-  "name": "vibe-kanban",
+﻿{
+  "name": "agent-chatgroup",
   "private": false,
   "version": "0.1.4",
   "main": "index.js",
   "bin": {
-    "vibe-kanban": "bin/cli.js"
+    "agent-chatgroup": "bin/cli.js"
   },
   "keywords": [],
   "author": "bloop",
   "repository": {
     "type": "git",
-    "url": "https://github.com/BloopAI/vibe-kanban"
+    "url": "https://github.com/BloopAI/agent-chatgroup"
   },
   "license": "",
-  "description": "NPX wrapper around vibe-kanban and vibe-kanban-mcp",
+  "description": "NPX wrapper around agent-chatgroup and agent-chatgroup-mcp",
   "dependencies": {
     "adm-zip": "^0.5.16"
   },
@@ -22,3 +22,4 @@
     "dist"
   ]
 }
+

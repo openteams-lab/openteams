@@ -1,4 +1,4 @@
----
+﻿---
 title: "Projects & Repositories"
 description: "Configure project-specific settings and repository scripts in the Settings dialog"
 ---
@@ -65,7 +65,7 @@ Command to start your development server. This enables the built-in preview brow
 | Rails | `rails server` |
 
 <Tip>
-The dev server must output its URL (e.g., `http://localhost:3000`) to stdout for Vibe Kanban to detect and display it in the preview panel.
+The dev server must output its URL (e.g., `http://localhost:3000`) to stdout for agent-chatgroup to detect and display it in the preview panel.
 </Tip>
 
 <Card title="Preview Panel Documentation" icon="eye" href="/workspaces/preview">
@@ -153,7 +153,7 @@ rm -rf .cache/ || true
 ```
 
 <Warning>
-Cleanup scripts should be idempotent—safe to run even if the resources don't exist. Use `|| true` to prevent failures when there's nothing to clean up.
+Cleanup scripts should be idempotent鈥攕afe to run even if the resources don't exist. Use `|| true` to prevent failures when there's nothing to clean up.
 </Warning>
 
 ## Best Practices
@@ -175,7 +175,7 @@ npm install || true
 </Accordion>
 
 <Accordion title="Test scripts locally">
-Run your scripts manually in a terminal before configuring them in Vibe Kanban to ensure they work correctly.
+Run your scripts manually in a terminal before configuring them in agent-chatgroup to ensure they work correctly.
 </Accordion>
 </AccordionGroup>
 
@@ -190,3 +190,4 @@ Run your scripts manually in a terminal before configuring them in Vibe Kanban t
   Working with multiple repositories in a single workspace
 </Card>
 </CardGroup>
+

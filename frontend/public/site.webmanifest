@@ -1,15 +1,15 @@
-{
-  "name": "Vibe Kanban",
-  "short_name": "VK",
+﻿{
+  "name": "agent-chatgroup",
+  "short_name": "agent-chatgroup",
   "icons": [
     {
-      "src": "/favicon-vk-light.svg",
+      "src": "/favicon-agent-chatgroup-light.svg",
       "sizes": "any",
       "purpose": "any",
       "type": "image/svg+xml"
     },
     {
-      "src": "/favicon-vk-light-maskable.svg",
+      "src": "/favicon-agent-chatgroup-light-maskable.svg",
       "sizes": "any",
       "purpose": "maskable",
       "type": "image/svg+xml"

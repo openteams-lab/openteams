@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)]
     [string]$Title,
     
@@ -6,7 +6,7 @@ param(
     [string]$Message,
     
     [Parameter(Mandatory=$false)]
-    [string]$AppName = "Vibe Kanban"
+    [string]$AppName = "agent-chatgroup"
 )
 
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null

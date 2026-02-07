@@ -1,4 +1,4 @@
-use std::{
+﻿use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
@@ -534,19 +534,19 @@ impl WorktreeManager {
         .map_err(|e| WorktreeError::TaskJoin(format!("{e}")))?
     }
 
-    /// Get the base directory for vibe-kanban worktrees
+    /// Get the base directory for agent-chatgroup worktrees
     pub fn get_worktree_base_dir() -> std::path::PathBuf {
         if let Some(override_path) = WORKSPACE_DIR_OVERRIDE.get() {
             // Always use app-owned subdirectory within custom path for safety.
             // This ensures orphan cleanup never touches user's existing folders.
-            return override_path.join(".vibe-kanban-workspaces");
+            return override_path.join(".agent-chatgroup-workspaces");
         }
         Self::get_default_worktree_base_dir()
     }
 
     /// Get the default base directory (ignoring any override)
     pub fn get_default_worktree_base_dir() -> std::path::PathBuf {
-        utils::path::get_vibe_kanban_temp_dir().join("worktrees")
+        utils::path::get_agent_chatgroup_temp_dir().join("worktrees")
     }
 
     pub async fn cleanup_suspected_worktree(path: &Path) -> Result<bool, WorktreeError> {
@@ -606,3 +606,4 @@ async fn create_worktree_when_repo_path_is_a_worktree() {
     .await
     .unwrap();
 }
+

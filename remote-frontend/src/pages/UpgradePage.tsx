@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { isLoggedIn } from "../auth";
 import {
@@ -138,8 +138,8 @@ export default function UpgradePage() {
         {/* Header */}
         <div className="text-center mb-12 pt-8">
           <img
-            src="/vibe-kanban-logo.svg"
-            alt="Vibe Kanban"
+            src="/agent-chatgroup-logo.svg"
+            alt="agent-chatgroup"
             className="h-10 mx-auto mb-6"
           />
           <h1 className="text-3xl font-bold text-gray-900">Choose Your Plan</h1>
@@ -436,3 +436,5 @@ function OAuthButton({
     </button>
   );
 }
+
+

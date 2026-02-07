@@ -357,7 +357,7 @@
       "prMerged": "PR #{{number}} 已合併",
       "loginRequired": {
         "title": "登入以管理 Git 操作",
-        "description": "登入 Vibe Kanban，才能推送分支、合併變更或為此任務建立 PR。",
+        "description": "登入 agent-chatgroup，才能推送分支、合併變更或為此任務建立 PR。",
         "action": "登入"
       }
     },
@@ -513,12 +513,12 @@
   "showcases": {
     "taskPanel": {
       "companion": {
-        "title": "Vibe Kanban Companion 點選功能",
+        "title": "agent-chatgroup Companion 點選功能",
         "description": "點擊預覽視窗中的任何 UI 元件以精準選取它。編碼代理將收到確切的 DOM 選擇器與元件層級結構，減少模糊回饋。"
       },
       "installation": {
         "title": "開發伺服器與 Companion 安裝",
-        "description": "為預覽設定開發伺服器命令，設定腳本可在設定中配置。使用編碼代理自動安裝 Vibe Kanban Web Companion。"
+        "description": "為預覽設定開發伺服器命令，設定腳本可在設定中配置。使用編碼代理自動安裝 agent-chatgroup Web Companion。"
       },
       "codeReview": {
         "title": "內建程式碼審查",

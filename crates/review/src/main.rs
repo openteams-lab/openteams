@@ -1,4 +1,4 @@
-mod api;
+﻿mod api;
 mod archive;
 mod claude_session;
 mod config;
@@ -18,24 +18,22 @@ use tempfile::TempDir;
 use tracing::debug;
 use tracing_subscriber::EnvFilter;
 
-const DEFAULT_API_URL: &str = "https://api.vibekanban.com";
+const DEFAULT_API_URL: &str = "https://api.agent-chatgroup.com";
 const POLL_INTERVAL: Duration = Duration::from_secs(10);
 const TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
 
 const BANNER: &str = r#"
-██████╗ ███████╗██╗   ██╗██╗███████╗██╗    ██╗   ███████╗ █████╗ ███████╗████████╗
-██╔══██╗██╔════╝██║   ██║██║██╔════╝██║    ██║   ██╔════╝██╔══██╗██╔════╝╚══██╔══╝
-██████╔╝█████╗  ██║   ██║██║█████╗  ██║ █╗ ██║   █████╗  ███████║███████╗   ██║   
-██╔══██╗██╔══╝  ╚██╗ ██╔╝██║██╔══╝  ██║███╗██║   ██╔══╝  ██╔══██║╚════██║   ██║   
-██║  ██║███████╗ ╚████╔╝ ██║███████╗╚███╔███╔╝██╗██║     ██║  ██║███████║   ██║   
-╚═╝  ╚═╝╚══════╝  ╚═══╝  ╚═╝╚══════╝ ╚══╝╚══╝ ╚═╝╚═╝     ╚═╝  ╚═╝╚══════╝   ╚═╝   
+鈻堚枅鈻堚枅鈻堚枅鈺?鈻堚枅鈻堚枅鈻堚枅鈻堚晽鈻堚枅鈺?  鈻堚枅鈺椻枅鈻堚晽鈻堚枅鈻堚枅鈻堚枅鈻堚晽鈻堚枅鈺?   鈻堚枅鈺?  鈻堚枅鈻堚枅鈻堚枅鈻堚晽 鈻堚枅鈻堚枅鈻堚晽 鈻堚枅鈻堚枅鈻堚枅鈻堚晽鈻堚枅鈻堚枅鈻堚枅鈻堚枅鈺?鈻堚枅鈺斺晲鈺愨枅鈻堚晽鈻堚枅鈺斺晲鈺愨晲鈺愨暆鈻堚枅鈺?  鈻堚枅鈺戔枅鈻堚晳鈻堚枅鈺斺晲鈺愨晲鈺愨暆鈻堚枅鈺?   鈻堚枅鈺?  鈻堚枅鈺斺晲鈺愨晲鈺愨暆鈻堚枅鈺斺晲鈺愨枅鈻堚晽鈻堚枅鈺斺晲鈺愨晲鈺愨暆鈺氣晲鈺愨枅鈻堚晹鈺愨晲鈺?鈻堚枅鈻堚枅鈻堚枅鈺斺暆鈻堚枅鈻堚枅鈻堚晽  鈻堚枅鈺?  鈻堚枅鈺戔枅鈻堚晳鈻堚枅鈻堚枅鈻堚晽  鈻堚枅鈺?鈻堚晽 鈻堚枅鈺?  鈻堚枅鈻堚枅鈻堚晽  鈻堚枅鈻堚枅鈻堚枅鈻堚晳鈻堚枅鈻堚枅鈻堚枅鈻堚晽   鈻堚枅鈺?  
+鈻堚枅鈺斺晲鈺愨枅鈻堚晽鈻堚枅鈺斺晲鈺愨暆  鈺氣枅鈻堚晽 鈻堚枅鈺斺暆鈻堚枅鈺戔枅鈻堚晹鈺愨晲鈺? 鈻堚枅鈺戔枅鈻堚枅鈺椻枅鈻堚晳   鈻堚枅鈺斺晲鈺愨暆  鈻堚枅鈺斺晲鈺愨枅鈻堚晳鈺氣晲鈺愨晲鈺愨枅鈻堚晳   鈻堚枅鈺?  
+鈻堚枅鈺? 鈻堚枅鈺戔枅鈻堚枅鈻堚枅鈻堚枅鈺?鈺氣枅鈻堚枅鈻堚晹鈺?鈻堚枅鈺戔枅鈻堚枅鈻堚枅鈻堚枅鈺椻暁鈻堚枅鈻堚晹鈻堚枅鈻堚晹鈺濃枅鈻堚晽鈻堚枅鈺?    鈻堚枅鈺? 鈻堚枅鈺戔枅鈻堚枅鈻堚枅鈻堚枅鈺?  鈻堚枅鈺?  
+鈺氣晲鈺? 鈺氣晲鈺濃暁鈺愨晲鈺愨晲鈺愨晲鈺? 鈺氣晲鈺愨晲鈺? 鈺氣晲鈺濃暁鈺愨晲鈺愨晲鈺愨晲鈺?鈺氣晲鈺愨暆鈺氣晲鈺愨暆 鈺氣晲鈺濃暁鈺愨暆     鈺氣晲鈺? 鈺氣晲鈺濃暁鈺愨晲鈺愨晲鈺愨晲鈺?  鈺氣晲鈺?  
 
 "#;
 
 #[derive(Parser, Debug)]
 #[command(name = "review")]
 #[command(
-    about = "Vibe-Kanban Review helps you review GitHub pull requests by turning them into a clear, story-driven summary instead of a wall of diffs. You provide a pull request URL, optionally link a Claude Code project for additional context, and it builds a narrative that highlights key events and important decisions, helping you prioritise what actually needs attention. It's particularly useful when reviewing large amounts of AI-generated code. Note that code is uploaded to and processed on Vibe-Kanban servers using AI."
+    about = "Agent Chatgroup Review helps you review GitHub pull requests by turning them into a clear, story-driven summary instead of a wall of diffs. You provide a pull request URL, optionally link a Claude Code project for additional context, and it builds a narrative that highlights key events and important decisions, helping you prioritise what actually needs attention. It's particularly useful when reviewing large amounts of AI-generated code. Note that code is uploaded to and processed on Agent Chatgroup servers using AI."
 )]
 #[command(version)]
 struct Args {
@@ -258,3 +256,4 @@ async fn run(args: Args) -> Result<(), ReviewError> {
 
     Ok(())
 }
+

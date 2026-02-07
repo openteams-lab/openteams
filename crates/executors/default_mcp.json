@@ -1,9 +1,9 @@
-{
-  "vibe_kanban": {
+﻿{
+  "agent_chatgroup": {
     "command": "npx",
     "args": [
       "-y",
-      "vibe-kanban@latest",
+      "agent-chatgroup@latest",
       "--mcp"
     ]
   },
@@ -45,11 +45,11 @@
     ]
   },
   "meta": {
-    "vibe_kanban": {
-      "name": "Vibe Kanban",
-      "description": "Create, update and delete Vibe Kanban tasks",
-      "url": "https://www.vibekanban.com/docs/integrations/vibe-kanban-mcp-server",
-      "icon": "favicon-vk-light.svg"
+    "agent_chatgroup": {
+      "name": "agent-chatgroup",
+      "description": "Create, update and delete agent-chatgroup tasks",
+      "url": "https://www.agent-chatgroup.com/docs/integrations/agent-chatgroup-mcp-server",
+      "icon": "favicon-agent-chatgroup-light.svg"
     },
     "context7": {
       "name": "Context7",
@@ -83,4 +83,7 @@
     }
   }
 }
+
+
+
 

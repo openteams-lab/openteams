@@ -1,4 +1,4 @@
-use anyhow::{self, Error as AnyhowError};
+﻿use anyhow::{self, Error as AnyhowError};
 use deployment::{Deployment, DeploymentError};
 use server::{DeploymentImpl, routes};
 use services::services::container::ContainerService;
@@ -14,7 +14,7 @@ use utils::{
 };
 
 #[derive(Debug, Error)]
-pub enum VibeKanbanError {
+pub enum AgentChatgroupError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -26,7 +26,7 @@ pub enum VibeKanbanError {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), VibeKanbanError> {
+async fn main() -> Result<(), AgentChatgroupError> {
     // Install rustls crypto provider before any TLS operations
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
@@ -100,7 +100,7 @@ async fn main() -> Result<(), VibeKanbanError> {
 
     let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let listener = tokio::net::TcpListener::bind(format!("{host}:{port}")).await?;
-    let actual_port = listener.local_addr()?.port(); // get → 53427 (example)
+    let actual_port = listener.local_addr()?.port(); // get 鈫?53427 (example)
 
     tracing::info!("Server running on http://{host}:{actual_port}");
 
@@ -173,3 +173,4 @@ pub async fn perform_cleanup_actions(deployment: &DeploymentImpl) {
         .await
         .expect("Failed to cleanly kill running execution processes");
 }
+

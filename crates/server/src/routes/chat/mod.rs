@@ -5,6 +5,7 @@ pub mod sessions;
 
 use axum::{
     Router,
+    extract::DefaultBodyLimit,
     middleware::from_fn_with_state,
     routing::get,
 };
@@ -34,6 +35,15 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route(
             "/messages",
             get(messages::get_messages).post(messages::create_message),
+        )
+        .route(
+            "/messages/upload",
+            axum::routing::post(messages::upload_message_attachments)
+                .layer(DefaultBodyLimit::max(25 * 1024 * 1024)),
+        )
+        .route(
+            "/messages/{message_id}/attachments/{attachment_id}",
+            get(messages::serve_message_attachment),
         )
         .layer(from_fn_with_state(
             deployment.clone(),

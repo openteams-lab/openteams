@@ -1,4 +1,4 @@
----
+﻿---
 title: "Creating Tasks"
 description: "Learn how to create and manage tasks on your kanban board, including using templates, starting coding agents, and understanding task states"
 ---
@@ -63,7 +63,7 @@ Tasks can also be created programmatically using coding agents or MCP (Model Con
 - **Automated task generation** from project plans or requirements documents
 
 <Tip>
-For detailed setup instructions and examples, see the [Vibe Kanban MCP Server](/integrations/vibe-kanban-mcp-server) documentation.
+For detailed setup instructions and examples, see the [agent-chatgroup MCP Server](/integrations/agent-chatgroup-mcp-server) documentation.
 </Tip>
 
 ### Example MCP Task Creation
@@ -81,7 +81,7 @@ I need to implement user authentication with:
 Please create individual tasks for each component.
 ```
 
-The MCP client will automatically generate structured tasks in your Vibe Kanban project based on this description.
+The MCP client will automatically generate structured tasks in your agent-chatgroup project based on this description.
 
 ## Understanding Task Columns
 
@@ -98,3 +98,5 @@ Tasks begin in the "To do" column and move automatically based on their progress
 <Info>
 You can manually drag tasks between columns, but this won't trigger any functionality. Task movement is primarily driven by coding agent actions and GitHub integration (which polls every 60 seconds).
 </Info>
+
+

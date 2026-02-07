@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -80,7 +80,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
         <DialogHeader>
           <div className="flex items-center gap-3">
             <HandMetal className="h-6 w-6 text-primary text-primary-foreground" />
-            <DialogTitle>Welcome to Vibe Kanban</DialogTitle>
+            <DialogTitle>Welcome to agent-chatgroup</DialogTitle>
           </div>
           <DialogDescription className="text-left pt-2">
             Let's set up your coding preferences. You can always change these
@@ -245,3 +245,4 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
 export const OnboardingDialog = defineModal<void, OnboardingResult>(
   OnboardingDialogImpl
 );
+

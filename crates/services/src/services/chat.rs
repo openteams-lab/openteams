@@ -6,6 +6,7 @@ use db::models::{
     chat_session::{ChatSession, ChatSessionStatus},
 };
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::SqlitePool;
 use thiserror::Error;
@@ -24,6 +25,35 @@ pub enum ChatServiceError {
     SessionArchived,
     #[error("Validation error: {0}")]
     Validation(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatAttachmentMeta {
+    pub id: Uuid,
+    pub name: String,
+    pub mime_type: Option<String>,
+    pub size_bytes: i64,
+    pub kind: String,
+    pub relative_path: String,
+}
+
+pub fn extract_attachments(meta: &Value) -> Vec<ChatAttachmentMeta> {
+    meta.get("attachments")
+        .and_then(|value| serde_json::from_value::<Vec<ChatAttachmentMeta>>(value.clone()).ok())
+        .unwrap_or_default()
+}
+
+pub fn has_attachments(meta: &Value) -> bool {
+    !extract_attachments(meta).is_empty()
+}
+
+pub fn extract_reference_message_id(meta: &Value) -> Option<Uuid> {
+    let id = meta
+        .get("reference")
+        .and_then(|value| value.get("message_id"))
+        .and_then(|value| value.as_str())
+        .or_else(|| meta.get("reference_message_id").and_then(|value| value.as_str()));
+    id.and_then(|value| Uuid::parse_str(value).ok())
 }
 
 pub fn parse_mentions(content: &str) -> Vec<String> {
@@ -71,12 +101,27 @@ pub async fn create_message(
     content: String,
     meta: Option<Value>,
 ) -> Result<ChatMessage, ChatServiceError> {
-    if content.trim().is_empty() {
-        return Err(ChatServiceError::Validation(
-            "content cannot be empty".to_string(),
-        ));
-    }
+    create_message_with_id(
+        pool,
+        session_id,
+        sender_type,
+        sender_id,
+        content,
+        meta,
+        Uuid::new_v4(),
+    )
+    .await
+}
 
+pub async fn create_message_with_id(
+    pool: &SqlitePool,
+    session_id: Uuid,
+    sender_type: ChatSenderType,
+    sender_id: Option<Uuid>,
+    content: String,
+    meta: Option<Value>,
+    message_id: Uuid,
+) -> Result<ChatMessage, ChatServiceError> {
     if matches!(sender_type, ChatSenderType::Agent) && sender_id.is_none() {
         return Err(ChatServiceError::Validation(
             "sender_id is required for agent messages".to_string(),
@@ -95,6 +140,11 @@ pub async fn create_message(
     let mut meta = meta.unwrap_or_else(|| serde_json::json!({}));
     if !meta.is_object() {
         meta = serde_json::json!({ "raw_meta": meta });
+    }
+    if content.trim().is_empty() && !has_attachments(&meta) {
+        return Err(ChatServiceError::Validation(
+            "content cannot be empty".to_string(),
+        ));
     }
 
     let sender_handle = meta
@@ -152,7 +202,7 @@ pub async fn create_message(
             mentions,
             meta,
         },
-        Uuid::new_v4(),
+        message_id,
     )
     .await?;
 

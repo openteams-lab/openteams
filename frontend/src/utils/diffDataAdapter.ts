@@ -1,4 +1,4 @@
-import {
+﻿import {
   parseDiffFromFile,
   type FileContents,
   type FileDiffMetadata,
@@ -21,15 +21,15 @@ export type CommentAnnotation =
   | { type: 'github'; comment: NormalizedGitHubComment };
 
 /**
- * Maps vibe-kanban's DiffChangeKind to pierre/diffs ChangeTypes.
+ * Maps agent-chatgroup's DiffChangeKind to pierre/diffs ChangeTypes.
  *
  * Mapping:
- * - 'added' → 'new'
- * - 'deleted' → 'deleted'
- * - 'modified' → 'change'
- * - 'renamed' → 'rename-pure' or 'rename-changed' (based on content diff)
- * - 'copied' → 'change'
- * - 'permissionChange' → 'change'
+ * - 'added' 鈫?'new'
+ * - 'deleted' 鈫?'deleted'
+ * - 'modified' 鈫?'change'
+ * - 'renamed' 鈫?'rename-pure' or 'rename-changed' (based on content diff)
+ * - 'copied' 鈫?'change'
+ * - 'permissionChange' 鈫?'change'
  */
 function mapChangeKindToChangeType(
   kind: DiffChangeKind,
@@ -70,12 +70,12 @@ function getFilePath(diff: Diff): string {
 }
 
 /**
- * Transforms a vibe-kanban Diff to pierre/diffs FileDiffMetadata.
+ * Transforms a agent-chatgroup Diff to pierre/diffs FileDiffMetadata.
  *
  * Uses parseDiffFromFile from @pierre/diffs to generate the diff metadata
  * from old and new file contents.
  *
- * @param diff - The vibe-kanban Diff object
+ * @param diff - The agent-chatgroup Diff object
  * @returns FileDiffMetadata for use with pierre/diffs components
  */
 export function transformDiffToFileDiffMetadata(
@@ -219,3 +219,4 @@ export function transformCommentsToAnnotations(
 
   return annotations;
 }
+

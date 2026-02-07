@@ -1,9 +1,9 @@
 {
-  "name": "vibe-kanban",
+  "name": "agent-chatgroup",
   "version": "0.1.4",
   "private": true,
   "bin": {
-    "vibe-kanban": "npx-cli/bin/cli.js"
+    "agent-chatgroup": "npx-cli/bin/cli.js"
   },
   "files": [
     "npx-cli/bin/cli.js",

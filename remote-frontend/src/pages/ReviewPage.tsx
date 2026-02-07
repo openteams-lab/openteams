@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DiffView, DiffModeEnum } from "@git-diff-view/react";
 import "@git-diff-view/react/styles/diff-view.css";
@@ -174,7 +174,7 @@ export default function ReviewPage() {
 
   useEffect(() => {
     if (review && prMetadata.title) {
-      document.title = `Review: ${prMetadata.title} · ${prMetadata.org}/${prMetadata.repo}#${prMetadata.number}`;
+      document.title = `Review: ${prMetadata.title} 路 ${prMetadata.org}/${prMetadata.repo}#${prMetadata.number}`;
     }
   }, [review, prMetadata]);
 
@@ -328,7 +328,7 @@ export default function ReviewPage() {
             Generate AI-powered code reviews for your pull requests
           </p>
           <code className="inline-block bg-secondary px-3 py-2 rounded-md text-sm font-mono text-foreground">
-            npx vibe-kanban review https://github.com/owner/repo/pull/123
+            npx agent-chatgroup review https://github.com/owner/repo/pull/123
           </code>
         </div>
       </div>
@@ -517,7 +517,7 @@ function DiffFragmentCard({
           <span className="font-mono truncate">{file}</span>
           <span className="shrink-0">
             Lines {startLine}
-            {endLine !== startLine && `–${endLine}`}
+            {endLine !== startLine && `鈥?{endLine}`}
           </span>
         </div>
         {message && (
@@ -612,3 +612,4 @@ function DiffFragmentCard({
     </div>
   );
 }
+
