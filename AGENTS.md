@@ -1,19 +1,118 @@
 # Repository Guidelines
 
+## Project Overview
+
+Agent-Chatgroup is a multi-agent conversation platform where multiple AI agents can collaborate in shared chat sessions. Key features:
+- **Multi-agent chat sessions** with real-time streaming
+- **Context synchronization** across agents
+- **Agent execution tracking** with diffs and logs
+- **Session archive/restore** functionality
+- **Permission-based access control**
+
 ## Project Structure & Module Organization
-- `crates/`: Rust workspace crates — `server` (API + bins), `db` (SQLx models/migrations), `executors`, `services`, `utils`, `deployment`, `local-deployment`, `remote`.
-- `frontend/`: React + TypeScript app (Vite, Tailwind). Source in `frontend/src`.
-- `frontend/src/components/dialogs`: Dialog components for the frontend.
-- `remote-frontend/`: Remote deployment frontend.
-- `shared/`: Generated TypeScript types (`shared/types.ts`). Do not edit directly.
-- `assets/`, `dev_assets_seed/`, `dev_assets/`: Packaged and local dev assets.
-- `npx-cli/`: Files published to the npm CLI package.
-- `scripts/`: Dev helpers (ports, DB preparation).
-- `docs/`: Documentation files.
+
+### Backend (Rust Workspace)
+- `crates/db/`: SQLx database models and migrations
+  - Core chat models: `chat_session.rs`, `chat_agent.rs`, `chat_session_agent.rs`, `chat_message.rs`, `chat_run.rs`, `chat_permission.rs`, `chat_artifact.rs`
+  - Legacy models: `task.rs`, `workspace.rs`, `session.rs` (legacy), `image.rs`
+  - Migrations: `migrations/20260205190000_add_chat_tables.sql`
+- `crates/server/`: API server and binaries
+  - Chat routes: `src/routes/chat/` (sessions.rs, agents.rs, messages.rs, runs.rs)
+  - Type generation: `src/bin/generate_types.rs`
+- `crates/services/`: Business logic
+  - `chat.rs`: Message parsing, mentions, attachments
+  - `chat_runner.rs`: Agent execution orchestration, WebSocket streaming
+- `crates/executors/`, `crates/utils/`, `crates/deployment/`, `crates/local-deployment/`: Supporting crates
+
+### Frontend
+- `frontend/`: Main React + TypeScript application (Vite, Tailwind)
+  - `src/pages/ui-new/`: **New design** pages (ChatSessions.tsx, Workspaces.tsx, ProjectKanban.tsx)
+  - `src/pages/`: **Legacy design** pages (Projects.tsx, ProjectTasks.tsx - wrapped in LegacyDesignScope)
+  - `src/components/ui-new/`: New design system components
+    - `primitives/`: ChatBoxBase, CreateChatBox, SessionChatBox
+    - `primitives/conversation/`: Message renderers (ChatUserMessage, ChatAssistantMessage, ChatSystemMessage, ChatMarkdown, ChatAggregatedDiffEntries, etc.)
+    - `containers/`: State management wrappers
+  - `src/components/ui/`: Legacy design system components (still used by legacy pages)
+  - `src/lib/api.ts`: API client with chatApi methods
+  - `src/styles/`: CSS for both design systems
+    - `new/index.css` + `tailwind.new.config.js` (scoped to `.new-design`)
+    - `legacy/index.css` + `tailwind.legacy.config.js` (scoped to `.legacy-design`)
+- `remote-frontend/`: Lightweight remote deployment frontend
+- `shared/`: Generated TypeScript types from Rust (`shared/types.ts` - auto-generated, do not edit)
+- `npx-cli/`: NPM CLI package files
+- `scripts/`: Development helpers (port management, DB preparation, desktop packaging)
+- `docs/`: Documentation (Mintlify setup)
+- `src-tauri/`: Tauri desktop application configuration
+- `assets/`, `dev_assets_seed/`, `dev_assets/`: Packaged and local dev assets
+
+## Chat System Architecture
+
+### Database Schema
+The chat system uses 7 core entities:
+- **ChatSession**: Conversation containers with title, status (active/archived), timestamps
+- **ChatAgent**: Agent definitions with name, runner_type, system_prompt, tools_enabled
+- **ChatSessionAgent**: Join table linking agents to sessions; tracks state (idle/running/waiting_approval/dead), workspace_path
+- **ChatMessage**: Messages with sender_type (user/agent/system), mentions, metadata
+- **ChatRun**: Agent execution runs per session_agent; includes run_index, run_dir, log/output paths
+- **ChatPermission**: Access control with capability, scope, TTL
+- **ChatArtifact**: Files/artifacts pinned to sessions
+
+### API Routes (`/chat`)
+```
+/chat
+├── /sessions (list, create)
+│   ├── /{session_id}
+│   │   ├── / (get, update, delete)
+│   │   ├── /archive (POST), /restore (POST)
+│   │   ├── /stream (WebSocket - real-time events)
+│   │   ├── /agents (list, create session agents)
+│   │   ├── /agents/{session_agent_id} (update, delete)
+│   │   ├── /messages (list, create)
+│   │   └── /messages/{message_id} (get, delete, upload attachments)
+├── /agents (list, create, update, delete)
+└── /runs/{run_id} (log, diff, untracked files)
+```
+
+### Frontend Chat Components
+- **Main Page**: `frontend/src/pages/ui-new/ChatSessions.tsx` (93KB)
+  - Lists active/archived sessions
+  - Create new sessions with agent members
+  - Real-time WebSocket message streaming
+  - @mentions autocomplete
+  - Diff viewer and run output display
+- **UI Primitives**: `frontend/src/components/ui-new/primitives/`
+  - `ChatBoxBase.tsx`, `CreateChatBox.tsx`, `SessionChatBox.tsx`
+  - `conversation/`: 15+ specialized message renderers
+- **API Client**: `frontend/src/lib/api.ts` exports `chatApi` object
+
+### Data Flow
+1. User creates session → API → DB (chat_sessions)
+2. User adds agents → API → DB (chat_session_agents)
+3. User sends message → API → mention parsing → DB
+4. Agent executes → chat_runner orchestrates → WebSocket streams events
+5. Run artifacts captured → stored with diffs/logs
+
+## Design System Status
+
+The project currently maintains two design systems during transition:
+- **New Design** (`.new-design` scope): Used in `pages/ui-new/` - ChatSessions, Workspaces, ProjectKanban
+  - Components: `components/ui-new/`
+  - Styles: `styles/new/index.css` + `tailwind.new.config.js`
+- **Legacy Design** (`.legacy-design` scope): Used in `pages/` - Projects, ProjectTasks
+  - Components: `components/ui/`, `components/legacy-design/`
+  - Styles: `styles/legacy/index.css` + `tailwind.legacy.config.js`
+
+Both scopes coexist via CSS class scoping. New features should use the **new design system**.
 
 ## Managing Shared Types Between Rust and TypeScript
 
 ts-rs allows you to derive TypeScript types from Rust structs/enums. By annotating your Rust types with #[derive(TS)] and related macros, ts-rs will generate .ts declaration files for those types.
+
+**Key shared types** exported in `shared/types.ts`:
+- Chat: `ChatSession`, `ChatMessage`, `ChatAgent`, `ChatSessionAgent`, `ChatRun`, `ChatPermission`, `ChatArtifact`
+- Stream: `ChatStreamEvent` (message_new, agent_delta, agent_state)
+- Enums: `ChatSessionStatus` (active/archived), `ChatSenderType` (user/agent/system), `ChatSessionAgentState` (idle/running/waiting_approval/dead)
+
 When making changes to the types, you can regenerate them using `pnpm run generate-types`
 Do not manually edit shared/types.ts, instead edit crates/server/src/bin/generate_types.rs
 

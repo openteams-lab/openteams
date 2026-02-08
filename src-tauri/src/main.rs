@@ -1,18 +1,19 @@
 use std::sync::Mutex;
 
 use portpicker::pick_unused_port;
-use tauri::{Manager, WindowUrl};
+use tauri::{api::process::{Command, CommandChild}, Manager};
 
 struct BackendState {
-    child: Mutex<Option<tauri::api::process::Child>>,
+    child: Mutex<Option<CommandChild>>,
 }
 
-fn spawn_backend(port: u16) -> Result<tauri::api::process::Child, Box<dyn std::error::Error>> {
-    let mut cmd = tauri::api::process::Command::new_sidecar("server")?;
-    cmd = cmd
-        .env("BACKEND_PORT", port.to_string())
-        .env("HOST", "127.0.0.1")
-        .env("RUST_LOG", "info");
+fn spawn_backend(port: u16) -> Result<CommandChild, Box<dyn std::error::Error>> {
+    let mut cmd = Command::new_sidecar("server")?;
+    let mut envs = std::collections::HashMap::new();
+    envs.insert("BACKEND_PORT".to_string(), port.to_string());
+    envs.insert("HOST".to_string(), "127.0.0.1".to_string());
+    envs.insert("RUST_LOG".to_string(), "info".to_string());
+    cmd = cmd.envs(envs);
 
     let (_rx, child) = cmd.spawn()?;
 
@@ -31,7 +32,10 @@ fn main() {
 
             if let Some(window) = app.get_window("main") {
                 let url = format!("http://127.0.0.1:{}", port);
-                window.set_url(WindowUrl::External(url.parse()?))?;
+                window.eval(&format!(
+                    "window.location.replace('{}')",
+                    url.replace('\'', "\\'")
+                ))?;
             }
 
             Ok(())
@@ -42,7 +46,7 @@ fn main() {
             tauri::RunEvent::ExitRequested { .. } => {
                 if let Some(state) = app.try_state::<BackendState>() {
                     if let Ok(mut guard) = state.child.lock() {
-                        if let Some(mut child) = guard.take() {
+                        if let Some(child) = guard.take() {
                             let _ = child.kill();
                         }
                     }

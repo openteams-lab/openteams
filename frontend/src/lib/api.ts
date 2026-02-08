@@ -99,7 +99,6 @@ import {
   ChatSessionStatus,
   ChatMessage,
   ChatAgent,
-  ChatStreamEvent,
   ChatSenderType,
   CreateChatAgent,
   CreateChatSession,

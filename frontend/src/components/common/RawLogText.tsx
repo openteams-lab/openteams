@@ -3,6 +3,72 @@ import { AnsiHtml } from 'fancy-ansi/react';
 import { hasAnsi } from 'fancy-ansi';
 import { clsx } from 'clsx';
 
+// Utility function to check if a string is valid JSON
+const isValidJSON = (str: string): boolean => {
+  if (!str.trim()) return false;
+  const trimmed = str.trim();
+  if (!(trimmed.startsWith('{') || trimmed.startsWith('['))) return false;
+  try {
+    JSON.parse(trimmed);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Utility function to convert JSON log to readable text format
+const formatJSONLog = (jsonStr: string): string => {
+  try {
+    const parsed = JSON.parse(jsonStr);
+
+    // Check if it's a log object (has common log fields)
+    const isLogObject = typeof parsed === 'object' && parsed !== null;
+    if (!isLogObject) {
+      return JSON.stringify(parsed, null, 2);
+    }
+
+    const lines: string[] = [];
+
+    // Extract common log fields
+    const timestamp = parsed.timestamp || parsed.time || parsed.ts || parsed.date;
+    const level = parsed.level || parsed.severity || parsed.lvl;
+    const message = parsed.message || parsed.msg || parsed.text;
+
+    // Build the main log line
+    const parts: string[] = [];
+    if (timestamp) parts.push(`[${timestamp}]`);
+    if (level) parts.push(String(level).toUpperCase());
+    if (message) parts.push(String(message));
+
+    if (parts.length > 0) {
+      lines.push(parts.join(' '));
+    }
+
+    // Add remaining fields as key-value pairs
+    const excludeKeys = new Set(['timestamp', 'time', 'ts', 'date', 'level', 'severity', 'lvl', 'message', 'msg', 'text']);
+    const remainingEntries = Object.entries(parsed).filter(([key]) => !excludeKeys.has(key));
+
+    if (remainingEntries.length > 0) {
+      for (const [key, value] of remainingEntries) {
+        if (typeof value === 'object' && value !== null) {
+          lines.push(`  ${key}: ${JSON.stringify(value)}`);
+        } else {
+          lines.push(`  ${key}: ${value}`);
+        }
+      }
+    }
+
+    // If no recognizable log structure, just pretty-print the JSON
+    if (lines.length === 0) {
+      return JSON.stringify(parsed, null, 2);
+    }
+
+    return lines.join('\n');
+  } catch {
+    return jsonStr;
+  }
+};
+
 interface RawLogTextProps {
   content: string;
   channel?: 'stdout' | 'stderr';
@@ -55,6 +121,12 @@ const RawLogText = memo(
     };
 
     const renderContent = () => {
+      // Check if the entire content is JSON and format it
+      if (isValidJSON(content)) {
+        const formatted = formatJSONLog(content);
+        return highlightMatches(formatted, 'content');
+      }
+
       if (!linkifyUrls) {
         return highlightMatches(content, 'content');
       }

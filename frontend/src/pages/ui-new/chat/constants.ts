@@ -1,0 +1,46 @@
+import { ChatSessionAgentState } from 'shared/types';
+import type { MessageTone } from './types';
+
+export const mentionRegex = /(^|\s)@([a-zA-Z0-9_-]*)$/;
+export const mentionTokenRegex = /(^|\s)@([a-zA-Z0-9_-]+)/g;
+export const memberNameRegex = /^[a-zA-Z0-9_-]+$/;
+
+export const fallbackRunnerTypes = [
+  'CLAUDE_CODE',
+  'CODEX',
+  'AMP',
+  'GEMINI',
+  'OPENCODE',
+  'CURSOR_AGENT',
+  'QWEN_CODE',
+  'COPILOT',
+  'DROID',
+];
+
+export const agentStateLabels: Record<ChatSessionAgentState, string> = {
+  idle: 'Idle',
+  running: 'Running',
+  waitingapproval: 'Waiting approval',
+  dead: 'Dead',
+};
+
+export const agentStateDotClass: Record<ChatSessionAgentState, string> = {
+  idle: 'bg-low',
+  running: 'bg-brand',
+  waitingapproval: 'bg-brand-secondary',
+  dead: 'bg-error',
+};
+
+export const messagePalette: MessageTone[] = [
+  { bg: 'rgba(226, 239, 255, 0.8)', border: 'rgba(176, 205, 242, 0.7)' },
+  { bg: 'rgba(231, 249, 239, 0.85)', border: 'rgba(176, 223, 198, 0.7)' },
+  { bg: 'rgba(255, 243, 227, 0.85)', border: 'rgba(231, 204, 173, 0.7)' },
+  { bg: 'rgba(245, 236, 255, 0.8)', border: 'rgba(209, 187, 234, 0.7)' },
+  { bg: 'rgba(255, 236, 242, 0.8)', border: 'rgba(232, 184, 198, 0.7)' },
+  { bg: 'rgba(238, 244, 248, 0.85)', border: 'rgba(189, 205, 217, 0.7)' },
+];
+
+export const userMessageTone: MessageTone = {
+  bg: 'rgba(219, 238, 255, 0.9)',
+  border: 'rgba(156, 197, 237, 0.8)',
+};
