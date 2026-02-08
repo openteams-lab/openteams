@@ -29,7 +29,7 @@ import {
   type AvailabilityInfo,
   type JsonValue,
 } from 'shared/types';
-import { chatApi, configApi } from '@/lib/api';
+import { ApiError, chatApi, configApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
@@ -672,6 +672,42 @@ export function ChatSessions() {
       return;
     }
 
+    let nameChanged = false;
+    let runnerChanged = false;
+    let promptChanged = false;
+    let workspaceChanged = false;
+    if (editingMember) {
+      nameChanged = editingMember.agent.name !== name;
+      runnerChanged = editingMember.agent.runner_type !== runnerType;
+      promptChanged = (editingMember.agent.system_prompt ?? '') !== prompt;
+      workspaceChanged =
+        (editingMember.sessionAgent.workspace_path ?? '') !== workspacePathVal;
+
+      if (nameChanged) {
+        const conflict = agents.find(
+          (agent) =>
+            agent.id !== editingMember.agent.id &&
+            agent.name.toLowerCase() === name.toLowerCase()
+        );
+        if (conflict) {
+          setMemberError('An AI member with this name already exists.');
+          return;
+        }
+      }
+
+      if (
+        !nameChanged &&
+        !runnerChanged &&
+        !promptChanged &&
+        !workspaceChanged
+      ) {
+        setEditingMember(null);
+        setIsAddMemberOpen(false);
+        setMemberError(null);
+        return;
+      }
+    }
+
     setIsSavingMember(true);
     setMemberError(null);
 
@@ -679,11 +715,9 @@ export function ChatSessions() {
       if (editingMember) {
         const agentId = editingMember.agent.id;
         const updatePayload = {
-          name: editingMember.agent.name !== name ? name : null,
-          runner_type:
-            editingMember.agent.runner_type !== runnerType ? runnerType : null,
-          system_prompt:
-            (editingMember.agent.system_prompt ?? '') !== prompt ? prompt : null,
+          name: nameChanged ? name : null,
+          runner_type: runnerChanged ? runnerType : null,
+          system_prompt: promptChanged ? prompt : null,
           tools_enabled: null,
         };
 
@@ -695,11 +729,18 @@ export function ChatSessions() {
           await chatApi.updateAgent(agentId, updatePayload);
         }
 
-        await chatApi.updateSessionAgent(
-          activeSessionId,
-          editingMember.sessionAgent.id,
-          { workspace_path: workspacePathVal }
-        );
+        if (workspaceChanged) {
+          const sessionIdForUpdate =
+            editingMember.sessionAgent.session_id ?? activeSessionId;
+          if (!sessionIdForUpdate) {
+            throw new ApiError('Missing session context for AI member update.');
+          }
+          await chatApi.updateSessionAgent(
+            sessionIdForUpdate,
+            editingMember.sessionAgent.id,
+            { workspace_path: workspacePathVal }
+          );
+        }
       } else {
         const existing = agents.find((agent) => agent.name === name);
         let agentId = existing?.id ?? null;
@@ -752,7 +793,17 @@ export function ChatSessions() {
       setIsAddMemberOpen(false);
     } catch (error) {
       console.warn('Failed to add AI member', error);
-      setMemberError('Failed to add AI member. Check server logs.');
+      if (error instanceof ApiError && error.message) {
+        setMemberError(error.message);
+      } else if (error instanceof Error && error.message) {
+        setMemberError(error.message);
+      } else {
+        setMemberError(
+          editingMember
+            ? 'Failed to update AI member. Check server logs.'
+            : 'Failed to add AI member. Check server logs.'
+        );
+      }
     } finally {
       setIsSavingMember(false);
     }
@@ -1403,7 +1454,7 @@ export function ChatSessions() {
               )}
             />
             {mentionQuery !== null && visibleMentionSuggestions.length > 0 && (
-              <div className="absolute z-20 left-0 right-0 mt-half bg-panel border border-border rounded-sm shadow">
+              <div className="absolute z-20 left-0 right-0 bottom-full mb-half bg-panel border border-border rounded-sm shadow">
                 {visibleMentionSuggestions.map((agent) => (
                   <button
                     key={agent.id}
