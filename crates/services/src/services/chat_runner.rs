@@ -46,6 +46,7 @@ use crate::services::chat::{self, ChatServiceError};
 
 const DIFF_PREVIEW_LIMIT: usize = 4000;
 const UNTRACKED_FILE_LIMIT: u64 = 1024 * 1024;
+const MAX_AGENT_CHAIN_DEPTH: u32 = 5;
 
 struct DiffInfo {
     preview: String,
@@ -137,16 +138,45 @@ impl ChatRunner {
     pub async fn handle_message(&self, session: &ChatSession, message: &ChatMessage) {
         self.emit_message_new(session.id, message.clone());
 
-        if message.sender_type != ChatSenderType::User {
+        // Check chain depth to prevent infinite loops
+        let chain_depth = self.extract_chain_depth(&message.meta);
+        if chain_depth >= MAX_AGENT_CHAIN_DEPTH {
+            tracing::warn!(
+                session_id = %session.id,
+                chain_depth = chain_depth,
+                "agent chain depth limit reached; not triggering further agents"
+            );
             return;
         }
+
+        // Get sender agent id if this is an agent message
+        let sender_agent_id = if message.sender_type == ChatSenderType::Agent {
+            message.sender_id
+        } else {
+            None
+        };
 
         let session_id = session.id;
         let mentions = message.mentions.0.clone();
         for mention in mentions {
             let runner = self.clone();
             let message_clone = message.clone();
+            let sender_agent_id_clone = sender_agent_id;
             tokio::spawn(async move {
+                // Check if mentioned agent is the same as sender (prevent self-triggering)
+                if let Some(sender_id) = sender_agent_id_clone {
+                    if let Ok(Some(agent)) = ChatAgent::find_by_name(&runner.db.pool, &mention).await {
+                        if agent.id == sender_id {
+                            tracing::debug!(
+                                agent_id = %sender_id,
+                                mention = mention,
+                                "skipping self-mention by agent"
+                            );
+                            return;
+                        }
+                    }
+                }
+
                 if let Err(err) =
                     runner.run_agent_for_mention(session_id, &mention, &message_clone).await
                 {
@@ -159,6 +189,13 @@ impl ChatRunner {
                 }
             });
         }
+    }
+
+    fn extract_chain_depth(&self, meta: &sqlx::types::Json<serde_json::Value>) -> u32 {
+        meta.get("chain_depth")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32)
+            .unwrap_or(0)
     }
 
     fn emit(&self, session_id: Uuid, event: ChatStreamEvent) {
@@ -228,6 +265,7 @@ impl ChatRunner {
         let agent_id = agent.id;
 
         let reply_handle = self.resolve_reply_handle(source_message);
+        let chain_depth = self.extract_chain_depth(&source_message.meta);
 
         let result = async {
             let workspace_path = session_agent
@@ -343,6 +381,7 @@ impl ChatRunner {
                 run_dir,
                 Some(reply_handle),
                 failed_flag.clone(),
+                chain_depth,
             );
 
             self.spawn_exit_watcher(spawned.child, msg_store, failed_flag);
@@ -829,6 +868,7 @@ impl ChatRunner {
         run_dir: PathBuf,
         reply_handle: Option<String>,
         failed_flag: Arc<AtomicBool>,
+        chain_depth: u32,
     ) {
         let db = self.db.clone();
         let sender = self.sender_for(session_id);
@@ -908,6 +948,7 @@ impl ChatRunner {
                             "agent_session_id": agent_session_id,
                             "agent_message_id": agent_message_id,
                             "finished_at": Utc::now().to_rfc3339(),
+                            "chain_depth": chain_depth + 1,
                         });
 
                         if let Some(diff) = diff_info.as_ref() {

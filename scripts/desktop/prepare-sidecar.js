@@ -26,6 +26,32 @@ const binPath = path.join(targetDir, binName);
 const outDir = path.join(root, 'src-tauri', 'bin');
 const outPath = path.join(outDir, binName);
 
+function inferTargetTriple() {
+  const arch = process.arch;
+  if (process.platform === 'win32') {
+    return arch === 'arm64'
+      ? 'aarch64-pc-windows-msvc'
+      : 'x86_64-pc-windows-msvc';
+  }
+  if (process.platform === 'darwin') {
+    return arch === 'arm64'
+      ? 'aarch64-apple-darwin'
+      : 'x86_64-apple-darwin';
+  }
+  if (process.platform === 'linux') {
+    return arch === 'arm64'
+      ? 'aarch64-unknown-linux-gnu'
+      : 'x86_64-unknown-linux-gnu';
+  }
+  return '';
+}
+
+const targetTriple =
+  process.env.TAURI_TARGET_TRIPLE ||
+  process.env.TAURI_ENV_TARGET ||
+  process.env.TARGET ||
+  inferTargetTriple();
+
 const cargoArgs = ['build', '--bin', 'server'];
 if (isRelease) cargoArgs.splice(1, 0, '--release');
 
@@ -47,6 +73,16 @@ fs.mkdirSync(outDir, { recursive: true });
 fs.copyFileSync(binPath, outPath);
 if (process.platform !== 'win32') {
   fs.chmodSync(outPath, 0o755);
+}
+
+if (targetTriple) {
+  const ext = process.platform === 'win32' ? '.exe' : '';
+  const triplePath = path.join(outDir, `server-${targetTriple}${ext}`);
+  fs.copyFileSync(binPath, triplePath);
+  if (process.platform !== 'win32') {
+    fs.chmodSync(triplePath, 0o755);
+  }
+  console.log(`Sidecar prepared: ${triplePath}`);
 }
 
 console.log(`Sidecar prepared: ${outPath}`);

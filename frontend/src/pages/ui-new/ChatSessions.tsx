@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   CaretRightIcon,
@@ -21,16 +21,13 @@ import {
   XIcon,
 } from '@phosphor-icons/react';
 import {
-  ChatAgent,
   ChatMessage,
   ChatSenderType,
   ChatSessionStatus,
-  ChatSessionAgent,
   ChatSessionAgentState,
   BaseCodingAgent,
   type AvailabilityInfo,
   type JsonValue,
-  type ChatStreamEvent,
 } from 'shared/types';
 import { chatApi, configApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -41,345 +38,151 @@ import { ChatEntryContainer } from '@/components/ui-new/primitives/conversation/
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
 import { ChatSystemMessage } from '@/components/ui-new/primitives/conversation/ChatSystemMessage';
 import { DiffViewBody } from '@/components/ui-new/primitives/conversation/PierreConversationDiff';
+import RawLogText from '@/components/common/RawLogText';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useTheme } from '@/components/ThemeProvider';
 import { formatDateShortWithTime } from '@/utils/date';
-import { parseDiffStats } from '@/utils/diffStatsParser';
 import { toPrettyCase } from '@/utils/string';
 import { getActualTheme } from '@/utils/theme';
 
-type StreamRun = {
-  agentId: string;
-  content: string;
-  isFinal: boolean;
-};
-
-type RunHistoryItem = {
-  runId: string;
-  agentId: string;
-  createdAt: string;
-  content: string;
-};
-
-type SessionMember = {
-  agent: ChatAgent;
-  sessionAgent: ChatSessionAgent;
-};
-
-type DiffMeta = {
-  runId: string | null;
-  preview: string | null;
-  truncated: boolean;
-  available: boolean;
-  untrackedFiles: string[];
-};
-
-type ChatAttachment = {
-  id: string;
-  name: string;
-  mime_type?: string | null;
-  size_bytes?: number;
-  kind?: string;
-  relative_path?: string;
-};
-
-const mentionRegex = /(^|\s)@([a-zA-Z0-9_-]*)$/;
-const mentionTokenRegex = /(^|\s)@([a-zA-Z0-9_-]+)/g;
-const memberNameRegex = /^[a-zA-Z0-9_-]+$/;
-
-const fallbackRunnerTypes = [
-  'CLAUDE_CODE',
-  'CODEX',
-  'AMP',
-  'GEMINI',
-  'OPENCODE',
-  'CURSOR_AGENT',
-  'QWEN_CODE',
-  'COPILOT',
-  'DROID',
-];
-
-const agentStateLabels: Record<ChatSessionAgentState, string> = {
-  idle: 'Idle',
-  running: 'Running',
-  waitingapproval: 'Waiting approval',
-  dead: 'Dead',
-};
-
-const agentStateDotClass: Record<ChatSessionAgentState, string> = {
-  idle: 'bg-low',
-  running: 'bg-brand',
-  waitingapproval: 'bg-brand-secondary',
-  dead: 'bg-error',
-};
-
-const messagePalette = [
-  { bg: 'rgba(226, 239, 255, 0.8)', border: 'rgba(176, 205, 242, 0.7)' },
-  { bg: 'rgba(231, 249, 239, 0.85)', border: 'rgba(176, 223, 198, 0.7)' },
-  { bg: 'rgba(255, 243, 227, 0.85)', border: 'rgba(231, 204, 173, 0.7)' },
-  { bg: 'rgba(245, 236, 255, 0.8)', border: 'rgba(209, 187, 234, 0.7)' },
-  { bg: 'rgba(255, 236, 242, 0.8)', border: 'rgba(232, 184, 198, 0.7)' },
-  { bg: 'rgba(238, 244, 248, 0.85)', border: 'rgba(189, 205, 217, 0.7)' },
-];
-
-function hashKey(value: string): number {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-function getMessageTone(key: string, isUser: boolean) {
-  if (isUser) {
-    return { bg: 'rgba(219, 238, 255, 0.9)', border: 'rgba(156, 197, 237, 0.8)' };
-  }
-  const index = hashKey(key) % messagePalette.length;
-  return messagePalette[index];
-}
-
-function extractMentions(content: string): Set<string> {
-  const mentions = new Set<string>();
-  for (const match of content.matchAll(mentionTokenRegex)) {
-    const name = match[2];
-    if (name) mentions.add(name);
-  }
-  return mentions;
-}
-
-function extractRunId(meta: unknown): string | null {
-  if (!meta || typeof meta !== 'object') return null;
-  const runId = (meta as { run_id?: unknown }).run_id;
-  return typeof runId === 'string' ? runId : null;
-}
-
-function sanitizeHandle(value: string | null | undefined): string {
-  if (!value) return 'you';
-  const sanitized = value
-    .split('@')[0]
-    .split(' ')[0]
-    .trim()
-    .replace(/[^a-zA-Z0-9_-]/g, '');
-  return sanitized.length > 0 ? sanitized : 'you';
-}
-
-function extractDiffMeta(meta: unknown): DiffMeta {
-  if (!meta || typeof meta !== 'object') {
-    return {
-      runId: null,
-      preview: null,
-      truncated: false,
-      available: false,
-      untrackedFiles: [],
-    };
-  }
-  const raw = meta as {
-    run_id?: unknown;
-    diff_preview?: unknown;
-    diff_truncated?: unknown;
-    diff_available?: unknown;
-    untracked_files?: unknown;
-  };
-  const runId = typeof raw.run_id === 'string' ? raw.run_id : null;
-  const preview = typeof raw.diff_preview === 'string' ? raw.diff_preview : null;
-  const truncated = raw.diff_truncated === true;
-  const available = raw.diff_available === true || preview !== null;
-  const untrackedFiles = Array.isArray(raw.untracked_files)
-    ? raw.untracked_files.filter((item) => typeof item === 'string')
-    : [];
-  return { runId, preview, truncated, available, untrackedFiles };
-}
-
-function extractReferenceId(meta: unknown): string | null {
-  if (!meta || typeof meta !== 'object') return null;
-  const raw = meta as {
-    reference?: { message_id?: unknown };
-    reference_message_id?: unknown;
-  };
-  if (raw.reference && typeof raw.reference === 'object') {
-    const value = raw.reference.message_id;
-    if (typeof value === 'string') return value;
-  }
-  return typeof raw.reference_message_id === 'string'
-    ? raw.reference_message_id
-    : null;
-}
-
-function extractAttachments(meta: unknown): ChatAttachment[] {
-  if (!meta || typeof meta !== 'object') return [];
-  const raw = meta as { attachments?: unknown };
-  if (!Array.isArray(raw.attachments)) return [];
-  return raw.attachments
-    .filter((item) => item && typeof item === 'object')
-    .map((item) => item as ChatAttachment)
-    .filter((item) => typeof item.id === 'string');
-}
-
-function formatBytes(value?: number | null) {
-  if (!value || value <= 0) return '';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let size = value;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  const decimals = size >= 10 || unitIndex === 0 ? 0 : 1;
-  return `${size.toFixed(decimals)} ${units[unitIndex]}`;
-}
-
-function truncateText(value: string, maxLength: number) {
-  if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength - 1)}…`;
-}
-
-type DiffFileEntry = {
-  path: string;
-  patch: string;
-  additions: number;
-  deletions: number;
-};
-
-function splitUnifiedDiff(patch: string): DiffFileEntry[] {
-  const lines = patch.split('\n');
-  const entries: DiffFileEntry[] = [];
-  let current: string[] = [];
-  let currentPath = '';
-
-  const flush = () => {
-    if (current.length === 0) return;
-    const content = current.join('\n');
-    const path = currentPath || 'unknown';
-    const stats = parseDiffStats(content);
-    entries.push({
-      path,
-      patch: content,
-      additions: stats.additions,
-      deletions: stats.deletions,
-    });
-  };
-
-  for (const line of lines) {
-    if (line.startsWith('diff --git ')) {
-      flush();
-      current = [line];
-      const match = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
-      currentPath = match?.[2] || line.replace('diff --git ', '').trim();
-      continue;
-    }
-    if (current.length > 0) {
-      current.push(line);
-    }
-  }
-
-  flush();
-  return entries;
-}
+import {
+  type SessionMember,
+  type RunHistoryItem,
+  useChatData,
+  useRunHistory,
+  useChatMutations,
+  useChatWebSocket,
+  useMessageInput,
+  useDiffViewer,
+  fallbackRunnerTypes,
+  agentStateLabels,
+  agentStateDotClass,
+  memberNameRegex,
+  getMessageTone,
+  extractDiffMeta,
+  extractReferenceId,
+  extractAttachments,
+  formatBytes,
+  truncateText,
+  sanitizeHandle,
+} from './chat';
 
 export function ChatSessions() {
   const { sessionId } = useParams<{ sessionId?: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const promptFileInputRef = useRef<HTMLInputElement | null>(null);
   const { profiles, loginStatus } = useUserSystem();
   const { theme } = useTheme();
   const actualTheme = getActualTheme(theme);
 
-  const { data: sessions = [], isLoading: isSessionsLoading } = useQuery({
-    queryKey: ['chatSessions'],
-    queryFn: () => chatApi.listSessions(),
-  });
-
-  const { data: agents = [], isLoading: isAgentsLoading } = useQuery({
-    queryKey: ['chatAgents'],
-    queryFn: () => chatApi.listAgents(),
-  });
-
-  const sortedSessions = useMemo(
-    () =>
-      [...sessions].sort(
-        (a, b) =>
-          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      ),
-    [sessions]
-  );
-
-  const activeSessions = useMemo(
-    () =>
-      sortedSessions.filter(
-        (session) => session.status === ChatSessionStatus.active
-      ),
-    [sortedSessions]
-  );
-
-  const archivedSessions = useMemo(
-    () =>
-      sortedSessions.filter(
-        (session) => session.status === ChatSessionStatus.archived
-      ),
-    [sortedSessions]
-  );
+  // Data queries
+  const {
+    sortedSessions,
+    activeSessions,
+    archivedSessions,
+    agents,
+    sessionAgents,
+    messagesData,
+    agentById,
+    sessionMembers,
+    mentionAgents,
+    isLoading,
+  } = useChatData(sessionId ?? null);
 
   const activeSessionId = sessionId ?? sortedSessions[0]?.id ?? null;
 
-  useEffect(() => {
-    if (!sessionId && sortedSessions.length > 0) {
-      navigate(`/chat/${sortedSessions[0].id}`, { replace: true });
-    }
-    if (
-      sessionId &&
-      sortedSessions.length > 0 &&
-      !sortedSessions.some((session) => session.id === sessionId)
-    ) {
-      navigate(`/chat/${sortedSessions[0].id}`, { replace: true });
-    }
-  }, [navigate, sessionId, sortedSessions]);
+  // Messages state
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  const { data: sessionAgents = [], isLoading: isSessionAgentsLoading } =
-    useQuery({
-      queryKey: ['chatSessionAgents', activeSessionId],
-      queryFn: () => chatApi.listSessionAgents(activeSessionId!),
-      enabled: !!activeSessionId,
+  const upsertMessage = useCallback((message: ChatMessage) => {
+    setMessages((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === message.id);
+      if (existingIndex >= 0) {
+        const next = [...prev];
+        next[existingIndex] = message;
+        return next;
+      }
+      return [...prev, message];
     });
+  }, []);
+
+  // WebSocket connection
+  const { streamingRuns, agentStates, setAgentStates } = useChatWebSocket(
+    activeSessionId,
+    upsertMessage
+  );
+
+  // Mutations
+  const {
+    createSession,
+    updateSession,
+    archiveSession,
+    restoreSession,
+    sendMessage,
+  } = useChatMutations(
+    (session) => navigate(`/chat/${session.id}`),
+    (session) => navigate(`/chat/${session.id}`),
+    upsertMessage
+  );
+
+  // Message input
+  const getMessageMentionHandle = useCallback(
+    (message: ChatMessage) => {
+      if (message.sender_type !== ChatSenderType.agent) return null;
+      if (!message.sender_id) return null;
+      const name = agentById.get(message.sender_id)?.name ?? null;
+      if (!name || !memberNameRegex.test(name)) return null;
+      return name;
+    },
+    [agentById]
+  );
 
   const {
-    data: messagesData = [],
-    isLoading: isMessagesLoading,
-  } = useQuery({
-    queryKey: ['chatMessages', activeSessionId],
-    queryFn: () => chatApi.listMessages(activeSessionId!),
-    enabled: !!activeSessionId,
-  });
+    draft,
+    selectedMentions,
+    setSelectedMentions,
+    mentionQuery,
+    replyToMessage,
+    setReplyToMessage,
+    inputRef,
+    handleDraftChange,
+    handleMentionSelect,
+    handleReplySelect,
+    visibleMentionSuggestions,
+    agentOptions,
+    resetInput,
+  } = useMessageInput(mentionAgents);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(
-    null
-  );
+  // Diff viewer
+  const {
+    diffViewerRunId,
+    diffViewerUntracked,
+    diffViewerHasDiff,
+    diffViewerOpen,
+    diffViewerFullscreen,
+    runDiffs,
+    untrackedContent,
+    handleOpenDiffViewer,
+    handleCloseDiffViewer,
+    handleToggleFullscreen,
+    handleToggleUntracked,
+    resetDiffViewer,
+  } = useDiffViewer();
+
+  // Local state
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [agentAvailability, setAgentAvailability] = useState<
     Record<string, AvailabilityInfo | null>
   >({});
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
-  const [streamingRuns, setStreamingRuns] = useState<Record<string, StreamRun>>(
-    {}
-  );
-  const [agentStates, setAgentStates] = useState<
-    Record<string, ChatSessionAgentState>
-  >({});
-  const [selectedMentions, setSelectedMentions] = useState<string[]>([]);
-  const [draft, setDraft] = useState('');
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [workspaceDrawerOpen, setWorkspaceDrawerOpen] = useState(false);
   const [workspaceAgentId, setWorkspaceAgentId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<SessionMember | null>(
-    null
-  );
+  const [editingMember, setEditingMember] = useState<SessionMember | null>(null);
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberRunnerType, setNewMemberRunnerType] = useState('');
   const [newMemberPrompt, setNewMemberPrompt] = useState('');
@@ -396,44 +199,26 @@ export function ChatSessions() {
   const [runningSince, setRunningSince] = useState<Record<string, number>>({});
   const [clock, setClock] = useState(() => Date.now());
   const [showArchived, setShowArchived] = useState(false);
-  const [runDiffs, setRunDiffs] = useState<
-    Record<
-      string,
-      { loading: boolean; error: string | null; files: DiffFileEntry[] }
-    >
-  >({});
-  const [untrackedContent, setUntrackedContent] = useState<
-    Record<
-      string,
-      { loading: boolean; error: string | null; content: string | null; open: boolean }
-    >
-  >({});
-  const [diffViewerRunId, setDiffViewerRunId] = useState<string | null>(null);
-  const [diffViewerUntracked, setDiffViewerUntracked] = useState<string[]>([]);
-  const [diffViewerHasDiff, setDiffViewerHasDiff] = useState(false);
-  const [diffViewerOpen, setDiffViewerOpen] = useState(false);
-  const [diffViewerFullscreen, setDiffViewerFullscreen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [titleError, setTitleError] = useState<string | null>(null);
 
+  // Sync messages from query
   useEffect(() => {
     if (activeSessionId) {
       setMessages(messagesData);
     } else {
-    setMessages([]);
-  }
-}, [messagesData, activeSessionId]);
+      setMessages([]);
+    }
+  }, [messagesData, activeSessionId]);
 
-useEffect(() => {
+  // Reset state on session change
+  useEffect(() => {
+    resetInput();
+    resetDiffViewer();
     setReplyToMessage(null);
     setIsUploadingAttachments(false);
     setAttachmentError(null);
-    setStreamingRuns({});
-    setAgentStates({});
-    setSelectedMentions([]);
-    setDraft('');
-    setMentionQuery(null);
     setWorkspaceDrawerOpen(false);
     setWorkspaceAgentId(null);
     setIsAddMemberOpen(false);
@@ -447,20 +232,28 @@ useEffect(() => {
     setLogError(null);
     setRunningSince({});
     setClock(Date.now());
-    setRunDiffs({});
-    setUntrackedContent({});
-    setDiffViewerRunId(null);
-    setDiffViewerUntracked([]);
-    setDiffViewerHasDiff(false);
-    setDiffViewerOpen(false);
-    setDiffViewerFullscreen(false);
     setIsEditingTitle(false);
     setTitleError(null);
     setIsPromptEditorOpen(false);
     setPromptFileError(null);
     setPromptFileLoading(false);
-  }, [activeSessionId]);
+  }, [activeSessionId, resetInput, resetDiffViewer, setReplyToMessage]);
 
+  // Navigate to first session if needed
+  useEffect(() => {
+    if (!sessionId && sortedSessions.length > 0) {
+      navigate(`/chat/${sortedSessions[0].id}`, { replace: true });
+    }
+    if (
+      sessionId &&
+      sortedSessions.length > 0 &&
+      !sortedSessions.some((session) => session.id === sessionId)
+    ) {
+      navigate(`/chat/${sortedSessions[0].id}`, { replace: true });
+    }
+  }, [navigate, sessionId, sortedSessions]);
+
+  // Derived state
   const availableRunnerTypes = useMemo(() => {
     const keys = Object.keys(profiles ?? {});
     const baseList = keys.length > 0 ? keys : fallbackRunnerTypes;
@@ -473,10 +266,7 @@ useEffect(() => {
   const isRunnerAvailable = useCallback(
     (runner: string) => {
       const info = agentAvailability[runner];
-      return (
-        info?.type === 'LOGIN_DETECTED' ||
-        info?.type === 'INSTALLATION_FOUND'
-      );
+      return info?.type === 'LOGIN_DETECTED' || info?.type === 'INSTALLATION_FOUND';
     },
     [agentAvailability]
   );
@@ -490,10 +280,7 @@ useEffect(() => {
     (runner: string) => {
       const info = agentAvailability[runner];
       if (!info) return isCheckingAvailability ? ' (checking)' : ' (unavailable)';
-      if (
-        info.type === 'LOGIN_DETECTED' ||
-        info.type === 'INSTALLATION_FOUND'
-      ) {
+      if (info.type === 'LOGIN_DETECTED' || info.type === 'INSTALLATION_FOUND') {
         return '';
       }
       return ' (not installed)';
@@ -512,6 +299,75 @@ useEffect(() => {
     return 'you';
   }, [loginStatus]);
 
+  const messageList = useMemo(
+    () =>
+      [...messages].sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      ),
+    [messages]
+  );
+
+  const messageById = useMemo(
+    () => new Map(messageList.map((message) => [message.id, message])),
+    [messageList]
+  );
+
+  const runHistory = useRunHistory(messages);
+
+  const activeSession = useMemo(
+    () => sortedSessions.find((session) => session.id === activeSessionId),
+    [sortedSessions, activeSessionId]
+  );
+
+  const isArchived = activeSession?.status === ChatSessionStatus.archived;
+
+  const placeholderAgents = useMemo(
+    () =>
+      sessionMembers.filter(
+        (member) => agentStates[member.agent.id] === ChatSessionAgentState.running
+      ),
+    [agentStates, sessionMembers]
+  );
+
+  const activeWorkspaceAgent = workspaceAgentId
+    ? agentById.get(workspaceAgentId)
+    : null;
+
+  const workspacePath = useMemo(() => {
+    if (!workspaceAgentId) return null;
+    const sessionAgent = sessionAgents.find(
+      (item) => item.agent_id === workspaceAgentId
+    );
+    if (sessionAgent?.workspace_path) return sessionAgent.workspace_path;
+    if (!activeSessionId) return null;
+    return `chat/session_${activeSessionId}/agents/${workspaceAgentId}`;
+  }, [activeSessionId, sessionAgents, workspaceAgentId]);
+
+  const activeWorkspaceRuns = useMemo<RunHistoryItem[]>(
+    () =>
+      runHistory
+        .filter((run: RunHistoryItem) => run.agentId === workspaceAgentId)
+        .sort(
+          (a: RunHistoryItem, b: RunHistoryItem) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ),
+    [runHistory, workspaceAgentId]
+  );
+
+  const canSend =
+    !!activeSessionId &&
+    !isArchived &&
+    (draft.trim().length > 0 || selectedMentions.length > 0) &&
+    !sendMessage.isPending &&
+    !isUploadingAttachments;
+
+  const diffViewerRun = diffViewerRunId ? runDiffs[diffViewerRunId] : null;
+  const DiffViewerIcon = diffViewerFullscreen
+    ? ArrowsInSimpleIcon
+    : ArrowsOutSimpleIcon;
+
+  // Check agent availability
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -554,6 +410,7 @@ useEffect(() => {
     };
   }, [availableRunnerTypes]);
 
+  // Set default runner type
   useEffect(() => {
     if (editingMember) return;
     if (enabledRunnerTypes.length === 0) {
@@ -565,6 +422,7 @@ useEffect(() => {
     }
   }, [editingMember, enabledRunnerTypes, isRunnerAvailable, newMemberRunnerType]);
 
+  // Sync agent states from session agents
   useEffect(() => {
     setAgentStates((prev) => {
       let changed = false;
@@ -577,7 +435,7 @@ useEffect(() => {
       }
       return changed ? next : prev;
     });
-  }, [agents]);
+  }, [agents, setAgentStates]);
 
   useEffect(() => {
     setAgentStates((prev) => {
@@ -587,385 +445,9 @@ useEffect(() => {
       }
       return next;
     });
-  }, [sessionAgents]);
+  }, [sessionAgents, setAgentStates]);
 
-  const upsertMessage = useCallback((message: ChatMessage) => {
-    setMessages((prev) => {
-      const existingIndex = prev.findIndex((item) => item.id === message.id);
-      if (existingIndex >= 0) {
-        const next = [...prev];
-        next[existingIndex] = message;
-        return next;
-      }
-      return [...prev, message];
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!activeSessionId) return;
-    let ws: WebSocket | null = null;
-    let shouldReconnect = true;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const connect = () => {
-      const streamUrl = chatApi.getStreamUrl(activeSessionId);
-      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const wsUrl = `${protocol}://${window.location.host}${streamUrl}`;
-      ws = new WebSocket(wsUrl);
-
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data) as ChatStreamEvent;
-          if (payload.type === 'message_new') {
-            const message = payload.message;
-            upsertMessage(message);
-            const runId = extractRunId(message.meta);
-            if (runId) {
-              setStreamingRuns((prev) => {
-                if (!prev[runId]) return prev;
-                const next = { ...prev };
-                delete next[runId];
-                return next;
-              });
-            }
-            return;
-          }
-
-          if (payload.type === 'agent_delta') {
-            setStreamingRuns((prev) => {
-              const previous = prev[payload.run_id];
-              const content =
-                payload.delta && previous
-                  ? `${previous.content}${payload.content}`
-                  : payload.content;
-              return {
-                ...prev,
-                [payload.run_id]: {
-                  agentId: payload.agent_id,
-                  content,
-                  isFinal: payload.is_final,
-                },
-              };
-            });
-            if (payload.is_final) {
-              setTimeout(() => {
-                setStreamingRuns((prev) => {
-                  if (!prev[payload.run_id]) return prev;
-                  const next = { ...prev };
-                  delete next[payload.run_id];
-                  return next;
-                });
-              }, 1500);
-            }
-            return;
-          }
-
-          if (payload.type === 'agent_state') {
-            setAgentStates((prev) => ({
-              ...prev,
-              [payload.agent_id]: payload.state,
-            }));
-          }
-        } catch (error) {
-          console.warn('Failed to parse chat stream payload', error);
-        }
-      };
-
-      ws.onclose = () => {
-        if (!shouldReconnect) return;
-        reconnectTimer = setTimeout(connect, 1500);
-      };
-
-      ws.onerror = () => {
-        ws?.close();
-      };
-    };
-
-    connect();
-
-    return () => {
-      shouldReconnect = false;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      ws?.close();
-    };
-  }, [activeSessionId, upsertMessage]);
-
-  const messageList = useMemo(
-    () =>
-      [...messages].sort(
-        (a, b) =>
-          new Date(a.created_at).getTime() -
-          new Date(b.created_at).getTime()
-      ),
-    [messages]
-  );
-  const messageById = useMemo(
-    () => new Map(messageList.map((message) => [message.id, message])),
-    [messageList]
-  );
-
-  const createSessionMutation = useMutation({
-    mutationFn: () => chatApi.createSession({ title: null }),
-    onSuccess: (session) => {
-      queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
-      navigate(`/chat/${session.id}`);
-    },
-  });
-
-  const updateSessionMutation = useMutation({
-    mutationFn: (params: { sessionId: string; title: string | null }) =>
-      chatApi.updateSession(params.sessionId, {
-        title: params.title,
-        status: null,
-        summary_text: null,
-        archive_ref: null,
-      }),
-    onSuccess: (session) => {
-      queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
-      setTitleDraft(session.title ?? '');
-      setIsEditingTitle(false);
-      setTitleError(null);
-    },
-  });
-
-  const archiveSessionMutation = useMutation({
-    mutationFn: (id: string) => chatApi.archiveSession(id),
-    onSuccess: (session) => {
-      queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
-      navigate(`/chat/${session.id}`);
-    },
-  });
-
-  const restoreSessionMutation = useMutation({
-    mutationFn: (id: string) => chatApi.restoreSession(id),
-    onSuccess: (session) => {
-      queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
-      navigate(`/chat/${session.id}`);
-    },
-  });
-
-  const sendMessageMutation = useMutation({
-    mutationFn: async (params: {
-      sessionId: string;
-      content: string;
-      meta?: JsonValue;
-    }) =>
-      chatApi.createMessage(
-        params.sessionId,
-        chatApi.buildCreateMessageRequest(params.content, params.meta ?? null)
-      ),
-    onSuccess: (message) => {
-      upsertMessage(message);
-      queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
-    },
-  });
-
-  const handleSend = async () => {
-    if (!activeSessionId || isArchived) return;
-    const trimmed = draft.trim();
-    const contentMentions = extractMentions(draft);
-    const mentionsToInject = selectedMentions.filter(
-      (name) => !contentMentions.has(name)
-    );
-    const mentionPrefix =
-      mentionsToInject.length > 0
-        ? mentionsToInject.map((name) => `@${name}`).join(' ')
-        : '';
-    const content = [mentionPrefix, trimmed].filter(Boolean).join(' ').trim();
-    if (!content) return;
-
-    const meta: JsonValue = {
-      sender_handle: senderHandle,
-      ...(replyToMessage
-        ? { reference: { message_id: replyToMessage.id } }
-        : {}),
-    };
-
-    try {
-      await sendMessageMutation.mutateAsync({
-        sessionId: activeSessionId,
-        content,
-        meta,
-      });
-
-      setDraft('');
-      setSelectedMentions([]);
-      setMentionQuery(null);
-      setReplyToMessage(null);
-      inputRef.current?.focus();
-    } catch (error) {
-      console.warn('Failed to send chat message', error);
-    }
-  };
-
-  const handleAttachmentUpload = async (files: FileList | File[]) => {
-    if (!activeSessionId || isArchived) return;
-    const list = Array.from(files);
-    if (list.length === 0) return;
-    setIsUploadingAttachments(true);
-    setAttachmentError(null);
-    try {
-      const message = await chatApi.uploadChatAttachments(
-        activeSessionId,
-        list,
-        senderHandle
-      );
-      upsertMessage(message);
-      queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
-    } catch (error) {
-      console.warn('Failed to upload attachments', error);
-      setAttachmentError('Unable to upload attachments.');
-    } finally {
-      setIsUploadingAttachments(false);
-    }
-  };
-
-  const handleAttachmentInputChange = (
-    event: ChangeEvent<HTMLInputElement>
-  ) => {
-    if (event.target.files) {
-      handleAttachmentUpload(event.target.files);
-    }
-    event.target.value = '';
-  };
-
-  const handlePromptFileChange = async (
-    event: ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setPromptFileLoading(true);
-    setPromptFileError(null);
-    try {
-      const text = await file.text();
-      setNewMemberPrompt(text);
-    } catch (error) {
-      console.warn('Failed to read prompt file', error);
-      setPromptFileError('Unable to read the file.');
-    } finally {
-      setPromptFileLoading(false);
-      event.target.value = '';
-    }
-  };
-
-  const handleDraftChange = (value: string) => {
-    setDraft(value);
-    const match = mentionRegex.exec(value);
-    if (match) {
-      setMentionQuery(match[2] ?? '');
-    } else {
-      setMentionQuery(null);
-    }
-  };
-
-  const handleMentionSelect = (name: string) => {
-    setDraft((prev) => {
-      const match = mentionRegex.exec(prev);
-      if (!match) {
-        return `${prev}${
-          prev.endsWith(' ') || prev.length === 0 ? '' : ' '
-        }@${name} `;
-      }
-      const matchIndex = match.index ?? prev.length;
-      const prefix = prev.slice(0, matchIndex);
-      const spacer = match[1] ?? '';
-      return `${prefix}${spacer}@${name} `;
-    });
-    setMentionQuery(null);
-    inputRef.current?.focus();
-  };
-
-  const agentById = useMemo(() => {
-    const map = new Map<string, ChatAgent>();
-    for (const agent of agents) map.set(agent.id, agent);
-    return map;
-  }, [agents]);
-
-  const getMessageSenderLabel = useCallback(
-    (message: ChatMessage) => {
-      if (message.sender_type === ChatSenderType.user) return 'You';
-      if (message.sender_type === ChatSenderType.agent) {
-        if (message.sender_id) {
-          return agentById.get(message.sender_id)?.name ?? 'Agent';
-        }
-        return 'Agent';
-      }
-      return 'System';
-    },
-    [agentById]
-  );
-
-  const getReferencePreview = useCallback(
-    (message: ChatMessage) => {
-      const attachments = extractAttachments(message.meta);
-      const trimmed = message.content.trim();
-      if (trimmed) return truncateText(trimmed, 140);
-      if (attachments.length > 0) {
-        const names = attachments
-          .map((item) => item.name)
-          .filter(Boolean)
-          .slice(0, 3);
-        const suffix =
-          attachments.length > 3 ? ` and ${attachments.length - 3} more` : '';
-        return `Attachment: ${names.join(', ')}${suffix}`;
-      }
-      return 'Referenced message';
-    },
-    []
-  );
-
-  const sessionMembers = useMemo<SessionMember[]>(() => {
-    return sessionAgents
-      .map((sessionAgent) => {
-        const agent = agentById.get(sessionAgent.agent_id);
-        if (!agent) return null;
-        return { agent, sessionAgent };
-      })
-      .filter((item): item is SessionMember => item !== null);
-  }, [agentById, sessionAgents]);
-
-  const mentionAgents = useMemo(
-    () => sessionMembers.map((member) => member.agent),
-    [sessionMembers]
-  );
-
-  useEffect(() => {
-    if (mentionAgents.length === 0) {
-      setSelectedMentions([]);
-      return;
-    }
-    setSelectedMentions((prev) =>
-      prev.filter((mention) =>
-        mentionAgents.some((agent) => agent.name === mention)
-      )
-    );
-  }, [mentionAgents]);
-
-  const visibleMentionSuggestions = useMemo(() => {
-    if (mentionQuery === null) return [];
-    const query = mentionQuery.toLowerCase();
-    return mentionAgents.filter((agent) =>
-      agent.name.toLowerCase().includes(query)
-    );
-  }, [mentionAgents, mentionQuery]);
-
-  const agentOptions = useMemo(
-    () =>
-      mentionAgents.map((agent) => ({
-        value: agent.name,
-        label: agent.name,
-      })),
-    [mentionAgents]
-  );
-
-  const placeholderAgents = useMemo(
-    () =>
-      sessionMembers.filter(
-        (member) => agentStates[member.agent.id] === ChatSessionAgentState.running
-      ),
-    [agentStates, sessionMembers]
-  );
-
+  // Running timer
   useEffect(() => {
     setRunningSince((prev) => {
       const runningIds = new Set(
@@ -1001,67 +483,149 @@ useEffect(() => {
     return () => clearInterval(timer);
   }, [runningSince]);
 
-  const runHistory = useMemo(() => {
-    const runs: RunHistoryItem[] = [];
-    for (const message of messages) {
-      if (message.sender_type !== ChatSenderType.agent || !message.sender_id) {
-        continue;
-      }
-      const runId = extractRunId(message.meta);
-      if (!runId) continue;
-      runs.push({
-        runId,
-        agentId: message.sender_id,
-        createdAt: message.created_at,
-        content: message.content,
-      });
-    }
-    return runs;
-  }, [messages]);
-
-  const activeWorkspaceAgent = workspaceAgentId
-    ? agentById.get(workspaceAgentId)
-    : null;
-  const workspacePath = useMemo(() => {
-    if (!workspaceAgentId) return null;
-    const sessionAgent = sessionAgents.find(
-      (item) => item.agent_id === workspaceAgentId
-    );
-    if (sessionAgent?.workspace_path) return sessionAgent.workspace_path;
-    if (!activeSessionId) return null;
-    return `chat/session_${activeSessionId}/agents/${workspaceAgentId}`;
-  }, [activeSessionId, sessionAgents, workspaceAgentId]);
-
-  const activeWorkspaceRuns = useMemo(
-    () =>
-      runHistory
-        .filter((run) => run.agentId === workspaceAgentId)
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        ),
-    [runHistory, workspaceAgentId]
-  );
-
-  const activeSession = useMemo(
-    () => sessions.find((session) => session.id === activeSessionId),
-    [sessions, activeSessionId]
-  );
-
+  // Title editing
   useEffect(() => {
     setTitleDraft(activeSession?.title ?? '');
     setIsEditingTitle(false);
     setTitleError(null);
   }, [activeSession?.id]);
 
-  const isArchived =
-    activeSession?.status === ChatSessionStatus.archived;
-
   useEffect(() => {
     if (activeSession?.status === ChatSessionStatus.archived) {
       setShowArchived(true);
     }
   }, [activeSession?.status]);
+
+  // Auto-scroll
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [
+    messageList.length,
+    Object.keys(streamingRuns).length,
+    placeholderAgents.length,
+  ]);
+
+  useEffect(() => {
+    setLogRunId(null);
+    setLogContent('');
+    setLogError(null);
+  }, [workspaceAgentId]);
+
+  // Handlers
+  const getMessageSenderLabel = useCallback(
+    (message: ChatMessage) => {
+      if (message.sender_type === ChatSenderType.user) return 'You';
+      if (message.sender_type === ChatSenderType.agent) {
+        if (message.sender_id) {
+          return agentById.get(message.sender_id)?.name ?? 'Agent';
+        }
+        return 'Agent';
+      }
+      return 'System';
+    },
+    [agentById]
+  );
+
+  const getReferencePreview = useCallback((message: ChatMessage) => {
+    const attachments = extractAttachments(message.meta);
+    const trimmed = message.content.trim();
+    if (trimmed) return truncateText(trimmed, 140);
+    if (attachments.length > 0) {
+      const names = attachments
+        .map((item) => item.name)
+        .filter(Boolean)
+        .slice(0, 3);
+      const suffix =
+        attachments.length > 3 ? ` and ${attachments.length - 3} more` : '';
+      return `Attachment: ${names.join(', ')}${suffix}`;
+    }
+    return 'Referenced message';
+  }, []);
+
+  const handleSend = async () => {
+    if (!activeSessionId || isArchived) return;
+    const trimmed = draft.trim();
+    const contentMentions = new Set<string>();
+    const mentionTokenRegex = /(^|\s)@([a-zA-Z0-9_-]+)/g;
+    for (const match of draft.matchAll(mentionTokenRegex)) {
+      const name = match[2];
+      if (name) contentMentions.add(name);
+    }
+    const mentionsToInject = selectedMentions.filter(
+      (name) => !contentMentions.has(name)
+    );
+    const mentionPrefix =
+      mentionsToInject.length > 0
+        ? mentionsToInject.map((name) => `@${name}`).join(' ')
+        : '';
+    const content = [mentionPrefix, trimmed].filter(Boolean).join(' ').trim();
+    if (!content) return;
+
+    const meta: JsonValue = {
+      sender_handle: senderHandle,
+      ...(replyToMessage
+        ? { reference: { message_id: replyToMessage.id } }
+        : {}),
+    };
+
+    try {
+      await sendMessage.mutateAsync({
+        sessionId: activeSessionId,
+        content,
+        meta,
+      });
+      resetInput();
+      inputRef.current?.focus();
+    } catch (error) {
+      console.warn('Failed to send chat message', error);
+    }
+  };
+
+  const handleAttachmentUpload = async (files: FileList | File[]) => {
+    if (!activeSessionId || isArchived) return;
+    const list = Array.from(files);
+    if (list.length === 0) return;
+    setIsUploadingAttachments(true);
+    setAttachmentError(null);
+    try {
+      const message = await chatApi.uploadChatAttachments(
+        activeSessionId,
+        list,
+        senderHandle
+      );
+      upsertMessage(message);
+      queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
+    } catch (error) {
+      console.warn('Failed to upload attachments', error);
+      setAttachmentError('Unable to upload attachments.');
+    } finally {
+      setIsUploadingAttachments(false);
+    }
+  };
+
+  const handleAttachmentInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      handleAttachmentUpload(event.target.files);
+    }
+    event.target.value = '';
+  };
+
+  const handlePromptFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPromptFileLoading(true);
+    setPromptFileError(null);
+    try {
+      const text = await file.text();
+      setNewMemberPrompt(text);
+    } catch (error) {
+      console.warn('Failed to read prompt file', error);
+      setPromptFileError('Unable to read the file.');
+    } finally {
+      setPromptFileLoading(false);
+      event.target.value = '';
+    }
+  };
 
   const handleAddMember = async () => {
     if (!activeSessionId) {
@@ -1076,7 +640,7 @@ useEffect(() => {
     const name = newMemberName.trim();
     const runnerType = newMemberRunnerType.trim();
     const prompt = newMemberPrompt.trim();
-    const workspacePath = newMemberWorkspace.trim();
+    const workspacePathVal = newMemberWorkspace.trim();
 
     if (!name) {
       setMemberError('AI member name is required.');
@@ -1098,7 +662,7 @@ useEffect(() => {
       return;
     }
 
-    if (!workspacePath) {
+    if (!workspacePathVal) {
       setMemberError('Workspace path is required.');
       return;
     }
@@ -1117,9 +681,7 @@ useEffect(() => {
         const updatePayload = {
           name: editingMember.agent.name !== name ? name : null,
           runner_type:
-            editingMember.agent.runner_type !== runnerType
-              ? runnerType
-              : null,
+            editingMember.agent.runner_type !== runnerType ? runnerType : null,
           system_prompt:
             (editingMember.agent.system_prompt ?? '') !== prompt ? prompt : null,
           tools_enabled: null,
@@ -1136,7 +698,7 @@ useEffect(() => {
         await chatApi.updateSessionAgent(
           activeSessionId,
           editingMember.sessionAgent.id,
-          { workspace_path: workspacePath }
+          { workspace_path: workspacePathVal }
         );
       } else {
         const existing = agents.find((agent) => agent.name === name);
@@ -1144,18 +706,14 @@ useEffect(() => {
         if (existing) {
           const updatePayload = {
             name: null,
-            runner_type:
-              existing.runner_type !== runnerType ? runnerType : null,
+            runner_type: existing.runner_type !== runnerType ? runnerType : null,
             system_prompt:
               (existing.system_prompt ?? '') !== prompt ? prompt : null,
             tools_enabled: null,
           };
 
           if (updatePayload.runner_type || updatePayload.system_prompt) {
-            const updated = await chatApi.updateAgent(
-              existing.id,
-              updatePayload
-            );
+            const updated = await chatApi.updateAgent(existing.id, updatePayload);
             agentId = updated.id;
           }
         } else {
@@ -1175,7 +733,7 @@ useEffect(() => {
 
         await chatApi.createSessionAgent(activeSessionId, {
           agent_id: agentId,
-          workspace_path: workspacePath,
+          workspace_path: workspacePathVal,
         });
       }
 
@@ -1229,10 +787,7 @@ useEffect(() => {
     if (!confirmed) return;
 
     try {
-      await chatApi.deleteSessionAgent(
-        activeSessionId,
-        member.sessionAgent.id
-      );
+      await chatApi.deleteSessionAgent(activeSessionId, member.sessionAgent.id);
       await queryClient.invalidateQueries({
         queryKey: ['chatSessionAgents', activeSessionId],
       });
@@ -1250,10 +805,12 @@ useEffect(() => {
     if (!activeSessionId) return;
     const trimmed = titleDraft.trim();
     try {
-      await updateSessionMutation.mutateAsync({
+      await updateSession.mutateAsync({
         sessionId: activeSessionId,
         title: trimmed.length > 0 ? trimmed : null,
       });
+      setIsEditingTitle(false);
+      setTitleError(null);
     } catch (error) {
       console.warn('Failed to update session title', error);
       setTitleError('Unable to update session name.');
@@ -1282,133 +839,17 @@ useEffect(() => {
     }
   };
 
-  const handleOpenDiffViewer = (
-    runId: string,
-    untracked: string[],
-    hasDiff: boolean
-  ) => {
-    setDiffViewerRunId(runId);
-    setDiffViewerUntracked(untracked);
-    setDiffViewerHasDiff(hasDiff);
-    setDiffViewerOpen(true);
-    setDiffViewerFullscreen(false);
-    if (runId && hasDiff) {
-      handleLoadDiff(runId);
-    }
-  };
-
-  const handleCloseDiffViewer = () => {
-    setDiffViewerOpen(false);
-    setDiffViewerFullscreen(false);
-  };
-
-  const handleLoadDiff = async (runId: string) => {
-    setRunDiffs((prev) => {
-      const existing = prev[runId];
-      if (existing?.loading || existing?.files.length) return prev;
-      return {
-        ...prev,
-        [runId]: { loading: true, error: null, files: [] },
-      };
-    });
-
-    try {
-      const patch = await chatApi.getRunDiff(runId);
-      const files = splitUnifiedDiff(patch);
-      setRunDiffs((prev) => ({
-        ...prev,
-        [runId]: { loading: false, error: null, files },
-      }));
-    } catch (error) {
-      console.warn('Failed to load run diff', error);
-      setRunDiffs((prev) => ({
-        ...prev,
-        [runId]: {
-          loading: false,
-          error: 'Unable to load diff.',
-          files: [],
-        },
-      }));
-    }
-  };
-
-  const handleToggleUntracked = async (runId: string, path: string) => {
-    const key = `${runId}:${path}`;
-    const existing = untrackedContent[key];
-    if (existing?.open) {
-      setUntrackedContent((prev) => ({
-        ...prev,
-        [key]: { ...existing, open: false },
-      }));
-      return;
-    }
-
-    setUntrackedContent((prev) => ({
-      ...prev,
-      [key]: {
-        loading: !existing?.content && !existing?.error,
-        error: existing?.error ?? null,
-        content: existing?.content ?? null,
-        open: true,
-      },
-    }));
-
-    if (existing?.content || existing?.error) {
-      return;
-    }
-
-    try {
-      const content = await chatApi.getRunUntrackedFile(runId, path);
-      setUntrackedContent((prev) => ({
-        ...prev,
-        [key]: { loading: false, error: null, content, open: true },
-      }));
-    } catch (error) {
-      console.warn('Failed to load untracked file content', error);
-      setUntrackedContent((prev) => ({
-        ...prev,
-        [key]: {
-          loading: false,
-          error: 'Unable to load file.',
-          content: null,
-          open: true,
-        },
-      }));
-    }
-  };
-
-  const isLoading =
-    isSessionsLoading ||
-    isMessagesLoading ||
-    isAgentsLoading ||
-    isSessionAgentsLoading;
-  const canSend =
-    !!activeSessionId &&
-    !isArchived &&
-    (draft.trim().length > 0 || selectedMentions.length > 0) &&
-    !sendMessageMutation.isPending &&
-    !isUploadingAttachments;
-  const diffViewerRun = diffViewerRunId ? runDiffs[diffViewerRunId] : null;
-  const DiffViewerIcon = diffViewerFullscreen
-    ? ArrowsInSimpleIcon
-    : ArrowsOutSimpleIcon;
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [
-    messageList.length,
-    Object.keys(streamingRuns).length,
-    placeholderAgents.length,
-  ]);
-
-  useEffect(() => {
-    setLogRunId(null);
-    setLogContent('');
-    setLogError(null);
-  }, [workspaceAgentId]);
+  const handleLocalReplySelect = useCallback(
+    (message: ChatMessage) => {
+      const handle = getMessageMentionHandle(message);
+      handleReplySelect(message, handle);
+    },
+    [getMessageMentionHandle, handleReplySelect]
+  );
 
   return (
-    <div className="relative flex h-full min-h-0 bg-primary overflow-hidden pt-16">
+    <div className="relative flex h-full min-h-0 bg-primary overflow-hidden">
+      {/* Session List Sidebar */}
       <aside className="w-72 border-r border-border flex flex-col min-h-0">
         <div className="px-base py-base border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-half text-normal font-medium">
@@ -1418,8 +859,8 @@ useEffect(() => {
           <PrimaryButton
             variant="secondary"
             value="New"
-            onClick={() => createSessionMutation.mutate()}
-            disabled={createSessionMutation.isPending}
+            onClick={() => createSession.mutate()}
+            disabled={createSession.isPending}
           >
             <PlusIcon className="size-icon-xs" />
           </PrimaryButton>
@@ -1496,6 +937,7 @@ useEffect(() => {
         </div>
       </aside>
 
+      {/* Main Chat Section */}
       <section className="flex-1 min-w-0 min-h-0 flex flex-col">
         <header className="px-base py-half border-b border-border flex items-center justify-between">
           <div className="min-w-0">
@@ -1535,7 +977,7 @@ useEffect(() => {
                     }
                   }}
                   placeholder="Session name"
-                  disabled={updateSessionMutation.isPending}
+                  disabled={updateSession.isPending}
                   className={cn(
                     'w-[240px] max-w-full rounded-sm border border-border bg-panel px-base py-half',
                     'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
@@ -1544,19 +986,17 @@ useEffect(() => {
                 <PrimaryButton
                   value="Save"
                   onClick={handleSaveTitle}
-                  disabled={updateSessionMutation.isPending}
+                  disabled={updateSession.isPending}
                 />
                 <PrimaryButton
                   variant="tertiary"
                   value="Cancel"
                   onClick={handleCancelTitleEdit}
-                  disabled={updateSessionMutation.isPending}
+                  disabled={updateSession.isPending}
                 />
               </div>
             )}
-            {titleError && (
-              <div className="text-xs text-error">{titleError}</div>
-            )}
+            {titleError && <div className="text-xs text-error">{titleError}</div>}
             {activeSession && (
               <div className="text-xs text-low">
                 Created {formatDateShortWithTime(activeSession.created_at)}
@@ -1581,25 +1021,21 @@ useEffect(() => {
                   onClick={() => {
                     if (!activeSessionId) return;
                     if (isArchived) {
-                      restoreSessionMutation.mutate(activeSessionId);
+                      restoreSession.mutate(activeSessionId);
                     } else {
-                      archiveSessionMutation.mutate(activeSessionId);
+                      archiveSession.mutate(activeSessionId);
                     }
                   }}
-                  disabled={
-                    archiveSessionMutation.isPending ||
-                    restoreSessionMutation.isPending
-                  }
+                  disabled={archiveSession.isPending || restoreSession.isPending}
                 />
               </div>
             )}
           </div>
         </header>
 
+        {/* Messages */}
         <div className="flex-1 min-h-0 overflow-y-auto p-base space-y-base">
-          {isLoading && (
-            <div className="text-sm text-low">Loading chat...</div>
-          )}
+          {isLoading && <div className="text-sm text-low">Loading chat...</div>}
           {isArchived && !isLoading && (
             <div className="text-xs text-low border border-border rounded-sm bg-secondary/60 px-base py-half">
               This session is archived. Messages and members are read-only.
@@ -1619,6 +1055,12 @@ useEffect(() => {
                 ? agentById.get(message.sender_id)?.name ?? 'Agent'
                 : null;
             const diffMeta = isAgent ? extractDiffMeta(message.meta) : null;
+            const diffInfo = diffMeta && diffMeta.runId ? diffMeta : null;
+            const diffRunId = diffInfo?.runId ?? '';
+            const hasDiffInfo =
+              !!diffInfo &&
+              diffRunId.length > 0 &&
+              (diffInfo.available || diffInfo.untrackedFiles.length > 0);
             const attachments = extractAttachments(message.meta);
             const referenceId = extractReferenceId(message.meta);
             const referenceMessage = referenceId
@@ -1657,7 +1099,7 @@ useEffect(() => {
                           'text-brand hover:text-brand-hover',
                           isArchived && 'pointer-events-none opacity-50'
                         )}
-                        onClick={() => setReplyToMessage(message)}
+                        onClick={() => handleLocalReplySelect(message)}
                         disabled={isArchived}
                       >
                         引用
@@ -1768,49 +1210,48 @@ useEffect(() => {
                       })}
                     </div>
                   )}
-                  {(diffMeta?.available ||
-                    (diffMeta?.untrackedFiles ?? []).length > 0) &&
-                    diffMeta.runId && (
-                      <div className="mt-half border border-border rounded-sm bg-secondary/70 px-base py-half text-xs text-normal">
-                        <div className="flex items-center justify-between gap-base">
-                          <span>Code changes</span>
-                          <button
-                            type="button"
-                            className="text-brand hover:text-brand-hover"
-                            onClick={() =>
-                              handleOpenDiffViewer(
-                                diffMeta.runId!,
-                                diffMeta.untrackedFiles,
-                                diffMeta.available
-                              )
-                            }
-                          >
-                            View changes
-                          </button>
-                        </div>
-                        {diffMeta.available && runDiffs[diffMeta.runId]?.loading && (
-                          <div className="mt-half text-xs text-low">
-                            Loading diff...
-                          </div>
-                        )}
-                        {diffMeta.available && runDiffs[diffMeta.runId]?.error && (
-                          <div className="mt-half text-xs text-error">
-                            {runDiffs[diffMeta.runId]?.error}
-                          </div>
-                        )}
-                        {diffMeta.untrackedFiles.length > 0 && (
-                          <div className="mt-half text-xs text-low">
-                            {diffMeta.untrackedFiles.length} untracked file
-                            {diffMeta.untrackedFiles.length === 1 ? '' : 's'}
-                          </div>
-                        )}
+                  {hasDiffInfo && diffInfo && (
+                    <div className="mt-half border border-border rounded-sm bg-secondary/70 px-base py-half text-xs text-normal">
+                      <div className="flex items-center justify-between gap-base">
+                        <span>Code changes</span>
+                        <button
+                          type="button"
+                          className="text-brand hover:text-brand-hover"
+                          onClick={() =>
+                            handleOpenDiffViewer(
+                              diffRunId,
+                              diffInfo.untrackedFiles,
+                              diffInfo.available
+                            )
+                          }
+                        >
+                          View changes
+                        </button>
                       </div>
-                    )}
+                      {diffInfo.available && runDiffs[diffRunId]?.loading && (
+                        <div className="mt-half text-xs text-low">
+                          Loading diff...
+                        </div>
+                      )}
+                      {diffInfo.available && runDiffs[diffRunId]?.error && (
+                        <div className="mt-half text-xs text-error">
+                          {runDiffs[diffRunId]?.error}
+                        </div>
+                      )}
+                      {diffInfo.untrackedFiles.length > 0 && (
+                        <div className="mt-half text-xs text-low">
+                          {diffInfo.untrackedFiles.length} untracked file
+                          {diffInfo.untrackedFiles.length === 1 ? '' : 's'}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </ChatEntryContainer>
               </div>
             );
           })}
 
+          {/* Running placeholders */}
           {placeholderAgents.map((member) => {
             const startedAt = runningSince[member.agent.id] ?? clock;
             const elapsedSeconds = Math.max(
@@ -1834,23 +1275,18 @@ useEffect(() => {
                     borderColor: tone.border,
                   }}
                 >
-                  <ChatMarkdown
-                    content={`回复中。。。已用${elapsedSeconds}秒`}
-                  />
+                  <ChatMarkdown content={`回复中。。。已用${elapsedSeconds}秒`} />
                 </ChatEntryContainer>
               </div>
             );
           })}
 
+          {/* Streaming runs */}
           {Object.entries(streamingRuns).map(([runId, run]) => {
-            const agentName =
-              agentById.get(run.agentId)?.name ?? 'Agent';
+            const agentName = agentById.get(run.agentId)?.name ?? 'Agent';
             const tone = getMessageTone(run.agentId, false);
             return (
-              <div
-                key={`stream-${runId}`}
-                className="flex justify-start"
-              >
+              <div key={`stream-${runId}`} className="flex justify-start">
                 <ChatEntryContainer
                   variant="system"
                   title={agentName}
@@ -1880,6 +1316,7 @@ useEffect(() => {
           <div ref={bottomRef} />
         </div>
 
+        {/* Message Input */}
         <div className="border-t border-border p-base space-y-base">
           <div className="flex items-center gap-base flex-wrap">
             <MultiSelectDropdown
@@ -1933,9 +1370,7 @@ useEffect(() => {
                   Cancel
                 </button>
               </div>
-              <div className="mt-half">
-                {getReferencePreview(replyToMessage)}
-              </div>
+              <div className="mt-half">{getReferencePreview(replyToMessage)}</div>
             </div>
           )}
 
@@ -2017,9 +1452,7 @@ useEffect(() => {
             </div>
             <PrimaryButton
               value="Send"
-              actionIcon={
-                sendMessageMutation.isPending ? 'spinner' : PaperPlaneRightIcon
-              }
+              actionIcon={sendMessage.isPending ? 'spinner' : PaperPlaneRightIcon}
               onClick={handleSend}
               disabled={!canSend}
             />
@@ -2027,12 +1460,11 @@ useEffect(() => {
         </div>
       </section>
 
+      {/* AI Members Sidebar */}
       <aside className="w-80 border-l border-border flex flex-col min-h-0">
         <div className="px-base py-base border-b border-border flex items-center justify-between">
           <div className="text-sm text-normal font-medium">AI Members</div>
-          <div className="text-xs text-low">
-            {sessionMembers.length} in session
-          </div>
+          <div className="text-xs text-low">{sessionMembers.length} in session</div>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-base space-y-base">
           {!activeSessionId && (
@@ -2046,8 +1478,7 @@ useEffect(() => {
             </div>
           )}
           {sessionMembers.map(({ agent, sessionAgent }) => {
-            const state =
-              agentStates[agent.id] ?? ChatSessionAgentState.idle;
+            const state = agentStates[agent.id] ?? ChatSessionAgentState.idle;
             return (
               <div
                 key={sessionAgent.id}
@@ -2059,8 +1490,7 @@ useEffect(() => {
                       className={cn(
                         'size-2 rounded-full',
                         agentStateDotClass[state],
-                        state === ChatSessionAgentState.running &&
-                          'animate-pulse'
+                        state === ChatSessionAgentState.running && 'animate-pulse'
                       )}
                     />
                     <div className="min-w-0">
@@ -2068,8 +1498,7 @@ useEffect(() => {
                         @{agent.name}
                       </div>
                       <div className="text-xs text-low">
-                        {toPrettyCase(agent.runner_type)} ·{' '}
-                        {agentStateLabels[state]}
+                        {toPrettyCase(agent.runner_type)} · {agentStateLabels[state]}
                       </div>
                     </div>
                   </div>
@@ -2117,6 +1546,7 @@ useEffect(() => {
             );
           })}
 
+          {/* Add Member Form */}
           <div className="border-t border-border pt-base space-y-half">
             {!isAddMemberOpen ? (
               <PrimaryButton
@@ -2157,14 +1587,10 @@ useEffect(() => {
                   />
                 </div>
                 <div className="space-y-half">
-                  <label className="text-xs text-low">
-                    Base coding agent
-                  </label>
+                  <label className="text-xs text-low">Base coding agent</label>
                   <select
                     value={newMemberRunnerType}
-                    onChange={(event) =>
-                      setNewMemberRunnerType(event.target.value)
-                    }
+                    onChange={(event) => setNewMemberRunnerType(event.target.value)}
                     disabled={
                       isCheckingAvailability || enabledRunnerTypes.length === 0
                     }
@@ -2213,9 +1639,7 @@ useEffect(() => {
                   </div>
                   <textarea
                     value={newMemberPrompt}
-                    onChange={(event) =>
-                      setNewMemberPrompt(event.target.value)
-                    }
+                    onChange={(event) => setNewMemberPrompt(event.target.value)}
                     rows={3}
                     placeholder="Describe how this AI member should behave."
                     className={cn(
@@ -2228,9 +1652,7 @@ useEffect(() => {
                   <label className="text-xs text-low">Workspace path</label>
                   <input
                     value={newMemberWorkspace}
-                    onChange={(event) =>
-                      setNewMemberWorkspace(event.target.value)
-                    }
+                    onChange={(event) => setNewMemberWorkspace(event.target.value)}
                     placeholder="Absolute path on the server"
                     className={cn(
                       'w-full rounded-sm border border-border bg-panel px-base py-half',
@@ -2267,30 +1689,28 @@ useEffect(() => {
         </div>
       </aside>
 
+      {/* Workspace Drawer */}
       <div
         className={cn(
-          'absolute top-0 right-0 h-full w-[360px] bg-primary border-l border-border shadow-lg transition-transform',
+          'absolute top-0 right-0 h-full w-[360px] bg-primary border-l border-border shadow-lg transition-transform z-50 flex flex-col',
           workspaceDrawerOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
-        <div className="px-base py-base border-b border-border flex items-center justify-between">
-          <div>
-            <div className="text-sm text-normal font-medium">
-              {activeWorkspaceAgent?.name ?? 'Agent workspace'}
-            </div>
-            <div className="text-xs text-low">
-              Workspace & run history
-            </div>
+        <div className="px-base py-base border-b border-border shrink-0 flex items-center justify-between">
+          <div className="text-sm text-normal font-medium">
+            {activeWorkspaceAgent?.name ?? 'Agent workspace'}
           </div>
           <button
             type="button"
             onClick={() => setWorkspaceDrawerOpen(false)}
-            className="text-low hover:text-normal"
+            className="text-low hover:text-normal transition-colors"
+            aria-label="Close workspace drawer"
+            title="Close"
           >
             <XIcon className="size-icon-sm" />
           </button>
         </div>
-        <div className="p-base space-y-base overflow-y-auto h-full">
+        <div className="p-base space-y-base overflow-y-auto flex-1 min-h-0">
           <div className="space-y-half">
             <div className="text-xs text-low">
               Workspace path is created on first run.
@@ -2303,15 +1723,11 @@ useEffect(() => {
           </div>
 
           <div className="space-y-half">
-            <div className="text-sm text-normal font-medium">
-              Run history
-            </div>
+            <div className="text-sm text-normal font-medium">Run history</div>
             {activeWorkspaceRuns.length === 0 && (
-              <div className="text-xs text-low">
-                No runs yet for this agent.
-              </div>
+              <div className="text-xs text-low">No runs yet for this agent.</div>
             )}
-            {activeWorkspaceRuns.map((run) => (
+            {activeWorkspaceRuns.map((run: RunHistoryItem) => (
               <div
                 key={run.runId}
                 className="border border-border rounded-sm p-base space-y-half"
@@ -2320,9 +1736,7 @@ useEffect(() => {
                   <span>Run {run.runId.slice(0, 8)}</span>
                   <span>{formatDateShortWithTime(run.createdAt)}</span>
                 </div>
-                <div className="text-xs text-normal">
-                  {run.content}
-                </div>
+                <div className="text-xs text-normal">{run.content}</div>
                 <div className="flex items-center justify-between text-xs">
                   <button
                     type="button"
@@ -2362,18 +1776,15 @@ useEffect(() => {
                 {logLoading && (
                   <div className="text-xs text-low">Loading log...</div>
                 )}
-                {logError && (
-                  <div className="text-xs text-error">{logError}</div>
-                )}
+                {logError && <div className="text-xs text-error">{logError}</div>}
                 {!logLoading && !logError && (
-                  <pre
-                    className={cn(
-                      'text-xs text-normal whitespace-pre-wrap break-words',
-                      'max-h-64 overflow-y-auto font-ibm-plex-mono'
+                  <div className="max-h-64 overflow-y-auto border-t border-border pt-base">
+                    {logContent ? (
+                      <RawLogText content={logContent} />
+                    ) : (
+                      <div className="text-xs text-low">Log is empty.</div>
                     )}
-                  >
-                    {logContent || 'Log is empty.'}
-                  </pre>
+                  </div>
                 )}
               </div>
             )}
@@ -2381,6 +1792,7 @@ useEffect(() => {
         </div>
       </div>
 
+      {/* Diff Viewer Modal */}
       {diffViewerOpen && diffViewerRunId && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
@@ -2397,9 +1809,7 @@ useEffect(() => {
           >
             <div className="flex items-center justify-between border-b border-border px-base py-half">
               <div>
-                <div className="text-sm text-normal font-medium">
-                  Code changes
-                </div>
+                <div className="text-sm text-normal font-medium">Code changes</div>
                 <div className="text-xs text-low">
                   Run {diffViewerRunId.slice(0, 8)}
                 </div>
@@ -2408,9 +1818,7 @@ useEffect(() => {
                 <button
                   type="button"
                   className="text-low hover:text-normal"
-                  onClick={() =>
-                    setDiffViewerFullscreen((prev) => !prev)
-                  }
+                  onClick={handleToggleFullscreen}
                   aria-label={
                     diffViewerFullscreen ? 'Exit full screen' : 'Full screen'
                   }
@@ -2434,9 +1842,7 @@ useEffect(() => {
                     <div className="text-xs text-low">Loading diff...</div>
                   )}
                   {diffViewerRun?.error && (
-                    <div className="text-xs text-error">
-                      {diffViewerRun.error}
-                    </div>
+                    <div className="text-xs text-error">{diffViewerRun.error}</div>
                   )}
                   {!diffViewerRun?.loading &&
                     !diffViewerRun?.error &&
@@ -2456,15 +1862,11 @@ useEffect(() => {
                         </span>
                         <span className="text-xs text-low">
                           {file.additions > 0 && (
-                            <span className="text-success">
-                              +{file.additions}
-                            </span>
+                            <span className="text-success">+{file.additions}</span>
                           )}
                           {file.additions > 0 && file.deletions > 0 && ' '}
                           {file.deletions > 0 && (
-                            <span className="text-error">
-                              -{file.deletions}
-                            </span>
+                            <span className="text-error">-{file.deletions}</span>
                           )}
                         </span>
                       </div>
@@ -2496,9 +1898,7 @@ useEffect(() => {
                   </div>
                 </>
               ) : (
-                <div className="text-xs text-low">
-                  No tracked diff available.
-                </div>
+                <div className="text-xs text-low">No tracked diff available.</div>
               )}
               {diffViewerUntracked.length > 0 && (
                 <div className="space-y-half">
@@ -2528,22 +1928,16 @@ useEffect(() => {
                         {entry?.open && (
                           <div className="mt-half">
                             {entry.loading && (
-                              <div className="text-xs text-low">
-                                Loading file...
-                              </div>
+                              <div className="text-xs text-low">Loading file...</div>
                             )}
                             {entry.error && (
-                              <div className="text-xs text-error">
-                                {entry.error}
-                              </div>
+                              <div className="text-xs text-error">{entry.error}</div>
                             )}
-                            {!entry.loading &&
-                              !entry.error &&
-                              entry.content && (
-                                <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-xs font-ibm-plex-mono text-normal">
-                                  {entry.content}
-                                </pre>
-                              )}
+                            {!entry.loading && !entry.error && entry.content && (
+                              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-xs font-ibm-plex-mono text-normal">
+                                {entry.content}
+                              </pre>
+                            )}
                           </div>
                         )}
                       </div>
@@ -2556,6 +1950,7 @@ useEffect(() => {
         </div>
       )}
 
+      {/* Prompt Editor Modal */}
       {isPromptEditorOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
@@ -2567,12 +1962,8 @@ useEffect(() => {
           >
             <div className="flex items-center justify-between border-b border-border px-base py-half">
               <div>
-                <div className="text-sm text-normal font-medium">
-                  System Prompt
-                </div>
-                <div className="text-xs text-low">
-                  Edit the AI member system prompt
-                </div>
+                <div className="text-sm text-normal font-medium">System Prompt</div>
+                <div className="text-xs text-low">Edit the AI member system prompt</div>
               </div>
               <button
                 type="button"

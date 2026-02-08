@@ -15,7 +15,7 @@ case "$ARCH" in
     ARCH="arm64"
     ;;
   *)
-    echo "鈿狅笍  Warning: Unknown architecture $ARCH, using as-is"
+    echo "⚠️  Warning: Unknown architecture $ARCH, using as-is"
     ;;
 esac
 
@@ -28,7 +28,7 @@ case "$OS" in
     OS="macos"
     ;;
   *)
-    echo "鈿狅笍  Warning: Unknown OS $OS, using as-is"
+    echo "⚠️  Warning: Unknown OS $OS, using as-is"
     ;;
 esac
 
@@ -39,25 +39,25 @@ if [ -z "$CARGO_TARGET_DIR" ]; then
   CARGO_TARGET_DIR="target"
 fi
 
-echo "馃攳 Detected platform: $PLATFORM"
-echo "馃敡 Using target directory: $CARGO_TARGET_DIR"
+echo "📍 Detected platform: $PLATFORM"
+echo "📂 Using target directory: $CARGO_TARGET_DIR"
 
 # Set API base URL for remote features
 export VK_SHARED_API_BASE="https://api.agent-chatgroup.com"
 export VITE_VK_SHARED_API_BASE="https://api.agent-chatgroup.com"
 
-echo "馃Ч Cleaning previous builds..."
+echo "🧹 Cleaning previous builds..."
 rm -rf npx-cli/dist
 mkdir -p npx-cli/dist/$PLATFORM
 
-echo "馃敤 Building frontend..."
+echo "🏗️ Building frontend..."
 (cd frontend && npm run build)
 
-echo "馃敤 Building Rust binaries..."
+echo "🏗️ Building Rust binaries..."
 cargo build --release --manifest-path Cargo.toml
 cargo build --release --bin mcp_task_server --manifest-path Cargo.toml
 
-echo "馃摝 Creating distribution package..."
+echo "📦 Creating distribution package..."
 
 # Copy the main binary
 cp ${CARGO_TARGET_DIR}/release/server agent-chatgroup
@@ -77,13 +77,13 @@ zip -q agent-chatgroup-review.zip agent-chatgroup-review
 rm -f agent-chatgroup-review
 mv agent-chatgroup-review.zip npx-cli/dist/$PLATFORM/agent-chatgroup-review.zip
 
-echo "鉁?Build complete!"
-echo "馃搧 Files created:"
+echo "✅ Build complete!"
+echo "📋 Files created:"
 echo "   - npx-cli/dist/$PLATFORM/agent-chatgroup.zip"
 echo "   - npx-cli/dist/$PLATFORM/agent-chatgroup-mcp.zip"
 echo "   - npx-cli/dist/$PLATFORM/agent-chatgroup-review.zip"
 echo ""
-echo "馃殌 To test locally, run:"
+echo "🚀 To test locally, run:"
 echo "   cd npx-cli && node bin/cli.js"
 
 

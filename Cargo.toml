@@ -11,7 +11,7 @@ members = [
     "crates/deployment",
     "crates/review",
 ]
-exclude = ["crates/remote"]
+exclude = ["crates/remote", "src-tauri"]
 
 [workspace.dependencies]
 tokio = { version = "1.0", features = ["full"] }

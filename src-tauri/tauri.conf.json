@@ -1,9 +1,9 @@
 {
   "build": {
-    "beforeDevCommand": "pnpm -C ../frontend build && node ../scripts/desktop/prepare-sidecar.js --debug",
-    "beforeBuildCommand": "pnpm -C ../frontend build && node ../scripts/desktop/prepare-sidecar.js --release",
+    "beforeDevCommand": "pnpm -C frontend build && node scripts/desktop/prepare-sidecar.js --debug",
+    "beforeBuildCommand": "pnpm -C frontend build && node scripts/desktop/prepare-sidecar.js --release",
     "devPath": "../frontend/dist",
-    "frontendDist": "../frontend/dist"
+    "distDir": "../frontend/dist"
   },
   "package": {
     "productName": "agent-chatgroup",

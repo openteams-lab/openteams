@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { X } from 'lucide-react';
 import { FileTreeContainer } from '@/components/ui-new/containers/FileTreeContainer';
 import { ProcessListContainer } from '@/components/ui-new/containers/ProcessListContainer';
 import { PreviewControlsContainer } from '@/components/ui-new/containers/PreviewControlsContainer';
@@ -210,27 +211,40 @@ export function RightSidebar({
   }
 
   return (
-    <div className="h-full border-l bg-secondary overflow-y-auto">
-      <div className="divide-y border-b">
-        {sections
-          .filter((section) => section.visible)
-          .map((section) => (
-            <div
-              key={section.persistKey}
-              className="max-h-[max(50vh,400px)] flex flex-col overflow-hidden"
-            >
-              <CollapsibleSectionHeader
-                title={section.title}
-                persistKey={section.persistKey}
-                defaultExpanded={section.expanded}
-                actions={section.actions}
+    <div className="h-full flex flex-col border-l bg-secondary">
+      <div className="flex items-center justify-between px-base py-base border-b border-border shrink-0 bg-secondary relative z-10">
+        <span className="text-sm text-low font-medium">Workspace</span>
+        <button
+          onClick={() => useUiPreferencesStore.getState().toggleRightSidebar()}
+          className="rounded border border-border p-1.5 text-high bg-panel hover:bg-primary hover:border-brand transition-all focus:outline-none focus:ring-2 focus:ring-brand shadow-sm"
+          aria-label={t('common:buttons.close')}
+          title="Close sidebar"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="divide-y border-b">
+          {sections
+            .filter((section) => section.visible)
+            .map((section) => (
+              <div
+                key={section.persistKey}
+                className="max-h-[max(50vh,400px)] flex flex-col overflow-hidden"
               >
-                <div className="flex flex-1 border-t min-h-[200px] w-full overflow-auto">
-                  {section.content}
-                </div>
-              </CollapsibleSectionHeader>
-            </div>
-          ))}
+                <CollapsibleSectionHeader
+                  title={section.title}
+                  persistKey={section.persistKey}
+                  defaultExpanded={section.expanded}
+                  actions={section.actions}
+                >
+                  <div className="flex flex-1 border-t min-h-[200px] w-full overflow-auto">
+                    {section.content}
+                  </div>
+                </CollapsibleSectionHeader>
+              </div>
+            ))}
+        </div>
       </div>
     </div>
   );
