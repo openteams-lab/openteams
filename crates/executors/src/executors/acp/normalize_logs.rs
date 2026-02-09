@@ -17,6 +17,7 @@ use crate::{
     logs::{
         ActionType, FileChange, NormalizedEntry, NormalizedEntryError, NormalizedEntryType,
         TodoItem, ToolResult, ToolResultValueType, ToolStatus as LogToolStatus,
+        api_errors::detect_api_error,
         stderr_processor::normalize_stderr_logs,
         utils::{ConversationPatch, EntryIndexProvider},
     },
@@ -50,12 +51,16 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     }
                     AcpEvent::Error(msg) => {
                         let idx = entry_index.next();
+                        // Detect specific API error types
+                        let (error_type, content) = if let Some(detected) = detect_api_error(&msg) {
+                            (detected.error_type, detected.message)
+                        } else {
+                            (NormalizedEntryError::Other, msg)
+                        };
                         let entry = NormalizedEntry {
                             timestamp: None,
-                            entry_type: NormalizedEntryType::ErrorMessage {
-                                error_type: NormalizedEntryError::Other,
-                            },
-                            content: msg,
+                            entry_type: NormalizedEntryType::ErrorMessage { error_type },
+                            content,
                             metadata: None,
                         };
                         msg_store.push_patch(ConversationPatch::add_normalized_entry(idx, entry));

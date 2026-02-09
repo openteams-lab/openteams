@@ -37,6 +37,7 @@ use crate::{
         ActionType, CommandExitStatus, CommandRunResult, FileChange, NormalizedEntry,
         NormalizedEntryError, NormalizedEntryType, TodoItem, ToolResult, ToolResultValueType,
         ToolStatus,
+        api_errors::detect_api_error,
         stderr_processor::normalize_stderr_logs,
         utils::{
             ConversationPatch, EntryIndexProvider,
@@ -1173,14 +1174,20 @@ impl Error {
 impl ToNormalizedEntry for Error {
     fn to_normalized_entry(&self) -> NormalizedEntry {
         match self {
-            Error::LaunchError { error } => NormalizedEntry {
-                timestamp: None,
-                entry_type: NormalizedEntryType::ErrorMessage {
-                    error_type: NormalizedEntryError::Other,
-                },
-                content: error.clone(),
-                metadata: None,
-            },
+            Error::LaunchError { error } => {
+                // Detect specific API error types
+                let (error_type, content) = if let Some(detected) = detect_api_error(error) {
+                    (detected.error_type, detected.message)
+                } else {
+                    (NormalizedEntryError::Other, error.clone())
+                };
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::ErrorMessage { error_type },
+                    content,
+                    metadata: None,
+                }
+            }
             Error::AuthRequired { error } => NormalizedEntry {
                 timestamp: None,
                 entry_type: NormalizedEntryType::ErrorMessage {

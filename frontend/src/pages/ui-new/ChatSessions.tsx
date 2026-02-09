@@ -50,6 +50,7 @@ import { ChatEntryContainer } from '@/components/ui-new/primitives/conversation/
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
 import { ChatSystemMessage } from '@/components/ui-new/primitives/conversation/ChatSystemMessage';
 import { DiffViewBody } from '@/components/ui-new/primitives/conversation/PierreConversationDiff';
+import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
 import RawLogText from '@/components/common/RawLogText';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useTheme } from '@/components/ThemeProvider';
@@ -79,6 +80,7 @@ import {
   formatBytes,
   truncateText,
   sanitizeHandle,
+  detectApiError,
 } from './chat';
 
 const mentionStatusPriority: Record<MentionStatus, number> = {
@@ -162,6 +164,7 @@ export function ChatSessions() {
     updateSession,
     archiveSession,
     restoreSession,
+    deleteSession,
     sendMessage,
     deleteMessages,
   } = useChatMutations(
@@ -173,6 +176,10 @@ export function ChatSessions() {
       if (activeSessionId) {
         queryClient.invalidateQueries({ queryKey: ['chatMessages', activeSessionId] });
       }
+    },
+    () => {
+      // Navigate to chat root after session deletion
+      navigate('/chat');
     }
   );
 
@@ -234,6 +241,7 @@ export function ChatSessions() {
   const [editingMember, setEditingMember] = useState<SessionMember | null>(null);
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberRunnerType, setNewMemberRunnerType] = useState('');
+  const [newMemberVariant, setNewMemberVariant] = useState('DEFAULT');
   const [newMemberPrompt, setNewMemberPrompt] = useState('');
   const [newMemberWorkspace, setNewMemberWorkspace] = useState('');
   const [memberError, setMemberError] = useState<string | null>(null);
@@ -262,6 +270,12 @@ export function ChatSessions() {
   } | null>(null);
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [isDeletingMessages, setIsDeletingMessages] = useState(false);
+  // Resizable panel states
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(288); // 18rem = 288px
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(320); // 20rem = 320px
+  const [inputAreaHeight, setInputAreaHeight] = useState(240); // min-h-[240px]
+  const [isResizing, setIsResizing] = useState<'left' | 'right' | 'input' | null>(null);
+  const resizeStartRef = useRef<{ startX: number; startY: number; startWidth: number; startHeight: number } | null>(null);
 
   // Sync messages from query
   useEffect(() => {
@@ -387,6 +401,51 @@ export function ChatSessions() {
       return ' (not installed)';
     },
     [agentAvailability, isCheckingAvailability]
+  );
+
+  // Get model name from profiles for a given runner type and variant
+  const getModelName = useCallback(
+    (runnerType: string, variant?: string): string | null => {
+      if (!profiles) return null;
+      const executorConfig = profiles[runnerType];
+      if (!executorConfig) return null;
+      // Get the specified variant, or DEFAULT, or first available variant
+      const variantKey = variant && variant in executorConfig
+        ? variant
+        : 'DEFAULT' in executorConfig
+          ? 'DEFAULT'
+          : Object.keys(executorConfig)[0];
+      if (!variantKey) return null;
+      const variantConfig = executorConfig[variantKey];
+      if (!variantConfig) return null;
+      // The config is wrapped like { "CLAUDE_CODE": { model: "..." } }
+      const innerConfig = Object.values(variantConfig)[0] as { model?: string | null } | undefined;
+      return innerConfig?.model ?? null;
+    },
+    [profiles]
+  );
+
+  // Get available variants for a given runner type
+  const getVariantOptions = useCallback(
+    (runnerType: string): string[] => {
+      if (!profiles) return [];
+      const executorConfig = profiles[runnerType];
+      if (!executorConfig) return [];
+      const variants = Object.keys(executorConfig);
+      // Sort: DEFAULT first, then alphabetically
+      return variants.sort((a, b) => {
+        if (a === 'DEFAULT') return -1;
+        if (b === 'DEFAULT') return 1;
+        return a.localeCompare(b);
+      });
+    },
+    [profiles]
+  );
+
+  // Get variant options for current member runner type
+  const memberVariantOptions = useMemo(
+    () => getVariantOptions(newMemberRunnerType),
+    [getVariantOptions, newMemberRunnerType]
   );
 
   const senderHandle = useMemo(() => {
@@ -531,6 +590,19 @@ export function ChatSessions() {
     }
   }, [editingMember, enabledRunnerTypes, isRunnerAvailable, newMemberRunnerType]);
 
+  // Set default variant when runner type changes
+  useEffect(() => {
+    if (memberVariantOptions.length > 0) {
+      // Set to DEFAULT if available, otherwise first option
+      const defaultVariant = memberVariantOptions.includes('DEFAULT')
+        ? 'DEFAULT'
+        : memberVariantOptions[0];
+      setNewMemberVariant(defaultVariant);
+    } else {
+      setNewMemberVariant('DEFAULT');
+    }
+  }, [newMemberRunnerType, memberVariantOptions]);
+
   // Sync agent states from session agents
   useEffect(() => {
     setAgentStates((prev) => {
@@ -658,6 +730,32 @@ export function ChatSessions() {
     const content = [mentionPrefix, trimmed].filter(Boolean).join(' ').trim();
     if (!content) return;
 
+    // Check if any mentioned agent is currently running
+    const allMentions = new Set([...contentMentions, ...selectedMentions]);
+    const runningMentionedAgents: string[] = [];
+    allMentions.forEach((name) => {
+      const agentId = agentIdByName.get(name);
+      if (agentId && agentStates[agentId] === ChatSessionAgentState.running) {
+        runningMentionedAgents.push(name);
+      }
+    });
+
+    if (runningMentionedAgents.length > 0) {
+      setConfirmModal({
+        title: 'Agent Running',
+        message: `The following agent(s) are currently running: @${runningMentionedAgents.join(', @')}. They will not process new messages until the current task is stopped. Do you still want to send this message?`,
+        onConfirm: async () => {
+          await doSendMessage(content);
+        },
+      });
+      return;
+    }
+
+    await doSendMessage(content);
+  };
+
+  const doSendMessage = async (content: string) => {
+    if (!activeSessionId) return;
     const meta: JsonValue = {
       sender_handle: senderHandle,
       ...(replyToMessage
@@ -1023,10 +1121,64 @@ export function ChatSessions() {
     [activeSessionId]
   );
 
+  // Resize handlers
+  const handleResizeStart = useCallback(
+    (type: 'left' | 'right' | 'input', e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizing(type);
+      resizeStartRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startWidth: type === 'left' ? leftSidebarWidth : rightSidebarWidth,
+        startHeight: inputAreaHeight,
+      };
+    },
+    [leftSidebarWidth, rightSidebarWidth, inputAreaHeight]
+  );
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizeStartRef.current) return;
+      const { startX, startY, startWidth, startHeight } = resizeStartRef.current;
+
+      if (isResizing === 'left') {
+        const delta = e.clientX - startX;
+        const newWidth = Math.max(200, Math.min(500, startWidth + delta));
+        setLeftSidebarWidth(newWidth);
+      } else if (isResizing === 'right') {
+        const delta = startX - e.clientX;
+        const newWidth = Math.max(240, Math.min(600, startWidth + delta));
+        setRightSidebarWidth(newWidth);
+      } else if (isResizing === 'input') {
+        const delta = startY - e.clientY;
+        const newHeight = Math.max(120, Math.min(500, startHeight + delta));
+        setInputAreaHeight(newHeight);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(null);
+      resizeStartRef.current = null;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
   return (
-    <div className="relative flex h-full min-h-0 bg-primary overflow-hidden">
+    <div className="relative flex h-full min-h-0 bg-primary overflow-hidden select-none">
       {/* Session List Sidebar */}
-      <aside className="w-72 border-r border-border flex flex-col min-h-0">
+      <aside
+        className="border-r border-border flex flex-col min-h-0 shrink-0"
+        style={{ width: leftSidebarWidth }}
+      >
         <div className="px-base py-base border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-half text-normal font-medium">
             <ChatsTeardropIcon className="size-icon-sm" />
@@ -1113,6 +1265,12 @@ export function ChatSessions() {
         </div>
       </aside>
 
+      {/* Left Sidebar Resize Handle */}
+      <div
+        className="w-1 cursor-col-resize hover:bg-brand/50 active:bg-brand transition-colors shrink-0"
+        onMouseDown={(e) => handleResizeStart('left', e)}
+      />
+
       {/* Main Chat Section */}
       <section className="flex-1 min-w-0 min-h-0 flex flex-col">
         <header className="px-base py-half border-b border-border flex items-center justify-between">
@@ -1123,17 +1281,36 @@ export function ChatSessions() {
                   {activeSession?.title || 'Untitled session'}
                 </div>
                 {activeSession && (
-                  <button
-                    type="button"
-                    className="text-low hover:text-normal"
-                    onClick={() => {
-                      setIsEditingTitle(true);
-                      setTitleError(null);
-                    }}
-                    aria-label="Edit session name"
-                  >
-                    <PencilSimpleIcon className="size-icon-xs" />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="text-low hover:text-normal"
+                      onClick={() => {
+                        setIsEditingTitle(true);
+                        setTitleError(null);
+                      }}
+                      aria-label="Edit session name"
+                    >
+                      <PencilSimpleIcon className="size-icon-xs" />
+                    </button>
+                    <button
+                      type="button"
+                      className="text-low hover:text-error"
+                      onClick={() => {
+                        setConfirmModal({
+                          title: 'Delete Session',
+                          message: `Are you sure you want to delete "${activeSession.title || 'Untitled session'}"? This action cannot be undone and all messages will be permanently deleted.`,
+                          onConfirm: async () => {
+                            await deleteSession.mutateAsync(activeSession.id);
+                          },
+                        });
+                      }}
+                      aria-label="Delete session"
+                      title="Delete session"
+                    >
+                      <TrashIcon className="size-icon-xs" />
+                    </button>
+                  </>
                 )}
               </div>
             )}
@@ -1448,6 +1625,16 @@ export function ChatSessions() {
                         )}
                     </div>
                   )}
+                  {(() => {
+                    const apiError = isAgent ? detectApiError(message.content) : null;
+                    return apiError ? (
+                      <div className="mb-half flex items-center gap-half rounded-sm bg-error/10 border border-error/30 px-base py-half text-xs text-error">
+                        <XCircleIcon className="size-icon-sm flex-shrink-0" weight="fill" />
+                        <span className="font-medium">{apiError.message}</span>
+                        <span className="text-error/70">- Please check your API quota or try again later</span>
+                      </div>
+                    ) : null;
+                  })()}
                   <ChatMarkdown content={message.content} />
                   {mentionList.length > 0 && (
                     <div className="mt-half flex flex-wrap items-center gap-half text-xs text-low">
@@ -1706,8 +1893,14 @@ export function ChatSessions() {
           <div ref={bottomRef} />
         </div>
 
+        {/* Input Area Resize Handle */}
+        <div
+          className="h-1 cursor-row-resize hover:bg-brand/50 active:bg-brand transition-colors shrink-0 border-t border-border"
+          onMouseDown={(e) => handleResizeStart('input', e)}
+        />
+
         {/* Message Input */}
-        <div className="border-t border-border p-base space-y-base">
+        <div className="p-base space-y-base shrink-0">
           <div className="flex items-center gap-base flex-wrap">
             <MultiSelectDropdown
               icon={ChatsTeardropIcon}
@@ -1768,7 +1961,7 @@ export function ChatSessions() {
             <div className="text-xs text-error">{attachmentError}</div>
           )}
 
-          <div className="relative">
+          <div className="relative flex-1">
             <textarea
               ref={inputRef}
               value={draft}
@@ -1784,10 +1977,10 @@ export function ChatSessions() {
                   ? 'This session is archived and read-only.'
                   : 'Type your message and @mention agents...'
               }
-              rows={8}
               disabled={isArchived || !activeSessionId}
+              style={{ height: inputAreaHeight }}
               className={cn(
-                'w-full resize-none rounded-sm border border-border bg-panel min-h-[240px]',
+                'w-full resize-none rounded-sm border border-border bg-panel',
                 'px-base py-base text-sm text-normal leading-relaxed focus:outline-none focus:ring-1 focus:ring-brand',
                 isArchived && 'opacity-60 cursor-not-allowed'
               )}
@@ -1850,8 +2043,17 @@ export function ChatSessions() {
         </div>
       </section>
 
+      {/* Right Sidebar Resize Handle */}
+      <div
+        className="w-1 cursor-col-resize hover:bg-brand/50 active:bg-brand transition-colors shrink-0"
+        onMouseDown={(e) => handleResizeStart('right', e)}
+      />
+
       {/* AI Members Sidebar */}
-      <aside className="w-80 border-l border-border flex flex-col min-h-0">
+      <aside
+        className="border-l border-border flex flex-col min-h-0 shrink-0"
+        style={{ width: rightSidebarWidth }}
+      >
         <div className="px-base py-base border-b border-border flex items-center justify-between">
           <div className="text-sm text-normal font-medium">AI Members</div>
           <div className="text-xs text-low">{sessionMembers.length} in session</div>
@@ -1883,13 +2085,21 @@ export function ChatSessions() {
                         state === ChatSessionAgentState.running && 'animate-pulse'
                       )}
                     />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1 overflow-hidden">
                       <div className="text-sm text-normal truncate">
                         @{agent.name}
                       </div>
-                      <div className="text-xs text-low">
-                        {toPrettyCase(agent.runner_type)} · {agentStateLabels[state]}
-                      </div>
+                      {(() => {
+                        const modelName = getModelName(agent.runner_type);
+                        const fullText = `${toPrettyCase(agent.runner_type)} · ${agentStateLabels[state]}${modelName ? ` · ${modelName}` : ''}`;
+                        return (
+                          <Tooltip content={fullText} side="bottom">
+                            <div className="text-xs text-low truncate cursor-default">
+                              {fullText}
+                            </div>
+                          </Tooltip>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="flex items-center gap-half text-xs">
@@ -2013,6 +2223,33 @@ export function ChatSessions() {
                     </div>
                   )}
                 </div>
+                {memberVariantOptions.length > 0 && (
+                  <div className="space-y-half">
+                    <label className="text-xs text-low">Model variant</label>
+                    <select
+                      value={newMemberVariant}
+                      onChange={(event) => setNewMemberVariant(event.target.value)}
+                      className={cn(
+                        'w-full rounded-sm border border-border bg-panel px-base py-half',
+                        'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
+                      )}
+                    >
+                      {memberVariantOptions.map((variant) => {
+                        const modelName = getModelName(newMemberRunnerType, variant);
+                        return (
+                          <option key={variant} value={variant}>
+                            {variant}{modelName ? ` (${modelName})` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    {getModelName(newMemberRunnerType, newMemberVariant) && (
+                      <div className="text-xs text-low">
+                        Model: {getModelName(newMemberRunnerType, newMemberVariant)}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-half">
                   <div className="flex items-center justify-between gap-base">
                     <label className="text-xs text-low">System prompt</label>

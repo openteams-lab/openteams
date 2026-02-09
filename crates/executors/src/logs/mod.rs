@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use workspace_utils::approvals::ApprovalStatus;
 
+pub mod api_errors;
 pub mod plain_text_processor;
 pub mod stderr_processor;
 pub mod utils;
@@ -67,6 +68,31 @@ pub struct NormalizedConversation {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum NormalizedEntryError {
     SetupRequired,
+    /// API quota or credit limit reached
+    QuotaExceeded {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        provider: Option<String>,
+    },
+    /// API rate limit exceeded (429)
+    RateLimitExceeded {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        provider: Option<String>,
+    },
+    /// API server overloaded (503)
+    ServerOverloaded {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        provider: Option<String>,
+    },
+    /// API authentication failed
+    AuthenticationFailed {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        provider: Option<String>,
+    },
+    /// Context or token limit exceeded
+    ContextLimitExceeded {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        provider: Option<String>,
+    },
     Other,
 }
 

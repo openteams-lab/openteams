@@ -114,6 +114,207 @@ export function truncateText(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
+/**
+ * Detect if message content contains common API error patterns
+ * Returns an error type string if detected, or null otherwise
+ * Supports: Claude, OpenAI/Codex, QWen Coder, Azure OpenAI, Google AI, and other providers
+ */
+export function detectApiError(content: string): {
+  type: 'quota_exceeded' | 'rate_limit' | 'overloaded' | 'credit_exhausted' | 'auth_error' | 'context_limit' | 'other_error';
+  message: string;
+  provider?: string;
+} | null {
+  const lowered = content.toLowerCase();
+
+  // === Anthropic/Claude specific errors ===
+  if (
+    lowered.includes('anthropic') ||
+    lowered.includes('claude')
+  ) {
+    if (lowered.includes('credit balance') || lowered.includes('credit exhausted')) {
+      return { type: 'credit_exhausted', message: 'Claude credit balance exhausted', provider: 'Anthropic' };
+    }
+    if (lowered.includes('rate limit') || lowered.includes('rate_limit')) {
+      return { type: 'rate_limit', message: 'Claude API rate limit exceeded', provider: 'Anthropic' };
+    }
+    if (lowered.includes('overloaded')) {
+      return { type: 'overloaded', message: 'Claude API is overloaded', provider: 'Anthropic' };
+    }
+  }
+
+  // === OpenAI/Codex specific errors ===
+  if (
+    lowered.includes('openai') ||
+    lowered.includes('codex') ||
+    lowered.includes('gpt-4') ||
+    lowered.includes('gpt-3') ||
+    lowered.includes('o1-') ||
+    lowered.includes('o3-')
+  ) {
+    if (
+      lowered.includes('billing hard limit') ||
+      lowered.includes('exceeded your current quota') ||
+      lowered.includes('insufficient_quota')
+    ) {
+      return { type: 'quota_exceeded', message: 'OpenAI quota exceeded', provider: 'OpenAI' };
+    }
+    if (lowered.includes('rate limit') || lowered.includes('rate_limit_exceeded')) {
+      return { type: 'rate_limit', message: 'OpenAI API rate limit exceeded', provider: 'OpenAI' };
+    }
+    if (lowered.includes('context_length_exceeded') || lowered.includes('maximum context length')) {
+      return { type: 'context_limit', message: 'OpenAI context length exceeded', provider: 'OpenAI' };
+    }
+    if (lowered.includes('invalid_api_key') || lowered.includes('incorrect api key')) {
+      return { type: 'auth_error', message: 'OpenAI API key invalid', provider: 'OpenAI' };
+    }
+  }
+
+  // === Alibaba Cloud / QWen Coder specific errors ===
+  if (
+    lowered.includes('qwen') ||
+    lowered.includes('tongyi') ||
+    lowered.includes('dashscope') ||
+    lowered.includes('aliyun') ||
+    lowered.includes('alibaba')
+  ) {
+    if (
+      lowered.includes('quota') ||
+      lowered.includes('余额不足') ||
+      lowered.includes('账户余额') ||
+      lowered.includes('免费额度')
+    ) {
+      return { type: 'quota_exceeded', message: 'QWen API 额度已用尽', provider: 'Alibaba' };
+    }
+    if (
+      lowered.includes('rate limit') ||
+      lowered.includes('限流') ||
+      lowered.includes('请求过于频繁') ||
+      lowered.includes('qps')
+    ) {
+      return { type: 'rate_limit', message: 'QWen API 请求频率超限', provider: 'Alibaba' };
+    }
+    if (lowered.includes('accessdenied') || lowered.includes('invalidaccesskey')) {
+      return { type: 'auth_error', message: 'QWen API 密钥无效', provider: 'Alibaba' };
+    }
+  }
+
+  // === Azure OpenAI specific errors ===
+  if (lowered.includes('azure') && lowered.includes('openai')) {
+    if (lowered.includes('quota') || lowered.includes('tokens per minute')) {
+      return { type: 'quota_exceeded', message: 'Azure OpenAI quota exceeded', provider: 'Azure' };
+    }
+    if (lowered.includes('rate limit') || lowered.includes('429')) {
+      return { type: 'rate_limit', message: 'Azure OpenAI rate limit exceeded', provider: 'Azure' };
+    }
+  }
+
+  // === Google AI / Gemini specific errors ===
+  if (
+    lowered.includes('google') ||
+    lowered.includes('gemini') ||
+    lowered.includes('palm') ||
+    lowered.includes('vertex')
+  ) {
+    if (lowered.includes('quota') || lowered.includes('resource_exhausted')) {
+      return { type: 'quota_exceeded', message: 'Google AI quota exceeded', provider: 'Google' };
+    }
+    if (lowered.includes('rate limit') || lowered.includes('429')) {
+      return { type: 'rate_limit', message: 'Google AI rate limit exceeded', provider: 'Google' };
+    }
+  }
+
+  // === DeepSeek specific errors ===
+  if (lowered.includes('deepseek')) {
+    if (lowered.includes('quota') || lowered.includes('balance')) {
+      return { type: 'quota_exceeded', message: 'DeepSeek 额度已用尽', provider: 'DeepSeek' };
+    }
+    if (lowered.includes('rate limit') || lowered.includes('429')) {
+      return { type: 'rate_limit', message: 'DeepSeek API 请求频率超限', provider: 'DeepSeek' };
+    }
+  }
+
+  // === Generic quota/credit exhaustion (fallback) ===
+  if (
+    lowered.includes('quota exceeded') ||
+    lowered.includes('quota_exceeded') ||
+    lowered.includes('credit balance') ||
+    lowered.includes('credit exhausted') ||
+    lowered.includes('insufficient credit') ||
+    lowered.includes('insufficient_quota') ||
+    (lowered.includes('billing') && lowered.includes('limit')) ||
+    lowered.includes('余额不足') ||
+    lowered.includes('额度') && (lowered.includes('用尽') || lowered.includes('不足'))
+  ) {
+    return {
+      type: 'quota_exceeded',
+      message: 'API quota or credit limit reached',
+    };
+  }
+
+  // === Generic rate limiting (fallback) ===
+  if (
+    lowered.includes('rate limit') ||
+    lowered.includes('rate_limit') ||
+    lowered.includes('too many requests') ||
+    lowered.includes('429') ||
+    lowered.includes('请求过于频繁') ||
+    lowered.includes('限流')
+  ) {
+    return {
+      type: 'rate_limit',
+      message: 'API rate limit exceeded',
+    };
+  }
+
+  // === Generic server overload (fallback) ===
+  if (
+    lowered.includes('overloaded') ||
+    lowered.includes('server is busy') ||
+    lowered.includes('503') ||
+    lowered.includes('service unavailable') ||
+    lowered.includes('服务繁忙') ||
+    lowered.includes('系统繁忙')
+  ) {
+    return {
+      type: 'overloaded',
+      message: 'API server is overloaded',
+    };
+  }
+
+  // === Generic authentication errors (fallback) ===
+  if (
+    lowered.includes('invalid api key') ||
+    lowered.includes('invalid_api_key') ||
+    lowered.includes('authentication failed') ||
+    lowered.includes('unauthorized') ||
+    lowered.includes('401') ||
+    lowered.includes('密钥无效') ||
+    lowered.includes('认证失败')
+  ) {
+    return {
+      type: 'auth_error',
+      message: 'API authentication failed',
+    };
+  }
+
+  // === Context/token limit errors (fallback) ===
+  if (
+    lowered.includes('context length') ||
+    lowered.includes('context_length') ||
+    lowered.includes('token limit') ||
+    lowered.includes('maximum.*tokens') ||
+    lowered.includes('上下文长度') ||
+    lowered.includes('超出最大')
+  ) {
+    return {
+      type: 'context_limit',
+      message: 'Context or token limit exceeded',
+    };
+  }
+
+  return null;
+}
+
 export function splitUnifiedDiff(patch: string): DiffFileEntry[] {
   const lines = patch.split('\n');
   const entries: DiffFileEntry[] = [];
