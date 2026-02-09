@@ -1534,6 +1534,27 @@ export const chatApi = {
     return handleApiResponse<ChatMessage>(response);
   },
 
+  deleteMessage: async (messageId: string): Promise<void> => {
+    const response = await makeRequest(`/api/chat/messages/${messageId}`, {
+      method: 'DELETE',
+    });
+    return handleApiResponse<void>(response);
+  },
+
+  deleteMessagesBatch: async (
+    sessionId: string,
+    messageIds: string[]
+  ): Promise<number> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/messages/batch-delete`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ message_ids: messageIds }),
+      }
+    );
+    return handleApiResponse<number>(response);
+  },
+
   listAgents: async (): Promise<ChatAgent[]> => {
     const response = await makeRequest('/api/chat/agents');
     return handleApiResponse<ChatAgent[]>(response);

@@ -21,6 +21,9 @@ import {
   ArrowsInSimpleIcon,
   XCircleIcon,
   XIcon,
+  TrashIcon,
+  CheckSquareIcon,
+  SquareIcon,
 } from '@phosphor-icons/react';
 import {
   ChatMessage,
@@ -138,6 +141,7 @@ export function ChatSessions() {
     agentStateInfos,
     mentionStatuses,
     setAgentStates,
+    setAgentStateInfos,
     setMentionStatuses,
   } =
     useChatWebSocket(
@@ -152,10 +156,17 @@ export function ChatSessions() {
     archiveSession,
     restoreSession,
     sendMessage,
+    deleteMessages,
   } = useChatMutations(
     (session) => navigate(`/chat/${session.id}`),
     (session) => navigate(`/chat/${session.id}`),
-    upsertMessage
+    upsertMessage,
+    (_count) => {
+      // Refresh messages after deletion
+      if (activeSessionId) {
+        queryClient.invalidateQueries({ queryKey: ['chatMessages', activeSessionId] });
+      }
+    }
   );
 
   // Message input
@@ -233,6 +244,10 @@ export function ChatSessions() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [titleError, setTitleError] = useState<string | null>(null);
+  // Cleanup mode states
+  const [isCleanupMode, setIsCleanupMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+  const [isDeletingMessages, setIsDeletingMessages] = useState(false);
 
   // Sync messages from query
   useEffect(() => {
@@ -525,7 +540,26 @@ export function ChatSessions() {
       }
       return next;
     });
-  }, [sessionAgents, setAgentStates]);
+    // Also sync agentStateInfos with updated_at as startedAt for running agents
+    // This ensures the timer works correctly after page refresh
+    setAgentStateInfos((prev) => {
+      const next = { ...prev };
+      for (const sessionAgent of sessionAgents) {
+        // Only set if not already present (WebSocket events take precedence)
+        if (!next[sessionAgent.agent_id]) {
+          next[sessionAgent.agent_id] = {
+            state: sessionAgent.state,
+            // Use updated_at as startedAt for running agents
+            startedAt:
+              sessionAgent.state === ChatSessionAgentState.running
+                ? sessionAgent.updated_at
+                : null,
+          };
+        }
+      }
+      return next;
+    });
+  }, [sessionAgents, setAgentStates, setAgentStateInfos]);
 
   // Running timer - tick clock when any agent is running
   useEffect(() => {
@@ -1147,10 +1181,75 @@ export function ChatSessions() {
                   }}
                   disabled={archiveSession.isPending || restoreSession.isPending}
                 />
+                {!isArchived && (
+                  <PrimaryButton
+                    variant={isCleanupMode ? 'default' : 'tertiary'}
+                    value={isCleanupMode ? 'Exit Cleanup' : 'Cleanup'}
+                    onClick={() => {
+                      if (isCleanupMode) {
+                        setIsCleanupMode(false);
+                        setSelectedMessageIds(new Set());
+                      } else {
+                        setIsCleanupMode(true);
+                      }
+                    }}
+                    disabled={isDeletingMessages}
+                  />
+                )}
               </div>
             )}
           </div>
         </header>
+
+        {/* Message count display */}
+        {activeSession && (
+          <div className="px-base py-half border-b border-border text-xs text-low flex items-center justify-between">
+            <span>Total messages: {messageList.length}</span>
+            {isCleanupMode && (
+              <div className="flex items-center gap-base">
+                <span>Selected: {selectedMessageIds.size}</span>
+                <button
+                  type="button"
+                  className="text-brand hover:text-brand-hover"
+                  onClick={() => {
+                    if (selectedMessageIds.size === messageList.length) {
+                      setSelectedMessageIds(new Set());
+                    } else {
+                      setSelectedMessageIds(new Set(messageList.map((m) => m.id)));
+                    }
+                  }}
+                >
+                  {selectedMessageIds.size === messageList.length ? 'Deselect All' : 'Select All'}
+                </button>
+                {selectedMessageIds.size > 0 && (
+                  <button
+                    type="button"
+                    className="text-error hover:text-error/80 flex items-center gap-half"
+                    onClick={async () => {
+                      if (!activeSessionId) return;
+                      if (!window.confirm(`Are you sure you want to delete ${selectedMessageIds.size} message(s)?`)) return;
+                      setIsDeletingMessages(true);
+                      try {
+                        await deleteMessages.mutateAsync({
+                          sessionId: activeSessionId,
+                          messageIds: Array.from(selectedMessageIds),
+                        });
+                        setSelectedMessageIds(new Set());
+                        setIsCleanupMode(false);
+                      } finally {
+                        setIsDeletingMessages(false);
+                      }
+                    }}
+                    disabled={isDeletingMessages}
+                  >
+                    <TrashIcon className="size-icon-xs" />
+                    Delete Selected
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 min-h-0 overflow-y-auto p-base space-y-base">
@@ -1194,13 +1293,42 @@ export function ChatSessions() {
               : message.sender_id ?? agentName ?? 'agent';
             const tone = getMessageTone(String(toneKey), isUser);
 
+            const isSelected = selectedMessageIds.has(message.id);
+            const toggleSelect = () => {
+              setSelectedMessageIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(message.id)) {
+                  next.delete(message.id);
+                } else {
+                  next.add(message.id);
+                }
+                return next;
+              });
+            };
+
             if (message.sender_type === ChatSenderType.system) {
               return (
-                <ChatSystemMessage
-                  key={message.id}
-                  content={message.content}
-                  expanded
-                />
+                <div key={message.id} className="flex items-start gap-base">
+                  {isCleanupMode && (
+                    <button
+                      type="button"
+                      className="flex-shrink-0 mt-1"
+                      onClick={toggleSelect}
+                    >
+                      {isSelected ? (
+                        <CheckSquareIcon className="size-icon text-brand" weight="fill" />
+                      ) : (
+                        <SquareIcon className="size-icon text-low" />
+                      )}
+                    </button>
+                  )}
+                  <div className="flex-1">
+                    <ChatSystemMessage
+                      content={message.content}
+                      expanded
+                    />
+                  </div>
+                </div>
               );
             }
 
@@ -1208,8 +1336,21 @@ export function ChatSessions() {
               <div
                 key={message.id}
                 id={`chat-message-${message.id}`}
-                className={cn('flex', isUser ? 'justify-end' : 'justify-start')}
+                className={cn('flex items-start gap-base', isUser ? 'justify-end' : 'justify-start')}
               >
+                {isCleanupMode && !isUser && (
+                  <button
+                    type="button"
+                    className="flex-shrink-0 mt-1"
+                    onClick={toggleSelect}
+                  >
+                    {isSelected ? (
+                      <CheckSquareIcon className="size-icon text-brand" weight="fill" />
+                    ) : (
+                      <SquareIcon className="size-icon text-low" />
+                    )}
+                  </button>
+                )}
                 <ChatEntryContainer
                   variant={isUser ? 'user' : 'system'}
                   title={isUser ? 'You' : agentName ?? 'Agent'}
@@ -1232,7 +1373,8 @@ export function ChatSessions() {
                   }
                   className={cn(
                     'max-w-[720px] w-full md:w-[80%] shadow-sm rounded-2xl',
-                    isUser && 'ml-auto'
+                    isUser && 'ml-auto',
+                    isCleanupMode && isSelected && 'ring-2 ring-brand'
                   )}
                   headerClassName="bg-transparent"
                   style={{
@@ -1415,6 +1557,19 @@ export function ChatSessions() {
                     </div>
                   )}
                 </ChatEntryContainer>
+                {isCleanupMode && isUser && (
+                  <button
+                    type="button"
+                    className="flex-shrink-0 mt-1"
+                    onClick={toggleSelect}
+                  >
+                    {isSelected ? (
+                      <CheckSquareIcon className="size-icon text-brand" weight="fill" />
+                    ) : (
+                      <SquareIcon className="size-icon text-low" />
+                    )}
+                  </button>
+                )}
               </div>
             );
           })}
