@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, Request, State},
+    extract::{Path, RawPathParams, Request, State},
     http::StatusCode,
     middleware::Next,
     response::Response,
@@ -172,10 +172,20 @@ pub async fn load_session_middleware(
 
 pub async fn load_chat_session_middleware(
     State(deployment): State<DeploymentImpl>,
-    Path(session_id): Path<Uuid>,
+    params: RawPathParams,
     mut request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
+    // Extract session_id from raw path params to avoid consuming Path extractor
+    let session_id = params
+        .iter()
+        .find(|(key, _)| *key == "session_id")
+        .and_then(|(_, value)| value.parse::<Uuid>().ok())
+        .ok_or_else(|| {
+            tracing::warn!("session_id not found in path params");
+            StatusCode::BAD_REQUEST
+        })?;
+
     let session = match ChatSession::find_by_id(&deployment.db().pool, session_id).await {
         Ok(Some(session)) => session,
         Ok(None) => {

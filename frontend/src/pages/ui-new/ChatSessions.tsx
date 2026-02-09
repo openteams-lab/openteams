@@ -37,6 +37,13 @@ import {
 import { ApiError, chatApi, configApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogHeader,
+  DialogTitle,
+  DialogContent,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 import { MultiSelectDropdown } from '@/components/ui-new/primitives/MultiSelectDropdown';
 import { ChatEntryContainer } from '@/components/ui-new/primitives/conversation/ChatEntryContainer';
@@ -247,6 +254,13 @@ export function ChatSessions() {
   // Cleanup mode states
   const [isCleanupMode, setIsCleanupMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [isDeletingMessages, setIsDeletingMessages] = useState(false);
 
   // Sync messages from query
@@ -915,24 +929,33 @@ export function ChatSessions() {
       setMemberError('This session is archived and read-only.');
       return;
     }
-    const confirmed = window.confirm(
-      `Remove @${member.agent.name} from this session?`
-    );
-    if (!confirmed) return;
-
-    try {
-      await chatApi.deleteSessionAgent(activeSessionId, member.sessionAgent.id);
-      await queryClient.invalidateQueries({
-        queryKey: ['chatSessionAgents', activeSessionId],
-      });
-      if (workspaceAgentId === member.agent.id) {
-        setWorkspaceDrawerOpen(false);
-        setWorkspaceAgentId(null);
-      }
-    } catch (error) {
-      console.warn('Failed to remove AI member', error);
-      setMemberError('Failed to remove AI member.');
-    }
+    const sessionAgentId = member.sessionAgent.id;
+    setConfirmModal({
+      title: 'Remove AI Member',
+      message: `Are you sure you want to remove @${member.agent.name} from this session?`,
+      onConfirm: async () => {
+        try {
+          console.log('Deleting session agent:', { activeSessionId, sessionAgentId });
+          await chatApi.deleteSessionAgent(activeSessionId, sessionAgentId);
+          console.log('Delete successful, invalidating queries...');
+          // Invalidate and refetch to ensure UI updates
+          await queryClient.invalidateQueries({
+            queryKey: ['chatSessionAgents', activeSessionId],
+          });
+          await queryClient.refetchQueries({
+            queryKey: ['chatSessionAgents', activeSessionId],
+          });
+          console.log('Queries refetched');
+          if (workspaceAgentId === member.agent.id) {
+            setWorkspaceDrawerOpen(false);
+            setWorkspaceAgentId(null);
+          }
+        } catch (error) {
+          console.error('Failed to remove AI member:', error);
+          setMemberError('Failed to remove AI member.');
+        }
+      },
+    });
   };
 
   const handleSaveTitle = async () => {
@@ -1222,20 +1245,26 @@ export function ChatSessions() {
               <button
                 type="button"
                 className="text-error hover:text-error/80 flex items-center gap-half"
-                onClick={async () => {
+                onClick={() => {
                   if (!activeSessionId) return;
-                  if (!window.confirm(`Are you sure you want to delete ${selectedMessageIds.size} message(s)?`)) return;
-                  setIsDeletingMessages(true);
-                  try {
-                    await deleteMessages.mutateAsync({
-                      sessionId: activeSessionId,
-                      messageIds: Array.from(selectedMessageIds),
-                    });
-                    setSelectedMessageIds(new Set());
-                    setIsCleanupMode(false);
-                  } finally {
-                    setIsDeletingMessages(false);
-                  }
+                  const count = selectedMessageIds.size;
+                  setConfirmModal({
+                    title: 'Delete Messages',
+                    message: `Are you sure you want to delete ${count} message(s)? This action cannot be undone.`,
+                    onConfirm: async () => {
+                      setIsDeletingMessages(true);
+                      try {
+                        await deleteMessages.mutateAsync({
+                          sessionId: activeSessionId,
+                          messageIds: Array.from(selectedMessageIds),
+                        });
+                        setSelectedMessageIds(new Set());
+                        setIsCleanupMode(false);
+                      } finally {
+                        setIsDeletingMessages(false);
+                      }
+                    },
+                  });
                 }}
                 disabled={isDeletingMessages}
               >
@@ -2015,11 +2044,17 @@ export function ChatSessions() {
                     value={newMemberWorkspace}
                     onChange={(event) => setNewMemberWorkspace(event.target.value)}
                     placeholder="Absolute path on the server"
+                    disabled={!!editingMember}
+                    title={editingMember ? 'Workspace path cannot be changed after creation' : undefined}
                     className={cn(
                       'w-full rounded-sm border border-border bg-panel px-base py-half',
-                      'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
+                      'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand',
+                      editingMember && 'opacity-50 cursor-not-allowed'
                     )}
                   />
+                  {editingMember && (
+                    <p className="text-xs text-low">Workspace path cannot be modified</p>
+                  )}
                 </div>
                 {memberError && (
                   <div className="text-xs text-error">{memberError}</div>
@@ -2376,6 +2411,46 @@ export function ChatSessions() {
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <Dialog
+        open={!!confirmModal}
+        onOpenChange={(open) => {
+          if (!open && !isConfirmLoading) {
+            setConfirmModal(null);
+          }
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>{confirmModal?.title ?? 'Confirm'}</DialogTitle>
+        </DialogHeader>
+        <DialogContent>
+          <p className="text-sm text-normal">{confirmModal?.message}</p>
+        </DialogContent>
+        <DialogFooter>
+          <PrimaryButton
+            variant="tertiary"
+            value="Cancel"
+            onClick={() => setConfirmModal(null)}
+            disabled={isConfirmLoading}
+          />
+          <PrimaryButton
+            variant="default"
+            value={isConfirmLoading ? 'Processing...' : 'Confirm'}
+            onClick={async () => {
+              if (!confirmModal) return;
+              setIsConfirmLoading(true);
+              try {
+                await confirmModal.onConfirm();
+              } finally {
+                setIsConfirmLoading(false);
+                setConfirmModal(null);
+              }
+            }}
+            disabled={isConfirmLoading}
+          />
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

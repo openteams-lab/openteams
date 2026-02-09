@@ -135,7 +135,7 @@ pub async fn create_session_agent(
 pub async fn update_session_agent(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
-    axum::extract::Path(session_agent_id): axum::extract::Path<Uuid>,
+    axum::extract::Path((_session_id, session_agent_id)): axum::extract::Path<(Uuid, Uuid)>,
     Json(payload): Json<UpdateChatSessionAgentRequest>,
 ) -> Result<ResponseJson<ApiResponse<ChatSessionAgent>>, ApiError> {
     if session.status != ChatSessionStatus::Active {
@@ -168,7 +168,7 @@ pub async fn update_session_agent(
 pub async fn delete_session_agent(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
-    axum::extract::Path(session_agent_id): axum::extract::Path<Uuid>,
+    axum::extract::Path((_session_id, session_agent_id)): axum::extract::Path<(Uuid, Uuid)>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
     let Some(existing) =
         ChatSessionAgent::find_by_id(&deployment.db().pool, session_agent_id).await?
@@ -292,7 +292,7 @@ async fn handle_chat_stream_ws(
 pub async fn stop_session_agent(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
-    axum::extract::Path(session_agent_id): axum::extract::Path<Uuid>,
+    axum::extract::Path((_session_id, session_agent_id)): axum::extract::Path<(Uuid, Uuid)>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
     // Check that session agent exists and belongs to this session
     let Some(existing) =
