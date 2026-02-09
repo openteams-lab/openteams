@@ -16,12 +16,16 @@ export interface UseChatMutationsResult {
       { sessionId: string; content: string; meta?: JsonValue }
     >
   >;
+  deleteMessages: ReturnType<
+    typeof useMutation<number, Error, { sessionId: string; messageIds: string[] }>
+  >;
 }
 
 export function useChatMutations(
   onSessionCreated?: (session: ChatSession) => void,
   onSessionUpdated?: (session: ChatSession) => void,
-  onMessageSent?: (message: ChatMessage) => void
+  onMessageSent?: (message: ChatMessage) => void,
+  onMessagesDeleted?: (count: number) => void
 ): UseChatMutationsResult {
   const queryClient = useQueryClient();
 
@@ -79,11 +83,22 @@ export function useChatMutations(
     },
   });
 
+  const deleteMessages = useMutation({
+    mutationFn: async (params: { sessionId: string; messageIds: string[] }) =>
+      chatApi.deleteMessagesBatch(params.sessionId, params.messageIds),
+    onSuccess: (count, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['chatMessages', variables.sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
+      onMessagesDeleted?.(count);
+    },
+  });
+
   return {
     createSession,
     updateSession,
     archiveSession,
     restoreSession,
     sendMessage,
+    deleteMessages,
   };
 }

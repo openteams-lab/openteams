@@ -13,6 +13,13 @@ use thiserror::Error;
 use tokio::{fs, io::AsyncWriteExt};
 use uuid::Uuid;
 
+/// Maximum number of messages to include in context
+const MAX_CONTEXT_MESSAGES: usize = 30;
+/// Number of recent messages to keep in full (uncompressed)
+const RECENT_MESSAGES_FULL: usize = 5;
+/// Target compression ratio for older messages (keep ~40% of content)
+const COMPRESSION_TARGET_RATIO: f64 = 0.4;
+
 #[derive(Debug, Error)]
 pub enum ChatServiceError {
     #[error(transparent)]
@@ -54,6 +61,134 @@ pub fn extract_reference_message_id(meta: &Value) -> Option<Uuid> {
         .and_then(|value| value.as_str())
         .or_else(|| meta.get("reference_message_id").and_then(|value| value.as_str()));
     id.and_then(|value| Uuid::parse_str(value).ok())
+}
+
+/// Compress message content to reduce token usage
+/// Keeps the first part of content and truncates with "..." if too long
+fn compress_content(content: &str, max_chars: usize) -> String {
+    let content = content.trim();
+    if content.chars().count() <= max_chars {
+        return content.to_string();
+    }
+
+    // Find a good break point (end of sentence or word)
+    let chars: Vec<char> = content.chars().collect();
+    let mut break_point = max_chars;
+
+    // Try to find sentence end (. ! ?) within the range
+    for i in (max_chars / 2..max_chars).rev() {
+        if i < chars.len() && matches!(chars[i], '.' | '!' | '?' | '。' | '！' | '？') {
+            break_point = i + 1;
+            break;
+        }
+    }
+
+    // If no sentence end, find word boundary
+    if break_point == max_chars {
+        for i in (max_chars / 2..max_chars).rev() {
+            if i < chars.len() && (chars[i].is_whitespace() || chars[i] == ',') {
+                break_point = i;
+                break;
+            }
+        }
+    }
+
+    let truncated: String = chars[..break_point.min(chars.len())].iter().collect();
+    format!("{}...[truncated]", truncated.trim())
+}
+
+/// Build structured messages with compression for older messages
+/// - Keeps the most recent RECENT_MESSAGES_FULL messages in full
+/// - Compresses older messages (from index 6 to the oldest)
+/// - Limits total messages to MAX_CONTEXT_MESSAGES
+pub async fn build_structured_messages_with_compression(
+    pool: &SqlitePool,
+    session_id: Uuid,
+) -> Result<Vec<Value>, ChatServiceError> {
+    let messages = ChatMessage::find_by_session_id(pool, session_id, None).await?;
+    let agents = ChatAgent::find_all(pool).await?;
+    let agent_map: HashMap<Uuid, String> =
+        agents.into_iter().map(|agent| (agent.id, agent.name)).collect();
+
+    let total_messages = messages.len();
+    // Apply message limit - take the most recent MAX_CONTEXT_MESSAGES
+    let messages: Vec<_> = if total_messages > MAX_CONTEXT_MESSAGES {
+        messages.into_iter().skip(total_messages - MAX_CONTEXT_MESSAGES).collect()
+    } else {
+        messages
+    };
+
+    let message_count = messages.len();
+    let mut result = Vec::with_capacity(message_count);
+
+    for (idx, message) in messages.into_iter().enumerate() {
+        let sender_handle = message
+            .meta
+            .0
+            .get("sender_handle")
+            .and_then(|value| value.as_str())
+            .map(|value| value.to_string());
+        let sender_name = message
+            .sender_id
+            .and_then(|id| agent_map.get(&id).cloned());
+        let sender_label = match message.sender_type {
+            ChatSenderType::User => sender_handle
+                .clone()
+                .unwrap_or_else(|| "user".to_string()),
+            ChatSenderType::Agent => sender_name
+                .clone()
+                .or_else(|| message.sender_id.map(|id| id.to_string()))
+                .unwrap_or_else(|| "agent".to_string()),
+            ChatSenderType::System => "system".to_string(),
+        };
+
+        let sender = serde_json::json!({
+            "type": message.sender_type,
+            "id": message.sender_id,
+            "handle": sender_handle,
+            "name": sender_name,
+            "label": sender_label,
+        });
+
+        // Determine if this message should be compressed
+        // Recent messages (last RECENT_MESSAGES_FULL) are kept in full
+        let is_recent = idx >= message_count.saturating_sub(RECENT_MESSAGES_FULL);
+
+        let content = if is_recent {
+            message.content.clone()
+        } else {
+            // Compress older messages - target ~40% of original length
+            let original_len = message.content.chars().count();
+            let target_len = (original_len as f64 * COMPRESSION_TARGET_RATIO) as usize;
+            let max_chars = target_len.max(100).min(500); // At least 100 chars, max 500
+            compress_content(&message.content, max_chars)
+        };
+
+        // For compressed messages, strip meta to save tokens
+        let meta = if is_recent {
+            message.meta.0.clone()
+        } else {
+            // Keep only essential meta for compressed messages
+            let mut minimal_meta = serde_json::json!({});
+            if let Some(sender_info) = message.meta.0.get("sender") {
+                minimal_meta["sender"] = sender_info.clone();
+            }
+            minimal_meta
+        };
+
+        result.push(serde_json::json!({
+            "id": message.id,
+            "session_id": message.session_id,
+            "created_at": message.created_at,
+            "sender": sender,
+            "content": content,
+            "mentions": message.mentions.0,
+            "meta": meta,
+            "compressed": !is_recent,
+        }));
+    }
+
+    Ok(result)
 }
 
 pub fn parse_mentions(content: &str) -> Vec<String> {

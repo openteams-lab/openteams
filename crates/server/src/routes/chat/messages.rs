@@ -33,6 +33,12 @@ pub struct CreateChatMessageRequest {
     pub meta: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct DeleteMessagesRequest {
+    pub message_ids: Vec<Uuid>,
+}
+
 fn sanitize_filename(name: &str) -> String {
     let sanitized: String = name
         .chars()
@@ -270,4 +276,28 @@ pub async fn delete_message(
     } else {
         Ok(ResponseJson(ApiResponse::success(())))
     }
+}
+
+/// Delete multiple messages at once
+pub async fn delete_messages_batch(
+    Extension(session): Extension<ChatSession>,
+    State(deployment): State<DeploymentImpl>,
+    Json(payload): Json<DeleteMessagesRequest>,
+) -> Result<ResponseJson<ApiResponse<u64>>, ApiError> {
+    if payload.message_ids.is_empty() {
+        return Ok(ResponseJson(ApiResponse::success(0)));
+    }
+
+    let mut total_deleted: u64 = 0;
+    for message_id in payload.message_ids {
+        // Verify the message belongs to this session before deleting
+        if let Some(message) = ChatMessage::find_by_id(&deployment.db().pool, message_id).await? {
+            if message.session_id == session.id {
+                let rows = ChatMessage::delete(&deployment.db().pool, message_id).await?;
+                total_deleted += rows;
+            }
+        }
+    }
+
+    Ok(ResponseJson(ApiResponse::success(total_deleted)))
 }

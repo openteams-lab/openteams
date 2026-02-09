@@ -25,7 +25,7 @@ use db::{
 use executors::{
     approvals::NoopExecutorApprovalService,
     env::{ExecutionEnv, RepoContext},
-    executors::{BaseCodingAgent, ExecutorError, StandardCodingAgentExecutor},
+    executors::{BaseCodingAgent, CancellationToken, ExecutorError, StandardCodingAgentExecutor},
     logs::{NormalizedEntryType, utils::patch::extract_normalized_entry_from_patch},
     profile::{ExecutorConfigs, ExecutorProfileId},
 };
@@ -134,8 +134,8 @@ pub enum ChatRunnerError {
 pub struct ChatRunner {
     db: DBService,
     streams: Arc<DashMap<Uuid, broadcast::Sender<ChatStreamEvent>>>,
-    // Store running processes, key = session_agent_id
-    running_processes: Arc<DashMap<Uuid, Arc<Mutex<Option<command_group::AsyncGroupChild>>>>>,
+    // Store cancellation tokens for graceful shutdown, key = session_agent_id
+    cancellation_tokens: Arc<DashMap<Uuid, CancellationToken>>,
 }
 
 impl ChatRunner {
@@ -143,7 +143,7 @@ impl ChatRunner {
         Self {
             db,
             streams: Arc::new(DashMap::new()),
-            running_processes: Arc::new(DashMap::new()),
+            cancellation_tokens: Arc::new(DashMap::new()),
         }
     }
 
@@ -463,7 +463,7 @@ impl ChatRunner {
                 agent.name.clone(),
             );
 
-            self.spawn_exit_watcher(spawned.child, msg_store, failed_flag, session_agent_id);
+            self.spawn_exit_watcher(spawned.child, spawned.cancel, msg_store, failed_flag, session_agent_id);
 
             Ok::<(), ChatRunnerError>(())
         }
@@ -708,8 +708,9 @@ impl ChatRunner {
         workspace_path: &str,
         run_dir: &PathBuf,
     ) -> Result<ContextSnapshot, ChatRunnerError> {
+        // Use compressed messages to reduce prompt size and token consumption
         let messages =
-            crate::services::chat::build_structured_messages(&self.db.pool, session_id).await?;
+            crate::services::chat::build_structured_messages_with_compression(&self.db.pool, session_id).await?;
         let mut jsonl = String::new();
         for message in messages {
             let line = serde_json::to_string(&message).unwrap_or_default();
@@ -1152,64 +1153,59 @@ impl ChatRunner {
 
     fn spawn_exit_watcher(
         &self,
-        child: command_group::AsyncGroupChild,
+        mut child: command_group::AsyncGroupChild,
+        cancel_token: Option<CancellationToken>,
         msg_store: Arc<MsgStore>,
         failed_flag: Arc<AtomicBool>,
         session_agent_id: Uuid,
     ) {
-        // Store the process reference for potential termination
-        let process_ref = Arc::new(Mutex::new(Some(child)));
-        self.running_processes.insert(session_agent_id, process_ref.clone());
+        // Store the cancellation token for graceful shutdown
+        if let Some(ref token) = cancel_token {
+            self.cancellation_tokens.insert(session_agent_id, token.clone());
+        }
 
-        let running_processes = self.running_processes.clone();
+        let cancellation_tokens = self.cancellation_tokens.clone();
         tokio::spawn(async move {
             loop {
-                let mut guard = process_ref.lock().await;
-                if let Some(ref mut child) = *guard {
-                    match child.try_wait() {
-                        Ok(Some(status)) => {
-                            if !status.success() {
-                                failed_flag.store(true, Ordering::Relaxed);
-                            }
-                            msg_store.push_finished();
-                            drop(guard);
-                            // Clean up the process reference
-                            running_processes.remove(&session_agent_id);
-                            break;
-                        }
-                        Ok(None) => {
-                            drop(guard);
-                            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-                        }
-                        Err(err) => {
-                            msg_store.push(LogMsg::Stderr(format!("process wait error: {err}")));
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        if !status.success() {
                             failed_flag.store(true, Ordering::Relaxed);
-                            msg_store.push_finished();
-                            drop(guard);
-                            // Clean up the process reference
-                            running_processes.remove(&session_agent_id);
-                            break;
                         }
+                        msg_store.push_finished();
+                        // Clean up the cancellation token
+                        cancellation_tokens.remove(&session_agent_id);
+                        break;
                     }
-                } else {
-                    // Process was terminated externally
-                    drop(guard);
-                    running_processes.remove(&session_agent_id);
-                    break;
+                    Ok(None) => {
+                        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                    }
+                    Err(err) => {
+                        msg_store.push(LogMsg::Stderr(format!("process wait error: {err}")));
+                        failed_flag.store(true, Ordering::Relaxed);
+                        msg_store.push_finished();
+                        // Clean up the cancellation token
+                        cancellation_tokens.remove(&session_agent_id);
+                        break;
+                    }
                 }
             }
         });
     }
 
-    /// Stop a running agent by killing its process
+    /// Stop a running agent by triggering graceful cancellation via CancellationToken
     pub async fn stop_agent(&self, session_id: Uuid, session_agent_id: Uuid) -> Result<(), ChatRunnerError> {
-        // Try to kill the process
-        if let Some(process_ref) = self.running_processes.get(&session_agent_id) {
-            let mut guard = process_ref.lock().await;
-            if let Some(mut child) = guard.take() {
-                // Kill the process group
-                let _ = child.kill();
-            }
+        tracing::info!("stop_agent called for session_agent_id: {}", session_agent_id);
+
+        // Try to cancel the agent via CancellationToken (graceful shutdown)
+        let token_found = self.cancellation_tokens.contains_key(&session_agent_id);
+        tracing::info!("CancellationToken found: {}", token_found);
+
+        if let Some(token) = self.cancellation_tokens.get(&session_agent_id) {
+            tracing::info!("Cancelling agent for session_agent_id: {}", session_agent_id);
+            token.cancel();
+        } else {
+            tracing::warn!("No CancellationToken found for session_agent_id: {}", session_agent_id);
         }
 
         // Update state to Dead
@@ -1231,8 +1227,8 @@ impl ChatRunner {
             },
         );
 
-        // Clean up the process reference
-        self.running_processes.remove(&session_agent_id);
+        // Clean up the cancellation token
+        self.cancellation_tokens.remove(&session_agent_id);
 
         Ok(())
     }

@@ -41,6 +41,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             get(messages::get_messages).post(messages::create_message),
         )
         .route(
+            "/messages/batch-delete",
+            axum::routing::post(messages::delete_messages_batch),
+        )
+        .route(
             "/messages/upload",
             axum::routing::post(messages::upload_message_attachments)
                 .layer(DefaultBodyLimit::max(25 * 1024 * 1024)),
