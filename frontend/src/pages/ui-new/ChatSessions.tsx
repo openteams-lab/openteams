@@ -1619,7 +1619,7 @@ export function ChatSessions() {
                   }
                 >
                   <div className="text-sm text-low">
-                    工作执行中，请稀等... 已用{elapsedSeconds}秒
+                    工作执行中，请稍等... 已用{elapsedSeconds}秒
                   </div>
                 </ChatEntryContainer>
               </div>
@@ -1649,7 +1649,7 @@ export function ChatSessions() {
                   headerRight={
                     <div className="flex items-center gap-base text-xs text-low">
                       <span className="flex items-center gap-half">
-                        <span>工作执行中，请稀等</span>
+                        <span>工作执行中，请稍等</span>
                         <span className="flex items-center gap-[2px]">
                           <span className="size-dot rounded-full bg-brand animate-running-dot-1" />
                           <span className="size-dot rounded-full bg-brand animate-running-dot-2" />
