@@ -9,25 +9,6 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  CaretRightIcon,
-  ChatsTeardropIcon,
-  CheckCircleIcon,
-  PencilSimpleIcon,
-  PaperclipIcon,
-  PaperPlaneRightIcon,
-  PaperPlaneTiltIcon,
-  PlusIcon,
-  UsersIcon,
-  ArrowsOutSimpleIcon,
-  ArrowsInSimpleIcon,
-  XCircleIcon,
-  XIcon,
-  TrashIcon,
-  CheckSquareIcon,
-  SquareIcon,
-  EyeIcon,
-} from '@phosphor-icons/react';
-import {
   ChatMessage,
   ChatSenderType,
   ChatSessionStatus,
@@ -36,29 +17,9 @@ import {
   type AvailabilityInfo,
   type JsonValue,
 } from 'shared/types';
-import type { ChatAttachment } from './chat/types';
 import { ApiError, chatApi, configApi } from '@/lib/api';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogHeader,
-  DialogTitle,
-  DialogContent,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
-import { MultiSelectDropdown } from '@/components/ui-new/primitives/MultiSelectDropdown';
-import { ChatEntryContainer } from '@/components/ui-new/primitives/conversation/ChatEntryContainer';
-import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
-import { ChatSystemMessage } from '@/components/ui-new/primitives/conversation/ChatSystemMessage';
-import { DiffViewBody } from '@/components/ui-new/primitives/conversation/PierreConversationDiff';
-import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
-import RawLogText from '@/components/common/RawLogText';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useTheme } from '@/components/ThemeProvider';
-import { formatDateShortWithTime } from '@/utils/date';
-import { toPrettyCase } from '@/utils/string';
 import { getActualTheme } from '@/utils/theme';
 
 import {
@@ -72,19 +33,30 @@ import {
   useMessageInput,
   useDiffViewer,
   fallbackRunnerTypes,
-  agentStateLabels,
-  agentStateDotClass,
   memberNameRegex,
   getMessageTone,
   extractDiffMeta,
   extractMentions,
   extractReferenceId,
   extractAttachments,
-  formatBytes,
   truncateText,
   sanitizeHandle,
-  detectApiError,
 } from './chat';
+
+import { isAllowedAttachment } from './chat/components/MessageInputArea';
+import { SessionListSidebar } from './chat/components/SessionListSidebar';
+import { ChatHeader } from './chat/components/ChatHeader';
+import { CleanupModeBar } from './chat/components/CleanupModeBar';
+import { ChatMessageItem } from './chat/components/ChatMessageItem';
+import { RunningAgentPlaceholder } from './chat/components/RunningAgentPlaceholder';
+import { StreamingRunEntry } from './chat/components/StreamingRunEntry';
+import { MessageInputArea } from './chat/components/MessageInputArea';
+import { AiMembersSidebar } from './chat/components/AiMembersSidebar';
+import { WorkspaceDrawer } from './chat/components/WorkspaceDrawer';
+import { DiffViewerModal } from './chat/components/DiffViewerModal';
+import { PromptEditorModal } from './chat/components/PromptEditorModal';
+import { ConfirmModal } from './chat/components/ConfirmModal';
+import { FilePreviewModal } from './chat/components/FilePreviewModal';
 
 const mentionStatusPriority: Record<MentionStatus, number> = {
   received: 0,
@@ -92,48 +64,6 @@ const mentionStatusPriority: Record<MentionStatus, number> = {
   completed: 2,
   failed: 2,
 };
-
-const allowedAttachmentExtensions = [
-  '.txt',
-  '.csv',
-  '.md',
-  '.json',
-  '.xml',
-  '.yaml',
-  '.yml',
-  '.html',
-  '.htm',
-  '.css',
-  '.js',
-  '.ts',
-  '.jsx',
-  '.tsx',
-  '.py',
-  '.java',
-  '.c',
-  '.cpp',
-  '.h',
-  '.hpp',
-  '.rb',
-  '.php',
-  '.go',
-  '.rs',
-  '.sql',
-  '.sh',
-  '.bash',
-  '.svg',
-];
-
-const isTextAttachment = (file: File) =>
-  file.type.startsWith('text/') ||
-  allowedAttachmentExtensions.some((ext) =>
-    file.name.toLowerCase().endsWith(ext)
-  );
-
-const isImageAttachment = (file: File) => file.type.startsWith('image/');
-
-const isAllowedAttachment = (file: File) =>
-  isTextAttachment(file) || isImageAttachment(file);
 
 const coerceMentionStatus = (value: unknown): MentionStatus | null => {
   if (
@@ -146,6 +76,17 @@ const coerceMentionStatus = (value: unknown): MentionStatus | null => {
   }
   return null;
 };
+
+const isImageAttachment = (file: File) => file.type.startsWith('image/');
+
+const isTextAttachment = (file: File) =>
+  file.type.startsWith('text/') ||
+  [
+    '.txt', '.csv', '.md', '.json', '.xml', '.yaml', '.yml',
+    '.html', '.htm', '.css', '.js', '.ts', '.jsx', '.tsx',
+    '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.rb', '.php',
+    '.go', '.rs', '.sql', '.sh', '.bash', '.svg',
+  ].some((ext) => file.name.toLowerCase().endsWith(ext));
 
 export function ChatSessions() {
   const { sessionId } = useParams<{ sessionId?: string }>();
@@ -176,17 +117,37 @@ export function ChatSessions() {
   // Messages state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  const upsertMessage = useCallback((message: ChatMessage) => {
-    setMessages((prev) => {
-      const existingIndex = prev.findIndex((item) => item.id === message.id);
-      if (existingIndex >= 0) {
-        const next = [...prev];
-        next[existingIndex] = message;
-        return next;
-      }
-      return [...prev, message];
-    });
-  }, []);
+  const upsertMessage = useCallback(
+    (message: ChatMessage) => {
+      setMessages((prev) => {
+        const existingIndex = prev.findIndex((item) => item.id === message.id);
+        if (existingIndex >= 0) {
+          const next = [...prev];
+          next[existingIndex] = message;
+          return next;
+        }
+        return [...prev, message];
+      });
+
+      if (!message.session_id) return;
+      queryClient.setQueryData<ChatMessage[]>(
+        ['chatMessages', message.session_id],
+        (prev) => {
+          if (!prev) return [message];
+          const existingIndex = prev.findIndex(
+            (item) => item.id === message.id
+          );
+          if (existingIndex >= 0) {
+            const next = [...prev];
+            next[existingIndex] = message;
+            return next;
+          }
+          return [...prev, message];
+        }
+      );
+    },
+    [queryClient]
+  );
 
   // WebSocket connection
   const {
@@ -217,13 +178,11 @@ export function ChatSessions() {
     (session) => navigate(`/chat/${session.id}`),
     upsertMessage,
     (_count) => {
-      // Refresh messages after deletion
       if (activeSessionId) {
         queryClient.invalidateQueries({ queryKey: ['chatMessages', activeSessionId] });
       }
     },
     () => {
-      // Navigate to chat root after session deletion
       navigate('/chat');
     }
   );
@@ -308,10 +267,8 @@ export function ChatSessions() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [titleError, setTitleError] = useState<string | null>(null);
-  // Cleanup mode states
   const [isCleanupMode, setIsCleanupMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
-  // Confirm modal state
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
     message: string;
@@ -319,10 +276,9 @@ export function ChatSessions() {
   } | null>(null);
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [isDeletingMessages, setIsDeletingMessages] = useState(false);
-  // Resizable panel states
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState(288); // 18rem = 288px
-  const [rightSidebarWidth, setRightSidebarWidth] = useState(320); // 20rem = 320px
-  const [inputAreaHeight, setInputAreaHeight] = useState(240); // min-h-[240px]
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(288);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
+  const [inputAreaHeight, setInputAreaHeight] = useState(240);
   const [isResizing, setIsResizing] = useState<'left' | 'right' | 'input' | null>(null);
   const resizeStartRef = useRef<{ startX: number; startY: number; startWidth: number; startHeight: number } | null>(null);
 
@@ -452,13 +408,11 @@ export function ChatSessions() {
     [agentAvailability, isCheckingAvailability]
   );
 
-  // Get model name from profiles for a given runner type and variant
   const getModelName = useCallback(
     (runnerType: string, variant?: string): string | null => {
       if (!profiles) return null;
       const executorConfig = profiles[runnerType];
       if (!executorConfig) return null;
-      // Get the specified variant, or DEFAULT, or first available variant
       const variantKey = variant && variant in executorConfig
         ? variant
         : 'DEFAULT' in executorConfig
@@ -467,21 +421,18 @@ export function ChatSessions() {
       if (!variantKey) return null;
       const variantConfig = executorConfig[variantKey];
       if (!variantConfig) return null;
-      // The config is wrapped like { "CLAUDE_CODE": { model: "..." } }
       const innerConfig = Object.values(variantConfig)[0] as { model?: string | null } | undefined;
       return innerConfig?.model ?? null;
     },
     [profiles]
   );
 
-  // Get available variants for a given runner type
   const getVariantOptions = useCallback(
     (runnerType: string): string[] => {
       if (!profiles) return [];
       const executorConfig = profiles[runnerType];
       if (!executorConfig) return [];
       const variants = Object.keys(executorConfig);
-      // Sort: DEFAULT first, then alphabetically
       return variants.sort((a, b) => {
         if (a === 'DEFAULT') return -1;
         if (b === 'DEFAULT') return 1;
@@ -491,7 +442,6 @@ export function ChatSessions() {
     [profiles]
   );
 
-  // Get variant options for current member runner type
   const memberVariantOptions = useMemo(
     () => getVariantOptions(newMemberRunnerType),
     [getVariantOptions, newMemberRunnerType]
@@ -541,9 +491,11 @@ export function ChatSessions() {
 
   const placeholderAgents = useMemo(
     () =>
-      sessionMembers.filter(
-        (member) => agentStates[member.agent.id] === ChatSessionAgentState.running
-      ),
+      sessionMembers.filter((member) => {
+        const state =
+          agentStates[member.agent.id] ?? member.sessionAgent.state;
+        return state === ChatSessionAgentState.running;
+      }),
     [agentStates, sessionMembers]
   );
 
@@ -582,9 +534,6 @@ export function ChatSessions() {
     !isUploadingAttachments;
 
   const diffViewerRun = diffViewerRunId ? runDiffs[diffViewerRunId] : null;
-  const DiffViewerIcon = diffViewerFullscreen
-    ? ArrowsInSimpleIcon
-    : ArrowsOutSimpleIcon;
 
   // Check agent availability
   useEffect(() => {
@@ -644,7 +593,6 @@ export function ChatSessions() {
   // Set default variant when runner type changes
   useEffect(() => {
     if (memberVariantOptions.length > 0) {
-      // Set to DEFAULT if available, otherwise first option
       const defaultVariant = memberVariantOptions.includes('DEFAULT')
         ? 'DEFAULT'
         : memberVariantOptions[0];
@@ -677,19 +625,21 @@ export function ChatSessions() {
       }
       return next;
     });
-    // Also sync agentStateInfos with updated_at as startedAt for running agents
-    // This ensures the timer works correctly after page refresh
     setAgentStateInfos((prev) => {
       const next = { ...prev };
       for (const sessionAgent of sessionAgents) {
-        // Only set if not already present (WebSocket events take precedence)
-        if (!next[sessionAgent.agent_id]) {
+        const existing = next[sessionAgent.agent_id];
+        const shouldSetStartedAt =
+          sessionAgent.state === ChatSessionAgentState.running &&
+          !existing?.startedAt;
+        const shouldUpdateState =
+          !existing || existing.state !== sessionAgent.state;
+        if (shouldUpdateState || shouldSetStartedAt) {
           next[sessionAgent.agent_id] = {
             state: sessionAgent.state,
-            // Use updated_at as startedAt for running agents
             startedAt:
               sessionAgent.state === ChatSessionAgentState.running
-                ? sessionAgent.updated_at
+                ? existing?.startedAt ?? sessionAgent.updated_at
                 : null,
           };
         }
@@ -698,15 +648,12 @@ export function ChatSessions() {
     });
   }, [sessionAgents, setAgentStates, setAgentStateInfos]);
 
-  // Running timer - tick clock when any agent is running
+  // Running timer
   useEffect(() => {
-    const hasRunning = sessionMembers.some(
-      (member) => agentStates[member.agent.id] === ChatSessionAgentState.running
-    );
-    if (!hasRunning) return;
+    if (placeholderAgents.length === 0) return;
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [agentStates, sessionMembers]);
+  }, [placeholderAgents]);
 
   // Title editing
   useEffect(() => {
@@ -780,10 +727,8 @@ export function ChatSessions() {
         : '';
     const content = [mentionPrefix, trimmed].filter(Boolean).join(' ').trim();
 
-    // If there are no content and no files, exit early
     if (!content && attachedFiles.length === 0) return;
 
-    // Check if any mentioned agent is currently running
     const allMentions = new Set([...contentMentions, ...selectedMentions]);
     const runningMentionedAgents: string[] = [];
     allMentions.forEach((name) => {
@@ -817,14 +762,12 @@ export function ChatSessions() {
     };
 
     try {
-      // If there are attached files, upload them with the message content
       if (attachedFiles.length > 0) {
         await handleAttachmentUpload(attachedFiles, {
           content: content || undefined,
           referenceMessageId: replyToMessage?.id,
         });
       } else {
-        // Send content only if there are no files
         await sendMessage.mutateAsync({
           sessionId: activeSessionId,
           content,
@@ -834,7 +777,6 @@ export function ChatSessions() {
 
       resetInput();
       inputRef.current?.focus();
-      // Clear attached files after sending
       setAttachedFiles([]);
     } catch (error) {
       console.warn('Failed to send chat message', error);
@@ -849,7 +791,6 @@ export function ChatSessions() {
     const list = Array.from(files);
     if (list.length === 0) return;
 
-    // Filter for allowed file types (text and images) only
     const allowedFiles = list.filter((file) => isAllowedAttachment(file));
 
     if (allowedFiles.length === 0) {
@@ -871,7 +812,6 @@ export function ChatSessions() {
       );
       upsertMessage(message);
       queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
-      // Clear attached files after successful upload
       setAttachedFiles([]);
     } catch (error) {
       console.warn('Failed to upload attachments', error);
@@ -884,7 +824,6 @@ export function ChatSessions() {
   const handleAttachmentInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       const files = Array.from(event.target.files);
-      // Filter files by type before adding to state
       const allowedFiles = files.filter((file) => isAllowedAttachment(file));
 
       if (allowedFiles.length !== files.length) {
@@ -892,7 +831,6 @@ export function ChatSessions() {
         setAttachmentError(`Some files were rejected (${rejectedCount}). Only text files and images are allowed.`);
       }
 
-      // Add allowed files to the attachedFiles state
       setAttachedFiles(prev => [...prev, ...allowedFiles]);
     }
     event.target.value = '';
@@ -906,31 +844,23 @@ export function ChatSessions() {
     setAttachedFiles([]);
   };
 
-  // Function to download and add an attachment to the current file list
-  const addAttachmentAsFile = async (messageId: string, attachment: ChatAttachment) => {
+  const addAttachmentAsFile = async (messageId: string, attachment: { id: string; name: string; mime_type?: string | null }) => {
     if (!activeSessionId || !attachment.id) return;
 
     try {
-      // Get the attachment URL
       const attachmentUrl = chatApi.getChatAttachmentUrl(
         activeSessionId,
         messageId,
         attachment.id
       );
 
-      // Fetch the attachment
       const response = await fetch(attachmentUrl);
       if (!response.ok) {
         throw new Error(`Failed to download attachment: ${response.statusText}`);
       }
 
-      // Convert the response to a blob
       const blob = await response.blob();
-
-      // Create a File object from the blob
       const file = new File([blob], attachment.name, { type: blob.type });
-
-      // Add the file to attachedFiles
       setAttachedFiles(prev => [...prev, file]);
     } catch (error) {
       console.error('Error downloading attachment:', error);
@@ -938,24 +868,18 @@ export function ChatSessions() {
     }
   };
 
-  // Function to preview a file
   const previewAttachedFile = async (file: File) => {
     try {
-      // For text files, read the content
       if (isTextAttachment(file)) {
         const content = await file.text();
         setPreviewFile({file, content});
-      }
-      // For image files, create a data URL
-      else if (isImageAttachment(file)) {
+      } else if (isImageAttachment(file)) {
         const reader = new FileReader();
         reader.onload = (e) => {
           setPreviewFile({file, content: e.target?.result as string});
         };
         reader.readAsDataURL(file);
-      }
-      // For other file types, we could show file info or a preview placeholder
-      else {
+      } else {
         setPreviewFile({file, content: null});
       }
     } catch (error) {
@@ -1196,17 +1120,13 @@ export function ChatSessions() {
       message: `Are you sure you want to remove @${member.agent.name} from this session?`,
       onConfirm: async () => {
         try {
-          console.log('Deleting session agent:', { activeSessionId, sessionAgentId });
           await chatApi.deleteSessionAgent(activeSessionId, sessionAgentId);
-          console.log('Delete successful, invalidating queries...');
-          // Invalidate and refetch to ensure UI updates
           await queryClient.invalidateQueries({
             queryKey: ['chatSessionAgents', activeSessionId],
           });
           await queryClient.refetchQueries({
             queryKey: ['chatSessionAgents', activeSessionId],
           });
-          console.log('Queries refetched');
           if (workspaceAgentId === member.agent.id) {
             setWorkspaceDrawerOpen(false);
             setWorkspaceAgentId(null);
@@ -1336,97 +1256,19 @@ export function ChatSessions() {
   }, [isResizing]);
 
   return (
-    <div className="relative flex h-full min-h-0 bg-primary overflow-hidden select-none">
+    <div className="relative flex h-full min-h-0 bg-white overflow-hidden select-none">
       {/* Session List Sidebar */}
-      <aside
-        className="border-r border-border flex flex-col min-h-0 shrink-0"
-        style={{ width: leftSidebarWidth }}
-      >
-        <div className="px-base py-base border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-half text-normal font-medium">
-            <ChatsTeardropIcon className="size-icon-sm" />
-            <span>Group Chat</span>
-          </div>
-          <PrimaryButton
-            variant="secondary"
-            value="New"
-            onClick={() => createSession.mutate()}
-            disabled={createSession.isPending}
-          >
-            <PlusIcon className="size-icon-xs" />
-          </PrimaryButton>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-base space-y-half">
-          {activeSessions.length === 0 && archivedSessions.length === 0 && (
-            <div className="text-sm text-low">
-              No sessions yet. Create your first group chat.
-            </div>
-          )}
-          {activeSessions.map((session) => {
-            const isActive = session.id === activeSessionId;
-            return (
-              <button
-                key={session.id}
-                type="button"
-                onClick={() => navigate(`/chat/${session.id}`)}
-                className={cn(
-                  'w-full text-left rounded-sm border px-base py-half',
-                  isActive
-                    ? 'border-brand bg-brand/10 text-normal'
-                    : 'border-transparent hover:border-border hover:bg-secondary text-low'
-                )}
-              >
-                <div className="flex items-center justify-between gap-base">
-                  <span className="text-sm font-medium truncate text-normal">
-                    {session.title || 'Untitled session'}
-                  </span>
-                  <span className="text-xs text-low">
-                    {formatDateShortWithTime(session.updated_at)}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-          {archivedSessions.length > 0 && (
-            <div className="pt-base mt-base border-t border-border space-y-half">
-              <button
-                type="button"
-                onClick={() => setShowArchived((prev) => !prev)}
-                className="text-xs text-low uppercase tracking-wide hover:text-normal"
-              >
-                {showArchived ? 'Hide Archived' : 'Show Archived'} (
-                {archivedSessions.length})
-              </button>
-              {showArchived &&
-                archivedSessions.map((session) => {
-                  const isActive = session.id === activeSessionId;
-                  return (
-                    <button
-                      key={session.id}
-                      type="button"
-                      onClick={() => navigate(`/chat/${session.id}`)}
-                      className={cn(
-                        'w-full text-left rounded-sm border px-base py-half',
-                        isActive
-                          ? 'border-brand bg-brand/10 text-normal'
-                          : 'border-transparent hover:border-border hover:bg-secondary text-low'
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-base">
-                        <span className="text-sm font-medium truncate text-normal">
-                          {session.title || 'Untitled session'}
-                        </span>
-                        <span className="text-xs text-low">
-                          {formatDateShortWithTime(session.updated_at)}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-      </aside>
+      <SessionListSidebar
+        activeSessions={activeSessions}
+        archivedSessions={archivedSessions}
+        activeSessionId={activeSessionId}
+        showArchived={showArchived}
+        onToggleArchived={() => setShowArchived((prev) => !prev)}
+        onSelectSession={(id) => navigate(`/chat/${id}`)}
+        onCreateSession={() => createSession.mutate()}
+        isCreating={createSession.isPending}
+        width={leftSidebarWidth}
+      />
 
       {/* Left Sidebar Resize Handle */}
       <div
@@ -1435,184 +1277,87 @@ export function ChatSessions() {
       />
 
       {/* Main Chat Section */}
-      <section className="flex-1 min-w-0 min-h-0 flex flex-col">
-        <header className="px-base py-half border-b border-border flex items-center justify-between">
-          <div className="min-w-0">
-            {!isEditingTitle && (
-              <div className="flex items-center gap-half">
-                <div className="text-sm text-normal font-medium truncate">
-                  {activeSession?.title || 'Untitled session'}
-                </div>
-                {activeSession && (
-                  <>
-                    <button
-                      type="button"
-                      className="text-low hover:text-normal"
-                      onClick={() => {
-                        setIsEditingTitle(true);
-                        setTitleError(null);
-                      }}
-                      aria-label="Edit session name"
-                    >
-                      <PencilSimpleIcon className="size-icon-xs" />
-                    </button>
-                    <button
-                      type="button"
-                      className="text-low hover:text-error"
-                      onClick={() => {
-                        setConfirmModal({
-                          title: 'Delete Session',
-                          message: `Are you sure you want to delete "${activeSession.title || 'Untitled session'}"? This action cannot be undone and all messages will be permanently deleted.`,
-                          onConfirm: async () => {
-                            await deleteSession.mutateAsync(activeSession.id);
-                          },
-                        });
-                      }}
-                      aria-label="Delete session"
-                      title="Delete session"
-                    >
-                      <TrashIcon className="size-icon-xs" />
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-            {isEditingTitle && (
-              <div className="flex items-center gap-half flex-wrap">
-                <input
-                  value={titleDraft}
-                  onChange={(event) => setTitleDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      handleSaveTitle();
-                    }
-                    if (event.key === 'Escape') {
-                      event.preventDefault();
-                      handleCancelTitleEdit();
-                    }
-                  }}
-                  placeholder="Session name"
-                  disabled={updateSession.isPending}
-                  className={cn(
-                    'w-[240px] max-w-full rounded-sm border border-border bg-panel px-base py-half',
-                    'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
-                  )}
-                />
-                <PrimaryButton
-                  value="Save"
-                  onClick={handleSaveTitle}
-                  disabled={updateSession.isPending}
-                />
-                <PrimaryButton
-                  variant="tertiary"
-                  value="Cancel"
-                  onClick={handleCancelTitleEdit}
-                  disabled={updateSession.isPending}
-                />
-              </div>
-            )}
-            {titleError && <div className="text-xs text-error">{titleError}</div>}
-            {activeSession && (
-              <div className="text-xs text-low">
-                Created {formatDateShortWithTime(activeSession.created_at)} / Total messages: {messageList.length}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-base">
-            <div className="flex items-center gap-base text-xs text-low">
-              <UsersIcon className="size-icon-xs" />
-              <span>{sessionMembers.length} AI members</span>
-            </div>
-            {activeSession && (
-              <div className="flex items-center gap-half">
-                {isArchived && (
-                  <Badge variant="secondary" className="text-xs">
-                    Archived
-                  </Badge>
-                )}
-                <PrimaryButton
-                  variant="tertiary"
-                  value={isArchived ? 'Restore' : 'Archive'}
-                  onClick={() => {
-                    if (!activeSessionId) return;
-                    if (isArchived) {
-                      restoreSession.mutate(activeSessionId);
-                    } else {
-                      archiveSession.mutate(activeSessionId);
-                    }
-                  }}
-                  disabled={archiveSession.isPending || restoreSession.isPending}
-                />
-                {!isArchived && (
-                  <PrimaryButton
-                    variant={isCleanupMode ? 'default' : 'secondary'}
-                    value={isCleanupMode ? 'Exit Cleanup' : 'Cleanup'}
-                    onClick={() => {
-                      if (isCleanupMode) {
-                        setIsCleanupMode(false);
-                        setSelectedMessageIds(new Set());
-                      } else {
-                        setIsCleanupMode(true);
-                      }
-                    }}
-                    disabled={isDeletingMessages}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        </header>
+      <section className="flex-1 min-w-0 min-h-0 flex flex-col bg-white">
+        <ChatHeader
+          activeSession={activeSession ?? null}
+          messageCount={messageList.length}
+          memberCount={sessionMembers.length}
+          isArchived={isArchived}
+          isEditingTitle={isEditingTitle}
+          titleDraft={titleDraft}
+          titleError={titleError}
+          isSavingTitle={updateSession.isPending}
+          onStartEditTitle={() => {
+            setIsEditingTitle(true);
+            setTitleError(null);
+          }}
+          onTitleDraftChange={setTitleDraft}
+          onSaveTitle={handleSaveTitle}
+          onCancelTitleEdit={handleCancelTitleEdit}
+          onDeleteSession={() => {
+            if (!activeSession) return;
+            setConfirmModal({
+              title: 'Delete Session',
+              message: `Are you sure you want to delete "${activeSession.title || 'Untitled session'}"? This action cannot be undone and all messages will be permanently deleted.`,
+              onConfirm: async () => {
+                await deleteSession.mutateAsync(activeSession.id);
+              },
+            });
+          }}
+          onArchive={() => {
+            if (activeSessionId) archiveSession.mutate(activeSessionId);
+          }}
+          onRestore={() => {
+            if (activeSessionId) restoreSession.mutate(activeSessionId);
+          }}
+          isArchiving={archiveSession.isPending || restoreSession.isPending}
+          isCleanupMode={isCleanupMode}
+          onToggleCleanupMode={() => {
+            if (isCleanupMode) {
+              setIsCleanupMode(false);
+              setSelectedMessageIds(new Set());
+            } else {
+              setIsCleanupMode(true);
+            }
+          }}
+          isDeletingMessages={isDeletingMessages}
+        />
 
         {/* Cleanup mode controls */}
         {activeSession && isCleanupMode && (
-          <div className="px-base py-half border-b border-border text-xs text-low flex items-center justify-end gap-base">
-            <span>Selected: {selectedMessageIds.size}</span>
-            <button
-              type="button"
-              className="text-brand hover:text-brand-hover"
-              onClick={() => {
-                if (selectedMessageIds.size === messageList.length) {
-                  setSelectedMessageIds(new Set());
-                } else {
-                  setSelectedMessageIds(new Set(messageList.map((m) => m.id)));
-                }
-              }}
-            >
-              {selectedMessageIds.size === messageList.length ? 'Deselect All' : 'Select All'}
-            </button>
-            {selectedMessageIds.size > 0 && (
-              <button
-                type="button"
-                className="text-error hover:text-error/80 flex items-center gap-half"
-                onClick={() => {
-                  if (!activeSessionId) return;
-                  const count = selectedMessageIds.size;
-                  setConfirmModal({
-                    title: 'Delete Messages',
-                    message: `Are you sure you want to delete ${count} message(s)? This action cannot be undone.`,
-                    onConfirm: async () => {
-                      setIsDeletingMessages(true);
-                      try {
-                        await deleteMessages.mutateAsync({
-                          sessionId: activeSessionId,
-                          messageIds: Array.from(selectedMessageIds),
-                        });
-                        setSelectedMessageIds(new Set());
-                        setIsCleanupMode(false);
-                      } finally {
-                        setIsDeletingMessages(false);
-                      }
-                    },
-                  });
-                }}
-                disabled={isDeletingMessages}
-              >
-                <TrashIcon className="size-icon-xs" />
-                Delete Selected
-              </button>
-            )}
-          </div>
+          <CleanupModeBar
+            selectedCount={selectedMessageIds.size}
+            totalCount={messageList.length}
+            onToggleSelectAll={() => {
+              if (selectedMessageIds.size === messageList.length) {
+                setSelectedMessageIds(new Set());
+              } else {
+                setSelectedMessageIds(new Set(messageList.map((m) => m.id)));
+              }
+            }}
+            onDeleteSelected={() => {
+              if (!activeSessionId) return;
+              const count = selectedMessageIds.size;
+              setConfirmModal({
+                title: 'Delete Messages',
+                message: `Are you sure you want to delete ${count} message(s)? This action cannot be undone.`,
+                onConfirm: async () => {
+                  setIsDeletingMessages(true);
+                  try {
+                    await deleteMessages.mutateAsync({
+                      sessionId: activeSessionId,
+                      messageIds: Array.from(selectedMessageIds),
+                    });
+                    setSelectedMessageIds(new Set());
+                    setIsCleanupMode(false);
+                  } finally {
+                    setIsDeletingMessages(false);
+                  }
+                },
+              });
+            }}
+            isDeletingMessages={isDeletingMessages}
+          />
         )}
 
         {/* Messages */}
@@ -1630,7 +1375,6 @@ export function ChatSessions() {
           )}
 
           {messageList.map((message) => {
-            const isUser = message.sender_type === ChatSenderType.user;
             const isAgent = message.sender_type === ChatSenderType.agent;
             const agentName =
               isAgent && message.sender_id
@@ -1638,11 +1382,6 @@ export function ChatSessions() {
                 : null;
             const diffMeta = isAgent ? extractDiffMeta(message.meta) : null;
             const diffInfo = diffMeta && diffMeta.runId ? diffMeta : null;
-            const diffRunId = diffInfo?.runId ?? '';
-            const hasDiffInfo =
-              !!diffInfo &&
-              diffRunId.length > 0 &&
-              (diffInfo.available || diffInfo.untrackedFiles.length > 0);
             const attachments = extractAttachments(message.meta);
             const mentionList = Array.from(
               new Set(message.mentions.filter((mention) => mention.length > 0))
@@ -1652,421 +1391,89 @@ export function ChatSessions() {
             const referenceMessage = referenceId
               ? messageById.get(referenceId)
               : null;
+            const isUser = message.sender_type === ChatSenderType.user;
             const toneKey = isUser
               ? 'user'
               : message.sender_id ?? agentName ?? 'agent';
             const tone = getMessageTone(String(toneKey), isUser);
 
             const isSelected = selectedMessageIds.has(message.id);
-            const toggleSelect = () => {
-              setSelectedMessageIds((prev) => {
-                const next = new Set(prev);
-                if (next.has(message.id)) {
-                  next.delete(message.id);
-                } else {
-                  next.add(message.id);
-                }
-                return next;
-              });
-            };
-
-            if (message.sender_type === ChatSenderType.system) {
-              return (
-                <div key={message.id} className="flex items-start gap-base">
-                  {isCleanupMode && (
-                    <button
-                      type="button"
-                      className="flex-shrink-0 mt-1"
-                      onClick={toggleSelect}
-                    >
-                      {isSelected ? (
-                        <CheckSquareIcon className="size-icon text-brand" weight="fill" />
-                      ) : (
-                        <SquareIcon className="size-icon text-low" />
-                      )}
-                    </button>
-                  )}
-                  <div className="flex-1">
-                    <ChatSystemMessage
-                      content={message.content}
-                      expanded
-                    />
-                  </div>
-                </div>
-              );
-            }
 
             return (
-              <div
+              <ChatMessageItem
                 key={message.id}
-                id={`chat-message-${message.id}`}
-                className={cn('flex items-start gap-base', isUser ? 'justify-end' : 'justify-start')}
-              >
-                {isCleanupMode && !isUser && (
-                  <button
-                    type="button"
-                    className="flex-shrink-0 mt-1"
-                    onClick={toggleSelect}
-                  >
-                    {isSelected ? (
-                      <CheckSquareIcon className="size-icon text-brand" weight="fill" />
-                    ) : (
-                      <SquareIcon className="size-icon text-low" />
-                    )}
-                  </button>
-                )}
-                <ChatEntryContainer
-                  variant={isUser ? 'user' : 'system'}
-                  title={isUser ? 'You' : agentName ?? 'Agent'}
-                  expanded
-                  headerRight={
-                    <div className="flex items-center gap-half text-xs text-low">
-                      <button
-                        type="button"
-                        className={cn(
-                          'text-brand hover:text-brand-hover',
-                          isArchived && 'pointer-events-none opacity-50'
-                        )}
-                        onClick={() => handleLocalReplySelect(message)}
-                        disabled={isArchived}
-                      >
-                        引用
-                      </button>
-                      <span>{formatDateShortWithTime(message.created_at)}</span>
-                    </div>
-                  }
-                  className={cn(
-                    'max-w-[720px] w-full md:w-[80%] shadow-sm rounded-2xl',
-                    isUser && 'ml-auto',
-                    isCleanupMode && isSelected && 'ring-2 ring-brand'
-                  )}
-                  headerClassName="bg-transparent"
-                  style={{
-                    backgroundColor: tone.bg,
-                    borderColor: tone.border,
-                  }}
-                >
-                  {referenceId && (
-                    <div className="mb-half border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
-                      <div className="flex items-center justify-between gap-base">
-                        <span className="font-medium text-normal">
-                          Replying to{' '}
-                          {referenceMessage
-                            ? getMessageSenderLabel(referenceMessage)
-                            : 'message'}
-                        </span>
-                        <button
-                          type="button"
-                          className="text-brand hover:text-brand-hover"
-                          onClick={() => {
-                            if (referenceMessage) {
-                              const element = document.getElementById(
-                                `chat-message-${referenceMessage.id}`
-                              );
-                              element?.scrollIntoView({ behavior: 'smooth' });
-                            }
-                          }}
-                        >
-                          View
-                        </button>
-                      </div>
-                      <div className="mt-half">
-                        {referenceMessage
-                          ? getReferencePreview(referenceMessage)
-                          : 'Referenced message unavailable.'}
-                      </div>
-                      {referenceMessage &&
-                        extractAttachments(referenceMessage.meta).length > 0 && (
-                          <div className="mt-half text-xs text-low">
-                            Attachments:{' '}
-                            {extractAttachments(referenceMessage.meta)
-                              .map((item) => item.name)
-                              .filter(Boolean)
-                              .slice(0, 3)
-                              .join(', ')}
-                          </div>
-                        )}
-                    </div>
-                  )}
-                  {(() => {
-                    const apiError = isAgent ? detectApiError(message.content) : null;
-                    return apiError ? (
-                      <div className="mb-half flex items-center gap-half rounded-sm bg-error/10 border border-error/30 px-base py-half text-xs text-error">
-                        <XCircleIcon className="size-icon-sm flex-shrink-0" weight="fill" />
-                        <span className="font-medium">{apiError.message}</span>
-                        <span className="text-error/70">- Please check your API quota or try again later</span>
-                      </div>
-                    ) : null;
-                  })()}
-                  <ChatMarkdown content={message.content} />
-                  {mentionList.length > 0 && (
-                    <div className="mt-half flex flex-wrap items-center gap-half text-xs text-low">
-                      <span>Mentions:</span>
-                      {mentionList.map((mention) => {
-                        const agentId = agentIdByName.get(mention);
-                        const mentionStatus = mentionStatusMap?.get(mention);
-                        const isFallbackRunning =
-                          !mentionStatusMap &&
-                          !!agentId &&
-                          agentStates[agentId] === ChatSessionAgentState.running;
-                        const isRunning =
-                          mentionStatus === 'running' ||
-                          mentionStatus === 'received' ||
-                          isFallbackRunning;
-                        const isCompleted = mentionStatus === 'completed';
-                        const isFailed = mentionStatus === 'failed';
-                        const showCheck = !isFailed && (isRunning || isCompleted);
-                        const pulse = mentionStatus === 'running';
-                        return (
-                          <Badge
-                            key={`${message.id}-mention-${mention}`}
-                            variant="secondary"
-                            className="flex items-center gap-1 px-2 py-0.5 text-xs"
-                          >
-                            @{mention}
-                            {showCheck && (
-                              <CheckCircleIcon
-                                className={cn(
-                                  'size-icon-2xs text-success',
-                                  pulse && 'animate-pulse'
-                                )}
-                                weight="fill"
-                              />
-                            )}
-                            {isFailed && (
-                              <XCircleIcon
-                                className="size-icon-2xs text-error"
-                                weight="fill"
-                              />
-                            )}
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {attachments.length > 0 && (
-                    <div className="mt-half space-y-half">
-                      {attachments.map((attachment) => {
-                        const attachmentUrl =
-                          activeSessionId && attachment.id
-                            ? chatApi.getChatAttachmentUrl(
-                                activeSessionId,
-                                message.id,
-                                attachment.id
-                              )
-                            : '#';
-                        const isImage =
-                          attachment.kind === 'image' ||
-                          (attachment.mime_type ?? '').startsWith('image/');
-                        return (
-                          <div
-                            key={attachment.id}
-                            className="border border-border rounded-sm bg-panel px-base py-half text-xs text-normal"
-                          >
-                            <div className="flex items-center justify-between gap-base">
-                              <span className="font-ibm-plex-mono break-all">
-                                {attachment.name}
-                              </span>
-                              <div className="flex gap-half">
-                                <button
-                                  type="button"
-                                  className="text-brand hover:text-brand-hover px-1 py-0.5"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Download and add this attachment to the attached files
-                                    addAttachmentAsFile(message.id, attachment);
-                                  }}
-                                  title="Send to agent"
-                                >
-                                  <PaperPlaneTiltIcon className="size-icon-sm" />
-                                </button>
-                                <a
-                                  className="text-brand hover:text-brand-hover"
-                                  href={attachmentUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  Open
-                                </a>
-                              </div>
-                            </div>
-                            {attachment.size_bytes && (
-                              <div className="text-xs text-low">
-                                {formatBytes(attachment.size_bytes)}
-                              </div>
-                            )}
-                            {isImage && attachmentUrl !== '#' && (
-                              <img
-                                src={attachmentUrl}
-                                alt={attachment.name}
-                                loading="lazy"
-                                className="mt-half max-h-56 w-auto rounded-sm border border-border"
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {hasDiffInfo && diffInfo && (
-                    <div className="mt-half border border-border rounded-sm bg-secondary/70 px-base py-half text-xs text-normal">
-                      <div className="flex items-center justify-between gap-base">
-                        <span>Code changes</span>
-                        <button
-                          type="button"
-                          className="text-brand hover:text-brand-hover"
-                          onClick={() =>
-                            handleOpenDiffViewer(
-                              diffRunId,
-                              diffInfo.untrackedFiles,
-                              diffInfo.available
-                            )
-                          }
-                        >
-                          View changes
-                        </button>
-                      </div>
-                      {diffInfo.available && runDiffs[diffRunId]?.loading && (
-                        <div className="mt-half text-xs text-low">
-                          Loading diff...
-                        </div>
-                      )}
-                      {diffInfo.available && runDiffs[diffRunId]?.error && (
-                        <div className="mt-half text-xs text-error">
-                          {runDiffs[diffRunId]?.error}
-                        </div>
-                      )}
-                      {diffInfo.untrackedFiles.length > 0 && (
-                        <div className="mt-half text-xs text-low">
-                          {diffInfo.untrackedFiles.length} untracked file
-                          {diffInfo.untrackedFiles.length === 1 ? '' : 's'}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </ChatEntryContainer>
-                {isCleanupMode && isUser && (
-                  <button
-                    type="button"
-                    className="flex-shrink-0 mt-1"
-                    onClick={toggleSelect}
-                  >
-                    {isSelected ? (
-                      <CheckSquareIcon className="size-icon text-brand" weight="fill" />
-                    ) : (
-                      <SquareIcon className="size-icon text-low" />
-                    )}
-                  </button>
-                )}
-              </div>
+                message={message}
+                senderLabel={getMessageSenderLabel(message)}
+                tone={tone}
+                referenceMessage={referenceMessage ?? null}
+                referenceSenderLabel={
+                  referenceMessage
+                    ? getMessageSenderLabel(referenceMessage)
+                    : null
+                }
+                referencePreview={
+                  referenceMessage
+                    ? getReferencePreview(referenceMessage)
+                    : null
+                }
+                mentionList={mentionList}
+                mentionStatusMap={mentionStatusMap}
+                agentStates={agentStates}
+                agentIdByName={agentIdByName}
+                attachments={attachments}
+                activeSessionId={activeSessionId}
+                onAddAttachmentAsFile={addAttachmentAsFile}
+                diffInfo={diffInfo}
+                runDiffs={runDiffs}
+                onOpenDiffViewer={handleOpenDiffViewer}
+                isArchived={isArchived}
+                onReply={handleLocalReplySelect}
+                isCleanupMode={isCleanupMode}
+                isSelected={isSelected}
+                onToggleSelect={() => {
+                  setSelectedMessageIds((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(message.id)) {
+                      next.delete(message.id);
+                    } else {
+                      next.add(message.id);
+                    }
+                    return next;
+                  });
+                }}
+              />
             );
           })}
 
           {/* Running placeholders */}
-          {placeholderAgents.map((member) => {
-            const stateInfo = agentStateInfos[member.agent.id];
-            const startedAtStr = stateInfo?.startedAt;
-            const startedAtMs = startedAtStr
-              ? new Date(startedAtStr).getTime()
-              : clock;
-            const elapsedSeconds = Math.max(
-              0,
-              Math.floor((clock - startedAtMs) / 1000)
-            );
-            const tone = getMessageTone(member.agent.id, false);
-            const isStopping = stoppingAgents.has(member.agent.id);
-            return (
-              <div
-                key={`placeholder-${member.agent.id}`}
-                className="flex justify-start"
-              >
-                <ChatEntryContainer
-                  variant="system"
-                  title={member.agent.name}
-                  expanded
-                  className="max-w-[720px] w-full md:w-[80%] opacity-80 shadow-sm rounded-2xl"
-                  headerClassName="bg-transparent"
-                  style={{
-                    backgroundColor: tone.bg,
-                    borderColor: tone.border,
-                  }}
-                  headerRight={
-                    <button
-                      type="button"
-                      className={cn(
-                        'text-xs text-error hover:text-error/80',
-                        isStopping && 'opacity-50 cursor-not-allowed'
-                      )}
-                      onClick={() =>
-                        handleStopAgent(member.sessionAgent.id, member.agent.id)
-                      }
-                      disabled={isStopping}
-                    >
-                      {isStopping ? '停止中...' : '停止'}
-                    </button>
-                  }
-                >
-                  <div className="text-sm text-low">
-                    工作执行中，请稍等... 已用{elapsedSeconds}秒
-                  </div>
-                </ChatEntryContainer>
-              </div>
-            );
-          })}
+          {placeholderAgents.map((member) => (
+            <RunningAgentPlaceholder
+              key={`placeholder-${member.agent.id}`}
+              member={member}
+              tone={getMessageTone(member.agent.id, false)}
+              stateInfo={agentStateInfos[member.agent.id]}
+              clock={clock}
+              isStopping={stoppingAgents.has(member.agent.id)}
+              onStop={handleStopAgent}
+            />
+          ))}
 
           {/* Streaming runs */}
-          {Object.entries(streamingRuns).map(([runId, run]) => {
-            const agentName = agentById.get(run.agentId)?.name ?? 'Agent';
-            const tone = getMessageTone(run.agentId, false);
-            const sessionAgent = sessionAgents.find(
-              (sa) => sa.agent_id === run.agentId
-            );
-            const isStopping = stoppingAgents.has(run.agentId);
-            return (
-              <div key={`stream-${runId}`} className="flex justify-start">
-                <ChatEntryContainer
-                  variant="system"
-                  title={agentName}
-                  expanded
-                  className="max-w-[720px] w-full md:w-[80%] opacity-90 shadow-sm rounded-2xl"
-                  headerClassName="bg-transparent"
-                  style={{
-                    backgroundColor: tone.bg,
-                    borderColor: tone.border,
-                  }}
-                  headerRight={
-                    <div className="flex items-center gap-base text-xs text-low">
-                      <span className="flex items-center gap-half">
-                        <span>工作执行中，请稍等</span>
-                        <span className="flex items-center gap-[2px]">
-                          <span className="size-dot rounded-full bg-brand animate-running-dot-1" />
-                          <span className="size-dot rounded-full bg-brand animate-running-dot-2" />
-                          <span className="size-dot rounded-full bg-brand animate-running-dot-3" />
-                        </span>
-                      </span>
-                      {sessionAgent && (
-                        <button
-                          type="button"
-                          className={cn(
-                            'text-error hover:text-error/80',
-                            isStopping && 'opacity-50 cursor-not-allowed'
-                          )}
-                          onClick={() =>
-                            handleStopAgent(sessionAgent.id, run.agentId)
-                          }
-                          disabled={isStopping}
-                        >
-                          {isStopping ? '停止中...' : '停止'}
-                        </button>
-                      )}
-                    </div>
-                  }
-                >
-                  <ChatMarkdown content={run.content} />
-                </ChatEntryContainer>
-              </div>
-            );
-          })}
+          {Object.entries(streamingRuns).map(([runId, run]) => (
+            <StreamingRunEntry
+              key={`stream-${runId}`}
+              runId={runId}
+              run={run}
+              agentName={agentById.get(run.agentId)?.name ?? 'Agent'}
+              tone={getMessageTone(run.agentId, false)}
+              sessionAgent={sessionAgents.find(
+                (sa) => sa.agent_id === run.agentId
+              )}
+              isStopping={stoppingAgents.has(run.agentId)}
+              onStop={handleStopAgent}
+            />
+          ))}
+
           <div ref={bottomRef} />
         </div>
 
@@ -2077,203 +1484,42 @@ export function ChatSessions() {
         />
 
         {/* Message Input */}
-        <div className="p-base space-y-base shrink-0">
-          <div className="flex items-center gap-base flex-wrap">
-            <MultiSelectDropdown
-              icon={ChatsTeardropIcon}
-              label="Mention agents"
-              menuLabel="Route to agents"
-              values={selectedMentions}
-              options={agentOptions}
-              onChange={setSelectedMentions}
-              disabled={
-                !activeSessionId || mentionAgents.length === 0 || isArchived
-              }
-            />
-            {selectedMentions.length > 0 && (
-              <div className="flex items-center gap-half flex-wrap">
-                {selectedMentions.map((mention) => (
-                  <Badge
-                    key={mention}
-                    variant="secondary"
-                    className="flex items-center gap-half px-2 py-0.5"
-                  >
-                    @{mention}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelectedMentions((prev) =>
-                          prev.filter((item) => item !== mention)
-                        )
-                      }
-                      className="text-xs text-low hover:text-normal"
-                    >
-                      <XIcon className="size-icon-2xs" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {replyToMessage && (
-            <div className="border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
-              <div className="flex items-center justify-between gap-base">
-                <span className="font-medium text-normal">
-                  Replying to {getMessageSenderLabel(replyToMessage)}
-                </span>
-                <button
-                  type="button"
-                  className="text-brand hover:text-brand-hover"
-                  onClick={() => setReplyToMessage(null)}
-                >
-                  Cancel
-                </button>
-              </div>
-              <div className="mt-half">{getReferencePreview(replyToMessage)}</div>
-            </div>
-          )}
-
-          {/* Display attached files */}
-          {attachedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 p-2 border border-border rounded-sm bg-secondary/40">
-              {attachedFiles.map((file, index) => (
-                <div
-                  key={`${file.name}-${file.size}-${index}`}
-                  className="flex items-center gap-1 bg-panel border border-border rounded px-2 py-1 text-xs"
-                >
-                  <PaperclipIcon className="size-icon-2xs text-low" />
-                  <span className="max-w-[120px] truncate" title={file.name}>
-                    {file.name}
-                  </span>
-                  {isAllowedAttachment(file) && (
-                    <button
-                      type="button"
-                      className="text-low hover:text-normal"
-                      onClick={() => previewAttachedFile(file)}
-                      title="Preview"
-                    >
-                      <EyeIcon className="size-icon-2xs" />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="text-low hover:text-normal"
-                    onClick={() => removeAttachedFile(file.name, file.size)}
-                  >
-                    <XIcon className="size-icon-2xs" />
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                className="text-xs text-brand hover:text-brand-hover ml-1"
-                onClick={clearAttachedFiles}
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-
-          {attachmentError && (
-            <div className="text-xs text-error">{attachmentError}</div>
-          )}
-
-          <div className="relative flex-1">
-            <textarea
-              ref={inputRef}
-              value={draft}
-              onChange={(event) => handleDraftChange(event.target.value)}
-              onKeyDown={(event) => {
-                // First check if mention suggestions should handle the key
-                if (handleMentionKeyDown(event)) {
-                  return;
-                }
-                // Otherwise handle send on Enter
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder={
-                isArchived
-                  ? 'This session is archived and read-only.'
-                  : 'Type your message and @mention agents...'
-              }
-              disabled={isArchived || !activeSessionId}
-              style={{ height: inputAreaHeight }}
-              className={cn(
-                'w-full resize-none rounded-sm border border-border bg-panel',
-                'px-base py-base text-sm text-normal leading-relaxed focus:outline-none focus:ring-1 focus:ring-brand',
-                isArchived && 'opacity-60 cursor-not-allowed'
-              )}
-            />
-            {mentionQuery !== null && visibleMentionSuggestions.length > 0 && (
-              <div className="absolute z-20 left-0 right-0 bottom-full mb-half bg-panel border border-border rounded-sm shadow">
-                {visibleMentionSuggestions.map((agent, index) => (
-                  <button
-                    key={agent.id}
-                    type="button"
-                    onClick={() => handleMentionSelect(agent.name)}
-                    className={cn(
-                      'w-full px-base py-half text-left text-sm',
-                      'flex items-center justify-between',
-                      index === highlightedMentionIndex
-                        ? 'bg-brand-secondary text-on-brand'
-                        : 'text-normal hover:bg-secondary'
-                    )}
-                  >
-                    <span>@{agent.name}</span>
-                    <CaretRightIcon
-                      className={cn(
-                        'size-icon-xs',
-                        index === highlightedMentionIndex
-                          ? 'text-on-brand'
-                          : 'text-low'
-                      )}
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between gap-base">
-            <div className="flex items-center gap-half text-xs text-low">
-              <button
-                type="button"
-                className={cn(
-                  'flex items-center justify-center rounded-sm border border-border bg-panel px-2 py-1',
-                  'text-low hover:text-normal hover:border-border/80',
-                  (isArchived || !activeSessionId || isUploadingAttachments) &&
-                    'pointer-events-none opacity-50'
-                )}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isArchived || !activeSessionId || isUploadingAttachments}
-              >
-                <PaperclipIcon className="size-icon-xs" />
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleAttachmentInputChange}
-              />
-              <span>
-                {isUploadingAttachments
-                  ? 'Uploading attachments...'
-                  : 'Press Enter to send, Shift+Enter for new line.'}
-              </span>
-            </div>
-            <PrimaryButton
-              value="Send"
-              actionIcon={sendMessage.isPending ? 'spinner' : PaperPlaneRightIcon}
-              onClick={handleSend}
-              disabled={!canSend}
-            />
-          </div>
-        </div>
+        <MessageInputArea
+          draft={draft}
+          onDraftChange={handleDraftChange}
+          inputRef={inputRef}
+          selectedMentions={selectedMentions}
+          onSelectedMentionsChange={setSelectedMentions}
+          agentOptions={agentOptions}
+          mentionAgentsCount={mentionAgents.length}
+          mentionQuery={mentionQuery}
+          visibleMentionSuggestions={visibleMentionSuggestions}
+          highlightedMentionIndex={highlightedMentionIndex}
+          onMentionSelect={handleMentionSelect}
+          onMentionKeyDown={handleMentionKeyDown}
+          replyToMessage={replyToMessage}
+          replyToSenderLabel={
+            replyToMessage ? getMessageSenderLabel(replyToMessage) : null
+          }
+          replyToPreview={
+            replyToMessage ? getReferencePreview(replyToMessage) : null
+          }
+          onCancelReply={() => setReplyToMessage(null)}
+          attachedFiles={attachedFiles}
+          attachmentError={attachmentError}
+          isUploadingAttachments={isUploadingAttachments}
+          onAttachmentInputChange={handleAttachmentInputChange}
+          onRemoveAttachedFile={removeAttachedFile}
+          onClearAttachedFiles={clearAttachedFiles}
+          onPreviewFile={previewAttachedFile}
+          fileInputRef={fileInputRef}
+          canSend={canSend}
+          isSending={sendMessage.isPending}
+          onSend={handleSend}
+          inputAreaHeight={inputAreaHeight}
+          isArchived={isArchived}
+          activeSessionId={activeSessionId}
+        />
       </section>
 
       {/* Right Sidebar Resize Handle */}
@@ -2283,691 +1529,129 @@ export function ChatSessions() {
       />
 
       {/* AI Members Sidebar */}
-      <aside
-        className="border-l border-border flex flex-col min-h-0 shrink-0"
-        style={{ width: rightSidebarWidth }}
-      >
-        <div className="px-base py-base border-b border-border flex items-center justify-between">
-          <div className="text-sm text-normal font-medium">AI Members</div>
-          <div className="text-xs text-low">{sessionMembers.length} in session</div>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-base space-y-base">
-          {!activeSessionId && (
-            <div className="text-xs text-low mt-base">
-              Select a session to manage AI members.
-            </div>
-          )}
-          {activeSessionId && sessionMembers.length === 0 && (
-            <div className="text-xs text-low mt-base">
-              No AI members yet. Add one below to enable @mentions.
-            </div>
-          )}
-          {sessionMembers.map(({ agent, sessionAgent }) => {
-            const state = agentStates[agent.id] ?? ChatSessionAgentState.idle;
-            return (
-              <div
-                key={sessionAgent.id}
-                className="border border-border rounded-sm px-base py-half space-y-half"
-              >
-                <div className="flex items-center justify-between gap-base">
-                  <div className="flex items-center gap-half min-w-0">
-                    <span
-                      className={cn(
-                        'size-2 rounded-full',
-                        agentStateDotClass[state],
-                        state === ChatSessionAgentState.running && 'animate-pulse'
-                      )}
-                    />
-                    <div className="min-w-0 flex-1 overflow-hidden">
-                      <div className="text-sm text-normal truncate">
-                        @{agent.name}
-                      </div>
-                      {(() => {
-                        const modelName = getModelName(agent.runner_type);
-                        const fullText = `${toPrettyCase(agent.runner_type)} · ${agentStateLabels[state]}${modelName ? ` · ${modelName}` : ''}`;
-                        return (
-                          <Tooltip content={fullText} side="bottom">
-                            <div className="text-xs text-low truncate cursor-default">
-                              {fullText}
-                            </div>
-                          </Tooltip>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-half text-xs">
-                    <button
-                      type="button"
-                      className="text-brand hover:text-brand-hover"
-                      onClick={() => {
-                        setWorkspaceAgentId(agent.id);
-                        setWorkspaceDrawerOpen(true);
-                      }}
-                    >
-                      Workspace
-                    </button>
-                    <button
-                      type="button"
-                      className={cn(
-                        'text-low hover:text-normal',
-                        isArchived && 'pointer-events-none opacity-50'
-                      )}
-                      onClick={() => handleEditMember({ agent, sessionAgent })}
-                      disabled={isArchived}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className={cn(
-                        'text-error hover:text-error/80',
-                        isArchived && 'pointer-events-none opacity-50'
-                      )}
-                      onClick={() => handleRemoveMember({ agent, sessionAgent })}
-                      disabled={isArchived}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                {sessionAgent.workspace_path && (
-                  <div className="text-xs text-low break-all">
-                    {sessionAgent.workspace_path}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Add Member Form */}
-          <div className="border-t border-border pt-base space-y-half">
-            {!isAddMemberOpen ? (
-              <PrimaryButton
-                variant="secondary"
-                value="Add AI member"
-                onClick={() => {
-                  setIsAddMemberOpen(true);
-                  setMemberError(null);
-                  setEditingMember(null);
-                  setNewMemberName('');
-                  setNewMemberPrompt('');
-                  setNewMemberWorkspace('');
-                  setIsPromptEditorOpen(false);
-                  setPromptFileError(null);
-                }}
-                disabled={!activeSessionId || isArchived}
-              >
-                <PlusIcon className="size-icon-xs" />
-              </PrimaryButton>
-            ) : (
-              <div className="border border-border rounded-sm p-base space-y-half">
-                <div className="text-sm text-normal font-medium">
-                  {editingMember ? 'Edit AI member' : 'Add AI member'}
-                </div>
-                <div className="text-xs text-low">
-                  AI member name is the @mention handle.
-                </div>
-                <div className="space-y-half">
-                  <label className="text-xs text-low">AI member name</label>
-                  <input
-                    value={newMemberName}
-                    onChange={(event) => setNewMemberName(event.target.value)}
-                    placeholder="e.g. coder"
-                    className={cn(
-                      'w-full rounded-sm border border-border bg-panel px-base py-half',
-                      'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
-                    )}
-                  />
-                </div>
-                <div className="space-y-half">
-                  <label className="text-xs text-low">Base coding agent</label>
-                  <select
-                    value={newMemberRunnerType}
-                    onChange={(event) => setNewMemberRunnerType(event.target.value)}
-                    disabled={
-                      isCheckingAvailability || enabledRunnerTypes.length === 0
-                    }
-                    className={cn(
-                      'w-full rounded-sm border border-border bg-panel px-base py-half',
-                      'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
-                    )}
-                  >
-                    {enabledRunnerTypes.length === 0 && (
-                      <option value="">
-                        {isCheckingAvailability
-                          ? 'Checking agents...'
-                          : 'No local agents detected'}
-                      </option>
-                    )}
-                    {availableRunnerTypes.map((runner) => (
-                      <option
-                        key={runner}
-                        value={runner}
-                        disabled={!isRunnerAvailable(runner)}
-                      >
-                        {toPrettyCase(runner)}
-                        {availabilityLabel(runner)}
-                      </option>
-                    ))}
-                  </select>
-                  {enabledRunnerTypes.length === 0 && !isCheckingAvailability && (
-                    <div className="text-xs text-error">
-                      No installed code agents detected on this machine.
-                    </div>
-                  )}
-                </div>
-                {memberVariantOptions.length > 0 && (
-                  <div className="space-y-half">
-                    <label className="text-xs text-low">Model variant</label>
-                    <select
-                      value={newMemberVariant}
-                      onChange={(event) => setNewMemberVariant(event.target.value)}
-                      className={cn(
-                        'w-full rounded-sm border border-border bg-panel px-base py-half',
-                        'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
-                      )}
-                    >
-                      {memberVariantOptions.map((variant) => {
-                        const modelName = getModelName(newMemberRunnerType, variant);
-                        return (
-                          <option key={variant} value={variant}>
-                            {variant}{modelName ? ` (${modelName})` : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    {getModelName(newMemberRunnerType, newMemberVariant) && (
-                      <div className="text-xs text-low">
-                        Model: {getModelName(newMemberRunnerType, newMemberVariant)}
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="space-y-half">
-                  <div className="flex items-center justify-between gap-base">
-                    <label className="text-xs text-low">System prompt</label>
-                    <button
-                      type="button"
-                      className="text-xs text-brand hover:text-brand-hover"
-                      onClick={() => {
-                        setIsPromptEditorOpen(true);
-                        setPromptFileError(null);
-                      }}
-                    >
-                      Expand
-                    </button>
-                  </div>
-                  <textarea
-                    value={newMemberPrompt}
-                    onChange={(event) => setNewMemberPrompt(event.target.value)}
-                    rows={3}
-                    placeholder="Describe how this AI member should behave."
-                    className={cn(
-                      'w-full resize-none rounded-sm border border-border bg-panel',
-                      'px-base py-half text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
-                    )}
-                  />
-                </div>
-                <div className="space-y-half">
-                  <label className="text-xs text-low">Workspace path</label>
-                  <input
-                    value={newMemberWorkspace}
-                    onChange={(event) => setNewMemberWorkspace(event.target.value)}
-                    placeholder="Absolute path on the server"
-                    disabled={!!editingMember}
-                    title={editingMember ? 'Workspace path cannot be changed after creation' : undefined}
-                    className={cn(
-                      'w-full rounded-sm border border-border bg-panel px-base py-half',
-                      'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand',
-                      editingMember && 'opacity-50 cursor-not-allowed'
-                    )}
-                  />
-                  {editingMember && (
-                    <p className="text-xs text-low">Workspace path cannot be modified</p>
-                  )}
-                </div>
-                {memberError && (
-                  <div className="text-xs text-error">{memberError}</div>
-                )}
-                <div className="flex items-center justify-end gap-half pt-half">
-                  <PrimaryButton
-                    variant="tertiary"
-                    value="Cancel"
-                    onClick={() => {
-                      setIsAddMemberOpen(false);
-                      setMemberError(null);
-                      setEditingMember(null);
-                      setIsPromptEditorOpen(false);
-                      setPromptFileError(null);
-                    }}
-                    disabled={isSavingMember}
-                  />
-                  <PrimaryButton
-                    value={editingMember ? 'Save' : 'Add'}
-                    actionIcon={isSavingMember ? 'spinner' : PlusIcon}
-                    onClick={handleAddMember}
-                    disabled={isSavingMember || isArchived}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </aside>
+      <AiMembersSidebar
+        sessionMembers={sessionMembers}
+        agentStates={agentStates}
+        activeSessionId={activeSessionId}
+        isArchived={isArchived}
+        width={rightSidebarWidth}
+        isAddMemberOpen={isAddMemberOpen}
+        editingMember={editingMember}
+        newMemberName={newMemberName}
+        newMemberRunnerType={newMemberRunnerType}
+        newMemberVariant={newMemberVariant}
+        newMemberPrompt={newMemberPrompt}
+        newMemberWorkspace={newMemberWorkspace}
+        onNameChange={setNewMemberName}
+        onRunnerTypeChange={setNewMemberRunnerType}
+        onVariantChange={setNewMemberVariant}
+        onPromptChange={setNewMemberPrompt}
+        onWorkspaceChange={setNewMemberWorkspace}
+        memberError={memberError}
+        isSavingMember={isSavingMember}
+        availableRunnerTypes={availableRunnerTypes}
+        enabledRunnerTypes={enabledRunnerTypes}
+        isCheckingAvailability={isCheckingAvailability}
+        isRunnerAvailable={isRunnerAvailable}
+        availabilityLabel={availabilityLabel}
+        memberVariantOptions={memberVariantOptions}
+        getModelName={getModelName}
+        onOpenAddMember={() => {
+          setIsAddMemberOpen(true);
+          setMemberError(null);
+          setEditingMember(null);
+          setNewMemberName('');
+          setNewMemberPrompt('');
+          setNewMemberWorkspace('');
+          setIsPromptEditorOpen(false);
+          setPromptFileError(null);
+        }}
+        onCancelMember={() => {
+          setIsAddMemberOpen(false);
+          setMemberError(null);
+          setEditingMember(null);
+          setIsPromptEditorOpen(false);
+          setPromptFileError(null);
+        }}
+        onSaveMember={handleAddMember}
+        onEditMember={handleEditMember}
+        onRemoveMember={handleRemoveMember}
+        onOpenWorkspace={(agentId) => {
+          setWorkspaceAgentId(agentId);
+          setWorkspaceDrawerOpen(true);
+        }}
+        onExpandPromptEditor={() => {
+          setIsPromptEditorOpen(true);
+          setPromptFileError(null);
+        }}
+      />
 
       {/* Workspace Drawer */}
-      <div
-        className={cn(
-          'absolute top-0 right-0 h-full w-[360px] bg-primary border-l border-border shadow-lg transition-transform z-50 flex flex-col',
-          workspaceDrawerOpen ? 'translate-x-0' : 'translate-x-full'
-        )}
-      >
-        <div className="px-base py-base border-b border-border shrink-0 flex items-center justify-between">
-          <div className="text-sm text-normal font-medium">
-            {activeWorkspaceAgent?.name ?? 'Agent workspace'}
-          </div>
-          <button
-            type="button"
-            onClick={() => setWorkspaceDrawerOpen(false)}
-            className="text-low hover:text-normal transition-colors"
-            aria-label="Close workspace drawer"
-            title="Close"
-          >
-            <XIcon className="size-icon-sm" />
-          </button>
-        </div>
-        <div className="p-base space-y-base overflow-y-auto flex-1 min-h-0">
-          <div className="space-y-half">
-            <div className="text-xs text-low">
-              Workspace path is created on first run.
-            </div>
-            {workspacePath && (
-              <div className="border border-border rounded-sm px-base py-half text-xs font-mono text-normal break-all">
-                {workspacePath}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-half">
-            <div className="text-sm text-normal font-medium">Run history</div>
-            {activeWorkspaceRuns.length === 0 && (
-              <div className="text-xs text-low">No runs yet for this agent.</div>
-            )}
-            {activeWorkspaceRuns.map((run: RunHistoryItem) => (
-              <div
-                key={run.runId}
-                className="border border-border rounded-sm p-base space-y-half"
-              >
-                <div className="flex items-center justify-between text-xs text-low">
-                  <span>Run {run.runId.slice(0, 8)}</span>
-                  <span>{formatDateShortWithTime(run.createdAt)}</span>
-                </div>
-                <div className="text-xs text-normal">{run.content}</div>
-                <div className="flex items-center justify-between text-xs">
-                  <button
-                    type="button"
-                    className="text-brand hover:text-brand-hover"
-                    onClick={() => handleLoadLog(run.runId)}
-                  >
-                    View log
-                  </button>
-                  {logRunId === run.runId && (
-                    <span className="text-low">Selected</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="space-y-half">
-            <div className="text-sm text-normal font-medium">Run log</div>
-            {!logRunId && (
-              <div className="text-xs text-low">
-                Select a run to view its log output.
-              </div>
-            )}
-            {logRunId && (
-              <div className="border border-border rounded-sm bg-secondary p-base">
-                <div className="flex items-center justify-between text-xs text-low pb-half">
-                  <span>Run {logRunId.slice(0, 8)}</span>
-                  <button
-                    type="button"
-                    className="text-brand hover:text-brand-hover"
-                    onClick={() => handleLoadLog(logRunId)}
-                    disabled={logLoading}
-                  >
-                    Refresh
-                  </button>
-                </div>
-                {logLoading && (
-                  <div className="text-xs text-low">Loading log...</div>
-                )}
-                {logError && <div className="text-xs text-error">{logError}</div>}
-                {!logLoading && !logError && (
-                  <div className="max-h-64 overflow-y-auto border-t border-border pt-base">
-                    {logContent ? (
-                      <RawLogText content={logContent} />
-                    ) : (
-                      <div className="text-xs text-low">Log is empty.</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <WorkspaceDrawer
+        isOpen={workspaceDrawerOpen}
+        onClose={() => setWorkspaceDrawerOpen(false)}
+        agent={activeWorkspaceAgent ?? null}
+        workspacePath={workspacePath}
+        runs={activeWorkspaceRuns}
+        logRunId={logRunId}
+        logContent={logContent}
+        logLoading={logLoading}
+        logError={logError}
+        onLoadLog={handleLoadLog}
+      />
 
       {/* Diff Viewer Modal */}
-      {diffViewerOpen && diffViewerRunId && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={handleCloseDiffViewer}
-        >
-          <div
-            className={cn(
-              'bg-primary border border-border shadow-xl flex flex-col overflow-hidden',
-              diffViewerFullscreen
-                ? 'w-full h-full rounded-none'
-                : 'w-[92vw] h-[85vh] max-w-[1200px] rounded-xl'
-            )}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-border px-base py-half">
-              <div>
-                <div className="text-sm text-normal font-medium">Code changes</div>
-                <div className="text-xs text-low">
-                  Run {diffViewerRunId.slice(0, 8)}
-                </div>
-              </div>
-              <div className="flex items-center gap-half">
-                <button
-                  type="button"
-                  className="text-low hover:text-normal"
-                  onClick={handleToggleFullscreen}
-                  aria-label={
-                    diffViewerFullscreen ? 'Exit full screen' : 'Full screen'
-                  }
-                >
-                  <DiffViewerIcon className="size-icon-sm" />
-                </button>
-                <button
-                  type="button"
-                  className="text-low hover:text-normal"
-                  onClick={handleCloseDiffViewer}
-                  aria-label="Close diff viewer"
-                >
-                  <XIcon className="size-icon-sm" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-base space-y-base">
-              {diffViewerHasDiff ? (
-                <>
-                  {diffViewerRun?.loading && (
-                    <div className="text-xs text-low">Loading diff...</div>
-                  )}
-                  {diffViewerRun?.error && (
-                    <div className="text-xs text-error">{diffViewerRun.error}</div>
-                  )}
-                  {!diffViewerRun?.loading &&
-                    !diffViewerRun?.error &&
-                    diffViewerRun?.files?.length === 0 && (
-                      <div className="text-xs text-low">
-                        No tracked diff available.
-                      </div>
-                    )}
-                  {diffViewerRun?.files?.map((file) => (
-                    <div
-                      key={`${diffViewerRunId}-${file.path}`}
-                      className="border border-border rounded-sm bg-panel"
-                    >
-                      <div className="flex items-center justify-between px-base py-half text-xs text-normal border-b border-border">
-                        <span className="font-ibm-plex-mono break-all">
-                          {file.path}
-                        </span>
-                        <span className="text-xs text-low">
-                          {file.additions > 0 && (
-                            <span className="text-success">+{file.additions}</span>
-                          )}
-                          {file.additions > 0 && file.deletions > 0 && ' '}
-                          {file.deletions > 0 && (
-                            <span className="text-error">-{file.deletions}</span>
-                          )}
-                        </span>
-                      </div>
-                      <DiffViewBody
-                        fileDiffMetadata={null}
-                        unifiedDiff={file.patch}
-                        isValid={file.patch.trim().length > 0}
-                        hideLineNumbers={false}
-                        theme={actualTheme}
-                        wrapText={false}
-                        modeOverride="split"
-                      />
-                    </div>
-                  ))}
-                  <div>
-                    <button
-                      type="button"
-                      className="text-brand hover:text-brand-hover text-xs"
-                      onClick={() =>
-                        window.open(
-                          chatApi.getRunDiffUrl(diffViewerRunId),
-                          '_blank',
-                          'noopener,noreferrer'
-                        )
-                      }
-                    >
-                      Open raw diff
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="text-xs text-low">No tracked diff available.</div>
-              )}
-              {diffViewerUntracked.length > 0 && (
-                <div className="space-y-half">
-                  <div className="text-xs text-low">Untracked files</div>
-                  {diffViewerUntracked.map((path) => {
-                    const key = `${diffViewerRunId}:${path}`;
-                    const entry = untrackedContent[key];
-                    return (
-                      <div
-                        key={key}
-                        className="border border-border rounded-sm bg-panel px-base py-half"
-                      >
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-ibm-plex-mono break-all">
-                            {path}
-                          </span>
-                          <button
-                            type="button"
-                            className="text-brand hover:text-brand-hover"
-                            onClick={() =>
-                              handleToggleUntracked(diffViewerRunId, path)
-                            }
-                          >
-                            {entry?.open ? 'Hide' : 'View'}
-                          </button>
-                        </div>
-                        {entry?.open && (
-                          <div className="mt-half">
-                            {entry.loading && (
-                              <div className="text-xs text-low">Loading file...</div>
-                            )}
-                            {entry.error && (
-                              <div className="text-xs text-error">{entry.error}</div>
-                            )}
-                            {!entry.loading && !entry.error && entry.content && (
-                              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-xs font-ibm-plex-mono text-normal">
-                                {entry.content}
-                              </pre>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <DiffViewerModal
+        isOpen={diffViewerOpen}
+        runId={diffViewerRunId}
+        hasDiff={diffViewerHasDiff}
+        isFullscreen={diffViewerFullscreen}
+        runDiff={diffViewerRun}
+        untrackedFiles={diffViewerUntracked}
+        untrackedContent={untrackedContent}
+        theme={actualTheme}
+        onClose={handleCloseDiffViewer}
+        onToggleFullscreen={handleToggleFullscreen}
+        onToggleUntracked={handleToggleUntracked}
+      />
 
       {/* Prompt Editor Modal */}
-      {isPromptEditorOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={() => setIsPromptEditorOpen(false)}
-        >
-          <div
-            className="bg-primary border border-border shadow-xl flex flex-col overflow-hidden w-[92vw] h-[80vh] max-w-[1200px] rounded-xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-border px-base py-half">
-              <div>
-                <div className="text-sm text-normal font-medium">System Prompt</div>
-                <div className="text-xs text-low">Edit the AI member system prompt</div>
-              </div>
-              <button
-                type="button"
-                className="text-low hover:text-normal"
-                onClick={() => setIsPromptEditorOpen(false)}
-                aria-label="Close prompt editor"
-              >
-                <XIcon className="size-icon-sm" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-hidden p-base flex flex-col gap-base">
-              <textarea
-                value={newMemberPrompt}
-                onChange={(event) => setNewMemberPrompt(event.target.value)}
-                placeholder="Describe how this AI member should behave."
-                className={cn(
-                  'flex-1 w-full resize-none rounded-sm border border-border bg-panel',
-                  'px-base py-base text-sm text-normal leading-relaxed focus:outline-none focus:ring-1 focus:ring-brand'
-                )}
-              />
-              <div className="flex items-center justify-between gap-base">
-                <div className="flex items-center gap-half text-xs text-low">
-                  <button
-                    type="button"
-                    className="text-brand hover:text-brand-hover"
-                    onClick={() => promptFileInputRef.current?.click()}
-                    disabled={promptFileLoading}
-                  >
-                    Attach text file
-                  </button>
-                  <input
-                    ref={promptFileInputRef}
-                    type="file"
-                    accept=".txt,.md,.prompt,text/plain"
-                    className="hidden"
-                    onChange={handlePromptFileChange}
-                  />
-                  {promptFileLoading && <span>Loading file...</span>}
-                  {promptFileError && (
-                    <span className="text-error">{promptFileError}</span>
-                  )}
-                </div>
-                <PrimaryButton
-                  value="Done"
-                  onClick={() => setIsPromptEditorOpen(false)}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <PromptEditorModal
+        isOpen={isPromptEditorOpen}
+        value={newMemberPrompt}
+        onChange={setNewMemberPrompt}
+        onClose={() => setIsPromptEditorOpen(false)}
+        promptFileInputRef={promptFileInputRef}
+        onPromptFileChange={handlePromptFileChange}
+        promptFileLoading={promptFileLoading}
+        promptFileError={promptFileError}
+      />
 
       {/* Confirm Modal */}
-      <Dialog
-        open={!!confirmModal}
-        onOpenChange={(open) => {
-          if (!open && !isConfirmLoading) {
+      <ConfirmModal
+        isOpen={!!confirmModal}
+        title={confirmModal?.title ?? 'Confirm'}
+        message={confirmModal?.message ?? ''}
+        isLoading={isConfirmLoading}
+        onConfirm={async () => {
+          if (!confirmModal) return;
+          setIsConfirmLoading(true);
+          try {
+            await confirmModal.onConfirm();
+          } finally {
+            setIsConfirmLoading(false);
             setConfirmModal(null);
           }
         }}
-      >
-        <DialogHeader>
-          <DialogTitle>{confirmModal?.title ?? 'Confirm'}</DialogTitle>
-        </DialogHeader>
-        <DialogContent>
-          <p className="text-sm text-normal">{confirmModal?.message}</p>
-        </DialogContent>
-        <DialogFooter>
-          <PrimaryButton
-            variant="tertiary"
-            value="Cancel"
-            onClick={() => setConfirmModal(null)}
-            disabled={isConfirmLoading}
-          />
-          <PrimaryButton
-            variant="default"
-            value={isConfirmLoading ? 'Processing...' : 'Confirm'}
-            onClick={async () => {
-              if (!confirmModal) return;
-              setIsConfirmLoading(true);
-              try {
-                await confirmModal.onConfirm();
-              } finally {
-                setIsConfirmLoading(false);
-                setConfirmModal(null);
-              }
-            }}
-            disabled={isConfirmLoading}
-          />
-          </DialogFooter>
-      </Dialog>
+        onCancel={() => setConfirmModal(null)}
+      />
 
       {/* File Preview Modal */}
-      {previewFile.file && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="relative w-full max-w-4xl bg-panel border border-border rounded-sm shadow-lg max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h3 className="font-medium text-normal truncate max-w-[70%]" title={previewFile.file.name}>
-                Preview: {previewFile.file.name}
-              </h3>
-              <button
-                type="button"
-                className="text-low hover:text-normal"
-                onClick={closePreview}
-              >
-                <XIcon className="size-icon-sm" />
-              </button>
-            </div>
-
-            <div className="overflow-auto flex-1 p-4">
-              {previewFile.content ? (
-                previewFile.file.type.startsWith('image/') ? (
-                  <img
-                    src={previewFile.content}
-                    alt={previewFile.file.name}
-                    className="max-w-full max-h-[70vh] object-contain"
-                  />
-                ) : (
-                  <pre className="whitespace-pre-wrap font-sans text-sm text-normal bg-secondary p-4 rounded-sm overflow-auto max-h-[60vh]">
-                    {previewFile.content}
-                  </pre>
-                )
-              ) : (
-                <div className="flex items-center justify-center h-64 text-low">
-                  Preview not available for this file type
-                </div>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-border flex justify-end">
-              <PrimaryButton
-                value="Close"
-                onClick={closePreview}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <FilePreviewModal
+        file={previewFile.file}
+        content={previewFile.content}
+        onClose={closePreview}
+      />
     </div>
   );
 }

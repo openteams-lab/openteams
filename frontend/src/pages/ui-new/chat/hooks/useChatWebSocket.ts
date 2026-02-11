@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type {
   ChatMessage,
+  ChatSessionAgent,
   ChatSessionAgentState,
   ChatStreamEvent,
 } from 'shared/types';
@@ -51,6 +53,7 @@ export function useChatWebSocket(
   const [mentionStatuses, setMentionStatuses] = useState<
     Map<string, Map<string, MentionStatus>>
   >(new Map());
+  const queryClient = useQueryClient();
 
   const handleMessageNew = useCallback(
     (message: ChatMessage) => {
@@ -100,7 +103,12 @@ export function useChatWebSocket(
   );
 
   const handleAgentState = useCallback(
-    (payload: ChatStreamEvent & { type: 'agent_state' } & { started_at?: string | null }) => {
+    (
+      payload: ChatStreamEvent & {
+        type: 'agent_state';
+        started_at?: string | null;
+      }
+    ) => {
       setAgentStates((prev) => ({
         ...prev,
         [payload.agent_id]: payload.state,
@@ -112,8 +120,29 @@ export function useChatWebSocket(
           startedAt: payload.started_at ?? null,
         },
       }));
+
+      if (!activeSessionId) return;
+      queryClient.setQueryData<ChatSessionAgent[]>(
+        ['chatSessionAgents', activeSessionId],
+        (prev) => {
+          if (!prev) return prev;
+          let changed = false;
+          const next = prev.map((sessionAgent) => {
+            if (sessionAgent.agent_id !== payload.agent_id) {
+              return sessionAgent;
+            }
+            changed = true;
+            return {
+              ...sessionAgent,
+              state: payload.state,
+              updated_at: payload.started_at ?? sessionAgent.updated_at,
+            };
+          });
+          return changed ? next : prev;
+        }
+      );
     },
-    []
+    [activeSessionId, queryClient]
   );
 
   const handleMentionAcknowledged = useCallback(

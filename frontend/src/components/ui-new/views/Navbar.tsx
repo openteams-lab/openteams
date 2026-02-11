@@ -92,7 +92,6 @@ export function Navbar({
   onExecuteAction,
   className,
 }: NavbarProps) {
-  const navigate = useNavigate();
 
   const renderItem = (item: NavbarItem, key: string) => {
     // Render divider
@@ -131,20 +130,25 @@ export function Navbar({
   return (
     <nav
       className={cn(
-        'flex items-center justify-between px-base py-half bg-secondary border-b shrink-0',
+        'flex items-center justify-between px-base py-base bg-secondary border-b shrink-0 min-h-12',
         className
       )}
     >
       {/* Left - Title + Archive & Old UI Link + optional slot */}
       <div className="flex items-center gap-base flex-1">
-        <span className="text-lg font-semibold text-normal">{workspaceTitle}</span>
+        <img
+          src="/agent-chatgroup-logo.png"
+          alt={workspaceTitle}
+          title={workspaceTitle}
+          className="h-8 w-80 object-contain object-left"
+        />
 
-        {leftItems.map((item, index) =>
+        {/* {leftItems.map((item, index) =>
           renderItem(
             item,
             `left-${isDivider(item) ? 'divider' : item.id}-${index}`
           )
-        )}
+        )} */}
         {leftSlot}
       </div>
 
@@ -157,22 +161,7 @@ export function Navbar({
             `right-${isDivider(item) ? 'divider' : item.id}-${index}`
           )
         )}
-        {/* Brand logo with click functionality */}
-        <button
-          type="button"
-          className="flex items-center"
-          onClick={() => {
-            // Navigate to the homepage when the logo is clicked
-            navigate('/');
-          }}
-          title="Go to home"
-        >
-          <img
-            src="/agent-chatgroup-logo.svg"
-            alt="AgentsChatGroup"
-            className="h-8 w-8"
-          />
-        </button>
+
       </div>
     </nav>
   );

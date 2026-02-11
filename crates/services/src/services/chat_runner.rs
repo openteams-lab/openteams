@@ -44,12 +44,10 @@ use utils::{assets::asset_dir, log_msg::LogMsg, msg_store::MsgStore};
 use uuid::Uuid;
 use crate::services::chat::{self, ChatServiceError};
 
-const DIFF_PREVIEW_LIMIT: usize = 4000;
 const UNTRACKED_FILE_LIMIT: u64 = 1024 * 1024;
 const MAX_AGENT_CHAIN_DEPTH: u32 = 5;
 
 struct DiffInfo {
-    preview: String,
     truncated: bool,
 }
 
@@ -811,10 +809,10 @@ impl ChatRunner {
             return None;
         }
 
-        let truncated = diff.len() > DIFF_PREVIEW_LIMIT;
-        let preview = diff.chars().take(DIFF_PREVIEW_LIMIT).collect::<String>();
+        // Consider diff truncated if it's over 4KB (for UI display purposes)
+        let truncated = diff.len() > 4000;
 
-        Some(DiffInfo { preview, truncated })
+        Some(DiffInfo { truncated })
     }
 
     async fn capture_untracked_files(
@@ -1362,7 +1360,6 @@ impl ChatRunner {
 
                         if let Some(diff) = diff_info.as_ref() {
                             meta["diff_available"] = true.into();
-                            meta["diff_preview"] = diff.preview.clone().into();
                             meta["diff_truncated"] = diff.truncated.into();
                         }
 
