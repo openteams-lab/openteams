@@ -9,7 +9,7 @@
   /* Light defaults - New Design */
   .new-design {
     color-scheme: light;
-    --_background: 35 30% 96%;
+    --_background: 48 33.33% 97.06%;
     --_foreground: 24 15% 12%;
     --_primary: 24 30% 18%;
     --_primary-foreground: 36 40% 96%;
@@ -87,7 +87,7 @@
     color-scheme: dark;
 
     /* Internal variables (dark) - needed for public tokens */
-    --_background: 24 14% 10%;
+    --_background: 60 0.67% 29.22%;
     --_foreground: 35 25% 90%;
     --_primary: 34 32% 88%;
     --_primary-foreground: 24 20% 12%;

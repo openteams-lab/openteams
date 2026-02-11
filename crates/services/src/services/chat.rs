@@ -471,10 +471,10 @@ fn build_summary_prompt(messages_to_summarize: &[Value]) -> String {
     );
 
     for msg in messages_to_summarize {
+        // sender is now a string (label) directly, not an object
         let sender_label = msg
             .get("sender")
-            .and_then(|s| s.get("label"))
-            .and_then(|l| l.as_str())
+            .and_then(|s| s.as_str())
             .unwrap_or("unknown");
         let content = msg
             .get("content")
@@ -489,28 +489,20 @@ fn build_summary_prompt(messages_to_summarize: &[Value]) -> String {
 /// Create a summary message from compressed messages
 fn create_summary_message(
     summary_text: &str,
-    compressed_message_ids: Vec<Uuid>,
+    _compressed_message_ids: Vec<Uuid>,
     earliest_created_at: &str,
 ) -> Value {
+    // Parse the RFC3339 timestamp and format as simple datetime
+    let time = chrono::DateTime::parse_from_rfc3339(earliest_created_at)
+        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+        .unwrap_or_else(|_| earliest_created_at.to_string());
+
+    // Only include essential fields: sender, content, compressed, time
     serde_json::json!({
-        "id": Uuid::new_v4(),
-        "session_id": null,
-        "created_at": earliest_created_at,
-        "sender": {
-            "type": "system",
-            "id": null,
-            "handle": null,
-            "name": null,
-            "label": "summary",
-        },
+        "sender": "summary",
         "content": summary_text,
-        "mentions": [],
-        "meta": {
-            "summary_of": compressed_message_ids,
-            "compression": "llm",
-            "compressed": true,
-        },
         "compressed": true,
+        "time": time,
     })
 }
 
@@ -518,10 +510,10 @@ fn create_summary_message(
 fn create_fallback_summary(messages_to_summarize: &[Value]) -> String {
     let mut summary = String::from("[Context Summary] ");
     for msg in messages_to_summarize.iter().take(LLM_COMPRESSION_BATCH_SIZE) {
+        // sender is now a string (label) directly, not an object
         let sender_label = msg
             .get("sender")
-            .and_then(|s| s.get("label"))
-            .and_then(|l| l.as_str())
+            .and_then(|s| s.as_str())
             .unwrap_or("unknown");
         let content = msg
             .get("content")
@@ -880,33 +872,24 @@ fn build_structured_messages_internal(
     let mut result = Vec::with_capacity(message_count);
 
     for (idx, message) in messages.iter().enumerate() {
+        // Build sender label from message metadata
         let sender_handle = message
             .meta
             .0
             .get("sender_handle")
-            .and_then(|value| value.as_str())
-            .map(|value| value.to_string());
+            .and_then(|value| value.as_str());
         let sender_name = message
             .sender_id
             .and_then(|id| agent_map.get(&id).cloned());
         let sender_label = match message.sender_type {
             ChatSenderType::User => sender_handle
-                .clone()
+                .map(|s| s.to_string())
                 .unwrap_or_else(|| "user".to_string()),
             ChatSenderType::Agent => sender_name
-                .clone()
                 .or_else(|| message.sender_id.map(|id| id.to_string()))
                 .unwrap_or_else(|| "agent".to_string()),
             ChatSenderType::System => "system".to_string(),
         };
-
-        let sender = serde_json::json!({
-            "type": message.sender_type,
-            "id": message.sender_id,
-            "handle": sender_handle,
-            "name": sender_name,
-            "label": sender_label,
-        });
 
         // Determine if this message should be compressed (only if apply_compression is true)
         let is_recent = !apply_compression || idx >= message_count.saturating_sub(RECENT_MESSAGES_FULL);
@@ -920,25 +903,12 @@ fn build_structured_messages_internal(
             compress_content(&message.content, max_chars)
         };
 
-        let meta = if is_recent {
-            message.meta.0.clone()
-        } else {
-            let mut minimal_meta = serde_json::json!({});
-            if let Some(sender_info) = message.meta.0.get("sender") {
-                minimal_meta["sender"] = sender_info.clone();
-            }
-            minimal_meta
-        };
-
+        // Only include essential fields: sender, content, compressed, time
         result.push(serde_json::json!({
-            "id": message.id,
-            "session_id": message.session_id,
-            "created_at": message.created_at,
-            "sender": sender,
+            "sender": sender_label,
             "content": content,
-            "mentions": message.mentions.0,
-            "meta": meta,
             "compressed": !is_recent,
+            "time": message.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
         }));
     }
 
