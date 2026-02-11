@@ -1,4 +1,8 @@
 import {
+  ArrowCounterClockwiseIcon,
+  BoxArrowDownIcon,
+  BroomIcon,
+  GearSixIcon,
   PencilSimpleIcon,
   TrashIcon,
   UsersIcon,
@@ -7,6 +11,7 @@ import type { ChatSession } from 'shared/types';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
+import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
 import { formatDateShortWithTime } from '@/utils/date';
 
 export interface ChatHeaderProps {
@@ -25,6 +30,7 @@ export interface ChatHeaderProps {
   onCancelTitleEdit: () => void;
   // Session actions
   onDeleteSession: () => void;
+  onOpenSettings: () => void;
   onArchive: () => void;
   onRestore: () => void;
   isArchiving: boolean;
@@ -48,6 +54,7 @@ export function ChatHeader({
   onSaveTitle,
   onCancelTitleEdit,
   onDeleteSession,
+  onOpenSettings,
   onArchive,
   onRestore,
   isArchiving,
@@ -56,18 +63,18 @@ export function ChatHeader({
   isDeletingMessages,
 }: ChatHeaderProps) {
   return (
-    <header className="px-base py-half border-b border-border flex items-center justify-between">
-      <div className="min-w-0">
+    <header className="chat-session-header px-base py-half border-b border-border flex items-center justify-between">
+      <div className="chat-session-header-main min-w-0">
         {!isEditingTitle && (
-          <div className="flex items-center gap-half">
-            <div className="text-sm text-normal font-medium truncate">
+          <div className="chat-session-header-title-row flex items-center gap-half">
+            <div className="chat-session-header-title text-sm text-normal font-medium truncate">
               {activeSession?.title || 'Untitled session'}
             </div>
             {activeSession && (
               <>
                 <button
                   type="button"
-                  className="text-low hover:text-normal"
+                  className="chat-session-header-icon-btn"
                   onClick={onStartEditTitle}
                   aria-label="Edit session name"
                 >
@@ -75,7 +82,7 @@ export function ChatHeader({
                 </button>
                 <button
                   type="button"
-                  className="text-low hover:text-error"
+                  className="chat-session-header-icon-btn danger"
                   onClick={onDeleteSession}
                   aria-label="Delete session"
                   title="Delete session"
@@ -105,6 +112,7 @@ export function ChatHeader({
               disabled={isSavingTitle}
               className={cn(
                 'w-[240px] max-w-full rounded-sm border border-border bg-panel px-base py-half',
+                'chat-session-header-input',
                 'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
               )}
             />
@@ -112,12 +120,14 @@ export function ChatHeader({
               value="Save"
               onClick={onSaveTitle}
               disabled={isSavingTitle}
+              className="chat-session-header-btn"
             />
             <PrimaryButton
               variant="tertiary"
               value="Cancel"
               onClick={onCancelTitleEdit}
               disabled={isSavingTitle}
+              className="chat-session-header-btn"
             />
           </div>
         )}
@@ -125,38 +135,92 @@ export function ChatHeader({
           <div className="text-xs text-error">{titleError}</div>
         )}
         {activeSession && (
-          <div className="text-xs text-low">
+          <div className="chat-session-header-meta text-xs text-low">
             Created {formatDateShortWithTime(activeSession.created_at)} /
             Total messages: {messageCount}
           </div>
         )}
       </div>
-      <div className="flex items-center gap-base">
-        <div className="flex items-center gap-base text-xs text-low">
+      <div className="chat-session-header-actions flex items-center gap-base">
+        <div className="chat-session-header-members flex items-center gap-base text-xs text-low">
           <UsersIcon className="size-icon-xs" />
           <span>{memberCount} AI members</span>
         </div>
         {activeSession && (
-          <div className="flex items-center gap-half">
+          <div className="chat-session-header-ops flex items-center gap-half">
             {isArchived && (
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="chat-session-archived-badge text-xs">
                 Archived
               </Badge>
             )}
-            <PrimaryButton
-              variant="tertiary"
-              value={isArchived ? 'Restore' : 'Archive'}
-              onClick={isArchived ? onRestore : onArchive}
-              disabled={isArchiving}
-            />
+            <Tooltip
+              content={
+                isArchived ? 'Restore session' : 'Archive session'
+              }
+              side="bottom"
+            >
+              <button
+                type="button"
+                className={cn(
+                  'chat-session-header-icon-btn chat-session-header-op-btn',
+                  isArchiving && 'opacity-50 cursor-not-allowed'
+                )}
+                onClick={isArchived ? onRestore : onArchive}
+                disabled={isArchiving}
+                aria-label={
+                  isArchived ? 'Restore session' : 'Archive session'
+                }
+              >
+                {isArchived ? (
+                  <ArrowCounterClockwiseIcon className="size-icon-xs" />
+                ) : (
+                  <BoxArrowDownIcon className="size-icon-xs" />
+                )}
+              </button>
+            </Tooltip>
             {!isArchived && (
-              <PrimaryButton
-                variant={isCleanupMode ? 'default' : 'secondary'}
-                value={isCleanupMode ? 'Exit Cleanup' : 'Cleanup'}
-                onClick={onToggleCleanupMode}
-                disabled={isDeletingMessages}
-              />
+              <Tooltip
+                content={
+                  isCleanupMode
+                    ? 'Exit cleanup mode'
+                    : 'Cleanup messages'
+                }
+                side="bottom"
+              >
+                <button
+                  type="button"
+                  className={cn(
+                    'chat-session-header-icon-btn chat-session-header-op-btn',
+                    isCleanupMode && 'active',
+                    isDeletingMessages &&
+                      'opacity-50 cursor-not-allowed'
+                  )}
+                  onClick={onToggleCleanupMode}
+                  disabled={isDeletingMessages}
+                  aria-label={
+                    isCleanupMode
+                      ? 'Exit cleanup mode'
+                      : 'Cleanup messages'
+                  }
+                >
+                  <BroomIcon
+                    className="size-icon-xs"
+                    weight={isCleanupMode ? 'fill' : 'regular'}
+                  />
+                </button>
+              </Tooltip>
             )}
+            <Tooltip content="Settings" side="bottom">
+              <button
+                type="button"
+                className="chat-session-header-icon-btn chat-session-header-op-btn"
+                onClick={onOpenSettings}
+                aria-label="Settings"
+                title="Settings"
+              >
+                <GearSixIcon className="size-icon-xs" />
+              </button>
+            </Tooltip>
           </div>
         )}
       </div>

@@ -21,6 +21,7 @@ import { ApiError, chatApi, configApi } from '@/lib/api';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useTheme } from '@/components/ThemeProvider';
 import { getActualTheme } from '@/utils/theme';
+import { SettingsDialog } from '@/components/ui-new/dialogs/SettingsDialog';
 
 import {
   type SessionMember,
@@ -87,6 +88,11 @@ const isTextAttachment = (file: File) =>
     '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.rb', '.php',
     '.go', '.rs', '.sql', '.sh', '.bash', '.svg',
   ].some((ext) => file.name.toLowerCase().endsWith(ext));
+
+const MAX_SESSION_TITLE_LENGTH = 20;
+
+const getSessionTitleLength = (value: string) =>
+  Array.from(value.trim()).length;
 
 export function ChatSessions() {
   const { sessionId } = useParams<{ sessionId?: string }>();
@@ -276,11 +282,13 @@ export function ChatSessions() {
   } | null>(null);
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [isDeletingMessages, setIsDeletingMessages] = useState(false);
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState(288);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(340);
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
   const [inputAreaHeight, setInputAreaHeight] = useState(240);
   const [isResizing, setIsResizing] = useState<'left' | 'right' | 'input' | null>(null);
   const resizeStartRef = useRef<{ startX: number; startY: number; startWidth: number; startHeight: number } | null>(null);
+  const lastExpandedLeftWidthRef = useRef(340);
 
   // Sync messages from query
   useEffect(() => {
@@ -1142,6 +1150,12 @@ export function ChatSessions() {
   const handleSaveTitle = async () => {
     if (!activeSessionId) return;
     const trimmed = titleDraft.trim();
+    if (getSessionTitleLength(trimmed) > MAX_SESSION_TITLE_LENGTH) {
+      setTitleError(
+        `Session name cannot exceed ${MAX_SESSION_TITLE_LENGTH} characters.`
+      );
+      return;
+    }
     try {
       await updateSession.mutateAsync({
         sessionId: activeSessionId,
@@ -1208,6 +1222,9 @@ export function ChatSessions() {
   const handleResizeStart = useCallback(
     (type: 'left' | 'right' | 'input', e: React.MouseEvent) => {
       e.preventDefault();
+      if (type === 'left' && isLeftSidebarCollapsed) {
+        return;
+      }
       setIsResizing(type);
       resizeStartRef.current = {
         startX: e.clientX,
@@ -1216,8 +1233,27 @@ export function ChatSessions() {
         startHeight: inputAreaHeight,
       };
     },
-    [leftSidebarWidth, rightSidebarWidth, inputAreaHeight]
+    [
+      inputAreaHeight,
+      isLeftSidebarCollapsed,
+      leftSidebarWidth,
+      rightSidebarWidth,
+    ]
   );
+
+  const handleToggleLeftSidebar = useCallback(() => {
+    setIsLeftSidebarCollapsed((prev) => {
+      if (!prev) {
+        lastExpandedLeftWidthRef.current = leftSidebarWidth;
+        setLeftSidebarWidth(84);
+        return true;
+      }
+      setLeftSidebarWidth(
+        Math.max(220, lastExpandedLeftWidthRef.current)
+      );
+      return false;
+    });
+  }, [leftSidebarWidth]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -1256,7 +1292,7 @@ export function ChatSessions() {
   }, [isResizing]);
 
   return (
-    <div className="relative flex h-full min-h-0 bg-white overflow-hidden select-none">
+    <div className="chat-session-page relative flex h-full min-h-0 overflow-hidden select-none">
       {/* Session List Sidebar */}
       <SessionListSidebar
         activeSessions={activeSessions}
@@ -1268,16 +1304,20 @@ export function ChatSessions() {
         onCreateSession={() => createSession.mutate()}
         isCreating={createSession.isPending}
         width={leftSidebarWidth}
+        isCollapsed={isLeftSidebarCollapsed}
+        onToggleCollapsed={handleToggleLeftSidebar}
       />
 
       {/* Left Sidebar Resize Handle */}
-      <div
-        className="w-1 cursor-col-resize hover:bg-brand/50 active:bg-brand transition-colors shrink-0"
-        onMouseDown={(e) => handleResizeStart('left', e)}
-      />
+      {!isLeftSidebarCollapsed && (
+        <div
+          className="chat-session-resize-handle w-1 cursor-col-resize transition-colors shrink-0"
+          onMouseDown={(e) => handleResizeStart('left', e)}
+        />
+      )}
 
       {/* Main Chat Section */}
-      <section className="flex-1 min-w-0 min-h-0 flex flex-col bg-white">
+      <section className="chat-session-main flex-1 min-w-0 min-h-0 flex flex-col">
         <ChatHeader
           activeSession={activeSession ?? null}
           messageCount={messageList.length}
@@ -1291,7 +1331,18 @@ export function ChatSessions() {
             setIsEditingTitle(true);
             setTitleError(null);
           }}
-          onTitleDraftChange={setTitleDraft}
+          onTitleDraftChange={(value) => {
+            setTitleDraft(value);
+            if (
+              getSessionTitleLength(value) > MAX_SESSION_TITLE_LENGTH
+            ) {
+              setTitleError(
+                `Session name cannot exceed ${MAX_SESSION_TITLE_LENGTH} characters.`
+              );
+            } else {
+              setTitleError(null);
+            }
+          }}
           onSaveTitle={handleSaveTitle}
           onCancelTitleEdit={handleCancelTitleEdit}
           onDeleteSession={() => {
@@ -1303,6 +1354,9 @@ export function ChatSessions() {
                 await deleteSession.mutateAsync(activeSession.id);
               },
             });
+          }}
+          onOpenSettings={() => {
+            SettingsDialog.show();
           }}
           onArchive={() => {
             if (activeSessionId) archiveSession.mutate(activeSessionId);
@@ -1361,7 +1415,7 @@ export function ChatSessions() {
         )}
 
         {/* Messages */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-base space-y-base">
+        <div className="chat-session-messages flex-1 min-h-0 overflow-y-auto p-base space-y-base">
           {isLoading && <div className="text-sm text-low">Loading chat...</div>}
           {isArchived && !isLoading && (
             <div className="text-xs text-low border border-border rounded-sm bg-secondary/60 px-base py-half">
@@ -1479,7 +1533,7 @@ export function ChatSessions() {
 
         {/* Input Area Resize Handle */}
         <div
-          className="h-1 cursor-row-resize hover:bg-brand/50 active:bg-brand transition-colors shrink-0 border-t border-border"
+          className="chat-session-resize-handle h-1 cursor-row-resize transition-colors shrink-0 border-t border-border"
           onMouseDown={(e) => handleResizeStart('input', e)}
         />
 
@@ -1524,7 +1578,7 @@ export function ChatSessions() {
 
       {/* Right Sidebar Resize Handle */}
       <div
-        className="w-1 cursor-col-resize hover:bg-brand/50 active:bg-brand transition-colors shrink-0"
+        className="chat-session-resize-handle w-1 cursor-col-resize transition-colors shrink-0"
         onMouseDown={(e) => handleResizeStart('right', e)}
       />
 

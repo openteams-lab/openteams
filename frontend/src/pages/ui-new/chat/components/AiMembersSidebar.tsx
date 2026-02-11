@@ -83,33 +83,38 @@ export function AiMembersSidebar({
 }: AiMembersSidebarProps) {
   return (
     <aside
-      className="border-l border-border flex flex-col min-h-0 shrink-0 bg-white"
+      className="chat-session-members-panel border-l border-border flex flex-col min-h-0 shrink-0"
       style={{ width }}
     >
-      <div className="px-base py-base border-b border-border flex items-center justify-between">
-        <div className="text-sm text-normal font-medium">AI Members</div>
-        <div className="text-xs text-low">
+      <div className="chat-session-members-header px-base py-base border-b border-border flex items-center justify-between">
+        <div className="chat-session-members-title text-sm text-normal font-medium">
+          AI Members
+        </div>
+        <div className="chat-session-members-count text-xs text-low">
           {sessionMembers.length} in session
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto p-base space-y-base">
+      <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto p-base space-y-base">
         {!activeSessionId && (
-          <div className="text-xs text-low mt-base">
+          <div className="chat-session-members-empty text-xs text-low mt-base">
             Select a session to manage AI members.
           </div>
         )}
         {activeSessionId && sessionMembers.length === 0 && (
-          <div className="text-xs text-low mt-base">
+          <div className="chat-session-members-empty text-xs text-low mt-base">
             No AI members yet. Add one below to enable @mentions.
           </div>
         )}
         {sessionMembers.map(({ agent, sessionAgent }) => {
           const state =
             agentStates[agent.id] ?? ChatSessionAgentState.idle;
+          const modelName = getModelName(agent.runner_type);
+          const fullText = `${toPrettyCase(agent.runner_type)} | ${agentStateLabels[state]}${modelName ? ` | ${modelName}` : ''}`;
+
           return (
             <div
               key={sessionAgent.id}
-              className="border border-border rounded-sm px-base py-half space-y-half"
+              className="chat-session-member-card border border-border rounded-sm px-base py-half space-y-half"
             >
               <div className="flex items-center justify-between gap-base">
                 <div className="flex items-center gap-half min-w-0">
@@ -125,23 +130,17 @@ export function AiMembersSidebar({
                     <div className="text-sm text-normal truncate">
                       @{agent.name}
                     </div>
-                    {(() => {
-                      const modelName = getModelName(agent.runner_type);
-                      const fullText = `${toPrettyCase(agent.runner_type)} · ${agentStateLabels[state]}${modelName ? ` · ${modelName}` : ''}`;
-                      return (
-                        <Tooltip content={fullText} side="bottom">
-                          <div className="text-xs text-low truncate cursor-default">
-                            {fullText}
-                          </div>
-                        </Tooltip>
-                      );
-                    })()}
+                    <Tooltip content={fullText} side="bottom">
+                      <div className="chat-session-member-model text-xs text-low truncate cursor-default">
+                        {fullText}
+                      </div>
+                    </Tooltip>
                   </div>
                 </div>
-                <div className="flex items-center gap-half text-xs">
+                <div className="chat-session-member-actions flex items-center gap-half text-xs">
                   <button
                     type="button"
-                    className="text-brand hover:text-brand-hover"
+                    className="chat-session-member-action"
                     onClick={() => onOpenWorkspace(agent.id)}
                   >
                     Workspace
@@ -149,7 +148,7 @@ export function AiMembersSidebar({
                   <button
                     type="button"
                     className={cn(
-                      'text-low hover:text-normal',
+                      'chat-session-member-action',
                       isArchived && 'pointer-events-none opacity-50'
                     )}
                     onClick={() =>
@@ -162,7 +161,7 @@ export function AiMembersSidebar({
                   <button
                     type="button"
                     className={cn(
-                      'text-error hover:text-error/80',
+                      'chat-session-member-action danger',
                       isArchived && 'pointer-events-none opacity-50'
                     )}
                     onClick={() =>
@@ -175,7 +174,7 @@ export function AiMembersSidebar({
                 </div>
               </div>
               {sessionAgent.workspace_path && (
-                <div className="text-xs text-low break-all">
+                <div className="chat-session-member-workspace text-xs text-low break-all">
                   {sessionAgent.workspace_path}
                 </div>
               )}
@@ -184,18 +183,19 @@ export function AiMembersSidebar({
         })}
 
         {/* Add Member Form */}
-        <div className="border-t border-border pt-base space-y-half">
+        <div className="chat-session-member-form border-t border-border pt-base space-y-half">
           {!isAddMemberOpen ? (
-            <PrimaryButton
-              variant="secondary"
-              value="Add AI member"
+            <button
+              type="button"
+              className="chat-session-add-member-btn"
               onClick={onOpenAddMember}
               disabled={!activeSessionId || isArchived}
             >
+              Add AI member
               <PlusIcon className="size-icon-xs" />
-            </PrimaryButton>
+            </button>
           ) : (
-            <div className="border border-border rounded-sm p-base space-y-half">
+            <div className="chat-session-member-form-panel border border-border rounded-sm p-base space-y-half">
               <div className="text-sm text-normal font-medium">
                 {editingMember ? 'Edit AI member' : 'Add AI member'}
               </div>
@@ -209,7 +209,7 @@ export function AiMembersSidebar({
                   onChange={(event) => onNameChange(event.target.value)}
                   placeholder="e.g. coder"
                   className={cn(
-                    'w-full rounded-sm border border-border bg-panel px-base py-half',
+                    'chat-session-member-field w-full rounded-sm border border-border bg-panel px-base py-half',
                     'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
                   )}
                 />
@@ -228,7 +228,7 @@ export function AiMembersSidebar({
                     enabledRunnerTypes.length === 0
                   }
                   className={cn(
-                    'w-full rounded-sm border border-border bg-panel px-base py-half',
+                    'chat-session-member-field w-full rounded-sm border border-border bg-panel px-base py-half',
                     'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
                   )}
                 >
@@ -268,19 +268,19 @@ export function AiMembersSidebar({
                       onVariantChange(event.target.value)
                     }
                     className={cn(
-                      'w-full rounded-sm border border-border bg-panel px-base py-half',
+                      'chat-session-member-field w-full rounded-sm border border-border bg-panel px-base py-half',
                       'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
                     )}
                   >
                     {memberVariantOptions.map((variant) => {
-                      const modelName = getModelName(
+                      const name = getModelName(
                         newMemberRunnerType,
                         variant
                       );
                       return (
                         <option key={variant} value={variant}>
                           {variant}
-                          {modelName ? ` (${modelName})` : ''}
+                          {name ? ` (${name})` : ''}
                         </option>
                       );
                     })}
@@ -320,7 +320,7 @@ export function AiMembersSidebar({
                   rows={3}
                   placeholder="Describe how this AI member should behave."
                   className={cn(
-                    'w-full resize-none rounded-sm border border-border bg-panel',
+                    'chat-session-member-field w-full resize-none rounded-sm border border-border bg-panel',
                     'px-base py-half text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
                   )}
                 />
@@ -342,7 +342,7 @@ export function AiMembersSidebar({
                       : undefined
                   }
                   className={cn(
-                    'w-full rounded-sm border border-border bg-panel px-base py-half',
+                    'chat-session-member-field w-full rounded-sm border border-border bg-panel px-base py-half',
                     'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand',
                     editingMember && 'opacity-50 cursor-not-allowed'
                   )}
@@ -362,12 +362,14 @@ export function AiMembersSidebar({
                   value="Cancel"
                   onClick={onCancelMember}
                   disabled={isSavingMember}
+                  className="chat-session-member-btn"
                 />
                 <PrimaryButton
                   value={editingMember ? 'Save' : 'Add'}
                   actionIcon={isSavingMember ? 'spinner' : PlusIcon}
                   onClick={onSaveMember}
                   disabled={isSavingMember || isArchived}
+                  className="chat-session-member-btn"
                 />
               </div>
             </div>

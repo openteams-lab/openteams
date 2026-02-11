@@ -29,16 +29,19 @@ export function RunningAgentPlaceholder({
   );
 
   return (
-    <div className="flex justify-start">
+    <div className="chat-session-message-row is-agent flex justify-start">
       <ChatEntryContainer
         variant="system"
         title={member.agent.name}
         expanded
-        className="max-w-[720px] w-full md:w-[80%] opacity-80 shadow-sm rounded-2xl"
-        headerClassName="bg-transparent"
+        iconContainerClassName="chat-session-message-avatar is-agent"
+        iconClassName="chat-session-message-avatar-icon"
+        className="chat-session-message-card chat-session-message-card-agent max-w-[760px] w-full md:w-[84%] opacity-80 shadow-sm rounded-2xl"
+        headerClassName="chat-session-message-header"
+        bodyClassName="chat-session-message-body"
         style={{
-          backgroundColor: tone.bg,
-          borderColor: tone.border,
+          backgroundColor: `var(--chat-session-message-other-bg, ${tone.bg})`,
+          borderColor: `var(--chat-session-message-other-border, ${tone.border})`,
         }}
         headerRight={
           <button
@@ -52,12 +55,12 @@ export function RunningAgentPlaceholder({
             }
             disabled={isStopping}
           >
-            {isStopping ? '停止中...' : '停止'}
+            {isStopping ? 'Stopping...' : 'Stop'}
           </button>
         }
       >
         <div className="text-sm text-low">
-          工作执行中，请稍等... 已用{elapsedSeconds}秒
+          Agent is running. Elapsed {elapsedSeconds}s.
         </div>
       </ChatEntryContainer>
     </div>

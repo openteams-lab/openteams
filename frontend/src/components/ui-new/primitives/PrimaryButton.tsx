@@ -23,7 +23,7 @@ export function PrimaryButton({
   const variantStyles = disabled
     ? 'cursor-not-allowed bg-panel'
     : variant === 'default'
-      ? 'bg-brand hover:bg-brand-hover text-on-brand'
+      ? 'bg-[#4d55ad] hover:bg-[#444ca0] text-on-brand'
       : variant === 'secondary'
         ? 'bg-brand-secondary hover:bg-brand-hover text-on-brand'
         : 'bg-panel hover:bg-secondary text-normal';

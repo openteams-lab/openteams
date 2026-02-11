@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { Icon } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { Tooltip } from '../primitives/Tooltip';
@@ -92,6 +91,8 @@ export function Navbar({
   onExecuteAction,
   className,
 }: NavbarProps) {
+  // Keep prop for API compatibility while left slot replaces it in current layout.
+  void leftItems;
 
   const renderItem = (item: NavbarItem, key: string) => {
     // Render divider

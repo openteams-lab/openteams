@@ -18,11 +18,11 @@ export function CleanupModeBar({
   const allSelected = selectedCount === totalCount;
 
   return (
-    <div className="px-base py-half border-b border-border text-xs text-low flex items-center justify-end gap-base">
+    <div className="chat-session-cleanup-bar px-base py-half border-b border-border text-xs text-low flex items-center justify-end gap-base">
       <span>Selected: {selectedCount}</span>
       <button
         type="button"
-        className="text-brand hover:text-brand-hover"
+        className="chat-session-cleanup-action"
         onClick={onToggleSelectAll}
       >
         {allSelected ? 'Deselect All' : 'Select All'}
@@ -30,7 +30,7 @@ export function CleanupModeBar({
       {selectedCount > 0 && (
         <button
           type="button"
-          className="text-error hover:text-error/80 flex items-center gap-half"
+          className="chat-session-cleanup-delete flex items-center gap-half"
           onClick={onDeleteSelected}
           disabled={isDeletingMessages}
         >
