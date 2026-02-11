@@ -1,8 +1,25 @@
-import { ChatsTeardropIcon, PlusIcon } from '@phosphor-icons/react';
+import {
+  CaretDoubleLeftIcon,
+  CaretDoubleRightIcon,
+  ChatCircleDotsIcon,
+  PlusIcon,
+} from '@phosphor-icons/react';
 import type { ChatSession } from 'shared/types';
 import { cn } from '@/lib/utils';
-import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 import { formatDateShortWithTime } from '@/utils/date';
+
+const MAX_SESSION_TITLE_LENGTH = 20;
+
+const getDisplaySessionTitle = (title: string | null) => {
+  const fullTitle = title?.trim() || 'Untitled session';
+  if (fullTitle.length <= MAX_SESSION_TITLE_LENGTH) {
+    return { fullTitle, displayTitle: fullTitle };
+  }
+  return {
+    fullTitle,
+    displayTitle: `${fullTitle.slice(0, MAX_SESSION_TITLE_LENGTH)}...`,
+  };
+};
 
 export interface SessionListSidebarProps {
   activeSessions: ChatSession[];
@@ -14,6 +31,8 @@ export interface SessionListSidebarProps {
   onCreateSession: () => void;
   isCreating: boolean;
   width: number;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
 export function SessionListSidebar({
@@ -26,96 +45,190 @@ export function SessionListSidebar({
   onCreateSession,
   isCreating,
   width,
+  isCollapsed,
+  onToggleCollapsed,
 }: SessionListSidebarProps) {
+  const CollapseIcon = isCollapsed
+    ? CaretDoubleRightIcon
+    : CaretDoubleLeftIcon;
+  const isCompactSessionRow = !isCollapsed && width < 320;
+
+  const renderSessionItem = (session: ChatSession) => {
+    const isActive = session.id === activeSessionId;
+    const { fullTitle, displayTitle } = getDisplaySessionTitle(
+      session.title
+    );
+
+    return (
+      <button
+        key={session.id}
+        type="button"
+        onClick={() => onSelectSession(session.id)}
+        className={cn(
+          'chat-session-item w-full text-left',
+          isActive && 'active',
+          isCollapsed && 'collapsed'
+        )}
+        title={fullTitle}
+      >
+        <div className="chat-session-item-inner flex items-center gap-half">
+          {isActive ? (
+            <span
+              className="chat-session-item-active-dot"
+              aria-hidden="true"
+            />
+          ) : (
+            <ChatCircleDotsIcon className="chat-session-item-icon size-icon-xs" />
+          )}
+          {!isCollapsed && (
+            <div className="chat-session-item-content min-w-0 flex-1">
+              <div
+                className={cn(
+                  'chat-session-item-row',
+                  isCompactSessionRow && 'compact'
+                )}
+              >
+                <div
+                  className="chat-session-item-title truncate"
+                  title={fullTitle}
+                >
+                  {displayTitle}
+                </div>
+                <div className="chat-session-item-meta">
+                  {formatDateShortWithTime(session.updated_at)}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </button>
+    );
+  };
+
   return (
     <aside
-      className="border-r border-border flex flex-col min-h-0 shrink-0 bg-white"
+      className={cn(
+        'chat-session-left border-r flex flex-col min-h-0 shrink-0',
+        isCollapsed && 'collapsed'
+      )}
       style={{ width }}
     >
-      <div className="px-base py-base border-b border-border flex items-center justify-between">
-        <div className="flex items-center gap-half text-normal font-medium">
-          <ChatsTeardropIcon className="size-icon-sm" />
-          <span>Chat Groups</span>
+      <div className="chat-session-left-header px-base py-base">
+        <div className="chat-session-left-brand">
+          {!isCollapsed && (
+            <>
+              <img
+                src="/agent-chatgroup-logo-white.png"
+                alt="Agents ChatGroup"
+                className="chat-session-left-brand-logo"
+              />
+            </>
+          )}
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="chat-session-left-control-btn"
+            aria-label={
+              isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+            }
+            title={
+              isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+            }
+          >
+            <CollapseIcon className="size-icon-xs" />
+          </button>
         </div>
-        <PrimaryButton
-          variant="secondary"
-          value="New"
-          onClick={onCreateSession}
-          disabled={isCreating}
-        >
-          <PlusIcon className="size-icon-xs" />
-        </PrimaryButton>
-      </div>
-      <div className="flex-1 min-h-0 overflow-y-auto p-base space-y-half">
-        {activeSessions.length === 0 && archivedSessions.length === 0 && (
-          <div className="text-sm text-low">
-            No sessions yet. Create your first group chat.
+        {!isCollapsed && <div className="chat-session-left-divider" />}
+        <div className="chat-session-left-header-row flex items-center justify-between">
+          <div className="chat-session-left-title flex items-center gap-base font-medium min-w-0">
+            <img
+              src="/icon_vectorized_all_white.svg"
+              alt="Agents ChatGroup"
+              className="chat-session-left-logo"
+            />
+            {!isCollapsed && (
+              <span className="truncate">Chat Groups</span>
+            )}
           </div>
-        )}
-        {activeSessions.map((session) => {
-          const isActive = session.id === activeSessionId;
-          return (
+          {!isCollapsed && (
             <button
-              key={session.id}
               type="button"
-              onClick={() => onSelectSession(session.id)}
-              className={cn(
-                'w-full text-left rounded-sm border px-base py-half',
-                isActive
-                  ? 'border-brand bg-brand/10 text-normal'
-                  : 'border-transparent hover:border-border hover:bg-secondary text-low'
+              onClick={onCreateSession}
+              disabled={isCreating}
+              className="chat-session-left-new-btn"
+              aria-label="Create new session"
+              title="Create new session"
+            >
+              <span className="chat-session-left-new-label">
+                New
+              </span>
+              <PlusIcon className="chat-session-left-new-icon size-icon-xs" />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="chat-session-left-divider" />
+      {isCollapsed ? (
+        <div className="chat-session-list flex-1 min-h-0 overflow-y-auto p-base space-y-half">
+          {activeSessions.length === 0 ? (
+            <div className="chat-session-list-empty text-sm text-low">
+              No active sessions.
+            </div>
+          ) : (
+            activeSessions.map((session) =>
+              renderSessionItem(session)
+            )
+          )}
+        </div>
+      ) : (
+        <div className="chat-session-lists flex-1 min-h-0">
+          <div className="chat-session-active-panel min-h-0">
+            <div className="chat-session-active-list min-h-0 overflow-y-auto p-base space-y-half">
+              {activeSessions.length === 0 ? (
+                <div className="chat-session-list-empty text-sm text-low">
+                  No active sessions.
+                </div>
+              ) : (
+                activeSessions.map((session) =>
+                  renderSessionItem(session)
+                )
               )}
-            >
-              <div className="flex items-center justify-between gap-base">
-                <span className="text-sm font-medium truncate text-normal">
-                  {session.title || 'Untitled session'}
-                </span>
-                <span className="text-xs text-low">
-                  {formatDateShortWithTime(session.updated_at)}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-        {archivedSessions.length > 0 && (
-          <div className="pt-base mt-base border-t border-border space-y-half">
-            <button
-              type="button"
-              onClick={onToggleArchived}
-              className="text-xs text-low uppercase tracking-wide hover:text-normal"
-            >
-              {showArchived ? 'Hide Archived' : 'Show Archived'} (
-              {archivedSessions.length})
-            </button>
-            {showArchived &&
-              archivedSessions.map((session) => {
-                const isActive = session.id === activeSessionId;
-                return (
-                  <button
-                    key={session.id}
-                    type="button"
-                    onClick={() => onSelectSession(session.id)}
-                    className={cn(
-                      'w-full text-left rounded-sm border px-base py-half',
-                      isActive
-                        ? 'border-brand bg-brand/10 text-normal'
-                        : 'border-transparent hover:border-border hover:bg-secondary text-low'
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-base">
-                      <span className="text-sm font-medium truncate text-normal">
-                        {session.title || 'Untitled session'}
-                      </span>
-                      <span className="text-xs text-low">
-                        {formatDateShortWithTime(session.updated_at)}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+            </div>
           </div>
-        )}
-      </div>
+
+          <div className="chat-session-left-divider" />
+          <div className="chat-session-archived-panel min-h-0">
+            <div className="chat-session-archived-header px-base py-half">
+              <button
+                type="button"
+                onClick={onToggleArchived}
+                disabled={archivedSessions.length === 0}
+                className={cn(
+                  'chat-session-archived-toggle',
+                  archivedSessions.length === 0 &&
+                    'opacity-60 cursor-not-allowed'
+                )}
+              >
+                {showArchived ? 'Hide Archived' : 'Show Archived'} (
+                {archivedSessions.length})
+              </button>
+            </div>
+            <div className="chat-session-archived-list min-h-0 overflow-y-auto p-base space-y-half">
+              {archivedSessions.length === 0 && (
+                <div className="chat-session-list-empty text-sm text-low">
+                  No archived sessions.
+                </div>
+              )}
+              {archivedSessions.length > 0 &&
+                showArchived &&
+                archivedSessions.map((session) =>
+                  renderSessionItem(session)
+                )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </aside>
   );
 }

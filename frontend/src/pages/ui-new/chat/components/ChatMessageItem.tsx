@@ -110,7 +110,7 @@ export function ChatMessageItem({
   // System messages
   if (message.sender_type === ChatSenderType.system) {
     return (
-      <div className="flex items-start gap-base">
+      <div className="chat-session-message-row is-system flex items-start gap-base">
         {isCleanupMode && (
           <button
             type="button"
@@ -138,8 +138,8 @@ export function ChatMessageItem({
     <div
       id={`chat-message-${message.id}`}
       className={cn(
-        'flex items-start gap-base',
-        isUser ? 'justify-end' : 'justify-start'
+        'chat-session-message-row flex items-start gap-base',
+        isUser ? 'is-user justify-end' : 'is-agent justify-start'
       )}
     >
       {isCleanupMode && !isUser && (
@@ -162,41 +162,49 @@ export function ChatMessageItem({
         variant={isUser ? 'user' : 'system'}
         title={senderLabel}
         expanded
+        iconContainerClassName={cn(
+          'chat-session-message-avatar',
+          isUser ? 'is-user' : 'is-agent'
+        )}
+        iconClassName="chat-session-message-avatar-icon"
         headerRight={
-          <div className="flex items-center gap-half text-xs text-low">
+          <div className="chat-session-message-meta flex items-center gap-half text-xs text-low">
             <button
               type="button"
               className={cn(
-                'text-brand hover:text-brand-hover',
+                'chat-session-message-reply text-brand hover:text-brand-hover',
                 isArchived && 'pointer-events-none opacity-50'
               )}
               onClick={() => onReply(message)}
               disabled={isArchived}
             >
-              引用
+              Quote
             </button>
-            <span>
-              {formatDateShortWithTime(message.created_at)}
-            </span>
+            <span>{formatDateShortWithTime(message.created_at)}</span>
           </div>
         }
         className={cn(
-          'max-w-[720px] w-full md:w-[80%] shadow-sm rounded-2xl',
-          isUser && 'ml-auto',
+          'chat-session-message-card max-w-[760px] w-full md:w-[84%] shadow-sm rounded-2xl',
+          isUser && 'chat-session-message-card-self ml-auto',
+          !isUser && 'chat-session-message-card-agent',
           isCleanupMode && isSelected && 'ring-2 ring-brand'
         )}
-        headerClassName="bg-transparent"
+        headerClassName="chat-session-message-header"
+        bodyClassName="chat-session-message-body"
         style={{
-          backgroundColor: tone.bg,
-          borderColor: tone.border,
+          backgroundColor: isUser
+            ? `var(--chat-session-message-self-bg, ${tone.bg})`
+            : `var(--chat-session-message-other-bg, ${tone.bg})`,
+          borderColor: isUser
+            ? `var(--chat-session-message-self-border, ${tone.border})`
+            : `var(--chat-session-message-other-border, ${tone.border})`,
         }}
       >
         {referenceId && (
-          <div className="mb-half border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
+          <div className="chat-session-reference-card mb-half border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
             <div className="flex items-center justify-between gap-base">
               <span className="font-medium text-normal">
-                Replying to{' '}
-                {referenceSenderLabel ?? 'message'}
+                Replying to {referenceSenderLabel ?? 'message'}
               </span>
               <button
                 type="button"
@@ -248,7 +256,7 @@ export function ChatMessageItem({
         })()}
         <ChatMarkdown content={message.content} />
         {mentionList.length > 0 && (
-          <div className="mt-half flex flex-wrap items-center gap-half text-xs text-low">
+          <div className="chat-session-mentions mt-half flex flex-wrap items-center gap-half text-xs text-low">
             <span>Mentions:</span>
             {mentionList.map((mention) => {
               const agentId = agentIdByName.get(mention);
@@ -271,7 +279,7 @@ export function ChatMessageItem({
                 <Badge
                   key={`${message.id}-mention-${mention}`}
                   variant="secondary"
-                  className="flex items-center gap-1 px-2 py-0.5 text-xs"
+                  className="chat-session-mention-tag flex items-center gap-1 px-2 py-0.5 text-xs"
                 >
                   @{mention}
                   {showCheck && (
@@ -295,7 +303,7 @@ export function ChatMessageItem({
           </div>
         )}
         {attachments.length > 0 && (
-          <div className="mt-half space-y-half">
+          <div className="chat-session-attachments mt-half space-y-half">
             {attachments.map((attachment) => {
               const attachmentUrl =
                 activeSessionId && attachment.id
@@ -311,7 +319,7 @@ export function ChatMessageItem({
               return (
                 <div
                   key={attachment.id}
-                  className="border border-border rounded-sm bg-panel px-base py-half text-xs text-normal"
+                  className="chat-session-attachment-card border border-border rounded-sm bg-panel px-base py-half text-xs text-normal"
                 >
                   <div className="flex items-center justify-between gap-base">
                     <span className="font-ibm-plex-mono break-all">
@@ -361,12 +369,12 @@ export function ChatMessageItem({
           </div>
         )}
         {hasDiffInfo && diffInfo && (
-          <div className="mt-half border border-border rounded-sm bg-secondary/70 px-base py-half text-xs text-normal">
-            <div className="flex items-center justify-between gap-base">
-              <span>Code changes</span>
+          <div className="chat-session-code-card mt-half border border-border rounded-sm bg-secondary/70 px-base py-half text-xs text-normal">
+            <div className="chat-session-code-card-header flex items-center justify-between gap-base">
+              <span className="chat-session-code-card-title">Code changes</span>
               <button
                 type="button"
-                className="text-brand hover:text-brand-hover"
+                className="chat-session-code-card-link text-brand hover:text-brand-hover"
                 onClick={() =>
                   onOpenDiffViewer(
                     diffRunId,
@@ -379,17 +387,17 @@ export function ChatMessageItem({
               </button>
             </div>
             {diffInfo.available && runDiffs[diffRunId]?.loading && (
-              <div className="mt-half text-xs text-low">
+              <div className="chat-session-code-card-meta mt-half text-xs text-low">
                 Loading diff...
               </div>
             )}
             {diffInfo.available && runDiffs[diffRunId]?.error && (
-              <div className="mt-half text-xs text-error">
+              <div className="chat-session-code-card-meta mt-half text-xs text-error">
                 {runDiffs[diffRunId]?.error}
               </div>
             )}
             {diffInfo.untrackedFiles.length > 0 && (
-              <div className="mt-half text-xs text-low">
+              <div className="chat-session-code-card-meta mt-half text-xs text-low">
                 {diffInfo.untrackedFiles.length} untracked file
                 {diffInfo.untrackedFiles.length === 1 ? '' : 's'}
               </div>

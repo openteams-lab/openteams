@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { SyncErrorProvider } from '@/contexts/SyncErrorContext';
 import { UserProvider } from '@/contexts/remote/UserContext';
 import { NavbarContainer } from './NavbarContainer';
@@ -137,25 +138,32 @@ export function SharedAppLayout() {
     <SyncErrorProvider>
       <UserProvider>
         <div className="flex h-screen bg-primary">
-          <AppBar
-            projects={orgProjects}
-            organizations={organizations}
-            selectedOrgId={selectedOrgId ?? ''}
-            onOrgSelect={setSelectedOrgId}
-            onCreateOrg={handleCreateOrg}
-            onCreateProject={handleCreateProject}
-            onWorkspacesClick={handleWorkspacesClick}
-            onChatClick={handleChatClick}
-            onProjectClick={handleProjectClick}
-            isWorkspacesActive={isWorkspacesActive}
-            isChatActive={isChatActive}
-            activeProjectId={activeProjectId}
-            isSignedIn={isSignedIn}
-            isLoadingProjects={isLoading}
-          />
+          {!isChatActive && (
+            <AppBar
+              projects={orgProjects}
+              organizations={organizations}
+              selectedOrgId={selectedOrgId ?? ''}
+              onOrgSelect={setSelectedOrgId}
+              onCreateOrg={handleCreateOrg}
+              onCreateProject={handleCreateProject}
+              onWorkspacesClick={handleWorkspacesClick}
+              onChatClick={handleChatClick}
+              onProjectClick={handleProjectClick}
+              isWorkspacesActive={isWorkspacesActive}
+              isChatActive={isChatActive}
+              activeProjectId={activeProjectId}
+              isSignedIn={isSignedIn}
+              isLoadingProjects={isLoading}
+            />
+          )}
           <div className="flex flex-col flex-1 min-w-0">
-            <NavbarContainer />
-            <div className="flex-1 min-h-0">
+            {!isChatActive && <NavbarContainer />}
+            <div
+              className={cn(
+                'flex-1 min-h-0',
+                isChatActive && 'chat-session-route'
+              )}
+            >
               <Outlet />
             </div>
           </div>

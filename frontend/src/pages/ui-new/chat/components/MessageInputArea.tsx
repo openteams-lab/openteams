@@ -108,8 +108,8 @@ export function MessageInputArea({
   activeSessionId,
 }: MessageInputAreaProps) {
   return (
-    <div className="p-base space-y-base shrink-0">
-      <div className="flex items-center gap-base flex-wrap">
+    <div className="chat-session-input-area p-base space-y-base shrink-0">
+      <div className="chat-session-mention-bar flex items-center gap-base flex-wrap">
         <MultiSelectDropdown
           icon={ChatsTeardropIcon}
           label="Mention agents"
@@ -124,12 +124,12 @@ export function MessageInputArea({
           }
         />
         {selectedMentions.length > 0 && (
-          <div className="flex items-center gap-half flex-wrap">
+          <div className="chat-session-selected-mentions flex items-center gap-half flex-wrap">
             {selectedMentions.map((mention) => (
               <Badge
                 key={mention}
                 variant="secondary"
-                className="flex items-center gap-half px-2 py-0.5"
+                className="chat-session-selected-mention flex items-center gap-half px-2 py-0.5"
               >
                 @{mention}
                 <button
@@ -150,14 +150,14 @@ export function MessageInputArea({
       </div>
 
       {replyToMessage && (
-        <div className="border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
+        <div className="chat-session-reply-card border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
           <div className="flex items-center justify-between gap-base">
             <span className="font-medium text-normal">
               Replying to {replyToSenderLabel ?? 'message'}
             </span>
             <button
               type="button"
-              className="text-brand hover:text-brand-hover"
+              className="chat-session-reply-cancel text-brand hover:text-brand-hover"
               onClick={onCancelReply}
             >
               Cancel
@@ -171,11 +171,11 @@ export function MessageInputArea({
 
       {/* Display attached files */}
       {attachedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-2 p-2 border border-border rounded-sm bg-secondary/40">
+        <div className="chat-session-attachments flex flex-wrap gap-2 p-2 border border-border rounded-sm bg-secondary/40">
           {attachedFiles.map((file, index) => (
             <div
               key={`${file.name}-${file.size}-${index}`}
-              className="flex items-center gap-1 bg-panel border border-border rounded px-2 py-1 text-xs"
+              className="chat-session-attachment-item flex items-center gap-1 bg-panel border border-border rounded px-2 py-1 text-xs"
             >
               <PaperclipIcon className="size-icon-2xs text-low" />
               <span
@@ -207,7 +207,7 @@ export function MessageInputArea({
           ))}
           <button
             type="button"
-            className="text-xs text-brand hover:text-brand-hover ml-1"
+            className="chat-session-attachment-clear text-xs text-brand hover:text-brand-hover ml-1"
             onClick={onClearAttachedFiles}
           >
             Clear all
@@ -219,7 +219,7 @@ export function MessageInputArea({
         <div className="text-xs text-error">{attachmentError}</div>
       )}
 
-      <div className="relative flex-1">
+      <div className="chat-session-input-editor relative flex-1">
         <textarea
           ref={inputRef}
           value={draft}
@@ -241,21 +241,21 @@ export function MessageInputArea({
           disabled={isArchived || !activeSessionId}
           style={{ height: inputAreaHeight }}
           className={cn(
-            'w-full resize-none rounded-sm border border-border bg-panel',
+            'chat-session-textarea w-full resize-none rounded-sm border border-border',
             'px-base py-base text-sm text-normal leading-relaxed focus:outline-none focus:ring-1 focus:ring-brand',
             isArchived && 'opacity-60 cursor-not-allowed'
           )}
         />
         {mentionQuery !== null &&
           visibleMentionSuggestions.length > 0 && (
-            <div className="absolute z-20 left-0 right-0 bottom-full mb-half bg-panel border border-border rounded-sm shadow">
+            <div className="chat-session-mention-suggestions absolute z-20 left-0 right-0 bottom-full mb-half bg-panel border border-border rounded-sm shadow">
               {visibleMentionSuggestions.map((agent, index) => (
                 <button
                   key={agent.id}
                   type="button"
                   onClick={() => onMentionSelect(agent.name)}
                   className={cn(
-                    'w-full px-base py-half text-left text-sm',
+                    'chat-session-mention-option w-full px-base py-half text-left text-sm',
                     'flex items-center justify-between',
                     index === highlightedMentionIndex
                       ? 'bg-brand-secondary text-on-brand'
@@ -278,11 +278,11 @@ export function MessageInputArea({
       </div>
 
       <div className="flex items-center justify-between gap-base">
-        <div className="flex items-center gap-half text-xs text-low">
+        <div className="chat-session-input-hint flex items-center gap-half text-xs text-low">
           <button
             type="button"
             className={cn(
-              'flex items-center justify-center rounded-sm border border-border bg-panel px-2 py-1',
+              'chat-session-attach-btn flex items-center justify-center rounded-sm border border-border bg-panel px-2 py-1',
               'text-low hover:text-normal hover:border-border/80',
               (isArchived ||
                 !activeSessionId ||
@@ -318,6 +318,7 @@ export function MessageInputArea({
           }
           onClick={onSend}
           disabled={!canSend}
+          className="chat-session-send-btn"
         />
       </div>
     </div>

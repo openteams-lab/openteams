@@ -253,6 +253,32 @@ pnpm --filter frontend build
 pnpm desktop:build
 ```
 
+#### Windows (PowerShell): run backend and frontend separately
+
+If `pnpm run dev` fails in Windows PowerShell because of Unix-style `export`, use two terminals:
+
+**Terminal A (backend)**
+
+```powershell
+$env:FRONTEND_PORT = node scripts/setup-dev-environment.js frontend
+$env:BACKEND_PORT = node scripts/setup-dev-environment.js backend
+$env:VK_ALLOWED_ORIGINS = "http://localhost:$env:FRONTEND_PORT"
+$env:DISABLE_WORKTREE_CLEANUP = "1"
+$env:RUST_LOG = "debug"
+cargo watch -w crates -x "run --bin server"
+```
+
+**Terminal B (frontend)**
+
+```powershell
+$env:FRONTEND_PORT = node scripts/setup-dev-environment.js frontend
+cd frontend
+pnpm dev -- --port $env:FRONTEND_PORT --host
+```
+
+Open frontend at `http://localhost:<FRONTEND_PORT>` (example: `http://localhost:3001`).
+
+
 ### 技术栈
 
 ```

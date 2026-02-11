@@ -57,6 +57,8 @@ interface ChatEntryContainerProps {
   style?: CSSProperties;
   headerClassName?: string;
   bodyClassName?: string;
+  iconContainerClassName?: string;
+  iconClassName?: string;
   status?: ToolStatus;
   isGreyed?: boolean;
 }
@@ -73,6 +75,8 @@ export function ChatEntryContainer({
   style,
   headerClassName,
   bodyClassName,
+  iconContainerClassName,
+  iconClassName,
   status,
   isGreyed,
 }: ChatEntryContainerProps) {
@@ -105,7 +109,19 @@ export function ChatEntryContainer({
         )}
         onClick={onToggle}
       >
-        <Icon className="size-icon-xs shrink-0 text-low" />
+        <span
+          className={cn(
+            'shrink-0 flex items-center justify-center',
+            iconContainerClassName
+          )}
+        >
+          <Icon
+            className={cn(
+              'size-icon-xs shrink-0 text-low',
+              iconClassName
+            )}
+          />
+        </span>
         {title && (
           <span className="flex-1 text-sm text-normal truncate">{title}</span>
         )}

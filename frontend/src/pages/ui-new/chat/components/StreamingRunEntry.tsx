@@ -24,21 +24,24 @@ export function StreamingRunEntry({
   onStop,
 }: StreamingRunEntryProps) {
   return (
-    <div key={`stream-${runId}`} className="flex justify-start">
+    <div key={`stream-${runId}`} className="chat-session-message-row is-agent flex justify-start">
       <ChatEntryContainer
         variant="system"
         title={agentName}
         expanded
-        className="max-w-[720px] w-full md:w-[80%] opacity-90 shadow-sm rounded-2xl"
-        headerClassName="bg-transparent"
+        iconContainerClassName="chat-session-message-avatar is-agent"
+        iconClassName="chat-session-message-avatar-icon"
+        className="chat-session-message-card chat-session-message-card-agent max-w-[760px] w-full md:w-[84%] opacity-90 shadow-sm rounded-2xl"
+        headerClassName="chat-session-message-header"
+        bodyClassName="chat-session-message-body"
         style={{
-          backgroundColor: tone.bg,
-          borderColor: tone.border,
+          backgroundColor: `var(--chat-session-message-other-bg, ${tone.bg})`,
+          borderColor: `var(--chat-session-message-other-border, ${tone.border})`,
         }}
         headerRight={
           <div className="flex items-center gap-base text-xs text-low">
             <span className="flex items-center gap-half">
-              <span>工作执行中，请稍等</span>
+              <span>Agent is running</span>
               <span className="flex items-center gap-[2px]">
                 <span className="size-dot rounded-full bg-brand animate-running-dot-1" />
                 <span className="size-dot rounded-full bg-brand animate-running-dot-2" />
@@ -57,7 +60,7 @@ export function StreamingRunEntry({
                 }
                 disabled={isStopping}
               >
-                {isStopping ? '停止中...' : '停止'}
+                {isStopping ? 'Stopping...' : 'Stop'}
               </button>
             )}
           </div>
