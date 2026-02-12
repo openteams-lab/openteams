@@ -6,6 +6,11 @@ import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
 import { toPrettyCase } from '@/utils/string';
 import type { SessionMember } from '../types';
 import { agentStateLabels, agentStateDotClass } from '../constants';
+import {
+  AgentBrandIcon,
+  getAgentAvatarSeed,
+  getAgentAvatarStyle,
+} from '../avatar';
 
 const truncateByChars = (value: string, maxChars: number): string => {
   const chars = Array.from(value);
@@ -119,6 +124,11 @@ export function AiMembersSidebar({
           const modelName = getModelName(agent.runner_type);
           const fullText = `${toPrettyCase(agent.runner_type)} | ${agentStateLabels[state]}${modelName ? ` | ${modelName}` : ''}`;
           const modelStatusPreview = truncateByChars(fullText, 15);
+          const avatarSeed = getAgentAvatarSeed(
+            agent.id,
+            agent.runner_type,
+            agent.name
+          );
           const workspacePath = sessionAgent.workspace_path ?? '';
           const shouldShowWorkspaceTooltip =
             workspacePath.length > 48;
@@ -138,6 +148,15 @@ export function AiMembersSidebar({
                         'animate-pulse'
                     )}
                   />
+                  <span
+                    className="chat-session-member-avatar"
+                    style={getAgentAvatarStyle(avatarSeed)}
+                  >
+                    <AgentBrandIcon
+                      runnerType={agent.runner_type}
+                      className="chat-session-member-avatar-logo"
+                    />
+                  </span>
                   <div className="chat-session-member-name text-sm text-normal min-w-0 flex-1">
                     @{agent.name}
                   </div>
