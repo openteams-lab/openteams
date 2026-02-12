@@ -155,9 +155,9 @@ export function ChatHeader({
               placeholder="Session name"
               disabled={isSavingTitle}
               className={cn(
-                'w-[240px] max-w-full rounded-sm border border-border bg-panel px-base py-half',
+                'w-[240px] max-w-full rounded-sm px-base py-half',
                 'chat-session-header-input',
-                'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
+                'text-sm text-normal focus:outline-none'
               )}
             />
             <PrimaryButton
@@ -171,7 +171,7 @@ export function ChatHeader({
               value="Cancel"
               onClick={onCancelTitleEdit}
               disabled={isSavingTitle}
-              className="chat-session-header-btn"
+              className="chat-session-header-btn chat-session-header-cancel-btn"
             />
           </div>
         )}

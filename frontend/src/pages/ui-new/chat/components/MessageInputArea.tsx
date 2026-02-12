@@ -119,7 +119,7 @@ export function MessageInputArea({
           options={agentOptions}
           onChange={onSelectedMentionsChange}
           triggerClassName="chat-session-mention-trigger !bg-[#cbcbd1] hover:!bg-[#cbcbd1] data-[state=open]:!bg-[#cbcbd1]"
-          menuContentClassName="!bg-[#ecedf1]"
+          menuContentClassName="chat-session-mention-menu !bg-[#ecedf1]"
           disabled={
             !activeSessionId ||
             mentionAgentsCount === 0 ||
@@ -251,7 +251,7 @@ export function MessageInputArea({
         />
         {mentionQuery !== null &&
           visibleMentionSuggestions.length > 0 && (
-            <div className="chat-session-mention-suggestions absolute z-20 left-0 right-0 bottom-full mb-half bg-panel border border-border rounded-sm shadow">
+            <div className="chat-session-mention-suggestions absolute z-20 left-0 right-0 bottom-full mb-half border border-border rounded-sm shadow">
               {visibleMentionSuggestions.map((agent, index) => (
                 <button
                   key={agent.id}
@@ -261,8 +261,8 @@ export function MessageInputArea({
                     'chat-session-mention-option w-full px-base py-half text-left text-sm',
                     'flex items-center justify-between',
                     index === highlightedMentionIndex
-                      ? 'bg-brand-secondary text-on-brand'
-                      : 'text-normal hover:bg-secondary'
+                      ? 'bg-[#d5d5dc] text-normal'
+                      : 'text-normal hover:bg-[#d5d5dc]'
                   )}
                 >
                   <span>@{agent.name}</span>

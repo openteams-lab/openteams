@@ -30,6 +30,10 @@ pub enum AgentChatgroupError {
     Other(#[from] AnyhowError),
 }
 
+fn is_desktop_mode() -> bool {
+    std::env::var_os("AGENT_CHATGROUP_DESKTOP").is_some()
+}
+
 #[tokio::main]
 async fn main() -> Result<(), AgentChatgroupError> {
     // Install rustls crypto provider before any TLS operations
@@ -126,8 +130,9 @@ async fn main() -> Result<(), AgentChatgroupError> {
 
     tracing::info!("Server running on http://{host}:{actual_port}");
 
-    // Production only: write port file for extension discovery and open browser
-    if !cfg!(debug_assertions) {
+    // Production non-desktop mode: write port file for extension discovery and open browser.
+    // Desktop mode is launched by Tauri sidecar and should not open an external terminal/browser.
+    if !cfg!(debug_assertions) && !is_desktop_mode() {
         if let Err(e) = write_port_file(actual_port).await {
             tracing::warn!("Failed to write port file: {}", e);
         }

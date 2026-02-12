@@ -1,31 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
-    <DirectoryRef Id="INSTALLDIR">
-      <Directory Id="AgentsChatGroupDirectory" Name="AgentsChatGroup" />
-    </DirectoryRef>
+    <SetProperty
+      Id="INSTALLDIR"
+      Value="[INSTALLDIR]agents_chatgroup\"
+      Before="CostFinalize"
+    >
+      NOT Installed
+      AND NOT REMOVE
+      AND NOT (INSTALLDIR ~&gt;&lt; "agents_chatgroup")
+      AND NOT (INSTALLDIR ~&gt;&lt; "agent-chatgroup")
+    </SetProperty>
   </Fragment>
 
   <Fragment>
-    <Component
-      Id="AgentsChatGroupDirectoryComponent"
-      Directory="AgentsChatGroupDirectory"
-      Guid="*"
-    >
-      <CreateFolder />
-      <RemoveFolder
-        Id="RemoveAgentsChatGroupDirectory"
-        Directory="AgentsChatGroupDirectory"
-        On="uninstall"
-      />
-      <RegistryValue
-        Root="HKLM"
-        Key="Software\[Manufacturer]\[ProductName]"
-        Name="AgentsChatGroupDirectoryInstalled"
-        Type="integer"
-        Value="1"
-        KeyPath="yes"
-      />
-    </Component>
+    <!-- Remove all user data/cache on full uninstall (but keep data during upgrades). -->
+    <CustomAction
+      Id="CleanupAgentChatgroupData"
+      Directory="INSTALLDIR"
+      Execute="deferred"
+      Impersonate="yes"
+      ExeCommand="powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command &quot;$ErrorActionPreference = 'SilentlyContinue'; $workspaceRoot = $null; $configPaths = @((Join-Path $env:APPDATA 'agent-chatgroup\config.json'), (Join-Path $env:APPDATA 'ai\agent-chatgroup\config.json')); foreach ($configPath in $configPaths) { if (Test-Path -LiteralPath $configPath) { try { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json; if ($config.workspace_dir) { $workspaceRoot = Join-Path $config.workspace_dir '.agent-chatgroup-workspaces'; break } } catch {} } }; $paths = @((Join-Path $env:APPDATA 'agent-chatgroup'), (Join-Path $env:APPDATA 'ai\agent-chatgroup'), (Join-Path $env:LOCALAPPDATA 'utils'), (Join-Path $env:LOCALAPPDATA 'ai\utils'), (Join-Path $env:LOCALAPPDATA 'agent-chatgroup'), (Join-Path $env:LOCALAPPDATA 'ai\agent-chatgroup'), (Join-Path $env:TEMP 'agent-chatgroup'), (Join-Path $env:TEMP 'agent-chatgroup-dev')); if ($workspaceRoot) { $paths += $workspaceRoot }; foreach ($path in $paths) { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue } }&quot;"
+      Return="ignore"
+    />
+
+    <InstallExecuteSequence>
+      <Custom Action="CleanupAgentChatgroupData" Before="RemoveFiles">
+        REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE
+      </Custom>
+    </InstallExecuteSequence>
   </Fragment>
 </Wix>
