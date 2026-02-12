@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::sync::Mutex;
 
 use portpicker::pick_unused_port;
@@ -13,6 +15,7 @@ fn spawn_backend(port: u16) -> Result<CommandChild, Box<dyn std::error::Error>> 
     envs.insert("BACKEND_PORT".to_string(), port.to_string());
     envs.insert("HOST".to_string(), "127.0.0.1".to_string());
     envs.insert("RUST_LOG".to_string(), "info".to_string());
+    envs.insert("AGENT_CHATGROUP_DESKTOP".to_string(), "1".to_string());
     cmd = cmd.envs(envs);
 
     let (_rx, child) = cmd.spawn()?;

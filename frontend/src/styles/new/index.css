@@ -844,6 +844,15 @@
     border-color: #5353bf;
   }
 
+  .new-design .chat-session-header-input {
+    border: 1px solid #d8e0ee;
+    background: #ecedf1;
+  }
+
+  .new-design .chat-session-header-input:focus {
+    border-color: #5353bf;
+  }
+
   .new-design .chat-session-header-search-clear-btn {
     position: absolute;
     right: 8px;
@@ -916,6 +925,18 @@
     font-weight: 500;
     min-width: 84px;
     justify-content: center;
+  }
+
+  .new-design
+    .chat-session-header-cancel-btn.primary-button-tertiary {
+    background: #ffffff !important;
+  }
+
+  .new-design
+    .chat-session-header-cancel-btn.primary-button-tertiary:hover:not(
+      :disabled
+    ) {
+    background: #ffffff !important;
   }
 
   .new-design .chat-session-header-ops .chat-session-header-btn {
@@ -1075,6 +1096,21 @@
     background: #cbcbd1;
   }
 
+  .new-design .chat-session-mention-menu {
+    background: #ecedf1 !important;
+  }
+
+  .new-design .chat-session-mention-menu .dropdown-menu-checkbox-item:focus,
+  .new-design
+    .chat-session-mention-menu
+    .dropdown-menu-checkbox-item[data-highlighted],
+  .new-design
+    .chat-session-mention-menu
+    .dropdown-menu-checkbox-item[data-state='checked'] {
+    background: #d5d5dc !important;
+    color: var(--chat-session-text-primary) !important;
+  }
+
   .new-design .chat-session-attachments {
     background: #f8fafc;
     border-color: #e2e8f0;
@@ -1098,7 +1134,7 @@
 
   .new-design .chat-session-mention-suggestions {
     border-radius: 10px;
-    background: #fff;
+    background: var(--chat-session-bg-secondary) !important;
     border-color: #e2e8f0;
     box-shadow: var(--chat-session-shadow-md);
   }
@@ -1608,7 +1644,18 @@
   .new-design .chat-session-member-field {
     border-radius: 8px;
     background: #ffffff !important;
-    border-color: #dbe3ef;
+    border: 1px solid #d8e0ee !important;
+    box-shadow: none !important;
+  }
+
+  .new-design .chat-session-member-form-panel .chat-session-member-field:focus,
+  .new-design .chat-session-member-field:focus,
+  .new-design
+    .chat-session-member-form-panel
+    .chat-session-member-field:focus-visible,
+  .new-design .chat-session-member-field:focus-visible {
+    border-color: #5353bf !important;
+    box-shadow: none !important;
   }
 
   .new-design .chat-session-member-btn {

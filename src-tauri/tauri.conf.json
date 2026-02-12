@@ -26,9 +26,6 @@
         "wix": {
           "fragmentPaths": [
             "wix/fragments/agents-chatgroup-directory.wxs"
-          ],
-          "componentRefs": [
-            "AgentsChatGroupDirectoryComponent"
           ]
         }
       },
@@ -47,8 +44,8 @@
     "windows": [
       {
         "title": "agent-chatgroup",
-        "width": 1280,
-        "height": 800,
+        "width": 1920,
+        "height": 1080,
         "minWidth": 1024,
         "minHeight": 640,
         "resizable": true

@@ -7,6 +7,9 @@ use std::{
 use os_info;
 use serde_json::{Value, json};
 
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 #[derive(Debug, Clone)]
 pub struct AnalyticsContext {
     pub user_id: String,
@@ -142,9 +145,14 @@ pub fn generate_user_id() -> String {
 
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+
         // Use PowerShell to get machine GUID from registry
-        if let Ok(output) = std::process::Command::new("powershell")
-            .args(&[
+        let mut command = std::process::Command::new("powershell");
+        command.creation_flags(CREATE_NO_WINDOW);
+
+        if let Ok(output) = command
+            .args([
                 "-NoProfile",
                 "-Command",
                 "(Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Cryptography').MachineGuid",

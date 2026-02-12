@@ -7,7 +7,7 @@
     "agent-chatgroup": "bin/cli.js"
   },
   "keywords": [],
-  "author": "bloop",
+  "author": "starterra.ai",
   "repository": {
     "type": "git",
     "url": "https://github.com/BloopAI/agent-chatgroup"

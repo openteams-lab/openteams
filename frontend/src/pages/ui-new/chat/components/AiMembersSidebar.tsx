@@ -234,8 +234,8 @@ export function AiMembersSidebar({
                   onChange={(event) => onNameChange(event.target.value)}
                   placeholder="e.g. coder"
                   className={cn(
-                    'chat-session-member-field w-full rounded-sm border border-border bg-panel px-base py-half',
-                    'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
+                    'chat-session-member-field w-full rounded-sm border bg-panel px-base py-half',
+                    'text-sm text-normal focus:outline-none'
                   )}
                 />
                 {memberNameLengthError && (
@@ -258,8 +258,8 @@ export function AiMembersSidebar({
                     enabledRunnerTypes.length === 0
                   }
                   className={cn(
-                    'chat-session-member-field w-full rounded-sm border border-border bg-panel px-base py-half',
-                    'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
+                    'chat-session-member-field w-full rounded-sm border bg-panel px-base py-half',
+                    'text-sm text-normal focus:outline-none'
                   )}
                 >
                   {enabledRunnerTypes.length === 0 && (
@@ -298,8 +298,8 @@ export function AiMembersSidebar({
                       onVariantChange(event.target.value)
                     }
                     className={cn(
-                      'chat-session-member-field w-full rounded-sm border border-border bg-panel px-base py-half',
-                      'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
+                      'chat-session-member-field w-full rounded-sm border bg-panel px-base py-half',
+                      'text-sm text-normal focus:outline-none'
                     )}
                   >
                     {memberVariantOptions.map((variant) => {
@@ -350,8 +350,8 @@ export function AiMembersSidebar({
                   rows={3}
                   placeholder="Describe how this AI member should behave."
                   className={cn(
-                    'chat-session-member-field w-full resize-none rounded-sm border border-border bg-panel',
-                    'px-base py-half text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand'
+                    'chat-session-member-field w-full resize-none rounded-sm border bg-panel',
+                    'px-base py-half text-sm text-normal focus:outline-none'
                   )}
                 />
               </div>
@@ -372,8 +372,8 @@ export function AiMembersSidebar({
                       : undefined
                   }
                   className={cn(
-                    'chat-session-member-field w-full rounded-sm border border-border bg-panel px-base py-half',
-                    'text-sm text-normal focus:outline-none focus:ring-1 focus:ring-brand',
+                    'chat-session-member-field w-full rounded-sm border bg-panel px-base py-half',
+                    'text-sm text-normal focus:outline-none',
                     editingMember && 'opacity-50 cursor-not-allowed'
                   )}
                 />

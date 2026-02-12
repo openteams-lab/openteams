@@ -46,6 +46,9 @@ use crate::services::chat::{self, ChatServiceError};
 
 const UNTRACKED_FILE_LIMIT: u64 = 1024 * 1024;
 const MAX_AGENT_CHAIN_DEPTH: u32 = 5;
+const AGENTS_CHATGROUP_DIR: &str = ".agents_chatgroup";
+const RUNS_DIR_NAME: &str = ".runs";
+const CONTEXT_DIR_NAME: &str = ".context";
 
 struct DiffInfo {
     truncated: bool,
@@ -550,13 +553,12 @@ impl ChatRunner {
                 .clone()
                 .unwrap_or_else(|| self.build_workspace_path(session_id, agent_id));
             fs::create_dir_all(&workspace_path).await?;
-            fs::create_dir_all(PathBuf::from(&workspace_path).join(".runs")).await?;
+            let runs_dir = Self::chat_runs_dir(&workspace_path);
+            fs::create_dir_all(&runs_dir).await?;
 
             let run_index = ChatRun::next_run_index(&self.db.pool, session_agent_id).await?;
             let run_id = Uuid::new_v4();
-            let run_dir = PathBuf::from(&workspace_path)
-                .join(".runs")
-                .join(format!("run_{:04}", run_index));
+            let run_dir = runs_dir.join(format!("run_{:04}", run_index));
             fs::create_dir_all(&run_dir).await?;
 
             let input_path = run_dir.join("input.md");
@@ -705,6 +707,18 @@ impl ChatRunner {
             .join(agent_id.to_string())
             .to_string_lossy()
             .to_string()
+    }
+
+    fn chat_storage_root(workspace_path: &str) -> PathBuf {
+        PathBuf::from(workspace_path).join(AGENTS_CHATGROUP_DIR)
+    }
+
+    fn chat_runs_dir(workspace_path: &str) -> PathBuf {
+        Self::chat_storage_root(workspace_path).join(RUNS_DIR_NAME)
+    }
+
+    fn chat_context_dir(workspace_path: &str) -> PathBuf {
+        Self::chat_storage_root(workspace_path).join(CONTEXT_DIR_NAME)
     }
 
     fn parse_runner_type(&self, agent: &ChatAgent) -> Result<BaseCodingAgent, ChatRunnerError> {
@@ -902,7 +916,7 @@ impl ChatRunner {
 
         let jsonl = compacted.jsonl;
 
-        let context_dir = workspace_path_buf.join(".context");
+        let context_dir = Self::chat_context_dir(workspace_path);
         fs::create_dir_all(&context_dir).await?;
         let context_path = context_dir.join("messages.jsonl");
         fs::write(&context_path, jsonl.as_bytes()).await?;
@@ -910,7 +924,7 @@ impl ChatRunner {
         let runs_dir = run_dir
             .parent()
             .map(|path| path.to_path_buf())
-            .unwrap_or_else(|| workspace_path_buf.join(".runs"));
+            .unwrap_or_else(|| Self::chat_runs_dir(workspace_path));
         fs::create_dir_all(&runs_dir).await?;
         let run_context_path = runs_dir.join(format!("run_{session_id}.jsonl"));
         fs::write(&run_context_path, jsonl.as_bytes()).await?;
