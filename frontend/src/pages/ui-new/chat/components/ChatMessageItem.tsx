@@ -17,6 +17,11 @@ import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMa
 import { ChatSystemMessage } from '@/components/ui-new/primitives/conversation/ChatSystemMessage';
 import { chatApi } from '@/lib/api';
 import { formatDateShortWithTime } from '@/utils/date';
+import {
+  AgentBrandIcon,
+  getAgentAvatarSeed,
+  getAgentAvatarStyle,
+} from '../avatar';
 import type {
   ChatAttachment,
   DiffMeta,
@@ -33,6 +38,7 @@ import {
 export interface ChatMessageItemProps {
   message: ChatMessage;
   senderLabel: string;
+  senderRunnerType: string | null;
   tone: MessageTone;
   // Reference/reply
   referenceMessage: ChatMessage | null;
@@ -70,6 +76,7 @@ export interface ChatMessageItemProps {
 export function ChatMessageItem({
   message,
   senderLabel,
+  senderRunnerType,
   tone,
   referenceMessage,
   referenceSenderLabel,
@@ -92,6 +99,16 @@ export function ChatMessageItem({
 }: ChatMessageItemProps) {
   const isUser = message.sender_type === ChatSenderType.user;
   const isAgent = message.sender_type === ChatSenderType.agent;
+  const agentAvatarSeed = isAgent
+    ? getAgentAvatarSeed(
+        message.sender_id,
+        senderRunnerType,
+        senderLabel
+      )
+    : '';
+  const agentAvatarStyle = isAgent
+    ? getAgentAvatarStyle(agentAvatarSeed)
+    : undefined;
 
   const diffRunId = diffInfo?.runId ?? '';
   const hasDiffInfo =
@@ -161,12 +178,23 @@ export function ChatMessageItem({
       <ChatEntryContainer
         variant={isUser ? 'user' : 'system'}
         title={senderLabel}
+        icon={
+          isAgent ? (
+            <AgentBrandIcon
+              runnerType={senderRunnerType}
+              className="chat-session-agent-avatar-logo"
+            />
+          ) : undefined
+        }
         expanded
         iconContainerClassName={cn(
           'chat-session-message-avatar',
-          isUser ? 'is-user' : 'is-agent'
+          isUser ? 'is-user' : 'chat-session-agent-avatar'
         )}
-        iconClassName="chat-session-message-avatar-icon"
+        iconContainerStyle={agentAvatarStyle}
+        iconClassName={
+          isUser ? 'chat-session-message-avatar-icon' : undefined
+        }
         headerRight={
           <div className="chat-session-message-meta flex items-center gap-half text-xs text-low">
             <button

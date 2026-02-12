@@ -1804,6 +1804,11 @@ export function ChatSessions() {
                 key={message.id}
                 message={message}
                 senderLabel={getMessageSenderLabel(message)}
+                senderRunnerType={
+                  isAgent && message.sender_id
+                    ? agentById.get(message.sender_id)?.runner_type ?? null
+                    : null
+                }
                 tone={tone}
                 referenceMessage={referenceMessage ?? null}
                 referenceSenderLabel={
@@ -1865,6 +1870,9 @@ export function ChatSessions() {
               runId={runId}
               run={run}
               agentName={agentById.get(run.agentId)?.name ?? 'Agent'}
+              runnerType={
+                agentById.get(run.agentId)?.runner_type ?? null
+              }
               tone={getMessageTone(run.agentId, false)}
               sessionAgent={sessionAgents.find(
                 (sa) => sa.agent_id === run.agentId

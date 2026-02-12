@@ -1,5 +1,10 @@
 import { cn } from '@/lib/utils';
 import { ChatEntryContainer } from '@/components/ui-new/primitives/conversation/ChatEntryContainer';
+import {
+  AgentBrandIcon,
+  getAgentAvatarSeed,
+  getAgentAvatarStyle,
+} from '../avatar';
 import type { SessionMember, AgentStateInfo, MessageTone } from '../types';
 
 export interface RunningAgentPlaceholderProps {
@@ -27,15 +32,26 @@ export function RunningAgentPlaceholder({
     0,
     Math.floor((clock - startedAtMs) / 1000)
   );
+  const avatarSeed = getAgentAvatarSeed(
+    member.agent.id,
+    member.agent.runner_type,
+    member.agent.name
+  );
 
   return (
     <div className="chat-session-message-row is-agent flex justify-start">
       <ChatEntryContainer
         variant="system"
         title={member.agent.name}
+        icon={
+          <AgentBrandIcon
+            runnerType={member.agent.runner_type}
+            className="chat-session-agent-avatar-logo"
+          />
+        }
         expanded
-        iconContainerClassName="chat-session-message-avatar is-agent"
-        iconClassName="chat-session-message-avatar-icon"
+        iconContainerClassName="chat-session-message-avatar chat-session-agent-avatar"
+        iconContainerStyle={getAgentAvatarStyle(avatarSeed)}
         className="chat-session-message-card chat-session-message-card-agent max-w-[760px] w-full md:w-[84%] opacity-80 shadow-sm rounded-2xl"
         headerClassName="chat-session-message-header"
         bodyClassName="chat-session-message-body"

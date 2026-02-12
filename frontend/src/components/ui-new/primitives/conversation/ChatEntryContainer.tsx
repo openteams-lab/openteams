@@ -1,4 +1,8 @@
-import type { CSSProperties, ComponentType } from 'react';
+import type {
+  CSSProperties,
+  ComponentType,
+  ReactNode,
+} from 'react';
 import {
   CaretDownIcon,
   UserIcon,
@@ -48,6 +52,7 @@ const variantConfig: Record<Variant, VariantConfig> = {
 interface ChatEntryContainerProps {
   variant: Variant;
   title?: React.ReactNode;
+  icon?: ReactNode;
   headerRight?: React.ReactNode;
   expanded?: boolean;
   onToggle?: () => void;
@@ -58,6 +63,7 @@ interface ChatEntryContainerProps {
   headerClassName?: string;
   bodyClassName?: string;
   iconContainerClassName?: string;
+  iconContainerStyle?: CSSProperties;
   iconClassName?: string;
   status?: ToolStatus;
   isGreyed?: boolean;
@@ -66,6 +72,7 @@ interface ChatEntryContainerProps {
 export function ChatEntryContainer({
   variant,
   title,
+  icon,
   headerRight,
   expanded = false,
   onToggle,
@@ -76,6 +83,7 @@ export function ChatEntryContainer({
   headerClassName,
   bodyClassName,
   iconContainerClassName,
+  iconContainerStyle,
   iconClassName,
   status,
   isGreyed,
@@ -114,13 +122,16 @@ export function ChatEntryContainer({
             'shrink-0 flex items-center justify-center',
             iconContainerClassName
           )}
+          style={iconContainerStyle}
         >
-          <Icon
-            className={cn(
-              'size-icon-xs shrink-0 text-low',
-              iconClassName
-            )}
-          />
+          {icon ?? (
+            <Icon
+              className={cn(
+                'size-icon-xs shrink-0 text-low',
+                iconClassName
+              )}
+            />
+          )}
         </span>
         {title && (
           <span className="flex-1 text-sm text-normal truncate">{title}</span>

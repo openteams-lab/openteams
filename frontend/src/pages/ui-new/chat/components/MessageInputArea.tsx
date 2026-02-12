@@ -13,6 +13,11 @@ import { Badge } from '@/components/ui/badge';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 import { MultiSelectDropdown } from '@/components/ui-new/primitives/MultiSelectDropdown';
 import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
+import {
+  AgentBrandIcon,
+  getAgentAvatarSeed,
+  getAgentAvatarStyle,
+} from '../avatar';
 
 const allowedAttachmentExtensions = [
   '.txt', '.csv', '.md', '.json', '.xml', '.yaml', '.yml',
@@ -265,7 +270,24 @@ export function MessageInputArea({
                       : 'text-normal hover:bg-[#d5d5dc]'
                   )}
                 >
-                  <span>@{agent.name}</span>
+                  <span className="flex items-center gap-half min-w-0">
+                    <span
+                      className="chat-session-mention-avatar"
+                      style={getAgentAvatarStyle(
+                        getAgentAvatarSeed(
+                          agent.id,
+                          agent.runner_type,
+                          agent.name
+                        )
+                      )}
+                    >
+                      <AgentBrandIcon
+                        runnerType={agent.runner_type}
+                        className="chat-session-mention-avatar-logo"
+                      />
+                    </span>
+                    <span className="truncate">@{agent.name}</span>
+                  </span>
                   <CaretRightIcon
                     className={cn(
                       'size-icon-xs',
