@@ -1,0 +1,27 @@
+---
+title: "OpenCode"
+description: "SSTのOpenCodeをセットアップ"
+icon: /logos/opencode.svg
+---
+
+<Steps>
+<Step title="OpenCodeを実行">
+  ```bash
+  npx -y opencode-ai
+  ```
+</Step>
+
+<Step title="ログイン手順に従う">
+  プロンプトに従って認証フローを完了します。詳細は[OpenCode GitHubページ](https://github.com/sst/opencode)を参照してください。
+</Step>
+
+<Step title="agents-chatgroupを起動">
+  認証完了後、agents-chatgroupを起動：
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  タスク試行を作成する際にOpenCodeを選択できるようになりました。
+</Step>
+</Steps>

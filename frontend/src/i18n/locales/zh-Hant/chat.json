@@ -1,0 +1,162 @@
+{
+  "sidebar": {
+    "title": "聊天群組",
+    "newSession": "新建",
+    "noActiveSessions": "暫無活躍會話。",
+    "noArchivedSessions": "暫無已歸檔會話。",
+    "showArchived": "顯示已歸檔",
+    "hideArchived": "隱藏已歸檔",
+    "expandSidebar": "展開側邊欄",
+    "collapseSidebar": "收起側邊欄",
+    "createNewSession": "建立新會話",
+    "untitledSession": "未命名會話"
+  },
+  "header": {
+    "untitledSession": "未命名會話",
+    "editSessionName": "編輯會話名稱",
+    "deleteSession": "刪除會話",
+    "sessionNamePlaceholder": "會話名稱",
+    "created": "建立於",
+    "totalMessages": "訊息總數",
+    "aiMembers": "AI 成員",
+    "searchMessages": "搜尋訊息...",
+    "clearSearch": "清除搜尋",
+    "archived": "已歸檔",
+    "archiveSession": "歸檔會話",
+    "restoreSession": "還原會話",
+    "cleanupMessages": "清理訊息",
+    "exitCleanupMode": "退出清理模式",
+    "settings": "設定"
+  },
+  "input": {
+    "mentionAgents": "提及 Agent",
+    "routeToAgents": "路由到 Agent",
+    "replyingTo": "回覆 {{name}}",
+    "referencedMessage": "引用的訊息",
+    "cancel": "取消",
+    "clearAll": "清除全部",
+    "preview": "預覽",
+    "archivedPlaceholder": "此會話已歸檔，僅可讀。",
+    "inputPlaceholder": "輸入訊息並 @提及 Agent...",
+    "uploadingAttachments": "正在上傳附件...",
+    "sendHint": "按 Enter 傳送，Shift+Enter 換行。",
+    "addAttachment": "新增附件",
+    "send": "傳送"
+  },
+  "message": {
+    "quote": "引用",
+    "replyingTo": "回覆 {{name}}",
+    "view": "檢視",
+    "referencedMessageUnavailable": "引用的訊息不可用。",
+    "attachments": "附件",
+    "mentions": "提及",
+    "codeChanges": "程式碼變更",
+    "viewChanges": "檢視變更",
+    "loadingDiff": "正在載入差異...",
+    "untrackedFile": "未追蹤檔案",
+    "untrackedFiles": "未追蹤檔案",
+    "apiError": {
+      "quotaExceeded": "API 配額已用盡",
+      "rateLimited": "請求頻率受限",
+      "checkQuota": "請檢查您的 API 配額或稍後重試"
+    },
+    "sendToAgent": "傳送給 Agent",
+    "open": "開啟"
+  },
+  "members": {
+    "title": "AI 成員",
+    "countInSession": "會話中有 {{count}} 個成員",
+    "selectSessionToManage": "選擇一個會話來管理 AI 成員。",
+    "noMembersYet": "暫無 AI 成員。新增一個以啟用 @提及功能。",
+    "workspace": "工作區",
+    "edit": "編輯",
+    "remove": "移除",
+    "addAiMember": "新增 AI 成員",
+    "editAiMember": "編輯 AI 成員",
+    "memberNameHint": "AI 成員名稱將作為 @提及的句柄。",
+    "memberNameLabel": "AI 成員名稱",
+    "memberNamePlaceholder": "例如 coder",
+    "baseCodingAgent": "基礎編碼 Agent",
+    "checkingAgents": "正在檢測 Agent...",
+    "noLocalAgentsDetected": "未檢測到本地 Agent",
+    "noInstalledAgents": "此機器上未檢測到已安裝的程式碼 Agent。",
+    "modelVariant": "模型變體",
+    "model": "模型",
+    "systemPrompt": "系統提示",
+    "expand": "展開",
+    "systemPromptPlaceholder": "描述此 AI 成員應如何表現。",
+    "workspacePath": "工作區路徑",
+    "workspacePathPlaceholder": "伺服器上的絕對路徑",
+    "workspacePathCannotBeModified": "工作區路徑無法修改",
+    "add": "新增",
+    "save": "儲存"
+  },
+  "cleanup": {
+    "selected": "已選擇: {{count}}",
+    "selectAll": "全選",
+    "deselectAll": "取消全選",
+    "deleteSelected": "刪除所選"
+  },
+  "agent": {
+    "running": "Agent 正在執行",
+    "runningElapsed": "Agent 正在執行。已用時 {{seconds}} 秒。",
+    "processing": "正在處理您的請求...",
+    "thinking": "思考中...",
+    "idle": "閒置",
+    "completed": "已完成",
+    "failed": "失敗",
+    "received": "已接收",
+    "stop": "停止",
+    "stopping": "正在停止..."
+  },
+  "modals": {
+    "confirm": {
+      "cancel": "取消",
+      "confirm": "確認",
+      "processing": "處理中..."
+    },
+    "promptEditor": {
+      "title": "系統提示",
+      "description": "編輯 AI 成員的系統提示",
+      "close": "關閉提示編輯器",
+      "placeholder": "描述此 AI 成員應如何表現。",
+      "attachTextFile": "附加文字檔案",
+      "loadingFile": "正在載入檔案...",
+      "done": "完成"
+    },
+    "filePreview": {
+      "previewTitle": "預覽: {{filename}}",
+      "previewNotAvailable": "此檔案類型不支援預覽",
+      "close": "關閉"
+    },
+    "diffViewer": {
+      "title": "程式碼變更",
+      "run": "執行",
+      "exitFullScreen": "退出全螢幕",
+      "fullScreen": "全螢幕",
+      "closeDiffViewer": "關閉差異檢視器",
+      "loadingDiff": "正在載入差異...",
+      "noTrackedDiff": "沒有可用的追蹤差異。",
+      "openRawDiff": "開啟原始差異",
+      "untrackedFiles": "未追蹤檔案",
+      "loadingFile": "正在載入檔案...",
+      "hide": "隱藏",
+      "view": "檢視"
+    },
+    "workspaceDrawer": {
+      "agentWorkspace": "Agent 工作區",
+      "close": "關閉",
+      "workspacePathCreatedOnFirstRun": "工作區路徑將在首次執行時建立。",
+      "runHistory": "執行歷史",
+      "noRunsYet": "此 Agent 暫無執行記錄。",
+      "run": "執行",
+      "viewLog": "檢視日誌",
+      "selected": "已選擇",
+      "runLog": "執行日誌",
+      "selectRunToViewLog": "選擇一次執行以檢視其日誌輸出。",
+      "refresh": "重新整理",
+      "loadingLog": "正在載入日誌...",
+      "logEmpty": "日誌為空。"
+    }
+  }
+}

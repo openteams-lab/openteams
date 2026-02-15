@@ -1,0 +1,136 @@
+---
+title: "Collaboration sur les Tâches"
+description: "Assignez des tâches aux membres IA et coordonnez leur travail en utilisant les @mentions"
+---
+
+Une fois que vous avez configuré les membres IA, vous pouvez assigner des tâches et coordonner leur travail par simple messagerie.
+
+## Assigner des Tâches avec @Mentions
+
+Utilisez `@` suivi du nom du membre pour assigner des tâches :
+
+```
+@Codeur Veuillez implémenter le formulaire de connexion avec validation d'email.
+```
+
+Vous pouvez aussi mentionner plusieurs agents dans un seul message :
+
+```
+@Codeur implémente le endpoint API
+@Rédacteur documente le nouveau endpoint dans le README
+```
+
+### Utiliser le Sélecteur de Mention
+
+Pour plus de commodité, utilisez le sélecteur **Mentionner des agents** :
+
+1. Cliquez sur le bouton **@** dans l'entrée de message
+2. Sélectionnez un ou plusieurs membres IA
+3. Écrivez votre message
+4. Les mentions sélectionnées sont automatiquement incluses
+
+<Tip>
+Vous pouvez combiner les deux méthodes - tapez `@nom` dans votre message ET utilisez le sélecteur pour des mentions supplémentaires.
+</Tip>
+
+## Fonctionnalités de Message
+
+### Texte et Images
+
+Les messages supportent :
+- Instructions en texte brut
+- Pièces jointes d'images (pour le contexte visuel)
+
+### Référencer des Messages Précédents
+
+Citez un message précédent pour fournir du contexte :
+
+1. Survolez n'importe quel message
+2. Cliquez sur le bouton **Répondre**
+3. Votre nouveau message référencera le contenu cité
+
+C'est utile pour les instructions de suivi ou les corrections.
+
+## Comment Fonctionne l'Exécution des Tâches
+
+Quand vous mentionnez un membre IA :
+
+1. **Reçu** - L'agent accuse réception de votre message
+2. **En cours** - L'agent commence à travailler sur la tâche
+3. **Terminé** - La tâche est terminée avec succès
+4. **Échoué** - L'agent a rencontré une erreur
+
+<Note>
+Vous pouvez voir le statut actuel de chaque mention directement dans le message.
+</Note>
+
+### Comportement de File d'Attente
+
+Si un agent est déjà en cours d'exécution :
+- Les nouvelles tâches sont automatiquement mises en file d'attente
+- Les tâches s'exécutent dans l'ordre quand l'agent devient disponible
+- Vous verrez une confirmation lors de la mise en file d'attente d'une tâche vers un agent occupé
+
+### Collaboration en Chaîne
+
+Les agents peuvent mentionner d'autres agents dans leurs réponses, permettant des flux de travail comme :
+
+1. Vous demandez à `@Ingénieur` une conception de solution
+2. Ingénieur crée un plan et demande à `@Codeur` de l'implémenter
+3. Codeur implémente et demande à `@Réviseur` de vérifier le code
+
+<Warning>
+Les déclencheurs en chaîne ont une limite de profondeur pour prévenir les boucles infinies. Un agent ne peut pas se mentionner lui-même.
+</Warning>
+
+## Arrêter un Agent
+
+Si vous devez interrompre un agent en cours d'exécution :
+
+1. Trouvez le membre en cours d'exécution dans la barre latérale
+2. Cliquez sur **Arrêter**
+3. L'agent arrêtera sa tâche actuelle
+
+## Bonnes Pratiques
+
+### Instructions Claires
+
+Soyez spécifique sur ce que vous voulez :
+
+**Bon :**
+```
+@Codeur Ajoute un bouton de déconnexion dans l'en-tête. Il devrait effacer la session et rediriger vers /login.
+```
+
+**Vague :**
+```
+@Codeur corrige l'auth
+```
+
+### Une Tâche par Mention
+
+Pour le travail complexe, décomposez-le :
+
+```
+@Codeur D'abord, crée le schéma de base de données pour les profils utilisateurs.
+```
+
+Puis faites un suivi :
+
+```
+@Codeur Maintenant ajoute les endpoints API pour les opérations CRUD de profil.
+```
+
+### Utilisez le Bon Agent pour le Travail
+
+Associez les tâches aux rôles des agents :
+
+- Tâches de documentation → Agent Rédacteur
+- Implémentation de code → Agent Codeur
+- Questions d'architecture → Agent Ingénieur
+
+## Prochaines Étapes
+
+<Card title="Revue de Code" icon="code" href="/fr/core-features/code-review">
+  Voyez comment réviser les modifications de code faites par votre équipe IA
+</Card>

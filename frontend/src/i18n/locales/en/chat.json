@@ -1,0 +1,162 @@
+{
+  "sidebar": {
+    "title": "Chat Groups",
+    "newSession": "New",
+    "noActiveSessions": "No active sessions.",
+    "noArchivedSessions": "No archived sessions.",
+    "showArchived": "Show Archived",
+    "hideArchived": "Hide Archived",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "createNewSession": "Create new session",
+    "untitledSession": "Untitled session"
+  },
+  "header": {
+    "untitledSession": "Untitled session",
+    "editSessionName": "Edit session name",
+    "deleteSession": "Delete session",
+    "sessionNamePlaceholder": "Session name",
+    "created": "Created",
+    "totalMessages": "Total messages",
+    "aiMembers": "AI members",
+    "searchMessages": "Search messages...",
+    "clearSearch": "Clear search",
+    "archived": "Archived",
+    "archiveSession": "Archive session",
+    "restoreSession": "Restore session",
+    "cleanupMessages": "Cleanup messages",
+    "exitCleanupMode": "Exit cleanup mode",
+    "settings": "Settings"
+  },
+  "input": {
+    "mentionAgents": "Mention agents",
+    "routeToAgents": "Route to agents",
+    "replyingTo": "Replying to {{name}}",
+    "referencedMessage": "Referenced message",
+    "cancel": "Cancel",
+    "clearAll": "Clear all",
+    "preview": "Preview",
+    "archivedPlaceholder": "This session is archived and read-only.",
+    "inputPlaceholder": "Type your message and @mention agents...",
+    "uploadingAttachments": "Uploading attachments...",
+    "sendHint": "Press Enter to send, Shift+Enter for new line.",
+    "addAttachment": "Add attachment files",
+    "send": "Send"
+  },
+  "message": {
+    "quote": "Quote",
+    "replyingTo": "Replying to {{name}}",
+    "view": "View",
+    "referencedMessageUnavailable": "Referenced message unavailable.",
+    "attachments": "Attachments",
+    "mentions": "Mentions",
+    "codeChanges": "Code changes",
+    "viewChanges": "View changes",
+    "loadingDiff": "Loading diff...",
+    "untrackedFile": "untracked file",
+    "untrackedFiles": "untracked files",
+    "apiError": {
+      "quotaExceeded": "API quota exceeded",
+      "rateLimited": "Rate limited",
+      "checkQuota": "Please check your API quota or try again later"
+    },
+    "sendToAgent": "Send to agent",
+    "open": "Open"
+  },
+  "members": {
+    "title": "AI Members",
+    "countInSession": "{{count}} in session",
+    "selectSessionToManage": "Select a session to manage AI members.",
+    "noMembersYet": "No AI members yet. Add one below to enable @mentions.",
+    "workspace": "Workspace",
+    "edit": "Edit",
+    "remove": "Remove",
+    "addAiMember": "Add AI member",
+    "editAiMember": "Edit AI member",
+    "memberNameHint": "AI member name is the @mention handle.",
+    "memberNameLabel": "AI member name",
+    "memberNamePlaceholder": "e.g. coder",
+    "baseCodingAgent": "Base coding agent",
+    "checkingAgents": "Checking agents...",
+    "noLocalAgentsDetected": "No local agents detected",
+    "noInstalledAgents": "No installed code agents detected on this machine.",
+    "modelVariant": "Model variant",
+    "model": "Model",
+    "systemPrompt": "System prompt",
+    "expand": "Expand",
+    "systemPromptPlaceholder": "Describe how this AI member should behave.",
+    "workspacePath": "Workspace path",
+    "workspacePathPlaceholder": "Absolute path on the server",
+    "workspacePathCannotBeModified": "Workspace path cannot be modified",
+    "add": "Add",
+    "save": "Save"
+  },
+  "cleanup": {
+    "selected": "Selected: {{count}}",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "deleteSelected": "Delete Selected"
+  },
+  "agent": {
+    "running": "Agent is running",
+    "runningElapsed": "Agent is running. Elapsed {{seconds}}s.",
+    "processing": "Processing your request...",
+    "thinking": "Thinking...",
+    "idle": "Idle",
+    "completed": "Completed",
+    "failed": "Failed",
+    "received": "Received",
+    "stop": "Stop",
+    "stopping": "Stopping..."
+  },
+  "modals": {
+    "confirm": {
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "processing": "Processing..."
+    },
+    "promptEditor": {
+      "title": "System Prompt",
+      "description": "Edit the AI member system prompt",
+      "close": "Close prompt editor",
+      "placeholder": "Describe how this AI member should behave.",
+      "attachTextFile": "Attach text file",
+      "loadingFile": "Loading file...",
+      "done": "Done"
+    },
+    "filePreview": {
+      "previewTitle": "Preview: {{filename}}",
+      "previewNotAvailable": "Preview not available for this file type",
+      "close": "Close"
+    },
+    "diffViewer": {
+      "title": "Code changes",
+      "run": "Run",
+      "exitFullScreen": "Exit full screen",
+      "fullScreen": "Full screen",
+      "closeDiffViewer": "Close diff viewer",
+      "loadingDiff": "Loading diff...",
+      "noTrackedDiff": "No tracked diff available.",
+      "openRawDiff": "Open raw diff",
+      "untrackedFiles": "Untracked files",
+      "loadingFile": "Loading file...",
+      "hide": "Hide",
+      "view": "View"
+    },
+    "workspaceDrawer": {
+      "agentWorkspace": "Agent workspace",
+      "close": "Close",
+      "workspacePathCreatedOnFirstRun": "Workspace path is created on first run.",
+      "runHistory": "Run history",
+      "noRunsYet": "No runs yet for this agent.",
+      "run": "Run",
+      "viewLog": "View log",
+      "selected": "Selected",
+      "runLog": "Run log",
+      "selectRunToViewLog": "Select a run to view its log output.",
+      "refresh": "Refresh",
+      "loadingLog": "Loading log...",
+      "logEmpty": "Log is empty."
+    }
+  }
+}

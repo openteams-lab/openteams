@@ -1,0 +1,27 @@
+---
+title: "Claude Code"
+description: "Configurer l'agent Claude Code d'Anthropic"
+icon: /logos/claude.svg
+---
+
+<Steps>
+<Step title="Exécuter Claude Code">
+  ```bash
+  npx -y @anthropic-ai/claude-code
+  ```
+</Step>
+
+<Step title="Suivre les instructions de connexion">
+  Complétez le flux d'authentification comme indiqué. Pour plus de détails, voir la [documentation Claude Code](https://docs.claude.com/en/docs/claude-code/quickstart).
+</Step>
+
+<Step title="Démarrer agents-chatgroup">
+  Une fois authentifié, lancez agents-chatgroup :
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  Vous pouvez maintenant sélectionner Claude Code lors de la création de tentatives de tâches.
+</Step>
+</Steps>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { XIcon } from '@phosphor-icons/react';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 
@@ -12,6 +13,7 @@ export function FilePreviewModal({
   content,
   onClose,
 }: FilePreviewModalProps) {
+  const { t } = useTranslation('chat');
   if (!file) return null;
 
   return (
@@ -22,7 +24,7 @@ export function FilePreviewModal({
             className="font-medium text-normal truncate max-w-[70%]"
             title={file.name}
           >
-            Preview: {file.name}
+            {t('modals.filePreview.previewTitle', { filename: file.name })}
           </h3>
           <button
             type="button"
@@ -48,13 +50,13 @@ export function FilePreviewModal({
             )
           ) : (
             <div className="flex items-center justify-center h-64 text-low">
-              Preview not available for this file type
+              {t('modals.filePreview.previewNotAvailable')}
             </div>
           )}
         </div>
 
         <div className="p-4 border-t border-border flex justify-end">
-          <PrimaryButton value="Close" onClick={onClose} />
+          <PrimaryButton value={t('modals.filePreview.close')} onClick={onClose} />
         </div>
       </div>
     </div>

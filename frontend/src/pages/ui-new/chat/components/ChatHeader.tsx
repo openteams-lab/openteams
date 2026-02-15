@@ -9,6 +9,7 @@ import {
   UsersIcon,
   XIcon,
 } from '@phosphor-icons/react';
+import { useTranslation } from 'react-i18next';
 import type { ChatSession } from 'shared/types';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -72,6 +73,8 @@ export function ChatHeader({
   onToggleCleanupMode,
   isDeletingMessages,
 }: ChatHeaderProps) {
+  const { t } = useTranslation('chat');
+  const { t: tCommon } = useTranslation('common');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const searchInputContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -112,7 +115,7 @@ export function ChatHeader({
         {!isEditingTitle && (
           <div className="chat-session-header-title-row flex items-center gap-half">
             <div className="chat-session-header-title text-sm text-normal font-medium truncate">
-              {activeSession?.title || 'Untitled session'}
+              {activeSession?.title || t('header.untitledSession')}
             </div>
             {activeSession && (
               <>
@@ -120,7 +123,7 @@ export function ChatHeader({
                   type="button"
                   className="chat-session-header-icon-btn"
                   onClick={onStartEditTitle}
-                  aria-label="Edit session name"
+                  aria-label={t('header.editSessionName')}
                 >
                   <PencilSimpleIcon className="size-icon-xs" />
                 </button>
@@ -128,8 +131,8 @@ export function ChatHeader({
                   type="button"
                   className="chat-session-header-icon-btn danger"
                   onClick={onDeleteSession}
-                  aria-label="Delete session"
-                  title="Delete session"
+                  aria-label={t('header.deleteSession')}
+                  title={t('header.deleteSession')}
                 >
                   <TrashIcon className="size-icon-xs" />
                 </button>
@@ -152,7 +155,7 @@ export function ChatHeader({
                   onCancelTitleEdit();
                 }
               }}
-              placeholder="Session name"
+              placeholder={t('header.sessionNamePlaceholder')}
               disabled={isSavingTitle}
               className={cn(
                 'w-[240px] max-w-full rounded-sm px-base py-half',
@@ -161,14 +164,14 @@ export function ChatHeader({
               )}
             />
             <PrimaryButton
-              value="Save"
+              value={tCommon('buttons.save')}
               onClick={onSaveTitle}
               disabled={isSavingTitle}
               className="chat-session-header-btn"
             />
             <PrimaryButton
               variant="tertiary"
-              value="Cancel"
+              value={tCommon('buttons.cancel')}
               onClick={onCancelTitleEdit}
               disabled={isSavingTitle}
               className="chat-session-header-btn chat-session-header-cancel-btn"
@@ -180,15 +183,15 @@ export function ChatHeader({
         )}
         {activeSession && (
           <div className="chat-session-header-meta text-xs text-low">
-            Created {formatDateShortWithTime(activeSession.created_at)} /
-            Total messages: {messageCount}
+            {t('header.created')} {formatDateShortWithTime(activeSession.created_at)} /
+            {t('header.totalMessages')}: {messageCount}
           </div>
         )}
       </div>
       <div className="chat-session-header-actions flex items-center gap-base">
         <div className="chat-session-header-members flex items-center gap-base text-xs text-low">
           <UsersIcon className="size-icon-xs" />
-          <span>{memberCount} AI members</span>
+          <span>{memberCount} {t('header.aiMembers')}</span>
         </div>
         {activeSession && isSearchOpen && (
           <div
@@ -208,12 +211,12 @@ export function ChatHeader({
                     onCloseSearch();
                   }
                 }}
-                placeholder="Search messages..."
+                placeholder={t('header.searchMessages')}
                 className={cn(
                   'chat-session-header-search-input',
                   'px-base py-half text-sm text-normal focus:outline-none'
                 )}
-                aria-label="Search messages"
+                aria-label={t('header.searchMessages')}
               />
               {searchQuery.length > 0 && (
                 <button
@@ -223,8 +226,8 @@ export function ChatHeader({
                     onSearchQueryChange('');
                     searchInputRef.current?.focus();
                   }}
-                  aria-label="Clear search"
-                  title="Clear search"
+                  aria-label={t('header.clearSearch')}
+                  title={t('header.clearSearch')}
                 >
                   <XIcon className="size-icon-2xs" weight="bold" />
                 </button>
@@ -236,12 +239,12 @@ export function ChatHeader({
           <div className="chat-session-header-ops flex items-center gap-half">
             {isArchived && (
               <Badge variant="secondary" className="chat-session-archived-badge text-xs">
-                Archived
+                {t('header.archived')}
               </Badge>
             )}
             <Tooltip
               content={
-                isArchived ? 'Restore session' : 'Archive session'
+                isArchived ? t('header.restoreSession') : t('header.archiveSession')
               }
               side="bottom"
             >
@@ -254,7 +257,7 @@ export function ChatHeader({
                 onClick={isArchived ? onRestore : onArchive}
                 disabled={isArchiving}
                 aria-label={
-                  isArchived ? 'Restore session' : 'Archive session'
+                  isArchived ? t('header.restoreSession') : t('header.archiveSession')
                 }
               >
                 {isArchived ? (
@@ -268,8 +271,8 @@ export function ChatHeader({
               <Tooltip
                 content={
                   isCleanupMode
-                    ? 'Exit cleanup mode'
-                    : 'Cleanup messages'
+                    ? t('header.exitCleanupMode')
+                    : t('header.cleanupMessages')
                 }
                 side="bottom"
               >
@@ -285,8 +288,8 @@ export function ChatHeader({
                   disabled={isDeletingMessages}
                   aria-label={
                     isCleanupMode
-                      ? 'Exit cleanup mode'
-                      : 'Cleanup messages'
+                      ? t('header.exitCleanupMode')
+                      : t('header.cleanupMessages')
                   }
                 >
                   <BroomIcon
@@ -296,13 +299,13 @@ export function ChatHeader({
                 </button>
               </Tooltip>
             )}
-            <Tooltip content="Settings" side="bottom">
+            <Tooltip content={t('header.settings')} side="bottom">
               <button
                 type="button"
                 className="chat-session-header-icon-btn chat-session-header-op-btn"
                 onClick={onOpenSettings}
-                aria-label="Settings"
-                title="Settings"
+                aria-label={t('header.settings')}
+                title={t('header.settings')}
               >
                 <GearSixIcon className="size-icon-xs" />
               </button>

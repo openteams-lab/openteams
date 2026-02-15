@@ -1,0 +1,27 @@
+---
+title: "Claude Code"
+description: "设置 Anthropic 的 Claude Code 代理"
+icon: /logos/claude.svg
+---
+
+<Steps>
+<Step title="运行 Claude Code">
+  ```bash
+  npx -y @anthropic-ai/claude-code
+  ```
+</Step>
+
+<Step title="按照登录说明操作">
+  按照提示完成认证流程。更多详情请参阅 [Claude Code 文档](https://docs.claude.com/en/docs/claude-code/quickstart)。
+</Step>
+
+<Step title="启动 agents-chatgroup">
+  认证完成后，启动 agents-chatgroup：
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  现在您可以在创建任务尝试时选择 Claude Code。
+</Step>
+</Steps>

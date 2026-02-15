@@ -6,6 +6,7 @@ import {
   useState,
 } from 'react';
 import { PlusIcon } from '@phosphor-icons/react';
+import { useTranslation } from 'react-i18next';
 import { ChatSessionAgentState } from 'shared/types';
 import { cn } from '@/lib/utils';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
@@ -142,6 +143,9 @@ export function AiMembersSidebar({
   onOpenWorkspace,
   onExpandPromptEditor,
 }: AiMembersSidebarProps) {
+  const { t } = useTranslation('chat');
+  const { t: tCommon } = useTranslation('common');
+
   return (
     <aside
       className="chat-session-members-panel border-l border-border flex flex-col min-h-0 shrink-0"
@@ -149,21 +153,21 @@ export function AiMembersSidebar({
     >
       <div className="chat-session-members-header px-base py-base border-b border-border flex items-center justify-between">
         <div className="chat-session-members-title text-sm text-normal font-medium">
-          AI Members
+          {t('members.title')}
         </div>
         <div className="chat-session-members-count text-xs text-low">
-          {sessionMembers.length} in session
+          {t('members.countInSession', { count: sessionMembers.length })}
         </div>
       </div>
       <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto p-base space-y-base">
         {!activeSessionId && (
           <div className="chat-session-members-empty text-xs text-low mt-base">
-            Select a session to manage AI members.
+            {t('members.selectSessionToManage')}
           </div>
         )}
         {activeSessionId && sessionMembers.length === 0 && (
           <div className="chat-session-members-empty text-xs text-low mt-base">
-            No AI members yet. Add one below to enable @mentions.
+            {t('members.noMembersYet')}
           </div>
         )}
         {sessionMembers.map(({ agent, sessionAgent }) => {
@@ -213,7 +217,7 @@ export function AiMembersSidebar({
                     className="chat-session-member-action workspace"
                     onClick={() => onOpenWorkspace(agent.id)}
                   >
-                    Workspace
+                    {t('members.workspace')}
                   </button>
                   <button
                     type="button"
@@ -226,7 +230,7 @@ export function AiMembersSidebar({
                     }
                     disabled={isArchived}
                   >
-                    Edit
+                    {t('members.edit')}
                   </button>
                   <button
                     type="button"
@@ -239,7 +243,7 @@ export function AiMembersSidebar({
                     }
                     disabled={isArchived}
                   >
-                    Remove
+                    {t('members.remove')}
                   </button>
                 </div>
               </div>
@@ -281,23 +285,23 @@ export function AiMembersSidebar({
               onClick={onOpenAddMember}
               disabled={!activeSessionId || isArchived}
             >
-              Add AI member
+              {t('members.addAiMember')}
               <PlusIcon className="size-icon-xs" weight="light" />
             </button>
           ) : (
             <div className="chat-session-member-form-panel border border-border rounded-sm p-base space-y-half">
               <div className="text-sm text-normal font-medium">
-                {editingMember ? 'Edit AI member' : 'Add AI member'}
+                {editingMember ? t('members.editAiMember') : t('members.addAiMember')}
               </div>
               <div className="text-xs text-low">
-                AI member name is the @mention handle.
+                {t('members.memberNameHint')}
               </div>
               <div className="space-y-half">
-                <label className="text-xs text-low">AI member name</label>
+                <label className="text-xs text-low">{t('members.memberNameLabel')}</label>
                 <input
                   value={newMemberName}
                   onChange={(event) => onNameChange(event.target.value)}
-                  placeholder="e.g. coder"
+                  placeholder={t('members.memberNamePlaceholder')}
                   className={cn(
                     'chat-session-member-field w-full rounded-sm border bg-panel px-base py-half',
                     'text-sm text-normal focus:outline-none'
@@ -311,7 +315,7 @@ export function AiMembersSidebar({
               </div>
               <div className="space-y-half">
                 <label className="text-xs text-low">
-                  Base coding agent
+                  {t('members.baseCodingAgent')}
                 </label>
                 <select
                   value={newMemberRunnerType}
@@ -330,8 +334,8 @@ export function AiMembersSidebar({
                   {enabledRunnerTypes.length === 0 && (
                     <option value="">
                       {isCheckingAvailability
-                        ? 'Checking agents...'
-                        : 'No local agents detected'}
+                        ? t('members.checkingAgents')
+                        : t('members.noLocalAgentsDetected')}
                     </option>
                   )}
                   {availableRunnerTypes.map((runner) => (
@@ -348,14 +352,14 @@ export function AiMembersSidebar({
                 {enabledRunnerTypes.length === 0 &&
                   !isCheckingAvailability && (
                     <div className="text-xs text-error">
-                      No installed code agents detected on this machine.
+                      {t('members.noInstalledAgents')}
                     </div>
                   )}
               </div>
               {memberVariantOptions.length > 0 && (
                 <div className="space-y-half">
                   <label className="text-xs text-low">
-                    Model variant
+                    {t('members.modelVariant')}
                   </label>
                   <select
                     value={newMemberVariant}
@@ -385,7 +389,7 @@ export function AiMembersSidebar({
                     newMemberVariant
                   ) && (
                     <div className="text-xs text-low">
-                      Model:{' '}
+                      {t('members.model')}:{' '}
                       {getModelName(
                         newMemberRunnerType,
                         newMemberVariant
@@ -397,14 +401,14 @@ export function AiMembersSidebar({
               <div className="space-y-half">
                 <div className="flex items-center justify-between gap-base">
                   <label className="text-xs text-low">
-                    System prompt
+                    {t('members.systemPrompt')}
                   </label>
                   <button
                     type="button"
                     className="chat-session-member-expand-btn text-xs"
                     onClick={onExpandPromptEditor}
                   >
-                    Expand
+                    {t('members.expand')}
                   </button>
                 </div>
                 <textarea
@@ -413,7 +417,7 @@ export function AiMembersSidebar({
                     onPromptChange(event.target.value)
                   }
                   rows={3}
-                  placeholder="Describe how this AI member should behave."
+                  placeholder={t('members.systemPromptPlaceholder')}
                   className={cn(
                     'chat-session-member-field w-full resize-none rounded-sm border bg-panel',
                     'px-base py-half text-sm text-normal focus:outline-none'
@@ -422,18 +426,18 @@ export function AiMembersSidebar({
               </div>
               <div className="space-y-half">
                 <label className="text-xs text-low">
-                  Workspace path
+                  {t('members.workspacePath')}
                 </label>
                 <input
                   value={newMemberWorkspace}
                   onChange={(event) =>
                     onWorkspaceChange(event.target.value)
                   }
-                  placeholder="Absolute path on the server"
+                  placeholder={t('members.workspacePathPlaceholder')}
                   disabled={!!editingMember}
                   title={
                     editingMember
-                      ? 'Workspace path cannot be changed after creation'
+                      ? t('members.workspacePathCannotBeModified')
                       : undefined
                   }
                   className={cn(
@@ -444,7 +448,7 @@ export function AiMembersSidebar({
                 />
                 {editingMember && (
                   <p className="text-xs text-low">
-                    Workspace path cannot be modified
+                    {t('members.workspacePathCannotBeModified')}
                   </p>
                 )}
               </div>
@@ -454,13 +458,13 @@ export function AiMembersSidebar({
               <div className="flex items-center justify-end gap-half pt-half">
                 <PrimaryButton
                   variant="tertiary"
-                  value="Cancel"
+                  value={tCommon('buttons.cancel')}
                   onClick={onCancelMember}
                   disabled={isSavingMember}
                   className="chat-session-member-btn cancel"
                 />
                 <PrimaryButton
-                  value={editingMember ? 'Save' : 'Add'}
+                  value={editingMember ? t('members.save') : t('members.add')}
                   actionIcon={isSavingMember ? 'spinner' : PlusIcon}
                   onClick={onSaveMember}
                   disabled={

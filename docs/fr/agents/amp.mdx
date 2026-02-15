@@ -1,0 +1,27 @@
+---
+title: "Amp"
+description: "Configurer l'agent de complétion de code Amp"
+icon: /logos/amp-logo.svg
+---
+
+<Steps>
+<Step title="Exécuter Amp">
+  ```bash
+  npx -y @sourcegraph/amp
+  ```
+</Step>
+
+<Step title="Suivre les instructions de connexion">
+  Complétez le flux d'authentification comme indiqué. Pour plus de détails, voir le [Manuel Amp](https://ampcode.com/manual#install).
+</Step>
+
+<Step title="Démarrer agents-chatgroup">
+  Une fois authentifié, lancez agents-chatgroup :
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  Vous pouvez maintenant sélectionner Amp lors de la création de tentatives de tâches.
+</Step>
+</Steps>

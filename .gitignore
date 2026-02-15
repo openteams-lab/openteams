@@ -94,4 +94,5 @@ agent-chatgroup-cloud/
 .context/
 runs/
 context/
-
+.agents_chatgroup/
+**/.agents-chatgroup/

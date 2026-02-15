@@ -1,0 +1,71 @@
+---
+title: "Factory Droid"
+description: "Factory AIのDroidコーディングエージェントをセットアップ"
+icon: /logos/droid-light.svg
+---
+
+<Steps>
+<Step title="Droid CLIをインストール">
+  <Tabs>
+  <Tab title="macOS / Linux">
+  ```bash
+  curl -fsSL https://app.factory.ai/cli | sh
+  ```
+  </Tab>
+
+  <Tab title="Windows">
+  ```powershell
+  irm https://app.factory.ai/cli/windows | iex
+  ```
+  </Tab>
+  </Tabs>
+
+  最新のインストール手順とプラットフォーム固有のガイダンスは[Factory AI CLIドキュメント](https://factory.ai/product/cli)を参照してください。
+</Step>
+
+<Step title="Factory AIで認証">
+  agents-chatgroupでDroidを使用するには、まず認証が必要です：
+
+  1. `droid`を実行してインタラクティブCLIを起動
+  2. Droid内で`/login`コマンドを使用して認証
+
+  または、[Factory設定](https://app.factory.ai/settings/api-keys)からAPIキーを生成し、環境変数として設定：
+
+  ```bash
+  export FACTORY_API_KEY=fk-...
+  ```
+
+  詳細な認証手順は[Factory AIドキュメント](https://docs.factory.ai/factory-cli/getting-started/overview)を参照してください。
+</Step>
+
+<Step title="agents-chatgroupを起動">
+  認証完了後、agents-chatgroupを起動：
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  タスク試行を作成する際にFactory Droidを選択できるようになりました。
+</Step>
+</Steps>
+
+## 設定オプション
+
+Droidはagents-chatgroupでいくつかの設定オプションをサポートしています：
+
+- **自律レベル**：ファイルとシステム操作の権限レベルを制御
+  - `normal`：読み取り専用モード - 実行せずに計画された変更を安全にレビュー
+  - `low`：基本的なファイル作成/編集、システム変更はブロック
+  - `medium`：回復可能な副作用のある開発操作
+  - `high`：セキュリティへの影響や重大な副作用のある本番操作
+  - `skip-permissions-unsafe`：すべての権限チェックをバイパス（隔離環境でのみ使用）（デフォルト）
+
+- **モデル**：使用するモデルを指定
+
+- **推論強度**：推論の深さを制御
+  - `off`：最小限の推論
+  - `low`：軽い推論
+  - `medium`：バランスの取れた推論
+  - `high`：複雑なタスク向けの深い推論
+
+これらのオプションはagents-chatgroupでエージェント設定を作成する際に構成できます。

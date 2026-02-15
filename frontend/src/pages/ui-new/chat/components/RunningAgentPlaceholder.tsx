@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { ChatEntryContainer } from '@/components/ui-new/primitives/conversation/ChatEntryContainer';
 import {
@@ -24,6 +25,7 @@ export function RunningAgentPlaceholder({
   isStopping,
   onStop,
 }: RunningAgentPlaceholderProps) {
+  const { t } = useTranslation('chat');
   const startedAtStr = stateInfo?.startedAt;
   const startedAtMs = startedAtStr
     ? new Date(startedAtStr).getTime()
@@ -71,12 +73,12 @@ export function RunningAgentPlaceholder({
             }
             disabled={isStopping}
           >
-            {isStopping ? 'Stopping...' : 'Stop'}
+            {isStopping ? t('agent.stopping') : t('agent.stop')}
           </button>
         }
       >
         <div className="text-sm text-low">
-          Agent is running. Elapsed {elapsedSeconds}s.
+          {t('agent.runningElapsed', { seconds: elapsedSeconds })}
         </div>
       </ChatEntryContainer>
     </div>

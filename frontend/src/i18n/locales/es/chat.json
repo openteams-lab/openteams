@@ -1,0 +1,162 @@
+{
+  "sidebar": {
+    "title": "Grupos de chat",
+    "newSession": "Nuevo",
+    "noActiveSessions": "No hay sesiones activas.",
+    "noArchivedSessions": "No hay sesiones archivadas.",
+    "showArchived": "Mostrar archivados",
+    "hideArchived": "Ocultar archivados",
+    "expandSidebar": "Expandir barra lateral",
+    "collapseSidebar": "Contraer barra lateral",
+    "createNewSession": "Crear nueva sesión",
+    "untitledSession": "Sesión sin título"
+  },
+  "header": {
+    "untitledSession": "Sesión sin título",
+    "editSessionName": "Editar nombre de sesión",
+    "deleteSession": "Eliminar sesión",
+    "sessionNamePlaceholder": "Nombre de sesión",
+    "created": "Creado",
+    "totalMessages": "Total de mensajes",
+    "aiMembers": "Miembros IA",
+    "searchMessages": "Buscar mensajes...",
+    "clearSearch": "Borrar búsqueda",
+    "archived": "Archivado",
+    "archiveSession": "Archivar sesión",
+    "restoreSession": "Restaurar sesión",
+    "cleanupMessages": "Limpiar mensajes",
+    "exitCleanupMode": "Salir del modo limpieza",
+    "settings": "Configuración"
+  },
+  "input": {
+    "mentionAgents": "Mencionar agentes",
+    "routeToAgents": "Dirigir a agentes",
+    "replyingTo": "Respondiendo a {{name}}",
+    "referencedMessage": "Mensaje referenciado",
+    "cancel": "Cancelar",
+    "clearAll": "Borrar todo",
+    "preview": "Vista previa",
+    "archivedPlaceholder": "Esta sesión está archivada y es de solo lectura.",
+    "inputPlaceholder": "Escribe tu mensaje y @menciona agentes...",
+    "uploadingAttachments": "Subiendo archivos adjuntos...",
+    "sendHint": "Presiona Enter para enviar, Shift+Enter para nueva línea.",
+    "addAttachment": "Añadir archivos adjuntos",
+    "send": "Enviar"
+  },
+  "message": {
+    "quote": "Citar",
+    "replyingTo": "Respondiendo a {{name}}",
+    "view": "Ver",
+    "referencedMessageUnavailable": "Mensaje referenciado no disponible.",
+    "attachments": "Archivos adjuntos",
+    "mentions": "Menciones",
+    "codeChanges": "Cambios de código",
+    "viewChanges": "Ver cambios",
+    "loadingDiff": "Cargando diferencias...",
+    "untrackedFile": "archivo sin seguimiento",
+    "untrackedFiles": "archivos sin seguimiento",
+    "apiError": {
+      "quotaExceeded": "Cuota de API excedida",
+      "rateLimited": "Límite de solicitudes alcanzado",
+      "checkQuota": "Por favor verifica tu cuota de API o intenta más tarde"
+    },
+    "sendToAgent": "Enviar al agente",
+    "open": "Abrir"
+  },
+  "members": {
+    "title": "Miembros IA",
+    "countInSession": "{{count}} en la sesión",
+    "selectSessionToManage": "Selecciona una sesión para gestionar miembros IA.",
+    "noMembersYet": "Aún no hay miembros IA. Añade uno abajo para habilitar @menciones.",
+    "workspace": "Espacio de trabajo",
+    "edit": "Editar",
+    "remove": "Eliminar",
+    "addAiMember": "Añadir miembro IA",
+    "editAiMember": "Editar miembro IA",
+    "memberNameHint": "El nombre del miembro IA es el identificador para @menciones.",
+    "memberNameLabel": "Nombre del miembro IA",
+    "memberNamePlaceholder": "ej. coder",
+    "baseCodingAgent": "Agente de codificación base",
+    "checkingAgents": "Verificando agentes...",
+    "noLocalAgentsDetected": "No se detectaron agentes locales",
+    "noInstalledAgents": "No se detectaron agentes de código instalados en esta máquina.",
+    "modelVariant": "Variante del modelo",
+    "model": "Modelo",
+    "systemPrompt": "Prompt del sistema",
+    "expand": "Expandir",
+    "systemPromptPlaceholder": "Describe cómo debe comportarse este miembro IA.",
+    "workspacePath": "Ruta del espacio de trabajo",
+    "workspacePathPlaceholder": "Ruta absoluta en el servidor",
+    "workspacePathCannotBeModified": "La ruta del espacio de trabajo no se puede modificar",
+    "add": "Añadir",
+    "save": "Guardar"
+  },
+  "cleanup": {
+    "selected": "Seleccionados: {{count}}",
+    "selectAll": "Seleccionar todo",
+    "deselectAll": "Deseleccionar todo",
+    "deleteSelected": "Eliminar seleccionados"
+  },
+  "agent": {
+    "running": "Agente en ejecución",
+    "runningElapsed": "Agente en ejecución. Tiempo transcurrido: {{seconds}}s.",
+    "processing": "Procesando tu solicitud...",
+    "thinking": "Pensando...",
+    "idle": "Inactivo",
+    "completed": "Completado",
+    "failed": "Fallido",
+    "received": "Recibido",
+    "stop": "Detener",
+    "stopping": "Deteniendo..."
+  },
+  "modals": {
+    "confirm": {
+      "cancel": "Cancelar",
+      "confirm": "Confirmar",
+      "processing": "Procesando..."
+    },
+    "promptEditor": {
+      "title": "Prompt del sistema",
+      "description": "Editar el prompt del sistema del miembro IA",
+      "close": "Cerrar editor de prompt",
+      "placeholder": "Describe cómo debe comportarse este miembro IA.",
+      "attachTextFile": "Adjuntar archivo de texto",
+      "loadingFile": "Cargando archivo...",
+      "done": "Hecho"
+    },
+    "filePreview": {
+      "previewTitle": "Vista previa: {{filename}}",
+      "previewNotAvailable": "Vista previa no disponible para este tipo de archivo",
+      "close": "Cerrar"
+    },
+    "diffViewer": {
+      "title": "Cambios de código",
+      "run": "Ejecución",
+      "exitFullScreen": "Salir de pantalla completa",
+      "fullScreen": "Pantalla completa",
+      "closeDiffViewer": "Cerrar visor de diferencias",
+      "loadingDiff": "Cargando diferencias...",
+      "noTrackedDiff": "No hay diferencias rastreadas disponibles.",
+      "openRawDiff": "Abrir diferencias sin procesar",
+      "untrackedFiles": "Archivos sin seguimiento",
+      "loadingFile": "Cargando archivo...",
+      "hide": "Ocultar",
+      "view": "Ver"
+    },
+    "workspaceDrawer": {
+      "agentWorkspace": "Espacio de trabajo del agente",
+      "close": "Cerrar",
+      "workspacePathCreatedOnFirstRun": "La ruta del espacio de trabajo se crea en la primera ejecución.",
+      "runHistory": "Historial de ejecuciones",
+      "noRunsYet": "Aún no hay ejecuciones para este agente.",
+      "run": "Ejecución",
+      "viewLog": "Ver registro",
+      "selected": "Seleccionado",
+      "runLog": "Registro de ejecución",
+      "selectRunToViewLog": "Selecciona una ejecución para ver su salida de registro.",
+      "refresh": "Actualizar",
+      "loadingLog": "Cargando registro...",
+      "logEmpty": "El registro está vacío."
+    }
+  }
+}

@@ -1,0 +1,44 @@
+---
+title: "OpenAI Codex"
+description: "設定 OpenAI Codex 整合"
+icon: /logos/openai-logo.svg
+---
+
+<Steps>
+<Step title="執行 OpenAI Codex">
+  ```bash
+  npx -y @openai/codex
+  ```
+</Step>
+
+<Step title="按照登入說明操作">
+  按照提示完成認證流程。按照 [OpenAI 說明中心](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan) 的認證說明使用 ChatGPT 計畫的 Codex。
+
+  或者，可以透過設定 `OPENAI_API_KEY` 環境變數來透過 OpenAI API 使用 Codex。更多詳情請參閱 [OpenAI 文檔](https://developers.openai.com/codex/pricing/#use-an-openai-api-key)
+</Step>
+
+<Step title="啟動 agents-chatgroup">
+  認證完成後，啟動 agents-chatgroup：
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  現在您可以在建立任務嘗試時選擇 OpenAI Codex。
+</Step>
+</Steps>
+
+## 自訂配置目錄
+
+預設情況下，Codex 將其配置和會話資料儲存在 `~/.codex`。如果您使用 `CODEX_HOME` 環境變數配置了自訂位置，agents-chatgroup 將自動偵測並使用該位置。
+
+```bash
+# 範例：使用專案特定的 Codex 配置
+export CODEX_HOME=/path/to/custom/codex
+npx agents-chatgroup
+```
+
+這對以下情況很有用：
+- 專案特定的 Codex 設定檔
+- 分離工作和個人配置
+- 自訂自動化設定

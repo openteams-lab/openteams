@@ -1,0 +1,64 @@
+---
+title: "Dépannage"
+description: "Problèmes courants et solutions lors de l'utilisation d'agents-chatgroup"
+---
+
+## L'Agent Signale une Base de Code Vide
+
+Si votre agent de codage signale que la base de code est vide lorsque vous créez une nouvelle tâche, vous avez peut-être activé la fonctionnalité sparse-checkout de Git dans votre dépôt.
+
+**Solution :**
+
+Exécutez la commande suivante dans le répertoire racine de votre dépôt :
+
+```bash
+git sparse-checkout disable
+```
+
+Après avoir désactivé sparse-checkout, créez une nouvelle tâche et réessayez.
+
+## Activation des Journaux de Débogage
+
+Si vous avez besoin de journaux plus détaillés pour aider à déboguer un problème, vous pouvez activer la journalisation au niveau débogage en définissant la variable d'environnement `RUST_LOG`.
+
+**Utilisation :**
+
+```bash
+RUST_LOG=debug npx agents-chatgroup
+```
+
+Cela fournira une sortie de journalisation détaillée qui peut aider à identifier la cause racine des problèmes.
+
+## DANGER : Effacement de Votre Base de Données
+
+Si vous rencontrez des erreurs irrécupérables et devez effacer complètement votre base de données agents-chatgroup, vous pouvez supprimer le répertoire de données de l'application pour votre système d'exploitation.
+
+<Warning>
+Cette action est irréversible et entraînera la perte de TOUTES vos tâches et paramètres. Assurez-vous de sauvegarder toute information importante avant de continuer.
+</Warning>
+
+**Supprimez le répertoire suivant selon votre OS :**
+
+<Tabs>
+<Tab title="macOS">
+```bash
+~/Library/Application Support/ai.starterra.ai.agents-chatgroup/
+```
+</Tab>
+
+<Tab title="Linux">
+```bash
+~/.local/share/agents-chatgroup/
+```
+</Tab>
+
+<Tab title="Windows">
+```
+%APPDATA%\starterra.ai\agents-chatgroup\
+```
+
+Typiquement : `C:\Users\<nom d'utilisateur>\AppData\Roaming\starterra.ai\agents-chatgroup\`
+</Tab>
+</Tabs>
+
+Après avoir supprimé le répertoire de données de l'application, redémarrez agents-chatgroup pour réinitialiser avec une base de données vide et les paramètres par défaut.

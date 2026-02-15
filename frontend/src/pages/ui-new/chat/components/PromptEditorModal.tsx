@@ -1,4 +1,5 @@
 import type { ChangeEvent, RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import { XIcon } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
@@ -24,6 +25,7 @@ export function PromptEditorModal({
   promptFileLoading,
   promptFileError,
 }: PromptEditorModalProps) {
+  const { t } = useTranslation('chat');
   if (!isOpen) return null;
 
   return (
@@ -37,16 +39,16 @@ export function PromptEditorModal({
       >
         <div className="flex items-center justify-between border-b border-border px-base py-half">
           <div>
-            <div className="text-sm text-normal font-medium">System Prompt</div>
+            <div className="text-sm text-normal font-medium">{t('modals.promptEditor.title')}</div>
             <div className="text-xs text-low">
-              Edit the AI member system prompt
+              {t('modals.promptEditor.description')}
             </div>
           </div>
           <button
             type="button"
             className="text-low hover:text-normal"
             onClick={onClose}
-            aria-label="Close prompt editor"
+            aria-label={t('modals.promptEditor.close')}
           >
             <XIcon className="size-icon-sm" />
           </button>
@@ -55,7 +57,7 @@ export function PromptEditorModal({
           <textarea
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            placeholder="Describe how this AI member should behave."
+            placeholder={t('modals.promptEditor.placeholder')}
             className={cn(
               'chat-session-prompt-modal-input flex-1 w-full resize-none rounded-sm border border-border bg-panel',
               'px-base py-base text-sm text-normal leading-relaxed focus:outline-none focus:ring-1 focus:ring-brand'
@@ -69,7 +71,7 @@ export function PromptEditorModal({
                 onClick={() => promptFileInputRef.current?.click()}
                 disabled={promptFileLoading}
               >
-                Attach text file
+                {t('modals.promptEditor.attachTextFile')}
               </button>
               <input
                 ref={promptFileInputRef}
@@ -78,12 +80,12 @@ export function PromptEditorModal({
                 className="hidden"
                 onChange={onPromptFileChange}
               />
-              {promptFileLoading && <span>Loading file...</span>}
+              {promptFileLoading && <span>{t('modals.promptEditor.loadingFile')}</span>}
               {promptFileError && (
                 <span className="text-error">{promptFileError}</span>
               )}
             </div>
-            <PrimaryButton value="Done" onClick={onClose} />
+            <PrimaryButton value={t('modals.promptEditor.done')} onClick={onClose} />
           </div>
         </div>
       </div>

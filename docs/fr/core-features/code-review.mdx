@@ -1,0 +1,156 @@
+---
+title: "Revue de Code & Contrôle de Session"
+description: "Révisez les modifications de code, gérez le contexte et contrôlez votre équipe IA"
+---
+
+Quand les membres IA terminent des tâches de codage, vous pouvez réviser leur travail et gérer la session globale grâce aux outils intégrés.
+
+## Visualiser les Modifications de Code
+
+Après qu'un agent termine une tâche, vous verrez une carte **Modifications de code** sous leur message.
+
+Cliquez pour ouvrir le **Visualiseur de Diff** qui affiche :
+- Fichiers ajoutés, modifiés ou supprimés
+- Modifications ligne par ligne avec coloration syntaxique
+- Comparaison avant et après
+
+<Tip>
+Le visualiseur de diff n'affiche que les modifications git suivies. Assurez-vous que votre espace de travail est un dépôt git.
+</Tip>
+
+## Tiroir d'Espace de Travail
+
+Cliquez sur l'espace de travail d'un membre IA pour ouvrir le **Tiroir d'Espace de Travail**, qui fournit :
+
+### Chemin de l'Espace de Travail
+Le répertoire où cet agent travaille.
+
+### Historique d'Exécution
+Une liste de toutes les exécutions de tâches pour cet agent, montrant :
+- Quand chaque tâche a été exécutée
+- Si elle a réussi ou échoué
+- Accès rapide aux sorties
+
+### Journaux d'Exécution
+Journaux détaillés de chaque exécution, utiles pour le débogage ou comprendre ce que l'agent a fait.
+
+## Comprendre les Sorties d'Exécution
+
+Chaque fois qu'un agent s'exécute, il génère plusieurs sorties :
+
+| Fichier | Objectif |
+|------|---------|
+| Entrée | Le prompt de tâche envoyé à l'agent |
+| Sortie | La réponse et le résumé de l'agent |
+| Journal | Journal d'exécution détaillé |
+| Diff | Modifications de code (si des modifications git ont été faites) |
+
+<Note>
+Les gros diffs (plus de 4Ko) sont tronqués pour la performance. Vous pouvez voir les modifications complètes dans votre client git.
+</Note>
+
+## Nouveaux Fichiers
+
+Quand un agent crée de nouveaux fichiers qui ne sont pas suivis par git, ils apparaissent dans une section séparée **Fichiers non suivis**.
+
+<Warning>
+Les fichiers non suivis de plus de 1Mo ne sont pas capturés.
+</Warning>
+
+## Contrôle d'Exécution
+
+### Arrêter un Agent
+
+Si un agent prend trop de temps ou va dans la mauvaise direction :
+
+1. Trouvez l'agent en cours d'exécution dans la barre latérale (affiche le statut "En cours")
+2. Cliquez sur le bouton **Arrêter**
+3. L'agent arrêtera sa tâche actuelle
+
+<Tip>
+Après avoir arrêté un agent, vous pouvez envoyer un nouveau message avec des instructions plus claires.
+</Tip>
+
+### File d'Attente des Tâches
+
+Quand vous envoyez une tâche à un agent déjà en cours d'exécution :
+- La nouvelle tâche est automatiquement mise en file d'attente
+- Une boîte de dialogue de confirmation apparaît
+- Les tâches s'exécutent dans l'ordre quand l'agent termine
+
+## Gestion du Contexte
+
+Le système gère automatiquement le contexte de conversation pour vos agents IA.
+
+### Comment le Contexte Fonctionne
+
+Chaque membre IA reçoit :
+- **Membres de session** - Qui est dans le chat et leurs rôles
+- **Messages récents** - L'historique de conversation
+- **Contenu référencé** - Tous les messages ou pièces jointes cités
+
+### Compression Automatique du Contexte
+
+Pour garder les conversations efficaces :
+- Jusqu'à 30 messages sont conservés dans le contexte
+- Les 5 messages les plus récents sont toujours gardés complets
+- Les messages plus anciens sont automatiquement résumés
+
+<Note>
+Vous n'avez pas besoin de gérer le contexte manuellement - le système le gère automatiquement tout en préservant les informations importantes.
+</Note>
+
+## Outils de Gestion de Session
+
+### Rechercher des Messages
+
+Utilisez la fonction de recherche pour trouver des messages ou discussions spécifiques dans la session.
+
+### Suppression en Masse
+
+En mode nettoyage, vous pouvez sélectionner et supprimer plusieurs messages à la fois.
+
+### Historique des Messages
+
+L'historique complet de la conversation est préservé et disponible pour référence à tout moment.
+
+### Archiver des Sessions
+
+Quand un projet est terminé ou en pause :
+
+1. Cliquez sur **Archiver** sur la session
+2. La session devient en lecture seule
+3. Tous les messages et membres sont préservés
+
+Pour continuer le travail plus tard, cliquez sur **Restaurer** pour réactiver la session.
+
+## Conseils pour une Revue Efficace
+
+1. **Vérifiez d'abord le diff** - Voyez rapidement quel code a changé
+2. **Lisez la sortie** - Comprenez ce que l'agent avait l'intention de faire
+3. **Révisez les journaux si nécessaire** - Approfondissez les détails quand quelque chose semble anormal
+4. **Faites un suivi avec des mentions** - Demandez à l'agent de réviser ou expliquer si nécessaire
+
+```
+@Codeur La fonction de connexion a l'air bien, mais peux-tu ajouter la gestion des erreurs pour les identifiants invalides ?
+```
+
+## Conclusion
+
+Cela couvre les fonctionnalités principales d'Agent ChatGroup ! Vous savez maintenant comment :
+
+- Créer et gérer des sessions de chat
+- Ajouter des membres IA avec des rôles spécifiques
+- Assigner des tâches en utilisant les @mentions
+- Réviser les modifications de code et l'historique d'exécution
+- Contrôler les agents en cours d'exécution et gérer le contexte
+- Archiver et organiser vos sessions
+
+<CardGroup cols={2}>
+  <Card title="Agents Supportés" icon="robot" href="/fr/supported-coding-agents">
+    Voir tous les agents de codage compatibles
+  </Card>
+  <Card title="Dépannage" icon="wrench" href="/fr/troubleshooting">
+    Obtenir de l'aide pour les problèmes courants
+  </Card>
+</CardGroup>

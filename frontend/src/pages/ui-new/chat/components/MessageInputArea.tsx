@@ -7,6 +7,7 @@ import {
   XIcon,
   EyeIcon,
 } from '@phosphor-icons/react';
+import { useTranslation } from 'react-i18next';
 import type { ChatAgent, ChatMessage } from 'shared/types';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -113,13 +114,16 @@ export function MessageInputArea({
   isArchived,
   activeSessionId,
 }: MessageInputAreaProps) {
+  const { t } = useTranslation('chat');
+  const { t: tCommon } = useTranslation('common');
+
   return (
     <div className="chat-session-input-area p-base space-y-base shrink-0">
       <div className="chat-session-mention-bar flex items-center gap-base flex-wrap">
         <MultiSelectDropdown
           icon={ChatsTeardropIcon}
-          label="Mention agents"
-          menuLabel="Route to agents"
+          label={t('input.mentionAgents')}
+          menuLabel={t('input.routeToAgents')}
           values={selectedMentions}
           options={agentOptions}
           onChange={onSelectedMentionsChange}
@@ -161,18 +165,18 @@ export function MessageInputArea({
         <div className="chat-session-reply-card border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
           <div className="flex items-center justify-between gap-base">
             <span className="font-medium text-normal">
-              Replying to {replyToSenderLabel ?? 'message'}
+              {t('input.replyingTo', { name: replyToSenderLabel ?? 'message' })}
             </span>
             <button
               type="button"
               className="chat-session-reply-cancel text-brand hover:text-brand-hover"
               onClick={onCancelReply}
             >
-              Cancel
+              {tCommon('buttons.cancel')}
             </button>
           </div>
           <div className="mt-half">
-            {replyToPreview ?? 'Referenced message'}
+            {replyToPreview ?? t('input.referencedMessage')}
           </div>
         </div>
       )}
@@ -197,7 +201,7 @@ export function MessageInputArea({
                   type="button"
                   className="text-low hover:text-normal"
                   onClick={() => onPreviewFile(file)}
-                  title="Preview"
+                  title={t('input.preview')}
                 >
                   <EyeIcon className="size-icon-2xs" />
                 </button>
@@ -218,7 +222,7 @@ export function MessageInputArea({
             className="chat-session-attachment-clear text-xs text-brand hover:text-brand-hover ml-1"
             onClick={onClearAttachedFiles}
           >
-            Clear all
+            {t('input.clearAll')}
           </button>
         </div>
       )}
@@ -243,8 +247,8 @@ export function MessageInputArea({
           }}
           placeholder={
             isArchived
-              ? 'This session is archived and read-only.'
-              : 'Type your message and @mention agents...'
+              ? t('input.archivedPlaceholder')
+              : t('input.inputPlaceholder')
           }
           disabled={isArchived || !activeSessionId}
           style={{ height: inputAreaHeight }}
@@ -304,7 +308,7 @@ export function MessageInputArea({
 
       <div className="flex items-center justify-between gap-base">
         <div className="chat-session-input-hint flex items-center gap-half text-xs text-low">
-          <Tooltip content="Add attachment files" side="top">
+          <Tooltip content={t('input.addAttachment')} side="top">
             <span className="inline-flex">
               <button
                 type="button"
@@ -322,7 +326,7 @@ export function MessageInputArea({
                   !activeSessionId ||
                   isUploadingAttachments
                 }
-                aria-label="Add attachment files"
+                aria-label={t('input.addAttachment')}
               >
                 <PaperclipIcon className="size-icon-xs" />
               </button>
@@ -337,12 +341,12 @@ export function MessageInputArea({
           />
           <span>
             {isUploadingAttachments
-              ? 'Uploading attachments...'
-              : 'Press Enter to send, Shift+Enter for new line.'}
+              ? t('input.uploadingAttachments')
+              : t('input.sendHint')}
           </span>
         </div>
         <PrimaryButton
-          value="Send"
+          value={tCommon('buttons.send')}
           actionIcon={
             isSending ? 'spinner' : PaperPlaneRightIcon
           }

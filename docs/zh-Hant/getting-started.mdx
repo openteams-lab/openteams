@@ -1,0 +1,104 @@
+---
+title: "快速開始"
+description: "AgentsChatGroup 在 macOS、Linux 和 Windows 上的快速入門指南"
+sidebarTitle: "快速開始"
+---
+
+## 支援的系統
+
+AgentsChatGroup 可在以下平台執行：
+
+- macOS（Intel 和 Apple Silicon）
+- Linux
+- Windows
+
+## 前置條件
+
+在安裝 AgentsChatGroup 之前，請確保您已安裝至少一個支援的 AI 代理：
+
+| 代理 | 安裝指令 |
+|-------|-------------|
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` |
+| [Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` |
+| [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm install -g @qwen-code/qwen-code@latest` |
+
+<Tip>
+您可以按照其官方文檔安裝其他代理。
+</Tip>
+
+## 安裝
+
+<Tabs>
+  <Tab title="Windows">
+    下載最新安裝程式：
+
+    [![下載 Windows 版](https://img.shields.io/badge/下載-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+  </Tab>
+
+  <Tab title="macOS">
+    **方式一：使用 npx（推薦）**
+
+    ```bash
+    npx agents-chatgroup
+    ```
+
+    **方式二：下載應用程式**
+
+    [![下載 macOS 版](https://img.shields.io/badge/下載-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+  </Tab>
+
+  <Tab title="Linux">
+    ```bash
+    npx agents-chatgroup
+    ```
+  </Tab>
+</Tabs>
+
+## 快速入門
+
+<Steps>
+<Step title="安裝程式設計代理">
+  確保您的系統上已安裝並認證至少一個[支援的程式設計代理](/zh-Hant/supported-coding-agents)。
+</Step>
+
+<Step title="啟動 AgentsChatGroup">
+  開啟應用程式或執行 npx 指令。應用程式將自動在瀏覽器中開啟。
+
+  <Check>
+  應用程式綁定到一個隨機空閒連接埠，並在終端機中列印 URL。
+  </Check>
+</Step>
+
+<Step title="建立聊天會話">
+  點擊「建立會話」開始新的群聊。這是您進行 AI 協作的工作空間。
+</Step>
+
+<Step title="新增 AI 成員">
+  在右側邊欄中，點擊「新增 AI 成員」將代理新增到您的會話中。為每個成員配置：
+  - 唯一的 @提及名稱
+  - 選擇代理類型（如 Claude Code、Codex）
+  - 設定系統提示以定義其角色
+  - 指定其工作空間路徑
+</Step>
+
+<Step title="開始協作">
+  使用 @提及向您的 AI 團隊成員分配任務。他們將自動接收上下文並可以相互溝通！
+</Step>
+</Steps>
+
+<Tip>
+要使用固定連接埠，請指定 `PORT` 環境變數：`PORT=8080 npx agents-chatgroup`
+</Tip>
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card title="聊天會話概述" icon="comments" href="/zh-Hant/core-features/chat-session-overview">
+    了解聊天會話及其工作原理
+  </Card>
+
+  <Card title="管理 AI 成員" icon="robot" href="/zh-Hant/core-features/ai-members">
+    為您的團隊配置 AI 成員
+  </Card>
+</CardGroup>

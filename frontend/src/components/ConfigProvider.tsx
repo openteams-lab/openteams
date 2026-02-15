@@ -85,10 +85,10 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
     > | null) || null;
 
   // Sync language with i18n when config changes
+  // Default to browser language if not configured
   useEffect(() => {
-    if (config?.language) {
-      updateLanguageFromConfig(config.language);
-    }
+    const language = config?.language || 'BROWSER';
+    updateLanguageFromConfig(language);
   }, [config?.language]);
 
   const updateConfig = useCallback(

@@ -1,0 +1,103 @@
+---
+title: "CCR (Claude Code Router)"
+description: "複数のClaude CodeモデルをオーケストレーションするためにCCRをセットアップ"
+icon: /logos/claude.svg
+---
+
+CCR（Claude Code Router）を使用すると、異なるLLMプロバイダーとモデル間でコーディングプロンプトをルーティングし、長いコンテキスト、バックグラウンド作業、画像理解などの特定のタスクに特化したモデルを選択できます。
+
+<Warning>
+CCRはClaude CodeやAnthropicとは関連がなく、承認もされておらず、接続もありません。サードパーティツールです。
+</Warning>
+
+## インストール
+CCRは`npx`経由で利用可能 - 別途インストール不要。
+
+```bash
+npx -y @musistudio/claude-code-router ui
+```
+
+これによりCCRローカルUIが起動し、プロバイダーとモデルを設定できます。
+
+## 認証
+agents-chatgroupの外部でCCRの認証と設定を行います。CCR GitHubリポジトリの手順に従ってください：
+
+- GitHub: https://github.com/musistudio/claude-code-router
+
+CCR UIまたはCCRのJSON設定でプロバイダーの追加、APIキーの設定、モデル名の登録を行います（スキーマとファイルの場所についてはCCRリポジトリを参照）。
+
+## CCRの設定（プロバイダーとモデル）
+
+UIまたはJSON設定でCCRを設定します。
+
+CCR UI（`npx -y @musistudio/claude-code-router ui`）で：
+
+1) プロバイダーを追加
+- プロバイダーを選択（例：`openrouter`、`deepseek`など）。
+- そのプロバイダーに必要なAPIキーと設定を入力。
+
+2) モデルを追加
+- 各プロバイダーにモデル識別子を登録（例：`moonshotai/kimi-k2-0905`、`deepseek-chat`）。
+- CCRは特定のケースに異なるモデルを設定できます：
+  - `default`：一般的なコーディング
+  - `background`：軽量/バックグラウンド操作
+  - `think`：「思考」モードをサポートするモデル
+  - `longContext`：非常に長い入力/ファイル
+  - `webSearch`：ウェブ/ツール使用をサポートするモデル
+  - `image`：視覚機能を持つモデル
+
+注意：すべてのモデルがウェブ検索、思考、画像をサポートしているわけではありません。CCR UIで適切にモデルを選択してください。
+
+### JSON経由で設定（オプション）
+CCRはJSON設定ファイルでも設定できます。正確なスキーマ、キー、ファイルの場所についてはCCR GitHubドキュメントを参照してください。プロバイダー（APIキー付き）を定義し、モデルケース（`default`、`background`、`think`、`longContext`、`webSearch`、`image`）を特定のプロバイダー/モデルペアにマッピングします。
+
+### 例：CCR UIで設定されたOpenRouterプロバイダー
+
+<Frame>
+<img src="/images/ccr-openrouter-ui.png" alt="CCR UIで設定されたOpenRouter" />
+</Frame>
+
+### 例：CCRモデルマッピング（default/background/think/など）
+
+<Frame>
+<img src="/images/ccr-config-example.png" alt="CCRモデル設定例" />
+</Frame>
+
+## agents-chatgroupの設定
+
+agents-chatgroupにはCCRのデフォルト設定は付属していません。既存のClaude Codeエージェントに設定を追加：
+
+1)「コーディングエージェント設定」ページを開く。
+2) Claude Codeエージェントに新しい設定を追加（または既存の設定を編集）。
+3) `claude_code_router`チェックボックスを有効にする。
+4) オプションで特定のCCRプロバイダー/モデルをターゲットにするモデル文字列を設定。
+
+エージェント設定の管理については[エージェントプロファイルとバリアント](/configuration-customisation/agent-configurations)ガイドを参照してください。
+
+モデル文字列形式：`<provider>,<model-name>`
+
+例：
+```text
+openrouter,moonshotai/kimi-k2-0905
+deepseek,deepseek-chat
+```
+
+ヒント：
+- 異なるモデル間で簡単に切り替えたい場合は、複数の設定を作成。
+- CCRがCCR UI設定に基づいて独自のルーティング（`default`/`longContext`/などのマッピング）を使用するようにするには、モデル文字列を空のままに。
+
+### 例：agents-chatgroupでのClaude Codeエージェント設定
+
+<Frame>
+<img src="/images/vk-ccr-agent-config.png" alt="agents-chatgroupでのClaude Codeエージェント設定" />
+</Frame>
+
+## agents-chatgroupでCCRを使用
+
+タスク試行を作成する際、コーディングエージェントと設定を選択：Claude Codeエージェントを選び、CCR対応の設定のいずれかを選択。
+
+## トラブルシューティング
+
+- 認証エラー：CCRでAPIキー/プロバイダー設定を確認（UIまたはJSON設定経由）。
+- モデルが見つからない：選択したプロバイダーのモデル識別子が正しいことを確認。
+- 機能が見つからない（webSearch/think/image）：その機能をサポートするモデルに切り替え、CCRマッピングを更新（UIまたはJSON設定経由）。

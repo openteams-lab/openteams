@@ -1,0 +1,103 @@
+---
+title: "CCR (Claude Code Router)"
+description: "Configurer CCR pour orchestrer plusieurs modèles Claude Code"
+icon: /logos/claude.svg
+---
+
+CCR (Claude Code Router) vous permet de router les prompts de codage à travers différents fournisseurs LLM et modèles, et de sélectionner des modèles spécialisés pour des tâches spécifiques comme le long contexte, le travail en arrière-plan, ou la compréhension d'images.
+
+<Warning>
+CCR n'est pas affilié, approuvé ou connecté à Claude Code ou Anthropic. C'est un outil tiers.
+</Warning>
+
+## Installation
+CCR est disponible via `npx` - aucune installation séparée requise.
+
+```bash
+npx -y @musistudio/claude-code-router ui
+```
+
+Cela lance l'interface locale CCR où vous configurez les fournisseurs et les modèles.
+
+## Authentification
+Authentifiez et configurez CCR en dehors d'agents-chatgroup. Suivez les instructions sur le repo GitHub CCR :
+
+- GitHub : https://github.com/musistudio/claude-code-router
+
+Vous ajouterez des fournisseurs, définirez des clés API, et enregistrerez des noms de modèles dans l'interface CCR ou via la configuration JSON de CCR (voir le repo CCR pour le schéma et l'emplacement du fichier).
+
+## Configurer CCR (Fournisseurs et Modèles)
+
+Configurez CCR soit via l'interface soit via la config JSON.
+
+Dans l'interface CCR (`npx -y @musistudio/claude-code-router ui`) :
+
+1) Ajouter des fournisseurs
+- Choisissez un fournisseur (ex: `openrouter`, `deepseek`, etc.).
+- Entrez les clés API et paramètres requis pour ce fournisseur.
+
+2) Ajouter des modèles
+- Pour chaque fournisseur, enregistrez l'identifiant du modèle (ex: `moonshotai/kimi-k2-0905`, `deepseek-chat`).
+- CCR supporte la configuration de différents modèles pour des cas spécifiques :
+  - `default` : codage général
+  - `background` : opérations légères/en arrière-plan
+  - `think` : modèles qui supportent les modes de "pensée"
+  - `longContext` : entrées/fichiers très longs
+  - `webSearch` : modèles qui supportent l'utilisation web/outil
+  - `image` : modèles avec capacités de vision
+
+Note : tous les modèles ne supportent pas la recherche web, la pensée, ou les images. Choisissez les modèles en conséquence dans l'interface CCR.
+
+### Configurer via JSON (optionnel)
+CCR peut aussi être configuré via son fichier de configuration JSON. Référez-vous à la documentation GitHub CCR pour le schéma exact, les clés, et l'emplacement du fichier. Définissez les fournisseurs (avec clés API) et mappez les cas de modèles (`default`, `background`, `think`, `longContext`, `webSearch`, `image`) à des paires fournisseur/modèle spécifiques.
+
+### Exemple : Fournisseur OpenRouter configuré dans l'interface CCR
+
+<Frame>
+<img src="/images/ccr-openrouter-ui.png" alt="OpenRouter configuré dans l'interface CCR" />
+</Frame>
+
+### Exemple : Mapping de modèles CCR (default/background/think/etc.)
+
+<Frame>
+<img src="/images/ccr-config-example.png" alt="Exemple de configuration de modèles CCR" />
+</Frame>
+
+## Configurer agents-chatgroup
+
+agents-chatgroup ne fournit pas de configuration par défaut pour CCR. Ajoutez des configurations à l'agent Claude Code existant :
+
+1) Ouvrez la page "Configurations d'Agents de Codage".
+2) Ajoutez une nouvelle configuration pour l'agent Claude Code (ou éditez une existante).
+3) Activez la case `claude_code_router`.
+4) Optionnellement définissez une chaîne de modèle pour cibler un fournisseur/modèle CCR spécifique.
+
+Voir le guide [Profils et Variantes d'Agents](/configuration-customisation/agent-configurations) pour gérer les configurations d'agents.
+
+Format de chaîne de modèle : `<provider>,<model-name>`
+
+Exemples :
+```text
+openrouter,moonshotai/kimi-k2-0905
+deepseek,deepseek-chat
+```
+
+Conseils :
+- Créez plusieurs configurations si vous voulez facilement basculer entre différents modèles.
+- Laissez la chaîne de modèle vide si vous voulez que CCR utilise son propre routage basé sur votre configuration d'interface CCR (ex: ses mappings `default`/`longContext`/etc.).
+
+### Exemple : Configuration d'agent Claude Code dans agents-chatgroup
+
+<Frame>
+<img src="/images/vk-ccr-agent-config.png" alt="Configuration d'agent Claude Code dans agents-chatgroup" />
+</Frame>
+
+## Utiliser CCR dans agents-chatgroup
+
+Lors de la création d'une Tentative de Tâche, sélectionnez l'agent de codage et la configuration : choisissez l'agent Claude Code, puis choisissez une de vos configurations activées CCR.
+
+## Dépannage
+
+- Erreurs d'authentification : vérifiez vos clés API/paramètres de fournisseur dans CCR (via interface ou config JSON).
+- Modèle non trouvé : confirmez que l'identifiant du modèle est correct pour le fournisseur choisi.
+- Fonctionnalités manquantes (webSearch/think/image) : basculez vers un modèle qui supporte la capacité et mettez à jour votre mapping CCR (via interface ou config JSON).

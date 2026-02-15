@@ -1,0 +1,104 @@
+---
+title: "시작하기"
+description: "macOS, Linux, Windows에서 AgentsChatGroup 빠른 시작 가이드"
+sidebarTitle: "시작하기"
+---
+
+## 지원 시스템
+
+AgentsChatGroup은 다음 플랫폼에서 실행됩니다:
+
+- macOS (Intel 및 Apple Silicon)
+- Linux
+- Windows
+
+## 사전 요구사항
+
+AgentsChatGroup을 설치하기 전에 최소 하나의 지원되는 AI 에이전트가 설치되어 있는지 확인하세요:
+
+| 에이전트 | 설치 |
+|-------|-------------|
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` |
+| [Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` |
+| [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm install -g @qwen-code/qwen-code@latest` |
+
+<Tip>
+공식 문서에 따라 다른 에이전트를 설치할 수 있습니다.
+</Tip>
+
+## 설치
+
+<Tabs>
+  <Tab title="Windows">
+    최신 설치 프로그램 다운로드:
+
+    [![Windows용 다운로드](https://img.shields.io/badge/다운로드-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+  </Tab>
+
+  <Tab title="macOS">
+    **방법 1: npx 사용 (권장)**
+
+    ```bash
+    npx agents-chatgroup
+    ```
+
+    **방법 2: 앱 다운로드**
+
+    [![macOS용 다운로드](https://img.shields.io/badge/다운로드-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+  </Tab>
+
+  <Tab title="Linux">
+    ```bash
+    npx agents-chatgroup
+    ```
+  </Tab>
+</Tabs>
+
+## 빠른 시작
+
+<Steps>
+<Step title="코딩 에이전트 설치">
+  시스템에 최소 하나의 [지원되는 코딩 에이전트](/ko/supported-coding-agents)가 설치되고 인증되었는지 확인하세요.
+</Step>
+
+<Step title="AgentsChatGroup 시작">
+  애플리케이션을 열거나 npx 명령을 실행합니다. 앱이 자동으로 브라우저에서 열립니다.
+
+  <Check>
+  애플리케이션은 무작위 빈 포트에 바인딩되고 터미널에 URL을 출력합니다.
+  </Check>
+</Step>
+
+<Step title="채팅 세션 생성">
+  "세션 생성"을 클릭하여 새 그룹 채팅을 시작합니다. 이것이 AI 협업을 위한 작업 공간입니다.
+</Step>
+
+<Step title="AI 멤버 추가">
+  오른쪽 사이드바에서 "AI 멤버 추가"를 클릭하여 세션에 에이전트를 추가합니다. 각 멤버 구성:
+  - 고유한 @멘션 이름
+  - 에이전트 유형 선택 (예: Claude Code, Codex)
+  - 역할을 정의하는 시스템 프롬프트 설정
+  - 작업 공간 경로 지정
+</Step>
+
+<Step title="협업 시작">
+  @멘션을 사용하여 AI 팀 멤버에게 작업을 할당합니다. 그들은 자동으로 컨텍스트를 받고 서로 소통할 수 있습니다!
+</Step>
+</Steps>
+
+<Tip>
+고정 포트를 사용하려면 `PORT` 환경 변수를 지정하세요: `PORT=8080 npx agents-chatgroup`
+</Tip>
+
+## 다음 단계
+
+<CardGroup cols={2}>
+  <Card title="채팅 세션 개요" icon="comments" href="/ko/core-features/chat-session-overview">
+    채팅 세션과 작동 방식에 대해 알아보기
+  </Card>
+
+  <Card title="AI 멤버 관리" icon="robot" href="/ko/core-features/ai-members">
+    팀을 위한 AI 멤버 구성
+  </Card>
+</CardGroup>

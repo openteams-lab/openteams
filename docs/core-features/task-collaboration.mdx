@@ -1,0 +1,136 @@
+---
+title: "Task Collaboration"
+description: "Assign tasks to AI members and coordinate their work using @mentions"
+---
+
+Once you have AI members set up, you can assign tasks and coordinate their work through simple messaging.
+
+## Assigning Tasks with @Mentions
+
+Use `@` followed by the member's name to assign tasks:
+
+```
+@Coder Please implement the login form with email validation.
+```
+
+You can also mention multiple agents in one message:
+
+```
+@Coder implement the API endpoint
+@Writer document the new endpoint in the README
+```
+
+### Using the Mention Selector
+
+For convenience, use the **Mention agents** selector:
+
+1. Click the **@** button in the message input
+2. Select one or more AI members
+3. Write your message
+4. Selected mentions are automatically included
+
+<Tip>
+You can combine both methods - type `@name` in your message AND use the selector for additional mentions.
+</Tip>
+
+## Message Features
+
+### Text and Images
+
+Messages support:
+- Plain text instructions
+- Image attachments (for visual context)
+
+### Reference Previous Messages
+
+Quote a previous message to provide context:
+
+1. Hover over any message
+2. Click the **Reply** button
+3. Your new message will reference the quoted content
+
+This is useful for follow-up instructions or corrections.
+
+## How Task Execution Works
+
+When you mention an AI member:
+
+1. **Received** - The agent acknowledges your message
+2. **Running** - The agent starts working on the task
+3. **Completed** - The task is finished successfully
+4. **Failed** - The agent encountered an error
+
+<Note>
+You can see the current status of each mention directly in the message.
+</Note>
+
+### Queue Behavior
+
+If an agent is already running:
+- New tasks are queued automatically
+- Tasks execute in order when the agent becomes available
+- You'll see a confirmation when queuing a task to a busy agent
+
+### Chain Collaboration
+
+Agents can mention other agents in their responses, enabling workflows like:
+
+1. You ask `@Engineer` for a solution design
+2. Engineer creates a plan and asks `@Coder` to implement it
+3. Coder implements and asks `@Reviewer` to check the code
+
+<Warning>
+Chain triggers have a depth limit to prevent infinite loops. An agent cannot mention itself.
+</Warning>
+
+## Stopping an Agent
+
+If you need to interrupt a running agent:
+
+1. Find the running member in the sidebar
+2. Click **Stop**
+3. The agent will halt its current task
+
+## Best Practices
+
+### Clear Instructions
+
+Be specific about what you want:
+
+**Good:**
+```
+@Coder Add a logout button to the header. It should clear the session and redirect to /login.
+```
+
+**Vague:**
+```
+@Coder fix the auth
+```
+
+### One Task Per Mention
+
+For complex work, break it down:
+
+```
+@Coder First, create the database schema for user profiles.
+```
+
+Then follow up:
+
+```
+@Coder Now add the API endpoints for profile CRUD operations.
+```
+
+### Use the Right Agent for the Job
+
+Match tasks to agent roles:
+
+- Documentation tasks → Writer agent
+- Code implementation → Coder agent
+- Architecture questions → Engineer agent
+
+## Next Steps
+
+<Card title="Code Review" icon="code" href="/core-features/code-review">
+  See how to review code changes made by your AI team
+</Card>

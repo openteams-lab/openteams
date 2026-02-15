@@ -1,0 +1,29 @@
+---
+title: "Cursor Agent CLI"
+description: "Configurer l'agent en ligne de commande de Cursor"
+icon: /logos/cursor-logo.svg
+---
+
+<Steps>
+<Step title="Installer Cursor Agent CLI">
+  ```bash
+  curl https://cursor.com/install -fsS | bash
+  ```
+
+  Vérifiez l'installation avec `cursor-agent --version`. Pour plus de détails, voir le [guide d'installation officiel](https://docs.cursor.com/en/cli/installation).
+</Step>
+
+<Step title="Suivre les instructions de connexion">
+  Connectez-vous avec `cursor-agent login` (ouvre un navigateur). Vous pouvez aussi définir la variable d'environnement `CURSOR_API_KEY`. Instructions complètes : https://docs.cursor.com/en/cli/reference/authentication
+</Step>
+
+<Step title="Démarrer agents-chatgroup">
+  Une fois authentifié, lancez agents-chatgroup :
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  Vous pouvez maintenant sélectionner Cursor Agent CLI lors de la création de tentatives de tâches.
+</Step>
+</Steps>

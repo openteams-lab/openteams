@@ -12,10 +12,10 @@ sidebarTitle: "Testing Your Application"
 
 ## Overview
 
-Preview Mode provides an embedded browser experience within agent-chatgroup, allowing you to test and iterate on your web applications without leaving the development environment. This feature eliminates the need to switch between your browser and agent-chatgroup by providing live preview capabilities and precise component selection tools.
+Preview Mode provides an embedded browser experience within agents-chatgroup, allowing you to test and iterate on your web applications without leaving the development environment. This feature eliminates the need to switch between your browser and agents-chatgroup by providing live preview capabilities and precise component selection tools.
 
 **Key Benefits:**
-- **Embedded viewing**: See your application running directly in agent-chatgroup
+- **Embedded viewing**: See your application running directly in agents-chatgroup
 - **Precise component selection**: Click to select specific UI components for targeted feedback
 - **Dev Server Logs**: Monitor development server output with expandable/collapsible logs at the bottom
 - **Seamless workflows**: No context switching between tools
@@ -46,10 +46,10 @@ Preview Mode provides an embedded browser experience within agent-chatgroup, all
 </Step>
 
 <Step title="Install Web Companion">
-  For precise component selection, install the `agent-chatgroup-web-companion` package in your application.
+  For precise component selection, install the `agents-chatgroup-web-companion` package in your application.
 
   <Info>
-  **Recommended**: Use the "Install companion automatically" button in the Preview tab to have agent-chatgroup create a task that installs and configures the companion for you.
+  **Recommended**: Use the "Install companion automatically" button in the Preview tab to have agents-chatgroup create a task that installs and configures the companion for you.
   
   <Frame>
   <img src="/images/preview-mode-install-companion-button.png" alt="Install companion automatically button in Preview tab" />
@@ -60,7 +60,7 @@ Preview Mode provides an embedded browser experience within agent-chatgroup, all
 
   Add the dependency to your project:
   ```bash
-  npm install agent-chatgroup-web-companion
+  npm install agents-chatgroup-web-companion
   ```
 
   Then add the companion to your application:
@@ -69,7 +69,7 @@ Preview Mode provides an embedded browser experience within agent-chatgroup, all
   <Tab title="Create React App">
     Add to your `src/index.js` or `src/index.tsx`:
     ```jsx
-    import { AgentChatgroupWebCompanion } from 'agent-chatgroup-web-companion';
+    import { AgentChatgroupWebCompanion } from 'agents-chatgroup-web-companion';
     import React from 'react';
     import ReactDOM from 'react-dom/client';
     import App from './App';
@@ -87,7 +87,7 @@ Preview Mode provides an embedded browser experience within agent-chatgroup, all
   <Tab title="Next.js">
     Add to your `pages/_app.js` or `pages/_app.tsx`:
     ```jsx
-    import { AgentChatgroupWebCompanion } from 'agent-chatgroup-web-companion'
+    import { AgentChatgroupWebCompanion } from 'agents-chatgroup-web-companion'
     import type { AppProps } from 'next/app'
 
     function MyApp({ Component, pageProps }: AppProps) {
@@ -104,7 +104,7 @@ Preview Mode provides an embedded browser experience within agent-chatgroup, all
   <Tab title="Vite">
     Add to your `src/main.jsx` or `src/main.tsx`:
     ```jsx
-    import { AgentChatgroupWebCompanion } from "agent-chatgroup-web-companion";
+    import { AgentChatgroupWebCompanion } from "agents-chatgroup-web-companion";
     import React from "react";
     import ReactDOM from "react-dom/client";
     import App from "./App";
@@ -145,7 +145,7 @@ Once your development server is running and a URL is detected:
 
 1. **Click the Preview button** (eye icon) in the task interface
 2. **View embedded application** in the iframe
-3. **Interact with your app** directly within agent-chatgroup
+3. **Interact with your app** directly within agents-chatgroup
 
 <Frame>
 <img src="/images/vk-preview-interface.png" alt="Preview mode showing embedded application with toolbar controls" />
@@ -178,7 +178,7 @@ When the Web Companion is installed, you can precisely select UI components for 
 
 <Steps>
 <Step title="Activate Selection Mode">
-  Click the floating agent-chatgroup companion button in the bottom-right corner of your application to activate component selection mode.
+  Click the floating agents-chatgroup companion button in the bottom-right corner of your application to activate component selection mode.
 
   <Frame>
   <img src="/images/vk-component-selection.png" alt="Component selection interface showing selectable elements highlighted" />
@@ -186,7 +186,7 @@ When the Web Companion is installed, you can precisely select UI components for 
 </Step>
 
 <Step title="Choose Component Depth">
-  When you click a component, agent-chatgroup shows a hierarchy of components from innermost to outermost. Select the appropriate level for your feedback:
+  When you click a component, agents-chatgroup shows a hierarchy of components from innermost to outermost. Select the appropriate level for your feedback:
 
   - **Inner components**: For specific UI elements (buttons, inputs)
   - **Outer components**: For broader sections (cards, layouts)
@@ -226,7 +226,7 @@ URLs using `0.0.0.0` or `::` are automatically converted to `localhost` for embe
 
 - [New Task Attempts](/core-features/new-task-attempts) - Learn about task attempt lifecycle
 - [Reviewing Code Changes](/core-features/reviewing-code-changes) - Analyse and review code modifications
-- [Configuration & Customisation](/configuration-customisation/global-settings) - Customise agent-chatgroup settings
+- [Configuration & Customisation](/configuration-customisation/global-settings) - Customise agents-chatgroup settings
 
 
 

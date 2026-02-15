@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { ChatEntryContainer } from '@/components/ui-new/primitives/conversation/ChatEntryContainer';
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
@@ -30,6 +31,7 @@ export function StreamingRunEntry({
   isStopping,
   onStop,
 }: StreamingRunEntryProps) {
+  const { t } = useTranslation('chat');
   const avatarSeed = getAgentAvatarSeed(
     run.agentId,
     runnerType,
@@ -60,7 +62,7 @@ export function StreamingRunEntry({
         headerRight={
           <div className="flex items-center gap-base text-xs text-low">
             <span className="flex items-center gap-half">
-              <span>Agent is running</span>
+              <span>{t('agent.running')}</span>
               <span className="flex items-center gap-[2px]">
                 <span className="size-dot rounded-full bg-brand animate-running-dot-1" />
                 <span className="size-dot rounded-full bg-brand animate-running-dot-2" />
@@ -79,7 +81,7 @@ export function StreamingRunEntry({
                 }
                 disabled={isStopping}
               >
-                {isStopping ? 'Stopping...' : 'Stop'}
+                {isStopping ? t('agent.stopping') : t('agent.stop')}
               </button>
             )}
           </div>

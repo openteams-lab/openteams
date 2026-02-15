@@ -1,0 +1,103 @@
+---
+title: "CCR (Claude Code Router)"
+description: "여러 Claude Code 모델을 오케스트레이션하기 위한 CCR 설정"
+icon: /logos/claude.svg
+---
+
+CCR(Claude Code Router)을 사용하면 다양한 LLM 제공업체와 모델에 걸쳐 코딩 프롬프트를 라우팅하고, 긴 컨텍스트, 백그라운드 작업, 이미지 이해와 같은 특정 작업에 특화된 모델을 선택할 수 있습니다.
+
+<Warning>
+CCR은 Claude Code 또는 Anthropic과 관련이 없으며, 승인되지 않았고, 연결되어 있지 않습니다. 타사 도구입니다.
+</Warning>
+
+## 설치
+CCR은 `npx`를 통해 사용 가능 - 별도 설치 불필요.
+
+```bash
+npx -y @musistudio/claude-code-router ui
+```
+
+이렇게 하면 CCR 로컬 UI가 시작되어 제공업체와 모델을 구성할 수 있습니다.
+
+## 인증
+agents-chatgroup 외부에서 CCR을 인증하고 구성합니다. CCR GitHub 저장소의 지침을 따르세요:
+
+- GitHub: https://github.com/musistudio/claude-code-router
+
+CCR UI 또는 CCR의 JSON 구성을 통해 제공업체 추가, API 키 설정, 모델 이름 등록을 합니다 (스키마 및 파일 위치는 CCR 저장소 참조).
+
+## CCR 구성 (제공업체 및 모델)
+
+UI 또는 JSON 구성을 통해 CCR을 구성합니다.
+
+CCR UI(`npx -y @musistudio/claude-code-router ui`)에서:
+
+1) 제공업체 추가
+- 제공업체 선택 (예: `openrouter`, `deepseek` 등).
+- 해당 제공업체에 필요한 API 키와 설정 입력.
+
+2) 모델 추가
+- 각 제공업체에 모델 식별자 등록 (예: `moonshotai/kimi-k2-0905`, `deepseek-chat`).
+- CCR은 특정 케이스에 다른 모델 구성 지원:
+  - `default`: 일반 코딩
+  - `background`: 경량/백그라운드 작업
+  - `think`: "thinking" 모드를 지원하는 모델
+  - `longContext`: 매우 긴 입력/파일
+  - `webSearch`: 웹/도구 사용을 지원하는 모델
+  - `image`: 비전 기능이 있는 모델
+
+참고: 모든 모델이 웹 검색, thinking, 이미지를 지원하지는 않습니다. CCR UI에서 적절히 모델을 선택하세요.
+
+### JSON을 통한 구성 (선택사항)
+CCR은 JSON 구성 파일로도 구성할 수 있습니다. 정확한 스키마, 키, 파일 위치는 CCR GitHub 문서를 참조하세요. 제공업체(API 키 포함)를 정의하고 모델 케이스(`default`, `background`, `think`, `longContext`, `webSearch`, `image`)를 특정 제공업체/모델 쌍에 매핑합니다.
+
+### 예: CCR UI에서 구성된 OpenRouter 제공업체
+
+<Frame>
+<img src="/images/ccr-openrouter-ui.png" alt="CCR UI에서 구성된 OpenRouter" />
+</Frame>
+
+### 예: CCR 모델 매핑 (default/background/think/등)
+
+<Frame>
+<img src="/images/ccr-config-example.png" alt="CCR 모델 구성 예" />
+</Frame>
+
+## agents-chatgroup 구성
+
+agents-chatgroup에는 CCR에 대한 기본 구성이 제공되지 않습니다. 기존 Claude Code 에이전트에 구성 추가:
+
+1) "코딩 에이전트 구성" 페이지 열기.
+2) Claude Code 에이전트에 새 구성 추가 (또는 기존 구성 편집).
+3) `claude_code_router` 체크박스 활성화.
+4) 선택적으로 특정 CCR 제공업체/모델을 대상으로 하는 모델 문자열 설정.
+
+에이전트 구성 관리는 [에이전트 프로필 및 변형](/configuration-customisation/agent-configurations) 가이드를 참조하세요.
+
+모델 문자열 형식: `<provider>,<model-name>`
+
+예:
+```text
+openrouter,moonshotai/kimi-k2-0905
+deepseek,deepseek-chat
+```
+
+팁:
+- 다른 모델 간에 쉽게 전환하려면 여러 구성을 만드세요.
+- CCR이 CCR UI 구성에 기반한 자체 라우팅(`default`/`longContext`/등 매핑)을 사용하게 하려면 모델 문자열을 비워두세요.
+
+### 예: agents-chatgroup에서의 Claude Code 에이전트 구성
+
+<Frame>
+<img src="/images/vk-ccr-agent-config.png" alt="agents-chatgroup에서의 Claude Code 에이전트 구성" />
+</Frame>
+
+## agents-chatgroup에서 CCR 사용
+
+작업 시도를 생성할 때 코딩 에이전트와 구성을 선택: Claude Code 에이전트를 선택한 다음 CCR이 활성화된 구성 중 하나를 선택.
+
+## 문제 해결
+
+- 인증 오류: CCR에서 API 키/제공업체 설정 확인 (UI 또는 JSON 구성을 통해).
+- 모델을 찾을 수 없음: 선택한 제공업체에 대해 모델 식별자가 올바른지 확인.
+- 기능 없음 (webSearch/think/image): 해당 기능을 지원하는 모델로 전환하고 CCR 매핑 업데이트 (UI 또는 JSON 구성을 통해).

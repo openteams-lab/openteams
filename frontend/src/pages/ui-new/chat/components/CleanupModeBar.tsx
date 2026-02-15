@@ -1,4 +1,5 @@
 import { TrashIcon } from '@phosphor-icons/react';
+import { useTranslation } from 'react-i18next';
 
 export interface CleanupModeBarProps {
   selectedCount: number;
@@ -15,17 +16,18 @@ export function CleanupModeBar({
   onDeleteSelected,
   isDeletingMessages,
 }: CleanupModeBarProps) {
+  const { t } = useTranslation('chat');
   const allSelected = selectedCount === totalCount;
 
   return (
     <div className="chat-session-cleanup-bar px-base py-half border-b border-border text-xs text-low flex items-center justify-end gap-base">
-      <span>Selected: {selectedCount}</span>
+      <span>{t('cleanup.selected', { count: selectedCount })}</span>
       <button
         type="button"
         className="chat-session-cleanup-action"
         onClick={onToggleSelectAll}
       >
-        {allSelected ? 'Deselect All' : 'Select All'}
+        {allSelected ? t('cleanup.deselectAll') : t('cleanup.selectAll')}
       </button>
       {selectedCount > 0 && (
         <button
@@ -35,7 +37,7 @@ export function CleanupModeBar({
           disabled={isDeletingMessages}
         >
           <TrashIcon className="size-icon-xs" />
-          Delete Selected
+          {t('cleanup.deleteSelected')}
         </button>
       )}
     </div>

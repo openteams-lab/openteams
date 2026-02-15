@@ -1,0 +1,90 @@
+---
+title: "AI Members"
+description: "Add and configure AI coding agents as team members in your chat session"
+---
+
+AI Members are the coding agents that work on your behalf in a chat session. Each member has a specific role, workspace, and capabilities.
+
+## Adding an AI Member
+
+1. Open your chat session
+2. In the right sidebar, click **Add AI member**
+3. Fill in the required configuration
+
+### Configuration Options
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| Name | Yes | The @mention handle for this agent (e.g., `Coder`, `Writer`) |
+| Base Coding Agent | Yes | The underlying AI agent to use (must be installed locally) |
+| System Prompt | Yes | Instructions that define the agent's role and behavior |
+| Workspace Path | Yes | The directory where this agent will work |
+| Model Variant | No | Specific model configuration (if available) |
+
+<Note>
+The **Name** must be unique within the session and can only contain letters, numbers, underscores, and hyphens (maximum 10 characters).
+</Note>
+
+## Supported Coding Agents
+
+Choose from any locally installed coding agent:
+
+- **Claude Code** - Anthropic's coding assistant
+- **Codex** - OpenAI's coding agent
+- **Gemini** - Google's AI assistant
+- **Qwen Code** - Alibaba's coding model
+- **Amp** - Sourcegraph's agent
+- **Cursor Agent** - Cursor's AI assistant
+- **GitHub Copilot** - GitHub's coding companion
+- And more...
+
+<Tip>
+Only agents installed on your system will appear as available options.
+</Tip>
+
+## Writing Effective System Prompts
+
+The system prompt defines what your AI member does. Keep it clear and focused:
+
+**Good examples:**
+- "You are a documentation writer. Focus on clear, user-friendly content."
+- "You are a code reviewer. Check for bugs, performance issues, and best practices."
+- "You are a backend engineer. Implement features following the project's existing patterns."
+
+**Tips:**
+- Be specific about the role and responsibilities
+- Mention any constraints or preferences
+- Keep it concise - agents work better with clear directions
+
+## Managing AI Members
+
+### Edit a Member
+
+Click on an existing member in the sidebar to modify their configuration.
+
+<Warning>
+The workspace path cannot be changed after creation. If you need a different workspace, create a new AI member.
+</Warning>
+
+### Delete a Member
+
+1. Click on the member in the sidebar
+2. Click **Delete**
+3. Confirm the deletion
+
+## Member States
+
+Each AI member shows a status indicator:
+
+| State | Meaning |
+|-------|---------|
+| Idle | Ready to receive tasks |
+| Running | Currently working on a task |
+| Completed | Finished the last task |
+| Failed | Encountered an error |
+
+## Next Steps
+
+<Card title="Task Collaboration" icon="comments" href="/core-features/task-collaboration">
+  Learn how to assign tasks and collaborate with your AI team
+</Card>

@@ -1,0 +1,27 @@
+---
+title: "Amp"
+description: "设置 Amp 代码补全代理"
+icon: /logos/amp-logo.svg
+---
+
+<Steps>
+<Step title="运行 Amp">
+  ```bash
+  npx -y @sourcegraph/amp
+  ```
+</Step>
+
+<Step title="按照登录说明操作">
+  按照提示完成认证流程。更多详情请参阅 [Amp 用户手册](https://ampcode.com/manual#install)。
+</Step>
+
+<Step title="启动 agents-chatgroup">
+  认证完成后，启动 agents-chatgroup：
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  现在您可以在创建任务尝试时选择 Amp。
+</Step>
+</Steps>

@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "agent-chatgroup",
+  "name": "agents-chatgroup",
   "description": "A kanban board for developers to track coding tasks with AI coding agents",
   "appearance": {
     "default": "light"
@@ -17,148 +17,296 @@
       "dark": "#2F2F2D"
     }
   },
-  "favicon": "/logo/v-192.png",
+  "favicon": "/logos/favicon.svg",
   "navigation": {
-    "groups": [
+    "languages": [
       {
-        "group": "Getting started",
-        "pages": [
-          "index",
-          "getting-started",
+        "language": "en",
+        "groups": [
           {
-            "group": "Supported Coding Agents",
-            "expanded": true,
+            "group": "Getting started",
             "pages": [
-              "supported-coding-agents",
-              "agents/claude-code",
-              "agents/openai-codex",
-              "agents/github-copilot",
-              "agents/gemini-cli",
-              "agents/amp",
-              "agents/cursor-cli",
-              "agents/opencode",
-              "agents/droid",
-              "agents/ccr",
-              "agents/qwen-code"
+              "index",
+              "getting-started",
+              {
+                "group": "Supported Coding Agents",
+                "expanded": true,
+                "pages": [
+                  "supported-coding-agents",
+                  "agents/claude-code",
+                  "agents/openai-codex",
+                  "agents/github-copilot",
+                  "agents/gemini-cli",
+                  "agents/amp",
+                  "agents/cursor-cli",
+                  "agents/opencode",
+                  "agents/droid",
+                  "agents/ccr",
+                  "agents/qwen-code"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "core-features/chat-session-overview",
+              "core-features/managing-sessions",
+              "core-features/ai-members",
+              "core-features/task-collaboration",
+              "core-features/code-review"
+            ]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "troubleshooting"
             ]
           }
         ]
       },
       {
-        "group": "Core Features",
-        "pages": [
-          "core-features/creating-projects",
-          "core-features/creating-tasks",
-          "core-features/monitoring-task-execution",
-          "core-features/testing-your-application",
-          "core-features/reviewing-code-changes",
-          "core-features/completing-a-task"
-        ]
-      },
-      {
-        "group": "Advanced Features",
-        "pages": [
-          "core-features/subtasks",
-          "core-features/new-task-attempts",
-          "core-features/resolving-rebase-conflicts"
-        ]
-      },
-      {
-        "group": "Workspaces (Beta)",
-        "pages": [
-          "workspaces/index",
-          "workspaces/creating-workspaces",
-          "workspaces/managing-workspaces",
-          "workspaces/repositories",
-          "workspaces/sessions",
-          "workspaces/chat-interface",
-          "workspaces/slash-commands",
-          "workspaces/interface",
-          "workspaces/command-bar",
-          "workspaces/multi-repo-sessions",
-          "workspaces/preview",
-          "workspaces/changes",
-          "workspaces/git-operations"
-        ]
-      },
-      {
-        "group": "Cloud (Beta)",
-        "pages": [
-          "cloud/index",
-          "cloud/getting-started",
-          "cloud/migration",
-          "cloud/authentication",
-          "cloud/organizations",
-          "cloud/team-members",
-          "cloud/projects",
-          "cloud/issues",
-          "cloud/kanban-board",
-          "cloud/list-view",
-          "cloud/filtering",
-          "cloud/customisation",
-          "cloud/troubleshooting"
-        ]
-      },
-      {
-        "group": "Configuration & Customisation",
-        "pages": [
-          "configuration-customisation/global-settings",
-          "configuration-customisation/agent-configurations",
-          "configuration-customisation/creating-task-tags",
-          "configuration-customisation/keyboard-shortcuts"
-        ]
-      },
-      {
-        "group": "Settings (Beta)",
-        "pages": [
-          "settings-beta/index",
+        "language": "zh-Hans",
+        "groups": [
           {
-            "group": "General",
+            "group": "开始使用",
             "pages": [
-              "settings-beta/general",
-              "settings-beta/creating-task-tags"
+              "zh-Hans/index",
+              "zh-Hans/getting-started",
+              {
+                "group": "支持的编程代理",
+                "expanded": true,
+                "pages": [
+                  "zh-Hans/supported-coding-agents",
+                  "zh-Hans/agents/claude-code",
+                  "zh-Hans/agents/openai-codex",
+                  "zh-Hans/agents/github-copilot",
+                  "zh-Hans/agents/gemini-cli",
+                  "zh-Hans/agents/amp",
+                  "zh-Hans/agents/cursor-cli",
+                  "zh-Hans/agents/opencode",
+                  "zh-Hans/agents/droid",
+                  "zh-Hans/agents/ccr",
+                  "zh-Hans/agents/qwen-code"
+                ]
+              }
             ]
           },
-          "settings-beta/projects-repositories",
-          "settings-beta/organization-settings",
-          "settings-beta/remote-projects",
-          "settings-beta/agent-configurations",
-          "settings-beta/mcp-servers"
+          {
+            "group": "核心功能",
+            "pages": [
+              "zh-Hans/core-features/chat-session-overview",
+              "zh-Hans/core-features/managing-sessions",
+              "zh-Hans/core-features/ai-members",
+              "zh-Hans/core-features/task-collaboration",
+              "zh-Hans/core-features/code-review"
+            ]
+          },
+          {
+            "group": "帮助",
+            "pages": [
+              "zh-Hans/troubleshooting"
+            ]
+          }
         ]
       },
       {
-        "group": "Integrations",
-        "pages": [
-          "integrations/github-integration",
-          "integrations/azure-repos-integration",
-          "integrations/vscode-extension",
-          "integrations/mcp-server-configuration",
-          "integrations/agent-chatgroup-mcp-server"
+        "language": "zh-Hant",
+        "groups": [
+          {
+            "group": "開始使用",
+            "pages": [
+              "zh-Hant/index",
+              "zh-Hant/getting-started",
+              {
+                "group": "支援的程式設計代理",
+                "expanded": true,
+                "pages": [
+                  "zh-Hant/supported-coding-agents",
+                  "zh-Hant/agents/claude-code",
+                  "zh-Hant/agents/openai-codex",
+                  "zh-Hant/agents/github-copilot",
+                  "zh-Hant/agents/gemini-cli",
+                  "zh-Hant/agents/amp",
+                  "zh-Hant/agents/cursor-cli",
+                  "zh-Hant/agents/opencode",
+                  "zh-Hant/agents/droid",
+                  "zh-Hant/agents/ccr",
+                  "zh-Hant/agents/qwen-code"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "核心功能",
+            "pages": [
+              "zh-Hant/core-features/chat-session-overview",
+              "zh-Hant/core-features/managing-sessions",
+              "zh-Hant/core-features/ai-members",
+              "zh-Hant/core-features/task-collaboration",
+              "zh-Hant/core-features/code-review"
+            ]
+          },
+          {
+            "group": "幫助",
+            "pages": [
+              "zh-Hant/troubleshooting"
+            ]
+          }
         ]
       },
       {
-        "group": "Help",
-        "pages": [
-          "troubleshooting"
+        "language": "ja",
+        "groups": [
+          {
+            "group": "はじめに",
+            "pages": [
+              "ja/index",
+              "ja/getting-started",
+              {
+                "group": "サポートエージェント",
+                "expanded": true,
+                "pages": [
+                  "ja/supported-coding-agents",
+                  "ja/agents/claude-code",
+                  "ja/agents/openai-codex",
+                  "ja/agents/github-copilot",
+                  "ja/agents/gemini-cli",
+                  "ja/agents/amp",
+                  "ja/agents/cursor-cli",
+                  "ja/agents/opencode",
+                  "ja/agents/droid",
+                  "ja/agents/ccr",
+                  "ja/agents/qwen-code"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "コア機能",
+            "pages": [
+              "ja/core-features/chat-session-overview",
+              "ja/core-features/managing-sessions",
+              "ja/core-features/ai-members",
+              "ja/core-features/task-collaboration",
+              "ja/core-features/code-review"
+            ]
+          },
+          {
+            "group": "ヘルプ",
+            "pages": [
+              "ja/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "language": "ko",
+        "groups": [
+          {
+            "group": "시작하기",
+            "pages": [
+              "ko/index",
+              "ko/getting-started",
+              {
+                "group": "지원 에이전트",
+                "expanded": true,
+                "pages": [
+                  "ko/supported-coding-agents",
+                  "ko/agents/claude-code",
+                  "ko/agents/openai-codex",
+                  "ko/agents/github-copilot",
+                  "ko/agents/gemini-cli",
+                  "ko/agents/amp",
+                  "ko/agents/cursor-cli",
+                  "ko/agents/opencode",
+                  "ko/agents/droid",
+                  "ko/agents/ccr",
+                  "ko/agents/qwen-code"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "핵심 기능",
+            "pages": [
+              "ko/core-features/chat-session-overview",
+              "ko/core-features/managing-sessions",
+              "ko/core-features/ai-members",
+              "ko/core-features/task-collaboration",
+              "ko/core-features/code-review"
+            ]
+          },
+          {
+            "group": "도움말",
+            "pages": [
+              "ko/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "language": "fr",
+        "groups": [
+          {
+            "group": "Démarrage",
+            "pages": [
+              "fr/index",
+              "fr/getting-started",
+              {
+                "group": "Agents Supportés",
+                "expanded": true,
+                "pages": [
+                  "fr/supported-coding-agents",
+                  "fr/agents/claude-code",
+                  "fr/agents/openai-codex",
+                  "fr/agents/github-copilot",
+                  "fr/agents/gemini-cli",
+                  "fr/agents/amp",
+                  "fr/agents/cursor-cli",
+                  "fr/agents/opencode",
+                  "fr/agents/droid",
+                  "fr/agents/ccr",
+                  "fr/agents/qwen-code"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Fonctionnalités",
+            "pages": [
+              "fr/core-features/chat-session-overview",
+              "fr/core-features/managing-sessions",
+              "fr/core-features/ai-members",
+              "fr/core-features/task-collaboration",
+              "fr/core-features/code-review"
+            ]
+          },
+          {
+            "group": "Aide",
+            "pages": [
+              "fr/troubleshooting"
+            ]
+          }
         ]
       }
     ]
   },
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "light": "/logos/light.png",
+    "dark": "/logos/dark.png"
   },
   "navbar": {
     "links": [
       {
         "label": "GitHub",
-        "href": "https://github.com/BloopAI/agent-chatgroup"
+        "href": "https://github.com/BloopAI/agents-chatgroup"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Get Started",
-      "href": "https://agent-chatgroup.com/docs"
+      "href": "https://agents-chatgroup.com/docs"
     }
   },
   "contextual": {
@@ -181,11 +329,10 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/BloopAI/agent-chatgroup",
-      "x": "https://x.com/agent-chatgroup"
+      "github": "https://github.com/BloopAI/agents-chatgroup",
+      "x": "https://x.com/agents-chatgroup"
     }
   }
 }
-
 
 

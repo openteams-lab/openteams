@@ -1,0 +1,156 @@
+---
+title: "Code Review & Session Control"
+description: "Review code changes, manage context, and control your AI team"
+---
+
+When AI members complete coding tasks, you can review their work and manage the overall session through built-in tools.
+
+## Viewing Code Changes
+
+After an agent completes a task, you'll see a **Code changes** card below their message.
+
+Click to open the **Diff Viewer** which shows:
+- Files added, modified, or deleted
+- Line-by-line changes with syntax highlighting
+- Before and after comparison
+
+<Tip>
+The diff viewer only shows tracked git changes. Make sure your workspace is a git repository.
+</Tip>
+
+## Workspace Drawer
+
+Click on an AI member's workspace to open the **Workspace Drawer**, which provides:
+
+### Workspace Path
+The directory where this agent works.
+
+### Run History
+A list of all task runs for this agent, showing:
+- When each task ran
+- Whether it succeeded or failed
+- Quick access to outputs
+
+### Run Logs
+Detailed logs from each execution, useful for debugging or understanding what the agent did.
+
+## Understanding Run Outputs
+
+Each time an agent runs, it generates several outputs:
+
+| File | Purpose |
+|------|---------|
+| Input | The task prompt sent to the agent |
+| Output | The agent's response and summary |
+| Log | Detailed execution log |
+| Diff | Code changes (if any git changes were made) |
+
+<Note>
+Large diffs (over 4KB) are truncated for performance. You can view the full changes in your git client.
+</Note>
+
+## New Files
+
+When an agent creates new files that aren't tracked by git, they appear in a separate **Untracked files** section.
+
+<Warning>
+Untracked files larger than 1MB are not captured.
+</Warning>
+
+## Running Control
+
+### Stopping an Agent
+
+If an agent is taking too long or going in the wrong direction:
+
+1. Find the running agent in the sidebar (shows "Running" status)
+2. Click the **Stop** button
+3. The agent will halt its current task
+
+<Tip>
+After stopping an agent, you can send a new message with clearer instructions.
+</Tip>
+
+### Task Queue
+
+When you send a task to an agent that's already running:
+- The new task is automatically queued
+- A confirmation dialog appears
+- Tasks execute in order when the agent finishes
+
+## Context Management
+
+The system automatically manages conversation context for your AI agents.
+
+### How Context Works
+
+Each AI member receives:
+- **Session members** - Who's in the chat and their roles
+- **Recent messages** - The conversation history
+- **Referenced content** - Any quoted messages or attachments
+
+### Automatic Context Compression
+
+To keep conversations efficient:
+- Up to 30 messages are retained in context
+- The 5 most recent messages are always kept in full
+- Older messages are automatically summarized
+
+<Note>
+You don't need to manage context manually - the system handles it automatically while preserving important information.
+</Note>
+
+## Session Management Tools
+
+### Search Messages
+
+Use the search feature to find specific messages or discussions across the session.
+
+### Bulk Delete
+
+In cleanup mode, you can select and delete multiple messages at once.
+
+### Message History
+
+The full conversation history is preserved and available for reference at any time.
+
+### Archiving Sessions
+
+When a project is complete or paused:
+
+1. Click **Archive** on the session
+2. The session becomes read-only
+3. All messages and members are preserved
+
+To continue work later, click **Restore** to reactivate the session.
+
+## Tips for Effective Review
+
+1. **Check the diff first** - Quickly see what code changed
+2. **Read the output** - Understand what the agent intended to do
+3. **Review logs if needed** - Dig into details when something seems off
+4. **Follow up with mentions** - Ask the agent to revise or explain if needed
+
+```
+@Coder The login function looks good, but can you add error handling for invalid credentials?
+```
+
+## Wrapping Up
+
+That covers the core features of Agent ChatGroup! You now know how to:
+
+- Create and manage chat sessions
+- Add AI members with specific roles
+- Assign tasks using @mentions
+- Review code changes and run history
+- Control running agents and manage context
+- Archive and organize your sessions
+
+<CardGroup cols={2}>
+  <Card title="Supported Agents" icon="robot" href="/supported-coding-agents">
+    See all compatible coding agents
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+    Get help with common issues
+  </Card>
+</CardGroup>

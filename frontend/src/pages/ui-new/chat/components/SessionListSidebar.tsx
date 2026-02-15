@@ -2,22 +2,12 @@ import {
   ChatCircleDotsIcon,
   PlusIcon,
 } from '@phosphor-icons/react';
+import { useTranslation } from 'react-i18next';
 import type { ChatSession } from 'shared/types';
 import { cn } from '@/lib/utils';
 import { formatDateShortWithTime } from '@/utils/date';
 
 const MAX_SESSION_TITLE_LENGTH = 20;
-
-const getDisplaySessionTitle = (title: string | null) => {
-  const fullTitle = title?.trim() || 'Untitled session';
-  if (fullTitle.length <= MAX_SESSION_TITLE_LENGTH) {
-    return { fullTitle, displayTitle: fullTitle };
-  }
-  return {
-    fullTitle,
-    displayTitle: `${fullTitle.slice(0, MAX_SESSION_TITLE_LENGTH)}...`,
-  };
-};
 
 export interface SessionListSidebarProps {
   activeSessions: ChatSession[];
@@ -46,10 +36,22 @@ export function SessionListSidebar({
   isCollapsed,
   onToggleCollapsed,
 }: SessionListSidebarProps) {
+  const { t } = useTranslation('chat');
   const isCompactSessionRow = !isCollapsed && width < 320;
   const collapseActionLabel = isCollapsed
-    ? 'Expand sidebar'
-    : 'Collapse sidebar';
+    ? t('sidebar.expandSidebar')
+    : t('sidebar.collapseSidebar');
+
+  const getDisplaySessionTitle = (title: string | null) => {
+    const fullTitle = title?.trim() || t('sidebar.untitledSession');
+    if (fullTitle.length <= MAX_SESSION_TITLE_LENGTH) {
+      return { fullTitle, displayTitle: fullTitle };
+    }
+    return {
+      fullTitle,
+      displayTitle: `${fullTitle.slice(0, MAX_SESSION_TITLE_LENGTH)}...`,
+    };
+  };
 
   const renderSessionItem = (session: ChatSession) => {
     const isActive = session.id === activeSessionId;
@@ -133,7 +135,7 @@ export function SessionListSidebar({
           <div className="chat-session-list chat-session-list-collapsed flex-1 min-h-0 overflow-y-auto p-base space-y-half">
             {activeSessions.length === 0 ? (
               <div className="chat-session-list-empty text-sm text-low">
-                No active sessions.
+                {t('sidebar.noActiveSessions')}
               </div>
             ) : (
               activeSessions.map((session) =>
@@ -174,18 +176,18 @@ export function SessionListSidebar({
                   alt="Agents ChatGroup"
                   className="chat-session-left-logo"
                 />
-                <span className="truncate">Chat Groups</span>
+                <span className="truncate">{t('sidebar.title')}</span>
               </div>
               <button
                 type="button"
                 onClick={onCreateSession}
                 disabled={isCreating}
                 className="chat-session-left-new-btn"
-                aria-label="Create new session"
-                title="Create new session"
+                aria-label={t('sidebar.createNewSession')}
+                title={t('sidebar.createNewSession')}
               >
                 <span className="chat-session-left-new-label">
-                  New
+                  {t('sidebar.newSession')}
                 </span>
                 <PlusIcon className="chat-session-left-new-icon size-icon-xs" />
               </button>
@@ -197,7 +199,7 @@ export function SessionListSidebar({
               <div className="chat-session-active-list min-h-0 overflow-y-auto p-base space-y-half">
                 {activeSessions.length === 0 ? (
                   <div className="chat-session-list-empty text-sm text-low">
-                    No active sessions.
+                    {t('sidebar.noActiveSessions')}
                   </div>
                 ) : (
                   activeSessions.map((session) =>
@@ -220,14 +222,14 @@ export function SessionListSidebar({
                       'opacity-60 cursor-not-allowed'
                   )}
                 >
-                  {showArchived ? 'Hide Archived' : 'Show Archived'} (
+                  {showArchived ? t('sidebar.hideArchived') : t('sidebar.showArchived')} (
                   {archivedSessions.length})
                 </button>
               </div>
               <div className="chat-session-archived-list min-h-0 overflow-y-auto p-base space-y-half">
                 {archivedSessions.length === 0 && (
                   <div className="chat-session-list-empty text-sm text-low">
-                    No archived sessions.
+                    {t('sidebar.noArchivedSessions')}
                   </div>
                 )}
                 {archivedSessions.length > 0 &&

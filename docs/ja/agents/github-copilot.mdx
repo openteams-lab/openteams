@@ -1,0 +1,27 @@
+---
+title: "GitHub Copilot"
+description: "GitHub Copilot CLIをセットアップ"
+icon: /logos/github-copilot-logo.svg
+---
+
+<Steps>
+<Step title="GitHub Copilotを実行">
+  ```bash
+  npx -y @github/copilot
+  ```
+</Step>
+
+<Step title="ログイン手順に従う">
+  プロンプトが表示されたら、画面の指示に従って`/login`コマンドで認証します。詳細は[GitHub Copilot CLIドキュメント](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli)を参照してください。
+</Step>
+
+<Step title="agents-chatgroupを起動">
+  認証完了後、agents-chatgroupを起動：
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  タスク試行を作成する際にGitHub Copilotを選択できるようになりました。
+</Step>
+</Steps>

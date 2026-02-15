@@ -1,0 +1,29 @@
+---
+title: "Cursor Agent CLI"
+description: "Cursorのコマンドラインエージェントをセットアップ"
+icon: /logos/cursor-logo.svg
+---
+
+<Steps>
+<Step title="Cursor Agent CLIをインストール">
+  ```bash
+  curl https://cursor.com/install -fsS | bash
+  ```
+
+  `cursor-agent --version`でインストールを確認。詳細は[公式インストールガイド](https://docs.cursor.com/en/cli/installation)を参照してください。
+</Step>
+
+<Step title="ログイン手順に従う">
+  `cursor-agent login`でサインイン（ブラウザが開きます）。`CURSOR_API_KEY`環境変数を設定することもできます。完全な手順：https://docs.cursor.com/en/cli/reference/authentication
+</Step>
+
+<Step title="agents-chatgroupを起動">
+  認証完了後、agents-chatgroupを起動：
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  タスク試行を作成する際にCursor Agent CLIを選択できるようになりました。
+</Step>
+</Steps>

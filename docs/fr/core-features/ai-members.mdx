@@ -1,0 +1,90 @@
+---
+title: "Membres IA"
+description: "Ajoutez et configurez des agents de codage IA comme membres d'équipe dans votre session de chat"
+---
+
+Les Membres IA sont les agents de codage qui travaillent en votre nom dans une session de chat. Chaque membre a un rôle spécifique, un espace de travail et des capacités.
+
+## Ajouter un Membre IA
+
+1. Ouvrez votre session de chat
+2. Dans la barre latérale droite, cliquez sur **Ajouter un membre IA**
+3. Remplissez la configuration requise
+
+### Options de Configuration
+
+| Champ | Requis | Description |
+|-------|----------|-------------|
+| Nom | Oui | Le handle @mention pour cet agent (ex: `Codeur`, `Rédacteur`) |
+| Agent de Codage de Base | Oui | L'agent IA sous-jacent à utiliser (doit être installé localement) |
+| Prompt Système | Oui | Instructions qui définissent le rôle et le comportement de l'agent |
+| Chemin de l'Espace de Travail | Oui | Le répertoire où cet agent travaillera |
+| Variante de Modèle | Non | Configuration de modèle spécifique (si disponible) |
+
+<Note>
+Le **Nom** doit être unique dans la session et ne peut contenir que des lettres, chiffres, underscores et tirets (maximum 10 caractères).
+</Note>
+
+## Agents de Codage Supportés
+
+Choisissez parmi n'importe quel agent de codage installé localement :
+
+- **Claude Code** - L'assistant de codage d'Anthropic
+- **Codex** - L'agent de codage d'OpenAI
+- **Gemini** - L'assistant IA de Google
+- **Qwen Code** - Le modèle de codage d'Alibaba
+- **Amp** - L'agent de Sourcegraph
+- **Cursor Agent** - L'assistant IA de Cursor
+- **GitHub Copilot** - Le compagnon de codage de GitHub
+- Et plus...
+
+<Tip>
+Seuls les agents installés sur votre système apparaîtront comme options disponibles.
+</Tip>
+
+## Rédiger des Prompts Système Efficaces
+
+Le prompt système définit ce que fait votre membre IA. Gardez-le clair et ciblé :
+
+**Bons exemples :**
+- "Tu es un rédacteur de documentation. Concentre-toi sur un contenu clair et convivial."
+- "Tu es un réviseur de code. Vérifie les bugs, les problèmes de performance et les bonnes pratiques."
+- "Tu es un ingénieur backend. Implémente les fonctionnalités en suivant les patterns existants du projet."
+
+**Conseils :**
+- Soyez spécifique sur le rôle et les responsabilités
+- Mentionnez les contraintes ou préférences
+- Gardez-le concis - les agents fonctionnent mieux avec des directives claires
+
+## Gestion des Membres IA
+
+### Modifier un Membre
+
+Cliquez sur un membre existant dans la barre latérale pour modifier sa configuration.
+
+<Warning>
+Le chemin de l'espace de travail ne peut pas être modifié après la création. Si vous avez besoin d'un espace de travail différent, créez un nouveau membre IA.
+</Warning>
+
+### Supprimer un Membre
+
+1. Cliquez sur le membre dans la barre latérale
+2. Cliquez sur **Supprimer**
+3. Confirmez la suppression
+
+## États des Membres
+
+Chaque membre IA affiche un indicateur de statut :
+
+| État | Signification |
+|-------|---------|
+| Inactif | Prêt à recevoir des tâches |
+| En cours | Travaille actuellement sur une tâche |
+| Terminé | A terminé la dernière tâche |
+| Échoué | A rencontré une erreur |
+
+## Prochaines Étapes
+
+<Card title="Collaboration sur les Tâches" icon="comments" href="/fr/core-features/task-collaboration">
+  Apprenez à assigner des tâches et collaborer avec votre équipe IA
+</Card>

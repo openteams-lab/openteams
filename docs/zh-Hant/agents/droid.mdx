@@ -1,0 +1,71 @@
+---
+title: "Factory Droid"
+description: "設定 Factory AI 的 Droid 程式設計代理"
+icon: /logos/droid-light.svg
+---
+
+<Steps>
+<Step title="安裝 Droid CLI">
+  <Tabs>
+  <Tab title="macOS / Linux">
+  ```bash
+  curl -fsSL https://app.factory.ai/cli | sh
+  ```
+  </Tab>
+
+  <Tab title="Windows">
+  ```powershell
+  irm https://app.factory.ai/cli/windows | iex
+  ```
+  </Tab>
+  </Tabs>
+
+  有關最新安裝說明和平台特定指南，請造訪 [Factory AI CLI 文檔](https://factory.ai/product/cli)。
+</Step>
+
+<Step title="使用 Factory AI 進行認證">
+  要在 agents-chatgroup 中使用 Droid，您必須先進行認證：
+
+  1. 執行 `droid` 啟動互動式 CLI
+  2. 在 Droid 中使用 `/login` 指令進行認證
+
+  或者，從 [Factory 設定](https://app.factory.ai/settings/api-keys) 產生 API 金鑰並將其設定為環境變數：
+
+  ```bash
+  export FACTORY_API_KEY=fk-...
+  ```
+
+  有關詳細的認證說明，請參閱 [Factory AI 文檔](https://docs.factory.ai/factory-cli/getting-started/overview)。
+</Step>
+
+<Step title="啟動 agents-chatgroup">
+  認證完成後，啟動 agents-chatgroup：
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  現在您可以在建立任務嘗試時選擇 Factory Droid。
+</Step>
+</Steps>
+
+## 配置選項
+
+Droid 在 agents-chatgroup 中支援多個配置選項：
+
+- **自主級別**：控制檔案和系統操作的權限級別
+  - `normal`：唯讀模式 - 安全地檢視計畫的變更而不執行
+  - `low`：基本檔案建立/編輯，同時阻止系統變更
+  - `medium`：具有可恢復副作用的開發操作
+  - `high`：具有安全影響或重大副作用的生產操作
+  - `skip-permissions-unsafe`：繞過所有權限檢查（僅在隔離環境中使用）（預設）
+
+- **模型**：指定要使用的模型
+
+- **推理強度**：控制推理深度
+  - `off`：最小推理
+  - `low`：輕度推理
+  - `medium`：平衡推理
+  - `high`：用於複雜任務的深度推理
+
+這些選項可以在 agents-chatgroup 中建立代理配置時進行配置。

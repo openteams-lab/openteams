@@ -1,0 +1,103 @@
+---
+title: "CCR (Claude Code Router)"
+description: "設定 CCR 以編排多個 Claude Code 模型"
+icon: /logos/claude.svg
+---
+
+CCR（Claude Code Router）讓您可以跨不同的 LLM 提供商和模型路由程式設計提示，並為特定任務（如長上下文、後台工作或圖像理解）選擇專門的模型。
+
+<Warning>
+CCR 與 Claude Code 或 Anthropic 無關聯、未獲其認可或與之無關。這是一個第三方工具。
+</Warning>
+
+## 安裝
+CCR 可透過 `npx` 取得 - 無需單獨安裝。
+
+```bash
+npx -y @musistudio/claude-code-router ui
+```
+
+這將啟動 CCR 本地 UI，您可以在其中配置提供商和模型。
+
+## 認證
+在 agents-chatgroup 外部進行 CCR 的認證和配置。按照 CCR GitHub 儲存庫上的說明操作：
+
+- GitHub: https://github.com/musistudio/claude-code-router
+
+您將在 CCR UI 或透過 CCR 的 JSON 配置新增提供商、設定 API 金鑰和註冊模型名稱（有關架構和檔案位置，請參閱 CCR 儲存庫）。
+
+## 配置 CCR（提供商和模型）
+
+透過 UI 或 JSON 配置來配置 CCR。
+
+在 CCR UI（`npx -y @musistudio/claude-code-router ui`）中：
+
+1) 新增提供商
+- 選擇提供商（如 `openrouter`、`deepseek` 等）。
+- 輸入該提供商所需的 API 金鑰和設定。
+
+2) 新增模型
+- 為每個提供商註冊模型識別碼（如 `moonshotai/kimi-k2-0905`、`deepseek-chat`）。
+- CCR 支援為特定情況配置不同的模型：
+  - `default`：通用程式設計
+  - `background`：輕量級/後台操作
+  - `think`：支援「思考」模式的模型
+  - `longContext`：非常長的輸入/檔案
+  - `webSearch`：支援網路/工具使用的模型
+  - `image`：具有視覺能力的模型
+
+注意：並非所有模型都支援網路搜尋、思考或圖像。在 CCR UI 中相應地選擇模型。
+
+### 透過 JSON 配置（可選）
+CCR 也可以透過其 JSON 配置檔案進行配置。有關確切的架構、金鑰和檔案位置，請參閱 CCR GitHub 文檔。定義提供商（包含 API 金鑰）並將模型案例（`default`、`background`、`think`、`longContext`、`webSearch`、`image`）映射到特定的提供商/模型對。
+
+### 範例：在 CCR UI 中配置的 OpenRouter 提供商
+
+<Frame>
+<img src="/images/ccr-openrouter-ui.png" alt="在 CCR UI 中配置的 OpenRouter" />
+</Frame>
+
+### 範例：CCR 模型映射（default/background/think/等）
+
+<Frame>
+<img src="/images/ccr-config-example.png" alt="CCR 模型配置範例" />
+</Frame>
+
+## 配置 agents-chatgroup
+
+agents-chatgroup 不附帶 CCR 的預設配置。將配置新增到現有的 Claude Code 代理：
+
+1) 開啟「程式設計代理配置」頁面。
+2) 為 Claude Code 代理新增新配置（或編輯現有配置）。
+3) 啟用 `claude_code_router` 核取方塊。
+4) 可選擇設定模型字串以定位特定的 CCR 提供商/模型。
+
+有關管理代理配置，請參閱[代理設定檔和變體](/configuration-customisation/agent-configurations)指南。
+
+模型字串格式：`<provider>,<model-name>`
+
+範例：
+```text
+openrouter,moonshotai/kimi-k2-0905
+deepseek,deepseek-chat
+```
+
+提示：
+- 如果您想在不同模型之間輕鬆切換，請建立多個配置。
+- 如果您希望 CCR 根據您的 CCR UI 配置使用自己的路由（如其 `default`/`longContext`/等映射），請將模型字串留空。
+
+### 範例：agents-chatgroup 中的 Claude Code 代理配置
+
+<Frame>
+<img src="/images/vk-ccr-agent-config.png" alt="agents-chatgroup 中的 Claude Code 代理配置" />
+</Frame>
+
+## 在 agents-chatgroup 中使用 CCR
+
+建立任務嘗試時，選擇程式設計代理和配置：選擇 Claude Code 代理，然後選擇您啟用了 CCR 的配置之一。
+
+## 故障排除
+
+- 認證錯誤：在 CCR 中驗證您的 API 金鑰/提供商設定（透過 UI 或 JSON 配置）。
+- 找不到模型：確認模型識別碼對於所選提供商是正確的。
+- 缺少功能（webSearch/think/image）：切換到支援該功能的模型並更新您的 CCR 映射（透過 UI 或 JSON 配置）。

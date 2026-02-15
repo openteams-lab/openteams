@@ -1,0 +1,162 @@
+{
+  "sidebar": {
+    "title": "チャットグループ",
+    "newSession": "新規",
+    "noActiveSessions": "アクティブなセッションはありません。",
+    "noArchivedSessions": "アーカイブされたセッションはありません。",
+    "showArchived": "アーカイブを表示",
+    "hideArchived": "アーカイブを非表示",
+    "expandSidebar": "サイドバーを展開",
+    "collapseSidebar": "サイドバーを折りたたむ",
+    "createNewSession": "新しいセッションを作成",
+    "untitledSession": "無題のセッション"
+  },
+  "header": {
+    "untitledSession": "無題のセッション",
+    "editSessionName": "セッション名を編集",
+    "deleteSession": "セッションを削除",
+    "sessionNamePlaceholder": "セッション名",
+    "created": "作成日",
+    "totalMessages": "メッセージ総数",
+    "aiMembers": "AIメンバー",
+    "searchMessages": "メッセージを検索...",
+    "clearSearch": "検索をクリア",
+    "archived": "アーカイブ済み",
+    "archiveSession": "セッションをアーカイブ",
+    "restoreSession": "セッションを復元",
+    "cleanupMessages": "メッセージをクリーンアップ",
+    "exitCleanupMode": "クリーンアップモードを終了",
+    "settings": "設定"
+  },
+  "input": {
+    "mentionAgents": "エージェントをメンション",
+    "routeToAgents": "エージェントにルーティング",
+    "replyingTo": "{{name}}に返信",
+    "referencedMessage": "参照メッセージ",
+    "cancel": "キャンセル",
+    "clearAll": "すべてクリア",
+    "preview": "プレビュー",
+    "archivedPlaceholder": "このセッションはアーカイブ済みで読み取り専用です。",
+    "inputPlaceholder": "メッセージを入力し、@でエージェントをメンション...",
+    "uploadingAttachments": "添付ファイルをアップロード中...",
+    "sendHint": "Enterで送信、Shift+Enterで改行。",
+    "addAttachment": "添付ファイルを追加",
+    "send": "送信"
+  },
+  "message": {
+    "quote": "引用",
+    "replyingTo": "{{name}}に返信",
+    "view": "表示",
+    "referencedMessageUnavailable": "参照メッセージは利用できません。",
+    "attachments": "添付ファイル",
+    "mentions": "メンション",
+    "codeChanges": "コード変更",
+    "viewChanges": "変更を表示",
+    "loadingDiff": "差分を読み込み中...",
+    "untrackedFile": "未追跡ファイル",
+    "untrackedFiles": "未追跡ファイル",
+    "apiError": {
+      "quotaExceeded": "APIクォータを超過しました",
+      "rateLimited": "レート制限中",
+      "checkQuota": "APIクォータを確認するか、後でもう一度お試しください"
+    },
+    "sendToAgent": "エージェントに送信",
+    "open": "開く"
+  },
+  "members": {
+    "title": "AIメンバー",
+    "countInSession": "セッション内に{{count}}名",
+    "selectSessionToManage": "AIメンバーを管理するセッションを選択してください。",
+    "noMembersYet": "AIメンバーはまだいません。@メンションを有効にするには、下から追加してください。",
+    "workspace": "ワークスペース",
+    "edit": "編集",
+    "remove": "削除",
+    "addAiMember": "AIメンバーを追加",
+    "editAiMember": "AIメンバーを編集",
+    "memberNameHint": "AIメンバー名は@メンションのハンドルになります。",
+    "memberNameLabel": "AIメンバー名",
+    "memberNamePlaceholder": "例: coder",
+    "baseCodingAgent": "ベースコーディングエージェント",
+    "checkingAgents": "エージェントを確認中...",
+    "noLocalAgentsDetected": "ローカルエージェントが検出されません",
+    "noInstalledAgents": "このマシンにインストールされたコードエージェントが検出されません。",
+    "modelVariant": "モデルバリアント",
+    "model": "モデル",
+    "systemPrompt": "システムプロンプト",
+    "expand": "展開",
+    "systemPromptPlaceholder": "このAIメンバーの振る舞いを説明してください。",
+    "workspacePath": "ワークスペースパス",
+    "workspacePathPlaceholder": "サーバー上の絶対パス",
+    "workspacePathCannotBeModified": "ワークスペースパスは変更できません",
+    "add": "追加",
+    "save": "保存"
+  },
+  "cleanup": {
+    "selected": "選択済み: {{count}}",
+    "selectAll": "すべて選択",
+    "deselectAll": "すべて選択解除",
+    "deleteSelected": "選択項目を削除"
+  },
+  "agent": {
+    "running": "エージェント実行中",
+    "runningElapsed": "エージェント実行中。経過時間 {{seconds}}秒。",
+    "processing": "リクエストを処理中...",
+    "thinking": "思考中...",
+    "idle": "アイドル",
+    "completed": "完了",
+    "failed": "失敗",
+    "received": "受信済み",
+    "stop": "停止",
+    "stopping": "停止中..."
+  },
+  "modals": {
+    "confirm": {
+      "cancel": "キャンセル",
+      "confirm": "確認",
+      "processing": "処理中..."
+    },
+    "promptEditor": {
+      "title": "システムプロンプト",
+      "description": "AIメンバーのシステムプロンプトを編集",
+      "close": "プロンプトエディターを閉じる",
+      "placeholder": "このAIメンバーの振る舞いを説明してください。",
+      "attachTextFile": "テキストファイルを添付",
+      "loadingFile": "ファイルを読み込み中...",
+      "done": "完了"
+    },
+    "filePreview": {
+      "previewTitle": "プレビュー: {{filename}}",
+      "previewNotAvailable": "このファイル形式はプレビューできません",
+      "close": "閉じる"
+    },
+    "diffViewer": {
+      "title": "コード変更",
+      "run": "実行",
+      "exitFullScreen": "全画面を終了",
+      "fullScreen": "全画面",
+      "closeDiffViewer": "差分ビューアーを閉じる",
+      "loadingDiff": "差分を読み込み中...",
+      "noTrackedDiff": "追跡可能な差分がありません。",
+      "openRawDiff": "生の差分を開く",
+      "untrackedFiles": "未追跡ファイル",
+      "loadingFile": "ファイルを読み込み中...",
+      "hide": "非表示",
+      "view": "表示"
+    },
+    "workspaceDrawer": {
+      "agentWorkspace": "エージェントワークスペース",
+      "close": "閉じる",
+      "workspacePathCreatedOnFirstRun": "ワークスペースパスは初回実行時に作成されます。",
+      "runHistory": "実行履歴",
+      "noRunsYet": "このエージェントの実行履歴はまだありません。",
+      "run": "実行",
+      "viewLog": "ログを表示",
+      "selected": "選択済み",
+      "runLog": "実行ログ",
+      "selectRunToViewLog": "ログ出力を表示するには実行を選択してください。",
+      "refresh": "更新",
+      "loadingLog": "ログを読み込み中...",
+      "logEmpty": "ログは空です。"
+    }
+  }
+}

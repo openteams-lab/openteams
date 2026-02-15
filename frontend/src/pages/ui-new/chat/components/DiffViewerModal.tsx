@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   ArrowsOutSimpleIcon,
   ArrowsInSimpleIcon,
@@ -35,6 +36,7 @@ export function DiffViewerModal({
   onToggleFullscreen,
   onToggleUntracked,
 }: DiffViewerModalProps) {
+  const { t } = useTranslation('chat');
   if (!isOpen || !runId) return null;
 
   const DiffViewerIcon = isFullscreen
@@ -57,8 +59,8 @@ export function DiffViewerModal({
       >
         <div className="flex items-center justify-between border-b border-border px-base py-half">
           <div>
-            <div className="text-sm text-normal font-medium">Code changes</div>
-            <div className="text-xs text-low">Run {runId.slice(0, 8)}</div>
+            <div className="text-sm text-normal font-medium">{t('modals.diffViewer.title')}</div>
+            <div className="text-xs text-low">{t('modals.diffViewer.run')} {runId.slice(0, 8)}</div>
           </div>
           <div className="flex items-center gap-half">
             <button
@@ -66,7 +68,7 @@ export function DiffViewerModal({
               className="text-low hover:text-normal"
               onClick={onToggleFullscreen}
               aria-label={
-                isFullscreen ? 'Exit full screen' : 'Full screen'
+                isFullscreen ? t('modals.diffViewer.exitFullScreen') : t('modals.diffViewer.fullScreen')
               }
             >
               <DiffViewerIcon className="size-icon-sm" />
@@ -75,7 +77,7 @@ export function DiffViewerModal({
               type="button"
               className="text-low hover:text-normal"
               onClick={onClose}
-              aria-label="Close diff viewer"
+              aria-label={t('modals.diffViewer.closeDiffViewer')}
             >
               <XIcon className="size-icon-sm" />
             </button>
@@ -85,7 +87,7 @@ export function DiffViewerModal({
           {hasDiff ? (
             <>
               {runDiff?.loading && (
-                <div className="text-xs text-low">Loading diff...</div>
+                <div className="text-xs text-low">{t('modals.diffViewer.loadingDiff')}</div>
               )}
               {runDiff?.error && (
                 <div className="text-xs text-error">{runDiff.error}</div>
@@ -94,7 +96,7 @@ export function DiffViewerModal({
                 !runDiff?.error &&
                 runDiff?.files?.length === 0 && (
                   <div className="text-xs text-low">
-                    No tracked diff available.
+                    {t('modals.diffViewer.noTrackedDiff')}
                   </div>
                 )}
               {runDiff?.files?.map((file) => (
@@ -141,18 +143,18 @@ export function DiffViewerModal({
                     )
                   }
                 >
-                  Open raw diff
+                  {t('modals.diffViewer.openRawDiff')}
                 </button>
               </div>
             </>
           ) : (
             <div className="text-xs text-low">
-              No tracked diff available.
+              {t('modals.diffViewer.noTrackedDiff')}
             </div>
           )}
           {untrackedFiles.length > 0 && (
             <div className="space-y-half">
-              <div className="text-xs text-low">Untracked files</div>
+              <div className="text-xs text-low">{t('modals.diffViewer.untrackedFiles')}</div>
               {untrackedFiles.map((path) => {
                 const key = `${runId}:${path}`;
                 const entry = untrackedContent[key];
@@ -170,14 +172,14 @@ export function DiffViewerModal({
                         className="text-brand hover:text-brand-hover"
                         onClick={() => onToggleUntracked(runId, path)}
                       >
-                        {entry?.open ? 'Hide' : 'View'}
+                        {entry?.open ? t('modals.diffViewer.hide') : t('modals.diffViewer.view')}
                       </button>
                     </div>
                     {entry?.open && (
                       <div className="mt-half">
                         {entry.loading && (
                           <div className="text-xs text-low">
-                            Loading file...
+                            {t('modals.diffViewer.loadingFile')}
                           </div>
                         )}
                         {entry.error && (

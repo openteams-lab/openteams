@@ -1,0 +1,27 @@
+---
+title: "Amp"
+description: "Amp 코드 완성 에이전트 설정"
+icon: /logos/amp-logo.svg
+---
+
+<Steps>
+<Step title="Amp 실행">
+  ```bash
+  npx -y @sourcegraph/amp
+  ```
+</Step>
+
+<Step title="로그인 지침 따르기">
+  프롬프트에 따라 인증 흐름을 완료합니다. 자세한 내용은 [Amp 사용자 매뉴얼](https://ampcode.com/manual#install)을 참조하세요.
+</Step>
+
+<Step title="agents-chatgroup 시작">
+  인증 완료 후 agents-chatgroup 시작:
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  이제 작업 시도를 생성할 때 Amp를 선택할 수 있습니다.
+</Step>
+</Steps>

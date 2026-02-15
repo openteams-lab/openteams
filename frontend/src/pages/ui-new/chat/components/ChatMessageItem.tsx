@@ -5,6 +5,7 @@ import {
   CheckSquareIcon,
   SquareIcon,
 } from '@phosphor-icons/react';
+import { useTranslation } from 'react-i18next';
 import {
   type ChatMessage,
   ChatSenderType,
@@ -97,6 +98,7 @@ export function ChatMessageItem({
   isSelected,
   onToggleSelect,
 }: ChatMessageItemProps) {
+  const { t } = useTranslation('chat');
   const isUser = message.sender_type === ChatSenderType.user;
   const isAgent = message.sender_type === ChatSenderType.agent;
   const agentAvatarSeed = isAgent
@@ -206,7 +208,7 @@ export function ChatMessageItem({
               onClick={() => onReply(message)}
               disabled={isArchived}
             >
-              Quote
+              {t('message.quote')}
             </button>
             <span>{formatDateShortWithTime(message.created_at)}</span>
           </div>
@@ -233,7 +235,7 @@ export function ChatMessageItem({
             <div className="chat-session-reference-card mb-half border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
               <div className="flex items-center justify-between gap-base">
                 <span className="font-medium text-normal">
-                  Replying to {referenceSenderLabel ?? 'message'}
+                  {t('message.replyingTo', { name: referenceSenderLabel ?? 'message' })}
                 </span>
                 <button
                   type="button"
@@ -247,16 +249,16 @@ export function ChatMessageItem({
                     }
                   }}
                 >
-                  View
+                  {t('message.view')}
                 </button>
               </div>
               <div className="mt-half">
-                {referencePreview ?? 'Referenced message unavailable.'}
+                {referencePreview ?? t('message.referencedMessageUnavailable')}
               </div>
               {referenceMessage &&
                 extractAttachments(referenceMessage.meta).length > 0 && (
                   <div className="mt-half text-xs text-low">
-                    Attachments:{' '}
+                    {t('message.attachments')}:{' '}
                     {extractAttachments(referenceMessage.meta)
                       .map((item) => item.name)
                       .filter(Boolean)
@@ -278,7 +280,7 @@ export function ChatMessageItem({
                 />
                 <span className="font-medium">{apiError.message}</span>
                 <span className="text-error/70">
-                  - Please check your API quota or try again later
+                  - {t('message.apiError.checkQuota')}
                 </span>
               </div>
             ) : null;
@@ -286,7 +288,7 @@ export function ChatMessageItem({
           <ChatMarkdown content={message.content} />
           {mentionList.length > 0 && (
             <div className="chat-session-mentions mt-half flex flex-wrap items-center gap-half text-xs text-low">
-              <span>Mentions:</span>
+              <span>{t('message.mentions')}:</span>
               {mentionList.map((mention) => {
                 const agentId = agentIdByName.get(mention);
                 const mentionStatus = mentionStatusMap?.get(mention);
@@ -365,7 +367,7 @@ export function ChatMessageItem({
                               attachment
                             );
                           }}
-                          title="Send to agent"
+                          title={t('message.sendToAgent')}
                         >
                           <PaperPlaneTiltIcon className="size-icon-sm" />
                         </button>
@@ -375,7 +377,7 @@ export function ChatMessageItem({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Open
+                          {t('message.open')}
                         </a>
                       </div>
                     </div>
@@ -400,7 +402,7 @@ export function ChatMessageItem({
           {hasDiffInfo && diffInfo && (
             <div className="chat-session-code-card mt-half border border-border rounded-sm bg-secondary/70 px-base py-half text-xs text-normal">
               <div className="chat-session-code-card-header flex items-center justify-between gap-base">
-                <span className="chat-session-code-card-title">Code changes</span>
+                <span className="chat-session-code-card-title">{t('message.codeChanges')}</span>
                 <button
                   type="button"
                   className="chat-session-code-card-link text-brand hover:text-brand-hover"
@@ -412,12 +414,12 @@ export function ChatMessageItem({
                     )
                   }
                 >
-                  View changes
+                  {t('message.viewChanges')}
                 </button>
               </div>
               {diffInfo.available && runDiffs[diffRunId]?.loading && (
                 <div className="chat-session-code-card-meta mt-half text-xs text-low">
-                  Loading diff...
+                  {t('message.loadingDiff')}
                 </div>
               )}
               {diffInfo.available && runDiffs[diffRunId]?.error && (
@@ -427,8 +429,10 @@ export function ChatMessageItem({
               )}
               {diffInfo.untrackedFiles.length > 0 && (
                 <div className="chat-session-code-card-meta mt-half text-xs text-low">
-                  {diffInfo.untrackedFiles.length} untracked file
-                  {diffInfo.untrackedFiles.length === 1 ? '' : 's'}
+                  {diffInfo.untrackedFiles.length}{' '}
+                  {diffInfo.untrackedFiles.length === 1
+                    ? t('message.untrackedFile')
+                    : t('message.untrackedFiles')}
                 </div>
               )}
             </div>

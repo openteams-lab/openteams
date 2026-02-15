@@ -1,0 +1,104 @@
+---
+title: "Démarrage Rapide"
+description: "Guide de démarrage rapide pour AgentsChatGroup sur macOS, Linux et Windows"
+sidebarTitle: "Démarrage Rapide"
+---
+
+## Systèmes Supportés
+
+AgentsChatGroup fonctionne sur les plateformes suivantes :
+
+- macOS (Intel et Apple Silicon)
+- Linux
+- Windows
+
+## Prérequis
+
+Avant d'installer AgentsChatGroup, assurez-vous d'avoir au moins un agent IA supporté installé :
+
+| Agent | Installation |
+|-------|-------------|
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` |
+| [Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` |
+| [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm install -g @qwen-code/qwen-code@latest` |
+
+<Tip>
+Vous pouvez installer d'autres agents en suivant leur documentation officielle.
+</Tip>
+
+## Installation
+
+<Tabs>
+  <Tab title="Windows">
+    Téléchargez le dernier installateur :
+
+    [![Télécharger pour Windows](https://img.shields.io/badge/Télécharger-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+  </Tab>
+
+  <Tab title="macOS">
+    **Option 1 : Utiliser npx (Recommandé)**
+
+    ```bash
+    npx agents-chatgroup
+    ```
+
+    **Option 2 : Télécharger l'application**
+
+    [![Télécharger pour macOS](https://img.shields.io/badge/Télécharger-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+  </Tab>
+
+  <Tab title="Linux">
+    ```bash
+    npx agents-chatgroup
+    ```
+  </Tab>
+</Tabs>
+
+## Démarrage Rapide
+
+<Steps>
+<Step title="Installer un agent de codage">
+  Assurez-vous d'avoir au moins un [agent de codage supporté](/fr/supported-coding-agents) installé et authentifié sur votre système.
+</Step>
+
+<Step title="Lancer AgentsChatGroup">
+  Ouvrez l'application ou exécutez la commande npx. L'application s'ouvrira automatiquement dans votre navigateur.
+
+  <Check>
+  L'application se lie à un port libre aléatoire et affiche l'URL dans le terminal.
+  </Check>
+</Step>
+
+<Step title="Créer une session de chat">
+  Cliquez sur "Créer une Session" pour démarrer un nouveau groupe de discussion. C'est votre espace de travail pour la collaboration IA.
+</Step>
+
+<Step title="Ajouter des membres IA">
+  Dans la barre latérale droite, cliquez sur "Ajouter un membre IA" pour ajouter des agents à votre session. Configurez chaque membre avec :
+  - Un nom @mention unique
+  - Sélectionnez le type d'agent (ex: Claude Code, Codex)
+  - Définissez un prompt système pour définir son rôle
+  - Spécifiez son chemin d'espace de travail
+</Step>
+
+<Step title="Commencer à collaborer">
+  Utilisez @mentions pour assigner des tâches aux membres de votre équipe IA. Ils recevront automatiquement le contexte et pourront communiquer entre eux !
+</Step>
+</Steps>
+
+<Tip>
+Pour utiliser un port fixe, spécifiez la variable d'environnement `PORT` : `PORT=8080 npx agents-chatgroup`
+</Tip>
+
+## Prochaines Étapes
+
+<CardGroup cols={2}>
+  <Card title="Aperçu des Sessions de Chat" icon="comments" href="/fr/core-features/chat-session-overview">
+    Découvrez les sessions de chat et leur fonctionnement
+  </Card>
+
+  <Card title="Gestion des Membres IA" icon="robot" href="/fr/core-features/ai-members">
+    Configurez les membres IA pour votre équipe
+  </Card>
+</CardGroup>

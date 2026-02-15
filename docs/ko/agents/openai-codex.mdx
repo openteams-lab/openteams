@@ -1,0 +1,44 @@
+---
+title: "OpenAI Codex"
+description: "OpenAI Codex 통합 설정"
+icon: /logos/openai-logo.svg
+---
+
+<Steps>
+<Step title="OpenAI Codex 실행">
+  ```bash
+  npx -y @openai/codex
+  ```
+</Step>
+
+<Step title="로그인 지침 따르기">
+  프롬프트에 따라 인증 흐름을 완료합니다. [OpenAI 도움말 센터](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan)의 인증 지침에 따라 ChatGPT 플랜으로 Codex를 사용하세요.
+
+  또는 `OPENAI_API_KEY` 환경 변수를 설정하여 OpenAI API를 통해 Codex를 사용할 수 있습니다. 자세한 내용은 [OpenAI 문서](https://developers.openai.com/codex/pricing/#use-an-openai-api-key)를 참조하세요.
+</Step>
+
+<Step title="agents-chatgroup 시작">
+  인증 완료 후 agents-chatgroup 시작:
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  이제 작업 시도를 생성할 때 OpenAI Codex를 선택할 수 있습니다.
+</Step>
+</Steps>
+
+## 사용자 지정 구성 디렉토리
+
+기본적으로 Codex는 구성 및 세션 데이터를 `~/.codex`에 저장합니다. `CODEX_HOME` 환경 변수로 사용자 지정 위치를 구성한 경우 agents-chatgroup이 자동으로 해당 위치를 감지하고 사용합니다.
+
+```bash
+# 예: 프로젝트별 Codex 구성 사용
+export CODEX_HOME=/path/to/custom/codex
+npx agents-chatgroup
+```
+
+이것은 다음에 유용합니다:
+- 프로젝트별 Codex 프로필
+- 업무와 개인 구성 분리
+- 사용자 지정 자동화 설정

@@ -1,0 +1,44 @@
+---
+title: "OpenAI Codex"
+description: "Configurer l'intégration OpenAI Codex"
+icon: /logos/openai-logo.svg
+---
+
+<Steps>
+<Step title="Exécuter OpenAI Codex">
+  ```bash
+  npx -y @openai/codex
+  ```
+</Step>
+
+<Step title="Suivre les instructions de connexion">
+  Complétez le flux d'authentification comme indiqué. Suivez les instructions d'authentification du [centre d'aide OpenAI](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan) pour utiliser Codex avec votre plan ChatGPT.
+
+  Alternativement, Codex peut être utilisé via l'API OpenAI en définissant la variable d'environnement `OPENAI_API_KEY`. Pour plus de détails, voir la [documentation OpenAI](https://developers.openai.com/codex/pricing/#use-an-openai-api-key)
+</Step>
+
+<Step title="Démarrer agents-chatgroup">
+  Une fois authentifié, lancez agents-chatgroup :
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  Vous pouvez maintenant sélectionner OpenAI Codex lors de la création de tentatives de tâches.
+</Step>
+</Steps>
+
+## Répertoire de Configuration Personnalisé
+
+Par défaut, Codex stocke sa configuration et ses données de session dans `~/.codex`. Si vous avez configuré un emplacement personnalisé en utilisant la variable d'environnement `CODEX_HOME`, agents-chatgroup détectera et utilisera automatiquement cet emplacement.
+
+```bash
+# Exemple : Utiliser une configuration Codex spécifique au projet
+export CODEX_HOME=/chemin/vers/codex/personnalise
+npx agents-chatgroup
+```
+
+C'est utile pour :
+- Profils Codex spécifiques au projet
+- Séparer les configurations professionnelles et personnelles
+- Configurations d'automatisation personnalisées

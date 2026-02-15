@@ -1,0 +1,27 @@
+---
+title: "GitHub Copilot"
+description: "設定 GitHub Copilot CLI"
+icon: /logos/github-copilot-logo.svg
+---
+
+<Steps>
+<Step title="執行 GitHub Copilot">
+  ```bash
+  npx -y @github/copilot
+  ```
+</Step>
+
+<Step title="按照登入說明操作">
+  出現提示時，按照螢幕上的說明使用 `/login` 指令進行認證。更多詳情請參閱 [GitHub Copilot CLI 文檔](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli)。
+</Step>
+
+<Step title="啟動 agents-chatgroup">
+  認證完成後，啟動 agents-chatgroup：
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  現在您可以在建立任務嘗試時選擇 GitHub Copilot。
+</Step>
+</Steps>

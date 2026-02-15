@@ -1,0 +1,71 @@
+---
+title: "Factory Droid"
+description: "Factory AI의 Droid 코딩 에이전트 설정"
+icon: /logos/droid-light.svg
+---
+
+<Steps>
+<Step title="Droid CLI 설치">
+  <Tabs>
+  <Tab title="macOS / Linux">
+  ```bash
+  curl -fsSL https://app.factory.ai/cli | sh
+  ```
+  </Tab>
+
+  <Tab title="Windows">
+  ```powershell
+  irm https://app.factory.ai/cli/windows | iex
+  ```
+  </Tab>
+  </Tabs>
+
+  최신 설치 지침 및 플랫폼별 가이드는 [Factory AI CLI 문서](https://factory.ai/product/cli)를 참조하세요.
+</Step>
+
+<Step title="Factory AI로 인증">
+  agents-chatgroup에서 Droid를 사용하려면 먼저 인증해야 합니다:
+
+  1. `droid`를 실행하여 대화형 CLI 시작
+  2. Droid 내에서 `/login` 명령을 사용하여 인증
+
+  또는 [Factory 설정](https://app.factory.ai/settings/api-keys)에서 API 키를 생성하고 환경 변수로 설정:
+
+  ```bash
+  export FACTORY_API_KEY=fk-...
+  ```
+
+  자세한 인증 지침은 [Factory AI 문서](https://docs.factory.ai/factory-cli/getting-started/overview)를 참조하세요.
+</Step>
+
+<Step title="agents-chatgroup 시작">
+  인증 완료 후 agents-chatgroup 시작:
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  이제 작업 시도를 생성할 때 Factory Droid를 선택할 수 있습니다.
+</Step>
+</Steps>
+
+## 구성 옵션
+
+Droid는 agents-chatgroup에서 여러 구성 옵션을 지원합니다:
+
+- **자율성 수준**: 파일 및 시스템 작업에 대한 권한 수준 제어
+  - `normal`: 읽기 전용 모드 - 실행 없이 계획된 변경 사항을 안전하게 검토
+  - `low`: 기본 파일 생성/편집, 시스템 변경 차단
+  - `medium`: 복구 가능한 부작용이 있는 개발 작업
+  - `high`: 보안 영향 또는 주요 부작용이 있는 프로덕션 작업
+  - `skip-permissions-unsafe`: 모든 권한 검사 우회 (격리된 환경에서만 사용) (기본값)
+
+- **모델**: 사용할 모델 지정
+
+- **추론 수준**: 추론 깊이 제어
+  - `off`: 최소 추론
+  - `low`: 가벼운 추론
+  - `medium`: 균형 잡힌 추론
+  - `high`: 복잡한 작업을 위한 깊은 추론
+
+이러한 옵션은 agents-chatgroup에서 에이전트 구성을 생성할 때 구성할 수 있습니다.

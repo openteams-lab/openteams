@@ -1,0 +1,27 @@
+---
+title: "Claude Code"
+description: "AnthropicのClaude Codeエージェントをセットアップ"
+icon: /logos/claude.svg
+---
+
+<Steps>
+<Step title="Claude Codeを実行">
+  ```bash
+  npx -y @anthropic-ai/claude-code
+  ```
+</Step>
+
+<Step title="ログイン手順に従う">
+  プロンプトに従って認証フローを完了します。詳細は[Claude Codeドキュメント](https://docs.claude.com/en/docs/claude-code/quickstart)を参照してください。
+</Step>
+
+<Step title="agents-chatgroupを起動">
+  認証完了後、agents-chatgroupを起動：
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  タスク試行を作成する際にClaude Codeを選択できるようになりました。
+</Step>
+</Steps>

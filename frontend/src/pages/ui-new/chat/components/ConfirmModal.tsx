@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogHeader,
@@ -24,6 +25,7 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const { t } = useTranslation('chat');
   return (
     <Dialog
       className="chat-session-modal-surface"
@@ -43,13 +45,13 @@ export function ConfirmModal({
       <DialogFooter>
         <PrimaryButton
           variant="tertiary"
-          value="Cancel"
+          value={t('modals.confirm.cancel')}
           onClick={onCancel}
           disabled={isLoading}
         />
         <PrimaryButton
           variant="default"
-          value={isLoading ? 'Processing...' : 'Confirm'}
+          value={isLoading ? t('modals.confirm.processing') : t('modals.confirm.confirm')}
           onClick={onConfirm}
           disabled={isLoading}
         />

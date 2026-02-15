@@ -1,0 +1,64 @@
+---
+title: "故障排除"
+description: "使用 agents-chatgroup 时的常见问题和解决方案"
+---
+
+## 代理报告代码库为空
+
+如果您在创建新任务时，编程代理报告代码库为空，可能是因为您的仓库启用了 Git 的 sparse-checkout 功能。
+
+**解决方案：**
+
+在仓库根目录运行以下命令：
+
+```bash
+git sparse-checkout disable
+```
+
+禁用 sparse-checkout 后，创建新任务并重试。
+
+## 启用调试日志
+
+如果您需要更详细的日志来帮助调试问题，可以通过设置 `RUST_LOG` 环境变量来启用调试级别日志。
+
+**用法：**
+
+```bash
+RUST_LOG=debug npx agents-chatgroup
+```
+
+这将提供详细的日志输出，有助于识别问题的根本原因。
+
+## 危险：清除数据库
+
+如果您遇到不可恢复的错误并需要完全清除 agents-chatgroup 数据库，可以删除操作系统对应的应用数据目录。
+
+<Warning>
+此操作不可逆，将导致所有任务和设置丢失。在继续之前，请确保备份所有重要信息。
+</Warning>
+
+**根据您的操作系统删除以下目录：**
+
+<Tabs>
+<Tab title="macOS">
+```bash
+~/Library/Application Support/ai.starterra.ai.agents-chatgroup/
+```
+</Tab>
+
+<Tab title="Linux">
+```bash
+~/.local/share/agents-chatgroup/
+```
+</Tab>
+
+<Tab title="Windows">
+```
+%APPDATA%\starterra.ai\agents-chatgroup\
+```
+
+通常为：`C:\Users\<用户名>\AppData\Roaming\starterra.ai\agents-chatgroup\`
+</Tab>
+</Tabs>
+
+删除应用数据目录后，重启 agents-chatgroup 即可使用空数据库和默认设置重置。

@@ -1,11 +1,11 @@
-<p align="center">
-  <img src="frontend/public/agent-chatgroup-logo.svg" alt="Agent ChatGroup" width="200">
+﻿<p align="center">
+  <img src="../frontend/public/agent-chatgroup-logo-dark.png" alt="Agent ChatGroup" width="400">
 </p>
 
-<h1 align="center">AgentsChatGroup</h1>
+
 
 <p align="center">
-  <strong>🚀 一个人，一整个 AI 团队</strong>
+  <strong>🚀 以群聊协作的方式管理你的 AI 团队</strong>
 </p>
 
 <p align="center">
@@ -27,7 +27,7 @@
 
 ---
 
-## 为什么需要 AgentsChatGroup？
+## AgentsChatGroup想解决什么问题？
 
 ### 当前AI Agent的使用痛点
 
@@ -38,11 +38,11 @@
 | ⏳**单任务耗时长** | 单个 Agent 执行任务时间长，我们只能干等着，啥也干不了 |
 | 🔀**Agent各自为战** | 每个Agent在独立对话中工作，无法看到其他 Agent 的进展 |
 | 🔗**上下文断裂** | 切换 Agent 时需反复解释项目背景，信息传递效率低下 |
-| 📢**协调成本高** | 需要人工在多个 Agent 之间来回传递信息，充当"传话筒" |
-| 🚧**并行困难** | 复杂任务只能串行处理，一个 Agent 完成后才能交给下一个 |
+| 📢**协调成本高** | 执行复杂任务时，需要人工在多个 Agent 之间来回传递信息，充当"传话筒" |
+| 🚧**并行困难** | 复杂任务只能串行处理，一个 Agent 完成后才能交给下一个，较难完成任务拆分并行执行 |
 | 🎭**能力差异** | 有的擅长编码，有的擅长设计，总在它们之间疲于切换 |
 
-> 不知道你们是否有感受，**AI 越来越强，但我们却越来越累。** 这是因为我们需要不断在各种Agent上下文中切换，注意力被频繁打断，那为什么不把它们统一起来呢，这就是我们这个项目的初衷。
+> 不知道你们是否有感受，**AI 越来越强，但我们却越来越累。** 这是因为我们需要不断在各种Agent上下文中切换，注意力被频繁打断，那为什么不把它们统一起来呢？我们希望能探索一种和AI Agents新的协同工作模式，所以有了AgentsChatGroup。
 
 ### 我们的解决方案
 
@@ -72,7 +72,7 @@
 ╰──────────────────────────────────────────────────────────────╯
 ```
 
-**像管理真实团队一样管理 AI Agent们：**
+**我们的目标是能让 AI Agents们高效协作起来：**
 -  一个项目 = 一个群聊
 -  上下文清晰，作为管理者，我们能从群消息中快速获取AI成员的工作状态
 - 添加任意多个 AI 成员，赋予不同职责
@@ -88,18 +88,18 @@
 
 ### 🔗 上下文共享
 
-所有 Agent 在同一对话空间工作，**自动共享项目背景、讨论历史、代码变更**。
-
-无需反复解释，每个 Agent 都能看到完整上下文。
+- 所有 Agent 在同一对话空间工作，**自动共享项目背景、讨论历史、代码变更**。
+- 无需反复解释，每个 Agent 都能看到完整上下文。
+- 使用上下文压缩方法，能够合理控制上下文信息膨胀
 
 </td>
 <td width="50%">
 
 ### 💬 @互通机制
 
-Agent 之间可以 **相互 @唤起**，实现自动化任务流转。
+- Agent 之间可以 **相互 @唤起**，实现自动化任务流转。
 
-一个 Agent 完成工作后直接 @另一个接手，形成流畅协作链条。
+- 一个 Agent 完成工作后直接 @另一个接手，形成流畅协作链条。
 
 </td>
 </tr>
@@ -140,7 +140,7 @@ Agent 之间可以 **相互 @唤起**，实现自动化任务流转。
 | **协作能力** | ✅ 群聊模式 · ✅ 上下文共享 · ✅ @机制调度 · ✅ 任务状态追踪 · ✅ 会话归档 |
 | **配置管理** | ✅ 统一 MCP 配置 · ✅ 灵活环境变量 |
 | **部署方式** | ✅ 跨平台桌面应用 (Windows/macOS/Linux) · ✅ SSH 远程部署 |
-| **更多功能** | ▢ 更紧凑的上下文环境 |
+| **更多功能** | ▢ 更紧凑的上下文环境 · ▢ 预定义的AI成员（带技能skill）|
 
 
 ## 快速开始
@@ -191,7 +191,7 @@ npx agents-chatgroup
 
 </details>
 
-就是这么简单！打开应用，创建群聊，添加 Agent，开始协作！
+打开应用，创建群聊，添加 Agent，开始协作！就是这么简单自然！
 
 ## 文档
 
@@ -253,9 +253,9 @@ pnpm --filter frontend build
 pnpm desktop:build
 ```
 
-#### Windows (PowerShell): run backend and frontend separately
+#### Windows (PowerShell): 独立启动运行前后端
 
-If `pnpm run dev` fails in Windows PowerShell because of Unix-style `export`, use two terminals:
+Windows PowerShell环境下无法运行`pnpm run dev`，使用以下命令来运行前后端程序
 
 **Terminal A (backend)**
 
@@ -265,7 +265,7 @@ $env:BACKEND_PORT = node scripts/setup-dev-environment.js backend
 $env:VK_ALLOWED_ORIGINS = "http://localhost:$env:FRONTEND_PORT"
 $env:DISABLE_WORKTREE_CLEANUP = "1"
 $env:RUST_LOG = "debug"
-cargo watch -w crates -x "run --bin server"
+cargo run --bin server
 ```
 
 **Terminal B (frontend)**
@@ -276,7 +276,7 @@ cd frontend
 pnpm dev -- --port $env:FRONTEND_PORT --host
 ```
 
-Open frontend at `http://localhost:<FRONTEND_PORT>` (example: `http://localhost:3001`).
+打开前端页面 `http://localhost:<FRONTEND_PORT>` (example: `http://localhost:3001`).
 
 
 ### 技术栈
@@ -299,8 +299,6 @@ Open frontend at `http://localhost:<FRONTEND_PORT>` (example: `http://localhost:
 本项目基于 [Vibe Kanban](https://www.vibekanban.com/) 进行二次开发，感谢 Vibe Kanban 团队的开源贡献，为我们提供了优秀的项目基础架构。
 
 ## 贡献指南
-
-我们热烈欢迎社区贡献！🎉
 
 1. **Fork** 本仓库
 2. 创建你的特性分支 (`git checkout -b feature/amazing-feature`)

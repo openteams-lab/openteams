@@ -1,0 +1,104 @@
+---
+title: "はじめに"
+description: "macOS、Linux、WindowsでのAgentsChatGroupクイックスタートガイド"
+sidebarTitle: "はじめに"
+---
+
+## サポートシステム
+
+AgentsChatGroupは以下のプラットフォームで実行できます：
+
+- macOS（Intel および Apple Silicon）
+- Linux
+- Windows
+
+## 前提条件
+
+AgentsChatGroupをインストールする前に、少なくとも1つのサポートされているAIエージェントがインストールされていることを確認してください：
+
+| エージェント | インストール |
+|-------|-------------|
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` |
+| [Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` |
+| [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm install -g @qwen-code/qwen-code@latest` |
+
+<Tip>
+公式ドキュメントに従って他のエージェントをインストールできます。
+</Tip>
+
+## インストール
+
+<Tabs>
+  <Tab title="Windows">
+    最新のインストーラーをダウンロード：
+
+    [![Windows版をダウンロード](https://img.shields.io/badge/ダウンロード-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+  </Tab>
+
+  <Tab title="macOS">
+    **方法1：npxを使用（推奨）**
+
+    ```bash
+    npx agents-chatgroup
+    ```
+
+    **方法2：アプリをダウンロード**
+
+    [![macOS版をダウンロード](https://img.shields.io/badge/ダウンロード-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+  </Tab>
+
+  <Tab title="Linux">
+    ```bash
+    npx agents-chatgroup
+    ```
+  </Tab>
+</Tabs>
+
+## クイックスタート
+
+<Steps>
+<Step title="コーディングエージェントをインストール">
+  システムに少なくとも1つの[サポートされているコーディングエージェント](/ja/supported-coding-agents)がインストールされ、認証されていることを確認してください。
+</Step>
+
+<Step title="AgentsChatGroupを起動">
+  アプリケーションを開くか、npxコマンドを実行します。アプリは自動的にブラウザで開きます。
+
+  <Check>
+  アプリケーションはランダムな空きポートにバインドし、ターミナルにURLを表示します。
+  </Check>
+</Step>
+
+<Step title="チャットセッションを作成">
+  「セッション作成」をクリックして新しいグループチャットを開始します。これがAIコラボレーションのワークスペースです。
+</Step>
+
+<Step title="AIメンバーを追加">
+  右サイドバーで「AIメンバーを追加」をクリックしてエージェントをセッションに追加します。各メンバーに以下を設定：
+  - ユニークな@メンション名
+  - エージェントタイプを選択（例：Claude Code、Codex）
+  - 役割を定義するシステムプロンプトを設定
+  - ワークスペースパスを指定
+</Step>
+
+<Step title="コラボレーション開始">
+  @メンションを使用してAIチームメンバーにタスクを割り当てます。彼らは自動的にコンテキストを受け取り、互いにコミュニケーションできます！
+</Step>
+</Steps>
+
+<Tip>
+固定ポートを使用するには、`PORT`環境変数を指定：`PORT=8080 npx agents-chatgroup`
+</Tip>
+
+## 次のステップ
+
+<CardGroup cols={2}>
+  <Card title="チャットセッション概要" icon="comments" href="/ja/core-features/chat-session-overview">
+    チャットセッションとその仕組みについて学ぶ
+  </Card>
+
+  <Card title="AIメンバーの管理" icon="robot" href="/ja/core-features/ai-members">
+    チームのAIメンバーを設定
+  </Card>
+</CardGroup>

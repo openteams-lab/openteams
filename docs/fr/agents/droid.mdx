@@ -1,0 +1,71 @@
+---
+title: "Factory Droid"
+description: "Configurer l'agent de codage Droid de Factory AI"
+icon: /logos/droid-light.svg
+---
+
+<Steps>
+<Step title="Installer Droid CLI">
+  <Tabs>
+  <Tab title="macOS / Linux">
+  ```bash
+  curl -fsSL https://app.factory.ai/cli | sh
+  ```
+  </Tab>
+
+  <Tab title="Windows">
+  ```powershell
+  irm https://app.factory.ai/cli/windows | iex
+  ```
+  </Tab>
+  </Tabs>
+
+  Pour les dernières instructions d'installation et les guides spécifiques à chaque plateforme, visitez la [documentation Factory AI CLI](https://factory.ai/product/cli).
+</Step>
+
+<Step title="S'authentifier avec Factory AI">
+  Pour utiliser Droid dans agents-chatgroup, vous devez d'abord vous authentifier :
+
+  1. Exécutez `droid` pour lancer le CLI interactif
+  2. Utilisez la commande `/login` dans Droid pour vous authentifier
+
+  Alternativement, générez une clé API depuis [Factory Settings](https://app.factory.ai/settings/api-keys) et définissez-la comme variable d'environnement :
+
+  ```bash
+  export FACTORY_API_KEY=fk-...
+  ```
+
+  Pour des instructions d'authentification détaillées, voir la [documentation Factory AI](https://docs.factory.ai/factory-cli/getting-started/overview).
+</Step>
+
+<Step title="Démarrer agents-chatgroup">
+  Une fois authentifié, lancez agents-chatgroup :
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  Vous pouvez maintenant sélectionner Factory Droid lors de la création de tentatives de tâches.
+</Step>
+</Steps>
+
+## Options de Configuration
+
+Droid supporte plusieurs options de configuration dans agents-chatgroup :
+
+- **Niveau d'Autonomie** : Contrôle le niveau de permission pour les opérations de fichiers et système
+  - `normal` : Mode lecture seule - sûr pour réviser les changements planifiés sans exécution
+  - `low` : Création/édition de fichiers basique tout en bloquant les changements système
+  - `medium` : Opérations de développement avec effets secondaires récupérables
+  - `high` : Opérations de production avec implications de sécurité ou effets secondaires majeurs
+  - `skip-permissions-unsafe` : Contourne toutes les vérifications de permission (utiliser uniquement dans des environnements isolés) (défaut)
+
+- **Modèle** : Spécifiez quel modèle utiliser
+
+- **Effort de Raisonnement** : Contrôlez la profondeur de raisonnement
+  - `off` : Raisonnement minimal
+  - `low` : Raisonnement léger
+  - `medium` : Raisonnement équilibré
+  - `high` : Raisonnement approfondi pour les tâches complexes
+
+Ces options peuvent être configurées lors de la création de configurations d'agents dans agents-chatgroup.

@@ -1,0 +1,27 @@
+---
+title: "Amp"
+description: "Ampコード補完エージェントをセットアップ"
+icon: /logos/amp-logo.svg
+---
+
+<Steps>
+<Step title="Ampを実行">
+  ```bash
+  npx -y @sourcegraph/amp
+  ```
+</Step>
+
+<Step title="ログイン手順に従う">
+  プロンプトに従って認証フローを完了します。詳細は[Ampオーナーズマニュアル](https://ampcode.com/manual#install)を参照してください。
+</Step>
+
+<Step title="agents-chatgroupを起動">
+  認証完了後、agents-chatgroupを起動：
+
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  タスク試行を作成する際にAmpを選択できるようになりました。
+</Step>
+</Steps>

@@ -1,0 +1,162 @@
+{
+  "sidebar": {
+    "title": "채팅 그룹",
+    "newSession": "새로 만들기",
+    "noActiveSessions": "활성 세션이 없습니다.",
+    "noArchivedSessions": "보관된 세션이 없습니다.",
+    "showArchived": "보관된 항목 표시",
+    "hideArchived": "보관된 항목 숨기기",
+    "expandSidebar": "사이드바 펼치기",
+    "collapseSidebar": "사이드바 접기",
+    "createNewSession": "새 세션 만들기",
+    "untitledSession": "제목 없는 세션"
+  },
+  "header": {
+    "untitledSession": "제목 없는 세션",
+    "editSessionName": "세션 이름 편집",
+    "deleteSession": "세션 삭제",
+    "sessionNamePlaceholder": "세션 이름",
+    "created": "생성일",
+    "totalMessages": "전체 메시지",
+    "aiMembers": "AI 멤버",
+    "searchMessages": "메시지 검색...",
+    "clearSearch": "검색 지우기",
+    "archived": "보관됨",
+    "archiveSession": "세션 보관",
+    "restoreSession": "세션 복원",
+    "cleanupMessages": "메시지 정리",
+    "exitCleanupMode": "정리 모드 종료",
+    "settings": "설정"
+  },
+  "input": {
+    "mentionAgents": "에이전트 멘션",
+    "routeToAgents": "에이전트로 라우팅",
+    "replyingTo": "{{name}}에게 답장",
+    "referencedMessage": "참조된 메시지",
+    "cancel": "취소",
+    "clearAll": "모두 지우기",
+    "preview": "미리보기",
+    "archivedPlaceholder": "이 세션은 보관되었으며 읽기 전용입니다.",
+    "inputPlaceholder": "메시지를 입력하고 @로 에이전트를 멘션하세요...",
+    "uploadingAttachments": "첨부 파일 업로드 중...",
+    "sendHint": "Enter로 전송, Shift+Enter로 줄바꿈.",
+    "addAttachment": "첨부 파일 추가",
+    "send": "전송"
+  },
+  "message": {
+    "quote": "인용",
+    "replyingTo": "{{name}}에게 답장",
+    "view": "보기",
+    "referencedMessageUnavailable": "참조된 메시지를 사용할 수 없습니다.",
+    "attachments": "첨부 파일",
+    "mentions": "멘션",
+    "codeChanges": "코드 변경",
+    "viewChanges": "변경 사항 보기",
+    "loadingDiff": "차이점 로드 중...",
+    "untrackedFile": "추적되지 않는 파일",
+    "untrackedFiles": "추적되지 않는 파일",
+    "apiError": {
+      "quotaExceeded": "API 할당량 초과",
+      "rateLimited": "요청 속도 제한됨",
+      "checkQuota": "API 할당량을 확인하거나 나중에 다시 시도하세요"
+    },
+    "sendToAgent": "에이전트에게 보내기",
+    "open": "열기"
+  },
+  "members": {
+    "title": "AI 멤버",
+    "countInSession": "세션에 {{count}}명",
+    "selectSessionToManage": "AI 멤버를 관리할 세션을 선택하세요.",
+    "noMembersYet": "아직 AI 멤버가 없습니다. @멘션을 활성화하려면 아래에서 추가하세요.",
+    "workspace": "워크스페이스",
+    "edit": "편집",
+    "remove": "제거",
+    "addAiMember": "AI 멤버 추가",
+    "editAiMember": "AI 멤버 편집",
+    "memberNameHint": "AI 멤버 이름은 @멘션 핸들이 됩니다.",
+    "memberNameLabel": "AI 멤버 이름",
+    "memberNamePlaceholder": "예: coder",
+    "baseCodingAgent": "기본 코딩 에이전트",
+    "checkingAgents": "에이전트 확인 중...",
+    "noLocalAgentsDetected": "로컬 에이전트가 감지되지 않음",
+    "noInstalledAgents": "이 머신에 설치된 코드 에이전트가 감지되지 않습니다.",
+    "modelVariant": "모델 변형",
+    "model": "모델",
+    "systemPrompt": "시스템 프롬프트",
+    "expand": "확장",
+    "systemPromptPlaceholder": "이 AI 멤버가 어떻게 행동해야 하는지 설명하세요.",
+    "workspacePath": "워크스페이스 경로",
+    "workspacePathPlaceholder": "서버의 절대 경로",
+    "workspacePathCannotBeModified": "워크스페이스 경로는 수정할 수 없습니다",
+    "add": "추가",
+    "save": "저장"
+  },
+  "cleanup": {
+    "selected": "선택됨: {{count}}",
+    "selectAll": "모두 선택",
+    "deselectAll": "모두 선택 해제",
+    "deleteSelected": "선택 항목 삭제"
+  },
+  "agent": {
+    "running": "에이전트 실행 중",
+    "runningElapsed": "에이전트 실행 중. 경과 시간 {{seconds}}초.",
+    "processing": "요청 처리 중...",
+    "thinking": "생각 중...",
+    "idle": "대기 중",
+    "completed": "완료됨",
+    "failed": "실패함",
+    "received": "수신됨",
+    "stop": "중지",
+    "stopping": "중지 중..."
+  },
+  "modals": {
+    "confirm": {
+      "cancel": "취소",
+      "confirm": "확인",
+      "processing": "처리 중..."
+    },
+    "promptEditor": {
+      "title": "시스템 프롬프트",
+      "description": "AI 멤버의 시스템 프롬프트 편집",
+      "close": "프롬프트 편집기 닫기",
+      "placeholder": "이 AI 멤버가 어떻게 행동해야 하는지 설명하세요.",
+      "attachTextFile": "텍스트 파일 첨부",
+      "loadingFile": "파일 로드 중...",
+      "done": "완료"
+    },
+    "filePreview": {
+      "previewTitle": "미리보기: {{filename}}",
+      "previewNotAvailable": "이 파일 형식은 미리보기를 사용할 수 없습니다",
+      "close": "닫기"
+    },
+    "diffViewer": {
+      "title": "코드 변경",
+      "run": "실행",
+      "exitFullScreen": "전체 화면 종료",
+      "fullScreen": "전체 화면",
+      "closeDiffViewer": "차이점 뷰어 닫기",
+      "loadingDiff": "차이점 로드 중...",
+      "noTrackedDiff": "추적된 차이점이 없습니다.",
+      "openRawDiff": "원본 차이점 열기",
+      "untrackedFiles": "추적되지 않는 파일",
+      "loadingFile": "파일 로드 중...",
+      "hide": "숨기기",
+      "view": "보기"
+    },
+    "workspaceDrawer": {
+      "agentWorkspace": "에이전트 워크스페이스",
+      "close": "닫기",
+      "workspacePathCreatedOnFirstRun": "워크스페이스 경로는 첫 실행 시 생성됩니다.",
+      "runHistory": "실행 기록",
+      "noRunsYet": "이 에이전트의 실행 기록이 아직 없습니다.",
+      "run": "실행",
+      "viewLog": "로그 보기",
+      "selected": "선택됨",
+      "runLog": "실행 로그",
+      "selectRunToViewLog": "로그 출력을 보려면 실행을 선택하세요.",
+      "refresh": "새로고침",
+      "loadingLog": "로그 로드 중...",
+      "logEmpty": "로그가 비어 있습니다."
+    }
+  }
+}

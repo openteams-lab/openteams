@@ -1,0 +1,64 @@
+---
+title: "トラブルシューティング"
+description: "agents-chatgroup使用時の一般的な問題と解決策"
+---
+
+## エージェントがコードベースが空と報告する
+
+新しいタスクを作成する際にコーディングエージェントがコードベースが空と報告する場合、リポジトリでGitのsparse-checkout機能が有効になっている可能性があります。
+
+**解決策：**
+
+リポジトリのルートディレクトリで以下のコマンドを実行：
+
+```bash
+git sparse-checkout disable
+```
+
+sparse-checkoutを無効にした後、新しいタスクを作成して再試行してください。
+
+## デバッグログの有効化
+
+問題のデバッグに役立つより詳細なログが必要な場合、`RUST_LOG`環境変数を設定してデバッグレベルのログを有効にできます。
+
+**使用方法：**
+
+```bash
+RUST_LOG=debug npx agents-chatgroup
+```
+
+これにより、問題の根本原因を特定するのに役立つ詳細なログ出力が提供されます。
+
+## 危険：データベースのワイプ
+
+回復不可能なエラーが発生し、agents-chatgroupデータベースを完全にワイプする必要がある場合、オペレーティングシステムのアプリケーションデータディレクトリを削除できます。
+
+<Warning>
+このアクションは元に戻せず、すべてのタスクと設定が失われます。続行する前に重要な情報をバックアップしてください。
+</Warning>
+
+**OSに基づいて以下のディレクトリを削除：**
+
+<Tabs>
+<Tab title="macOS">
+```bash
+~/Library/Application Support/ai.starterra.ai.agents-chatgroup/
+```
+</Tab>
+
+<Tab title="Linux">
+```bash
+~/.local/share/agents-chatgroup/
+```
+</Tab>
+
+<Tab title="Windows">
+```
+%APPDATA%\starterra.ai\agents-chatgroup\
+```
+
+通常：`C:\Users\<ユーザー名>\AppData\Roaming\starterra.ai\agents-chatgroup\`
+</Tab>
+</Tabs>
+
+アプリケーションデータディレクトリを削除した後、agents-chatgroupを再起動すると、空のデータベースとデフォルト設定でリセットされます。
