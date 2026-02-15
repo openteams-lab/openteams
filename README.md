@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/agents-chatgroup-logo.svg" alt="Agent ChatGroup" width="200">
+  <img src="frontend/public/agent-chatgroup-logo-white.png" alt="Agent ChatGroup" width="400">
 </p>
 
 <h1 align="center">AgentsChatGroup</h1>
