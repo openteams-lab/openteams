@@ -25,6 +25,10 @@
   <a href="#文档">📖 文档</a>
 </p>
 
+<p align="center">
+  <a href="./README.md">🇬🇧 English</a>
+</p>
+
 ---
 
 ## AgentsChatGroup想解决什么问题？

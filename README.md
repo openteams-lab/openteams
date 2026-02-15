@@ -20,12 +20,18 @@
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/TFT3KnZOOAk">📺 Watch Demo</a> ·
-  <a href="#getting-started">⚡ Getting Started</a> ·
-  <a href="#documentation">📖 Docs</a>
+  <a href="">📺 Watch Demo</a> ·
+  <a href="">⚡ Getting Started</a> ·
+  <a href="">📖 Docs</a>
+</p>
+
+<p align="center">
+  <a href="./README_zh.md">🇨🇳 中文文档</a>
 </p>
 
 ---
+
+<img src="docs/images/preview.png" >
 
 ## Why AgentsChatGroup?
 
