@@ -6,13 +6,22 @@ icon: /logos/kimi-logo.svg
 
 <Steps>
 <Step title="运行 Kimi Code">
+  Mac OS 和 Linux:
   ```bash
-  npx -y @anthropic-ai/kimi-code
+  # Linux / macOS
+  curl -LsSf https://code.kimi.com/install.sh | bash
+  kimi
+  ```
+  Windows:
+  ```powershell
+  # Windows (PowerShell)
+  Invoke-RestMethod https://code.kimi.com/install.ps1 | Invoke-Expression
+  kimi
   ```
 </Step>
 
 <Step title="按照登录说明操作">
-  按照提示完成认证流程。更多详情请参阅 [Kimi 官方文档](https://github.com/nicepkg/kimi-code)。
+  按照提示完成认证流程。更多详情请参阅 [Kimi 官方文档](https://moonshotai.github.io/kimi-cli/en/guides/getting-started.html)。
 </Step>
 
 <Step title="启动 agents-chatgroup">

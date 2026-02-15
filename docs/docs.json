@@ -2,7 +2,8 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "agents-chatgroup",
-  "description": "A kanban board for developers to track coding tasks with AI coding agents",
+  "basePath": "/docs",
+  "description": "",
   "appearance": {
     "default": "light"
   },
@@ -312,7 +313,7 @@
     "primary": {
       "type": "button",
       "label": "Get Started",
-      "href": "https://docs.agentschatgroup.com"
+      "href": "https://agentschatgroup.com/docs"
     }
   },
   "contextual": {
