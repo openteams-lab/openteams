@@ -81,7 +81,7 @@ const CreatePRDialogImpl = NiceModal.create<CreatePRDialogProps>(
         return;
       }
 
-      setPrTitle(`${task.title} (agent-chatgroup)`);
+      setPrTitle(`${task.title} (agents-chatgroup)`);
       setPrBody(task.description || '');
       setError(null);
       setGhCliHelp(null);

@@ -234,7 +234,7 @@ impl FilesystemService {
                         return false;
                     }
 
-                    // Skip agent-chatgroup temp directory and all subdirectories
+                    // Skip agents-chatgroup temp directory and all subdirectories
                     // Normalize to handle macOS /private/var vs /var aliasing
                     if utils::path::normalize_macos_private_alias(path)
                         .starts_with(&agent_chatgroup_temp_dir)

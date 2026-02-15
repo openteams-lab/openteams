@@ -80,7 +80,7 @@
           "host": {
             "label": "Hôte SSH distant (optionnel)",
             "placeholder": "ex: nom d'hôte ou adresse IP",
-            "helper": "Définissez ceci si agent-chatgroup fonctionne sur un serveur distant. Lorsque défini, cliquer sur \"Ouvrir dans l'éditeur\" générera une URL pour ouvrir votre éditeur via SSH au lieu de lancer une commande locale."
+            "helper": "Définissez ceci si agents-chatgroup fonctionne sur un serveur distant. Lorsque défini, cliquer sur \"Ouvrir dans l'éditeur\" générera une URL pour ouvrir votre éditeur via SSH au lieu de lancer une commande locale."
           },
           "user": {
             "label": "Utilisateur SSH distant (optionnel)",
@@ -206,7 +206,7 @@
       },
       "privacy": {
         "title": "Confidentialité",
-        "description": "Aidez à améliorer agent-chatgroup en partageant des données d'utilisation anonymes.",
+        "description": "Aidez à améliorer agents-chatgroup en partageant des données d'utilisation anonymes.",
         "telemetry": {
           "label": "Activer la télémétrie",
           "helper": "Active le suivi anonyme des événements d'utilisation pour aider à améliorer l'application. Aucun prompt ou information de projet n'est collecté."

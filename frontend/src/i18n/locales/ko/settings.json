@@ -80,7 +80,7 @@
           "host": {
             "label": "원격 SSH 호스트 (선택사항)",
             "placeholder": "예: 호스트 이름 또는 IP 주소",
-            "helper": "agent-chatgroup이 원격 서버에서 실행 중인 경우 설정하세요. 설정하면 \"에디터에서 열기\"를 클릭할 때 로컬 명령을 실행하는 대신 SSH를 통해 에디터를 여는 URL이 생성됩니다."
+            "helper": "agents-chatgroup이 원격 서버에서 실행 중인 경우 설정하세요. 설정하면 \"에디터에서 열기\"를 클릭할 때 로컬 명령을 실행하는 대신 SSH를 통해 에디터를 여는 URL이 생성됩니다."
           },
           "user": {
             "label": "원격 SSH 사용자 (선택사항)",
@@ -206,7 +206,7 @@
       },
       "privacy": {
         "title": "개인정보 보호",
-        "description": "익명 사용 데이터를 공유하여 agent-chatgroup 개선에 도움을 주세요.",
+        "description": "익명 사용 데이터를 공유하여 agents-chatgroup 개선에 도움을 주세요.",
         "telemetry": {
           "label": "원격 분석 활성화",
           "helper": "애플리케이션 개선을 위한 익명 사용 이벤트 추적을 활성화합니다. 프롬프트나 프로젝트 정보는 수집되지 않습니다."

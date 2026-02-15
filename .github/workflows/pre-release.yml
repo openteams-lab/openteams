@@ -77,7 +77,7 @@ jobs:
         id: version
         run: |
           # Get the latest version from npm registry
-          latest_npm_version=$(npm view agent-chatgroup version 2>/dev/null || echo "0.0.0")
+          latest_npm_version=$(npm view agents-chatgroup version 2>/dev/null || echo "0.0.0")
           echo "Latest npm version: $latest_npm_version"
 
           # Get current repo version
@@ -379,13 +379,13 @@ jobs:
         run: |
           mkdir -p dist
           if [[ "${{ matrix.name }}" == *"windows"* ]]; then
-            cp target/${{ matrix.target }}/release/server.exe dist/agent-chatgroup-${{ matrix.name }}.exe
-            cp target/${{ matrix.target }}/release/mcp_task_server.exe dist/agent-chatgroup-mcp-${{ matrix.name }}.exe
-            cp target/${{ matrix.target }}/release/review.exe dist/agent-chatgroup-review-${{ matrix.name }}.exe
+            cp target/${{ matrix.target }}/release/server.exe dist/agents-chatgroup-${{ matrix.name }}.exe
+            cp target/${{ matrix.target }}/release/mcp_task_server.exe dist/agents-chatgroup-mcp-${{ matrix.name }}.exe
+            cp target/${{ matrix.target }}/release/review.exe dist/agents-chatgroup-review-${{ matrix.name }}.exe
           else
-            cp target/${{ matrix.target }}/release/server dist/agent-chatgroup-${{ matrix.name }}
-            cp target/${{ matrix.target }}/release/mcp_task_server dist/agent-chatgroup-mcp-${{ matrix.name }}
-            cp target/${{ matrix.target }}/release/review dist/agent-chatgroup-review-${{ matrix.name }}
+            cp target/${{ matrix.target }}/release/server dist/agents-chatgroup-${{ matrix.name }}
+            cp target/${{ matrix.target }}/release/mcp_task_server dist/agents-chatgroup-mcp-${{ matrix.name }}
+            cp target/${{ matrix.target }}/release/review dist/agents-chatgroup-review-${{ matrix.name }}
           fi
 
       # Code signing for macOS only
@@ -405,7 +405,7 @@ jobs:
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: target/${{ matrix.target }}/release/server
-          output_path: agent-chatgroup
+          output_path: agents-chatgroup
           p12_file: certificate.p12
           p12_password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           sign: true
@@ -413,14 +413,14 @@ jobs:
 
       - name: Package main binary (macOS)
         if: runner.os == 'macOS'
-        run: zip agent-chatgroup.zip agent-chatgroup
+        run: zip agents-chatgroup.zip agents-chatgroup
 
       - name: Sign MCP binary (macOS)
         if: runner.os == 'macOS'
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: target/${{ matrix.target }}/release/mcp_task_server
-          output_path: agent-chatgroup-mcp
+          output_path: agents-chatgroup-mcp
           p12_file: certificate.p12
           p12_password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           sign: true
@@ -428,14 +428,14 @@ jobs:
 
       - name: Package MCP binary (macOS)
         if: runner.os == 'macOS'
-        run: zip agent-chatgroup-mcp.zip agent-chatgroup-mcp
+        run: zip agents-chatgroup-mcp.zip agents-chatgroup-mcp
 
       - name: Sign Review binary (macOS)
         if: runner.os == 'macOS'
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: target/${{ matrix.target }}/release/review
-          output_path: agent-chatgroup-review
+          output_path: agents-chatgroup-review
           p12_file: certificate.p12
           p12_password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           sign: true
@@ -443,7 +443,7 @@ jobs:
 
       - name: Package Review binary (macOS)
         if: runner.os == 'macOS'
-        run: zip agent-chatgroup-review.zip agent-chatgroup-review
+        run: zip agents-chatgroup-review.zip agents-chatgroup-review
 
       - name: Notarize signed binaries (macOS)
         if: runner.os == 'macOS'
@@ -451,9 +451,9 @@ jobs:
         continue-on-error: true
         with:
           input_path: |
-            agent-chatgroup.zip
-            agent-chatgroup-mcp.zip
-            agent-chatgroup-review.zip
+            agents-chatgroup.zip
+            agents-chatgroup-mcp.zip
+            agents-chatgroup-review.zip
           sign: false
           notarize: true
           app_store_connect_api_key_json_file: app_store_key.json
@@ -462,9 +462,9 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           mkdir -p dist
-          cp agent-chatgroup.zip dist/agent-chatgroup-${{ matrix.name }}.zip
-          cp agent-chatgroup-mcp.zip dist/agent-chatgroup-mcp-${{ matrix.name }}.zip
-          cp agent-chatgroup-review.zip dist/agent-chatgroup-review-${{ matrix.name }}.zip
+          cp agents-chatgroup.zip dist/agents-chatgroup-${{ matrix.name }}.zip
+          cp agents-chatgroup-mcp.zip dist/agents-chatgroup-mcp-${{ matrix.name }}.zip
+          cp agents-chatgroup-review.zip dist/agents-chatgroup-review-${{ matrix.name }}.zip
 
       - name: Clean up certificates (macOS)
         if: runner.os == 'macOS'
@@ -496,34 +496,34 @@ jobs:
         include:
           - target: x86_64-unknown-linux-musl
             name: linux-x64
-            binary: agent-chatgroup
-            mcp_binary: agent-chatgroup-mcp
-            review_binary: agent-chatgroup-review
+            binary: agents-chatgroup
+            mcp_binary: agents-chatgroup-mcp
+            review_binary: agents-chatgroup-review
           - target: x86_64-pc-windows-msvc
             name: windows-x64
-            binary: agent-chatgroup.exe
-            mcp_binary: agent-chatgroup-mcp.exe
-            review_binary: agent-chatgroup-review.exe
+            binary: agents-chatgroup.exe
+            mcp_binary: agents-chatgroup-mcp.exe
+            review_binary: agents-chatgroup-review.exe
           - target: x86_64-apple-darwin
             name: macos-x64
-            binary: agent-chatgroup
-            mcp_binary: agent-chatgroup-mcp
-            review_binary: agent-chatgroup-review
+            binary: agents-chatgroup
+            mcp_binary: agents-chatgroup-mcp
+            review_binary: agents-chatgroup-review
           - target: aarch64-apple-darwin
             name: macos-arm64
-            binary: agent-chatgroup
-            mcp_binary: agent-chatgroup-mcp
-            review_binary: agent-chatgroup-review
+            binary: agents-chatgroup
+            mcp_binary: agents-chatgroup-mcp
+            review_binary: agents-chatgroup-review
           - target: aarch64-pc-windows-msvc
             name: windows-arm64
-            binary: agent-chatgroup.exe
-            mcp_binary: agent-chatgroup-mcp.exe
-            review_binary: agent-chatgroup-review.exe
+            binary: agents-chatgroup.exe
+            mcp_binary: agents-chatgroup-mcp.exe
+            review_binary: agents-chatgroup-review.exe
           - target: aarch64-unknown-linux-musl
             name: linux-arm64
-            binary: agent-chatgroup
-            mcp_binary: agent-chatgroup-mcp
-            review_binary: agent-chatgroup-review
+            binary: agents-chatgroup
+            mcp_binary: agents-chatgroup-mcp
+            review_binary: agents-chatgroup-review
     steps:
       - uses: actions/checkout@v6
         with:
@@ -550,26 +550,26 @@ jobs:
         if: matrix.name != 'macos-arm64' && matrix.name != 'macos-x64'
         run: |
           mkdir -p npx-cli/dist/${{ matrix.name }}
-          mkdir agent-chatgroup-${{ matrix.name }}
-          mkdir agent-chatgroup-mcp-${{ matrix.name }}
-          mkdir agent-chatgroup-review-${{ matrix.name }}
+          mkdir agents-chatgroup-${{ matrix.name }}
+          mkdir agents-chatgroup-mcp-${{ matrix.name }}
+          mkdir agents-chatgroup-review-${{ matrix.name }}
 
-          cp dist/agent-chatgroup-${{ matrix.name }}* agent-chatgroup-${{ matrix.name }}/${{ matrix.binary }}
-          cp dist/agent-chatgroup-mcp-${{ matrix.name }}* agent-chatgroup-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
-          cp dist/agent-chatgroup-review-${{ matrix.name }}* agent-chatgroup-review-${{ matrix.name }}/${{ matrix.review_binary }}
+          cp dist/agents-chatgroup-${{ matrix.name }}* agents-chatgroup-${{ matrix.name }}/${{ matrix.binary }}
+          cp dist/agents-chatgroup-mcp-${{ matrix.name }}* agents-chatgroup-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
+          cp dist/agents-chatgroup-review-${{ matrix.name }}* agents-chatgroup-review-${{ matrix.name }}/${{ matrix.review_binary }}
 
-          zip -j npx-cli/dist/${{ matrix.name }}/agent-chatgroup.zip agent-chatgroup-${{ matrix.name }}/${{ matrix.binary }}
-          zip -j npx-cli/dist/${{ matrix.name }}/agent-chatgroup-mcp.zip agent-chatgroup-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
-          zip -j npx-cli/dist/${{ matrix.name }}/agent-chatgroup-review.zip agent-chatgroup-review-${{ matrix.name }}/${{ matrix.review_binary }}
+          zip -j npx-cli/dist/${{ matrix.name }}/agents-chatgroup.zip agents-chatgroup-${{ matrix.name }}/${{ matrix.binary }}
+          zip -j npx-cli/dist/${{ matrix.name }}/agents-chatgroup-mcp.zip agents-chatgroup-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
+          zip -j npx-cli/dist/${{ matrix.name }}/agents-chatgroup-review.zip agents-chatgroup-review-${{ matrix.name }}/${{ matrix.review_binary }}
 
       - name: Create platform package (macOS)
         if: matrix.name == 'macos-arm64' || matrix.name == 'macos-x64'
         run: |
           mkdir -p npx-cli/dist/${{ matrix.name }}
-          mkdir agent-chatgroup-${{ matrix.name }}
-          cp dist/agent-chatgroup-${{ matrix.name }}* npx-cli/dist/${{ matrix.name }}/agent-chatgroup.zip
-          cp dist/agent-chatgroup-mcp-${{ matrix.name }}* npx-cli/dist/${{ matrix.name }}/agent-chatgroup-mcp.zip
-          cp dist/agent-chatgroup-review-${{ matrix.name }}* npx-cli/dist/${{ matrix.name }}/agent-chatgroup-review.zip
+          mkdir agents-chatgroup-${{ matrix.name }}
+          cp dist/agents-chatgroup-${{ matrix.name }}* npx-cli/dist/${{ matrix.name }}/agents-chatgroup.zip
+          cp dist/agents-chatgroup-mcp-${{ matrix.name }}* npx-cli/dist/${{ matrix.name }}/agents-chatgroup-mcp.zip
+          cp dist/agents-chatgroup-review-${{ matrix.name }}* npx-cli/dist/${{ matrix.name }}/agents-chatgroup-review.zip
 
       - name: Upload platform package artifact
         uses: actions/upload-artifact@v6
@@ -616,7 +616,7 @@ jobs:
             const crypto = require('crypto');
             const manifest = { version: '$TAG', platforms: {} };
             const platforms = ['linux-x64', 'linux-arm64', 'windows-x64', 'windows-arm64', 'macos-x64', 'macos-arm64'];
-            const binaries = ['agent-chatgroup', 'agent-chatgroup-mcp', 'agent-chatgroup-review'];
+            const binaries = ['agents-chatgroup', 'agents-chatgroup-mcp', 'agents-chatgroup-review'];
 
             for (const platform of platforms) {
               manifest.platforms[platform] = {};
@@ -638,7 +638,7 @@ jobs:
 
           # Upload binaries (use full tag for path, allows multiple pre-releases to coexist)
           for platform in linux-x64 linux-arm64 windows-x64 windows-arm64 macos-x64 macos-arm64; do
-            for binary in agent-chatgroup agent-chatgroup-mcp agent-chatgroup-review; do
+            for binary in agents-chatgroup agents-chatgroup-mcp agents-chatgroup-review; do
               if [ -f "binaries/$platform/$binary.zip" ]; then
                 echo "Uploading binaries/$platform/$binary.zip..."
                 aws s3 cp "binaries/$platform/$binary.zip" \
@@ -693,9 +693,9 @@ jobs:
 
       - name: Zip frontend
         run: |
-          mkdir agent-chatgroup-${{ needs.bump-version.outputs.new_tag }}
-          mv frontend/dist agent-chatgroup-${{ needs.bump-version.outputs.new_tag }}
-          zip -r agent-chatgroup-${{ needs.bump-version.outputs.new_tag }}.zip agent-chatgroup-${{ needs.bump-version.outputs.new_tag }}
+          mkdir agents-chatgroup-${{ needs.bump-version.outputs.new_tag }}
+          mv frontend/dist agents-chatgroup-${{ needs.bump-version.outputs.new_tag }}
+          zip -r agents-chatgroup-${{ needs.bump-version.outputs.new_tag }}.zip agents-chatgroup-${{ needs.bump-version.outputs.new_tag }}
 
       - name: Setup Node for npm pack
         uses: ./.github/actions/setup-node
@@ -716,6 +716,6 @@ jobs:
           prerelease: true
           generate_release_notes: true
           files: |
-            agent-chatgroup-${{ needs.bump-version.outputs.new_tag }}.zip
-            npx-cli/agent-chatgroup-*.tgz
+            agents-chatgroup-${{ needs.bump-version.outputs.new_tag }}.zip
+            npx-cli/agents-chatgroup-*.tgz
 

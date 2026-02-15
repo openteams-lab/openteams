@@ -11,12 +11,12 @@ pub const DEFAULT_PR_DESCRIPTION_PROMPT: &str = r#"Update the PR that was just c
 The PR number is #{pr_number} and the URL is {pr_url}.
 
 Analyze the changes in this branch and write:
-1. A concise, descriptive title that summarizes the changes, postfixed with "(agent-chatgroup)"
+1. A concise, descriptive title that summarizes the changes, postfixed with "(agents-chatgroup)"
 2. A detailed description that explains:
    - What changes were made
    - Why they were made (based on the task context)
    - Any important implementation details
-   - At the end, include a note: "This PR was written using [agent-chatgroup](https://agent-chatgroup.com)"
+   - At the end, include a note: "This PR was written using [agents-chatgroup](https://agents-chatgroup.com)"
 
 Use the appropriate CLI tool to update the PR (gh pr edit for GitHub, az repos pr update for Azure DevOps)."#;
 

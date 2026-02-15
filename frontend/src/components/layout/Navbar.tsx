@@ -49,12 +49,12 @@ const EXTERNAL_LINKS = [
   {
     label: 'Docs',
     icon: BookOpen,
-    href: 'https://agent-chatgroup.com/docs',
+    href: 'https://agents-chatgroup.com/docs',
   },
   {
     label: 'Support',
     icon: MessageCircleQuestion,
-    href: 'https://github.com/BloopAI/agent-chatgroup/issues',
+    href: 'https://github.com/StarterraAI/AgentsChatGroup/issues',
   },
   {
     label: 'Discord',

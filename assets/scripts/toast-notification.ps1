@@ -6,7 +6,7 @@
     [string]$Message,
     
     [Parameter(Mandatory=$false)]
-    [string]$AppName = "agent-chatgroup"
+    [string]$AppName = "agents-chatgroup"
 )
 
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null

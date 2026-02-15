@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/agent-chatgroup-logo.svg" alt="Agent ChatGroup" width="200">
+  <img src="frontend/public/agents-chatgroup-logo.svg" alt="Agent ChatGroup" width="200">
 </p>
 
 <h1 align="center">AgentsChatGroup</h1>
@@ -14,8 +14,8 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/agent-chatgroup"><img alt="npm" src="https://img.shields.io/npm/v/agent-chatgroup?style=flat-square" /></a>
-  <a href="https://github.com/BloopAI/agent-chatgroup/blob/main/.github/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/BloopAI/agent-chatgroup/.github%2Fworkflows%2Fpublish.yml" /></a>
+  <a href="https://www.npmjs.com/package/agents-chatgroup"><img alt="npm" src="https://img.shields.io/npm/v/agents-chatgroup?style=flat-square" /></a>
+  <a href="https://github.com/BloopAI/agents-chatgroup/blob/main/.github/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/BloopAI/agents-chatgroup/.github%2Fworkflows%2Fpublish.yml" /></a>
   <a href="#"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
 </p>
 
@@ -164,7 +164,7 @@ Make sure you have at least one supported AI Agent installed:
 
 Download the latest installer:
 
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/BloopAI/agent-chatgroup/releases/latest)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/BloopAI/agents-chatgroup/releases/latest)
 
 </details>
 
@@ -179,7 +179,7 @@ npx agents-chatgroup
 
 **Option 2: Download the app**
 
-[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/BloopAI/agent-chatgroup/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/BloopAI/agents-chatgroup/releases/latest)
 
 </details>
 
@@ -196,14 +196,14 @@ That's it! Open the app, create a group chat, add your Agents, and start collabo
 
 ## Documentation
 
-📚 Full documentation: [AgentsChatGroup Docs](https://agent-chatgroup.dev/docs)
+📚 Full documentation: [AgentsChatGroup Docs](https://agents-chatgroup.dev/docs)
 
 | Guide | Description |
 |-------|-------------|
-| [Quick Start](https://agent-chatgroup.dev/docs/quickstart) | Get up and running in 5 minutes |
-| [Configuration](https://agent-chatgroup.dev/docs/configuration) | Detailed configuration options |
-| [Agent Setup](https://agent-chatgroup.dev/docs/agents) | How to configure and manage Agents |
-| [FAQ](https://agent-chatgroup.dev/docs/faq) | Frequently asked questions |
+| [Quick Start](https://agents-chatgroup.dev/docs/quickstart) | Get up and running in 5 minutes |
+| [Configuration](https://agents-chatgroup.dev/docs/configuration) | Detailed configuration options |
+| [Agent Setup](https://agents-chatgroup.dev/docs/agents) | How to configure and manage Agents |
+| [FAQ](https://agents-chatgroup.dev/docs/faq) | Frequently asked questions |
 
 ## Community & Support
 
@@ -211,8 +211,8 @@ We'd love to hear from you!
 
 | Channel | Link |
 |---------|------|
-| 🐛 **Bug Reports** | [GitHub Issues](https://github.com/BloopAI/agent-chatgroup/issues) |
-| 💬 **Feature Requests** | [GitHub Discussions](https://github.com/BloopAI/agent-chatgroup/discussions) |
+| 🐛 **Bug Reports** | [GitHub Issues](https://github.com/BloopAI/agents-chatgroup/issues) |
+| 💬 **Feature Requests** | [GitHub Discussions](https://github.com/BloopAI/agents-chatgroup/discussions) |
 | 💭 **Community Chat** | *Coming soon* |
 
 ## Local Development
@@ -238,8 +238,8 @@ cargo install sqlx-cli     # Database management
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/BloopAI/agent-chatgroup.git
-cd agent-chatgroup
+git clone https://github.com/BloopAI/agents-chatgroup.git
+cd agents-chatgroup
 
 # 2. Install dependencies
 pnpm i
@@ -283,7 +283,7 @@ We welcome contributions! 🎉
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a **Pull Request**
 
-> 💡 Before submitting a PR, please discuss your idea via [Issue](https://github.com/BloopAI/agent-chatgroup/issues) or [Discussion](https://github.com/BloopAI/agent-chatgroup/discussions).
+> 💡 Before submitting a PR, please discuss your idea via [Issue](https://github.com/BloopAI/agents-chatgroup/issues) or [Discussion](https://github.com/BloopAI/agents-chatgroup/discussions).
 
 ## License
 

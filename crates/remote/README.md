@@ -1,6 +1,6 @@
 ﻿# Remote service
 
-The `remote` crate contains the implementation of the agent-chatgroup hosted API.
+The `remote` crate contains the implementation of the agents-chatgroup hosted API.
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ docker compose --env-file .env.remote -f docker-compose.yml up --build
 ```
 Exposes the API on `http://localhost:8081`. The Postgres service is available at `postgres://remote:remote@localhost:5432/remote`.
 
-## Run agent-chatgroup 
+## Run agents-chatgroup 
 
 ```bash
 export VK_SHARED_API_BASE=http://localhost:8081

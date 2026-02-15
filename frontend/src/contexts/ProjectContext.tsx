@@ -49,9 +49,9 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   // Centralized page title management
   useEffect(() => {
     if (project) {
-      document.title = `${project.name} | agent-chatgroup`;
+      document.title = `${project.name} | agents-chatgroup`;
     } else {
-      document.title = 'agent-chatgroup';
+      document.title = 'agents-chatgroup';
     }
   }, [project]);
 

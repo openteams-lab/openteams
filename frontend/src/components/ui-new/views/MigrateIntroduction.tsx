@@ -23,7 +23,7 @@ const features = [
       <>
         Access your projects from anywhere.{' '}
         <a
-          href="https://github.com/BloopAI/agent-chatgroup"
+          href="https://github.com/StarterraAI/AgentsChatGroup"
           target="_blank"
           rel="noopener noreferrer"
           className="text-brand hover:underline"

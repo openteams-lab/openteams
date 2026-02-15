@@ -138,7 +138,7 @@ export function Navbar({
       {/* Left - Title + Archive & Old UI Link + optional slot */}
       <div className="flex items-center gap-base flex-1">
         <img
-          src="/agent-chatgroup-logo.png"
+          src="/agents-chatgroup-logo.png"
           alt={workspaceTitle}
           title={workspaceTitle}
           className="h-8 w-80 object-contain object-left"

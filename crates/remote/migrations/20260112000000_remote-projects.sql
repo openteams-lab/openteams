@@ -8,7 +8,7 @@ DROP TYPE IF EXISTS task_status;
 CREATE TYPE issue_priority AS ENUM ('urgent', 'high', 'medium', 'low');
 
 -- 2. MODIFY EXISTING ORGANIZATIONS TABLE
--- Add issue_prefix for simple IDs (e.g., "BLO" from "Bloop")
+-- Add issue_prefix for simple IDs
 ALTER TABLE organizations ADD COLUMN IF NOT EXISTS issue_prefix VARCHAR(10) NOT NULL DEFAULT 'ISS';
 
 -- 3. MODIFY EXISTING PROJECTS TABLE

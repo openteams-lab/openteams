@@ -72,6 +72,6 @@
 4. ⏳ 根据收集的信息撰写完整README草稿
 
 ## 待确认事项
-- 项目正式名称是什么？（agent-chatgroup？vibe-kanban？）
+- 项目正式名称是什么？（agents-chatgroup？vibe-kanban？）
 - 使用中文还是英文撰写？
 - Logo 和截图资源位置？

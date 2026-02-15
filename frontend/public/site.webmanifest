@@ -1,6 +1,6 @@
 ﻿{
-  "name": "agent-chatgroup",
-  "short_name": "agent-chatgroup",
+  "name": "agents-chatgroup",
+  "short_name": "agents-chatgroup",
   "icons": [
     {
       "src": "/favionc-chatgroups.svg",
@@ -9,7 +9,7 @@
       "type": "image/svg+xml"
     },
     {
-      "src": "/favicon-agent-chatgroup-light-maskable.svg",
+      "src": "/favicon-agents-chatgroup-light-maskable.svg",
       "sizes": "any",
       "purpose": "maskable",
       "type": "image/svg+xml"

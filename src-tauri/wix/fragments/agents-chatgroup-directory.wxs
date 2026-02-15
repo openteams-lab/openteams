@@ -9,7 +9,7 @@
       NOT Installed
       AND NOT REMOVE
       AND NOT (INSTALLDIR ~&gt;&lt; "agents_chatgroup")
-      AND NOT (INSTALLDIR ~&gt;&lt; "agent-chatgroup")
+      AND NOT (INSTALLDIR ~&gt;&lt; "agents-chatgroup")
     </SetProperty>
   </Fragment>
 
@@ -20,7 +20,7 @@
       Directory="INSTALLDIR"
       Execute="deferred"
       Impersonate="yes"
-      ExeCommand="powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command &quot;$ErrorActionPreference = 'SilentlyContinue'; $workspaceRoot = $null; $configPaths = @((Join-Path $env:APPDATA 'agent-chatgroup\config.json'), (Join-Path $env:APPDATA 'ai\agent-chatgroup\config.json')); foreach ($configPath in $configPaths) { if (Test-Path -LiteralPath $configPath) { try { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json; if ($config.workspace_dir) { $workspaceRoot = Join-Path $config.workspace_dir '.agent-chatgroup-workspaces'; break } } catch {} } }; $paths = @((Join-Path $env:APPDATA 'agent-chatgroup'), (Join-Path $env:APPDATA 'ai\agent-chatgroup'), (Join-Path $env:LOCALAPPDATA 'utils'), (Join-Path $env:LOCALAPPDATA 'ai\utils'), (Join-Path $env:LOCALAPPDATA 'agent-chatgroup'), (Join-Path $env:LOCALAPPDATA 'ai\agent-chatgroup'), (Join-Path $env:TEMP 'agent-chatgroup'), (Join-Path $env:TEMP 'agent-chatgroup-dev')); if ($workspaceRoot) { $paths += $workspaceRoot }; foreach ($path in $paths) { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue } }&quot;"
+      ExeCommand="powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command &quot;$ErrorActionPreference = 'SilentlyContinue'; $workspaceRoot = $null; $configPaths = @((Join-Path $env:APPDATA 'agents-chatgroup\config.json'), (Join-Path $env:APPDATA 'ai\agents-chatgroup\config.json')); foreach ($configPath in $configPaths) { if (Test-Path -LiteralPath $configPath) { try { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json; if ($config.workspace_dir) { $workspaceRoot = Join-Path $config.workspace_dir '.agents-chatgroup-workspaces'; break } } catch {} } }; $paths = @((Join-Path $env:APPDATA 'agents-chatgroup'), (Join-Path $env:APPDATA 'ai\agents-chatgroup'), (Join-Path $env:LOCALAPPDATA 'utils'), (Join-Path $env:LOCALAPPDATA 'ai\utils'), (Join-Path $env:LOCALAPPDATA 'agents-chatgroup'), (Join-Path $env:LOCALAPPDATA 'ai\agents-chatgroup'), (Join-Path $env:TEMP 'agents-chatgroup'), (Join-Path $env:TEMP 'agents-chatgroup-dev')); if ($workspaceRoot) { $paths += $workspaceRoot }; foreach ($path in $paths) { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue } }&quot;"
       Return="ignore"
     />
 

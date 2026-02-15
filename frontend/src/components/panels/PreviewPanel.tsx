@@ -249,7 +249,7 @@ export function PreviewPanel() {
                   <li>
                     {t('preview.troubleAlert.item3')}{' '}
                     <a
-                      href="https://github.com/BloopAI/agent-chatgroup-web-companion"
+                      href="https://github.com/StarterraAI/AgentsChatGroup"
                       target="_blank"
                       className="underline font-bold"
                     >

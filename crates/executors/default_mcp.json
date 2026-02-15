@@ -3,7 +3,7 @@
     "command": "npx",
     "args": [
       "-y",
-      "agent-chatgroup@latest",
+      "agents-chatgroup@latest",
       "--mcp"
     ]
   },
@@ -46,10 +46,10 @@
   },
   "meta": {
     "agent_chatgroup": {
-      "name": "agent-chatgroup",
-      "description": "Create, update and delete agent-chatgroup tasks",
-      "url": "https://www.agent-chatgroup.com/docs/integrations/agent-chatgroup-mcp-server",
-      "icon": "favicon-agent-chatgroup-light.svg"
+      "name": "agents-chatgroup",
+      "description": "Create, update and delete agents-chatgroup tasks",
+      "url": "https://www.agents-chatgroup.com/docs/integrations/agents-chatgroup-mcp-server",
+      "icon": "favicon-agents-chatgroup-light.svg"
     },
     "context7": {
       "name": "Context7",

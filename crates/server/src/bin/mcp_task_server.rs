@@ -51,7 +51,7 @@ fn main() -> anyhow::Result<()> {
                         })?
                     }
                     Err(_) => {
-                        let port = read_port_file("agent-chatgroup").await?;
+                        let port = read_port_file("agents-chatgroup").await?;
                         tracing::info!("[MCP] Using port from port file: {}", port);
                         port
                     }

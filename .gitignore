@@ -74,8 +74,8 @@ remote-frontend/dist
 build-npm-package-codesign.sh
 
 npx-cli/dist
-npx-cli/agent-chatgroup-*
-agent-chatgroup-*.tgz
+npx-cli/agents-chatgroup-*
+agents-chatgroup-*.tgz
 
 # Development ports file
 .dev-ports.json
@@ -84,7 +84,7 @@ dev_assets
 /frontend/.env.sentry-build-plugin
 .ssh
 
-agent-chatgroup-cloud/
+agents-chatgroup-cloud/
 
 .jj
 .sisyphus/

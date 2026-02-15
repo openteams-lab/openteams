@@ -112,7 +112,7 @@
     "banner": "Mode développement - Ceci est une version de développement"
   },
   "oauth": {
-    "title": "Se connecter à agent-chatgroup",
+    "title": "Se connecter à agents-chatgroup",
     "description": "Connectez-vous pour rejoindre des organisations et partager des tâches avec votre équipe",
     "continueWithGitHub": "Continuer avec GitHub",
     "continueWithGoogle": "Continuer avec Google",
@@ -259,7 +259,7 @@
   },
   "betaWorkspaces": {
     "title": "Essayer la nouvelle interface",
-    "intro": "Nous avons reconstruit l'interface de agent-chatgroup de A à Z, et vous êtes invité à l'essayer.",
+    "intro": "Nous avons reconstruit l'interface de agents-chatgroup de A à Z, et vous êtes invité à l'essayer.",
     "newUiDescription": "La nouvelle interface est optimisée pour le travail quotidien : jongler avec les agents, prévisualiser les modifications et réviser le code. Elle débloque également des fonctionnalités non disponibles dans l'ancienne interface :",
     "newFeatures": {
       "multiRepo": "Modifier plusieurs dépôts en même temps",
@@ -280,7 +280,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "Bienvenue",
-      "content": "Bienvenue dans les Espaces de travail, une interface repensée pour agent-chatgroup. Nous la déployons auprès d'utilisateurs sélectionnés pour recueillir leurs premiers retours. Partagez vos impressions à tout moment en utilisant l'icône de feedback dans la barre de navigation."
+      "content": "Bienvenue dans les Espaces de travail, une interface repensée pour agents-chatgroup. Nous la déployons auprès d'utilisateurs sélectionnés pour recueillir leurs premiers retours. Partagez vos impressions à tout moment en utilisant l'icône de feedback dans la barre de navigation."
     },
     "commandBar": {
       "title": "Barre de commandes",

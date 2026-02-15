@@ -99,7 +99,7 @@ export default defineConfig({
         ],
       },
     }),
-    sentryVitePlugin({ org: 'starterra.ai-ai', project: 'agent-chatgroup' }),
+    sentryVitePlugin({ org: 'starterra.ai-ai', project: 'agents-chatgroup' }),
     executorSchemasPlugin(),
   ],
   resolve: {

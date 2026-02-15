@@ -21,7 +21,7 @@ export type CommentAnnotation =
   | { type: 'github'; comment: NormalizedGitHubComment };
 
 /**
- * Maps agent-chatgroup's DiffChangeKind to pierre/diffs ChangeTypes.
+ * Maps agents-chatgroup's DiffChangeKind to pierre/diffs ChangeTypes.
  *
  * Mapping:
  * - 'added' 鈫?'new'
@@ -70,12 +70,12 @@ function getFilePath(diff: Diff): string {
 }
 
 /**
- * Transforms a agent-chatgroup Diff to pierre/diffs FileDiffMetadata.
+ * Transforms a agents-chatgroup Diff to pierre/diffs FileDiffMetadata.
  *
  * Uses parseDiffFromFile from @pierre/diffs to generate the diff metadata
  * from old and new file contents.
  *
- * @param diff - The agent-chatgroup Diff object
+ * @param diff - The agents-chatgroup Diff object
  * @returns FileDiffMetadata for use with pierre/diffs components
  */
 export function transformDiffToFileDiffMetadata(

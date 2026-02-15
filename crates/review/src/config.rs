@@ -9,9 +9,9 @@ pub struct Config {
 }
 
 impl Config {
-    /// Get the path to the config file (~/.config/agent-chatgroup/review.toml)
+    /// Get the path to the config file (~/.config/agents-chatgroup/review.toml)
     fn config_path() -> Option<PathBuf> {
-        dirs::config_dir().map(|p| p.join("agent-chatgroup").join("review.toml"))
+        dirs::config_dir().map(|p| p.join("agents-chatgroup").join("review.toml"))
     }
 
     /// Load config from disk, returning default if file doesn't exist

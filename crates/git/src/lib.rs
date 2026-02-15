@@ -190,8 +190,8 @@ impl GitService {
         let has_email = cfg.get_string("user.email").is_ok();
         if !(has_name && has_email) {
             let mut cfg = repo.config()?;
-            cfg.set_str("user.name", "agent-chatgroup")?;
-            cfg.set_str("user.email", "noreply@agent-chatgroup.com")?;
+            cfg.set_str("user.name", "agents-chatgroup")?;
+            cfg.set_str("user.email", "noreply@agents-chatgroup.com")?;
         }
         Ok(())
     }
@@ -203,7 +203,7 @@ impl GitService {
     ) -> Result<git2::Signature<'a>, GitServiceError> {
         match repo.signature() {
             Ok(sig) => Ok(sig),
-            Err(_) => git2::Signature::now("agent-chatgroup", "noreply@agent-chatgroup.com")
+            Err(_) => git2::Signature::now("agents-chatgroup", "noreply@agents-chatgroup.com")
                 .map_err(GitServiceError::from),
         }
     }

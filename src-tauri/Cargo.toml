@@ -1,9 +1,9 @@
 [package]
-name = "agent-chatgroup-desktop"
-version = "0.1.4"
-description = "Agent Chatgroup Desktop"
-authors = ["BloopAI"]
-edition = "2021"
+name = "agents-chatgroup-desktop"
+version = "0.1.0"
+description = "Agents Chatgroup Desktop"
+authors = ["StarTerra AI"]
+edition = "2026"
 
 [build-dependencies]
 tauri-build = { version = "1.5.4", features = [] }

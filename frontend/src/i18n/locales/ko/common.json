@@ -112,7 +112,7 @@
     "banner": "개발 모드 - 개발 빌드입니다"
   },
   "oauth": {
-    "title": "agent-chatgroup 로그인",
+    "title": "agents-chatgroup 로그인",
     "description": "로그인하여 조직에 참여하고 팀과 작업을 공유하세요",
     "continueWithGitHub": "GitHub로 계속",
     "continueWithGoogle": "Google로 계속",
@@ -259,7 +259,7 @@
   },
   "betaWorkspaces": {
     "title": "새로운 UI 사용해보기",
-    "intro": "agent-chatgroup의 UI를 처음부터 다시 구축했으며, 체험에 초대되었습니다.",
+    "intro": "agents-chatgroup의 UI를 처음부터 다시 구축했으며, 체험에 초대되었습니다.",
     "newUiDescription": "새로운 UI는 일상 업무에 최적화되어 있습니다: 에이전트 관리, 변경 사항 미리보기, 코드 검토. 또한 기존 UI에서는 사용할 수 없는 기능도 제공합니다:",
     "newFeatures": {
       "multiRepo": "여러 저장소를 동시에 편집",
@@ -280,7 +280,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "환영합니다",
-      "content": "agent-chatgroup의 새롭게 디자인된 UI인 Workspaces에 오신 것을 환영합니다. 초기 피드백을 위해 일부 사용자에게 먼저 공개하고 있습니다. 네비게이션 바의 피드백 아이콘을 통해 언제든지 의견을 공유해 주세요."
+      "content": "agents-chatgroup의 새롭게 디자인된 UI인 Workspaces에 오신 것을 환영합니다. 초기 피드백을 위해 일부 사용자에게 먼저 공개하고 있습니다. 네비게이션 바의 피드백 아이콘을 통해 언제든지 의견을 공유해 주세요."
     },
     "commandBar": {
       "title": "명령 바",

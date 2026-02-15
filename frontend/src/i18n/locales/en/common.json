@@ -112,7 +112,7 @@
     "banner": "Development Mode - This is a development build"
   },
   "oauth": {
-    "title": "Sign in to agent-chatgroup",
+    "title": "Sign in to agents-chatgroup",
     "description": "Sign in to join organizations and share tasks with your team",
     "continueWithGitHub": "Continue with GitHub",
     "continueWithGoogle": "Continue with Google",
@@ -259,7 +259,7 @@
   },
   "betaWorkspaces": {
     "title": "Try the new UI",
-    "intro": "We've rebuilt agent-chatgroup's UI from the ground up, and you've been invited to try it.",
+    "intro": "We've rebuilt agents-chatgroup's UI from the ground up, and you've been invited to try it.",
     "newUiDescription": "The new UI is optimised for day-to-day work: juggling agents, previewing changes, and reviewing code. It also unlocks features that aren't available in the old UI:",
     "newFeatures": {
       "multiRepo": "Edit multiple repositories at the same time",
@@ -280,7 +280,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "Welcome",
-      "content": "Welcome to Workspaces, a redesigned UI for agent-chatgroup. We're rolling this out to select users for early feedback. Share your thoughts anytime using the feedback icon in the navbar."
+      "content": "Welcome to Workspaces, a redesigned UI for agents-chatgroup. We're rolling this out to select users for early feedback. Share your thoughts anytime using the feedback icon in the navbar."
     },
     "commandBar": {
       "title": "Command Bar",

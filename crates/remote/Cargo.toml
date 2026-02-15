@@ -14,7 +14,7 @@ vk-billing = ["dep:billing"]
 
 [dependencies]
 # private crate for billing functionality
-billing = { git = "ssh://git@github.com/BloopAI/agent-chatgroup-private", branch = "main", package = "billing", optional = true }
+billing = { git = "git@github.com:StarterraAI/AgentsChatGroup.git", branch = "main", package = "billing", optional = true }
 
 anyhow = "1.0"
 axum = { version = "0.8.4", features = ["macros", "multipart", "ws"] }

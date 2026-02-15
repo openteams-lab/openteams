@@ -412,7 +412,7 @@
       "prMerged": "La PR #{{number}} est déjà fusionnée",
       "loginRequired": {
         "title": "Connectez-vous pour gérer les actions git",
-        "description": "Connectez-vous à agent-chatgroup pour pouvoir pousser des branches, fusionner des modifications ou ouvrir des pull requests pour cette tâche.",
+        "description": "Connectez-vous à agents-chatgroup pour pouvoir pousser des branches, fusionner des modifications ou ouvrir des pull requests pour cette tâche.",
         "action": "Se connecter"
       }
     },
@@ -581,12 +581,12 @@
   "showcases": {
     "taskPanel": {
       "companion": {
-        "title": "agent-chatgroup Companion - Pointer et cliquer",
+        "title": "agents-chatgroup Companion - Pointer et cliquer",
         "description": "Cliquez sur n'importe quel composant d'interface dans la fenêtre d'aperçu pour le sélectionner précisément. L'agent de codage reçoit les sélecteurs DOM exacts et la hiérarchie des composants, éliminant les retours ambigus."
       },
       "installation": {
         "title": "Installation du serveur de développement et du Companion",
-        "description": "Définissez une commande de serveur de développement pour les aperçus, avec un script de configuration paramétrable dans les options. Utilisez un agent de codage pour installer automatiquement le web companion agent-chatgroup."
+        "description": "Définissez une commande de serveur de développement pour les aperçus, avec un script de configuration paramétrable dans les options. Utilisez un agent de codage pour installer automatiquement le web companion agents-chatgroup."
       },
       "codeReview": {
         "title": "Révision de code intégrée",

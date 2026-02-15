@@ -43,8 +43,8 @@ echo "📍 Detected platform: $PLATFORM"
 echo "📂 Using target directory: $CARGO_TARGET_DIR"
 
 # Set API base URL for remote features
-export VK_SHARED_API_BASE="https://api.agent-chatgroup.com"
-export VITE_VK_SHARED_API_BASE="https://api.agent-chatgroup.com"
+export VK_SHARED_API_BASE="https://api.agents-chatgroup.com"
+export VITE_VK_SHARED_API_BASE="https://api.agents-chatgroup.com"
 
 echo "🧹 Cleaning previous builds..."
 rm -rf npx-cli/dist
@@ -60,28 +60,28 @@ cargo build --release --bin mcp_task_server --manifest-path Cargo.toml
 echo "📦 Creating distribution package..."
 
 # Copy the main binary
-cp ${CARGO_TARGET_DIR}/release/server agent-chatgroup
-zip -q agent-chatgroup.zip agent-chatgroup
-rm -f agent-chatgroup 
-mv agent-chatgroup.zip npx-cli/dist/$PLATFORM/agent-chatgroup.zip
+cp ${CARGO_TARGET_DIR}/release/server agents-chatgroup
+zip -q agents-chatgroup.zip agents-chatgroup
+rm -f agents-chatgroup 
+mv agents-chatgroup.zip npx-cli/dist/$PLATFORM/agents-chatgroup.zip
 
 # Copy the MCP binary
-cp ${CARGO_TARGET_DIR}/release/mcp_task_server agent-chatgroup-mcp
-zip -q agent-chatgroup-mcp.zip agent-chatgroup-mcp
-rm -f agent-chatgroup-mcp
-mv agent-chatgroup-mcp.zip npx-cli/dist/$PLATFORM/agent-chatgroup-mcp.zip
+cp ${CARGO_TARGET_DIR}/release/mcp_task_server agents-chatgroup-mcp
+zip -q agents-chatgroup-mcp.zip agents-chatgroup-mcp
+rm -f agents-chatgroup-mcp
+mv agents-chatgroup-mcp.zip npx-cli/dist/$PLATFORM/agents-chatgroup-mcp.zip
 
 # Copy the Review CLI binary
-cp ${CARGO_TARGET_DIR}/release/review agent-chatgroup-review
-zip -q agent-chatgroup-review.zip agent-chatgroup-review
-rm -f agent-chatgroup-review
-mv agent-chatgroup-review.zip npx-cli/dist/$PLATFORM/agent-chatgroup-review.zip
+cp ${CARGO_TARGET_DIR}/release/review agents-chatgroup-review
+zip -q agents-chatgroup-review.zip agents-chatgroup-review
+rm -f agents-chatgroup-review
+mv agents-chatgroup-review.zip npx-cli/dist/$PLATFORM/agents-chatgroup-review.zip
 
 echo "✅ Build complete!"
 echo "📋 Files created:"
-echo "   - npx-cli/dist/$PLATFORM/agent-chatgroup.zip"
-echo "   - npx-cli/dist/$PLATFORM/agent-chatgroup-mcp.zip"
-echo "   - npx-cli/dist/$PLATFORM/agent-chatgroup-review.zip"
+echo "   - npx-cli/dist/$PLATFORM/agents-chatgroup.zip"
+echo "   - npx-cli/dist/$PLATFORM/agents-chatgroup-mcp.zip"
+echo "   - npx-cli/dist/$PLATFORM/agents-chatgroup-review.zip"
 echo ""
 echo "🚀 To test locally, run:"
 echo "   cd npx-cli && node bin/cli.js"

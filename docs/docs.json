@@ -42,7 +42,8 @@
                   "agents/opencode",
                   "agents/droid",
                   "agents/ccr",
-                  "agents/qwen-code"
+                  "agents/qwen-code",
+                  "agents/kimi-code"
                 ]
               }
             ]
@@ -87,7 +88,8 @@
                   "zh-Hans/agents/opencode",
                   "zh-Hans/agents/droid",
                   "zh-Hans/agents/ccr",
-                  "zh-Hans/agents/qwen-code"
+                  "zh-Hans/agents/qwen-code",
+                  "zh-Hans/agents/kimi-code"
                 ]
               }
             ]
@@ -132,7 +134,8 @@
                   "zh-Hant/agents/opencode",
                   "zh-Hant/agents/droid",
                   "zh-Hant/agents/ccr",
-                  "zh-Hant/agents/qwen-code"
+                  "zh-Hant/agents/qwen-code",
+                  "zh-Hant/agents/kimi-code"
                 ]
               }
             ]
@@ -177,7 +180,8 @@
                   "ja/agents/opencode",
                   "ja/agents/droid",
                   "ja/agents/ccr",
-                  "ja/agents/qwen-code"
+                  "ja/agents/qwen-code",
+                  "ja/agents/kimi-code"
                 ]
               }
             ]
@@ -222,7 +226,8 @@
                   "ko/agents/opencode",
                   "ko/agents/droid",
                   "ko/agents/ccr",
-                  "ko/agents/qwen-code"
+                  "ko/agents/qwen-code",
+                  "ko/agents/kimi-code"
                 ]
               }
             ]
@@ -267,7 +272,8 @@
                   "fr/agents/opencode",
                   "fr/agents/droid",
                   "fr/agents/ccr",
-                  "fr/agents/qwen-code"
+                  "fr/agents/qwen-code",
+                  "fr/agents/kimi-code"
                 ]
               }
             ]
@@ -300,13 +306,13 @@
     "links": [
       {
         "label": "GitHub",
-        "href": "https://github.com/BloopAI/agents-chatgroup"
+        "href": "https://github.com/StarterraAI/AgentsChatGroup"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Get Started",
-      "href": "https://agents-chatgroup.com/docs"
+      "href": "https://docs.agentschatgroup.com"
     }
   },
   "contextual": {
@@ -329,7 +335,7 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/BloopAI/agents-chatgroup",
+      "github": "https://github.com/StarterraAI/AgentsChatGroup",
       "x": "https://x.com/agents-chatgroup"
     }
   }

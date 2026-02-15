@@ -20,7 +20,7 @@ impl SessionManager {
         let namespace = namespace.into();
         let mut vk_dir = dirs::home_dir()
             .ok_or_else(|| io::Error::other("Could not determine home directory"))?
-            .join(".agent-chatgroup");
+            .join(".agents-chatgroup");
 
         if cfg!(debug_assertions) {
             vk_dir = vk_dir.join("dev");

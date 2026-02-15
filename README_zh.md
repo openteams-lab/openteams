@@ -1,5 +1,5 @@
 ﻿<p align="center">
-  <img src="../frontend/public/agent-chatgroup-logo-dark.png" alt="Agent ChatGroup" width="400">
+  <img src="../frontend/public/agents-chatgroup-logo-dark.png" alt="Agent ChatGroup" width="400">
 </p>
 
 
@@ -14,8 +14,8 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/agent-chatgroup"><img alt="npm" src="https://img.shields.io/npm/v/agent-chatgroup?style=flat-square" /></a>
-  <a href="https://github.com/BloopAI/agent-chatgroup/blob/main/.github/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/BloopAI/agent-chatgroup/.github%2Fworkflows%2Fpublish.yml" /></a>
+  <a href="https://www.npmjs.com/package/agents-chatgroup"><img alt="npm" src="https://img.shields.io/npm/v/agents-chatgroup?style=flat-square" /></a>
+  <a href="https://github.com/BloopAI/agents-chatgroup/blob/main/.github/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/BloopAI/agents-chatgroup/.github%2Fworkflows%2Fpublish.yml" /></a>
   <a href="#"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
 </p>
 
@@ -163,7 +163,7 @@
 
 下载最新版本的安装包：
 
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/BloopAI/agent-chatgroup/releases/latest)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
 
 </details>
 
@@ -178,7 +178,7 @@ npx agents-chatgroup
 
 **方式二：下载客户端**
 
-[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/BloopAI/agent-chatgroup/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
 
 </details>
 
@@ -195,14 +195,14 @@ npx agents-chatgroup
 
 ## 文档
 
-📚 完整文档请访问：[AgentsChatGroup Docs](https://agent-chatgroup.dev/docs)
+📚 完整文档请访问：[AgentsChatGroup Docs](https://agents-chatgroup.dev/docs)
 
 | 文档 | 描述 |
 |------|------|
-| [快速入门指南](https://agent-chatgroup.dev/docs/quickstart) | 5 分钟上手 AgentsChatGroup |
-| [配置说明](https://agent-chatgroup.dev/docs/configuration) | 详细配置参数说明 |
-| [Agent 配置指南](https://agent-chatgroup.dev/docs/agents) | 如何配置和管理 Agent |
-| [常见问题 FAQ](https://agent-chatgroup.dev/docs/faq) | 常见问题解答 |
+| [快速入门指南](https://agents-chatgroup.dev/docs/quickstart) | 5 分钟上手 AgentsChatGroup |
+| [配置说明](https://agents-chatgroup.dev/docs/configuration) | 详细配置参数说明 |
+| [Agent 配置指南](https://agents-chatgroup.dev/docs/agents) | 如何配置和管理 Agent |
+| [常见问题 FAQ](https://agents-chatgroup.dev/docs/faq) | 常见问题解答 |
 
 ## 社区与支持
 
@@ -210,8 +210,8 @@ npx agents-chatgroup
 
 | 渠道 | 链接 |
 |------|------|
-| 🐛 **Bug 反馈** | [GitHub Issues](https://github.com/BloopAI/agent-chatgroup/issues) |
-| 💬 **功能讨论** | [GitHub Discussions](https://github.com/BloopAI/agent-chatgroup/discussions) |
+| 🐛 **Bug 反馈** | [GitHub Issues](https://github.com/StarterraAI/AgentsChatGroup/issues) |
+| 💬 **功能讨论** | [GitHub Discussions](https://github.com/StarterraAI/AgentsChatGroup/discussions) |
 | 💭 **社区群** | *即将开放，敬请期待* |
 
 ## 本地开发
@@ -237,8 +237,8 @@ cargo install sqlx-cli     # 数据库管理
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/BloopAI/agent-chatgroup.git
-cd agent-chatgroup
+git clone https://github.com/StarterraAI/AgentsChatGroup.git
+cd agents-chatgroup
 
 # 2. 安装依赖
 pnpm i
@@ -306,7 +306,7 @@ pnpm dev -- --port $env:FRONTEND_PORT --host
 4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 开启一个 **Pull Request**
 
-> 💡 在提交 PR 之前，建议先通过 [Issue](https://github.com/BloopAI/agent-chatgroup/issues) 或 [Discussion](https://github.com/BloopAI/agent-chatgroup/discussions) 与我们讨论你的想法。
+> 💡 在提交 PR 之前，建议先通过 [Issue](https://github.com/StarterraAI/AgentsChatGroup/issues) 或 [Discussion](https://github.com/StarterraAI/AgentsChatGroup/discussions) 与我们讨论你的想法。
 
 ## 开源协议
 

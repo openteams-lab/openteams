@@ -28,7 +28,7 @@ const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
           </div>
           <DialogDescription className="text-left space-y-4 pt-4">
             <p>
-              agent-chatgroup runs AI coding agents with{' '}
+              agents-chatgroup runs AI coding agents with{' '}
               <code>--dangerously-skip-permissions</code> / <code>--yolo</code>{' '}
               by default, giving them unrestricted access to execute code and
               run commands on your system.
@@ -41,12 +41,12 @@ const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
             <p>
               Learn more at{' '}
               <a
-                href="https://www.agent-chatgroup.com/docs/getting-started#safety-notice"
+                href="https://www.agents-chatgroup.com/docs/getting-started#safety-notice"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 dark:text-blue-400 underline hover:no-underline"
               >
-                https://www.agent-chatgroup.com/docs/getting-started#safety-notice
+                https://www.agents-chatgroup.com/docs/getting-started#safety-notice
               </a>
             </p>
           </DialogDescription>

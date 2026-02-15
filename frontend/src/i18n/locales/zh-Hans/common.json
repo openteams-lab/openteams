@@ -112,7 +112,7 @@
     "banner": "开发模式 - 这是开发版本"
   },
   "oauth": {
-    "title": "登录 agent-chatgroup",
+    "title": "登录 agents-chatgroup",
     "description": "登录以加入组织并与团队共享任务",
     "continueWithGitHub": "使用 GitHub 继续",
     "continueWithGoogle": "使用 Google 继续",
@@ -259,7 +259,7 @@
   },
   "betaWorkspaces": {
     "title": "试用新界面",
-    "intro": "我们从头重建了 agent-chatgroup 的界面，您已被邀请试用。",
+    "intro": "我们从头重建了 agents-chatgroup 的界面，您已被邀请试用。",
     "newUiDescription": "新界面针对日常工作进行了优化：管理代理、预览更改和审查代码。它还解锁了旧界面中不可用的功能：",
     "newFeatures": {
       "multiRepo": "同时编辑多个仓库",
@@ -280,7 +280,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "欢迎",
-      "content": "欢迎使用 Workspaces，这是 agent-chatgroup 的全新设计界面。我们正在向部分用户推出以获取早期反馈。您可以随时通过导航栏中的反馈图标分享您的想法。"
+      "content": "欢迎使用 Workspaces，这是 agents-chatgroup 的全新设计界面。我们正在向部分用户推出以获取早期反馈。您可以随时通过导航栏中的反馈图标分享您的想法。"
     },
     "commandBar": {
       "title": "命令栏",

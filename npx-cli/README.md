@@ -1,20 +1,20 @@
-﻿# agent-chatgroup
+﻿# agents-chatgroup
 
 > A visual project management tool for developers that integrates with git repositories and coding agents like Claude Code and Amp.
 
 ## Quick Start
 
-Run agent-chatgroup instantly without installation:
+Run agents-chatgroup instantly without installation:
 
 ```bash
-npx agent-chatgroup
+npx agents-chatgroup
 ```
 
 This will launch the application locally and open it in your browser automatically.
 
-## What is agent-chatgroup?
+## What is agents-chatgroup?
 
-agent-chatgroup is a modern project management tool designed specifically for developers. It helps you organize your coding projects with kanban-style task management while providing powerful integrations with git repositories and AI coding agents.
+agents-chatgroup is a modern project management tool designed specifically for developers. It helps you organize your coding projects with kanban-style task management while providing powerful integrations with git repositories and AI coding agents.
 
 ### 鉁?Key Features
 
@@ -62,7 +62,7 @@ agent-chatgroup is a modern project management tool designed specifically for de
 
 ## Core Functionality
 
-agent-chatgroup provides a complete project management experience with these key capabilities:
+agents-chatgroup provides a complete project management experience with these key capabilities:
 
 **Project Repository Management**
 - Full CRUD operations for managing coding projects
@@ -97,7 +97,7 @@ agent-chatgroup provides a complete project management experience with these key
 
 ## Configuration
 
-agent-chatgroup supports customization through its configuration system:
+agents-chatgroup supports customization through its configuration system:
 
 - **Editor Integration**: Choose your preferred code editor
 - **Sound Notifications**: Customize completion sounds
@@ -153,7 +153,7 @@ agent-chatgroup supports customization through its configuration system:
 **Ready to supercharge your development workflow?**
 
 ```bash
-npx agent-chatgroup
+npx agents-chatgroup
 ```
 
 *Start managing your projects with the power of AI coding agents today!*

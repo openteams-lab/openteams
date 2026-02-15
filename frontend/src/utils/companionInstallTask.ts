@@ -1,14 +1,14 @@
 export const COMPANION_INSTALL_TASK_TITLE =
-  'Install and integrate agent-chatgroup Web Companion';
+  'Install and integrate agents-chatgroup Web Companion';
 
-export const COMPANION_INSTALL_TASK_DESCRIPTION = `Goal: Install and integrate the agent-chatgroup-web-companion so it renders at the app root in development.
+export const COMPANION_INSTALL_TASK_DESCRIPTION = `Goal: Install and integrate the agents-chatgroup-web-companion so it renders at the app root in development.
 
 Do:
 1) Detect package manager from lockfiles and use it:
-   - pnpm-lock.yaml â†?pnpm add agent-chatgroup-web-companion
-   - yarn.lock â†?yarn add agent-chatgroup-web-companion
-   - package-lock.json â†?npm i agent-chatgroup-web-companion
-   - bun.lockb â†?bun add agent-chatgroup-web-companion
+   - pnpm-lock.yaml â†?pnpm add agents-chatgroup-web-companion
+   - yarn.lock â†?yarn add agents-chatgroup-web-companion
+   - package-lock.json â†?npm i agents-chatgroup-web-companion
+   - bun.lockb â†?bun add agents-chatgroup-web-companion
    If already listed in package.json dependencies, skip install.
 
 2) Detect framework and app entry:
@@ -19,7 +19,7 @@ Do:
    Confirm by reading package.json and directory structure.
 
 3) Integrate the component:
-   import { AgentChatgroupWebCompanion } from 'agent-chatgroup-web-companion';
+   import { AgentChatgroupWebCompanion } from 'agents-chatgroup-web-companion';
    - Vite/CRA: render <AgentChatgroupWebCompanion /> at the app root.
    - Next.js (pages): render in pages/_app.*
    - Next.js (app): render in app/layout.* or a client providers component.
@@ -30,7 +30,7 @@ Do:
    - Ensure it compiles and renders without SSR/hydration errors.
 
 Acceptance:
-- agent-chatgroup-web-companion is installed in the correct package.
+- agents-chatgroup-web-companion is installed in the correct package.
 - The component is rendered once at the app root without SSR/hydration errors.
 - Build/type-check passes.`;
 

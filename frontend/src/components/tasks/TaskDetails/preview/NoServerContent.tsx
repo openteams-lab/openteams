@@ -165,7 +165,7 @@ export function NoServerContent({
               </Button>
               <div>
                 <a
-                  href="https://github.com/BloopAI/agent-chatgroup-web-companion"
+                  href="https://github.com/StarterraAI/AgentsChatGroup"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"

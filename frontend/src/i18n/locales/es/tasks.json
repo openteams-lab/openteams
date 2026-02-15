@@ -302,7 +302,7 @@
       "changeTarget": "Cambiar destino",
       "loginRequired": {
         "title": "Inicia sesión para gestionar acciones de Git",
-        "description": "Inicia sesión en agent-chatgroup para enviar ramas, fusionar cambios o abrir pull requests para esta tarea.",
+        "description": "Inicia sesión en agents-chatgroup para enviar ramas, fusionar cambios o abrir pull requests para esta tarea.",
         "action": "Iniciar sesión"
       }
     },
@@ -513,12 +513,12 @@
   "showcases": {
     "taskPanel": {
       "companion": {
-        "title": "agent-chatgroup Companion: Apuntar y Hacer Clic",
+        "title": "agents-chatgroup Companion: Apuntar y Hacer Clic",
         "description": "Haz clic en cualquier componente de la interfaz en la ventana de vista previa para seleccionarlo con precisión. El agente de codificación recibe selectores DOM exactos y jerarquía de componentes, eliminando comentarios ambiguos."
       },
       "installation": {
         "title": "Instalación del Servidor de Desarrollo y Companion",
-        "description": "Configura un comando de servidor de desarrollo para vistas previas, con un script de configuración configurable en ajustes. Usa un agente de codificación para instalar automáticamente el companion web de agent-chatgroup."
+        "description": "Configura un comando de servidor de desarrollo para vistas previas, con un script de configuración configurable en ajustes. Usa un agente de codificación para instalar automáticamente el companion web de agents-chatgroup."
       },
       "codeReview": {
         "title": "Revisión de Código Integrada",

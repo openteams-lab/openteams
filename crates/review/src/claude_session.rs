@@ -126,7 +126,7 @@ pub fn discover_projects() -> Result<Vec<ClaudeProject>, ReviewError> {
 /// Extract a friendly project name from the Claude directory name
 fn extract_project_name(dir_name: &str) -> String {
     // Directory names look like:
-    // "-private-var-folders-m1-9q-ct1913z10v6wbnv54j25r0000gn-T-agent-chatgroup-worktrees-a04a-store-payloads-i"
+    // "-private-var-folders-m1-9q-ct1913z10v6wbnv54j25r0000gn-T-agents-chatgroup-worktrees-a04a-store-payloads-i"
     // We want to extract the meaningful part after "worktrees-"
     if let Some(idx) = dir_name.find("worktrees-") {
         let after_worktrees = &dir_name[idx + "worktrees-".len()..];
@@ -451,14 +451,14 @@ mod tests {
     fn test_extract_project_name() {
         assert_eq!(
             extract_project_name(
-                "-private-var-folders-m1-9q-ct1913z10v6wbnv54j25r0000gn-T-agent-chatgroup-worktrees-a04a-store-payloads-i"
+                "-private-var-folders-m1-9q-ct1913z10v6wbnv54j25r0000gn-T-agents-chatgroup-worktrees-a04a-store-payloads-i"
             ),
             "store-payloads-i"
         );
 
         assert_eq!(
             extract_project_name(
-                "-private-var-folders-m1-9q-ct1913z10v6wbnv54j25r0000gn-T-agent-chatgroup-worktrees-1ff1-new-rust-binary"
+                "-private-var-folders-m1-9q-ct1913z10v6wbnv54j25r0000gn-T-agents-chatgroup-worktrees-1ff1-new-rust-binary"
             ),
             "new-rust-binary"
         );

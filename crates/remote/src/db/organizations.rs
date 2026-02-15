@@ -365,7 +365,7 @@ fn personal_org_slug(user_id: Uuid) -> String {
 
 /// Derive an issue prefix from an organization name.
 /// Takes the first 3 uppercase letters from the name.
-/// Examples: "Bloop" -> "BLO", "My Project" -> "MYP"
+/// Examples: "StarTerraAI" -> "STR", "My Project" -> "MYP"
 fn derive_issue_prefix(name: &str) -> String {
     let letters: String = name.chars().filter(|c| c.is_ascii_alphabetic()).collect();
     let prefix: String = letters.chars().take(3).collect::<String>().to_uppercase();

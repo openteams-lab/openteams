@@ -107,9 +107,9 @@ pub fn normalize_macos_private_alias<P: AsRef<Path>>(p: P) -> PathBuf {
 
 pub fn get_agent_chatgroup_temp_dir() -> std::path::PathBuf {
     let dir_name = if cfg!(debug_assertions) {
-        "agent-chatgroup-dev"
+        "agents-chatgroup-dev"
     } else {
-        "agent-chatgroup"
+        "agents-chatgroup"
     };
 
     if cfg!(target_os = "macos") {
@@ -119,7 +119,7 @@ pub fn get_agent_chatgroup_temp_dir() -> std::path::PathBuf {
         // Linux: use /var/tmp instead of /tmp to avoid RAM usage
         std::path::PathBuf::from("/var/tmp").join(dir_name)
     } else {
-        // Windows and other platforms: use temp dir with agent-chatgroup subdirectory
+        // Windows and other platforms: use temp dir with agents-chatgroup subdirectory
         std::env::temp_dir().join(dir_name)
     }
 }
@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn test_make_path_relative_macos_private_alias() {
         // Simulate a worktree under /var with a path reported under /private/var
-        let worktree = "/var/folders/zz/abc123/T/agent-chatgroup-dev/worktrees/acg-test";
+        let worktree = "/var/folders/zz/abc123/T/agents-chatgroup-dev/worktrees/acg-test";
         let path_under_private = format!(
             "/private/var{}/hello-world.txt",
             worktree.strip_prefix("/var").unwrap()
