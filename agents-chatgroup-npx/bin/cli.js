@@ -13,7 +13,7 @@ const CLI_VERSION = require("../package.json").version;
 // Configuration
 // ================================
 
-const REPO_URL = "https://github.com/anthropics/agents-chatgroup.git";
+const REPO_URL = "https://github.com/StarterraAI/AgentsChatGroup";
 const INSTALL_DIR = path.join(os.homedir(), ".agents-chatgroup");
 const SOURCE_DIR = path.join(INSTALL_DIR, "source");
 const CONFIG_DIR = path.join(INSTALL_DIR, "config");

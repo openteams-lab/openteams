@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
+    <!-- Property to track user's choice: 1 = keep core data, 0 = delete all -->
+    <Property Id="KEEPUSERDATA" Value="1" />
+
     <SetProperty
       Id="INSTALLDIR"
       Value="[INSTALLDIR]agents_chatgroup\"
@@ -14,9 +17,57 @@
   </Fragment>
 
   <Fragment>
-    <!-- Remove all user data/cache on full uninstall (but keep data during upgrades). -->
+    <!-- Show dialog to ask user whether to keep data (bilingual: Chinese/English) -->
     <CustomAction
-      Id="CleanupAgentChatgroupData"
+      Id="ShowUninstallDialog"
+      Script="vbscript"
+      Execute="immediate"
+      Return="check"
+    >
+      <![CDATA[
+        On Error Resume Next
+        Dim shell, lang, title, msg, result
+        Set shell = CreateObject("WScript.Shell")
+        lang = ""
+        lang = shell.RegRead("HKEY_CURRENT_USER\Control Panel\International\LocaleName")
+
+        If InStr(lang, "zh") > 0 Then
+          title = "卸载选项"
+          msg = "是否保留您的数据以便将来使用？" & vbCrLf & vbCrLf & _
+                "点击「是」保留核心数据（数据库、配置、凭据）" & vbCrLf & _
+                "点击「否」删除所有数据" & vbCrLf & vbCrLf & _
+                "注意：无论选择哪个选项，缓存和临时工作区都将被删除。"
+        Else
+          title = "Uninstall Options"
+          msg = "Would you like to keep your data for future use?" & vbCrLf & vbCrLf & _
+                "Click 'Yes' to keep core data (database, config, credentials)" & vbCrLf & _
+                "Click 'No' to delete all data" & vbCrLf & vbCrLf & _
+                "Note: Cache and temporary workspaces will be removed regardless."
+        End If
+
+        result = MsgBox(msg, vbYesNo + vbQuestion, title)
+
+        If result = vbYes Then
+          Session.Property("KEEPUSERDATA") = "1"
+        Else
+          Session.Property("KEEPUSERDATA") = "0"
+        End If
+      ]]>
+    </CustomAction>
+
+    <!-- Cleanup cache only (keep core data: db.sqlite, config.json, profiles.json, credentials.json) -->
+    <CustomAction
+      Id="CleanupCacheOnly"
+      Directory="INSTALLDIR"
+      Execute="deferred"
+      Impersonate="yes"
+      ExeCommand="powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command &quot;$ErrorActionPreference = 'SilentlyContinue'; $workspaceRoot = $null; $configPaths = @((Join-Path $env:APPDATA 'agents-chatgroup\config.json'), (Join-Path $env:APPDATA 'ai\agents-chatgroup\config.json')); foreach ($configPath in $configPaths) { if (Test-Path -LiteralPath $configPath) { try { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json; if ($config.workspace_dir) { $workspaceRoot = Join-Path $config.workspace_dir '.agents-chatgroup-workspaces'; break } } catch {} } }; $paths = @((Join-Path $env:LOCALAPPDATA 'utils'), (Join-Path $env:LOCALAPPDATA 'ai\utils'), (Join-Path $env:LOCALAPPDATA 'agents-chatgroup'), (Join-Path $env:LOCALAPPDATA 'ai\agents-chatgroup'), (Join-Path $env:TEMP 'agents-chatgroup'), (Join-Path $env:TEMP 'agents-chatgroup-dev')); if ($workspaceRoot) { $paths += $workspaceRoot }; foreach ($path in $paths) { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue } }&quot;"
+      Return="ignore"
+    />
+
+    <!-- Remove all user data/cache on full uninstall -->
+    <CustomAction
+      Id="CleanupAllData"
       Directory="INSTALLDIR"
       Execute="deferred"
       Impersonate="yes"
@@ -25,8 +76,19 @@
     />
 
     <InstallExecuteSequence>
-      <Custom Action="CleanupAgentChatgroupData" Before="RemoveFiles">
+      <!-- Show dialog before cleanup, only on full uninstall (not during upgrades) -->
+      <Custom Action="ShowUninstallDialog" Before="CleanupCacheOnly">
         REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE
+      </Custom>
+
+      <!-- Execute cache-only cleanup when user chooses to keep core data -->
+      <Custom Action="CleanupCacheOnly" Before="RemoveFiles">
+        REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE AND KEEPUSERDATA="1"
+      </Custom>
+
+      <!-- Execute full cleanup when user chooses to delete all data -->
+      <Custom Action="CleanupAllData" Before="RemoveFiles">
+        REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE AND KEEPUSERDATA="0"
       </Custom>
     </InstallExecuteSequence>
   </Fragment>

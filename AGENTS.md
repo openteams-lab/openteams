@@ -2,12 +2,20 @@
 
 ## Project Overview
 
-Agent-Chatgroup is a multi-agent conversation platform where multiple AI agents can collaborate in shared chat sessions. Key features:
+**AgentsChatGroup** is a multi-agent conversation platform where multiple AI agents (Claude Code, Gemini CLI, Codex, QWen Coder, etc.) can collaborate in shared chat sessions like a real team. Key features:
 - **Multi-agent chat sessions** with real-time streaming
 - **Context synchronization** across agents
 - **Agent execution tracking** with diffs and logs
 - **Session archive/restore** functionality
 - **Permission-based access control**
+
+### Supported AI Agents
+- Claude Code (`@anthropic-ai/claude-code`)
+- Gemini CLI (`@google/gemini-cli`)
+- Codex (`@openai/codex`)
+- QWen Coder (`@qwen-code/qwen-code`)
+- Amp
+- More coming soon
 
 ## Project Structure & Module Organization
 
@@ -22,11 +30,11 @@ Agent-Chatgroup is a multi-agent conversation platform where multiple AI agents 
 - `crates/services/`: Business logic
   - `chat.rs`: Message parsing, mentions, attachments
   - `chat_runner.rs`: Agent execution orchestration, WebSocket streaming
-- `crates/executors/`, `crates/utils/`, `crates/deployment/`, `crates/local-deployment/`: Supporting crates
+- `crates/executors/`, `crates/utils/`, `crates/deployment/`, `crates/local-deployment/`, `crates/git/`, `crates/review/`: Supporting crates
 
 ### Frontend
 - `frontend/`: Main React + TypeScript application (Vite, Tailwind)
-  - `src/pages/ui-new/`: **New design** pages (ChatSessions.tsx, Workspaces.tsx, ProjectKanban.tsx)
+  - `src/pages/ui-new/`: **New design** pages (ChatSessions.tsx, Workspaces.tsx, WorkspacesLanding.tsx, ProjectKanban.tsx, VSCodeWorkspacePage.tsx, MigratePage.tsx)
   - `src/pages/`: **Legacy design** pages (Projects.tsx, ProjectTasks.tsx - wrapped in LegacyDesignScope)
   - `src/components/ui-new/`: New design system components
     - `primitives/`: ChatBoxBase, CreateChatBox, SessionChatBox
@@ -39,7 +47,7 @@ Agent-Chatgroup is a multi-agent conversation platform where multiple AI agents 
     - `legacy/index.css` + `tailwind.legacy.config.js` (scoped to `.legacy-design`)
 - `remote-frontend/`: Lightweight remote deployment frontend
 - `shared/`: Generated TypeScript types from Rust (`shared/types.ts` - auto-generated, do not edit)
-- `npx-cli/`: NPM CLI package files
+- `agents-chatgroup-npx/`: NPM CLI package (`agents-chatgroup`) for cross-platform installer and runner
 - `scripts/`: Development helpers (port management, DB preparation, desktop packaging)
 - `docs/`: Documentation (Mintlify setup)
 - `src-tauri/`: Tauri desktop application configuration
@@ -126,7 +134,7 @@ Do not manually edit shared/types.ts, instead edit crates/server/src/bin/generat
 - Generate TS types from Rust: `pnpm run generate-types` (or `generate-types:check` in CI)
 - Prepare SQLx (offline): `pnpm run prepare-db`
 - Prepare SQLx (remote package, postgres): `pnpm run remote:prepare-db`
-- Local NPX build: `pnpm run build:npx` then `pnpm pack` in `npx-cli/`
+- Local NPX build: `pnpm run build:npx` then `pnpm pack` in `agents-chatgroup-npx/`
 
 ## Coding Style & Naming Conventions
 - Rust: `rustfmt` enforced (`rustfmt.toml`); group imports by crate; snake_case modules, PascalCase types.

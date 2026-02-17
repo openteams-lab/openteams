@@ -149,7 +149,7 @@ export function SessionListSidebar({
           <div className="chat-session-left-header px-base py-base">
             <div className="chat-session-left-brand">
               <img
-                src="/agents-chatgroup-logo-white.png"
+                src="/agent-chatgroup-logo-white.png"
                 alt="Agents ChatGroup"
                 className="chat-session-left-brand-logo"
               />
