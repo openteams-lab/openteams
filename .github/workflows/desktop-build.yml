@@ -1,0 +1,198 @@
+name: Build Desktop App
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - macos
+          - windows
+          - linux
+      macos_sign_and_notarize:
+        description: 'Sign and notarize macOS build'
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 22
+  PNPM_VERSION: 10.13.1
+  RUST_TOOLCHAIN: nightly-2025-12-04
+  CARGO_TERM_COLOR: always
+
+jobs:
+  tauri-build:
+    name: Build ${{ matrix.platform }}
+    if: ${{ inputs.platform == 'all' || inputs.platform == matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            os: macos-latest
+            artifact_name: desktop-macos
+            artifact_paths: |
+              src-tauri/target/release/bundle/dmg/*.dmg
+          - platform: windows
+            os: windows-latest
+            artifact_name: desktop-windows
+            artifact_paths: |
+              src-tauri/target/release/bundle/msi/*.msi
+          - platform: linux
+            os: ubuntu-22.04
+            artifact_name: desktop-linux
+            artifact_paths: |
+              src-tauri/target/release/bundle/appimage/*.AppImage
+              src-tauri/target/release/bundle/deb/*.deb
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y \
+            libwebkit2gtk-4.0-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            patchelf
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build desktop bundle
+        run: pnpm desktop:build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: Validate macOS signing secrets
+        if: runner.os == 'macOS' && inputs.macos_sign_and_notarize == 'true'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APP_STORE_API_KEY: ${{ secrets.APP_STORE_API_KEY }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for key in APPLE_CERTIFICATE_P12_BASE64 APPLE_CERTIFICATE_PASSWORD APP_STORE_API_KEY; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Resolve macOS bundle path
+        id: macos_bundle
+        if: runner.os == 'macOS' && inputs.macos_sign_and_notarize == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' | head -n 1 || true)
+          if [ -z "$app_path" ]; then
+            echo "::error::No .app bundle found under src-tauri/target/release/bundle/macos"
+            exit 1
+          fi
+          mkdir -p signed
+          echo "app_path=$app_path" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Apple certificate and API key
+        if: runner.os == 'macOS' && inputs.macos_sign_and_notarize == 'true'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APP_STORE_API_KEY: ${{ secrets.APP_STORE_API_KEY }}
+        run: |
+          set -euo pipefail
+          echo "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > certificate.p12
+          printf '%s' "$APP_STORE_API_KEY" > app_store_key.json
+
+      - name: Sign macOS app bundle
+        if: runner.os == 'macOS' && inputs.macos_sign_and_notarize == 'true'
+        uses: BloopAI/apple-code-sign-action@v1
+        with:
+          input_path: ${{ steps.macos_bundle.outputs.app_path }}
+          output_path: signed/agents-chatgroup.app
+          p12_file: certificate.p12
+          p12_password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          sign: true
+          sign_args: '--code-signature-flags=runtime'
+
+      - name: Create signed DMG from signed app
+        id: signed_dmg
+        if: runner.os == 'macOS' && inputs.macos_sign_and_notarize == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          signed_dmg='src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg'
+          rm -f "$signed_dmg"
+          hdiutil create -volname 'agents-chatgroup' -srcfolder 'signed/agents-chatgroup.app' -ov -format UDZO "$signed_dmg"
+          echo "signed_dmg=$signed_dmg" >> "$GITHUB_OUTPUT"
+
+      - name: Notarize signed DMG (macOS)
+        if: runner.os == 'macOS' && inputs.macos_sign_and_notarize == 'true'
+        uses: BloopAI/apple-code-sign-action@main
+        with:
+          input_path: ${{ steps.signed_dmg.outputs.signed_dmg }}
+          sign: false
+          notarize: true
+          app_store_connect_api_key_json_file: app_store_key.json
+
+      - name: Staple notarization ticket to DMG
+        if: runner.os == 'macOS' && inputs.macos_sign_and_notarize == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun stapler staple '${{ steps.signed_dmg.outputs.signed_dmg }}'
+
+      - name: Upload signed desktop artifacts (macOS)
+        if: runner.os == 'macOS' && inputs.macos_sign_and_notarize == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload desktop artifacts
+        if: runner.os != 'macOS' || inputs.macos_sign_and_notarize != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_paths }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Clean up signing files (macOS)
+        if: runner.os == 'macOS' && always()
+        shell: bash
+        run: |
+          rm -f certificate.p12 app_store_key.json

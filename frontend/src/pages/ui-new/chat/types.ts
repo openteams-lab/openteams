@@ -5,6 +5,9 @@ import type {
 
 export type StreamRun = {
   agentId: string;
+  thinkingContent: string;
+  assistantContent: string;
+  // Backward-compatible alias used by some existing views.
   content: string;
   isFinal: boolean;
 };

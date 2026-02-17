@@ -37,6 +37,9 @@ export function StreamingRunEntry({
     runnerType,
     agentName
   );
+  const assistantContent = run.assistantContent || run.content;
+  const hasThinking = run.thinkingContent.trim().length > 0;
+  const hasAssistant = assistantContent.trim().length > 0;
 
   return (
     <div key={`stream-${runId}`} className="chat-session-message-row is-agent flex justify-start">
@@ -87,7 +90,17 @@ export function StreamingRunEntry({
           </div>
         }
       >
-        <ChatMarkdown content={run.content} />
+        {hasThinking && (
+          <div className="mb-base rounded-lg border border-border bg-secondary/40 px-base py-half">
+            <div className="mb-half text-xs text-low">{t('agent.thinking')}</div>
+            <ChatMarkdown content={run.thinkingContent} />
+          </div>
+        )}
+        {hasAssistant ? (
+          <ChatMarkdown content={assistantContent} />
+        ) : (
+          <div className="text-xs text-low">{t('agent.processing')}</div>
+        )}
       </ChatEntryContainer>
     </div>
   );
