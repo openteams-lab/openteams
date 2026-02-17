@@ -1,0 +1,87 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    remove|purge)
+        # Get the original user (not root) when running via sudo
+        REAL_USER="${SUDO_USER:-$USER}"
+        REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+
+        # Detect language
+        LANG_CODE=$(echo "$LANG" | cut -d'_' -f1)
+
+        if [[ "$LANG_CODE" == "zh" ]]; then
+            TITLE="卸载选项"
+            MSG="是否删除所有用户数据？\n\n点击「是」删除所有数据\n点击「否」保留核心数据（数据库、配置、凭据）\n\n注意：缓存和临时工作区将被删除。"
+            YES_TEXT="是 - 删除所有数据"
+            NO_TEXT="否 - 保留核心数据"
+        else
+            TITLE="Uninstall Options"
+            MSG="Delete all user data?\n\nClick 'Yes' to delete all data\nClick 'No' to keep core data (database, config, credentials)\n\nNote: Cache and temp workspaces will be removed."
+            YES_TEXT="Yes - Delete all data"
+            NO_TEXT="No - Keep core data"
+        fi
+
+        DELETE_ALL=false
+
+        # Try zenity first (GNOME), then kdialog (KDE), then whiptail (terminal)
+        if command -v zenity &> /dev/null && [ -n "$DISPLAY" ]; then
+            if zenity --question --title="$TITLE" --text="$MSG" --ok-label="$YES_TEXT" --cancel-label="$NO_TEXT" 2>/dev/null; then
+                DELETE_ALL=true
+            fi
+        elif command -v kdialog &> /dev/null && [ -n "$DISPLAY" ]; then
+            if kdialog --title "$TITLE" --yesno "$MSG" 2>/dev/null; then
+                DELETE_ALL=true
+            fi
+        elif command -v whiptail &> /dev/null; then
+            if whiptail --title "$TITLE" --yesno "$MSG" 12 70 2>/dev/null; then
+                DELETE_ALL=true
+            fi
+        else
+            # Fallback: use read in terminal (default to keeping data)
+            echo ""
+            echo "=== $TITLE ==="
+            echo -e "$MSG"
+            echo ""
+            echo "Delete all data? (y/N)"
+            read -r answer
+            if [[ "$answer" =~ ^[Yy]$ ]]; then
+                DELETE_ALL=true
+            fi
+        fi
+
+        # Data directories
+        DATA_DIR="$REAL_HOME/.local/share/ai.starterra.ai/agents-chatgroup"
+        CACHE_DIR="$REAL_HOME/.cache/ai.starterra.ai/agents-chatgroup"
+        TEMP_DIR="/var/tmp/agents-chatgroup"
+
+        # Always delete cache and temp
+        if [ -d "$CACHE_DIR" ]; then
+            rm -rf "$CACHE_DIR" 2>/dev/null || true
+        fi
+        if [ -d "$TEMP_DIR" ]; then
+            rm -rf "$TEMP_DIR" 2>/dev/null || true
+        fi
+
+        if [ "$DELETE_ALL" = true ]; then
+            # Read workspace_dir from config before deleting
+            CONFIG_FILE="$DATA_DIR/config.json"
+            if [ -f "$CONFIG_FILE" ]; then
+                WORKSPACE_DIR=$(grep -o '"workspace_dir"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" 2>/dev/null | sed 's/.*: *"\([^"]*\)".*/\1/' || true)
+                if [ -n "$WORKSPACE_DIR" ]; then
+                    WORKSPACE_ROOT="$WORKSPACE_DIR/.agents-chatgroup-workspaces"
+                    if [ -d "$WORKSPACE_ROOT" ]; then
+                        rm -rf "$WORKSPACE_ROOT" 2>/dev/null || true
+                    fi
+                fi
+            fi
+
+            # Delete all data
+            if [ -d "$DATA_DIR" ]; then
+                rm -rf "$DATA_DIR" 2>/dev/null || true
+            fi
+        fi
+        ;;
+esac
+
+exit 0

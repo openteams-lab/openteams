@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "agents-chatgroup",
-    "version": "0.1.4"
+    "version": "0.1.0"
   },
   "tauri": {
     "allowlist": {
@@ -19,7 +19,6 @@
       "identifier": "com.agents-chatgroup.desktop",
       "icon": [
         "icons/icon.png",
-        "icons/icon.ico",
         "icons/icon.icns"
       ],
       "windows": {
@@ -27,6 +26,11 @@
           "fragmentPaths": [
             "wix/fragments/agents-chatgroup-directory.wxs"
           ]
+        }
+      },
+      "deb": {
+        "files": {
+          "/DEBIAN/postrm": "debian/postrm"
         }
       },
       "externalBin": [

@@ -1,16 +1,16 @@
 {
   "name": "agents-chatgroup",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "AI Coding Agents Chatgroup - Cross-platform installer and runner",
   "author": "starterra.ai",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/anthropics/agents-chatgroup"
+    "url": "https://github.com/StarterraAI/AgentsChatGroup"
   },
-  "homepage": "https://github.com/anthropics/agents-chatgroup",
+  "homepage": "https://github.com/StarterraAI/AgentsChatGroup",
   "bugs": {
-    "url": "https://github.com/anthropics/agents-chatgroup/issues"
+    "url": "https://github.com/StarterraAI/AgentsChatGroup/issues"
   },
   "keywords": [
     "ai",

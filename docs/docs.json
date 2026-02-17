@@ -3,7 +3,7 @@
   "theme": "mint",
   "name": "agents-chatgroup",
   "basePath": "/docs",
-  "description": "",
+  "description": "AgentsChatGroup - Make multiple AI Agents work together like a real team.",
   "appearance": {
     "default": "light"
   },
@@ -18,7 +18,7 @@
       "dark": "#2F2F2D"
     }
   },
-  "favicon": "/logos/favicon.svg",
+  "favicon": "/logos/favicon_black.svg",
   "navigation": {
     "languages": [
       {
