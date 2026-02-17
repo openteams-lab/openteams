@@ -9,8 +9,8 @@ on:
         description: 'Release tag (e.g., v1.2.3)'
         required: true
       release_id:
-        description: 'GitHub release ID'
-        required: true
+        description: 'GitHub release ID (optional; use only numeric release id)'
+        required: false
 
 concurrency:
   group: publish
@@ -38,9 +38,11 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "ref=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "release_tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
             echo "release_id=${{ inputs.release_id }}" >> "$GITHUB_OUTPUT"
           else
             echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "release_tag=${{ github.event.release.tag_name || github.ref_name }}" >> "$GITHUB_OUTPUT"
             echo "release_id=${{ github.event.release.id }}" >> "$GITHUB_OUTPUT"
           fi
 
@@ -59,32 +61,59 @@ jobs:
         uses: actions/github-script@v8
         env:
           RELEASE_ID: ${{ steps.meta.outputs.release_id }}
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
         with:
           script: |
             const fs = require('fs');
             const path = require('path');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const releaseIdRaw = (process.env.RELEASE_ID || '').trim();
+            const releaseTag = (process.env.RELEASE_TAG || '').trim();
 
-            const releaseId = process.env.RELEASE_ID;
-            if (!releaseId) {
-              core.setFailed('No release ID found.');
-              return;
+            let release;
+            if (context.payload.release?.id && Array.isArray(context.payload.release.assets)) {
+              release = context.payload.release;
+            } else if (context.payload.release?.id) {
+              release = (
+                await github.rest.repos.getRelease({
+                  owner,
+                  repo,
+                  release_id: Number(context.payload.release.id)
+                })
+              ).data;
+            } else if (/^\d+$/.test(releaseIdRaw)) {
+              release = (
+                await github.rest.repos.getRelease({
+                  owner,
+                  repo,
+                  release_id: Number(releaseIdRaw)
+                })
+              ).data;
+            } else {
+              const tagForLookup = releaseTag || releaseIdRaw;
+              if (!tagForLookup) {
+                core.setFailed('No valid release identifier found. Provide tag_name or numeric release_id.');
+                return;
+              }
+              release = (
+                await github.rest.repos.getReleaseByTag({
+                  owner,
+                  repo,
+                  tag: tagForLookup
+                })
+              ).data;
             }
 
-            const release = await github.rest.repos.getRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: releaseId
-            });
-
-            const tgzAsset = release.data.assets.find((asset) => asset.name.endsWith('.tgz'));
+            const tgzAsset = release.assets.find((asset) => asset.name.endsWith('.tgz'));
             if (!tgzAsset) {
               core.setFailed('No .tgz file found in release assets');
               return;
             }
 
             const response = await github.rest.repos.getReleaseAsset({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               asset_id: tgzAsset.id,
               headers: {
                 Accept: 'application/octet-stream'
@@ -125,19 +154,44 @@ jobs:
         uses: actions/github-script@v8
         env:
           RELEASE_ID: ${{ steps.meta.outputs.release_id }}
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
         with:
           script: |
-            const releaseId = process.env.RELEASE_ID;
-            const release = await github.rest.repos.getRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: releaseId
-            });
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const releaseIdRaw = (process.env.RELEASE_ID || '').trim();
+            const releaseTag = (process.env.RELEASE_TAG || '').trim();
 
-            const currentBody = release.data.body || '';
+            let release;
+            if (context.payload.release) {
+              release = context.payload.release;
+            } else if (/^\d+$/.test(releaseIdRaw)) {
+              release = (
+                await github.rest.repos.getRelease({
+                  owner,
+                  repo,
+                  release_id: Number(releaseIdRaw)
+                })
+              ).data;
+            } else {
+              const tagForLookup = releaseTag || releaseIdRaw;
+              if (!tagForLookup) {
+                core.setFailed('No valid release identifier found when updating release notes.');
+                return;
+              }
+              release = (
+                await github.rest.repos.getReleaseByTag({
+                  owner,
+                  repo,
+                  tag: tagForLookup
+                })
+              ).data;
+            }
+
+            const currentBody = release.body || '';
             await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: releaseId,
+              owner,
+              repo,
+              release_id: release.id,
               body: currentBody + '\n\nPublished to npm registry'
             });
