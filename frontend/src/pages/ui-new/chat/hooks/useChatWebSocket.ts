@@ -75,15 +75,27 @@ export function useChatWebSocket(
     (payload: ChatStreamEvent & { type: 'agent_delta' }) => {
       setStreamingRuns((prev) => {
         const previous = prev[payload.run_id];
-        const content =
-          payload.delta && previous
-            ? `${previous.content}${payload.content}`
-            : payload.content;
+        const streamType = payload.stream_type ?? 'assistant';
+        const previousAssistant =
+          previous?.assistantContent ?? previous?.content ?? '';
+        const previousThinking = previous?.thinkingContent ?? '';
+        const applyDelta = (base: string) =>
+          payload.delta ? `${base}${payload.content}` : payload.content;
+        const assistantContent =
+          streamType === 'thinking'
+            ? previousAssistant
+            : applyDelta(previousAssistant);
+        const thinkingContent =
+          streamType === 'thinking'
+            ? applyDelta(previousThinking)
+            : previousThinking;
         return {
           ...prev,
           [payload.run_id]: {
             agentId: payload.agent_id,
-            content,
+            thinkingContent,
+            assistantContent,
+            content: assistantContent,
             isFinal: payload.is_final,
           },
         };

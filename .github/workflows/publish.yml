@@ -82,8 +82,8 @@ jobs:
               }
             });
             
-            // Save to npx-cli directory
-            const filePath = path.join('npx-cli', tgzAsset.name);
+            // Save to agents-chatgroup-npx directory
+            const filePath = path.join('agents-chatgroup-npx', tgzAsset.name);
             fs.writeFileSync(filePath, Buffer.from(response.data));
             
             console.log(`Downloaded ${tgzAsset.name} to ${filePath}`);
@@ -95,7 +95,7 @@ jobs:
       - name: Verify package integrity
         id: verify
         run: |
-          cd npx-cli
+          cd agents-chatgroup-npx
           
           # List files to confirm download
           ls -la *.tgz
@@ -109,7 +109,7 @@ jobs:
 
       - name: Publish to npm
         run: |
-          cd npx-cli
+          cd agents-chatgroup-npx
 
           # Publish the exact same package that was tested
           PACKAGE_FILE="${{ steps.verify.outputs.package-file }}"

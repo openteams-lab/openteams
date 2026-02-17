@@ -113,6 +113,7 @@ pub enum ChatStreamEvent {
         session_agent_id: Uuid,
         agent_id: Uuid,
         run_id: Uuid,
+        stream_type: ChatStreamDeltaType,
         content: String,
         delta: bool,
         is_final: bool,
@@ -130,6 +131,14 @@ pub enum ChatStreamEvent {
         agent_id: Uuid,
         status: MentionStatus,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ChatStreamDeltaType {
+    Assistant,
+    Thinking,
 }
 
 #[derive(Debug, Error)]
@@ -1327,9 +1336,22 @@ impl ChatRunner {
                     }
                     Ok(LogMsg::JsonPatch(patch)) => {
                         if let Some((index, entry)) = extract_normalized_entry_from_patch(&patch) {
-                            if matches!(entry.entry_type, NormalizedEntryType::AssistantMessage) {
+                            let stream_type = match entry.entry_type {
+                                NormalizedEntryType::AssistantMessage => {
+                                    Some(ChatStreamDeltaType::Assistant)
+                                }
+                                NormalizedEntryType::Thinking => {
+                                    Some(ChatStreamDeltaType::Thinking)
+                                }
+                                _ => None,
+                            };
+
+                            if let Some(stream_type) = stream_type {
                                 let current = entry.content;
-                                let previous = last_content.get(&index).cloned().unwrap_or_default();
+                                let previous = last_content
+                                    .get(&index)
+                                    .cloned()
+                                    .unwrap_or_default();
                                 let (delta, is_delta) = if current.starts_with(&previous) {
                                     (current[previous.len()..].to_string(), true)
                                 } else {
@@ -1337,7 +1359,9 @@ impl ChatRunner {
                                 };
 
                                 last_content.insert(index, current.clone());
-                                latest_assistant = current.clone();
+                                if matches!(stream_type, ChatStreamDeltaType::Assistant) {
+                                    latest_assistant = current.clone();
+                                }
 
                                 if !delta.is_empty() {
                                     let _ = sender.send(ChatStreamEvent::AgentDelta {
@@ -1345,6 +1369,7 @@ impl ChatRunner {
                                         session_agent_id,
                                         agent_id,
                                         run_id,
+                                        stream_type,
                                         content: delta,
                                         delta: is_delta,
                                         is_final: false,
@@ -1415,6 +1440,7 @@ impl ChatRunner {
                             session_agent_id,
                             agent_id,
                             run_id,
+                            stream_type: ChatStreamDeltaType::Assistant,
                             content: latest_assistant.clone(),
                             delta: false,
                             is_final: true,

@@ -114,8 +114,8 @@ jobs:
             new_tag="v${new_version}-${timestamp}"
           fi
 
-          # Update npx-cli package.json to match
-          cd npx-cli
+          # Update agents-chatgroup-npx package.json to match
+          cd agents-chatgroup-npx
           npm version $new_version --no-git-tag-version --allow-same-version
           cd ..
 
@@ -142,7 +142,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add package.json pnpm-lock.yaml npx-cli/package.json frontend/package.json Cargo.lock
+          git add package.json pnpm-lock.yaml agents-chatgroup-npx/package.json frontend/package.json Cargo.lock
           git add $(find . -name Cargo.toml)
           [ -f crates/remote/Cargo.lock ] && git add crates/remote/Cargo.lock || true
           git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
@@ -203,7 +203,7 @@ jobs:
     needs: [bump-version, build-frontend]
     runs-on: ${{ matrix.os }}
     strategy:
-      # Platform matrix - keep target/name in sync with package-npx-cli job
+      # Platform matrix - keep target/name in sync with package-cli job
       matrix:
         include:
           - target: x86_64-unknown-linux-musl
@@ -486,7 +486,7 @@ jobs:
           cargo sweep --time 30
 
 
-  package-npx-cli:
+  package-cli:
     needs: [bump-version, build-frontend, build-backend]
     runs-on: ubuntu-latest-m
     strategy:
@@ -549,7 +549,7 @@ jobs:
       - name: Create platform package
         if: matrix.name != 'macos-arm64' && matrix.name != 'macos-x64'
         run: |
-          mkdir -p npx-cli/dist/${{ matrix.name }}
+          mkdir -p agents-chatgroup-npx/dist/${{ matrix.name }}
           mkdir agents-chatgroup-${{ matrix.name }}
           mkdir agents-chatgroup-mcp-${{ matrix.name }}
           mkdir agents-chatgroup-review-${{ matrix.name }}
@@ -558,28 +558,28 @@ jobs:
           cp dist/agents-chatgroup-mcp-${{ matrix.name }}* agents-chatgroup-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
           cp dist/agents-chatgroup-review-${{ matrix.name }}* agents-chatgroup-review-${{ matrix.name }}/${{ matrix.review_binary }}
 
-          zip -j npx-cli/dist/${{ matrix.name }}/agents-chatgroup.zip agents-chatgroup-${{ matrix.name }}/${{ matrix.binary }}
-          zip -j npx-cli/dist/${{ matrix.name }}/agents-chatgroup-mcp.zip agents-chatgroup-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
-          zip -j npx-cli/dist/${{ matrix.name }}/agents-chatgroup-review.zip agents-chatgroup-review-${{ matrix.name }}/${{ matrix.review_binary }}
+          zip -j agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup.zip agents-chatgroup-${{ matrix.name }}/${{ matrix.binary }}
+          zip -j agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup-mcp.zip agents-chatgroup-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
+          zip -j agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup-review.zip agents-chatgroup-review-${{ matrix.name }}/${{ matrix.review_binary }}
 
       - name: Create platform package (macOS)
         if: matrix.name == 'macos-arm64' || matrix.name == 'macos-x64'
         run: |
-          mkdir -p npx-cli/dist/${{ matrix.name }}
+          mkdir -p agents-chatgroup-npx/dist/${{ matrix.name }}
           mkdir agents-chatgroup-${{ matrix.name }}
-          cp dist/agents-chatgroup-${{ matrix.name }}* npx-cli/dist/${{ matrix.name }}/agents-chatgroup.zip
-          cp dist/agents-chatgroup-mcp-${{ matrix.name }}* npx-cli/dist/${{ matrix.name }}/agents-chatgroup-mcp.zip
-          cp dist/agents-chatgroup-review-${{ matrix.name }}* npx-cli/dist/${{ matrix.name }}/agents-chatgroup-review.zip
+          cp dist/agents-chatgroup-${{ matrix.name }}* agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup.zip
+          cp dist/agents-chatgroup-mcp-${{ matrix.name }}* agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup-mcp.zip
+          cp dist/agents-chatgroup-review-${{ matrix.name }}* agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup-review.zip
 
       - name: Upload platform package artifact
         uses: actions/upload-artifact@v6
         with:
           name: npx-platform-${{ matrix.name }}
-          path: npx-cli/dist/
+          path: agents-chatgroup-npx/dist/
           retention-days: 1
 
   upload-to-r2:
-    needs: [bump-version, package-npx-cli]
+    needs: [bump-version, package-cli]
     runs-on: ubuntu-latest-m
     steps:
       - uses: actions/checkout@v6
@@ -672,8 +672,153 @@ jobs:
             --endpoint-url "$ENDPOINT" \
             --recursive
 
+  build-desktop-installers:
+    needs: [bump-version]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            artifact_name: desktop-installer-windows
+            artifact_paths: |
+              src-tauri/target/release/bundle/msi/*.msi
+          - platform: macos
+            os: macos-15-xlarge
+            artifact_name: desktop-installer-macos
+            artifact_paths: |
+              src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump-version.outputs.new_tag }}
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install WiX Toolset (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install wixtoolset --no-progress -y
+          $wixPath = "${env:ProgramFiles(x86)}\WiX Toolset v3.11\bin"
+          if (Test-Path $wixPath) {
+            $wixPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build desktop bundle
+        run: pnpm desktop:build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: Validate macOS signing secrets
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APP_STORE_API_KEY: ${{ secrets.APP_STORE_API_KEY }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for key in APPLE_CERTIFICATE_P12_BASE64 APPLE_CERTIFICATE_PASSWORD APP_STORE_API_KEY; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Resolve macOS bundle path
+        id: macos_bundle
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' | head -n 1 || true)
+          if [ -z "$app_path" ]; then
+            echo "::error::No .app bundle found under src-tauri/target/release/bundle/macos"
+            exit 1
+          fi
+          mkdir -p signed
+          echo "app_path=$app_path" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Apple certificate and API key
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APP_STORE_API_KEY: ${{ secrets.APP_STORE_API_KEY }}
+        run: |
+          set -euo pipefail
+          echo "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > certificate.p12
+          printf '%s' "$APP_STORE_API_KEY" > app_store_key.json
+
+      - name: Sign macOS app bundle
+        if: runner.os == 'macOS'
+        uses: BloopAI/apple-code-sign-action@v1
+        with:
+          input_path: ${{ steps.macos_bundle.outputs.app_path }}
+          output_path: signed/agents-chatgroup.app
+          p12_file: certificate.p12
+          p12_password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          sign: true
+          sign_args: "--code-signature-flags=runtime"
+
+      - name: Create signed DMG from signed app
+        id: signed_dmg
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          signed_dmg='src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg'
+          rm -f "$signed_dmg"
+          hdiutil create -volname 'agents-chatgroup' -srcfolder 'signed/agents-chatgroup.app' -ov -format UDZO "$signed_dmg"
+          echo "signed_dmg=$signed_dmg" >> "$GITHUB_OUTPUT"
+
+      - name: Notarize signed DMG (macOS)
+        if: runner.os == 'macOS'
+        uses: BloopAI/apple-code-sign-action@main
+        with:
+          input_path: ${{ steps.signed_dmg.outputs.signed_dmg }}
+          sign: false
+          notarize: true
+          app_store_connect_api_key_json_file: app_store_key.json
+
+      - name: Staple notarization ticket to DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun stapler staple '${{ steps.signed_dmg.outputs.signed_dmg }}'
+
+      - name: Upload desktop installer artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_paths }}
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Clean up signing files (macOS)
+        if: runner.os == 'macOS' && always()
+        shell: bash
+        run: |
+          rm -f certificate.p12 app_store_key.json
+
   create-prerelease:
-    needs: [bump-version, build-frontend, upload-to-r2]
+    needs: [bump-version, build-frontend, upload-to-r2, build-desktop-installers]
     runs-on: ubuntu-latest-m
     steps:
       - uses: actions/checkout@v6
@@ -686,10 +831,19 @@ jobs:
           name: frontend-dist
           path: frontend/dist/
 
+      - name: Download desktop installer artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: desktop-installer-*
+          path: release-assets/desktop/
+          merge-multiple: true
+
       - name: List downloaded artifacts
         run: |
           echo "Frontend dist:"
           find frontend/dist
+          echo "Desktop installers:"
+          find release-assets/desktop
 
       - name: Zip frontend
         run: |
@@ -702,7 +856,7 @@ jobs:
 
       - name: Inject R2 URL and tag, then Pack
         run: |
-          cd npx-cli
+          cd agents-chatgroup-npx
           # Replace placeholders with actual values
           sed -i "s|__R2_PUBLIC_URL__|${{ secrets.R2_BINARIES_PUBLIC_URL }}|g" bin/download.js
           sed -i "s|__BINARY_TAG__|${{ needs.bump-version.outputs.new_tag }}|g" bin/download.js
@@ -717,5 +871,6 @@ jobs:
           generate_release_notes: true
           files: |
             agents-chatgroup-${{ needs.bump-version.outputs.new_tag }}.zip
-            npx-cli/agents-chatgroup-*.tgz
-
+            agents-chatgroup-npx/agents-chatgroup-*.tgz
+            release-assets/desktop/*.msi
+            release-assets/desktop/*.dmg
