@@ -1573,7 +1573,7 @@ checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 
 [[package]]
 name = "db"
-version = "0.1.4"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1643,7 +1643,7 @@ dependencies = [
 
 [[package]]
 name = "deployment"
-version = "0.1.4"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2068,7 +2068,7 @@ checksum = "dbfd0e7fc632dec5e6c9396a27bc9f9975b4e039720e1fd3e34021d3ce28c415"
 
 [[package]]
 name = "env_filter"
-version = "0.1.4"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1bf3c259d255ca70051b30e2e95b5446cdb8949ac4cd22c0d7fd634d89f568e2"
 dependencies = [
@@ -2169,7 +2169,7 @@ dependencies = [
 
 [[package]]
 name = "executors"
-version = "0.1.4"
+version = "0.1.0"
 dependencies = [
  "agent-client-protocol",
  "async-trait",
@@ -2344,7 +2344,7 @@ dependencies = [
 
 [[package]]
 name = "fluent-uri"
-version = "0.1.4"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17c704e9dbe1ddd863da1e6ff3567795087b1eb201ce80d8fa81162e1516500d"
 dependencies = [
@@ -2603,7 +2603,7 @@ checksum = "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7"
 
 [[package]]
 name = "git"
-version = "0.1.4"
+version = "0.1.0"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
@@ -3240,7 +3240,7 @@ dependencies = [
 
 [[package]]
 name = "inout"
-version = "0.1.4"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879f10e63c20629ecabbb64a8010319738c66a5cd0c29b02d63d272b03751d01"
 dependencies = [
@@ -3645,7 +3645,7 @@ checksum = "6373607a59f0be73a39b6fe456b8192fcc3585f602af20751600e974dd455e77"
 
 [[package]]
 name = "local-deployment"
-version = "0.1.4"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4913,7 +4913,7 @@ dependencies = [
 
 [[package]]
 name = "potential_utf"
-version = "0.1.4"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b73949432f5e2a09657003c25bca5e19a0e9c84f8058ca374f49e0ebe605af77"
 dependencies = [
@@ -5350,7 +5350,7 @@ dependencies = [
 
 [[package]]
 name = "review"
-version = "0.1.4"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -6186,7 +6186,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.1.4"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -6235,7 +6235,7 @@ dependencies = [
 
 [[package]]
 name = "services"
-version = "0.1.4"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7726,7 +7726,7 @@ dependencies = [
 
 [[package]]
 name = "unarray"
-version = "0.1.4"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
 
@@ -7759,7 +7759,7 @@ dependencies = [
 
 [[package]]
 name = "unicode-properties"
-version = "0.1.4"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7df058c713841ad818f1dc5d3fd88063241cc61f49f5fbea4b951e8cf5a8d71d"
 
@@ -7838,7 +7838,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utils"
-version = "0.1.4"
+version = "0.1.0"
 dependencies = [
  "axum",
  "bytes",
