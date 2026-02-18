@@ -14,7 +14,7 @@ vk-billing = ["dep:billing"]
 
 [dependencies]
 # private crate for billing functionality
-billing = { git = "git@github.com:StarterraAI/AgentsChatGroup.git", branch = "main", package = "billing", optional = true }
+billing = { git = "ssh://git@github.com/StarterraAI/AgentsChatGroup.git", branch = "main", package = "billing", optional = true }
 
 anyhow = "1.0"
 axum = { version = "0.8.4", features = ["macros", "multipart", "ws"] }
@@ -57,4 +57,3 @@ flate2 = "1.0"
 paste = "1.0"
 
 [workspace]
-
