@@ -134,7 +134,21 @@ jobs:
 
       - name: Update remote crate lockfile
         if: ${{ steps.ssh-setup.outcome == 'success' }}
-        run: cargo generate-lockfile --manifest-path crates/remote/Cargo.toml
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOG_FILE="$(mktemp)"
+          if cargo generate-lockfile --manifest-path crates/remote/Cargo.toml 2>&1 | tee "$LOG_FILE"; then
+            exit 0
+          fi
+
+          if grep -Fq "no matching package named \`billing\` found" "$LOG_FILE"; then
+            echo "Warning: billing crate is unavailable in configured git source. Skipping remote lockfile update."
+            exit 0
+          fi
+
+          echo "Update remote crate lockfile failed with an unexpected error."
+          exit 1
 
       - name: Stop SSH agent
         if: ${{ steps.ssh-setup.outcome == 'success' }}
