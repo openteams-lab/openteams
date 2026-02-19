@@ -102,7 +102,7 @@ jobs:
             patchelf
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Build desktop bundle
         run: pnpm desktop:build
