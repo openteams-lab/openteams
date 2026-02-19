@@ -18,7 +18,7 @@ import {
   AgentBrandIcon,
   getAgentAvatarSeed,
   getAgentAvatarStyle,
-} from '../avatar';
+} from '../Avatar';
 
 const allowedAttachmentExtensions = [
   '.txt', '.csv', '.md', '.json', '.xml', '.yaml', '.yml',

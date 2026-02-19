@@ -640,6 +640,11 @@ export function ChatSessions() {
   }, [sessionMembers]);
 
   const isArchived = activeSession?.status === ChatSessionStatus.archived;
+  const activeSessionTitle = activeSession?.title ?? '';
+  const streamingRunCount = useMemo(
+    () => Object.keys(streamingRuns).length,
+    [streamingRuns]
+  );
 
   const placeholderAgents = useMemo(
     () =>
@@ -809,10 +814,10 @@ export function ChatSessions() {
 
   // Title editing
   useEffect(() => {
-    setTitleDraft(activeSession?.title ?? '');
+    setTitleDraft(activeSessionTitle);
     setIsEditingTitle(false);
     setTitleError(null);
-  }, [activeSession?.id]);
+  }, [activeSession?.id, activeSessionTitle]);
 
   useEffect(() => {
     if (activeSession?.status === ChatSessionStatus.archived) {
@@ -835,7 +840,7 @@ export function ChatSessions() {
   }, [
     activeSessionId,
     lastMessageId,
-    Object.keys(streamingRuns).length,
+    streamingRunCount,
     placeholderAgents.length,
   ]);
 

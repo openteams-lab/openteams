@@ -20,6 +20,10 @@ type MentionAcknowledgedEvent = {
 };
 
 type ChatStreamPayload = ChatStreamEvent | MentionAcknowledgedEvent;
+type AgentDeltaPayload = Extract<ChatStreamEvent, { type: 'agent_delta' }> & {
+  type: 'agent_delta';
+  stream_type?: 'assistant' | 'thinking';
+};
 
 export interface UseChatWebSocketResult {
   streamingRuns: Record<string, StreamRun>;
@@ -72,7 +76,7 @@ export function useChatWebSocket(
   );
 
   const handleAgentDelta = useCallback(
-    (payload: ChatStreamEvent & { type: 'agent_delta' }) => {
+    (payload: AgentDeltaPayload) => {
       setStreamingRuns((prev) => {
         const previous = prev[payload.run_id];
         const streamType = payload.stream_type ?? 'assistant';
@@ -224,7 +228,13 @@ export function useChatWebSocket(
       if (reconnectTimer) clearTimeout(reconnectTimer);
       ws?.close();
     };
-  }, [activeSessionId, handleMessageNew, handleAgentDelta, handleAgentState]);
+  }, [
+    activeSessionId,
+    handleMessageNew,
+    handleAgentDelta,
+    handleAgentState,
+    handleMentionAcknowledged,
+  ]);
 
   // Reset state when session changes
   useEffect(() => {
