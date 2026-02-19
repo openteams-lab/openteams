@@ -7,7 +7,7 @@ import {
   AgentBrandIcon,
   getAgentAvatarSeed,
   getAgentAvatarStyle,
-} from '../Avatar';
+} from '../AgentAvatar';
 import type { StreamRun, MessageTone } from '../types';
 
 export interface StreamingRunEntryProps {
