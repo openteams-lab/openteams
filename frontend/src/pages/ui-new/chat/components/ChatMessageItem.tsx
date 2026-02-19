@@ -22,7 +22,7 @@ import {
   AgentBrandIcon,
   getAgentAvatarSeed,
   getAgentAvatarStyle,
-} from '../avatar';
+} from '../Avatar';
 import type {
   ChatAttachment,
   DiffMeta,

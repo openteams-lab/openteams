@@ -18,7 +18,7 @@ import {
   AgentBrandIcon,
   getAgentAvatarSeed,
   getAgentAvatarStyle,
-} from '../avatar';
+} from '../Avatar';
 
 const truncateByChars = (value: string, maxChars: number): string => {
   const chars = Array.from(value);

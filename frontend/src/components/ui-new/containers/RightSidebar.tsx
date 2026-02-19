@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
 import { FileTreeContainer } from '@/components/ui-new/containers/FileTreeContainer';
 import { ProcessListContainer } from '@/components/ui-new/containers/ProcessListContainer';
 import { PreviewControlsContainer } from '@/components/ui-new/containers/PreviewControlsContainer';
@@ -10,7 +9,7 @@ import { CreateModeAddReposSectionContainer } from '@/components/ui-new/containe
 import { WorkspaceNotesContainer } from '@/components/ui-new/containers/WorkspaceNotesContainer';
 import { useChangesView } from '@/contexts/ChangesViewContext';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
-import { ArrowsOutSimpleIcon } from '@phosphor-icons/react';
+import { ArrowsOutSimpleIcon, XIcon } from '@phosphor-icons/react';
 import { useLogsPanel } from '@/contexts/LogsPanelContext';
 import type { RepoWithTargetBranch, Workspace } from 'shared/types';
 import {
@@ -220,7 +219,7 @@ export function RightSidebar({
           aria-label={t('common:buttons.close')}
           title="Close sidebar"
         >
-          <X className="h-4 w-4" />
+          <XIcon className="h-4 w-4" />
         </button>
       </div>
       <div className="flex-1 overflow-y-auto">
