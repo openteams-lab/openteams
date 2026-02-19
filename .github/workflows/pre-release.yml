@@ -230,9 +230,6 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-14
             name: macos-arm64
-          - target: aarch64-pc-windows-msvc
-            os: ubuntu-latest
-            name: windows-arm64
     env:
       CARGO_INCREMENTAL: "0"
       SCCACHE_GHA_ENABLED: "true"
@@ -365,15 +362,6 @@ jobs:
           export AWS_LC_SYS_TARGET_CXX_x86_64_unknown_linux_gnu=clang++
           export CC_x86_64_unknown_linux_gnu=clang
           export CXX_x86_64_unknown_linux_gnu=clang++
-
-          if [[ "${{ matrix.target }}" == "aarch64-pc-windows-msvc" ]]; then
-            # ring requires clang on arm64 windows. See https://github.com/briansmith/ring/issues/2117
-            chmod +x scripts/ring-cc-wrapper.sh scripts/clang
-            export PATH="${{ github.workspace }}/scripts:$PATH"
-            export RING_CC=/usr/lib/llvm-19/bin/clang
-            export DEFAULT_CC=clang-cl
-            export CC_aarch64_pc_windows_msvc="${{ github.workspace }}/scripts/ring-cc-wrapper.sh"
-          fi
           cargo xwin build --cross-compiler clang-cl --release --target ${{ matrix.target }} -p server -p review --bin server --bin mcp_task_server --bin review
         env:
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
@@ -535,11 +523,6 @@ jobs:
             binary: agents-chatgroup
             mcp_binary: agents-chatgroup-mcp
             review_binary: agents-chatgroup-review
-          - target: aarch64-pc-windows-msvc
-            name: windows-arm64
-            binary: agents-chatgroup.exe
-            mcp_binary: agents-chatgroup-mcp.exe
-            review_binary: agents-chatgroup-review.exe
           - target: aarch64-unknown-linux-musl
             name: linux-arm64
             binary: agents-chatgroup
@@ -665,7 +648,7 @@ jobs:
             const fs = require('fs');
             const crypto = require('crypto');
             const manifest = { version: '$TAG', platforms: {} };
-            const platforms = ['linux-x64', 'linux-arm64', 'windows-x64', 'windows-arm64', 'macos-x64', 'macos-arm64'];
+            const platforms = ['linux-x64', 'linux-arm64', 'windows-x64', 'macos-x64', 'macos-arm64'];
             const binaries = ['agents-chatgroup', 'agents-chatgroup-mcp', 'agents-chatgroup-review'];
 
             for (const platform of platforms) {
@@ -687,7 +670,7 @@ jobs:
           "
 
           # Upload binaries (use full tag for path, allows multiple pre-releases to coexist)
-          for platform in linux-x64 linux-arm64 windows-x64 windows-arm64 macos-x64 macos-arm64; do
+          for platform in linux-x64 linux-arm64 windows-x64 macos-x64 macos-arm64; do
             for binary in agents-chatgroup agents-chatgroup-mcp agents-chatgroup-review; do
               if [ -f "binaries/$platform/$binary.zip" ]; then
                 echo "Uploading binaries/$platform/$binary.zip..."
