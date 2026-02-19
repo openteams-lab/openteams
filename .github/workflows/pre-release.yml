@@ -349,6 +349,14 @@ jobs:
       - name: Build backend (Windows)
         if: runner.os == 'Linux' && contains(matrix.target, 'windows')
         run: |
+          # Keep host-compiled C code on GNU clang.
+          # Without this, cargo-xwin's clang-cl can leak into host builds
+          # (e.g. aws-lc-sys for x86_64-unknown-linux-gnu) and fail on GCC-style flags.
+          export HOST_CC=clang
+          export HOST_CXX=clang++
+          export CC_x86_64_unknown_linux_gnu=clang
+          export CXX_x86_64_unknown_linux_gnu=clang++
+
           if [[ "${{ matrix.target }}" == "aarch64-pc-windows-msvc" ]]; then
             # ring requires clang on arm64 windows. See https://github.com/briansmith/ring/issues/2117
             chmod +x scripts/ring-cc-wrapper.sh scripts/clang
@@ -754,7 +762,8 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=8192
 
-      - name: Validate macOS signing secrets
+      - name: Detect macOS signing configuration
+        id: macos_signing
         if: runner.os == 'macOS'
         shell: bash
         env:
@@ -766,17 +775,20 @@ jobs:
           missing=0
           for key in APPLE_CERTIFICATE_P12_BASE64 APPLE_CERTIFICATE_PASSWORD APP_STORE_API_KEY; do
             if [ -z "${!key}" ]; then
-              echo "::error::Missing secret: $key"
+              echo "::warning::Missing secret: $key"
               missing=1
             fi
           done
-          if [ "$missing" -ne 0 ]; then
-            exit 1
+          if [ "$missing" -eq 1 ]; then
+            echo "::notice::Apple signing/notarization disabled. Will upload unsigned DMG."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Resolve macOS bundle path
         id: macos_bundle
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -789,7 +801,7 @@ jobs:
           echo "app_path=$app_path" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Apple certificate and API key
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
         shell: bash
         env:
           APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
@@ -800,7 +812,7 @@ jobs:
           printf '%s' "$APP_STORE_API_KEY" > app_store_key.json
 
       - name: Sign macOS app bundle
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: ${{ steps.macos_bundle.outputs.app_path }}
@@ -812,7 +824,7 @@ jobs:
 
       - name: Create signed DMG from signed app
         id: signed_dmg
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -822,7 +834,7 @@ jobs:
           echo "signed_dmg=$signed_dmg" >> "$GITHUB_OUTPUT"
 
       - name: Notarize signed DMG (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
         uses: BloopAI/apple-code-sign-action@main
         with:
           input_path: ${{ steps.signed_dmg.outputs.signed_dmg }}
@@ -831,17 +843,27 @@ jobs:
           app_store_connect_api_key_json_file: app_store_key.json
 
       - name: Staple notarization ticket to DMG
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
         shell: bash
         run: |
           set -euo pipefail
           xcrun stapler staple '${{ steps.signed_dmg.outputs.signed_dmg }}'
 
-      - name: Upload desktop installer artifact
+      - name: Upload signed desktop installer artifact (macOS)
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_paths }}
+          path: ${{ steps.signed_dmg.outputs.signed_dmg }}
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload desktop installer artifact
+        if: runner.os != 'macOS' || steps.macos_signing.outputs.enabled != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ runner.os == 'macOS' && 'src-tauri/target/release/bundle/dmg/*.dmg' || matrix.artifact_paths }}
           if-no-files-found: error
           retention-days: 1
 
