@@ -5,7 +5,7 @@ import {
   AgentBrandIcon,
   getAgentAvatarSeed,
   getAgentAvatarStyle,
-} from '../Avatar';
+} from '../AgentAvatar';
 import type { SessionMember, AgentStateInfo, MessageTone } from '../types';
 
 export interface RunningAgentPlaceholderProps {
