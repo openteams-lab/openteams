@@ -25,7 +25,6 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
 
 env:
   NODE_VERSION: 22
@@ -247,34 +246,15 @@ jobs:
 
           echo "bundle_name=${bundle_name}" >> "$GITHUB_OUTPUT"
 
-      - name: Setup ORAS
-        uses: oras-project/setup-oras@v1
-
-      - name: Login to GHCR
-        shell: bash
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          echo "$GHCR_TOKEN" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Push desktop bundle to GitHub Packages (GHCR)
-        shell: bash
-        run: |
-          set -euo pipefail
-          owner_lc="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
-          repo_lc="$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')"
-          package_tag="${{ github.sha }}-${{ github.run_number }}-${{ github.run_attempt }}"
-          package_ref="ghcr.io/${owner_lc}/${repo_lc}/desktop-${{ matrix.platform }}:${package_tag}"
-
-          cd gh-package
-          echo "Pushing package: ${package_ref}"
-          oras push "$package_ref" \
-            --artifact-type application/vnd.agentschatgroup.desktop.bundle.v1+tar \
-            --annotation "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
-            --annotation "org.opencontainers.image.revision=${{ github.sha }}" \
-            "${{ steps.package_bundle.outputs.bundle_name }}:application/gzip" \
-            "${{ steps.package_bundle.outputs.bundle_name }}.sha256:text/plain"
+      - name: Upload desktop package bundle (direct download)
+        uses: actions/upload-artifact@v6
+        with:
+          name: desktop-package-${{ matrix.platform }}
+          path: |
+            gh-package/${{ steps.package_bundle.outputs.bundle_name }}
+            gh-package/${{ steps.package_bundle.outputs.bundle_name }}.sha256
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Clean up signing files (macOS)
         if: runner.os == 'macOS' && always()
