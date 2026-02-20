@@ -379,9 +379,6 @@ jobs:
           project: ${{ secrets.SENTRY_PROJECT }}
           version: 2.21.2
 
-      - name: Upload source maps to Sentry
-        run: sentry-cli debug-files upload --include-sources target/${{ matrix.target }}/release
-
       - name: Prepare binaries (non-macOS)
         if: runner.os != 'macOS'
         shell: bash
