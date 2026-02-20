@@ -225,7 +225,7 @@ jobs:
             os: ubuntu-latest
             name: windows-x64
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-14
             name: macos-x64
           - target: aarch64-apple-darwin
             os: macos-14
@@ -243,7 +243,15 @@ jobs:
         with:
           ref: ${{ needs.bump-version.outputs.new_tag }}
 
+      - name: Disable sccache on macOS
+        if: runner.os == 'macOS'
+        run: |
+          echo "RUSTC_WRAPPER=" >> "$GITHUB_ENV"
+          echo "SCCACHE_GHA_ENABLED=" >> "$GITHUB_ENV"
+          echo "SCCACHE_CACHE_SIZE=" >> "$GITHUB_ENV"
+
       - name: Setup sccache
+        if: runner.os != 'macOS'
         uses: BloopAI/sccache-action@main
 
       - name: Cache Rust toolchain
@@ -783,25 +791,37 @@ jobs:
 
   build-desktop-installers:
     needs: [bump-version]
-    runs-on: ${{ matrix.os }}
+    name: Build desktop ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform == 'macos' && 'macos-latest' || matrix.platform == 'windows' && 'windows-latest' || 'ubuntu-22.04' }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: windows
-            os: windows-latest
-            artifact_name: desktop-installer-windows
-            artifact_paths: |
-              src-tauri/target/release/bundle/msi/*.msi
-          - platform: macos
-            os: macos-latest
-            artifact_name: desktop-installer-macos
-            artifact_paths: |
-              src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg
+        platform: [macos, windows, linux]
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.bump-version.outputs.new_tag }}
+
+      - name: Resolve artifact metadata
+        id: artifact_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.platform }}" in
+            macos)
+              echo "name=desktop-installer-macos" >> "$GITHUB_OUTPUT"
+              ;;
+            windows)
+              echo "name=desktop-installer-windows" >> "$GITHUB_OUTPUT"
+              ;;
+            linux)
+              echo "name=desktop-installer-linux" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Unsupported platform: ${{ matrix.platform }}"
+              exit 1
+              ;;
+          esac
 
       - name: Setup Node
         uses: ./.github/actions/setup-node
@@ -812,7 +832,7 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: Install WiX Toolset (Windows)
-        if: runner.os == 'Windows'
+        if: matrix.platform == 'windows'
         shell: pwsh
         run: |
           choco install wixtoolset --no-progress -y
@@ -820,6 +840,18 @@ jobs:
           if (Test-Path $wixPath) {
             $wixPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           }
+
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y \
+            libwebkit2gtk-4.0-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            patchelf
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -917,25 +949,105 @@ jobs:
           xcrun stapler staple '${{ steps.signed_dmg.outputs.signed_dmg }}'
 
       - name: Upload signed desktop installer artifact (macOS)
-        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
+        if: matrix.platform == 'macos' && steps.macos_signing.outputs.enabled == 'true'
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.artifact_name }}
+          name: ${{ steps.artifact_meta.outputs.name }}
           path: ${{ steps.signed_dmg.outputs.signed_dmg }}
           if-no-files-found: error
           retention-days: 1
 
-      - name: Upload desktop installer artifact
-        if: runner.os != 'macOS' || steps.macos_signing.outputs.enabled != 'true'
+      - name: Upload desktop artifacts (Windows)
+        if: matrix.platform == 'windows'
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ runner.os == 'macOS' && 'src-tauri/target/release/bundle/dmg/*.dmg' || matrix.artifact_paths }}
+          name: ${{ steps.artifact_meta.outputs.name }}
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
           if-no-files-found: error
           retention-days: 1
 
+      - name: Upload desktop artifacts (Linux)
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.artifact_meta.outputs.name }}
+          path: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload desktop artifacts (macOS unsigned)
+        if: matrix.platform == 'macos' && steps.macos_signing.outputs.enabled != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.artifact_meta.outputs.name }}
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Prepare desktop package bundle
+        id: package_bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p gh-package/files
+
+          if [[ "${{ matrix.platform }}" == "macos" && "${{ steps.macos_signing.outputs.enabled }}" == "true" ]]; then
+            cp src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg gh-package/files/
+          elif [[ "${{ matrix.platform }}" == "linux" ]]; then
+            cp src-tauri/target/release/bundle/appimage/*.AppImage gh-package/files/
+            cp src-tauri/target/release/bundle/deb/*.deb gh-package/files/
+          elif [[ "${{ matrix.platform }}" == "windows" ]]; then
+            cp src-tauri/target/release/bundle/msi/*.msi gh-package/files/
+          else
+            cp src-tauri/target/release/bundle/dmg/*.dmg gh-package/files/
+          fi
+
+          if ! compgen -G "gh-package/files/*" > /dev/null; then
+            echo "::error::No desktop files found to package for ${{ matrix.platform }}"
+            exit 1
+          fi
+
+          bundle_name="agents-chatgroup-desktop-${{ matrix.platform }}-${{ github.sha }}.tar.gz"
+          (cd gh-package/files && tar -czf "../${bundle_name}" .)
+          (cd gh-package && sha256sum "${bundle_name}" > "${bundle_name}.sha256")
+
+          echo "bundle_name=${bundle_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup ORAS
+        uses: oras-project/setup-oras@v1
+
+      - name: Login to GHCR
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$GHCR_TOKEN" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Push desktop bundle to GitHub Packages (GHCR)
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner_lc="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          repo_lc="$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')"
+          package_tag="${{ github.sha }}-${{ github.run_number }}-${{ github.run_attempt }}"
+          package_ref="ghcr.io/${owner_lc}/${repo_lc}/desktop-${{ matrix.platform }}:${package_tag}"
+
+          cd gh-package
+          echo "Pushing package: ${package_ref}"
+          oras push "$package_ref" \
+            --artifact-type application/vnd.agentschatgroup.desktop.bundle.v1+tar \
+            --annotation "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --annotation "org.opencontainers.image.revision=${{ github.sha }}" \
+            "${{ steps.package_bundle.outputs.bundle_name }}:application/gzip" \
+            "${{ steps.package_bundle.outputs.bundle_name }}.sha256:text/plain"
+
       - name: Clean up signing files (macOS)
-        if: runner.os == 'macOS' && always()
+        if: matrix.platform == 'macos' && always()
         shell: bash
         run: |
           rm -f certificate.p12 app_store_key.json
@@ -1200,3 +1312,5 @@ jobs:
             agents-chatgroup-npx/agents-chatgroup-*.tgz
             release-assets/desktop/*.msi
             release-assets/desktop/*.dmg
+            release-assets/desktop/*.AppImage
+            release-assets/desktop/*.deb
