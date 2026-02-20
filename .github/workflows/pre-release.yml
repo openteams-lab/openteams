@@ -403,19 +403,54 @@ jobs:
           fi
 
       # Code signing for macOS only
-      - name: Prepare Apple certificate (macOS)
+      - name: Detect macOS backend signing configuration
+        id: macos_backend_signing
         if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APP_STORE_API_KEY: ${{ secrets.APP_STORE_API_KEY }}
+        run: |
+          set -euo pipefail
+          sign_enabled=true
+          notarize_enabled=true
+
+          for key in APPLE_CERTIFICATE_P12_BASE64 APPLE_CERTIFICATE_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "::warning::Missing secret: $key"
+              sign_enabled=false
+            fi
+          done
+
+          if [ "$sign_enabled" != "true" ]; then
+            notarize_enabled=false
+            echo "::notice::macOS backend signing disabled. Will package unsigned binaries."
+          fi
+
+          if [ -z "${APP_STORE_API_KEY}" ]; then
+            notarize_enabled=false
+            if [ "$sign_enabled" = "true" ]; then
+              echo "::notice::APP_STORE_API_KEY missing. Skipping notarization."
+            fi
+          fi
+
+          echo "sign_enabled=$sign_enabled" >> "$GITHUB_OUTPUT"
+          echo "notarize_enabled=$notarize_enabled" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Apple certificate (macOS)
+        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
         run: |
           echo "${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}" | base64 --decode > certificate.p12
 
       - name: Write API Key to file
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.notarize_enabled == 'true'
         env:
           API_KEY: ${{ secrets.APP_STORE_API_KEY }}
         run: echo $API_KEY > app_store_key.json
 
       - name: Sign main binary (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: target/${{ matrix.target }}/release/server
@@ -426,11 +461,11 @@ jobs:
           sign_args: "--code-signature-flags=runtime"
 
       - name: Package main binary (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
         run: zip agents-chatgroup.zip agents-chatgroup
 
       - name: Sign MCP binary (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: target/${{ matrix.target }}/release/mcp_task_server
@@ -441,11 +476,11 @@ jobs:
           sign_args: "--code-signature-flags=runtime"
 
       - name: Package MCP binary (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
         run: zip agents-chatgroup-mcp.zip agents-chatgroup-mcp
 
       - name: Sign Review binary (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: target/${{ matrix.target }}/release/review
@@ -456,11 +491,22 @@ jobs:
           sign_args: "--code-signature-flags=runtime"
 
       - name: Package Review binary (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
         run: zip agents-chatgroup-review.zip agents-chatgroup-review
 
+      - name: Package unsigned binaries (macOS)
+        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled != 'true'
+        run: |
+          cp target/${{ matrix.target }}/release/server agents-chatgroup
+          cp target/${{ matrix.target }}/release/mcp_task_server agents-chatgroup-mcp
+          cp target/${{ matrix.target }}/release/review agents-chatgroup-review
+          chmod +x agents-chatgroup agents-chatgroup-mcp agents-chatgroup-review
+          zip agents-chatgroup.zip agents-chatgroup
+          zip agents-chatgroup-mcp.zip agents-chatgroup-mcp
+          zip agents-chatgroup-review.zip agents-chatgroup-review
+
       - name: Notarize signed binaries (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.notarize_enabled == 'true'
         uses: BloopAI/apple-code-sign-action@main
         continue-on-error: true
         with:
@@ -472,7 +518,7 @@ jobs:
           notarize: true
           app_store_connect_api_key_json_file: app_store_key.json
 
-      - name: Prepare signed binaries (macOS)
+      - name: Prepare macOS binaries
         if: runner.os == 'macOS'
         run: |
           mkdir -p dist
@@ -484,6 +530,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           rm -f certificate.p12
+          rm -f app_store_key.json
           rm -rf private_keys/
 
       - name: Upload binary artifact
