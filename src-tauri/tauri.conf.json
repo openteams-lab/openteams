@@ -18,7 +18,7 @@
       "targets": ["msi", "dmg", "appimage", "deb"],
       "identifier": "com.agents-chatgroup.desktop",
       "icon": [
-        "icons/icon.png",
+        "icons/icon-square.png",
         "icons/icon.icns",
         "icons/icon.ico"
       ],

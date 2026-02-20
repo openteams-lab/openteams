@@ -25,6 +25,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
 
 env:
   NODE_VERSION: 22
@@ -52,28 +53,12 @@ jobs:
           case "${{ matrix.platform }}" in
             macos)
               echo "name=desktop-macos" >> "$GITHUB_OUTPUT"
-              {
-                echo "paths<<EOF"
-                echo "src-tauri/target/release/bundle/dmg/*.dmg"
-                echo "EOF"
-              } >> "$GITHUB_OUTPUT"
               ;;
             windows)
               echo "name=desktop-windows" >> "$GITHUB_OUTPUT"
-              {
-                echo "paths<<EOF"
-                echo "src-tauri/target/release/bundle/msi/*.msi"
-                echo "EOF"
-              } >> "$GITHUB_OUTPUT"
               ;;
             linux)
               echo "name=desktop-linux" >> "$GITHUB_OUTPUT"
-              {
-                echo "paths<<EOF"
-                echo "src-tauri/target/release/bundle/appimage/*.AppImage"
-                echo "src-tauri/target/release/bundle/deb/*.deb"
-                echo "EOF"
-              } >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "::error::Unsupported platform: ${{ matrix.platform }}"
@@ -203,13 +188,93 @@ jobs:
           retention-days: 7
 
       - name: Upload desktop artifacts
-        if: runner.os != 'macOS' || inputs.macos_sign_and_notarize != 'true'
+        if: matrix.platform == 'windows'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.artifact_meta.outputs.name }}
-          path: ${{ steps.artifact_meta.outputs.paths }}
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload desktop artifacts (Linux)
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.artifact_meta.outputs.name }}
+          path: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload desktop artifacts (macOS unsigned)
+        if: matrix.platform == 'macos' && inputs.macos_sign_and_notarize != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.artifact_meta.outputs.name }}
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Prepare desktop package bundle
+        id: package_bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p gh-package/files
+
+          if [[ "${{ matrix.platform }}" == "macos" && "${{ inputs.macos_sign_and_notarize }}" == "true" ]]; then
+            cp src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg gh-package/files/
+          elif [[ "${{ matrix.platform }}" == "linux" ]]; then
+            cp src-tauri/target/release/bundle/appimage/*.AppImage gh-package/files/
+            cp src-tauri/target/release/bundle/deb/*.deb gh-package/files/
+          elif [[ "${{ matrix.platform }}" == "windows" ]]; then
+            cp src-tauri/target/release/bundle/msi/*.msi gh-package/files/
+          else
+            cp src-tauri/target/release/bundle/dmg/*.dmg gh-package/files/
+          fi
+
+          if ! compgen -G "gh-package/files/*" > /dev/null; then
+            echo "::error::No desktop files found to package for ${{ matrix.platform }}"
+            exit 1
+          fi
+
+          bundle_name="agents-chatgroup-desktop-${{ matrix.platform }}-${{ github.sha }}.tar.gz"
+          (cd gh-package/files && tar -czf "../${bundle_name}" .)
+          (cd gh-package && sha256sum "${bundle_name}" > "${bundle_name}.sha256")
+
+          echo "bundle_name=${bundle_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup ORAS
+        uses: oras-project/setup-oras@v1
+
+      - name: Login to GHCR
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$GHCR_TOKEN" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Push desktop bundle to GitHub Packages (GHCR)
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner_lc="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          repo_lc="$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')"
+          package_tag="${{ github.sha }}-${{ github.run_number }}-${{ github.run_attempt }}"
+          package_ref="ghcr.io/${owner_lc}/${repo_lc}/desktop-${{ matrix.platform }}:${package_tag}"
+
+          cd gh-package
+          echo "Pushing package: ${package_ref}"
+          oras push "$package_ref" \
+            --artifact-type application/vnd.agentschatgroup.desktop.bundle.v1+tar \
+            --annotation "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --annotation "org.opencontainers.image.revision=${{ github.sha }}" \
+            "${{ steps.package_bundle.outputs.bundle_name }}:application/gzip" \
+            "${{ steps.package_bundle.outputs.bundle_name }}.sha256:text/plain"
 
       - name: Clean up signing files (macOS)
         if: runner.os == 'macOS' && always()
