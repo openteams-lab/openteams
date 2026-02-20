@@ -4,7 +4,7 @@ import type { MessageTone } from './types';
 export const mentionRegex = /(^|\s)@([\p{L}\p{N}_-]*)$/u;
 export const mentionTokenRegex = /(^|\s)@([\p{L}\p{N}_-]+)/gu;
 export const memberNameRegex = /^[\p{L}\p{N}_-]+$/u;
-export const MAX_MEMBER_NAME_LENGTH = 10;
+export const MAX_MEMBER_NAME_LENGTH = 30;
 export const getMemberNameLength = (value: string) =>
   Array.from(value.trim()).length;
 
