@@ -1255,6 +1255,19 @@ jobs:
           else
             echo "bin/download.js not found; skipping URL/tag injection"
           fi
+
+          node -e '
+            const d = require("./bin/download.js");
+            const source = d.resolveRemoteSource();
+            if (!source) {
+              throw new Error("download.js URL injection verification failed: resolveRemoteSource() is null");
+            }
+            if (/^__[A-Z0-9_]+__$/.test(String(d.BINARY_TAG || "").trim())) {
+              throw new Error("download.js tag injection verification failed: BINARY_TAG is still unresolved");
+            }
+            console.log(`Verified download source: ${source.provider} ${source.baseUrl}`);
+            console.log(`Verified binary tag: ${d.BINARY_TAG}`);
+          '
           npm pack
 
       - name: Publish NPX package to npm

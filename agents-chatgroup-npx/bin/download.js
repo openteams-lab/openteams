@@ -31,19 +31,24 @@ function normalizeBaseUrl(url) {
   return url.replace(/\/+$/, "");
 }
 
-function isConfiguredBaseUrl(url, placeholder) {
-  return Boolean(url) && !url.includes(placeholder);
+function isUnresolvedTemplateToken(value) {
+  if (!value) return true;
+  return /^__[A-Z0-9_]+__$/.test(String(value).trim());
+}
+
+function isConfiguredBaseUrl(url) {
+  return Boolean(url) && !isUnresolvedTemplateToken(url);
 }
 
 function resolveRemoteSource() {
-  if (isConfiguredBaseUrl(OSS_BASE_URL, DEFAULT_OSS_BASE_URL)) {
+  if (isConfiguredBaseUrl(OSS_BASE_URL)) {
     return {
       provider: "oss",
       baseUrl: OSS_BASE_URL,
     };
   }
 
-  if (isConfiguredBaseUrl(R2_BASE_URL, DEFAULT_R2_BASE_URL)) {
+  if (isConfiguredBaseUrl(R2_BASE_URL)) {
     return {
       provider: "r2",
       baseUrl: R2_BASE_URL,
@@ -63,7 +68,7 @@ function ensureRemoteConfig() {
     );
   }
 
-  if (BINARY_TAG.includes("__BINARY_TAG__")) {
+  if (isUnresolvedTemplateToken(BINARY_TAG)) {
     throw new Error(
       "Binary tag is not configured. The npm package was published without binary tag injection.",
     );
