@@ -31,9 +31,19 @@ You can install other agents by following their official documentation.
 
 <Tabs>
   <Tab title="Windows">
-    Download the latest installer:
+    **Option 1: Using npx**
 
-    [![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+    ```bash
+    npx agents-chatgroup
+    ```
+
+    **Option 2: Desktop Installer**
+
+    Download the latest installer (`.msi`):
+
+    [![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
+
+    After installation, launch **AgentsChatGroup** from the Start menu.
   </Tab>
 
   <Tab title="macOS">
@@ -43,14 +53,37 @@ You can install other agents by following their official documentation.
     npx agents-chatgroup
     ```
 
-    **Option 2: Download the app**
+    **Option 2: Desktop Installer**
 
-    [![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+    [![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
+
+    Open the downloaded `.dmg`, move **AgentsChatGroup** to `Applications`, then launch it from Launchpad/Finder.
   </Tab>
 
   <Tab title="Linux">
+    **Option 1: Using npx**
+
     ```bash
     npx agents-chatgroup
+    ```
+
+    **Option 2: Desktop Installer**
+
+    Download the Linux package from Releases:
+    - `.deb` (Ubuntu/Debian)
+    - `.AppImage` (portable)
+
+    For `.deb`:
+
+    ```bash
+    sudo apt install ./agents-chatgroup-*.deb
+    ```
+
+    For `.AppImage`:
+
+    ```bash
+    chmod +x ./agents-chatgroup-*.AppImage
+    ./agents-chatgroup-*.AppImage
     ```
   </Tab>
 </Tabs>
@@ -63,7 +96,15 @@ You can install other agents by following their official documentation.
 </Step>
 
 <Step title="Launch AgentsChatGroup">
-  Open the application or run the npx command. The app will automatically open in your browser.
+  Choose one startup method:
+
+  **Option 1: Run with npx**
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  **Option 2: Use Desktop Installer**
+  Open the installed **AgentsChatGroup** app from your system launcher.
 
   <Check>
   The application binds to a random free port and prints the URL in the terminal.
@@ -102,5 +143,3 @@ To use a fixed port, specify the `PORT` environment variable: `PORT=8080 npx age
     Configure AI members for your team
   </Card>
 </CardGroup>
-
-

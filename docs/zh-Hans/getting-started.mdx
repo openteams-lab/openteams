@@ -31,9 +31,19 @@ AgentsChatGroup 可在以下平台运行：
 
 <Tabs>
   <Tab title="Windows">
-    下载最新安装程序：
+    **方式一：使用 npx**
 
-    [![下载 Windows 版](https://img.shields.io/badge/下载-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+    ```bash
+    npx agents-chatgroup
+    ```
+
+    **方式二：桌面安装包**
+
+    下载最新安装程序（`.msi`）：
+
+    [![下载 Windows 版](https://img.shields.io/badge/下载-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
+
+    安装完成后，从开始菜单启动 **AgentsChatGroup**。
   </Tab>
 
   <Tab title="macOS">
@@ -43,14 +53,37 @@ AgentsChatGroup 可在以下平台运行：
     npx agents-chatgroup
     ```
 
-    **方式二：下载应用**
+    **方式二：桌面安装包**
 
-    [![下载 macOS 版](https://img.shields.io/badge/下载-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+    [![下载 macOS 版](https://img.shields.io/badge/下载-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
+
+    打开下载的 `.dmg`，将 **AgentsChatGroup** 拖到 `Applications`，然后从 Launchpad/Finder 启动。
   </Tab>
 
   <Tab title="Linux">
+    **方式一：使用 npx**
+
     ```bash
     npx agents-chatgroup
+    ```
+
+    **方式二：桌面安装包**
+
+    从 Releases 下载 Linux 安装包：
+    - `.deb`（Ubuntu/Debian）
+    - `.AppImage`（免安装便携版）
+
+    使用 `.deb` 安装：
+
+    ```bash
+    sudo apt install ./agents-chatgroup-*.deb
+    ```
+
+    使用 `.AppImage` 启动：
+
+    ```bash
+    chmod +x ./agents-chatgroup-*.AppImage
+    ./agents-chatgroup-*.AppImage
     ```
   </Tab>
 </Tabs>
@@ -63,7 +96,15 @@ AgentsChatGroup 可在以下平台运行：
 </Step>
 
 <Step title="启动 AgentsChatGroup">
-  打开应用程序或运行 npx 命令。应用程序将自动在浏览器中打开。
+  选择一种启动方式：
+
+  **方式一：通过 npx 启动**
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  **方式二：通过桌面安装包启动**
+  从系统应用菜单中打开已安装的 **AgentsChatGroup**。
 
   <Check>
   应用程序绑定到一个随机空闲端口，并在终端中打印 URL。
