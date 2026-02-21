@@ -20,9 +20,9 @@
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/TFT3KnZOOAk">📺 观看视频介绍</a> ·
-  <a href="#快速开始">⚡ 快速开始</a> ·
-  <a href="#文档">📖 文档</a>
+  <a href="">📺 观看视频介绍</a> ·
+  <a href="https://docs.agentschatgroup.com/getting-started">⚡ 快速开始</a> ·
+  <a href="https://docs.agentschatgroup.com">📖 文档</a>
 </p>
 
 <p align="center">

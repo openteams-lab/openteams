@@ -21,8 +21,8 @@
 
 <p align="center">
   <a href="">📺 Watch Demo</a> ·
-  <a href="">⚡ Getting Started</a> ·
-  <a href="">📖 Docs</a>
+  <a href="https://docs.agentschatgroup.com/getting-started">⚡ Getting Started</a> ·
+  <a href="https://docs.agentschatgroup.com">📖 Docs</a>
 </p>
 
 <p align="center">
