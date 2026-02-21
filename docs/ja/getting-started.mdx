@@ -31,9 +31,19 @@ AgentsChatGroupをインストールする前に、少なくとも1つのサポ�
 
 <Tabs>
   <Tab title="Windows">
-    最新のインストーラーをダウンロード：
+    **方法1：npxを使用**
 
-    [![Windows版をダウンロード](https://img.shields.io/badge/ダウンロード-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+    ```bash
+    npx agents-chatgroup
+    ```
+
+    **方法2：Desktop Installer**
+
+    最新のインストーラー（`.msi`）をダウンロード：
+
+    [![Windows版をダウンロード](https://img.shields.io/badge/ダウンロード-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
+
+    インストール後、スタートメニューから **AgentsChatGroup** を起動します。
   </Tab>
 
   <Tab title="macOS">
@@ -43,14 +53,37 @@ AgentsChatGroupをインストールする前に、少なくとも1つのサポ�
     npx agents-chatgroup
     ```
 
-    **方法2：アプリをダウンロード**
+    **方法2：Desktop Installer**
 
-    [![macOS版をダウンロード](https://img.shields.io/badge/ダウンロード-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+    [![macOS版をダウンロード](https://img.shields.io/badge/ダウンロード-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
+
+    ダウンロードした `.dmg` を開き、**AgentsChatGroup** を `Applications` に移動して、Launchpad/Finder から起動します。
   </Tab>
 
   <Tab title="Linux">
+    **方法1：npxを使用**
+
     ```bash
     npx agents-chatgroup
+    ```
+
+    **方法2：Desktop Installer**
+
+    Releases から Linux パッケージをダウンロード：
+    - `.deb`（Ubuntu/Debian）
+    - `.AppImage`（ポータブル）
+
+    `.deb` の場合：
+
+    ```bash
+    sudo apt install ./agents-chatgroup-*.deb
+    ```
+
+    `.AppImage` の場合：
+
+    ```bash
+    chmod +x ./agents-chatgroup-*.AppImage
+    ./agents-chatgroup-*.AppImage
     ```
   </Tab>
 </Tabs>
@@ -63,7 +96,15 @@ AgentsChatGroupをインストールする前に、少なくとも1つのサポ�
 </Step>
 
 <Step title="AgentsChatGroupを起動">
-  アプリケーションを開くか、npxコマンドを実行します。アプリは自動的にブラウザで開きます。
+  起動方法を選択してください：
+
+  **方法1：npxで起動**
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  **方法2：Desktop Installerで起動**
+  システムのランチャーから、インストール済みの **AgentsChatGroup** を開きます。
 
   <Check>
   アプリケーションはランダムな空きポートにバインドし、ターミナルにURLを表示します。
