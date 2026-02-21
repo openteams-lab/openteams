@@ -31,9 +31,19 @@ AgentsChatGroup을 설치하기 전에 최소 하나의 지원되는 AI 에이�
 
 <Tabs>
   <Tab title="Windows">
-    최신 설치 프로그램 다운로드:
+    **방법 1: npx 사용**
 
-    [![Windows용 다운로드](https://img.shields.io/badge/다운로드-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+    ```bash
+    npx agents-chatgroup
+    ```
+
+    **방법 2: Desktop Installer**
+
+    최신 설치 프로그램(`.msi`) 다운로드:
+
+    [![Windows용 다운로드](https://img.shields.io/badge/다운로드-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
+
+    설치 후 시작 메뉴에서 **AgentsChatGroup**을 실행하세요.
   </Tab>
 
   <Tab title="macOS">
@@ -43,14 +53,37 @@ AgentsChatGroup을 설치하기 전에 최소 하나의 지원되는 AI 에이�
     npx agents-chatgroup
     ```
 
-    **방법 2: 앱 다운로드**
+    **방법 2: Desktop Installer**
 
-    [![macOS용 다운로드](https://img.shields.io/badge/다운로드-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/nicepkg/agents-chatgroup/releases/latest)
+    [![macOS용 다운로드](https://img.shields.io/badge/다운로드-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
+
+    다운로드한 `.dmg`를 열고 **AgentsChatGroup**을 `Applications`로 옮긴 뒤 Launchpad/Finder에서 실행하세요.
   </Tab>
 
   <Tab title="Linux">
+    **방법 1: npx 사용**
+
     ```bash
     npx agents-chatgroup
+    ```
+
+    **방법 2: Desktop Installer**
+
+    Releases에서 Linux 패키지를 다운로드하세요:
+    - `.deb` (Ubuntu/Debian)
+    - `.AppImage` (포터블)
+
+    `.deb` 설치:
+
+    ```bash
+    sudo apt install ./agents-chatgroup-*.deb
+    ```
+
+    `.AppImage` 실행:
+
+    ```bash
+    chmod +x ./agents-chatgroup-*.AppImage
+    ./agents-chatgroup-*.AppImage
     ```
   </Tab>
 </Tabs>
@@ -63,7 +96,15 @@ AgentsChatGroup을 설치하기 전에 최소 하나의 지원되는 AI 에이�
 </Step>
 
 <Step title="AgentsChatGroup 시작">
-  애플리케이션을 열거나 npx 명령을 실행합니다. 앱이 자동으로 브라우저에서 열립니다.
+  시작 방식을 선택하세요:
+
+  **방법 1: npx로 시작**
+  ```bash
+  npx agents-chatgroup
+  ```
+
+  **방법 2: Desktop Installer로 시작**
+  시스템 런처에서 설치된 **AgentsChatGroup** 앱을 실행하세요.
 
   <Check>
   애플리케이션은 무작위 빈 포트에 바인딩되고 터미널에 URL을 출력합니다.
