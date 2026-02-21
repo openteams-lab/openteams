@@ -31,6 +31,8 @@
 
 ---
 
+<img src="docs/images/preview.png" >
+
 ## AgentsChatGroup想解决什么问题？
 
 ### 当前AI Agent的使用痛点
