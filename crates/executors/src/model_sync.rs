@@ -142,6 +142,7 @@ fn supports_model(config: &CodingAgent) -> bool {
             | CodingAgent::ClaudeCode(_)
             | CodingAgent::Gemini(_)
             | CodingAgent::Opencode(_)
+            | CodingAgent::QwenCode(_)
             | CodingAgent::CursorAgent(_)
             | CodingAgent::Copilot(_)
             | CodingAgent::Droid(_)
@@ -170,6 +171,11 @@ fn with_model(config: &CodingAgent, model: &str) -> Option<CodingAgent> {
             let mut next = base.clone();
             next.model = Some(model);
             Some(CodingAgent::Opencode(next))
+        }
+        CodingAgent::QwenCode(base) => {
+            let mut next = base.clone();
+            next.model = Some(model);
+            Some(CodingAgent::QwenCode(next))
         }
         CodingAgent::CursorAgent(base) => {
             let mut next = base.clone();

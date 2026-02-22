@@ -40,6 +40,25 @@
     "AMP": {
       "DEFAULT": {
         "AMP": {
+          "model": "smart",
+          "dangerously_allow_all": true
+        }
+      },
+      "DEEP": {
+        "AMP": {
+          "model": "deep",
+          "dangerously_allow_all": true
+        }
+      },
+      "RUSH": {
+        "AMP": {
+          "model": "rush",
+          "dangerously_allow_all": true
+        }
+      },
+      "FREE": {
+        "AMP": {
+          "model": "free",
           "dangerously_allow_all": true
         }
       }
@@ -148,6 +167,18 @@
     "QWEN_CODE": {
       "DEFAULT": {
         "QWEN_CODE": {
+          "yolo": true
+        }
+      },
+      "QWEN_3_CODER_PLUS": {
+        "QWEN_CODE": {
+          "model": "qwen3-coder-plus",
+          "yolo": true
+        }
+      },
+      "QWEN_3_CODER_FLASH": {
+        "QWEN_CODE": {
+          "model": "qwen3-coder-flash",
           "yolo": true
         }
       },
