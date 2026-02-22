@@ -131,6 +131,17 @@ jobs:
           npm version $new_version --no-git-tag-version --allow-same-version
           cd ..
 
+          # Keep desktop app versions aligned with the npm package version
+          cargo set-version --manifest-path src-tauri/Cargo.toml "$new_version"
+          NEW_VERSION="$new_version" node -e '
+            const fs = require("fs");
+            const path = "src-tauri/tauri.conf.json";
+            const conf = JSON.parse(fs.readFileSync(path, "utf8"));
+            conf.package = conf.package || {};
+            conf.package.version = process.env.NEW_VERSION;
+            fs.writeFileSync(path, JSON.stringify(conf, null, 2) + "\n");
+          '
+
           cargo set-version --workspace "$new_version"
 
           echo "New version: $new_version"
@@ -163,7 +174,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add package.json pnpm-lock.yaml agents-chatgroup-npx/package.json frontend/package.json Cargo.lock
+          git add package.json pnpm-lock.yaml agents-chatgroup-npx/package.json frontend/package.json src-tauri/tauri.conf.json Cargo.lock
           git add $(find . -name Cargo.toml)
           [ -f crates/remote/Cargo.lock ] && git add crates/remote/Cargo.lock || true
           git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
