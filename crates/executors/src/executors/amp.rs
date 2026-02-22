@@ -24,6 +24,12 @@ pub struct Amp {
     pub append_prompt: AppendPrompt,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(
+        title = "Model",
+        description = "AMP mode profile. Mapped to CLI `--mode` (smart, deep, rush, free)."
+    )]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(
         title = "Dangerously Allow All",
         description = "Allow all commands to be executed, even if they are not safe."
     )]
@@ -36,6 +42,9 @@ impl Amp {
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
         let mut builder = CommandBuilder::new("npx -y @sourcegraph/amp@0.0.1764777697-g907e30")
             .params(["--execute", "--stream-json"]);
+        if let Some(model) = &self.model {
+            builder = builder.extend_params(["--mode", model]);
+        }
         if self.dangerously_allow_all.unwrap_or(false) {
             builder = builder.extend_params(["--dangerously-allow-all"]);
         }

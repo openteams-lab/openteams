@@ -11,6 +11,14 @@
       "format": "textarea",
       "default": null
     },
+    "model": {
+      "title": "Model",
+      "description": "AMP mode profile. Mapped to CLI `--mode` (smart, deep, rush, free).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "dangerously_allow_all": {
       "title": "Dangerously Allow All",
       "description": "Allow all commands to be executed, even if they are not safe.",
