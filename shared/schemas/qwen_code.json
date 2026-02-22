@@ -11,6 +11,13 @@
       "format": "textarea",
       "default": null
     },
+    "model": {
+      "description": "Model to use (e.g., qwen3-coder-plus, qwen3-coder-flash)",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "yolo": {
       "type": [
         "boolean",

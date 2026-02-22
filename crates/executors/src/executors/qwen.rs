@@ -23,6 +23,9 @@ pub struct QwenCode {
     #[serde(default)]
     pub append_prompt: AppendPrompt,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(description = "Model to use (e.g., qwen3-coder-plus, qwen3-coder-flash)")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub yolo: Option<bool>,
     #[serde(flatten)]
     pub cmd: CmdOverrides,
@@ -34,12 +37,16 @@ pub struct QwenCode {
 
 impl QwenCode {
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
-        let mut builder = CommandBuilder::new("npx -y @qwen-code/qwen-code@0.2.1");
+        let mut builder = CommandBuilder::new("npx -y @qwen-code/qwen-code@0.10.5");
+
+        if let Some(model) = &self.model {
+            builder = builder.extend_params(["--model", model.as_str()]);
+        }
 
         if self.yolo.unwrap_or(false) {
             builder = builder.extend_params(["--yolo"]);
         }
-        builder = builder.extend_params(["--experimental-acp"]);
+        builder = builder.extend_params(["--acp"]);
         apply_overrides(builder, &self.cmd)
     }
 }

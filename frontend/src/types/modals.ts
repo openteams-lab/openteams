@@ -22,7 +22,6 @@ declare module '@ebay/nice-modal-react' {
     // App flow modals
     disclaimer: void;
     onboarding: void;
-    'release-notes': void;
 
     // Task-related modals
     'task-form': TaskFormDialogProps;
