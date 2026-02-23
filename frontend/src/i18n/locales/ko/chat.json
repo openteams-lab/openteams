@@ -91,7 +91,7 @@
     "workspacePathCannotBeModified": "워크스페이스 경로는 수정할 수 없습니다",
     "add": "추가",
     "save": "저장",
-    "presetSection": "프리셋에서 빠르게 추가",
+    "presetSection": "멤버 빠른 추가",
     "addFromMemberPreset": "멤버 프리셋 추가",
     "importTeamPreset": "팀 프리셋 가져오기",
     "noEnabledPresets": "활성화된 프리셋이 없습니다. 설정 -> 프리셋에서 구성하세요.",
@@ -105,7 +105,42 @@
       "cancel": "취소",
       "importing": "가져오는 중..."
     },
-    "roleSettingsRequired": "역할 설정은 필수입니다."
+    "roleSettingsRequired": "역할 설정은 필수입니다.",
+    "presetDisplay": {
+      "members": {
+        "coordinator_pmo": "코디네이터",
+        "product_manager": "프로덕트 매니저",
+        "system_architect": "시스템 아키텍트",
+        "prompt_engineer": "프롬프트 엔지니어",
+        "frontend_engineer": "프론트엔드 엔지니어",
+        "backend_engineer": "백엔드 엔지니어",
+        "qa_tester": "QA 엔지니어",
+        "ux_ui_designer": "UX/UI 디자이너",
+        "safety_policy_officer": "안전 책임자",
+        "solution_manager": "솔루션 매니저",
+        "code_reviewer": "코드 리뷰어",
+        "devops_engineer": "DevOps 엔지니어",
+        "product_analyst": "프로덕트 애널리스트",
+        "data_analyst": "데이터 애널리스트",
+        "technical_writer": "기술 문서 작성자",
+        "content_researcher": "콘텐츠 리서처",
+        "content_editor": "콘텐츠 에디터",
+        "frontier_researcher": "프론티어 리서처",
+        "marketing_specialist": "마케팅 스페셜리스트",
+        "video_editor": "영상 편집자",
+        "market_analyst": "시장 애널리스트"
+      },
+      "teams": {
+        "fullstack_delivery_team": "풀스택 딜리버리 팀",
+        "ai_prompt_quality_team": "AI 프롬프트 품질 팀",
+        "architecture_governance_team": "아키텍처 거버넌스 팀",
+        "product_discovery_team": "제품 탐색 팀",
+        "content_studio_team": "콘텐츠 스튜디오 팀",
+        "growth_marketing_team": "그로스 마케팅 팀",
+        "research_innovation_team": "연구 혁신 팀",
+        "rapid_bugfix_team": "신속 버그 수정 팀"
+      }
+    }
   },
   "cleanup": {
     "selected": "선택됨: {{count}}",

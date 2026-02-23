@@ -148,6 +148,7 @@ function PresetListItem({
 
 export function ChatPresetsSettingsSectionContent() {
   const { t } = useTranslation('settings');
+  const { t: tChat } = useTranslation('chat');
   const { config, profiles, updateAndSaveConfig } = useUserSystem();
   const { setDirty: setContextDirty } = useSettingsDirty();
 
@@ -228,6 +229,26 @@ export function ChatPresetsSettingsSectionContent() {
         ? draft.teams.find((team) => team.id === selectedTeamId) ?? null
         : null,
     [draft.teams, selectedTeamId]
+  );
+
+  const getLocalizedMemberName = useCallback(
+    (member: Pick<ChatMemberPreset, 'id' | 'name' | 'is_builtin'>): string => {
+      if (!member.is_builtin) return member.name;
+      return tChat(`members.presetDisplay.members.${member.id}`, {
+        defaultValue: member.name,
+      });
+    },
+    [tChat]
+  );
+
+  const getLocalizedTeamName = useCallback(
+    (team: Pick<ChatTeamPreset, 'id' | 'name' | 'is_builtin'>): string => {
+      if (!team.is_builtin) return team.name;
+      return tChat(`members.presetDisplay.teams.${team.id}`, {
+        defaultValue: team.name,
+      });
+    },
+    [tChat]
   );
 
   useEffect(() => {
@@ -542,7 +563,7 @@ export function ChatPresetsSettingsSectionContent() {
               {draft.members.map((member) => (
                 <PresetListItem
                   key={member.id}
-                  title={`@${member.name}`}
+                  title={`@${getLocalizedMemberName(member)}`}
                   subtitle={member.description}
                   selected={selectedMemberId === member.id}
                   disabled={!member.enabled}
@@ -561,7 +582,7 @@ export function ChatPresetsSettingsSectionContent() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium text-normal">
-                      @{selectedMember.name}
+                      @{getLocalizedMemberName(selectedMember)}
                     </div>
                     <div className="flex items-center gap-half">
                       <PrimaryButton
@@ -734,7 +755,7 @@ export function ChatPresetsSettingsSectionContent() {
               {draft.teams.map((team) => (
                 <PresetListItem
                   key={team.id}
-                  title={team.name}
+                  title={getLocalizedTeamName(team)}
                   subtitle={team.description}
                   selected={selectedTeamId === team.id}
                   disabled={!team.enabled}
@@ -753,7 +774,7 @@ export function ChatPresetsSettingsSectionContent() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium text-normal">
-                      {selectedTeam.name}
+                      {getLocalizedTeamName(selectedTeam)}
                     </div>
                     <div className="flex items-center gap-half">
                       <PrimaryButton
@@ -872,7 +893,7 @@ export function ChatPresetsSettingsSectionContent() {
                               }}
                               className="accent-brand"
                             />
-                            <span>@{member.name}</span>
+                            <span>@{getLocalizedMemberName(member)}</span>
                           </label>
                         );
                       })}

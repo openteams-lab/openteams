@@ -92,7 +92,7 @@
     "workspacePathCannotBeModified": "Workspace path cannot be modified",
     "add": "Add",
     "save": "Save",
-    "presetSection": "Quick Add from Presets",
+    "presetSection": "Quick Add Members",
     "addFromMemberPreset": "Add member preset",
     "importTeamPreset": "Import team preset",
     "noEnabledPresets": "No enabled presets. Configure them in Settings -> Presets.",
@@ -105,6 +105,41 @@
       "confirmImport": "Import Team",
       "cancel": "Cancel",
       "importing": "Importing..."
+    },
+    "presetDisplay": {
+      "members": {
+        "coordinator_pmo": "Coordinator",
+        "product_manager": "Product Manager",
+        "system_architect": "System Architect",
+        "prompt_engineer": "Prompt Engineer",
+        "frontend_engineer": "Frontend Engineer",
+        "backend_engineer": "Backend Engineer",
+        "qa_tester": "QA Engineer",
+        "ux_ui_designer": "UX/UI Designer",
+        "safety_policy_officer": "Safety Officer",
+        "solution_manager": "Solution Manager",
+        "code_reviewer": "Code Reviewer",
+        "devops_engineer": "DevOps Engineer",
+        "product_analyst": "Product Analyst",
+        "data_analyst": "Data Analyst",
+        "technical_writer": "Technical Writer",
+        "content_researcher": "Content Researcher",
+        "content_editor": "Content Editor",
+        "frontier_researcher": "Frontier Researcher",
+        "marketing_specialist": "Marketing Specialist",
+        "video_editor": "Video Editor",
+        "market_analyst": "Market Analyst"
+      },
+      "teams": {
+        "fullstack_delivery_team": "Full-stack Delivery Team",
+        "ai_prompt_quality_team": "AI Prompt Quality Team",
+        "architecture_governance_team": "Architecture Governance Team",
+        "product_discovery_team": "Product Discovery Team",
+        "content_studio_team": "Content Studio Team",
+        "growth_marketing_team": "Growth Marketing Team",
+        "research_innovation_team": "Research Innovation Team",
+        "rapid_bugfix_team": "Rapid Bugfix Team"
+      }
     }
   },
   "cleanup": {
