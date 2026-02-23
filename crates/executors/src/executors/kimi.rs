@@ -98,7 +98,7 @@ impl KimiCode {
         }
     }
 
-    fn extract_event_type_and_message<'a>(payload: &'a Value) -> (&'a str, &'a Value) {
+    fn extract_event_type_and_message(payload: &Value) -> (&str, &Value) {
         let event_type = payload
             .get("type")
             .and_then(|v| v.as_str())
