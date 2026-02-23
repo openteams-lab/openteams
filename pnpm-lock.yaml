@@ -1855,7 +1855,7 @@ packages:
     engines: {node: '>=18'}
 
   '@tanstack/electric-db-collection@0.2.3':
-    resolution: {integrity: sha512-3J5mLxQ+PWwAxwsJy3Paygfd8dwUcs/oy1RxWjkIowRkYc1JA9x2/KSzX7ovzmYWbD87juHeLb73leuaWmqhow==}
+    resolution: {integrity: sha512-TZNoBqjqIiQOFr5v77djx5793XasVM9LboxJjkyBFSnPg4GCrYT9OznjW7rk2kfIZSZOnOA8h/q4tdpGaazx0w==}
 
   '@tanstack/form-core@1.24.4':
     resolution: {integrity: sha512-+eIR7DiDamit1zvTVgaHxuIRA02YFgJaXMUGxsLRJoBpUjGl/g/nhUocQoNkRyfXqOlh8OCMTanjwDprWSRq6w==}
