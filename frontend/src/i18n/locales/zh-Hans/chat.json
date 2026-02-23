@@ -91,7 +91,7 @@
     "workspacePathCannotBeModified": "工作区路径无法修改",
     "add": "添加",
     "save": "保存",
-    "presetSection": "从预设快速添加",
+    "presetSection": "快速添加成员",
     "addFromMemberPreset": "添加成员预设",
     "importTeamPreset": "导入团队预设",
     "noEnabledPresets": "没有已启用的预设。请在 设置 -> 预设 中配置。",
@@ -105,7 +105,42 @@
       "cancel": "取消",
       "importing": "导入中..."
     },
-    "roleSettingsRequired": "角色设定为必填项。"
+    "roleSettingsRequired": "角色设定为必填项。",
+    "presetDisplay": {
+      "members": {
+        "coordinator_pmo": "协调官",
+        "product_manager": "产品经理",
+        "system_architect": "系统架构师",
+        "prompt_engineer": "提示词工程师",
+        "frontend_engineer": "前端工程师",
+        "backend_engineer": "后端工程师",
+        "qa_tester": "QA工程师",
+        "ux_ui_designer": "UX/UI设计师",
+        "safety_policy_officer": "安全官",
+        "solution_manager": "解决方案经理",
+        "code_reviewer": "代码审查员",
+        "devops_engineer": "DevOps工程师",
+        "product_analyst": "产品分析师",
+        "data_analyst": "数据分析师",
+        "technical_writer": "技术写作",
+        "content_researcher": "内容研究员",
+        "content_editor": "内容编辑",
+        "frontier_researcher": "前沿研究员",
+        "marketing_specialist": "市场营销专家",
+        "video_editor": "视频剪辑师",
+        "market_analyst": "市场分析师"
+      },
+      "teams": {
+        "fullstack_delivery_team": "全栈交付团队",
+        "ai_prompt_quality_team": "AI提示词质量团队",
+        "architecture_governance_team": "架构治理团队",
+        "product_discovery_team": "产品探索团队",
+        "content_studio_team": "内容工作室团队",
+        "growth_marketing_team": "增长营销团队",
+        "research_innovation_team": "研究创新团队",
+        "rapid_bugfix_team": "快速修复团队"
+      }
+    }
   },
   "cleanup": {
     "selected": "已选择: {{count}}",

@@ -92,7 +92,7 @@
     "workspacePathCannotBeModified": "La ruta del espacio de trabajo no se puede modificar",
     "add": "Añadir",
     "save": "Guardar",
-    "presetSection": "Añadir rápido desde preajustes",
+    "presetSection": "Agregar miembros rápidamente",
     "addFromMemberPreset": "Añadir preajuste de miembro",
     "importTeamPreset": "Importar preajuste de equipo",
     "noEnabledPresets": "No hay preajustes habilitados. Configúralos en Configuración -> Preajustes.",
@@ -105,6 +105,41 @@
       "confirmImport": "Importar equipo",
       "cancel": "Cancelar",
       "importing": "Importando..."
+    },
+    "presetDisplay": {
+      "members": {
+        "coordinator_pmo": "Coordinador",
+        "product_manager": "Gerente de Producto",
+        "system_architect": "Arquitecto de Sistemas",
+        "prompt_engineer": "Ingeniero de Prompts",
+        "frontend_engineer": "Ingeniero Frontend",
+        "backend_engineer": "Ingeniero Backend",
+        "qa_tester": "Ingeniero de QA",
+        "ux_ui_designer": "Dise?ador UX/UI",
+        "safety_policy_officer": "Responsable de Seguridad",
+        "solution_manager": "Gerente de Soluciones",
+        "code_reviewer": "Revisor de C?digo",
+        "devops_engineer": "Ingeniero DevOps",
+        "product_analyst": "Analista de Producto",
+        "data_analyst": "Analista de Datos",
+        "technical_writer": "Redactor T?cnico",
+        "content_researcher": "Investigador de Contenido",
+        "content_editor": "Editor de Contenido",
+        "frontier_researcher": "Investigador de Frontera",
+        "marketing_specialist": "Especialista en Marketing",
+        "video_editor": "Editor de Video",
+        "market_analyst": "Analista de Mercado"
+      },
+      "teams": {
+        "fullstack_delivery_team": "Equipo de Entrega Full-stack",
+        "ai_prompt_quality_team": "Equipo de Calidad de Prompts de IA",
+        "architecture_governance_team": "Equipo de Gobernanza de Arquitectura",
+        "product_discovery_team": "Equipo de Descubrimiento de Producto",
+        "content_studio_team": "Equipo de Estudio de Contenido",
+        "growth_marketing_team": "Equipo de Marketing de Crecimiento",
+        "research_innovation_team": "Equipo de Investigaci?n e Innovaci?n",
+        "rapid_bugfix_team": "Equipo de Correcci?n R?pida de Bugs"
+      }
     }
   },
   "cleanup": {
