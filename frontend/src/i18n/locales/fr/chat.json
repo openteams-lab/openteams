@@ -91,7 +91,7 @@
     "workspacePathCannotBeModified": "Le chemin de l'espace de travail ne peut pas être modifié",
     "add": "Ajouter",
     "save": "Enregistrer",
-    "presetSection": "Ajout rapide depuis les préréglages",
+    "presetSection": "Ajouter rapidement des membres",
     "addFromMemberPreset": "Ajouter un préréglage de membre",
     "importTeamPreset": "Importer un préréglage d'équipe",
     "noEnabledPresets": "Aucun préréglage activé. Configurez-les dans Paramètres -> Préréglages.",
@@ -105,7 +105,42 @@
       "cancel": "Annuler",
       "importing": "Importation..."
     },
-    "roleSettingsRequired": "Les paramètres du rôle sont obligatoires."
+    "roleSettingsRequired": "Les paramètres du rôle sont obligatoires.",
+    "presetDisplay": {
+      "members": {
+        "coordinator_pmo": "Coordinateur",
+        "product_manager": "Chef de Produit",
+        "system_architect": "Architecte Syst?me",
+        "prompt_engineer": "Ing?nieur Prompt",
+        "frontend_engineer": "Ing?nieur Frontend",
+        "backend_engineer": "Ing?nieur Backend",
+        "qa_tester": "Ing?nieur QA",
+        "ux_ui_designer": "Designer UX/UI",
+        "safety_policy_officer": "Responsable S?curit?",
+        "solution_manager": "Responsable Solutions",
+        "code_reviewer": "Relecteur de Code",
+        "devops_engineer": "Ing?nieur DevOps",
+        "product_analyst": "Analyste Produit",
+        "data_analyst": "Analyste Donn?es",
+        "technical_writer": "R?dacteur Technique",
+        "content_researcher": "Chercheur de Contenu",
+        "content_editor": "?diteur de Contenu",
+        "frontier_researcher": "Chercheur de Fronti?re",
+        "marketing_specialist": "Sp?cialiste Marketing",
+        "video_editor": "Monteur Vid?o",
+        "market_analyst": "Analyste de March?"
+      },
+      "teams": {
+        "fullstack_delivery_team": "?quipe de Livraison Full-stack",
+        "ai_prompt_quality_team": "?quipe Qualit? des Prompts IA",
+        "architecture_governance_team": "?quipe de Gouvernance d'Architecture",
+        "product_discovery_team": "?quipe de D?couverte Produit",
+        "content_studio_team": "?quipe Studio Contenu",
+        "growth_marketing_team": "?quipe Marketing de Croissance",
+        "research_innovation_team": "?quipe Recherche et Innovation",
+        "rapid_bugfix_team": "?quipe de Correction Rapide des Bugs"
+      }
+    }
   },
   "cleanup": {
     "selected": "Sélectionné : {{count}}",

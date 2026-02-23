@@ -91,7 +91,7 @@
     "workspacePathCannotBeModified": "工作區路徑無法修改",
     "add": "新增",
     "save": "儲存",
-    "presetSection": "從預設快速新增",
+    "presetSection": "快速新增成員",
     "addFromMemberPreset": "新增成員預設",
     "importTeamPreset": "匯入團隊預設",
     "noEnabledPresets": "沒有已啟用的預設。請在設定 -> 預設中進行設定。",
@@ -105,7 +105,42 @@
       "cancel": "取消",
       "importing": "匯入中..."
     },
-    "roleSettingsRequired": "角色設定為必填欄位。"
+    "roleSettingsRequired": "角色設定為必填欄位。",
+    "presetDisplay": {
+      "members": {
+        "coordinator_pmo": "協調官",
+        "product_manager": "產品經理",
+        "system_architect": "系統架構師",
+        "prompt_engineer": "提示詞工程師",
+        "frontend_engineer": "前端工程師",
+        "backend_engineer": "後端工程師",
+        "qa_tester": "QA工程師",
+        "ux_ui_designer": "UX/UI設計師",
+        "safety_policy_officer": "安全官",
+        "solution_manager": "解決方案經理",
+        "code_reviewer": "程式碼審查員",
+        "devops_engineer": "DevOps工程師",
+        "product_analyst": "產品分析師",
+        "data_analyst": "數據分析師",
+        "technical_writer": "技術寫作",
+        "content_researcher": "內容研究員",
+        "content_editor": "內容編輯",
+        "frontier_researcher": "前沿研究員",
+        "marketing_specialist": "市場行銷專家",
+        "video_editor": "影片剪輯師",
+        "market_analyst": "市場分析師"
+      },
+      "teams": {
+        "fullstack_delivery_team": "全端交付團隊",
+        "ai_prompt_quality_team": "AI提示詞品質團隊",
+        "architecture_governance_team": "架構治理團隊",
+        "product_discovery_team": "產品探索團隊",
+        "content_studio_team": "內容工作室團隊",
+        "growth_marketing_team": "成長行銷團隊",
+        "research_innovation_team": "研究創新團隊",
+        "rapid_bugfix_team": "快速修復團隊"
+      }
+    }
   },
   "cleanup": {
     "selected": "已選擇: {{count}}",

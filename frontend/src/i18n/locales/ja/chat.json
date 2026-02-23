@@ -91,7 +91,7 @@
     "workspacePathCannotBeModified": "ワークスペースパスは変更できません",
     "add": "追加",
     "save": "保存",
-    "presetSection": "プリセットからクイック追加",
+    "presetSection": "メンバーをクイック追加",
     "addFromMemberPreset": "メンバープリセットを追加",
     "importTeamPreset": "チームプリセットをインポート",
     "noEnabledPresets": "有効なプリセットがありません。設定 -> プリセットで設定してください。",
@@ -105,7 +105,42 @@
       "cancel": "キャンセル",
       "importing": "インポート中..."
     },
-    "roleSettingsRequired": "役割設定は必須です。"
+    "roleSettingsRequired": "役割設定は必須です。",
+    "presetDisplay": {
+      "members": {
+        "coordinator_pmo": "コーディネーター",
+        "product_manager": "プロダクトマネージャー",
+        "system_architect": "システムアーキテクト",
+        "prompt_engineer": "プロンプトエンジニア",
+        "frontend_engineer": "フロントエンドエンジニア",
+        "backend_engineer": "バックエンドエンジニア",
+        "qa_tester": "QAエンジニア",
+        "ux_ui_designer": "UX/UIデザイナー",
+        "safety_policy_officer": "セーフティ責任者",
+        "solution_manager": "ソリューションマネージャー",
+        "code_reviewer": "コードレビュアー",
+        "devops_engineer": "DevOpsエンジニア",
+        "product_analyst": "プロダクトアナリスト",
+        "data_analyst": "データアナリスト",
+        "technical_writer": "テクニカルライター",
+        "content_researcher": "コンテンツリサーチャー",
+        "content_editor": "コンテンツエディター",
+        "frontier_researcher": "フロンティアリサーチャー",
+        "marketing_specialist": "マーケティングスペシャリスト",
+        "video_editor": "動画編集者",
+        "market_analyst": "市場アナリスト"
+      },
+      "teams": {
+        "fullstack_delivery_team": "フルスタックデリバリーチーム",
+        "ai_prompt_quality_team": "AIプロンプト品質チーム",
+        "architecture_governance_team": "アーキテクチャガバナンスチーム",
+        "product_discovery_team": "プロダクト探索チーム",
+        "content_studio_team": "コンテンツスタジオチーム",
+        "growth_marketing_team": "グロースマーケティングチーム",
+        "research_innovation_team": "研究・イノベーションチーム",
+        "rapid_bugfix_team": "高速バグ修正チーム"
+      }
+    }
   },
   "cleanup": {
     "selected": "選択済み: {{count}}",

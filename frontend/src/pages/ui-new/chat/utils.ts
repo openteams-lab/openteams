@@ -1,7 +1,9 @@
 import { parseDiffStats } from '@/utils/diffStatsParser';
+import type { TFunction } from 'i18next';
 import type {
   ChatAgent,
   ChatMemberPreset,
+  ChatTeamPreset,
   JsonValue,
 } from 'shared/types';
 import { mentionTokenRegex, messagePalette, userMessageTone } from './constants';
@@ -469,6 +471,36 @@ export interface MemberPresetImportPlan {
   reason: string;
   agentId: string | null;
   workspacePath: string;
+}
+
+export function getLocalizedMemberPresetName(
+  preset: Pick<ChatMemberPreset, 'id' | 'name' | 'is_builtin'>,
+  t: TFunction<'chat'>
+): string {
+  if (!preset.is_builtin) return preset.name;
+  return t(`members.presetDisplay.members.${preset.id}`, {
+    defaultValue: preset.name,
+  });
+}
+
+export function getLocalizedTeamPresetName(
+  preset: Pick<ChatTeamPreset, 'id' | 'name' | 'is_builtin'>,
+  t: TFunction<'chat'>
+): string {
+  if (!preset.is_builtin) return preset.name;
+  return t(`members.presetDisplay.teams.${preset.id}`, {
+    defaultValue: preset.name,
+  });
+}
+
+export function getLocalizedMemberPresetNameById(
+  presetId: string,
+  fallbackName: string,
+  t: TFunction<'chat'>
+): string {
+  return t(`members.presetDisplay.members.${presetId}`, {
+    defaultValue: fallbackName,
+  });
 }
 
 export function buildMemberPresetImportPlan({

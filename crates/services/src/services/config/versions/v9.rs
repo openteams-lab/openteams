@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::Error;
 use executors::{executors::BaseCodingAgent, profile::ExecutorProfileId};
 use serde::{Deserialize, Serialize};
@@ -183,6 +185,52 @@ fn builtin_team(id: &str, name: &str, description: &str, member_ids: &[&str]) ->
         member_ids: member_ids.iter().map(|member| member.to_string()).collect(),
         is_builtin: true,
         enabled: true,
+    }
+}
+
+fn complete_chat_presets_with_builtins(chat_presets: &mut ChatPresetsConfig) {
+    let defaults = default_chat_presets();
+
+    let builtin_member_ids: HashSet<&str> = defaults
+        .members
+        .iter()
+        .map(|preset| preset.id.as_str())
+        .collect();
+    let builtin_team_ids: HashSet<&str> = defaults
+        .teams
+        .iter()
+        .map(|preset| preset.id.as_str())
+        .collect();
+
+    // Keep custom presets untouched; remove only legacy built-in entries
+    // that are no longer part of the current built-in catalog.
+    chat_presets
+        .members
+        .retain(|preset| !preset.is_builtin || builtin_member_ids.contains(preset.id.as_str()));
+    chat_presets
+        .teams
+        .retain(|preset| !preset.is_builtin || builtin_team_ids.contains(preset.id.as_str()));
+
+    let mut existing_member_ids: HashSet<String> = chat_presets
+        .members
+        .iter()
+        .map(|preset| preset.id.clone())
+        .collect();
+    for preset in defaults.members {
+        if existing_member_ids.insert(preset.id.clone()) {
+            chat_presets.members.push(preset);
+        }
+    }
+
+    let mut existing_team_ids: HashSet<String> = chat_presets
+        .teams
+        .iter()
+        .map(|preset| preset.id.clone())
+        .collect();
+    for preset in defaults.teams {
+        if existing_team_ids.insert(preset.id.clone()) {
+            chat_presets.teams.push(preset);
+        }
     }
 }
 
@@ -674,6 +722,11 @@ pub struct Config {
 }
 
 impl Config {
+    fn with_completed_chat_presets(mut self) -> Self {
+        complete_chat_presets_with_builtins(&mut self.chat_presets);
+        self
+    }
+
     fn from_v8_config(old_config: v8::Config) -> Self {
         Self {
             config_version: "v9".to_string(),
@@ -700,6 +753,7 @@ impl Config {
             send_message_shortcut: old_config.send_message_shortcut,
             chat_presets: default_chat_presets(),
         }
+        .with_completed_chat_presets()
     }
 
     pub fn from_previous_version(raw_config: &str) -> Result<Self, Error> {
@@ -713,17 +767,17 @@ impl From<String> for Config {
         if let Ok(config) = serde_json::from_str::<Config>(&raw_config)
             && config.config_version == "v9"
         {
-            return config;
+            return config.with_completed_chat_presets();
         }
 
         match Self::from_previous_version(&raw_config) {
             Ok(config) => {
                 tracing::info!("Config upgraded to v9");
-                config
+                config.with_completed_chat_presets()
             }
             Err(e) => {
                 tracing::warn!("Config migration failed: {}, using default", e);
-                Self::default()
+                Self::default().with_completed_chat_presets()
             }
         }
     }

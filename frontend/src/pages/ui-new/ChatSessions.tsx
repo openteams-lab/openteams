@@ -50,6 +50,8 @@ import {
 } from './chat';
 import {
   buildMemberPresetImportPlan,
+  getLocalizedMemberPresetName,
+  getLocalizedTeamPresetName,
   type MemberPresetImportPlan,
 } from './chat/utils';
 
@@ -1489,6 +1491,7 @@ export function ChatSessions() {
       const existingAgentNamesLower = new Set(
         agents.map((agent) => agent.name.toLowerCase())
       );
+      const enabledRunnerTypesSet = new Set(enabledRunnerTypes);
       const createNamesLower = new Set<string>();
       const projectNameLower = activeSessionTitle.trim().toLowerCase();
       const preparedPlan: MemberPresetImportPlan[] = [];
@@ -1501,6 +1504,17 @@ export function ChatSessions() {
 
         const finalName = entry.finalName.trim();
         const workspacePath = entry.workspacePath.trim();
+        const runnerType = entry.runnerType.trim();
+
+        if (!runnerType) {
+          setMemberError('Base coding agent is required.');
+          return null;
+        }
+
+        if (!enabledRunnerTypesSet.has(runnerType)) {
+          setMemberError('Selected coding agent is unavailable.');
+          return null;
+        }
 
         if (!finalName) {
           setMemberError('AI member name is required.');
@@ -1528,6 +1542,7 @@ export function ChatSessions() {
           ...entry,
           finalName,
           workspacePath,
+          runnerType,
         };
 
         if (nextEntry.action === 'reuse') {
@@ -1539,6 +1554,13 @@ export function ChatSessions() {
               ...nextEntry,
               action: 'create',
               reason: 'create-new-agent',
+              agentId: null,
+            };
+          } else if (reusableAgent.runner_type !== runnerType) {
+            nextEntry = {
+              ...nextEntry,
+              action: 'create',
+              reason: 'runner-changed-create-new-agent',
               agentId: null,
             };
           }
@@ -1569,7 +1591,7 @@ export function ChatSessions() {
 
       return preparedPlan;
     },
-    [activeSessionTitle, agents]
+    [activeSessionTitle, agents, enabledRunnerTypes]
   );
 
   const handleAddMemberPreset = useCallback(
@@ -1609,7 +1631,7 @@ export function ChatSessions() {
         return;
       }
 
-      setTeamImportName(preset.name || preset.id);
+      setTeamImportName(getLocalizedMemberPresetName(preset, t));
       setTeamImportPlan([plan]);
       setMemberError(null);
     },
@@ -1621,6 +1643,7 @@ export function ChatSessions() {
       enabledRunnerTypes,
       isArchived,
       sessionMembers,
+      t,
     ]
   );
 
@@ -1641,17 +1664,17 @@ export function ChatSessions() {
         return;
       }
 
-      setTeamImportName(teamPreset.name || teamPreset.id);
+      setTeamImportName(getLocalizedTeamPresetName(teamPreset, t));
       setTeamImportPlan(plan);
       setMemberError(null);
     },
-    [activeSessionId, buildTeamImportPlan, isArchived]
+    [activeSessionId, buildTeamImportPlan, isArchived, t]
   );
 
   const handleUpdateTeamImportPlanEntry = useCallback(
     (
       index: number,
-      updates: { finalName?: string; workspacePath?: string }
+      updates: { finalName?: string; workspacePath?: string; runnerType?: string }
     ) => {
       setTeamImportPlan((prev) => {
         if (!prev || index < 0 || index >= prev.length) return prev;
@@ -1663,6 +1686,9 @@ export function ChatSessions() {
             : {}),
           ...(updates.workspacePath !== undefined
             ? { workspacePath: updates.workspacePath }
+            : {}),
+          ...(updates.runnerType !== undefined
+            ? { runnerType: updates.runnerType }
             : {}),
         };
         return next;

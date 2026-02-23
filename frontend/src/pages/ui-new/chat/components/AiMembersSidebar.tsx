@@ -29,7 +29,12 @@ import {
   getAgentAvatarSeed,
   getAgentAvatarStyle,
 } from '../AgentAvatar';
-import type { MemberPresetImportPlan } from '../utils';
+import {
+  getLocalizedMemberPresetName,
+  getLocalizedMemberPresetNameById,
+  getLocalizedTeamPresetName,
+  type MemberPresetImportPlan,
+} from '../utils';
 
 const truncateByChars = (value: string, maxChars: number): string => {
   const chars = Array.from(value);
@@ -126,7 +131,7 @@ export interface AiMembersSidebarProps {
   isImportingTeam: boolean;
   onUpdateTeamImportPlanEntry: (
     index: number,
-    updates: { finalName?: string; workspacePath?: string }
+    updates: { finalName?: string; workspacePath?: string; runnerType?: string }
   ) => void;
   onConfirmTeamImport: () => void;
   onCancelTeamImport: () => void;
@@ -246,7 +251,7 @@ export function AiMembersSidebar({
                             onClick={() => onAddMemberPreset(preset)}
                           >
                             <span className="font-medium text-normal">
-                              @{preset.name}
+                              @{getLocalizedMemberPresetName(preset, t)}
                             </span>
                             <span className="truncate text-low flex-1">
                               {preset.description}
@@ -273,7 +278,7 @@ export function AiMembersSidebar({
                             disabled={!!teamImportPlan}
                           >
                             <span className="font-medium text-normal">
-                              {team.name}
+                              {getLocalizedTeamPresetName(team, t)}
                             </span>
                             <span className="truncate text-low flex-1">
                               {team.description}
@@ -592,7 +597,11 @@ export function AiMembersSidebar({
                 >
                   <div className="flex items-center gap-2 text-xs">
                     <span className="font-medium truncate max-w-[180px]">
-                      {plan.presetName || plan.presetId}
+                      {getLocalizedMemberPresetNameById(
+                        plan.presetId,
+                        plan.presetName || plan.presetId,
+                        t
+                      )}
                     </span>
                     <span
                       className={cn(
@@ -613,6 +622,46 @@ export function AiMembersSidebar({
                   </div>
                   {plan.action !== 'skip' ? (
                     <div className="space-y-1">
+                      <div className="space-y-0.5">
+                        <label className="text-[11px] text-low">
+                          {t('members.baseCodingAgent')}
+                        </label>
+                        <select
+                          value={plan.runnerType}
+                          onChange={(event) =>
+                            onUpdateTeamImportPlanEntry(index, {
+                              runnerType: event.target.value,
+                            })
+                          }
+                          disabled={
+                            isImportingTeam ||
+                            isCheckingAvailability ||
+                            enabledRunnerTypes.length === 0
+                          }
+                          className={cn(
+                            'chat-session-member-field w-full rounded-sm border bg-panel px-2 py-1',
+                            'text-xs text-normal focus:outline-none disabled:opacity-50'
+                          )}
+                        >
+                          {enabledRunnerTypes.length === 0 && (
+                            <option value="">
+                              {isCheckingAvailability
+                                ? t('members.checkingAgents')
+                                : t('members.noLocalAgentsDetected')}
+                            </option>
+                          )}
+                          {availableRunnerTypes.map((runner) => (
+                            <option
+                              key={runner}
+                              value={runner}
+                              disabled={!isRunnerAvailable(runner)}
+                            >
+                              {toPrettyCase(runner)}
+                              {availabilityLabel(runner)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       <div className="space-y-0.5">
                         <label className="text-[11px] text-low">
                           {t('members.memberNameLabel')}
