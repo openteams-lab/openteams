@@ -23,7 +23,10 @@ use db::{
 use executors::{
     approvals::NoopExecutorApprovalService,
     env::{ExecutionEnv, RepoContext},
-    executors::{BaseCodingAgent, CancellationToken, ExecutorError, StandardCodingAgentExecutor},
+    executors::{
+        BaseCodingAgent, CancellationToken, ExecutorError, ExecutorExitSignal,
+        StandardCodingAgentExecutor,
+    },
     logs::{NormalizedEntryType, utils::patch::extract_normalized_entry_from_patch},
     profile::{ExecutorConfigs, ExecutorProfileId},
 };
@@ -696,6 +699,7 @@ impl ChatRunner {
             self.spawn_exit_watcher(
                 spawned.child,
                 spawned.cancel,
+                spawned.exit_signal,
                 msg_store,
                 failed_flag,
                 session_agent_id,
@@ -1541,6 +1545,7 @@ impl ChatRunner {
         &self,
         mut child: command_group::AsyncGroupChild,
         cancel_token: Option<CancellationToken>,
+        exit_signal: Option<ExecutorExitSignal>,
         msg_store: Arc<MsgStore>,
         failed_flag: Arc<AtomicBool>,
         session_agent_id: Uuid,
@@ -1551,33 +1556,84 @@ impl ChatRunner {
                 .insert(session_agent_id, token.clone());
         }
 
+        let finished_sent = Arc::new(AtomicBool::new(false));
+        let finished_from_exit_signal = Arc::new(AtomicBool::new(false));
         let cancellation_tokens = self.cancellation_tokens.clone();
+        let process_finished = finished_sent.clone();
+        let process_finished_from_signal = finished_from_exit_signal.clone();
+        let process_msg_store = msg_store.clone();
+        let process_failed_flag = failed_flag.clone();
         tokio::spawn(async move {
             loop {
                 match child.try_wait() {
                     Ok(Some(status)) => {
                         if !status.success() {
-                            failed_flag.store(true, Ordering::Relaxed);
+                            process_failed_flag.store(true, Ordering::Relaxed);
                         }
-                        msg_store.push_finished();
-                        // Clean up the cancellation token
-                        cancellation_tokens.remove(&session_agent_id);
+                        if !process_finished.swap(true, Ordering::Relaxed) {
+                            process_msg_store.push_finished();
+                        }
+                        // If completion already came from exit_signal, token was cleaned there.
+                        if !process_finished_from_signal.load(Ordering::Relaxed) {
+                            cancellation_tokens.remove(&session_agent_id);
+                        }
                         break;
                     }
                     Ok(None) => {
                         tokio::time::sleep(std::time::Duration::from_millis(250)).await;
                     }
                     Err(err) => {
-                        msg_store.push(LogMsg::Stderr(format!("process wait error: {err}")));
-                        failed_flag.store(true, Ordering::Relaxed);
-                        msg_store.push_finished();
-                        // Clean up the cancellation token
-                        cancellation_tokens.remove(&session_agent_id);
+                        process_msg_store
+                            .push(LogMsg::Stderr(format!("process wait error: {err}")));
+                        process_failed_flag.store(true, Ordering::Relaxed);
+                        if !process_finished.swap(true, Ordering::Relaxed) {
+                            process_msg_store.push_finished();
+                        }
+                        if !process_finished_from_signal.load(Ordering::Relaxed) {
+                            cancellation_tokens.remove(&session_agent_id);
+                        }
                         break;
                     }
                 }
             }
         });
+
+        if let Some(exit_signal_rx) = exit_signal {
+            let signal_msg_store = msg_store;
+            let signal_failed_flag = failed_flag;
+            let signal_finished = finished_sent;
+            let signal_finished_from_signal = finished_from_exit_signal;
+            let signal_cancel_token = cancel_token;
+            let signal_cancellation_tokens = self.cancellation_tokens.clone();
+            tokio::spawn(async move {
+                match exit_signal_rx.await {
+                    Ok(exit_result) => {
+                        if matches!(exit_result, executors::executors::ExecutorExitResult::Failure)
+                        {
+                            signal_failed_flag.store(true, Ordering::Relaxed);
+                        }
+
+                        // Ignore completion emitted after manual cancellation (e.g. stop_agent).
+                        let manually_cancelled = signal_cancel_token
+                            .as_ref()
+                            .map(CancellationToken::is_cancelled)
+                            .unwrap_or(false);
+
+                        if !manually_cancelled {
+                            signal_finished_from_signal.store(true, Ordering::Relaxed);
+                            if !signal_finished.swap(true, Ordering::Relaxed) {
+                                signal_msg_store.push_finished();
+                            }
+                            signal_cancellation_tokens.remove(&session_agent_id);
+                        }
+                    }
+                    Err(err) => {
+                        signal_msg_store
+                            .push(LogMsg::Stderr(format!("exit signal receive error: {err}")));
+                    }
+                }
+            });
+        }
     }
 
     /// Stop a running agent by triggering graceful cancellation via CancellationToken

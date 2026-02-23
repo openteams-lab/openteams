@@ -89,26 +89,36 @@ jobs:
           current_repo_version=$(node -p "require('./package.json').version")
           echo "Current repo version: $current_repo_version"
 
-          # Use the higher of the two versions as the base (prevents downgrade errors with cargo set-version)
-          base_version=$(node -e "
-            const npm = '$latest_npm_version'.split('.').map(Number);
-            const repo = '$current_repo_version'.split('.').map(Number);
+          # Use the higher major.minor.patch from npm/repo as the release base.
+          # This avoids semver ordering edge cases like:
+          #   0.2.3-main.0 > 0.2.3-30.0
+          release_base_version=$(node -e "
+            const toCore = (version) => {
+              const [core] = String(version).split('-');
+              const [major, minor, patch] = core
+                .split('.')
+                .map((value) => Number.parseInt(value, 10) || 0);
+              return [major, minor, patch];
+            };
+            const toString = ([major, minor, patch]) => major + '.' + minor + '.' + patch;
+            const npmCore = toCore('$latest_npm_version');
+            const repoCore = toCore('$current_repo_version');
             for (let i = 0; i < 3; i++) {
-              if ((npm[i] || 0) > (repo[i] || 0)) { console.log('$latest_npm_version'); process.exit(); }
-              if ((npm[i] || 0) < (repo[i] || 0)) { console.log('$current_repo_version'); process.exit(); }
+              if (npmCore[i] > repoCore[i]) { console.log(toString(npmCore)); process.exit(); }
+              if (npmCore[i] < repoCore[i]) { console.log(toString(repoCore)); process.exit(); }
             }
-            console.log('$current_repo_version');
+            console.log(toString(repoCore));
           ")
-          echo "Base version for bump: $base_version"
+          echo "Release base version for bump: $release_base_version"
 
           timestamp=$(date +%Y%m%d%H%M%S)
 
           # Update root package.json based on base version
           if [[ "${{ github.event.inputs.version_type }}" == "prerelease" ]]; then
-            # For prerelease, first align to base_version to avoid cargo downgrade errors,
-            # then increment to a prerelease with a numeric preid.
+            # For prerelease, align to stable release_base_version first,
+            # then increment to a numeric prerelease.
             # MSI requires a numeric prerelease identifier (<= 65535).
-            npm version $base_version --no-git-tag-version --allow-same-version
+            npm version $release_base_version --no-git-tag-version --allow-same-version
 
             msi_prerelease_id="${GITHUB_RUN_NUMBER:-1}"
             if ! [[ "$msi_prerelease_id" =~ ^[0-9]+$ ]]; then
@@ -122,8 +132,8 @@ jobs:
             new_version=$(node -p "require('./package.json').version")
             new_tag="v${new_version}.${timestamp}"
           else
-            # For regular releases, use base version and bump it
-            npm version $base_version --no-git-tag-version --allow-same-version
+            # For regular releases, use release_base_version and bump it
+            npm version $release_base_version --no-git-tag-version --allow-same-version
             npm version ${{ github.event.inputs.version_type }} --no-git-tag-version
 
             new_version=$(node -p "require('./package.json').version")
