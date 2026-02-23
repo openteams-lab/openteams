@@ -60,6 +60,7 @@
       "rateLimited": "Limite de requêtes atteinte",
       "checkQuota": "Veuillez vérifier votre quota API ou réessayer plus tard"
     },
+    "contextCompressed": "Le contexte a été compressé pour cette réponse",
     "sendToAgent": "Envoyer à l'agent",
     "open": "Ouvrir"
   },
@@ -89,7 +90,21 @@
     "workspacePathPlaceholder": "Chemin d'accès absolu pour le travail des membres IA",
     "workspacePathCannotBeModified": "Le chemin de l'espace de travail ne peut pas être modifié",
     "add": "Ajouter",
-    "save": "Enregistrer"
+    "save": "Enregistrer",
+    "presetSection": "Ajout rapide depuis les préréglages",
+    "addFromMemberPreset": "Ajouter un préréglage de membre",
+    "importTeamPreset": "Importer un préréglage d'équipe",
+    "noEnabledPresets": "Aucun préréglage activé. Configurez-les dans Paramètres -> Préréglages.",
+    "importPreview": {
+      "title": "Importer l'équipe : {{teamName}}",
+      "description": "Les membres suivants seront ajoutés à cette session :",
+      "actionCreate": "sera créé",
+      "actionReuse": "existe déjà (sera réutilisé)",
+      "actionSkip": "déjà dans la session (sera ignoré)",
+      "confirmImport": "Importer l'équipe",
+      "cancel": "Annuler",
+      "importing": "Importation..."
+    }
   },
   "cleanup": {
     "selected": "Sélectionné : {{count}}",
@@ -113,7 +128,20 @@
     "confirm": {
       "cancel": "Annuler",
       "confirm": "Confirmer",
-      "processing": "Traitement..."
+      "processing": "Traitement...",
+      "defaultTitle": "Confirmer",
+      "titles": {
+        "agentRunning": "Agent en cours d'exécution",
+        "removeMember": "Supprimer le membre IA",
+        "deleteSession": "Supprimer la session",
+        "deleteMessages": "Supprimer les messages"
+      },
+      "messages": {
+        "agentRunning": "Le(s) agent(s) suivant(s) est/sont en cours d’exécution : @{{agents}}. Ils ne traiteront pas de nouveaux messages tant que la tâche en cours ne sera pas arrêtée. Voulez-vous quand même envoyer ce message ?",
+        "removeMember": "Voulez-vous vraiment supprimer @{{name}} de cette session ?",
+        "deleteSession": "Voulez-vous vraiment supprimer \"{{title}}\" ? Cette action est irréversible et tous les messages seront supprimés définitivement.",
+        "deleteMessages": "Voulez-vous vraiment supprimer {{count}} message(s) ? Cette action est irréversible."
+      }
     },
     "promptEditor": {
       "title": "Prompt système",

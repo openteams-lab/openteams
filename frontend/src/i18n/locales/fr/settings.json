@@ -1,7 +1,8 @@
 {
   "settings": {
     "common": {
-      "unsavedChanges": "• Vous avez des modifications non enregistrées"
+      "unsavedChanges": "• Vous avez des modifications non enregistrées",
+      "discardChangesConfirm": "Ignorer les modifications non enregistrées ?"
     },
     "unsavedChanges": {
       "title": "Modifications non enregistrées",
@@ -25,7 +26,9 @@
         "organizations": "Paramètres de l'organisation",
         "organizationsDesc": "Gérer les membres et les permissions de l'organisation",
         "remote-projects": "Projets",
-        "remote-projectsDesc": "Gérer les projets"
+        "remote-projectsDesc": "Gérer les projets",
+        "presets": "Préréglages",
+        "presetsDesc": "Modèles prédéfinis de membres et d'équipes IA"
       }
     },
     "general": {
@@ -487,6 +490,63 @@
         "discard": "Abandonner",
         "confirmSwitch": "Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir changer de dépôt ? Vos modifications seront perdues."
       }
+    },
+    "presets": {
+      "title": "Modèles de préréglages",
+      "description": "Gérez des modèles réutilisables de membres et d’équipes IA pour les sessions de chat.",
+      "loadError": "Échec du chargement des préréglages.",
+      "saving": "Enregistrement...",
+      "saveSuccess": "Préréglages enregistrés avec succès.",
+      "saveError": "Échec de l'enregistrement des préréglages.",
+      "builtin": "intégré",
+      "disabled": "désactivé",
+      "tabs": {
+        "members": "Modèles de membres",
+        "teams": "Modèles d'équipes"
+      },
+      "actions": {
+        "copy": "Dupliquer",
+        "disable": "Désactiver",
+        "enable": "Activer",
+        "delete": "Supprimer"
+      },
+      "members": {
+        "listTitle": "Préréglages de membres",
+        "add": "Ajouter un membre",
+        "empty": "Aucun préréglage de membre. Ajoutez-en un pour commencer.",
+        "fields": {
+          "id": "ID du préréglage",
+          "name": "Identifiant (@mention)",
+          "namePlaceholder": "ex. backend",
+          "description": "Descriptif",
+          "descriptionPlaceholder": "Ce que fait ce membre IA",
+          "runnerType": "Type de runner (optionnel)",
+          "runnerTypePlaceholder": "Laissez vide pour utiliser la valeur par défaut de la session",
+          "systemPrompt": "Prompt système",
+          "systemPromptPlaceholder": "Décrivez le rôle et les responsabilités de ce membre IA...",
+          "workspacePath": "Chemin de workspace par défaut (optionnel)",
+          "workspacePathPlaceholder": "ex. backend",
+          "toolsEnabled": "Outils (JSON)"
+        },
+        "errors": {
+          "toolsJsonInvalid": "Le JSON des outils n'est pas valide.",
+          "toolsJsonObject": "Le JSON des outils doit être un objet."
+        }
+      },
+      "teams": {
+        "listTitle": "Préréglages d'équipes",
+        "add": "Ajouter une équipe",
+        "empty": "Aucun préréglage d'équipe. Ajoutez-en un pour commencer.",
+        "noMemberPresets": "Aucun préréglage de membre disponible. Créez d’abord des préréglages de membre.",
+        "fields": {
+          "id": "ID du préréglage",
+          "name": "Nom de l'équipe",
+          "namePlaceholder": "ex. Équipe de développement full-stack",
+          "description": "Descriptif",
+          "descriptionPlaceholder": "À quoi sert cette équipe",
+          "members": "Membres de l'équipe"
+        }
+      }
     }
   },
   "integrations": {
@@ -520,6 +580,63 @@
             "officialDocs": "documentation officielle",
             "andAuthenticate": "puis authentifiez-vous avec votre compte GitHub."
           }
+        }
+      }
+    },
+    "presets": {
+      "loading": "Chargement des préréglages...",
+      "saving": "Enregistrement...",
+      "saveSuccess": "✓ Préréglages enregistrés avec succès !",
+      "saveError": "Échec de l'enregistrement des préréglages",
+      "builtin": "Intégré",
+      "disabled": "Désactivé",
+      "actions": {
+        "cancel": "Annuler",
+        "save": "Enregistrer",
+        "edit": "Modifier",
+        "copy": "Copier",
+        "enable": "Activer",
+        "disable": "Désactiver",
+        "delete": "Supprimer"
+      },
+      "tabs": {
+        "members": "Modèles de membres",
+        "teams": "Modèles d'équipes"
+      },
+      "members": {
+        "title": "Modèles de membres",
+        "description": "Créez et gérez des modèles prédéfinis de membres IA. Utilisez-les pour ajouter rapidement des membres IA préconfigurés à vos sessions de chat.",
+        "add": "Ajouter un modèle de membre",
+        "newPreset": "Nouveau préréglage de membre",
+        "editPreset": "Modifier le préréglage de membre",
+        "empty": "Aucun préréglage de membre pour le moment. Créez-en un pour commencer !",
+        "fields": {
+          "name": "Nom",
+          "namePlaceholder": "ex. backend",
+          "description": "Descriptif",
+          "descriptionPlaceholder": "ex. Ingénieur backend pour le développement d’API",
+          "runnerType": "Type de runner (optionnel)",
+          "runnerTypePlaceholder": "ex. claude_code, laissez vide pour la valeur par défaut",
+          "systemPrompt": "Prompt système",
+          "systemPromptPlaceholder": "Décrivez comment ce membre IA doit se comporter...",
+          "workspacePath": "Chemin de workspace par défaut (optionnel)",
+          "workspacePathPlaceholder": "ex. backend"
+        }
+      },
+      "teams": {
+        "title": "Modèles d'équipes",
+        "description": "Créez et gérez des modèles prédéfinis d’équipes IA. Importez des équipes entières de membres IA préconfigurés en un clic.",
+        "add": "Ajouter un modèle d'équipe",
+        "newPreset": "Nouveau préréglage d'équipe",
+        "editPreset": "Modifier le préréglage d'équipe",
+        "empty": "Aucun préréglage d'équipe pour le moment. Créez-en un pour commencer !",
+        "noMemberPresets": "Aucun préréglage de membre disponible. Créez d’abord des préréglages de membre.",
+        "fields": {
+          "name": "Nom",
+          "namePlaceholder": "ex. Équipe de développement full-stack",
+          "description": "Descriptif",
+          "descriptionPlaceholder": "ex. Équipe de développement end-to-end",
+          "members": "Membres de l'équipe"
         }
       }
     }

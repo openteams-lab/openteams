@@ -22,5 +22,6 @@
   "projectNotFound": "El proyecto que buscas no existe o ha sido eliminado.",
   "viewProject": "Ver Proyecto",
   "openInIDE": "Abrir en IDE",
-  "createdDate": "Creado {{date}}"
+  "createdDate": "Creado {{date}}",
+  "confirmDelete": "¿Seguro que quieres eliminar el proyecto \"{{name}}\"? Esta acción no se puede deshacer."
 }

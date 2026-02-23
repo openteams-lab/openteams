@@ -233,7 +233,8 @@
   },
   "confirm": {
     "defaultConfirm": "확인",
-    "defaultCancel": "취소"
+    "defaultCancel": "취소",
+    "unexpectedError": "예기치 않은 오류가 발생했습니다."
   },
   "dialogs": {
     "selectGitRepository": "Git 저장소 선택",
@@ -384,5 +385,13 @@
     "streamsAffected_other": "{{count}}개 스트림이 영향을 받음",
     "status": "(상태 {{status}})",
     "refreshPage": "페이지 새로고침"
+  },
+  "issues": {
+    "deleteConfirm": {
+      "titleSingle": "이슈를 삭제할까요?",
+      "titleMultiple": "{{count}}개의 이슈를 삭제할까요?",
+      "messageSingle": "이 작업은 되돌릴 수 없습니다.",
+      "messageMultiple": "{{count}}개의 이슈가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+    }
   }
 }

@@ -359,6 +359,14 @@
         "title": "登录以管理 git 操作",
         "description": "登录 agents-chatgroup，以便您可以推送分支、合并更改或为此任务打开拉取请求。",
         "action": "登录"
+      },
+      "cannotMerge": {
+        "title": "无法合并",
+        "message": "该仓库存在打开中的 PR，请通过 PR 流程完成合并。"
+      },
+      "rebaseRequired": {
+        "title": "需要 Rebase",
+        "message": "当前分支落后目标分支 {{count}} 次提交。是否先 Rebase 再合并？"
       }
     },
     "mergeDialog": {
@@ -655,7 +663,7 @@
       "approve": "批准",
       "clearReviewComments": "清除审查评论",
       "edit": "编辑消息",
-      "scrollToPreviousMessage": "Go to previous message"
+      "scrollToPreviousMessage": "跳转到上一条消息"
     },
     "approval": {
       "conflictWarning": "冲突文件需要手动解决",

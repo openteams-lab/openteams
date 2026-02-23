@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useActions } from '@/contexts/ActionsContext';
 import { usePush } from '@/hooks/usePush';
 import { useRenameBranch } from '@/hooks/useRenameBranch';
@@ -22,6 +23,7 @@ export function GitPanelContainer({
   selectedWorkspace,
   repos,
 }: GitPanelContainerProps) {
+  const { t } = useTranslation(['tasks', 'common']);
   const { executeAction } = useActions();
 
   // Hooks for branch management (moved from WorkspacesLayout)
@@ -127,11 +129,11 @@ export function GitPanelContainer({
       // Show error state and dialog for other errors
       setPushStates((prev) => ({ ...prev, [repoId]: 'error' }));
       const message =
-        err instanceof Error ? err.message : 'Failed to push changes';
+        err instanceof Error ? err.message : t('tasks:git.errors.pushChanges');
       ConfirmDialog.show({
-        title: 'Error',
+        title: t('common:error'),
         message,
-        confirmText: 'OK',
+        confirmText: t('common:ok'),
         showCancelButton: false,
         variant: 'destructive',
       });

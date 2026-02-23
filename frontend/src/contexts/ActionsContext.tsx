@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Workspace } from 'shared/types';
@@ -86,6 +87,7 @@ interface ActionsProviderProps {
 }
 
 export function ActionsProvider({ children }: ActionsProviderProps) {
+  const { t } = useTranslation('common');
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId?: string }>();
   const queryClient = useQueryClient();
@@ -306,15 +308,16 @@ export function ActionsProvider({ children }: ActionsProviderProps) {
       } catch (error) {
         // Show error to user via alert dialog
         ConfirmDialog.show({
-          title: 'Error',
-          message: error instanceof Error ? error.message : 'An error occurred',
-          confirmText: 'OK',
+          title: t('error'),
+          message:
+            error instanceof Error ? error.message : t('confirm.unexpectedError'),
+          confirmText: t('ok'),
           showCancelButton: false,
           variant: 'destructive',
         });
       }
     },
-    [executorContext]
+    [executorContext, t]
   );
 
   // Get resolved label helper (supports dynamic labels via visibility context)

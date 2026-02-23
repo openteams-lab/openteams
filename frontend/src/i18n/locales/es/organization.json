@@ -42,7 +42,9 @@
     "loading": "Loading invitations...",
     "none": "No pending invitations",
     "invited": "Invited {{date}}",
-    "pending": "Pending"
+    "pending": "Pending",
+    "confirmRevoke": "¿Revocar la invitación para {{email}}?",
+    "revokeAction": "Revocar invitación"
   },
   "settings": {
     "title": "Organization Settings",
@@ -57,7 +59,7 @@
     "dangerZoneDescription": "Irreversible and destructive actions",
     "deleteOrganization": "Delete Organization",
     "deleteOrganizationDescription": "Permanently delete this organization and all its data",
-    "confirmDelete": "Are you sure you want to delete {{orgName}}? This action cannot be undone.",
+    "confirmDelete": "¿Seguro que quieres eliminar {{orgName}}? Esta acción no se puede deshacer.",
     "deleteSuccess": "Organization deleted successfully",
     "deleteError": "Failed to delete organization"
   },
@@ -66,7 +68,7 @@
     "description": "Debes iniciar sesión para administrar la configuración de la organización.",
     "action": "Iniciar sesión"
   },
-  "confirmRemoveMember": "Are you sure you want to remove this member from the organization?",
+  "confirmRemoveMember": "¿Seguro que quieres eliminar a este miembro de la organización?",
   "sharedProjects": {
     "title": "Proyectos compartidos",
     "description": "Proyectos remotos en {{orgName}} y sus enlaces a proyectos locales",

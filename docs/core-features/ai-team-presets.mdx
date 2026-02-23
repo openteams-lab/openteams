@@ -1,0 +1,117 @@
+---
+title: "AI Team Presets"
+description: "Instantly assemble your AI team using pre-configured member and team templates — no repetitive setup required"
+---
+
+AI Team Presets let you save and reuse AI member configurations, so you can spin up a full AI team in seconds instead of configuring each agent from scratch every time.
+
+There are two types of presets:
+
+- **Member Presets** — individual AI agent configurations (role, system prompt, agent type)
+- **Team Presets** — curated groups of member presets that can be imported into a session all at once
+
+## Built-in Presets
+
+AgentsChatGroup ships with **11 built-in member presets** and **5 built-in team presets** to get you started immediately.
+
+### Built-in Member Presets
+
+| Preset | Role |
+|--------|------|
+| Architect | System design and technical planning |
+| Backend Engineer | Server-side implementation |
+| Frontend Engineer | UI and client-side development |
+| Full-stack Engineer | End-to-end feature development |
+| Code Reviewer | Security, performance, and best-practice review |
+| QA Tester | Test planning and execution |
+| DevOps Engineer | CI/CD, infrastructure, and deployment |
+| Data Engineer | Data pipelines and ETL |
+| Product Manager | Requirements, roadmap, and prioritization |
+| Technical Writer | Documentation and user guides |
+| Security Analyst | Vulnerability assessment and hardening |
+
+### Built-in Team Presets
+
+| Team | Members Included |
+|------|-----------------|
+| Full-Stack Dev Team | Architect + Backend Engineer + Frontend Engineer + Code Reviewer |
+| Content Production | Product Manager + Technical Writer + QA Tester |
+| DevOps & Release | Backend Engineer + DevOps Engineer + Code Reviewer |
+| Security Audit | Security Analyst + Backend Engineer + Code Reviewer |
+| Data Platform | Data Engineer + Backend Engineer + QA Tester |
+
+<Note>
+Built-in presets cannot be deleted. You can disable them to hide them from the quick-add list, or copy them to create a customized version.
+</Note>
+
+## Managing Presets
+
+Open **Settings → Presets** to manage all member and team templates.
+
+### Member Presets Tab
+
+- **Add** a new custom member preset with any name, agent type, and system prompt
+- **Edit** an existing custom preset
+- **Copy** any preset (built-in or custom) to use it as a starting point
+- **Disable** a preset to hide it from the quick-add sidebar without deleting it
+- **Delete** custom presets you no longer need
+
+### Team Presets Tab
+
+- **Add** a new team by selecting member presets and giving the team a name
+- **Edit** the members in a custom team
+- **Copy** any team preset to create a variation
+- **Disable** a team to hide it from the import list
+- **Delete** custom teams
+
+## Using Presets in a Session
+
+### Adding a Member Preset
+
+In the **AI Members sidebar** on the right side of the chat:
+
+1. Click **Add from Preset** under the member list
+2. Browse the available member presets
+3. Click a preset to instantly add that AI member to your session
+
+The new member is created with the preset's name, agent type, and system prompt. You can still edit the member afterward to adjust the workspace path or any other field.
+
+### Importing a Team Preset
+
+1. Click **Import Team** in the AI Members sidebar
+2. Select the team preset you want to import
+3. Review the **import preview** — it shows each member and whether they will be:
+   - **Created** — a new member will be added
+   - **Reused** — an existing member with the same name and config is already in the session
+   - **Auto-renamed** — the name conflicts with an existing member but configs differ; a `_2` suffix (or higher) will be appended
+4. Confirm the import
+
+<Tip>
+The preview step lets you catch naming conflicts before they happen. If you already have a "Coder" in the session, a Coder preset with different settings will be imported as "Coder_2".
+</Tip>
+
+### Conflict Resolution Rules
+
+When importing a team, AgentsChatGroup applies these rules automatically:
+
+| Scenario | Action |
+|----------|--------|
+| Same name, same config | Reuse existing member — no duplicate created |
+| Same name, different config | Create new member with `_2` (or `_3`, etc.) suffix |
+| Member already in the session | Skip — leave existing member unchanged |
+
+## Archived Sessions
+
+Import controls are **disabled** in archived sessions. You cannot add members or import teams into an archived session.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AI Members" icon="robot" href="/core-features/ai-members">
+    Learn how to manually add and configure individual AI members
+  </Card>
+
+  <Card title="Task Collaboration" icon="comments" href="/core-features/task-collaboration">
+    Assign tasks to your team and let agents collaborate via @mentions
+  </Card>
+</CardGroup>

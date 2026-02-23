@@ -125,6 +125,13 @@ export function ChatMessageItem({
     (message.meta as { reference?: { message_id?: string } }).reference
       ?.message_id) ??
     null;
+  const contextCompacted =
+    isAgent &&
+    message.meta &&
+    typeof message.meta === 'object' &&
+    !Array.isArray(message.meta) &&
+    (message.meta as { context_compacted?: unknown }).context_compacted ===
+      true;
 
   // System messages
   if (message.sender_type === ChatSenderType.system) {
@@ -285,6 +292,11 @@ export function ChatMessageItem({
               </div>
             ) : null;
           })()}
+          {contextCompacted && (
+            <div className="mb-half text-[10px] leading-4 tracking-wide text-low/80">
+              --- {t('message.contextCompressed')} ---
+            </div>
+          )}
           <ChatMarkdown content={message.content} />
           {mentionList.length > 0 && (
             <div className="chat-session-mentions mt-half flex flex-wrap items-center gap-half text-xs text-low">
@@ -298,9 +310,7 @@ export function ChatMessageItem({
                   agentStates[agentId] ===
                     ChatSessionAgentState.running;
                 const isRunning =
-                  mentionStatus === 'running' ||
-                  mentionStatus === 'received' ||
-                  isFallbackRunning;
+                  mentionStatus === 'running' || isFallbackRunning;
                 const isCompleted = mentionStatus === 'completed';
                 const isFailed = mentionStatus === 'failed';
                 const showCheck =

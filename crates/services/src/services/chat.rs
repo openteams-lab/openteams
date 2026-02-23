@@ -115,6 +115,14 @@ pub fn extract_reference_message_id(meta: &Value) -> Option<Uuid> {
     id.and_then(|value| Uuid::parse_str(value).ok())
 }
 
+/// Truncate string by character count and append "..." when truncated.
+fn truncate_with_ellipsis(content: &str, max_chars: usize) -> String {
+    match content.char_indices().nth(max_chars) {
+        Some((idx, _)) => format!("{}...", &content[..idx]),
+        None => content.to_string(),
+    }
+}
+
 /// Compress message content to reduce token usage
 /// Keeps the first part of content and truncates with "..." if too long
 fn compress_content(content: &str, max_chars: usize) -> String {
@@ -521,18 +529,10 @@ fn create_fallback_summary(messages_to_summarize: &[Value]) -> String {
             .unwrap_or("unknown");
         let content = msg.get("content").and_then(|c| c.as_str()).unwrap_or("");
         // Keep only first 100 chars per message
-        let truncated = if content.len() > 100 {
-            format!("{}...", &content[..100])
-        } else {
-            content.to_string()
-        };
+        let truncated = truncate_with_ellipsis(content, 100);
         summary.push_str(&format!("{}:{} | ", sender_label, truncated));
     }
-    if summary.len() > 500 {
-        summary.truncate(500);
-        summary.push_str("...");
-    }
-    summary
+    truncate_with_ellipsis(&summary, 500)
 }
 
 /// Generate summary using an LLM agent in the background
@@ -681,11 +681,7 @@ async fn generate_llm_summary_inner(
                     let content = entry.content.trim();
                     if !content.is_empty() {
                         // Truncate if too long
-                        let summary = if content.len() > 500 {
-                            format!("{}...", &content[..500])
-                        } else {
-                            content.to_string()
-                        };
+                        let summary = truncate_with_ellipsis(content, 500);
                         return Ok(summary);
                     }
                 }
@@ -950,7 +946,11 @@ pub async fn export_session_archive(
 
 #[cfg(test)]
 mod tests {
-    use super::parse_mentions;
+    use serde_json::json;
+
+    use super::{
+        LLM_COMPRESSION_BATCH_SIZE, create_fallback_summary, parse_mentions, truncate_with_ellipsis,
+    };
 
     #[test]
     fn parses_mentions_with_basic_tokens() {
@@ -983,5 +983,30 @@ mod tests {
                 "\u{0645}\u{0637}\u{0648}\u{0631}_1",
             ]
         );
+    }
+
+    #[test]
+    fn truncate_with_ellipsis_handles_utf8_boundaries() {
+        let input = "\u{771F}".repeat(600);
+        let truncated = truncate_with_ellipsis(&input, 500);
+        assert!(truncated.ends_with("..."));
+        assert_eq!(truncated.chars().count(), 503);
+        assert!(truncated.starts_with(&"\u{771F}".repeat(500)));
+    }
+
+    #[test]
+    fn fallback_summary_truncates_unicode_safely() {
+        let messages = (0..LLM_COMPRESSION_BATCH_SIZE)
+            .map(|_| {
+                json!({
+                    "sender": "tester",
+                    "content": "\u{771F}".repeat(200),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let summary = create_fallback_summary(&messages);
+        assert!(summary.ends_with("..."));
+        assert!(summary.chars().count() <= 503);
     }
 }

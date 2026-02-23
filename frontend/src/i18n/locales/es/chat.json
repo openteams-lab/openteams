@@ -60,6 +60,7 @@
       "rateLimited": "Límite de solicitudes alcanzado",
       "checkQuota": "Por favor verifica tu cuota de API o intenta más tarde"
     },
+    "contextCompressed": "El contexto se comprimió para esta respuesta",
     "sendToAgent": "Enviar al agente",
     "open": "Abrir"
   },
@@ -89,7 +90,21 @@
     "workspacePathPlaceholder": "Ruta absoluta para el trabajo de los miembros de IA",
     "workspacePathCannotBeModified": "La ruta del espacio de trabajo no se puede modificar",
     "add": "Añadir",
-    "save": "Guardar"
+    "save": "Guardar",
+    "presetSection": "Añadir rápido desde preajustes",
+    "addFromMemberPreset": "Añadir preajuste de miembro",
+    "importTeamPreset": "Importar preajuste de equipo",
+    "noEnabledPresets": "No hay preajustes habilitados. Configúralos en Configuración -> Preajustes.",
+    "importPreview": {
+      "title": "Importar equipo: {{teamName}}",
+      "description": "Los siguientes miembros se añadirán a esta sesión:",
+      "actionCreate": "se creará",
+      "actionReuse": "ya existe (se reutilizará)",
+      "actionSkip": "ya está en la sesión (se omitirá)",
+      "confirmImport": "Importar equipo",
+      "cancel": "Cancelar",
+      "importing": "Importando..."
+    }
   },
   "cleanup": {
     "selected": "Seleccionados: {{count}}",
@@ -113,7 +128,20 @@
     "confirm": {
       "cancel": "Cancelar",
       "confirm": "Confirmar",
-      "processing": "Procesando..."
+      "processing": "Procesando...",
+      "defaultTitle": "Confirmar",
+      "titles": {
+        "agentRunning": "Agente en ejecución",
+        "removeMember": "Eliminar miembro de IA",
+        "deleteSession": "Eliminar sesión",
+        "deleteMessages": "Eliminar mensajes"
+      },
+      "messages": {
+        "agentRunning": "Los siguientes agentes se están ejecutando: @{{agents}}. No procesarán mensajes nuevos hasta que se detenga la tarea actual. ¿Aun así quieres enviar este mensaje?",
+        "removeMember": "¿Seguro que quieres eliminar a @{{name}} de esta sesión?",
+        "deleteSession": "¿Seguro que quieres eliminar \"{{title}}\"? Esta acción no se puede deshacer y todos los mensajes se eliminarán permanentemente.",
+        "deleteMessages": "¿Seguro que quieres eliminar {{count}} mensaje(s)? Esta acción no se puede deshacer."
+      }
     },
     "promptEditor": {
       "title": "Prompt del sistema",

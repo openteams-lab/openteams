@@ -60,6 +60,7 @@
       "rateLimited": "レート制限中",
       "checkQuota": "APIクォータを確認するか、後でもう一度お試しください"
     },
+    "contextCompressed": "この応答ではコンテキストが圧縮されました",
     "sendToAgent": "エージェントに送信",
     "open": "開く"
   },
@@ -89,7 +90,21 @@
     "workspacePathPlaceholder": "AIメンバーの作業用絶対パス",
     "workspacePathCannotBeModified": "ワークスペースパスは変更できません",
     "add": "追加",
-    "save": "保存"
+    "save": "保存",
+    "presetSection": "プリセットからクイック追加",
+    "addFromMemberPreset": "メンバープリセットを追加",
+    "importTeamPreset": "チームプリセットをインポート",
+    "noEnabledPresets": "有効なプリセットがありません。設定 -> プリセットで設定してください。",
+    "importPreview": {
+      "title": "チームをインポート: {{teamName}}",
+      "description": "次のメンバーがこのセッションに追加されます:",
+      "actionCreate": "作成されます",
+      "actionReuse": "既に存在します（再利用されます）",
+      "actionSkip": "既にセッション内です（スキップされます）",
+      "confirmImport": "チームをインポート",
+      "cancel": "キャンセル",
+      "importing": "インポート中..."
+    }
   },
   "cleanup": {
     "selected": "選択済み: {{count}}",
@@ -113,7 +128,20 @@
     "confirm": {
       "cancel": "キャンセル",
       "confirm": "確認",
-      "processing": "処理中..."
+      "processing": "処理中...",
+      "defaultTitle": "確認",
+      "titles": {
+        "agentRunning": "エージェント実行中",
+        "removeMember": "AIメンバーを削除",
+        "deleteSession": "セッションを削除",
+        "deleteMessages": "メッセージを削除"
+      },
+      "messages": {
+        "agentRunning": "次のエージェントが実行中です: @{{agents}}。現在のタスクを停止するまで新しいメッセージは処理されません。それでもこのメッセージを送信しますか？",
+        "removeMember": "@{{name}} をこのセッションから削除してもよろしいですか？",
+        "deleteSession": "「{{title}}」を削除してもよろしいですか？この操作は元に戻せず、すべてのメッセージが完全に削除されます。",
+        "deleteMessages": "{{count}} 件のメッセージを削除してもよろしいですか？この操作は元に戻せません。"
+      }
     },
     "promptEditor": {
       "title": "システムプロンプト",

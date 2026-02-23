@@ -414,6 +414,14 @@
         "title": "Sign in to manage git actions",
         "description": "Sign in to agents-chatgroup so you can push branches, merge changes, or open pull requests for this task.",
         "action": "Sign in"
+      },
+      "cannotMerge": {
+        "title": "Cannot merge",
+        "message": "This repository has an open pull request. Please merge through the pull request flow instead."
+      },
+      "rebaseRequired": {
+        "title": "Rebase required",
+        "message": "Your branch is {{count}} commit(s) behind the target branch. Rebase before merging?"
       }
     },
     "mergeDialog": {

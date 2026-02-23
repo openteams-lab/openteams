@@ -1,7 +1,8 @@
 {
   "settings": {
     "common": {
-      "unsavedChanges": "• You have unsaved changes"
+      "unsavedChanges": "• You have unsaved changes",
+      "discardChangesConfirm": "Discard unsaved changes?"
     },
     "unsavedChanges": {
       "title": "Unsaved Changes",
@@ -25,7 +26,9 @@
         "organizations": "Organization Settings",
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "Projects",
-        "remote-projectsDesc": "Manage projects"
+        "remote-projectsDesc": "Manage projects",
+        "presets": "Presets",
+        "presetsDesc": "AI member and team preset templates"
       }
     },
     "general": {
@@ -487,6 +490,63 @@
         "discard": "Discard",
         "confirmSwitch": "You have unsaved changes. Are you sure you want to switch repositories? Your changes will be lost."
       }
+    },
+    "presets": {
+      "title": "Preset Templates",
+      "description": "Manage reusable AI member and team templates for chat sessions.",
+      "loadError": "Failed to load presets.",
+      "saving": "Saving...",
+      "saveSuccess": "Presets saved successfully.",
+      "saveError": "Failed to save presets.",
+      "builtin": "built-in",
+      "disabled": "disabled",
+      "tabs": {
+        "members": "Member Templates",
+        "teams": "Team Templates"
+      },
+      "actions": {
+        "copy": "Duplicate",
+        "disable": "Disable",
+        "enable": "Enable",
+        "delete": "Delete"
+      },
+      "members": {
+        "listTitle": "Member Presets",
+        "add": "Add Member",
+        "empty": "No member presets. Add one to get started.",
+        "fields": {
+          "id": "Preset ID",
+          "name": "Handle (@mention name)",
+          "namePlaceholder": "e.g. backend",
+          "description": "Description",
+          "descriptionPlaceholder": "What this AI member does",
+          "runnerType": "Runner Type (optional)",
+          "runnerTypePlaceholder": "Leave empty to use session default",
+          "systemPrompt": "System Prompt",
+          "systemPromptPlaceholder": "Describe the AI member's role and responsibilities...",
+          "workspacePath": "Default Workspace Path (optional)",
+          "workspacePathPlaceholder": "e.g. backend",
+          "toolsEnabled": "Tools (JSON)"
+        },
+        "errors": {
+          "toolsJsonInvalid": "Tools JSON is invalid.",
+          "toolsJsonObject": "Tools JSON must be an object."
+        }
+      },
+      "teams": {
+        "listTitle": "Team Presets",
+        "add": "Add Team",
+        "empty": "No team presets. Add one to get started.",
+        "noMemberPresets": "No member presets available. Create member presets first.",
+        "fields": {
+          "id": "Preset ID",
+          "name": "Team Name",
+          "namePlaceholder": "e.g. Full-stack Development Team",
+          "description": "Description",
+          "descriptionPlaceholder": "What this team is for",
+          "members": "Team Members"
+        }
+      }
     }
   },
   "integrations": {
@@ -520,6 +580,63 @@
             "officialDocs": "official documentation",
             "andAuthenticate": "and then authenticate with your GitHub account."
           }
+        }
+      }
+    },
+    "presets": {
+      "loading": "Loading presets...",
+      "saving": "Saving...",
+      "saveSuccess": "✓ Presets saved successfully!",
+      "saveError": "Failed to save presets",
+      "builtin": "Built-in",
+      "disabled": "Disabled",
+      "actions": {
+        "cancel": "Cancel",
+        "save": "Save",
+        "edit": "Edit",
+        "copy": "Copy",
+        "enable": "Enable",
+        "disable": "Disable",
+        "delete": "Delete"
+      },
+      "tabs": {
+        "members": "Member Templates",
+        "teams": "Team Templates"
+      },
+      "members": {
+        "title": "Member Templates",
+        "description": "Create and manage AI member preset templates. Use them to quickly add pre-configured AI members to your chat sessions.",
+        "add": "Add Member Template",
+        "newPreset": "New Member Preset",
+        "editPreset": "Edit Member Preset",
+        "empty": "No member presets yet. Create one to get started!",
+        "fields": {
+          "name": "Name",
+          "namePlaceholder": "e.g., backend",
+          "description": "Description",
+          "descriptionPlaceholder": "e.g., Backend Engineer for API development",
+          "runnerType": "Runner Type (optional)",
+          "runnerTypePlaceholder": "e.g., claude_code, leave empty for default",
+          "systemPrompt": "System Prompt",
+          "systemPromptPlaceholder": "Describe how this AI member should behave...",
+          "workspacePath": "Default Workspace Path (optional)",
+          "workspacePathPlaceholder": "e.g., backend"
+        }
+      },
+      "teams": {
+        "title": "Team Templates",
+        "description": "Create and manage AI team preset templates. Import entire teams of pre-configured AI members with one click.",
+        "add": "Add Team Template",
+        "newPreset": "New Team Preset",
+        "editPreset": "Edit Team Preset",
+        "empty": "No team presets yet. Create one to get started!",
+        "noMemberPresets": "No member presets available. Create member presets first.",
+        "fields": {
+          "name": "Name",
+          "namePlaceholder": "e.g., Full-stack Development Team",
+          "description": "Description",
+          "descriptionPlaceholder": "e.g., End-to-end development team",
+          "members": "Team Members"
         }
       }
     }

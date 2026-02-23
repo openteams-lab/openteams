@@ -304,6 +304,14 @@
         "title": "Inicia sesión para gestionar acciones de Git",
         "description": "Inicia sesión en agents-chatgroup para enviar ramas, fusionar cambios o abrir pull requests para esta tarea.",
         "action": "Iniciar sesión"
+      },
+      "cannotMerge": {
+        "title": "No se puede fusionar",
+        "message": "Este repositorio tiene un pull request abierto. Fusiona los cambios mediante el flujo de pull request."
+      },
+      "rebaseRequired": {
+        "title": "Se requiere rebase",
+        "message": "Tu rama está {{count}} commit(s) detrás de la rama objetivo. ¿Hacer rebase antes de fusionar?"
       }
     },
     "mergeDialog": {
@@ -655,7 +663,7 @@
       "approve": "Aprobar",
       "clearReviewComments": "Limpiar comentarios de revisión",
       "edit": "Editar mensaje",
-      "scrollToPreviousMessage": "Go to previous message"
+      "scrollToPreviousMessage": "Ir al mensaje anterior"
     },
     "approval": {
       "conflictWarning": "Los archivos en conflicto necesitan resolución manual",

@@ -42,7 +42,9 @@
     "loading": "Chargement des invitations...",
     "none": "Aucune invitation en attente",
     "invited": "Invité le {{date}}",
-    "pending": "En attente"
+    "pending": "En attente",
+    "confirmRevoke": "Révoquer l'invitation de {{email}} ?",
+    "revokeAction": "Révoquer l'invitation"
   },
   "settings": {
     "title": "Paramètres de l'organisation",

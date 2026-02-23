@@ -42,7 +42,9 @@
     "loading": "Loading invitations...",
     "none": "No pending invitations",
     "invited": "Invited {{date}}",
-    "pending": "Pending"
+    "pending": "Pending",
+    "confirmRevoke": "Revoke invitation for {{email}}?",
+    "revokeAction": "Revoke invitation"
   },
   "settings": {
     "title": "Organization Settings",

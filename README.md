@@ -100,6 +100,22 @@ npx agents-chatgroup
 
 📚 [Full setup guide →](https://docs.agentschatgroup.com/getting-started)
 
+## AI Team Presets
+
+Stop configuring the same agents over and over. AgentsChatGroup includes **11 built-in member presets** and **5 built-in team presets** you can deploy in one click.
+
+```
+Settings → Presets → Import Team → "Full-Stack Dev Team"
+→ Architect + Backend Engineer + Frontend Engineer + Code Reviewer
+   added to your session instantly
+```
+
+You can also build and save your own custom presets. When importing a team, a preview shows exactly which members will be created, reused, or renamed — so there are no surprises.
+
+📚 [Team Presets documentation →](https://docs.agentschatgroup.com/core-features/ai-team-presets)
+
+---
+
 ## Use Cases
 
 **🧑‍💻 Full-stack Development Team**
@@ -130,8 +146,9 @@ Assemble more AI teams. The future is yours to build.
 
 | Category | Details |
 |----------|---------|
-| **Agent Support** | Claude Code · Gemini CLI · Codex · Amp · QWen Coder · Other popular  agents |
+| **Agent Support** | Claude Code · Gemini CLI · Codex · Amp · QWen Coder · Other popular agents |
 | **Collaboration** | Group chat · Shared context · @Mention handoff · Task tracking · Session archive |
+| **Team Presets** | 11 built-in member presets · 5 built-in team presets · One-click team import · Custom presets with full CRUD |
 | **Config** | Unified MCP config · Flexible environment variables |
 | **Platform** | Desktop app (Windows / macOS / Linux) · Web app (npx) |
 | **Coming Soon** | Compact context optimization · More agent integrations |

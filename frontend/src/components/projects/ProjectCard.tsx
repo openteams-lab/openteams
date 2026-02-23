@@ -50,18 +50,14 @@ function ProjectCard({ project, isFocused, setError, onEdit }: Props) {
   }, [isFocused]);
 
   const handleDelete = async (id: string, name: string) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete "${name}"? This action cannot be undone.`
-      )
-    )
+    if (!window.confirm(t('confirmDelete', { name })))
       return;
 
     try {
       await projectsApi.delete(id);
     } catch (error) {
       console.error('Failed to delete project:', error);
-      setError('Failed to delete project');
+      setError(t('errors.deleteFailed'));
     }
   };
 

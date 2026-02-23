@@ -60,6 +60,7 @@
       "rateLimited": "请求频率受限",
       "checkQuota": "请检查您的 API 配额或稍后重试"
     },
+    "contextCompressed": "该回复已进行了上下文压缩",
     "sendToAgent": "发送给 Agent",
     "open": "打开"
   },
@@ -89,7 +90,21 @@
     "workspacePathPlaceholder": "AI成员工作的绝对路径",
     "workspacePathCannotBeModified": "工作区路径无法修改",
     "add": "添加",
-    "save": "保存"
+    "save": "保存",
+    "presetSection": "从预设快速添加",
+    "addFromMemberPreset": "添加成员预设",
+    "importTeamPreset": "导入团队预设",
+    "noEnabledPresets": "没有已启用的预设。请在 设置 -> 预设 中配置。",
+    "importPreview": {
+      "title": "导入团队：{{teamName}}",
+      "description": "以下成员将加入此会话：",
+      "actionCreate": "将创建",
+      "actionReuse": "已存在（将复用）",
+      "actionSkip": "已在会话中（将跳过）",
+      "confirmImport": "导入团队",
+      "cancel": "取消",
+      "importing": "导入中..."
+    }
   },
   "cleanup": {
     "selected": "已选择: {{count}}",
@@ -113,7 +128,20 @@
     "confirm": {
       "cancel": "取消",
       "confirm": "确认",
-      "processing": "处理中..."
+      "processing": "处理中...",
+      "defaultTitle": "确认",
+      "titles": {
+        "agentRunning": "Agent 正在运行",
+        "removeMember": "移除 AI 成员",
+        "deleteSession": "删除会话",
+        "deleteMessages": "删除消息"
+      },
+      "messages": {
+        "agentRunning": "以下 Agent 正在运行：@{{agents}}。在当前任务停止前，它们不会处理新消息。仍要发送这条消息吗？",
+        "removeMember": "确定要将 @{{name}} 从此会话中移除吗？",
+        "deleteSession": "确定要删除“{{title}}”吗？此操作无法撤销，所有消息将被永久删除。",
+        "deleteMessages": "确定要删除 {{count}} 条消息吗？此操作无法撤销。"
+      }
     },
     "promptEditor": {
       "title": "系统提示",

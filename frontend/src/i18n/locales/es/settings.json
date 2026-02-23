@@ -1,7 +1,8 @@
 {
   "settings": {
     "common": {
-      "unsavedChanges": "• Tienes cambios sin guardar"
+      "unsavedChanges": "• Tienes cambios sin guardar",
+      "discardChangesConfirm": "¿Descartar cambios no guardados?"
     },
     "unsavedChanges": {
       "title": "Cambios sin guardar",
@@ -25,7 +26,9 @@
         "organizations": "Organization Settings",
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "Proyectos",
-        "remote-projectsDesc": "Gestionar proyectos"
+        "remote-projectsDesc": "Gestionar proyectos",
+        "presets": "Preajustes",
+        "presetsDesc": "Plantillas predefinidas de miembros y equipos de IA"
       }
     },
     "general": {
@@ -343,10 +346,6 @@
       "description": "Configura los servidores del Protocolo de Contexto de Modelos (MCP) para ampliar las capacidades del agente de codificación con herramientas y recursos personalizados.",
       "loading": "Cargando configuración MCP...",
       "applying": "Aplicando configuración...",
-      "loadingStates": {
-        "jsonEditor": "Cargando...",
-        "configuration": "Cargando configuración actual del servidor MCP..."
-      },
       "labels": {
         "agent": "Agente",
         "agentPlaceholder": "Seleccionar",
@@ -355,6 +354,10 @@
         "popularServers": "Servidores populares",
         "serverHelper": "Haz clic en una tarjeta para insertar ese Servidor MCP en el JSON de arriba.",
         "saveLocation": "Los cambios se guardarán en:"
+      },
+      "loadingStates": {
+        "jsonEditor": "Cargando...",
+        "configuration": "Cargando configuración actual del servidor MCP..."
       },
       "errors": {
         "loadFailed": "Error al cargar la configuración.",
@@ -487,6 +490,63 @@
         "discard": "Descartar",
         "confirmSwitch": "Tienes cambios sin guardar. ¿Estás seguro de que quieres cambiar de repositorio? Tus cambios se perderán."
       }
+    },
+    "presets": {
+      "title": "Plantillas de preajustes",
+      "description": "Administra plantillas reutilizables de miembros y equipos de IA para sesiones de chat.",
+      "loadError": "No se pudieron cargar los preajustes.",
+      "saving": "Guardando...",
+      "saveSuccess": "Preajustes guardados correctamente.",
+      "saveError": "No se pudieron guardar los preajustes.",
+      "builtin": "integrado",
+      "disabled": "deshabilitado",
+      "tabs": {
+        "members": "Plantillas de miembros",
+        "teams": "Plantillas de equipos"
+      },
+      "actions": {
+        "copy": "Duplicar",
+        "disable": "Deshabilitar",
+        "enable": "Habilitar",
+        "delete": "Eliminar"
+      },
+      "members": {
+        "listTitle": "Preajustes de miembros",
+        "add": "Agregar miembro",
+        "empty": "No hay preajustes de miembros. Agrega uno para comenzar.",
+        "fields": {
+          "id": "ID del preajuste",
+          "name": "Alias (nombre para @mención)",
+          "namePlaceholder": "p. ej., backend",
+          "description": "Descripción",
+          "descriptionPlaceholder": "Qué hace este miembro de IA",
+          "runnerType": "Tipo de runner (opcional)",
+          "runnerTypePlaceholder": "Déjalo vacío para usar el valor por defecto de la sesión",
+          "systemPrompt": "Prompt del sistema",
+          "systemPromptPlaceholder": "Describe el rol y las responsabilidades de este miembro de IA...",
+          "workspacePath": "Ruta de workspace predeterminada (opcional)",
+          "workspacePathPlaceholder": "p. ej., backend",
+          "toolsEnabled": "Herramientas (JSON)"
+        },
+        "errors": {
+          "toolsJsonInvalid": "El JSON de herramientas no es válido.",
+          "toolsJsonObject": "El JSON de herramientas debe ser un objeto."
+        }
+      },
+      "teams": {
+        "listTitle": "Preajustes de equipos",
+        "add": "Agregar equipo",
+        "empty": "No hay preajustes de equipos. Agrega uno para comenzar.",
+        "noMemberPresets": "No hay preajustes de miembros disponibles. Crea primero preajustes de miembros.",
+        "fields": {
+          "id": "ID del preajuste",
+          "name": "Nombre del equipo",
+          "namePlaceholder": "p. ej., Equipo de desarrollo full-stack",
+          "description": "Descripción",
+          "descriptionPlaceholder": "Para qué es este equipo",
+          "members": "Miembros del equipo"
+        }
+      }
     }
   },
   "integrations": {
@@ -520,6 +580,63 @@
             "officialDocs": "documentación oficial",
             "andAuthenticate": "y luego autentica con tu cuenta de GitHub."
           }
+        }
+      }
+    },
+    "presets": {
+      "loading": "Cargando preajustes...",
+      "saving": "Guardando...",
+      "saveSuccess": "✓ Preajustes guardados correctamente!",
+      "saveError": "No se pudieron guardar los preajustes",
+      "builtin": "Integrado",
+      "disabled": "Deshabilitado",
+      "actions": {
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "edit": "Editar",
+        "copy": "Copiar",
+        "enable": "Habilitar",
+        "disable": "Deshabilitar",
+        "delete": "Eliminar"
+      },
+      "tabs": {
+        "members": "Plantillas de miembros",
+        "teams": "Plantillas de equipos"
+      },
+      "members": {
+        "title": "Plantillas de miembros",
+        "description": "Crea y administra plantillas predefinidas de miembros de IA. Úsalas para agregar rápidamente miembros de IA preconfigurados a tus sesiones de chat.",
+        "add": "Agregar plantilla de miembro",
+        "newPreset": "Nuevo preajuste de miembro",
+        "editPreset": "Editar preajuste de miembro",
+        "empty": "Aún no hay preajustes de miembros. Crea uno para comenzar!",
+        "fields": {
+          "name": "Nombre",
+          "namePlaceholder": "p. ej., backend",
+          "description": "Descripción",
+          "descriptionPlaceholder": "p. ej., Ingeniero backend para desarrollo de API",
+          "runnerType": "Tipo de runner (opcional)",
+          "runnerTypePlaceholder": "p. ej., claude_code, deja vacío para usar el predeterminado",
+          "systemPrompt": "Prompt del sistema",
+          "systemPromptPlaceholder": "Describe cómo debe comportarse este miembro de IA...",
+          "workspacePath": "Ruta de workspace predeterminada (opcional)",
+          "workspacePathPlaceholder": "p. ej., backend"
+        }
+      },
+      "teams": {
+        "title": "Plantillas de equipos",
+        "description": "Crea y administra plantillas predefinidas de equipos de IA. Importa equipos completos de miembros de IA preconfigurados con un solo clic.",
+        "add": "Agregar plantilla de equipo",
+        "newPreset": "Nuevo preajuste de equipo",
+        "editPreset": "Editar preajuste de equipo",
+        "empty": "Aún no hay preajustes de equipos. Crea uno para comenzar!",
+        "noMemberPresets": "No hay preajustes de miembros disponibles. Crea primero preajustes de miembros.",
+        "fields": {
+          "name": "Nombre",
+          "namePlaceholder": "p. ej., Equipo de desarrollo full-stack",
+          "description": "Descripción",
+          "descriptionPlaceholder": "p. ej., Equipo de desarrollo end-to-end",
+          "members": "Miembros del equipo"
         }
       }
     }

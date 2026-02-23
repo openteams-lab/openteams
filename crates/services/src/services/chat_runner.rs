@@ -60,6 +60,7 @@ struct ContextSnapshot {
     jsonl: String,
     workspace_path: PathBuf,
     run_path: PathBuf,
+    context_compacted: bool,
 }
 
 struct ReferenceAttachment {
@@ -234,6 +235,110 @@ impl ChatRunner {
         }
     }
 
+    fn mention_status_as_str(status: &MentionStatus) -> &'static str {
+        match status {
+            MentionStatus::Received => "received",
+            MentionStatus::Running => "running",
+            MentionStatus::Completed => "completed",
+            MentionStatus::Failed => "failed",
+        }
+    }
+
+    async fn set_mention_status(
+        &self,
+        session_id: Uuid,
+        message_id: Uuid,
+        agent_name: &str,
+        agent_id: Option<Uuid>,
+        status: MentionStatus,
+    ) {
+        self.update_mention_status(message_id, agent_name, Self::mention_status_as_str(&status))
+            .await;
+
+        if let Some(agent_id) = agent_id {
+            self.emit(
+                session_id,
+                ChatStreamEvent::MentionAcknowledged {
+                    session_id,
+                    message_id,
+                    mentioned_agent: agent_name.to_string(),
+                    agent_id,
+                    status,
+                },
+            );
+        }
+    }
+
+    async fn report_mention_failure(
+        &self,
+        session_id: Uuid,
+        message_id: Uuid,
+        agent_name: &str,
+        agent_id: Option<Uuid>,
+        reason: impl Into<String>,
+    ) {
+        let reason = reason.into();
+        let compact_reason = reason
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let compact_reason = if compact_reason.is_empty() {
+            "Unknown error".to_string()
+        } else {
+            compact_reason
+        };
+
+        self.set_mention_status(
+            session_id,
+            message_id,
+            agent_name,
+            agent_id,
+            MentionStatus::Failed,
+        )
+        .await;
+
+        let mut failure_meta = serde_json::json!({
+            "mention_failure": {
+                "source_message_id": message_id,
+                "mentioned_agent": agent_name,
+                "reason": compact_reason.clone(),
+            }
+        });
+
+        if let Some(value) = agent_id {
+            failure_meta["mention_failure"]["agent_id"] = serde_json::json!(value);
+        }
+
+        let system_content = format!(
+            "Agent \"{}\" failed to execute this mention: {}",
+            agent_name, compact_reason
+        );
+
+        match chat::create_message(
+            &self.db.pool,
+            session_id,
+            ChatSenderType::System,
+            None,
+            system_content,
+            Some(failure_meta),
+        )
+        .await
+        {
+            Ok(message) => self.emit_message_new(session_id, message),
+            Err(err) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    message_id = %message_id,
+                    agent_name = %agent_name,
+                    error = %err,
+                    "failed to emit mention failure system message"
+                );
+            }
+        }
+    }
+
     pub async fn handle_message(&self, session: &ChatSession, message: &ChatMessage) {
         self.emit_message_new(session.id, message.clone());
 
@@ -322,23 +427,6 @@ impl ChatRunner {
                     agent_name = %pending_msg.agent_name,
                     session_agent_id = %session_agent_id,
                     "failed to process queued message"
-                );
-                // Mark this message's mention as failed
-                self.update_mention_status(
-                    pending_msg.message.id,
-                    &pending_msg.agent_name,
-                    "failed",
-                )
-                .await;
-                self.emit(
-                    pending_msg.session_id,
-                    ChatStreamEvent::MentionAcknowledged {
-                        session_id: pending_msg.session_id,
-                        message_id: pending_msg.message.id,
-                        mentioned_agent: pending_msg.agent_name.clone(),
-                        agent_id: pending_msg.agent_id,
-                        status: MentionStatus::Failed,
-                    },
                 );
                 // Continue processing the rest of the queue
                 Box::pin(self.process_pending_queue(session_id, session_agent_id)).await;
@@ -457,19 +545,48 @@ impl ChatRunner {
         mention: &str,
         source_message: &ChatMessage,
     ) -> Result<(), ChatRunnerError> {
-        let Some((session_agent, agent)) = self
+        let resolved = self
             .resolve_session_agent_for_mention(session_id, mention)
-            .await?
-        else {
+            .await;
+        let Some((session_agent, agent)) = (match resolved {
+            Ok(value) => value,
+            Err(err) => {
+                self.report_mention_failure(
+                    session_id,
+                    source_message.id,
+                    mention,
+                    None,
+                    format!("Failed to resolve mentioned agent: {err}"),
+                )
+                .await;
+                return Err(err);
+            }
+        }) else {
             if let Some(agent) = ChatAgent::find_by_name(&self.db.pool, mention).await? {
                 tracing::debug!(
                     session_id = %session_id,
                     agent_id = %agent.id,
                     mention = mention,
-                    "chat session agent not configured; skipping mention"
+                    "chat session agent not configured; marking mention as failed"
                 );
-                return Ok(());
+                self.report_mention_failure(
+                    session_id,
+                    source_message.id,
+                    &agent.name,
+                    Some(agent.id),
+                    "Agent is not configured in this session.",
+                )
+                .await;
+                return Err(ChatRunnerError::AgentNotFound(mention.to_string()));
             }
+            self.report_mention_failure(
+                session_id,
+                source_message.id,
+                mention,
+                None,
+                "Mentioned agent was not found.",
+            )
+            .await;
             return Err(ChatRunnerError::AgentNotFound(mention.to_string()));
         };
 
@@ -691,6 +808,7 @@ impl ChatRunner {
                 Some(reply_handle),
                 failed_flag.clone(),
                 chain_depth,
+                context_snapshot.context_compacted,
                 self.clone(),
                 source_message.id,
                 agent.name.clone(),
@@ -710,6 +828,16 @@ impl ChatRunner {
         .await;
 
         if result.is_err() {
+            if let Err(err) = &result {
+                self.report_mention_failure(
+                    session_id,
+                    source_message.id,
+                    &agent.name,
+                    Some(agent_id),
+                    format!("Failed to start agent run: {err}"),
+                )
+                .await;
+            }
             let _ = ChatSessionAgent::update_state(
                 &self.db.pool,
                 session_agent_id,
@@ -934,6 +1062,13 @@ impl ChatRunner {
         )
         .await?;
 
+        let context_compacted = compacted.messages.iter().any(|message| {
+            message
+                .get("compressed")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+        });
+
         let jsonl = compacted.jsonl;
 
         let context_dir = Self::chat_context_dir(workspace_path);
@@ -953,6 +1088,7 @@ impl ChatRunner {
             jsonl,
             workspace_path: context_path,
             run_path: run_context_path,
+            context_compacted,
         })
     }
 
@@ -1305,6 +1441,7 @@ impl ChatRunner {
         reply_handle: Option<String>,
         failed_flag: Arc<AtomicBool>,
         chain_depth: u32,
+        context_compacted: bool,
         runner: ChatRunner,
         source_message_id: Uuid,
         agent_name: String,
@@ -1403,6 +1540,10 @@ impl ChatRunner {
                             "finished_at": Utc::now().to_rfc3339(),
                             "chain_depth": chain_depth + 1,
                         });
+
+                        if context_compacted {
+                            meta["context_compacted"] = true.into();
+                        }
 
                         if let Some(diff) = diff_info.as_ref() {
                             meta["diff_available"] = true.into();
@@ -1608,8 +1749,10 @@ impl ChatRunner {
             tokio::spawn(async move {
                 match exit_signal_rx.await {
                     Ok(exit_result) => {
-                        if matches!(exit_result, executors::executors::ExecutorExitResult::Failure)
-                        {
+                        if matches!(
+                            exit_result,
+                            executors::executors::ExecutorExitResult::Failure
+                        ) {
                             signal_failed_flag.store(true, Ordering::Relaxed);
                         }
 

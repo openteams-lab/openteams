@@ -233,7 +233,8 @@
   },
   "confirm": {
     "defaultConfirm": "确认",
-    "defaultCancel": "取消"
+    "defaultCancel": "取消",
+    "unexpectedError": "发生了意外错误。"
   },
   "dialogs": {
     "selectGitRepository": "选择 Git 仓库",
@@ -384,5 +385,13 @@
     "streamsAffected_other": "{{count}} 个数据流受影响",
     "status": "(状态 {{status}})",
     "refreshPage": "刷新页面"
+  },
+  "issues": {
+    "deleteConfirm": {
+      "titleSingle": "删除事项？",
+      "titleMultiple": "删除 {{count}} 个事项？",
+      "messageSingle": "此操作无法撤销。",
+      "messageMultiple": "这将永久删除 {{count}} 个事项。此操作无法撤销。"
+    }
   }
 }

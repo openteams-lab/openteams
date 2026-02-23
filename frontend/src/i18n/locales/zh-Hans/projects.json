@@ -22,5 +22,6 @@
   "projectNotFound": "您查找的项目不存在或已被删除。",
   "viewProject": "查看项目",
   "openInIDE": "在 IDE 中打开",
-  "createdDate": "创建于 {{date}}"
+  "createdDate": "创建于 {{date}}",
+  "confirmDelete": "确定要删除项目“{{name}}”吗？此操作无法撤销。"
 }

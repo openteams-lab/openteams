@@ -359,6 +359,14 @@
         "title": "登入以管理 Git 操作",
         "description": "登入 agents-chatgroup，才能推送分支、合併變更或為此任務建立 PR。",
         "action": "登入"
+      },
+      "cannotMerge": {
+        "title": "無法合併",
+        "message": "此儲存庫有尚未關閉的 PR，請透過 PR 流程完成合併。"
+      },
+      "rebaseRequired": {
+        "title": "需要 Rebase",
+        "message": "目前分支落後目標分支 {{count}} 次提交。是否先 Rebase 再合併？"
       }
     },
     "mergeDialog": {
@@ -655,7 +663,7 @@
       "approve": "核准",
       "clearReviewComments": "清除審查評論",
       "edit": "編輯訊息",
-      "scrollToPreviousMessage": "Go to previous message"
+      "scrollToPreviousMessage": "跳到上一則訊息"
     },
     "approval": {
       "conflictWarning": "衝突檔案需要手動解決",

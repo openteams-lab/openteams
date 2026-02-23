@@ -8,6 +8,7 @@ import {
   PlugIcon,
   CaretLeftIcon,
   XIcon,
+  UsersThreeIcon,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
@@ -32,6 +33,7 @@ const SETTINGS_SECTIONS: {
   { id: 'agents', icon: CpuIcon },
   { id: 'mcp', icon: PlugIcon },
   { id: 'repos', icon: GitBranchIcon },
+  { id: 'presets', icon: UsersThreeIcon },
 ];
 
 export interface SettingsDialogProps {

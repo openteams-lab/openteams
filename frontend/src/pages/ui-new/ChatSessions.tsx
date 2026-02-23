@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -16,6 +17,8 @@ import {
   BaseCodingAgent,
   type AvailabilityInfo,
   type JsonValue,
+  type ChatMemberPreset,
+  type ChatTeamPreset,
 } from 'shared/types';
 import { ApiError, chatApi, configApi } from '@/lib/api';
 import { useUserSystem } from '@/components/ConfigProvider';
@@ -45,6 +48,10 @@ import {
   truncateText,
   sanitizeHandle,
 } from './chat';
+import {
+  buildMemberPresetImportPlan,
+  type MemberPresetImportPlan,
+} from './chat/utils';
 
 import { isAllowedAttachment } from './chat/components/MessageInputArea';
 import { SessionListSidebar } from './chat/components/SessionListSidebar';
@@ -85,10 +92,34 @@ const isImageAttachment = (file: File) => file.type.startsWith('image/');
 const isTextAttachment = (file: File) =>
   file.type.startsWith('text/') ||
   [
-    '.txt', '.csv', '.md', '.json', '.xml', '.yaml', '.yml',
-    '.html', '.htm', '.css', '.js', '.ts', '.jsx', '.tsx',
-    '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.rb', '.php',
-    '.go', '.rs', '.sql', '.sh', '.bash', '.svg',
+    '.txt',
+    '.csv',
+    '.md',
+    '.json',
+    '.xml',
+    '.yaml',
+    '.yml',
+    '.html',
+    '.htm',
+    '.css',
+    '.js',
+    '.ts',
+    '.jsx',
+    '.tsx',
+    '.py',
+    '.java',
+    '.c',
+    '.cpp',
+    '.h',
+    '.hpp',
+    '.rb',
+    '.php',
+    '.go',
+    '.rs',
+    '.sql',
+    '.sh',
+    '.bash',
+    '.svg',
   ].some((ext) => file.name.toLowerCase().endsWith(ext));
 
 const MAX_SESSION_TITLE_LENGTH = 20;
@@ -109,6 +140,7 @@ const getSessionTitleLength = (value: string) =>
   Array.from(value.trim()).length;
 
 export function ChatSessions() {
+  const { t } = useTranslation('chat');
   const { sessionId } = useParams<{ sessionId?: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -226,7 +258,7 @@ export function ChatSessions() {
       const senderLabel =
         message.sender_type === ChatSenderType.agent
           ? message.sender_id
-            ? agentByIdRef.current.get(message.sender_id)?.name ?? 'Agent'
+            ? (agentByIdRef.current.get(message.sender_id)?.name ?? 'Agent')
             : 'Agent'
           : 'System';
 
@@ -291,11 +323,7 @@ export function ChatSessions() {
     setAgentStates,
     setAgentStateInfos,
     setMentionStatuses,
-  } =
-    useChatWebSocket(
-      activeSessionId,
-      handleIncomingMessage
-    );
+  } = useChatWebSocket(activeSessionId, handleIncomingMessage);
 
   // Mutations
   const {
@@ -312,7 +340,9 @@ export function ChatSessions() {
     upsertMessage,
     () => {
       if (activeSessionId) {
-        queryClient.invalidateQueries({ queryKey: ['chatMessages', activeSessionId] });
+        queryClient.invalidateQueries({
+          queryKey: ['chatMessages', activeSessionId],
+        });
       }
     },
     () => {
@@ -370,7 +400,10 @@ export function ChatSessions() {
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [previewFile, setPreviewFile] = useState<{file: File | null, content: string | null}>({file: null, content: null});
+  const [previewFile, setPreviewFile] = useState<{
+    file: File | null;
+    content: string | null;
+  }>({ file: null, content: null });
   const [agentAvailability, setAgentAvailability] = useState<
     Record<string, AvailabilityInfo | null>
   >({});
@@ -381,7 +414,9 @@ export function ChatSessions() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const previousSessionIdRef = useRef<string | null>(null);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<SessionMember | null>(null);
+  const [editingMember, setEditingMember] = useState<SessionMember | null>(
+    null
+  );
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberRunnerType, setNewMemberRunnerType] = useState('');
   const [newMemberVariant, setNewMemberVariant] = useState('DEFAULT');
@@ -408,23 +443,38 @@ export function ChatSessions() {
   const [titleDraft, setTitleDraft] = useState('');
   const [titleError, setTitleError] = useState<string | null>(null);
   const [isCleanupMode, setIsCleanupMode] = useState(false);
-  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(
+    new Set()
+  );
   const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false);
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
-  const [debouncedMessageSearchQuery, setDebouncedMessageSearchQuery] = useState('');
+  const [debouncedMessageSearchQuery, setDebouncedMessageSearchQuery] =
+    useState('');
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
     message: string;
     onConfirm: () => void | Promise<void>;
   } | null>(null);
+  const [teamImportPlan, setTeamImportPlan] = useState<
+    MemberPresetImportPlan[] | null
+  >(null);
+  const [teamImportName, setTeamImportName] = useState<string | null>(null);
+  const [isImportingTeam, setIsImportingTeam] = useState(false);
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [isDeletingMessages, setIsDeletingMessages] = useState(false);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(340);
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
   const [inputAreaHeight, setInputAreaHeight] = useState(160);
-  const [isResizing, setIsResizing] = useState<'left' | 'right' | 'input' | null>(null);
-  const resizeStartRef = useRef<{ startX: number; startY: number; startWidth: number; startHeight: number } | null>(null);
+  const [isResizing, setIsResizing] = useState<
+    'left' | 'right' | 'input' | null
+  >(null);
+  const resizeStartRef = useRef<{
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startHeight: number;
+  } | null>(null);
   const lastExpandedLeftWidthRef = useRef(340);
 
   // Sync messages from query
@@ -461,8 +511,9 @@ export function ChatSessions() {
           const status = coerceMentionStatus(statusValue);
           if (!status) continue;
           const existing = perMessage.get(agentName);
-          const existingPriority =
-            existing ? mentionStatusPriority[existing] : -1;
+          const existingPriority = existing
+            ? mentionStatusPriority[existing]
+            : -1;
           if (mentionStatusPriority[status] > existingPriority) {
             perMessage.set(agentName, status);
             perMessageChanged = true;
@@ -505,6 +556,8 @@ export function ChatSessions() {
     setIsPromptEditorOpen(false);
     setPromptFileError(null);
     setPromptFileLoading(false);
+    setTeamImportPlan(null);
+    setTeamImportName(null);
   }, [activeSessionId, resetInput, resetDiffViewer, setReplyToMessage]);
 
   // Navigate to first session if needed
@@ -534,7 +587,9 @@ export function ChatSessions() {
   const isRunnerAvailable = useCallback(
     (runner: string) => {
       const info = agentAvailability[runner];
-      return info?.type === 'LOGIN_DETECTED' || info?.type === 'INSTALLATION_FOUND';
+      return (
+        info?.type === 'LOGIN_DETECTED' || info?.type === 'INSTALLATION_FOUND'
+      );
     },
     [agentAvailability]
   );
@@ -547,8 +602,12 @@ export function ChatSessions() {
   const availabilityLabel = useCallback(
     (runner: string) => {
       const info = agentAvailability[runner];
-      if (!info) return isCheckingAvailability ? ' (checking)' : ' (unavailable)';
-      if (info.type === 'LOGIN_DETECTED' || info.type === 'INSTALLATION_FOUND') {
+      if (!info)
+        return isCheckingAvailability ? ' (checking)' : ' (unavailable)';
+      if (
+        info.type === 'LOGIN_DETECTED' ||
+        info.type === 'INSTALLATION_FOUND'
+      ) {
         return '';
       }
       return ' (not installed)';
@@ -561,15 +620,18 @@ export function ChatSessions() {
       if (!profiles) return null;
       const executorConfig = profiles[runnerType];
       if (!executorConfig) return null;
-      const variantKey = variant && variant in executorConfig
-        ? variant
-        : 'DEFAULT' in executorConfig
-          ? 'DEFAULT'
-          : Object.keys(executorConfig)[0];
+      const variantKey =
+        variant && variant in executorConfig
+          ? variant
+          : 'DEFAULT' in executorConfig
+            ? 'DEFAULT'
+            : Object.keys(executorConfig)[0];
       if (!variantKey) return null;
       const variantConfig = executorConfig[variantKey];
       if (!variantConfig) return null;
-      const innerConfig = Object.values(variantConfig)[0] as { model?: string | null } | undefined;
+      const innerConfig = Object.values(variantConfig)[0] as
+        | { model?: string | null }
+        | undefined;
       return innerConfig?.model ?? null;
     },
     [profiles]
@@ -595,6 +657,16 @@ export function ChatSessions() {
     [getVariantOptions, newMemberRunnerType]
   );
 
+  // Preset-derived state
+  const enabledMemberPresets = useMemo(
+    () => (config?.chat_presets?.members ?? []).filter((m) => m.enabled),
+    [config?.chat_presets?.members]
+  );
+  const enabledTeamPresets = useMemo(
+    () => (config?.chat_presets?.teams ?? []).filter((t) => t.enabled),
+    [config?.chat_presets?.teams]
+  );
+
   const senderHandle = useMemo(() => {
     if (loginStatus?.status === 'loggedin') {
       return sanitizeHandle(
@@ -615,9 +687,7 @@ export function ChatSessions() {
     [messages]
   );
   const lastMessageId =
-    messageList.length > 0
-      ? messageList[messageList.length - 1].id
-      : null;
+    messageList.length > 0 ? messageList[messageList.length - 1].id : null;
 
   const messageById = useMemo(
     () => new Map(messageList.map((message) => [message.id, message])),
@@ -630,6 +700,14 @@ export function ChatSessions() {
     () => sortedSessions.find((session) => session.id === activeSessionId),
     [sortedSessions, activeSessionId]
   );
+
+  const memberPresetById = useMemo(() => {
+    const map = new Map<string, ChatMemberPreset>();
+    for (const preset of config?.chat_presets?.members ?? []) {
+      map.set(preset.id, preset);
+    }
+    return map;
+  }, [config?.chat_presets?.members]);
 
   const agentIdByName = useMemo(() => {
     const map = new Map<string, string>();
@@ -649,8 +727,7 @@ export function ChatSessions() {
   const placeholderAgents = useMemo(
     () =>
       sessionMembers.filter((member) => {
-        const state =
-          agentStates[member.agent.id] ?? member.sessionAgent.state;
+        const state = agentStates[member.agent.id] ?? member.sessionAgent.state;
         return state === ChatSessionAgentState.running;
       }),
     [agentStates, sessionMembers]
@@ -745,7 +822,12 @@ export function ChatSessions() {
     if (!newMemberRunnerType || !isRunnerAvailable(newMemberRunnerType)) {
       setNewMemberRunnerType(enabledRunnerTypes[0]);
     }
-  }, [editingMember, enabledRunnerTypes, isRunnerAvailable, newMemberRunnerType]);
+  }, [
+    editingMember,
+    enabledRunnerTypes,
+    isRunnerAvailable,
+    newMemberRunnerType,
+  ]);
 
   // Set default variant when runner type changes
   useEffect(() => {
@@ -796,7 +878,7 @@ export function ChatSessions() {
             state: sessionAgent.state,
             startedAt:
               sessionAgent.state === ChatSessionAgentState.running
-                ? existing?.startedAt ?? sessionAgent.updated_at
+                ? (existing?.startedAt ?? sessionAgent.updated_at)
                 : null,
           };
         }
@@ -827,8 +909,7 @@ export function ChatSessions() {
 
   // Auto-scroll
   useEffect(() => {
-    const isSessionChanged =
-      previousSessionIdRef.current !== activeSessionId;
+    const isSessionChanged = previousSessionIdRef.current !== activeSessionId;
     previousSessionIdRef.current = activeSessionId;
     const animationFrame = requestAnimationFrame(() => {
       bottomRef.current?.scrollIntoView({
@@ -1077,8 +1158,10 @@ export function ChatSessions() {
 
     if (runningMentionedAgents.length > 0) {
       setConfirmModal({
-        title: 'Agent Running',
-        message: `The following agent(s) are currently running: @${runningMentionedAgents.join(', @')}. They will not process new messages until the current task is stopped. Do you still want to send this message?`,
+        title: t('modals.confirm.titles.agentRunning'),
+        message: t('modals.confirm.messages.agentRunning', {
+          agents: runningMentionedAgents.join(', @'),
+        }),
         onConfirm: async () => {
           await doSendMessage(content);
         },
@@ -1158,30 +1241,39 @@ export function ChatSessions() {
     }
   };
 
-  const handleAttachmentInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleAttachmentInputChange = (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
     if (event.target.files) {
       const files = Array.from(event.target.files);
       const allowedFiles = files.filter((file) => isAllowedAttachment(file));
 
       if (allowedFiles.length !== files.length) {
         const rejectedCount = files.length - allowedFiles.length;
-        setAttachmentError(`Some files were rejected (${rejectedCount}). Only text files and images are allowed.`);
+        setAttachmentError(
+          `Some files were rejected (${rejectedCount}). Only text files and images are allowed.`
+        );
       }
 
-      setAttachedFiles(prev => [...prev, ...allowedFiles]);
+      setAttachedFiles((prev) => [...prev, ...allowedFiles]);
     }
     event.target.value = '';
   };
 
   const removeAttachedFile = (fileName: string, fileSize: number) => {
-    setAttachedFiles(prev => prev.filter(file => !(file.name === fileName && file.size === fileSize)));
+    setAttachedFiles((prev) =>
+      prev.filter((file) => !(file.name === fileName && file.size === fileSize))
+    );
   };
 
   const clearAttachedFiles = () => {
     setAttachedFiles([]);
   };
 
-  const addAttachmentAsFile = async (messageId: string, attachment: { id: string; name: string; mime_type?: string | null }) => {
+  const addAttachmentAsFile = async (
+    messageId: string,
+    attachment: { id: string; name: string; mime_type?: string | null }
+  ) => {
     if (!activeSessionId || !attachment.id) return;
 
     try {
@@ -1193,12 +1285,14 @@ export function ChatSessions() {
 
       const response = await fetch(attachmentUrl);
       if (!response.ok) {
-        throw new Error(`Failed to download attachment: ${response.statusText}`);
+        throw new Error(
+          `Failed to download attachment: ${response.statusText}`
+        );
       }
 
       const blob = await response.blob();
       const file = new File([blob], attachment.name, { type: blob.type });
-      setAttachedFiles(prev => [...prev, file]);
+      setAttachedFiles((prev) => [...prev, file]);
     } catch (error) {
       console.error('Error downloading attachment:', error);
       setAttachmentError('Could not download attachment.');
@@ -1209,15 +1303,15 @@ export function ChatSessions() {
     try {
       if (isTextAttachment(file)) {
         const content = await file.text();
-        setPreviewFile({file, content});
+        setPreviewFile({ file, content });
       } else if (isImageAttachment(file)) {
         const reader = new FileReader();
         reader.onload = (e) => {
-          setPreviewFile({file, content: e.target?.result as string});
+          setPreviewFile({ file, content: e.target?.result as string });
         };
         reader.readAsDataURL(file);
       } else {
-        setPreviewFile({file, content: null});
+        setPreviewFile({ file, content: null });
       }
     } catch (error) {
       console.error('Error previewing file:', error);
@@ -1226,10 +1320,12 @@ export function ChatSessions() {
   };
 
   const closePreview = () => {
-    setPreviewFile({file: null, content: null});
+    setPreviewFile({ file: null, content: null });
   };
 
-  const handlePromptFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handlePromptFileChange = async (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
     setPromptFileLoading(true);
@@ -1245,6 +1341,372 @@ export function ChatSessions() {
       event.target.value = '';
     }
   };
+
+  const buildTeamImportPlan = useCallback(
+    (teamPreset: ChatTeamPreset): MemberPresetImportPlan[] => {
+      if (!activeSessionId) return [];
+
+      const takenNamesLowercase = new Set(
+        agents.map((agent) => agent.name.toLowerCase())
+      );
+      const plannedAgentIds = new Set<string>();
+      const plans: MemberPresetImportPlan[] = [];
+
+      for (const memberPresetId of teamPreset.member_ids) {
+        const preset = memberPresetById.get(memberPresetId);
+        if (!preset) {
+          plans.push({
+            presetId: memberPresetId,
+            presetName: memberPresetId,
+            runnerType: '',
+            finalName: memberPresetId,
+            systemPrompt: '',
+            toolsEnabled: {},
+            action: 'skip',
+            reason: 'member-preset-missing',
+            agentId: null,
+            workspacePath: '',
+          });
+          continue;
+        }
+
+        if (!preset.enabled) {
+          plans.push({
+            presetId: preset.id,
+            presetName: preset.name,
+            runnerType: '',
+            finalName: preset.name,
+            systemPrompt: '',
+            toolsEnabled: {},
+            action: 'skip',
+            reason: 'member-preset-disabled',
+            agentId: null,
+            workspacePath: '',
+          });
+          continue;
+        }
+
+        const plan = buildMemberPresetImportPlan({
+          preset,
+          sessionId: activeSessionId,
+          existingAgents: agents,
+          sessionMembers,
+          defaultRunnerType: config?.executor_profile?.executor ?? null,
+          enabledRunnerTypes,
+          availableRunnerTypes,
+          takenNamesLowercase,
+        });
+
+        if (!plan) {
+          plans.push({
+            presetId: preset.id,
+            presetName: preset.name,
+            runnerType: '',
+            finalName: preset.name,
+            systemPrompt: '',
+            toolsEnabled: {},
+            action: 'skip',
+            reason: 'runner-not-available',
+            agentId: null,
+            workspacePath: '',
+          });
+          continue;
+        }
+
+        if (plan.agentId && plannedAgentIds.has(plan.agentId)) {
+          plans.push({
+            ...plan,
+            action: 'skip',
+            reason: 'duplicate-reused-agent',
+          });
+          continue;
+        }
+
+        if (plan.agentId) {
+          plannedAgentIds.add(plan.agentId);
+        }
+        plans.push(plan);
+      }
+
+      return plans;
+    },
+    [
+      activeSessionId,
+      agents,
+      availableRunnerTypes,
+      config?.executor_profile?.executor,
+      enabledRunnerTypes,
+      memberPresetById,
+      sessionMembers,
+    ]
+  );
+
+  const importMembersFromPlan = useCallback(
+    async (plan: MemberPresetImportPlan[]) => {
+      if (!activeSessionId) return;
+
+      const attachedAgentIds = new Set(
+        sessionMembers.map((member) => member.agent.id)
+      );
+
+      for (const entry of plan) {
+        if (entry.action === 'skip') continue;
+
+        let agentId = entry.agentId;
+        if (entry.action === 'create') {
+          const created = await chatApi.createAgent({
+            name: entry.finalName,
+            runner_type: entry.runnerType,
+            system_prompt: entry.systemPrompt,
+            tools_enabled: entry.toolsEnabled as JsonValue,
+          });
+          agentId = created.id;
+        }
+
+        if (!agentId || attachedAgentIds.has(agentId)) {
+          continue;
+        }
+
+        await chatApi.createSessionAgent(activeSessionId, {
+          agent_id: agentId,
+          workspace_path: entry.workspacePath,
+        });
+        attachedAgentIds.add(agentId);
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['chatAgents'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['chatSessionAgents', activeSessionId],
+        }),
+      ]);
+    },
+    [activeSessionId, queryClient, sessionMembers]
+  );
+
+  const validateAndPrepareImportPlan = useCallback(
+    (plan: MemberPresetImportPlan[]): MemberPresetImportPlan[] | null => {
+      const existingAgentNamesLower = new Set(
+        agents.map((agent) => agent.name.toLowerCase())
+      );
+      const createNamesLower = new Set<string>();
+      const projectNameLower = activeSessionTitle.trim().toLowerCase();
+      const preparedPlan: MemberPresetImportPlan[] = [];
+
+      for (const entry of plan) {
+        if (entry.action === 'skip') {
+          preparedPlan.push(entry);
+          continue;
+        }
+
+        const finalName = entry.finalName.trim();
+        const workspacePath = entry.workspacePath.trim();
+
+        if (!finalName) {
+          setMemberError('AI member name is required.');
+          return null;
+        }
+
+        if (getMemberNameLength(finalName) > MAX_MEMBER_NAME_LENGTH) {
+          setMemberError(
+            `AI member name cannot exceed ${MAX_MEMBER_NAME_LENGTH} characters.`
+          );
+          return null;
+        }
+
+        if (!memberNameRegex.test(finalName)) {
+          setMemberError('Name can only include letters, numbers, "_" or "-".');
+          return null;
+        }
+
+        if (!workspacePath) {
+          setMemberError('Workspace path is required.');
+          return null;
+        }
+
+        let nextEntry: MemberPresetImportPlan = {
+          ...entry,
+          finalName,
+          workspacePath,
+        };
+
+        if (nextEntry.action === 'reuse') {
+          const reusableAgent = nextEntry.agentId
+            ? agents.find((agent) => agent.id === nextEntry.agentId)
+            : null;
+          if (!reusableAgent || reusableAgent.name !== finalName) {
+            nextEntry = {
+              ...nextEntry,
+              action: 'create',
+              reason: 'create-new-agent',
+              agentId: null,
+            };
+          }
+        }
+
+        if (nextEntry.action === 'create') {
+          const finalNameLower = finalName.toLowerCase();
+          if (
+            projectNameLower.length > 0 &&
+            finalNameLower === projectNameLower
+          ) {
+            setMemberError('AI member name cannot match the project name.');
+            return null;
+          }
+          if (existingAgentNamesLower.has(finalNameLower)) {
+            setMemberError('An AI member with this name already exists.');
+            return null;
+          }
+          if (createNamesLower.has(finalNameLower)) {
+            setMemberError('Duplicate AI member names in import plan.');
+            return null;
+          }
+          createNamesLower.add(finalNameLower);
+        }
+
+        preparedPlan.push(nextEntry);
+      }
+
+      return preparedPlan;
+    },
+    [activeSessionTitle, agents]
+  );
+
+  const handleAddMemberPreset = useCallback(
+    (preset: ChatMemberPreset) => {
+      if (!activeSessionId) {
+        setMemberError('Select a chat session first.');
+        return;
+      }
+      if (isArchived) {
+        setMemberError('This session is archived and read-only.');
+        return;
+      }
+
+      const takenNamesLowercase = new Set(
+        agents.map((agent) => agent.name.toLowerCase())
+      );
+      const plan = buildMemberPresetImportPlan({
+        preset,
+        sessionId: activeSessionId,
+        existingAgents: agents,
+        sessionMembers,
+        defaultRunnerType: config?.executor_profile?.executor ?? null,
+        enabledRunnerTypes,
+        availableRunnerTypes,
+        takenNamesLowercase,
+      });
+
+      if (!plan) {
+        setMemberError('No available coding agent to import this preset.');
+        return;
+      }
+
+      if (plan.action === 'skip') {
+        setMemberError(
+          'This preset is already represented in the current session.'
+        );
+        return;
+      }
+
+      setTeamImportName(preset.name || preset.id);
+      setTeamImportPlan([plan]);
+      setMemberError(null);
+    },
+    [
+      activeSessionId,
+      agents,
+      availableRunnerTypes,
+      config?.executor_profile?.executor,
+      enabledRunnerTypes,
+      isArchived,
+      sessionMembers,
+    ]
+  );
+
+  const handleImportTeamPreset = useCallback(
+    (teamPreset: ChatTeamPreset) => {
+      if (!activeSessionId) {
+        setMemberError('Select a chat session first.');
+        return;
+      }
+      if (isArchived) {
+        setMemberError('This session is archived and read-only.');
+        return;
+      }
+
+      const plan = buildTeamImportPlan(teamPreset);
+      if (plan.length === 0) {
+        setMemberError('Selected team has no member presets.');
+        return;
+      }
+
+      setTeamImportName(teamPreset.name || teamPreset.id);
+      setTeamImportPlan(plan);
+      setMemberError(null);
+    },
+    [activeSessionId, buildTeamImportPlan, isArchived]
+  );
+
+  const handleUpdateTeamImportPlanEntry = useCallback(
+    (
+      index: number,
+      updates: { finalName?: string; workspacePath?: string }
+    ) => {
+      setTeamImportPlan((prev) => {
+        if (!prev || index < 0 || index >= prev.length) return prev;
+        const next = [...prev];
+        next[index] = {
+          ...next[index],
+          ...(updates.finalName !== undefined
+            ? { finalName: updates.finalName }
+            : {}),
+          ...(updates.workspacePath !== undefined
+            ? { workspacePath: updates.workspacePath }
+            : {}),
+        };
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleConfirmTeamImport = useCallback(async () => {
+    if (!teamImportPlan || teamImportPlan.length === 0) return;
+
+    const preparedPlan = validateAndPrepareImportPlan(teamImportPlan);
+    if (!preparedPlan) return;
+
+    const actionablePlan = preparedPlan.filter(
+      (entry) => entry.action !== 'skip'
+    );
+    if (actionablePlan.length === 0) {
+      setMemberError('Nothing to import from this team preset.');
+      setTeamImportPlan(null);
+      setTeamImportName(null);
+      return;
+    }
+
+    setIsImportingTeam(true);
+    setMemberError(null);
+    setTeamImportPlan(preparedPlan);
+    try {
+      await importMembersFromPlan(preparedPlan);
+      setTeamImportPlan(null);
+      setTeamImportName(null);
+    } catch (error) {
+      console.error('Failed to import team preset', error);
+      setMemberError('Failed to import team preset.');
+    } finally {
+      setIsImportingTeam(false);
+    }
+  }, [importMembersFromPlan, teamImportPlan, validateAndPrepareImportPlan]);
+
+  const handleCancelTeamImport = useCallback(() => {
+    if (isImportingTeam) return;
+    setTeamImportPlan(null);
+    setTeamImportName(null);
+  }, [isImportingTeam]);
 
   const handleAddMember = async () => {
     if (!activeSessionId) {
@@ -1386,14 +1848,18 @@ export function ChatSessions() {
         if (existing) {
           const updatePayload = {
             name: null,
-            runner_type: existing.runner_type !== runnerType ? runnerType : null,
+            runner_type:
+              existing.runner_type !== runnerType ? runnerType : null,
             system_prompt:
               (existing.system_prompt ?? '') !== prompt ? prompt : null,
             tools_enabled: null,
           };
 
           if (updatePayload.runner_type || updatePayload.system_prompt) {
-            const updated = await chatApi.updateAgent(existing.id, updatePayload);
+            const updated = await chatApi.updateAgent(
+              existing.id,
+              updatePayload
+            );
             agentId = updated.id;
           }
         } else {
@@ -1473,8 +1939,10 @@ export function ChatSessions() {
     }
     const sessionAgentId = member.sessionAgent.id;
     setConfirmModal({
-      title: 'Remove AI Member',
-      message: `Are you sure you want to remove @${member.agent.name} from this session?`,
+      title: t('modals.confirm.titles.removeMember'),
+      message: t('modals.confirm.messages.removeMember', {
+        name: member.agent.name,
+      }),
       onConfirm: async () => {
         try {
           await chatApi.deleteSessionAgent(activeSessionId, sessionAgentId);
@@ -1495,6 +1963,8 @@ export function ChatSessions() {
       },
     });
   };
+
+  // ── Preset import handlers ──────────────────────────────────────────────────
 
   const handleSaveTitle = async () => {
     if (!activeSessionId) return;
@@ -1597,9 +2067,7 @@ export function ChatSessions() {
         setLeftSidebarWidth(COLLAPSED_LEFT_SIDEBAR_WIDTH);
         return true;
       }
-      setLeftSidebarWidth(
-        Math.max(220, lastExpandedLeftWidthRef.current)
-      );
+      setLeftSidebarWidth(Math.max(220, lastExpandedLeftWidthRef.current));
       return false;
     });
   }, [leftSidebarWidth]);
@@ -1609,7 +2077,8 @@ export function ChatSessions() {
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!resizeStartRef.current) return;
-      const { startX, startY, startWidth, startHeight } = resizeStartRef.current;
+      const { startX, startY, startWidth, startHeight } =
+        resizeStartRef.current;
 
       if (isResizing === 'left') {
         const delta = e.clientX - startX;
@@ -1686,9 +2155,7 @@ export function ChatSessions() {
           }}
           onTitleDraftChange={(value) => {
             setTitleDraft(value);
-            if (
-              getSessionTitleLength(value) > MAX_SESSION_TITLE_LENGTH
-            ) {
+            if (getSessionTitleLength(value) > MAX_SESSION_TITLE_LENGTH) {
               setTitleError(
                 `Session name cannot exceed ${MAX_SESSION_TITLE_LENGTH} characters.`
               );
@@ -1701,8 +2168,10 @@ export function ChatSessions() {
           onDeleteSession={() => {
             if (!activeSession) return;
             setConfirmModal({
-              title: 'Delete Session',
-              message: `Are you sure you want to delete "${activeSession.title || 'Untitled session'}"? This action cannot be undone and all messages will be permanently deleted.`,
+              title: t('modals.confirm.titles.deleteSession'),
+              message: t('modals.confirm.messages.deleteSession', {
+                title: activeSession.title || t('sidebar.untitledSession'),
+              }),
               onConfirm: async () => {
                 await deleteSession.mutateAsync(activeSession.id);
               },
@@ -1746,8 +2215,10 @@ export function ChatSessions() {
               if (!activeSessionId) return;
               const count = selectedMessageIds.size;
               setConfirmModal({
-                title: 'Delete Messages',
-                message: `Are you sure you want to delete ${count} message(s)? This action cannot be undone.`,
+                title: t('modals.confirm.titles.deleteMessages'),
+                message: t('modals.confirm.messages.deleteMessages', {
+                  count,
+                }),
                 onConfirm: async () => {
                   setIsDeletingMessages(true);
                   try {
@@ -1796,7 +2267,7 @@ export function ChatSessions() {
             const isAgent = message.sender_type === ChatSenderType.agent;
             const agentName =
               isAgent && message.sender_id
-                ? agentById.get(message.sender_id)?.name ?? 'Agent'
+                ? (agentById.get(message.sender_id)?.name ?? 'Agent')
                 : null;
             const diffMeta = isAgent ? extractDiffMeta(message.meta) : null;
             const diffInfo = diffMeta && diffMeta.runId ? diffMeta : null;
@@ -1812,7 +2283,7 @@ export function ChatSessions() {
             const isUser = message.sender_type === ChatSenderType.user;
             const toneKey = isUser
               ? 'user'
-              : message.sender_id ?? agentName ?? 'agent';
+              : (message.sender_id ?? agentName ?? 'agent');
             const tone = getMessageTone(String(toneKey), isUser);
 
             const isSelected = selectedMessageIds.has(message.id);
@@ -1824,7 +2295,7 @@ export function ChatSessions() {
                 senderLabel={getMessageSenderLabel(message)}
                 senderRunnerType={
                   isAgent && message.sender_id
-                    ? agentById.get(message.sender_id)?.runner_type ?? null
+                    ? (agentById.get(message.sender_id)?.runner_type ?? null)
                     : null
                 }
                 tone={tone}
@@ -1888,9 +2359,7 @@ export function ChatSessions() {
               runId={runId}
               run={run}
               agentName={agentById.get(run.agentId)?.name ?? 'Agent'}
-              runnerType={
-                agentById.get(run.agentId)?.runner_type ?? null
-              }
+              runnerType={agentById.get(run.agentId)?.runner_type ?? null}
               tone={getMessageTone(run.agentId, false)}
               sessionAgent={sessionAgents.find(
                 (sa) => sa.agent_id === run.agentId
@@ -2011,6 +2480,16 @@ export function ChatSessions() {
           setIsPromptEditorOpen(true);
           setPromptFileError(null);
         }}
+        enabledMemberPresets={enabledMemberPresets}
+        enabledTeamPresets={enabledTeamPresets}
+        onAddMemberPreset={handleAddMemberPreset}
+        onImportTeamPreset={handleImportTeamPreset}
+        teamImportPlan={teamImportPlan}
+        teamImportName={teamImportName}
+        isImportingTeam={isImportingTeam}
+        onUpdateTeamImportPlanEntry={handleUpdateTeamImportPlanEntry}
+        onConfirmTeamImport={handleConfirmTeamImport}
+        onCancelTeamImport={handleCancelTeamImport}
       />
 
       {/* Workspace Drawer */}
@@ -2057,7 +2536,7 @@ export function ChatSessions() {
       {/* Confirm Modal */}
       <ConfirmModal
         isOpen={!!confirmModal}
-        title={confirmModal?.title ?? 'Confirm'}
+        title={confirmModal?.title ?? t('modals.confirm.defaultTitle')}
         message={confirmModal?.message ?? ''}
         isLoading={isConfirmLoading}
         onConfirm={async () => {
