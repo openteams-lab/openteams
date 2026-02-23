@@ -283,7 +283,7 @@
       "approve": "Approuver",
       "clearReviewComments": "Effacer les commentaires de révision",
       "edit": "Modifier le message",
-      "scrollToPreviousMessage": "Go to previous message"
+      "scrollToPreviousMessage": "Aller au message précédent"
     },
     "approval": {
       "conflictWarning": "Les fichiers en conflit nécessitent une résolution manuelle",
@@ -414,6 +414,14 @@
         "title": "Connectez-vous pour gérer les actions git",
         "description": "Connectez-vous à agents-chatgroup pour pouvoir pousser des branches, fusionner des modifications ou ouvrir des pull requests pour cette tâche.",
         "action": "Se connecter"
+      },
+      "cannotMerge": {
+        "title": "Fusion impossible",
+        "message": "Ce dépôt a une pull request ouverte. Veuillez fusionner via le flux pull request."
+      },
+      "rebaseRequired": {
+        "title": "Rebase requis",
+        "message": "Votre branche a {{count}} commit(s) de retard sur la branche cible. Rebase avant de fusionner ?"
       }
     },
     "mergeDialog": {

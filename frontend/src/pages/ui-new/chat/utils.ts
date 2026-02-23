@@ -1,6 +1,17 @@
 import { parseDiffStats } from '@/utils/diffStatsParser';
+import type {
+  ChatAgent,
+  ChatMemberPreset,
+  JsonValue,
+} from 'shared/types';
 import { mentionTokenRegex, messagePalette, userMessageTone } from './constants';
-import type { ChatAttachment, DiffFileEntry, DiffMeta, MessageTone } from './types';
+import type {
+  ChatAttachment,
+  DiffFileEntry,
+  DiffMeta,
+  MessageTone,
+  SessionMember,
+} from './types';
 
 export function hashKey(value: string): number {
   let hash = 0;
@@ -349,4 +360,199 @@ export function splitUnifiedDiff(patch: string): DiffFileEntry[] {
 
   flush();
   return entries;
+}
+
+function stableStringifyJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringifyJson(item)).join(',')}]`;
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>).sort(
+    ([a], [b]) => a.localeCompare(b)
+  );
+  return `{${entries
+    .map(([key, item]) => `${JSON.stringify(key)}:${stableStringifyJson(item)}`)
+    .join(',')}}`;
+}
+
+export function normalizePresetToolsEnabled(
+  value: unknown
+): JsonValue {
+  if (value === null || value === undefined) {
+    return {};
+  }
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value as JsonValue;
+}
+
+export function areToolsEnabledEqual(a: unknown, b: unknown): boolean {
+  return stableStringifyJson(normalizePresetToolsEnabled(a)) ===
+    stableStringifyJson(normalizePresetToolsEnabled(b));
+}
+
+export function resolvePresetRunnerType({
+  presetRunnerType,
+  defaultRunnerType,
+  enabledRunnerTypes,
+  availableRunnerTypes,
+}: {
+  presetRunnerType: string | null | undefined;
+  defaultRunnerType: string | null | undefined;
+  enabledRunnerTypes: string[];
+  availableRunnerTypes: string[];
+}): string | null {
+  const trimmedPresetRunner = presetRunnerType?.trim();
+  if (
+    trimmedPresetRunner &&
+    (enabledRunnerTypes.includes(trimmedPresetRunner) ||
+      availableRunnerTypes.includes(trimmedPresetRunner))
+  ) {
+    return trimmedPresetRunner;
+  }
+
+  const trimmedDefaultRunner = defaultRunnerType?.trim();
+  if (
+    trimmedDefaultRunner &&
+    enabledRunnerTypes.includes(trimmedDefaultRunner)
+  ) {
+    return trimmedDefaultRunner;
+  }
+
+  if (enabledRunnerTypes.length > 0) {
+    return enabledRunnerTypes[0];
+  }
+  if (availableRunnerTypes.length > 0) {
+    return availableRunnerTypes[0];
+  }
+  return null;
+}
+
+export function resolveUniqueAgentName(
+  requestedName: string,
+  takenNamesLowercase: Set<string>
+): string {
+  const trimmed = requestedName.trim();
+  const baseName = trimmed.length > 0 ? trimmed : 'agent';
+  let candidate = baseName;
+  let suffix = 2;
+  while (takenNamesLowercase.has(candidate.toLowerCase())) {
+    candidate = `${baseName}_${suffix}`;
+    suffix += 1;
+  }
+  takenNamesLowercase.add(candidate.toLowerCase());
+  return candidate;
+}
+
+export function getSessionWorkspacePath(
+  sessionId: string,
+  agentName: string
+): string {
+  return `chat/session_${sessionId}/agents/${agentName}`;
+}
+
+export type MemberPresetImportAction = 'create' | 'reuse' | 'skip';
+
+export interface MemberPresetImportPlan {
+  presetId: string;
+  presetName: string;
+  runnerType: string;
+  finalName: string;
+  systemPrompt: string;
+  toolsEnabled: JsonValue;
+  action: MemberPresetImportAction;
+  reason: string;
+  agentId: string | null;
+  workspacePath: string;
+}
+
+export function buildMemberPresetImportPlan({
+  preset,
+  sessionId,
+  existingAgents,
+  sessionMembers,
+  defaultRunnerType,
+  enabledRunnerTypes,
+  availableRunnerTypes,
+  takenNamesLowercase,
+}: {
+  preset: ChatMemberPreset;
+  sessionId: string;
+  existingAgents: ChatAgent[];
+  sessionMembers: SessionMember[];
+  defaultRunnerType: string | null | undefined;
+  enabledRunnerTypes: string[];
+  availableRunnerTypes: string[];
+  takenNamesLowercase: Set<string>;
+}): MemberPresetImportPlan | null {
+  const runnerType = resolvePresetRunnerType({
+    presetRunnerType: preset.runner_type,
+    defaultRunnerType,
+    enabledRunnerTypes,
+    availableRunnerTypes,
+  });
+  if (!runnerType) {
+    return null;
+  }
+
+  const presetName = preset.name.trim().length > 0
+    ? preset.name.trim()
+    : preset.id;
+  const systemPrompt = preset.system_prompt?.trim() ?? '';
+  const toolsEnabled = normalizePresetToolsEnabled(preset.tools_enabled);
+  const sessionAgentIds = new Set(sessionMembers.map((item) => item.agent.id));
+
+  const sameNameAgents = existingAgents.filter(
+    (agent) => agent.name.toLowerCase() === presetName.toLowerCase()
+  );
+  const reusableAgent = sameNameAgents.find(
+    (agent) =>
+      agent.runner_type === runnerType &&
+      (agent.system_prompt ?? '') === systemPrompt &&
+      areToolsEnabledEqual(agent.tools_enabled, toolsEnabled)
+  );
+
+  if (reusableAgent) {
+    const action: MemberPresetImportAction = sessionAgentIds.has(reusableAgent.id)
+      ? 'skip'
+      : 'reuse';
+    return {
+      presetId: preset.id,
+      presetName: preset.name,
+      runnerType,
+      finalName: reusableAgent.name,
+      systemPrompt,
+      toolsEnabled,
+      action,
+      reason:
+        action === 'skip'
+          ? 'already-in-session'
+          : 'reuse-existing-agent',
+      agentId: reusableAgent.id,
+      workspacePath:
+        preset.default_workspace_path?.trim() ||
+        getSessionWorkspacePath(sessionId, reusableAgent.name),
+    };
+  }
+
+  const finalName = resolveUniqueAgentName(presetName, takenNamesLowercase);
+  return {
+    presetId: preset.id,
+    presetName: preset.name,
+    runnerType,
+    finalName,
+    systemPrompt,
+    toolsEnabled,
+    action: 'create',
+    reason: 'create-new-agent',
+    agentId: null,
+    workspacePath:
+      preset.default_workspace_path?.trim() ||
+      getSessionWorkspacePath(sessionId, finalName),
+  };
 }

@@ -42,7 +42,9 @@
     "loading": "Loading invitations...",
     "none": "No pending invitations",
     "invited": "Invited {{date}}",
-    "pending": "Pending"
+    "pending": "Pending",
+    "confirmRevoke": "{{email}} 초대를 취소할까요?",
+    "revokeAction": "초대 취소"
   },
   "settings": {
     "title": "Organization Settings",
@@ -57,7 +59,7 @@
     "dangerZoneDescription": "Irreversible and destructive actions",
     "deleteOrganization": "Delete Organization",
     "deleteOrganizationDescription": "Permanently delete this organization and all its data",
-    "confirmDelete": "Are you sure you want to delete {{orgName}}? This action cannot be undone.",
+    "confirmDelete": "{{orgName}}을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
     "deleteSuccess": "Organization deleted successfully",
     "deleteError": "Failed to delete organization"
   },
@@ -66,7 +68,7 @@
     "description": "조직 설정을 관리하려면 로그인해야 합니다.",
     "action": "로그인"
   },
-  "confirmRemoveMember": "Are you sure you want to remove this member from the organization?",
+  "confirmRemoveMember": "이 멤버를 조직에서 제거하시겠습니까?",
   "sharedProjects": {
     "title": "공유 프로젝트",
     "description": "{{orgName}}의 원격 프로젝트와 로컬 프로젝트 링크",

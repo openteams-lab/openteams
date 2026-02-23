@@ -60,6 +60,7 @@
       "rateLimited": "Rate limited",
       "checkQuota": "Please check your API quota or try again later"
     },
+    "contextCompressed": "Context was compressed for this response",
     "sendToAgent": "Send to agent",
     "open": "Open"
   },
@@ -89,7 +90,21 @@
     "workspacePathPlaceholder": "AI member working absolute path",
     "workspacePathCannotBeModified": "Workspace path cannot be modified",
     "add": "Add",
-    "save": "Save"
+    "save": "Save",
+    "presetSection": "Quick Add from Presets",
+    "addFromMemberPreset": "Add member preset",
+    "importTeamPreset": "Import team preset",
+    "noEnabledPresets": "No enabled presets. Configure them in Settings -> Presets.",
+    "importPreview": {
+      "title": "Import Team: {{teamName}}",
+      "description": "The following members will be added to this session:",
+      "actionCreate": "will be created",
+      "actionReuse": "already exists (will be reused)",
+      "actionSkip": "already in session (will be skipped)",
+      "confirmImport": "Import Team",
+      "cancel": "Cancel",
+      "importing": "Importing..."
+    }
   },
   "cleanup": {
     "selected": "Selected: {{count}}",
@@ -113,7 +128,20 @@
     "confirm": {
       "cancel": "Cancel",
       "confirm": "Confirm",
-      "processing": "Processing..."
+      "processing": "Processing...",
+      "defaultTitle": "Confirm",
+      "titles": {
+        "agentRunning": "Agent Running",
+        "removeMember": "Remove AI Member",
+        "deleteSession": "Delete Session",
+        "deleteMessages": "Delete Messages"
+      },
+      "messages": {
+        "agentRunning": "The following agent(s) are currently running: @{{agents}}. They will not process new messages until the current task is stopped. Do you still want to send this message?",
+        "removeMember": "Are you sure you want to remove @{{name}} from this session?",
+        "deleteSession": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone and all messages will be permanently deleted.",
+        "deleteMessages": "Are you sure you want to delete {{count}} message(s)? This action cannot be undone."
+      }
     },
     "promptEditor": {
       "title": "System Prompt",

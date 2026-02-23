@@ -5,12 +5,14 @@ import { GeneralSettingsSectionContent } from './GeneralSettingsSection';
 import { ReposSettingsSectionContent } from './ReposSettingsSection';
 import { AgentsSettingsSectionContent } from './AgentsSettingsSection';
 import { McpSettingsSectionContent } from './McpSettingsSection';
+import { ChatPresetsSettingsSectionContent } from './ChatPresetsSettingsSection';
 
 export type SettingsSectionType =
   | 'general'
   | 'repos'
   | 'agents'
-  | 'mcp';
+  | 'mcp'
+  | 'presets';
 
 // Section-specific initial state types
 export type SettingsSectionInitialState = {
@@ -18,6 +20,7 @@ export type SettingsSectionInitialState = {
   repos: undefined;
   agents: { executor?: string; variant?: string } | undefined;
   mcp: undefined;
+  presets: undefined;
 };
 
 interface SettingsSectionProps {
@@ -41,6 +44,8 @@ export function SettingsSection({
         return <AgentsSettingsSectionContent />;
       case 'mcp':
         return <McpSettingsSectionContent />;
+      case 'presets':
+        return <ChatPresetsSettingsSectionContent />;
       default:
         return <GeneralSettingsSectionContent />;
     }

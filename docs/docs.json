@@ -55,6 +55,7 @@
               "core-features/chat-session-overview",
               "core-features/managing-sessions",
               "core-features/ai-members",
+              "core-features/ai-team-presets",
               "core-features/task-collaboration",
               "core-features/code-review"
             ]
@@ -101,6 +102,7 @@
               "zh-Hans/core-features/chat-session-overview",
               "zh-Hans/core-features/managing-sessions",
               "zh-Hans/core-features/ai-members",
+              "zh-Hans/core-features/ai-team-presets",
               "zh-Hans/core-features/task-collaboration",
               "zh-Hans/core-features/code-review"
             ]

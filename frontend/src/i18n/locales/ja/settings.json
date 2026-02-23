@@ -1,7 +1,8 @@
 {
   "settings": {
     "common": {
-      "unsavedChanges": "• 未保存の変更があります"
+      "unsavedChanges": "• 未保存の変更があります",
+      "discardChangesConfirm": "未保存の変更を破棄しますか？"
     },
     "unsavedChanges": {
       "title": "未保存の変更",
@@ -25,7 +26,9 @@
         "organizations": "Organization Settings",
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "プロジェクト",
-        "remote-projectsDesc": "プロジェクトを管理"
+        "remote-projectsDesc": "プロジェクトを管理",
+        "presets": "プリセット",
+        "presetsDesc": "AIメンバーとチームのプリセットテンプレート"
       }
     },
     "general": {
@@ -487,6 +490,63 @@
         "discard": "破棄",
         "confirmSwitch": "未保存の変更があります。本当にリポジトリを切り替えますか？変更は失われます。"
       }
+    },
+    "presets": {
+      "title": "プリセットテンプレート",
+      "description": "チャットセッションで再利用できるAIメンバー/チームテンプレートを管理します。",
+      "loadError": "プリセットの読み込みに失敗しました。",
+      "saving": "保存中...",
+      "saveSuccess": "プリセットを保存しました。",
+      "saveError": "プリセットの保存に失敗しました。",
+      "builtin": "組み込み",
+      "disabled": "無効",
+      "tabs": {
+        "members": "メンバーテンプレート",
+        "teams": "チームテンプレート"
+      },
+      "actions": {
+        "copy": "複製",
+        "disable": "無効化",
+        "enable": "有効化",
+        "delete": "削除"
+      },
+      "members": {
+        "listTitle": "メンバープリセット",
+        "add": "メンバーを追加",
+        "empty": "メンバープリセットがありません。追加して開始してください。",
+        "fields": {
+          "id": "プリセットID",
+          "name": "ハンドル（@メンション名）",
+          "namePlaceholder": "例: backend",
+          "description": "説明",
+          "descriptionPlaceholder": "このAIメンバーの役割",
+          "runnerType": "ランナー種別（任意）",
+          "runnerTypePlaceholder": "空欄の場合はセッションのデフォルトを使用",
+          "systemPrompt": "システムプロンプト",
+          "systemPromptPlaceholder": "このAIメンバーの役割と責務を記述してください...",
+          "workspacePath": "既定のワークスペースパス（任意）",
+          "workspacePathPlaceholder": "例: backend",
+          "toolsEnabled": "ツール（JSON）"
+        },
+        "errors": {
+          "toolsJsonInvalid": "ツールJSONが無効です。",
+          "toolsJsonObject": "ツールJSONはオブジェクトである必要があります。"
+        }
+      },
+      "teams": {
+        "listTitle": "チームプリセット",
+        "add": "チームを追加",
+        "empty": "チームプリセットがありません。追加して開始してください。",
+        "noMemberPresets": "利用可能なメンバープリセットがありません。先にメンバープリセットを作成してください。",
+        "fields": {
+          "id": "プリセットID",
+          "name": "チーム名",
+          "namePlaceholder": "例: フルスタック開発チーム",
+          "description": "説明",
+          "descriptionPlaceholder": "このチームの用途",
+          "members": "チームメンバー"
+        }
+      }
     }
   },
   "integrations": {
@@ -520,6 +580,63 @@
             "officialDocs": "公式ドキュメント",
             "andAuthenticate": "その後、GitHubアカウントで認証してください。"
           }
+        }
+      }
+    },
+    "presets": {
+      "loading": "プリセットを読み込み中...",
+      "saving": "保存中...",
+      "saveSuccess": "✓ プリセットを保存しました！",
+      "saveError": "プリセットの保存に失敗しました",
+      "builtin": "組み込み",
+      "disabled": "無効",
+      "actions": {
+        "cancel": "キャンセル",
+        "save": "保存",
+        "edit": "編集",
+        "copy": "コピー",
+        "enable": "有効化",
+        "disable": "無効化",
+        "delete": "削除"
+      },
+      "tabs": {
+        "members": "メンバーテンプレート",
+        "teams": "チームテンプレート"
+      },
+      "members": {
+        "title": "メンバーテンプレート",
+        "description": "AIメンバーのプリセットテンプレートを作成・管理します。事前設定済みのAIメンバーをチャットセッションにすばやく追加できます。",
+        "add": "メンバーテンプレートを追加",
+        "newPreset": "新しいメンバープリセット",
+        "editPreset": "メンバープリセットを編集",
+        "empty": "メンバープリセットはまだありません。作成して開始しましょう！",
+        "fields": {
+          "name": "名前",
+          "namePlaceholder": "例: backend",
+          "description": "説明",
+          "descriptionPlaceholder": "例: API開発向けバックエンドエンジニア",
+          "runnerType": "ランナー種別（任意）",
+          "runnerTypePlaceholder": "例: claude_code。空欄の場合はデフォルトを使用",
+          "systemPrompt": "システムプロンプト",
+          "systemPromptPlaceholder": "このAIメンバーの振る舞いを記述してください...",
+          "workspacePath": "既定のワークスペースパス（任意）",
+          "workspacePathPlaceholder": "例: backend"
+        }
+      },
+      "teams": {
+        "title": "チームテンプレート",
+        "description": "AIチームのプリセットテンプレートを作成・管理します。事前設定済みのAIメンバーを含むチームをワンクリックでインポートできます。",
+        "add": "チームテンプレートを追加",
+        "newPreset": "新しいチームプリセット",
+        "editPreset": "チームプリセットを編集",
+        "empty": "チームプリセットはまだありません。作成して開始しましょう！",
+        "noMemberPresets": "利用可能なメンバープリセットがありません。先にメンバープリセットを作成してください。",
+        "fields": {
+          "name": "名前",
+          "namePlaceholder": "例: フルスタック開発チーム",
+          "description": "説明",
+          "descriptionPlaceholder": "例: エンドツーエンド開発チーム",
+          "members": "チームメンバー"
         }
       }
     }

@@ -233,7 +233,8 @@
   },
   "confirm": {
     "defaultConfirm": "Confirm",
-    "defaultCancel": "Cancel"
+    "defaultCancel": "Cancel",
+    "unexpectedError": "An unexpected error occurred."
   },
   "dialogs": {
     "selectGitRepository": "Select Git Repository",
@@ -384,5 +385,13 @@
     "streamsAffected_other": "{{count}} streams affected",
     "status": "(status {{status}})",
     "refreshPage": "Refresh Page"
+  },
+  "issues": {
+    "deleteConfirm": {
+      "titleSingle": "Delete issue?",
+      "titleMultiple": "Delete {{count}} issues?",
+      "messageSingle": "This action cannot be undone.",
+      "messageMultiple": "This will permanently delete {{count}} issues. This action cannot be undone."
+    }
   }
 }

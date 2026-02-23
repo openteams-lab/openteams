@@ -42,7 +42,9 @@
     "loading": "加载邀请中...",
     "none": "没有待处理的邀请",
     "invited": "邀请于 {{date}}",
-    "pending": "待处理"
+    "pending": "待处理",
+    "confirmRevoke": "确定撤销对 {{email}} 的邀请吗？",
+    "revokeAction": "撤销邀请"
   },
   "settings": {
     "title": "组织设置",

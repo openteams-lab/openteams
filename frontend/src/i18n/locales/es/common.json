@@ -233,7 +233,8 @@
   },
   "confirm": {
     "defaultConfirm": "Confirmar",
-    "defaultCancel": "Cancelar"
+    "defaultCancel": "Cancelar",
+    "unexpectedError": "Se produjo un error inesperado."
   },
   "dialogs": {
     "selectGitRepository": "Seleccionar repositorio Git",
@@ -384,5 +385,13 @@
     "streamsAffected_other": "{{count}} flujos afectados",
     "status": "(estado {{status}})",
     "refreshPage": "Actualizar página"
+  },
+  "issues": {
+    "deleteConfirm": {
+      "titleSingle": "¿Eliminar issue?",
+      "titleMultiple": "¿Eliminar {{count}} issues?",
+      "messageSingle": "Esta acción no se puede deshacer.",
+      "messageMultiple": "Esto eliminará permanentemente {{count}} issues. Esta acción no se puede deshacer."
+    }
   }
 }

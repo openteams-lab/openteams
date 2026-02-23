@@ -186,6 +186,12 @@ export function useChatWebSocket(
       const wsUrl = `${protocol}://${window.location.host}${streamUrl}`;
       ws = new WebSocket(wsUrl);
 
+      ws.onopen = () => {
+        queryClient.invalidateQueries({
+          queryKey: ['chatMessages', activeSessionId],
+        });
+      };
+
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as ChatStreamPayload;

@@ -460,7 +460,11 @@ export type DirectoryListResponse = { entries: Array<DirectoryEntry>, current_pa
 
 export type SearchMode = "taskform" | "settings";
 
-export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, commit_reminder_enabled: boolean, commit_reminder_prompt: string | null, send_message_shortcut: SendMessageShortcut, };
+export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, commit_reminder_enabled: boolean, commit_reminder_prompt: string | null, send_message_shortcut: SendMessageShortcut, 
+/**
+ * Chat presets configuration (member and team templates)
+ */
+chat_presets: ChatPresetsConfig, };
 
 export type NotificationConfig = { sound_enabled: boolean, push_enabled: boolean, sound_file: SoundFile, };
 
@@ -481,6 +485,80 @@ export type UiLanguage = "BROWSER" | "EN" | "FR" | "JA" | "ES" | "KO" | "ZH_HANS
 export type ShowcaseState = { seen_features: Array<string>, };
 
 export type SendMessageShortcut = "ModifierEnter" | "Enter";
+
+export type ChatPresetsConfig = { 
+/**
+ * List of member preset templates
+ */
+members: Array<ChatMemberPreset>, 
+/**
+ * List of team preset templates
+ */
+teams: Array<ChatTeamPreset>, };
+
+export type ChatMemberPreset = { 
+/**
+ * Unique identifier for the preset
+ */
+id: string, 
+/**
+ * Display name (also used as @mention handle)
+ */
+name: string, 
+/**
+ * Description of the preset's purpose
+ */
+description: string, 
+/**
+ * Optional runner type (null means use default)
+ */
+runner_type: string | null, 
+/**
+ * System prompt defining the agent's behavior
+ */
+system_prompt: string, 
+/**
+ * Optional default workspace path
+ */
+default_workspace_path: string | null, 
+/**
+ * Tools enabled for this preset
+ */
+tools_enabled: JsonValue, 
+/**
+ * Whether this is a built-in preset (cannot be deleted)
+ */
+is_builtin: boolean, 
+/**
+ * Whether this preset is enabled (visible for import)
+ */
+enabled: boolean, };
+
+export type ChatTeamPreset = { 
+/**
+ * Unique identifier for the preset
+ */
+id: string, 
+/**
+ * Display name of the team
+ */
+name: string, 
+/**
+ * Description of the team's purpose
+ */
+description: string, 
+/**
+ * List of member preset IDs to include in this team
+ */
+member_ids: Array<string>, 
+/**
+ * Whether this is a built-in preset (cannot be deleted)
+ */
+is_builtin: boolean, 
+/**
+ * Whether this preset is enabled (visible for import)
+ */
+enabled: boolean, };
 
 export type GitBranch = { name: string, is_current: boolean, is_remote: boolean, last_commit_date: Date, };
 

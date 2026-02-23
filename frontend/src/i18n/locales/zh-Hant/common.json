@@ -233,7 +233,8 @@
   },
   "confirm": {
     "defaultConfirm": "確認",
-    "defaultCancel": "取消"
+    "defaultCancel": "取消",
+    "unexpectedError": "發生了非預期錯誤。"
   },
   "dialogs": {
     "selectGitRepository": "選擇 Git 儲存庫",
@@ -384,5 +385,13 @@
     "streamsAffected_other": "{{count}} 個資料流受影響",
     "status": "(狀態 {{status}})",
     "refreshPage": "重新整理頁面"
+  },
+  "issues": {
+    "deleteConfirm": {
+      "titleSingle": "刪除事項？",
+      "titleMultiple": "刪除 {{count}} 個事項？",
+      "messageSingle": "此操作無法復原。",
+      "messageMultiple": "這將永久刪除 {{count}} 個事項。此操作無法復原。"
+    }
   }
 }

@@ -42,7 +42,9 @@
     "loading": "Loading invitations...",
     "none": "No pending invitations",
     "invited": "Invited {{date}}",
-    "pending": "Pending"
+    "pending": "Pending",
+    "confirmRevoke": "{{email}} への招待を取り消しますか？",
+    "revokeAction": "招待を取り消す"
   },
   "settings": {
     "title": "Organization Settings",
@@ -57,7 +59,7 @@
     "dangerZoneDescription": "Irreversible and destructive actions",
     "deleteOrganization": "Delete Organization",
     "deleteOrganizationDescription": "Permanently delete this organization and all its data",
-    "confirmDelete": "Are you sure you want to delete {{orgName}}? This action cannot be undone.",
+    "confirmDelete": "{{orgName}} を削除してもよろしいですか？この操作は元に戻せません。",
     "deleteSuccess": "Organization deleted successfully",
     "deleteError": "Failed to delete organization"
   },
@@ -66,7 +68,7 @@
     "description": "組織設定を管理するにはログインする必要があります。",
     "action": "ログイン"
   },
-  "confirmRemoveMember": "Are you sure you want to remove this member from the organization?",
+  "confirmRemoveMember": "このメンバーを組織から削除してもよろしいですか？",
   "sharedProjects": {
     "title": "共有プロジェクト",
     "description": "{{orgName}}のリモートプロジェクトとローカルプロジェクトへのリンク",

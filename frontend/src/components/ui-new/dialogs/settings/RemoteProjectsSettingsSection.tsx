@@ -140,7 +140,7 @@ export function RemoteProjectsSettingsSection({
   const handleOrgSelect = (orgId: string) => {
     if (isDirty) {
       const confirmed = window.confirm(
-        t('settings.common.discardChangesConfirm', 'Discard unsaved changes?')
+        t('settings.common.discardChangesConfirm')
       );
       if (!confirmed) return;
     }
@@ -154,7 +154,7 @@ export function RemoteProjectsSettingsSection({
   const handleProjectSelect = (projectId: string) => {
     if (isDirty) {
       const confirmed = window.confirm(
-        t('settings.common.discardChangesConfirm', 'Discard unsaved changes?')
+        t('settings.common.discardChangesConfirm')
       );
       if (!confirmed) return;
     }

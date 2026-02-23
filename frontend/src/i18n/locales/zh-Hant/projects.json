@@ -22,5 +22,6 @@
   "projectNotFound": "您要查找的專案不存在或已被刪除。",
   "viewProject": "查看專案",
   "openInIDE": "在 IDE 中開啟",
-  "createdDate": "建立於 {{date}}"
+  "createdDate": "建立於 {{date}}",
+  "confirmDelete": "確定要刪除專案「{{name}}」嗎？此操作無法復原。"
 }

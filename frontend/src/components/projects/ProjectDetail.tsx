@@ -39,11 +39,7 @@ export function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
 
   const handleDelete = async () => {
     if (!project) return;
-    if (
-      !confirm(
-        `Are you sure you want to delete "${project.name}"? This action cannot be undone.`
-      )
-    )
+    if (!window.confirm(t('confirmDelete', { name: project.name })))
       return;
 
     try {

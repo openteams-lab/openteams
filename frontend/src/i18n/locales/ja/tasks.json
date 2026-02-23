@@ -278,6 +278,14 @@
         "title": "Git アクションを管理するにはサインインしてください",
         "description": "このタスクでブランチのプッシュ、変更のマージ、プルリクエストの作成を行うには agents-chatgroup にサインインしてください。",
         "action": "サインイン"
+      },
+      "cannotMerge": {
+        "title": "マージできません",
+        "message": "このリポジトリにはオープン中のPull Requestがあります。Pull Requestのフローからマージしてください。"
+      },
+      "rebaseRequired": {
+        "title": "リベースが必要です",
+        "message": "現在のブランチは対象ブランチより{{count}}コミット遅れています。マージ前にリベースしますか？"
       }
     },
     "mergeDialog": {
@@ -655,7 +663,7 @@
       "approve": "承認",
       "clearReviewComments": "レビューコメントをクリア",
       "edit": "メッセージを編集",
-      "scrollToPreviousMessage": "Go to previous message"
+      "scrollToPreviousMessage": "前のメッセージへ移動"
     },
     "approval": {
       "conflictWarning": "競合するファイルは手動で解決する必要があります",

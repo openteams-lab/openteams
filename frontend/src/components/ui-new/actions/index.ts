@@ -12,6 +12,7 @@ import type { DiffViewMode } from '@/stores/useDiffViewStore';
 import type { LogsPanelContent } from '../containers/LogsContentContainer';
 import type { LogEntry } from '../containers/VirtualizedProcessLogs';
 import type { LayoutMode } from '@/stores/useUiPreferencesStore';
+import i18n from '@/i18n/config';
 import {
   CopyIcon,
   PushPinIcon,
@@ -407,11 +408,10 @@ export const Actions = {
     execute: async (ctx, workspaceId) => {
       const workspace = await getWorkspace(ctx.queryClient, workspaceId);
       const result = await ConfirmDialog.show({
-        title: 'Delete Workspace',
-        message:
-          'Are you sure you want to delete this workspace? This action cannot be undone.',
-        confirmText: 'Delete',
-        cancelText: 'Cancel',
+        title: i18n.t('common:workspaces.deleteWorkspace'),
+        message: i18n.t('common:workspaces.deleteConfirmMessage'),
+        confirmText: i18n.t('common:buttons.delete'),
+        cancelText: i18n.t('common:buttons.cancel'),
         variant: 'destructive',
       });
       if (result === 'confirmed') {
@@ -1008,10 +1008,9 @@ export const Actions = {
       );
       if (hasOpenPR) {
         await ConfirmDialog.show({
-          title: 'Cannot Merge',
-          message:
-            'This repository has an open pull request. Please close or merge the PR before merging directly.',
-          confirmText: 'OK',
+          title: i18n.t('tasks:git.actions.cannotMerge.title'),
+          message: i18n.t('tasks:git.actions.cannotMerge.message'),
+          confirmText: i18n.t('common:ok'),
           showCancelButton: false,
         });
         return;
@@ -1044,10 +1043,12 @@ export const Actions = {
       if (commitsBehind > 0) {
         // Prompt user to rebase first
         const confirmRebase = await ConfirmDialog.show({
-          title: 'Rebase Required',
-          message: `Your branch is ${commitsBehind} commit${commitsBehind === 1 ? '' : 's'} behind the target branch. Would you like to rebase first?`,
-          confirmText: 'Rebase',
-          cancelText: 'Cancel',
+          title: i18n.t('tasks:git.actions.rebaseRequired.title'),
+          message: i18n.t('tasks:git.actions.rebaseRequired.message', {
+            count: commitsBehind,
+          }),
+          confirmText: i18n.t('tasks:git.states.rebase'),
+          cancelText: i18n.t('common:buttons.cancel'),
         });
 
         if (confirmRebase === 'confirmed') {
@@ -1061,11 +1062,10 @@ export const Actions = {
       }
 
       const confirmResult = await ConfirmDialog.show({
-        title: 'Merge Branch',
-        message:
-          'Are you sure you want to merge this branch into the target branch?',
-        confirmText: 'Merge',
-        cancelText: 'Cancel',
+        title: i18n.t('tasks:git.mergeDialog.title'),
+        message: i18n.t('tasks:git.mergeDialog.description'),
+        confirmText: i18n.t('tasks:git.states.merge'),
+        cancelText: i18n.t('common:buttons.cancel'),
       });
 
       if (confirmResult === 'confirmed') {
@@ -1422,13 +1422,16 @@ export const Actions = {
     execute: async (ctx, _projectId, issueIds) => {
       const count = issueIds.length;
       const result = await ConfirmDialog.show({
-        title: count === 1 ? 'Delete Issue' : `Delete ${count} Issues`,
+        title:
+          count === 1
+            ? i18n.t('common:issues.deleteConfirm.titleSingle')
+            : i18n.t('common:issues.deleteConfirm.titleMultiple', { count }),
         message:
           count === 1
-            ? 'Are you sure you want to delete this issue? This action cannot be undone.'
-            : `Are you sure you want to delete these ${count} issues? This action cannot be undone.`,
-        confirmText: 'Delete',
-        cancelText: 'Cancel',
+            ? i18n.t('common:issues.deleteConfirm.messageSingle')
+            : i18n.t('common:issues.deleteConfirm.messageMultiple', { count }),
+        confirmText: i18n.t('common:buttons.delete'),
+        cancelText: i18n.t('common:buttons.cancel'),
         variant: 'destructive',
       });
       if (result === 'confirmed' && ctx.projectMutations?.removeIssue) {

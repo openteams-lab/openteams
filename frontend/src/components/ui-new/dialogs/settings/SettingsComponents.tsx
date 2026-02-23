@@ -328,6 +328,7 @@ export function SettingsInput({
 export function SettingsTextarea({
   value,
   onChange,
+  onBlur,
   placeholder,
   disabled,
   rows = 4,
@@ -335,6 +336,7 @@ export function SettingsTextarea({
 }: {
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
   disabled?: boolean;
   rows?: number;
@@ -344,6 +346,7 @@ export function SettingsTextarea({
     <textarea
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
       placeholder={placeholder}
       disabled={disabled}
       rows={rows}

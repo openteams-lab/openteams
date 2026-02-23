@@ -22,5 +22,6 @@
   "projectNotFound": "お探しのプロジェクトは存在しないか、削除されました。",
   "viewProject": "プロジェクトを表示",
   "openInIDE": "IDEで開く",
-  "createdDate": "作成日 {{date}}"
+  "createdDate": "作成日 {{date}}",
+  "confirmDelete": "プロジェクト「{{name}}」を削除してもよろしいですか？この操作は元に戻せません。"
 }

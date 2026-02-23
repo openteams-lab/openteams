@@ -1,7 +1,8 @@
 {
   "settings": {
     "common": {
-      "unsavedChanges": "• 您有未儲存的變更"
+      "unsavedChanges": "• 您有未儲存的變更",
+      "discardChangesConfirm": "要捨棄未儲存的變更嗎？"
     },
     "unsavedChanges": {
       "title": "未儲存的變更",
@@ -25,7 +26,9 @@
         "organizations": "組織設定",
         "organizationsDesc": "管理組織成員與權限",
         "remote-projects": "專案",
-        "remote-projectsDesc": "管理專案"
+        "remote-projectsDesc": "管理專案",
+        "presets": "預設",
+        "presetsDesc": "AI 成員與團隊預設範本"
       }
     },
     "general": {
@@ -487,6 +490,63 @@
         "discard": "放棄",
         "confirmSwitch": "您有未儲存的變更。確定要切換儲存庫嗎？您的變更將會遺失。"
       }
+    },
+    "presets": {
+      "title": "預設範本",
+      "description": "管理可重複使用的 AI 成員與團隊範本，用於聊天會話。",
+      "loadError": "載入預設失敗。",
+      "saving": "儲存中...",
+      "saveSuccess": "預設已成功儲存。",
+      "saveError": "儲存預設失敗。",
+      "builtin": "內建",
+      "disabled": "已停用",
+      "tabs": {
+        "members": "成員範本",
+        "teams": "團隊範本"
+      },
+      "actions": {
+        "copy": "複製",
+        "disable": "停用",
+        "enable": "啟用",
+        "delete": "刪除"
+      },
+      "members": {
+        "listTitle": "成員預設",
+        "add": "新增成員",
+        "empty": "尚無成員預設，請先新增。",
+        "fields": {
+          "id": "預設 ID",
+          "name": "名稱（@提及名稱）",
+          "namePlaceholder": "例如 backend",
+          "description": "描述",
+          "descriptionPlaceholder": "此 AI 成員的角色",
+          "runnerType": "Runner 類型（選填）",
+          "runnerTypePlaceholder": "留空則使用會話預設",
+          "systemPrompt": "系統提示詞",
+          "systemPromptPlaceholder": "描述此 AI 成員的角色與職責...",
+          "workspacePath": "預設工作目錄（選填）",
+          "workspacePathPlaceholder": "例如 backend",
+          "toolsEnabled": "工具（JSON）"
+        },
+        "errors": {
+          "toolsJsonInvalid": "工具 JSON 無效。",
+          "toolsJsonObject": "工具 JSON 必須是物件。"
+        }
+      },
+      "teams": {
+        "listTitle": "團隊預設",
+        "add": "新增團隊",
+        "empty": "尚無團隊預設，請先新增。",
+        "noMemberPresets": "沒有可用的成員預設。請先建立成員預設。",
+        "fields": {
+          "id": "預設 ID",
+          "name": "團隊名稱",
+          "namePlaceholder": "例如 全端開發團隊",
+          "description": "描述",
+          "descriptionPlaceholder": "此團隊的用途",
+          "members": "團隊成員"
+        }
+      }
     }
   },
   "integrations": {
@@ -520,6 +580,63 @@
             "officialDocs": "官方文件",
             "andAuthenticate": "安裝 GitHub CLI，並使用您的 GitHub 帳號進行驗證。"
           }
+        }
+      }
+    },
+    "presets": {
+      "loading": "載入預設中...",
+      "saving": "儲存中...",
+      "saveSuccess": "✓ 預設已成功儲存！",
+      "saveError": "儲存預設失敗",
+      "builtin": "內建",
+      "disabled": "已停用",
+      "actions": {
+        "cancel": "取消",
+        "save": "儲存",
+        "edit": "編輯",
+        "copy": "複製",
+        "enable": "啟用",
+        "disable": "停用",
+        "delete": "刪除"
+      },
+      "tabs": {
+        "members": "成員範本",
+        "teams": "團隊範本"
+      },
+      "members": {
+        "title": "成員範本",
+        "description": "建立並管理 AI 成員預設範本。可快速將已預先設定的 AI 成員加入聊天會話。",
+        "add": "新增成員範本",
+        "newPreset": "新增成員預設",
+        "editPreset": "編輯成員預設",
+        "empty": "尚無成員預設，建立一個開始吧！",
+        "fields": {
+          "name": "名稱",
+          "namePlaceholder": "例如 backend",
+          "description": "描述",
+          "descriptionPlaceholder": "例如：後端工程師（API 開發）",
+          "runnerType": "Runner 類型（選填）",
+          "runnerTypePlaceholder": "例如：claude_code，留空使用預設值",
+          "systemPrompt": "系統提示詞",
+          "systemPromptPlaceholder": "描述此 AI 成員應如何行為...",
+          "workspacePath": "預設工作目錄（選填）",
+          "workspacePathPlaceholder": "例如 backend"
+        }
+      },
+      "teams": {
+        "title": "團隊範本",
+        "description": "建立並管理 AI 團隊預設範本。可一鍵匯入整組預先設定好的 AI 成員團隊。",
+        "add": "新增團隊範本",
+        "newPreset": "新增團隊預設",
+        "editPreset": "編輯團隊預設",
+        "empty": "尚無團隊預設，建立一個開始吧！",
+        "noMemberPresets": "沒有可用的成員預設。請先建立成員預設。",
+        "fields": {
+          "name": "名稱",
+          "namePlaceholder": "例如 全端開發團隊",
+          "description": "描述",
+          "descriptionPlaceholder": "例如：端到端開發團隊",
+          "members": "團隊成員"
         }
       }
     }
