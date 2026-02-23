@@ -522,8 +522,8 @@
           "descriptionPlaceholder": "What this AI member does",
           "runnerType": "Runner Type (optional)",
           "runnerTypePlaceholder": "Leave empty to use session default",
-          "systemPrompt": "System Prompt",
-          "systemPromptPlaceholder": "Describe the AI member's role and responsibilities...",
+          "systemPrompt": "Role settings (required)",
+          "systemPromptPlaceholder": "Describe this AI member's role settings...",
           "workspacePath": "Default Workspace Path (optional)",
           "workspacePathPlaceholder": "e.g. backend",
           "toolsEnabled": "Tools (JSON)"
@@ -617,8 +617,8 @@
           "descriptionPlaceholder": "e.g., Backend Engineer for API development",
           "runnerType": "Runner Type (optional)",
           "runnerTypePlaceholder": "e.g., claude_code, leave empty for default",
-          "systemPrompt": "System Prompt",
-          "systemPromptPlaceholder": "Describe how this AI member should behave...",
+          "systemPrompt": "Role settings (required)",
+          "systemPromptPlaceholder": "Describe this AI member's role settings...",
           "workspacePath": "Default Workspace Path (optional)",
           "workspacePathPlaceholder": "e.g., backend"
         }

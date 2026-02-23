@@ -62,19 +62,19 @@ fn sanitize_filename(name: &str) -> String {
 }
 
 fn attachment_kind(mime: Option<&str>) -> String {
-    if let Some(mime) = mime {
-        if mime.starts_with("image/") {
-            return "image".to_string();
-        }
+    if let Some(mime) = mime
+        && mime.starts_with("image/")
+    {
+        return "image".to_string();
     }
     "file".to_string()
 }
 
 fn is_allowed_attachment(filename: &str, mime: Option<&str>) -> bool {
-    if let Some(mime) = mime {
-        if mime.starts_with("text/") || mime.starts_with("image/") {
-            return true;
-        }
+    if let Some(mime) = mime
+        && (mime.starts_with("text/") || mime.starts_with("image/"))
+    {
+        return true;
     }
     let lower = filename.to_ascii_lowercase();
     ALLOWED_TEXT_EXTENSIONS
@@ -335,11 +335,11 @@ pub async fn delete_messages_batch(
     let mut total_deleted: u64 = 0;
     for message_id in payload.message_ids {
         // Verify the message belongs to this session before deleting
-        if let Some(message) = ChatMessage::find_by_id(&deployment.db().pool, message_id).await? {
-            if message.session_id == session.id {
-                let rows = ChatMessage::delete(&deployment.db().pool, message_id).await?;
-                total_deleted += rows;
-            }
+        if let Some(message) = ChatMessage::find_by_id(&deployment.db().pool, message_id).await?
+            && message.session_id == session.id
+        {
+            let rows = ChatMessage::delete(&deployment.db().pool, message_id).await?;
+            total_deleted += rows;
         }
     }
 

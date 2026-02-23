@@ -51,16 +51,15 @@ async fn discover_models(
             continue;
         }
 
-        match base {
-            CodingAgent::Opencode(opencode) => match opencode.list_models(current_dir, env).await {
+        if let CodingAgent::Opencode(opencode) = base {
+            match opencode.list_models(current_dir, env).await {
                 Ok(models) => {
                     updates.insert(*executor, models);
                 }
                 Err(err) => {
                     tracing::debug!("Failed to list models for {executor}: {err}");
                 }
-            },
-            _ => {}
+            }
         }
     }
 

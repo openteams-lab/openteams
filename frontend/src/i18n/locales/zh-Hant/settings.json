@@ -522,8 +522,8 @@
           "descriptionPlaceholder": "此 AI 成員的角色",
           "runnerType": "Runner 類型（選填）",
           "runnerTypePlaceholder": "留空則使用會話預設",
-          "systemPrompt": "系統提示詞",
-          "systemPromptPlaceholder": "描述此 AI 成員的角色與職責...",
+          "systemPrompt": "角色設定（必填）",
+          "systemPromptPlaceholder": "描述此 AI 成員的角色設定...",
           "workspacePath": "預設工作目錄（選填）",
           "workspacePathPlaceholder": "例如 backend",
           "toolsEnabled": "工具（JSON）"
@@ -617,8 +617,8 @@
           "descriptionPlaceholder": "例如：後端工程師（API 開發）",
           "runnerType": "Runner 類型（選填）",
           "runnerTypePlaceholder": "例如：claude_code，留空使用預設值",
-          "systemPrompt": "系統提示詞",
-          "systemPromptPlaceholder": "描述此 AI 成員應如何行為...",
+          "systemPrompt": "角色設定（必填）",
+          "systemPromptPlaceholder": "描述此 AI 成員的角色設定...",
           "workspacePath": "預設工作目錄（選填）",
           "workspacePathPlaceholder": "例如 backend"
         }

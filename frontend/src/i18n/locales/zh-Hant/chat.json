@@ -83,9 +83,9 @@
     "noInstalledAgents": "此機器上未檢測到已安裝的程式碼 Agent。",
     "modelVariant": "模型變體",
     "model": "模型",
-    "systemPrompt": "系統提示",
+    "systemPrompt": "角色設定（必填）",
     "expand": "展開",
-    "systemPromptPlaceholder": "描述此 AI 成員應如何表現。",
+    "systemPromptPlaceholder": "描述此 AI 成員的角色設定。",
     "workspacePath": "工作區路徑",
     "workspacePathPlaceholder": "AI成員工作的絕對路徑",
     "workspacePathCannotBeModified": "工作區路徑無法修改",
@@ -104,7 +104,8 @@
       "confirmImport": "匯入團隊",
       "cancel": "取消",
       "importing": "匯入中..."
-    }
+    },
+    "roleSettingsRequired": "角色設定為必填欄位。"
   },
   "cleanup": {
     "selected": "已選擇: {{count}}",
@@ -144,10 +145,10 @@
       }
     },
     "promptEditor": {
-      "title": "系統提示",
-      "description": "編輯 AI 成員的系統提示",
+      "title": "角色設定",
+      "description": "編輯 AI 成員的角色設定",
       "close": "關閉提示編輯器",
-      "placeholder": "描述此 AI 成員應如何表現。",
+      "placeholder": "描述此 AI 成員的角色設定。",
       "attachTextFile": "附加文字檔案",
       "loadingFile": "正在載入檔案...",
       "done": "完成"

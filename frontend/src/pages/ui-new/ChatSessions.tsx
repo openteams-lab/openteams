@@ -1769,7 +1769,7 @@ export function ChatSessions() {
     }
 
     if (!prompt) {
-      setMemberError('System prompt is required.');
+      setMemberError(t('members.roleSettingsRequired'));
       return;
     }
 

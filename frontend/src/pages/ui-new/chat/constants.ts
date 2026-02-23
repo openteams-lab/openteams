@@ -1,7 +1,9 @@
 import { ChatSessionAgentState } from 'shared/types';
 import type { MessageTone } from './types';
 
-export const mentionRegex = /(^|\s)@([\p{L}\p{N}_-]*)$/u;
+// Detect an active mention query at the input tail. The token before `@`
+// can be start-of-text or any character so `hello@` also opens suggestions.
+export const mentionRegex = /(^|[\s\S])@([\p{L}\p{N}_-]*)$/u;
 export const mentionTokenRegex = /(^|\s)@([\p{L}\p{N}_-]+)/gu;
 export const memberNameRegex = /^[\p{L}\p{N}_-]+$/u;
 export const MAX_MEMBER_NAME_LENGTH = 30;

@@ -158,10 +158,9 @@ pub fn generate_user_id() -> String {
                 "(Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Cryptography').MachineGuid",
             ])
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                output.stdout.hash(&mut hasher);
-            }
+            output.stdout.hash(&mut hasher);
         }
     }
 

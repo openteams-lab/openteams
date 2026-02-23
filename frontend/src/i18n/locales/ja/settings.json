@@ -522,8 +522,8 @@
           "descriptionPlaceholder": "このAIメンバーの役割",
           "runnerType": "ランナー種別（任意）",
           "runnerTypePlaceholder": "空欄の場合はセッションのデフォルトを使用",
-          "systemPrompt": "システムプロンプト",
-          "systemPromptPlaceholder": "このAIメンバーの役割と責務を記述してください...",
+          "systemPrompt": "役割設定（必須）",
+          "systemPromptPlaceholder": "このAIメンバーの役割設定を記述してください...",
           "workspacePath": "既定のワークスペースパス（任意）",
           "workspacePathPlaceholder": "例: backend",
           "toolsEnabled": "ツール（JSON）"
@@ -617,8 +617,8 @@
           "descriptionPlaceholder": "例: API開発向けバックエンドエンジニア",
           "runnerType": "ランナー種別（任意）",
           "runnerTypePlaceholder": "例: claude_code。空欄の場合はデフォルトを使用",
-          "systemPrompt": "システムプロンプト",
-          "systemPromptPlaceholder": "このAIメンバーの振る舞いを記述してください...",
+          "systemPrompt": "役割設定（必須）",
+          "systemPromptPlaceholder": "このAIメンバーの役割設定を記述してください...",
           "workspacePath": "既定のワークスペースパス（任意）",
           "workspacePathPlaceholder": "例: backend"
         }

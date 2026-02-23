@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
-    path::{Component, PathBuf},
+    path::{Component, Path, PathBuf},
     str::FromStr,
     sync::{
         Arc,
@@ -590,17 +590,16 @@ impl ChatRunner {
             return Err(ChatRunnerError::AgentNotFound(mention.to_string()));
         };
 
-        if source_message.sender_type == ChatSenderType::Agent {
-            if let Some(sender_id) = source_message.sender_id {
-                if sender_id == agent.id {
-                    tracing::debug!(
-                        agent_id = %sender_id,
-                        mention = mention,
-                        "skipping self-mention by agent"
-                    );
-                    return Ok(());
-                }
-            }
+        if source_message.sender_type == ChatSenderType::Agent
+            && let Some(sender_id) = source_message.sender_id
+            && sender_id == agent.id
+        {
+            tracing::debug!(
+                agent_id = %sender_id,
+                mention = mention,
+                "skipping self-mention by agent"
+            );
+            return Ok(());
         }
 
         if session_agent.state == ChatSessionAgentState::Running {
@@ -621,7 +620,7 @@ impl ChatRunner {
 
             self.pending_messages
                 .entry(session_agent.id)
-                .or_insert_with(VecDeque::new)
+                .or_default()
                 .push_back(pending);
 
             // Emit a "received" status to indicate the message is queued
@@ -750,7 +749,7 @@ impl ChatRunner {
             let executor_profile_id = ExecutorProfileId::new(self.parse_runner_type(&agent)?);
             let mut executor =
                 ExecutorConfigs::get_cached().get_coding_agent_or_default(&executor_profile_id);
-            executor.use_approvals(Arc::new(NoopExecutorApprovalService::default()));
+            executor.use_approvals(Arc::new(NoopExecutorApprovalService));
 
             let repo_context = RepoContext::new(PathBuf::from(&workspace_path), Vec::new());
             let mut env = ExecutionEnv::new(repo_context, false, String::new());
@@ -882,7 +881,7 @@ impl ChatRunner {
 
     fn parse_runner_type(&self, agent: &ChatAgent) -> Result<BaseCodingAgent, ChatRunnerError> {
         let raw = agent.runner_type.trim();
-        let normalized = raw.replace('-', "_").replace(' ', "_").to_ascii_uppercase();
+        let normalized = raw.replace(['-', ' '], "_").to_ascii_uppercase();
         BaseCodingAgent::from_str(&normalized)
             .map_err(|_| ChatRunnerError::UnknownRunnerType(raw.to_string()))
     }
@@ -918,7 +917,7 @@ impl ChatRunner {
         }
     }
 
-    async fn capture_git_diff(workspace_path: &PathBuf, run_dir: &PathBuf) -> Option<DiffInfo> {
+    async fn capture_git_diff(workspace_path: &Path, run_dir: &Path) -> Option<DiffInfo> {
         let check = Command::new("git")
             .arg("-C")
             .arg(workspace_path)
@@ -982,7 +981,7 @@ impl ChatRunner {
         Some(DiffInfo { truncated })
     }
 
-    async fn capture_untracked_files(workspace_path: &PathBuf, run_dir: &PathBuf) -> Vec<String> {
+    async fn capture_untracked_files(workspace_path: &Path, run_dir: &Path) -> Vec<String> {
         let output = Command::new("git")
             .arg("-C")
             .arg(workspace_path)
@@ -1016,11 +1015,11 @@ impl ChatRunner {
             let src = workspace_path.join(&rel_path);
             let dest = untracked_dir.join(&rel_path);
 
-            if let Some(parent) = dest.parent() {
-                if let Err(err) = fs::create_dir_all(parent).await {
-                    tracing::warn!("Failed to create untracked dir: {}", err);
-                    continue;
-                }
+            if let Some(parent) = dest.parent()
+                && let Err(err) = fs::create_dir_all(parent).await
+            {
+                tracing::warn!("Failed to create untracked dir: {}", err);
+                continue;
             }
 
             match fs::metadata(&src).await {
@@ -1049,7 +1048,7 @@ impl ChatRunner {
         &self,
         session_id: Uuid,
         workspace_path: &str,
-        run_dir: &PathBuf,
+        run_dir: &Path,
     ) -> Result<ContextSnapshot, ChatRunnerError> {
         // Use LLM-based compacted context for better compression
         // When messages > 20, compresses oldest 5 into 1 summary, keeping 16 total messages
@@ -1096,7 +1095,7 @@ impl ChatRunner {
         &self,
         session_id: Uuid,
         source_message: &ChatMessage,
-        context_dir: &PathBuf,
+        context_dir: &Path,
     ) -> Result<Option<ReferenceContext>, ChatRunnerError> {
         let Some(reference_id) = chat::extract_reference_message_id(&source_message.meta.0) else {
             return Ok(None);
@@ -1173,7 +1172,7 @@ impl ChatRunner {
     async fn build_message_attachment_context(
         &self,
         source_message: &ChatMessage,
-        context_dir: &PathBuf,
+        context_dir: &Path,
     ) -> Result<Option<MessageAttachmentContext>, ChatRunnerError> {
         let attachments = chat::extract_attachments(&source_message.meta.0);
         if attachments.is_empty() {
@@ -1266,12 +1265,13 @@ impl ChatRunner {
         Ok(summaries)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn build_prompt(
         &self,
         agent: &ChatAgent,
         message: &ChatMessage,
         context_jsonl: &str,
-        context_path: &PathBuf,
+        context_path: &Path,
         session_agents: &[SessionAgentSummary],
         message_attachments: Option<&MessageAttachmentContext>,
         reference: Option<&ReferenceContext>,
@@ -1345,23 +1345,23 @@ impl ChatRunner {
             prompt.push_str("\n[/REFERENCE_MESSAGE]\n\n");
         }
 
-        if let Some(message_attachments) = message_attachments {
-            if !message_attachments.attachments.is_empty() {
-                prompt.push_str("[MESSAGE_ATTACHMENTS]\n");
-                prompt.push_str("Attachments included with this message.\n");
-                prompt.push_str(&format!("message_id={}\n", message_attachments.message_id));
-                for attachment in &message_attachments.attachments {
-                    prompt.push_str(&format!(
-                        "- name={} kind={} size_bytes={} mime_type={} local_path={}\n",
-                        attachment.name,
-                        attachment.kind,
-                        attachment.size_bytes,
-                        attachment.mime_type.as_deref().unwrap_or("unknown"),
-                        attachment.local_path
-                    ));
-                }
-                prompt.push_str("[/MESSAGE_ATTACHMENTS]\n\n");
+        if let Some(message_attachments) = message_attachments
+            && !message_attachments.attachments.is_empty()
+        {
+            prompt.push_str("[MESSAGE_ATTACHMENTS]\n");
+            prompt.push_str("Attachments included with this message.\n");
+            prompt.push_str(&format!("message_id={}\n", message_attachments.message_id));
+            for attachment in &message_attachments.attachments {
+                prompt.push_str(&format!(
+                    "- name={} kind={} size_bytes={} mime_type={} local_path={}\n",
+                    attachment.name,
+                    attachment.kind,
+                    attachment.size_bytes,
+                    attachment.mime_type.as_deref().unwrap_or("unknown"),
+                    attachment.local_path
+                ));
             }
+            prompt.push_str("[/MESSAGE_ATTACHMENTS]\n\n");
         }
 
         prompt.push_str("[USER_MESSAGE]\n");
@@ -1427,6 +1427,7 @@ impl ChatRunner {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn spawn_stream_bridge(
         &self,
         msg_store: Arc<MsgStore>,
@@ -1563,8 +1564,8 @@ impl ChatRunner {
                             reply_handle.as_deref(),
                         );
 
-                        if !final_content.trim().is_empty() {
-                            if let Ok(message) = crate::services::chat::create_message(
+                        if !final_content.trim().is_empty()
+                            && let Ok(message) = crate::services::chat::create_message(
                                 &db.pool,
                                 session_id,
                                 ChatSenderType::Agent,
@@ -1573,17 +1574,16 @@ impl ChatRunner {
                                 Some(meta.clone()),
                             )
                             .await
+                        {
+                            // Call handle_message to process @mentions in the agent's response
+                            // This enables AI-to-AI message routing (chain calls)
+                            if let Ok(Some(session)) =
+                                ChatSession::find_by_id(&db.pool, session_id).await
                             {
-                                // Call handle_message to process @mentions in the agent's response
-                                // This enables AI-to-AI message routing (chain calls)
-                                if let Ok(Some(session)) =
-                                    ChatSession::find_by_id(&db.pool, session_id).await
-                                {
-                                    runner.handle_message(&session, &message).await;
-                                } else {
-                                    // Fallback: emit MessageNew event if session lookup fails
-                                    let _ = sender.send(ChatStreamEvent::MessageNew { message });
-                                }
+                                runner.handle_message(&session, &message).await;
+                            } else {
+                                // Fallback: emit MessageNew event if session lookup fails
+                                let _ = sender.send(ChatStreamEvent::MessageNew { message });
                             }
                         }
 

@@ -55,8 +55,10 @@ export function useMessageInput(
       }
       const matchIndex = match.index ?? prev.length;
       const prefix = prev.slice(0, matchIndex);
-      const spacer = match[1] ?? '';
-      return `${prefix}${spacer}@${name} `;
+      const beforeAt = match[1] ?? '';
+      const needsSeparator = beforeAt.length > 0 && !/\s/u.test(beforeAt);
+      const normalizedBeforeAt = needsSeparator ? `${beforeAt} ` : beforeAt;
+      return `${prefix}${normalizedBeforeAt}@${name} `;
     });
     setSelectedMentions((prev) =>
       prev.includes(name) ? prev : [...prev, name]

@@ -221,7 +221,7 @@ pub async fn build_structured_messages_with_compression(
             // Compress older messages - target ~40% of original length
             let original_len = message.content.chars().count();
             let target_len = (original_len as f64 * COMPRESSION_TARGET_RATIO) as usize;
-            let max_chars = target_len.max(100).min(500); // At least 100 chars, max 500
+            let max_chars = target_len.clamp(100, 500); // At least 100 chars, max 500
             compress_content(&message.content, max_chars)
         };
 
@@ -596,8 +596,7 @@ async fn generate_llm_summary_inner(
     // Parse runner type
     let runner_type_str = agent.runner_type.trim();
     let normalized = runner_type_str
-        .replace('-', "_")
-        .replace(' ', "_")
+        .replace(['-', ' '], "_")
         .to_ascii_uppercase();
     let base_agent = BaseCodingAgent::from_str(&normalized).map_err(|_| {
         ChatServiceError::Validation(format!("Unknown runner type: {}", runner_type_str))
@@ -610,7 +609,7 @@ async fn generate_llm_summary_inner(
     let executor_profile_id = ExecutorProfileId::new(base_agent);
     let mut executor =
         ExecutorConfigs::get_cached().get_coding_agent_or_default(&executor_profile_id);
-    executor.use_approvals(Arc::new(NoopExecutorApprovalService::default()));
+    executor.use_approvals(Arc::new(NoopExecutorApprovalService));
 
     // Set up execution environment
     let repo_context = RepoContext::new(workspace_path.to_path_buf(), Vec::new());
@@ -660,7 +659,7 @@ async fn generate_llm_summary_inner(
     let exit_status = tokio::time::timeout(timeout_duration, spawned.child.wait())
         .await
         .map_err(|_| ChatServiceError::Io(std::io::Error::other("LLM summarization timed out")))?
-        .map_err(|e| ChatServiceError::Io(e))?;
+        .map_err(ChatServiceError::Io)?;
 
     if !exit_status.success() {
         return Err(ChatServiceError::Io(std::io::Error::other(format!(
@@ -675,16 +674,15 @@ async fn generate_llm_summary_inner(
     // Extract the last assistant message from the history
     let history = msg_store.get_history();
     for msg in history.iter().rev() {
-        if let LogMsg::JsonPatch(patch) = msg {
-            if let Some((_, entry)) = extract_normalized_entry_from_patch(patch) {
-                if matches!(entry.entry_type, NormalizedEntryType::AssistantMessage) {
-                    let content = entry.content.trim();
-                    if !content.is_empty() {
-                        // Truncate if too long
-                        let summary = truncate_with_ellipsis(content, 500);
-                        return Ok(summary);
-                    }
-                }
+        if let LogMsg::JsonPatch(patch) = msg
+            && let Some((_, entry)) = extract_normalized_entry_from_patch(patch)
+            && matches!(entry.entry_type, NormalizedEntryType::AssistantMessage)
+        {
+            let content = entry.content.trim();
+            if !content.is_empty() {
+                // Truncate if too long
+                let summary = truncate_with_ellipsis(content, 500);
+                return Ok(summary);
             }
         }
     }
@@ -763,13 +761,12 @@ pub async fn build_compacted_context(
         .iter()
         .filter(|m| {
             // Check if this is a system message with compression meta (already a summary)
-            if m.sender_type == ChatSenderType::System {
-                if let Some(compression) = m.meta.0.get("compression") {
-                    if compression.as_str() == Some("llm") {
-                        tracing::debug!("Skipping already compressed message: {}", m.id);
-                        return false;
-                    }
-                }
+            if m.sender_type == ChatSenderType::System
+                && let Some(compression) = m.meta.0.get("compression")
+                && compression.as_str() == Some("llm")
+            {
+                tracing::debug!("Skipping already compressed message: {}", m.id);
+                return false;
             }
             true
         })
@@ -846,7 +843,7 @@ pub async fn build_compacted_context(
 
     // Build structured messages for remaining messages
     let structured_to_keep =
-        build_structured_messages_internal(&messages_to_keep, &agent_map, false);
+        build_structured_messages_internal(messages_to_keep, &agent_map, false);
 
     // Combine: summary + remaining messages
     let mut final_messages = vec![summary_message];
@@ -902,7 +899,7 @@ fn build_structured_messages_internal(
         } else {
             let original_len = message.content.chars().count();
             let target_len = (original_len as f64 * COMPRESSION_TARGET_RATIO) as usize;
-            let max_chars = target_len.max(100).min(500);
+            let max_chars = target_len.clamp(100, 500);
             compress_content(&message.content, max_chars)
         };
 
