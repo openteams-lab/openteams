@@ -522,8 +522,8 @@
           "descriptionPlaceholder": "该 AI 成员负责什么",
           "runnerType": "运行器类型（可选）",
           "runnerTypePlaceholder": "留空则使用会话默认值",
-          "systemPrompt": "系统提示",
-          "systemPromptPlaceholder": "描述 AI 成员的角色和职责...",
+          "systemPrompt": "角色设定（必填）",
+          "systemPromptPlaceholder": "描述此 AI 成员的角色设定...",
           "workspacePath": "默认工作区路径（可选）",
           "workspacePathPlaceholder": "例如 backend",
           "toolsEnabled": "工具（JSON）"
@@ -617,8 +617,8 @@
           "descriptionPlaceholder": "例如：用于 API 开发的后端工程师",
           "runnerType": "执行器类型（可选）",
           "runnerTypePlaceholder": "例如：claude_code，留空使用默认",
-          "systemPrompt": "系统提示",
-          "systemPromptPlaceholder": "描述此 AI 成员应如何表现...",
+          "systemPrompt": "角色设定（必填）",
+          "systemPromptPlaceholder": "描述此 AI 成员的角色设定...",
           "workspacePath": "默认工作区路径（可选）",
           "workspacePathPlaceholder": "例如：backend"
         }

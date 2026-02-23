@@ -83,9 +83,9 @@
     "noInstalledAgents": "Aucun agent de code installé détecté sur cette machine.",
     "modelVariant": "Variante du modèle",
     "model": "Modèle",
-    "systemPrompt": "Prompt système",
+    "systemPrompt": "Paramètres du rôle (obligatoire)",
     "expand": "Développer",
-    "systemPromptPlaceholder": "Décrivez comment ce membre IA doit se comporter.",
+    "systemPromptPlaceholder": "Décrivez les paramètres du rôle de ce membre IA.",
     "workspacePath": "Chemin de l'espace de travail",
     "workspacePathPlaceholder": "Chemin d'accès absolu pour le travail des membres IA",
     "workspacePathCannotBeModified": "Le chemin de l'espace de travail ne peut pas être modifié",
@@ -104,7 +104,8 @@
       "confirmImport": "Importer l'équipe",
       "cancel": "Annuler",
       "importing": "Importation..."
-    }
+    },
+    "roleSettingsRequired": "Les paramètres du rôle sont obligatoires."
   },
   "cleanup": {
     "selected": "Sélectionné : {{count}}",
@@ -144,10 +145,10 @@
       }
     },
     "promptEditor": {
-      "title": "Prompt système",
-      "description": "Modifier le prompt système du membre IA",
+      "title": "Paramètres du rôle",
+      "description": "Modifier les paramètres du rôle du membre IA",
       "close": "Fermer l'éditeur de prompt",
-      "placeholder": "Décrivez comment ce membre IA doit se comporter.",
+      "placeholder": "Décrivez les paramètres du rôle de ce membre IA.",
       "attachTextFile": "Joindre un fichier texte",
       "loadingFile": "Chargement du fichier...",
       "done": "Terminé"

@@ -1,13 +1,42 @@
-export function isMac(): boolean {
-  // Modern API (Chrome, Edge) - not supported in Safari
+type ClientPlatform = 'windows' | 'macos' | 'linux' | 'unknown';
+
+function detectClientPlatform(): ClientPlatform {
+  if (typeof navigator === 'undefined') {
+    return 'unknown';
+  }
+
   const nav = navigator as Navigator & {
     userAgentData?: { platform?: string };
   };
-  if (nav.userAgentData?.platform) {
-    return nav.userAgentData.platform === 'macOS';
+
+  const platformHint = (
+    nav.userAgentData?.platform ||
+    navigator.platform ||
+    navigator.userAgent
+  ).toLowerCase();
+
+  if (platformHint.includes('win')) return 'windows';
+  if (
+    platformHint.includes('mac') ||
+    platformHint.includes('iphone') ||
+    platformHint.includes('ipad') ||
+    platformHint.includes('ipod')
+  ) {
+    return 'macos';
   }
-  // Fallback for Safari and older browsers
-  return /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+  if (platformHint.includes('linux')) return 'linux';
+
+  return 'unknown';
+}
+
+export function isMac(): boolean {
+  return detectClientPlatform() === 'macos';
+}
+
+export function getWorkspacePathExample(): string {
+  return detectClientPlatform() === 'windows'
+    ? 'E:\\workspace\\MyProject'
+    : '~/workspace/MyProject';
 }
 
 export function getModifierKey(): string {

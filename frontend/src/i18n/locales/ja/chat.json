@@ -83,9 +83,9 @@
     "noInstalledAgents": "このマシンにインストールされたコードエージェントが検出されません。",
     "modelVariant": "モデルバリアント",
     "model": "モデル",
-    "systemPrompt": "システムプロンプト",
+    "systemPrompt": "役割設定（必須）",
     "expand": "展開",
-    "systemPromptPlaceholder": "このAIメンバーの振る舞いを説明してください。",
+    "systemPromptPlaceholder": "このAIメンバーの役割設定を記述してください。",
     "workspacePath": "ワークスペースパス",
     "workspacePathPlaceholder": "AIメンバーの作業用絶対パス",
     "workspacePathCannotBeModified": "ワークスペースパスは変更できません",
@@ -104,7 +104,8 @@
       "confirmImport": "チームをインポート",
       "cancel": "キャンセル",
       "importing": "インポート中..."
-    }
+    },
+    "roleSettingsRequired": "役割設定は必須です。"
   },
   "cleanup": {
     "selected": "選択済み: {{count}}",
@@ -144,10 +145,10 @@
       }
     },
     "promptEditor": {
-      "title": "システムプロンプト",
-      "description": "AIメンバーのシステムプロンプトを編集",
+      "title": "役割設定",
+      "description": "AIメンバーの役割設定を編集",
       "close": "プロンプトエディターを閉じる",
-      "placeholder": "このAIメンバーの振る舞いを説明してください。",
+      "placeholder": "このAIメンバーの役割設定を記述してください。",
       "attachTextFile": "テキストファイルを添付",
       "loadingFile": "ファイルを読み込み中...",
       "done": "完了"

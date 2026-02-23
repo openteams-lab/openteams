@@ -522,8 +522,8 @@
           "descriptionPlaceholder": "Qué hace este miembro de IA",
           "runnerType": "Tipo de runner (opcional)",
           "runnerTypePlaceholder": "Déjalo vacío para usar el valor por defecto de la sesión",
-          "systemPrompt": "Prompt del sistema",
-          "systemPromptPlaceholder": "Describe el rol y las responsabilidades de este miembro de IA...",
+          "systemPrompt": "Configuración del rol (obligatorio)",
+          "systemPromptPlaceholder": "Describe la configuración del rol de este miembro de IA...",
           "workspacePath": "Ruta de workspace predeterminada (opcional)",
           "workspacePathPlaceholder": "p. ej., backend",
           "toolsEnabled": "Herramientas (JSON)"
@@ -617,8 +617,8 @@
           "descriptionPlaceholder": "p. ej., Ingeniero backend para desarrollo de API",
           "runnerType": "Tipo de runner (opcional)",
           "runnerTypePlaceholder": "p. ej., claude_code, deja vacío para usar el predeterminado",
-          "systemPrompt": "Prompt del sistema",
-          "systemPromptPlaceholder": "Describe cómo debe comportarse este miembro de IA...",
+          "systemPrompt": "Configuración del rol (obligatorio)",
+          "systemPromptPlaceholder": "Describe la configuración del rol de este miembro de IA...",
           "workspacePath": "Ruta de workspace predeterminada (opcional)",
           "workspacePathPlaceholder": "p. ej., backend"
         }

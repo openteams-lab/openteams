@@ -83,9 +83,9 @@
     "noInstalledAgents": "此机器上未检测到已安装的代码 Agent。",
     "modelVariant": "模型变体",
     "model": "模型",
-    "systemPrompt": "系统提示",
+    "systemPrompt": "角色设定（必填）",
     "expand": "展开",
-    "systemPromptPlaceholder": "描述此 AI 成员应如何表现。",
+    "systemPromptPlaceholder": "描述此 AI 成员的角色设定。",
     "workspacePath": "工作区路径",
     "workspacePathPlaceholder": "AI成员工作的绝对路径",
     "workspacePathCannotBeModified": "工作区路径无法修改",
@@ -104,7 +104,8 @@
       "confirmImport": "导入团队",
       "cancel": "取消",
       "importing": "导入中..."
-    }
+    },
+    "roleSettingsRequired": "角色设定为必填项。"
   },
   "cleanup": {
     "selected": "已选择: {{count}}",
@@ -144,10 +145,10 @@
       }
     },
     "promptEditor": {
-      "title": "系统提示",
-      "description": "编辑 AI 成员的系统提示",
+      "title": "角色设定",
+      "description": "编辑 AI 成员的角色设定",
       "close": "关闭提示编辑器",
-      "placeholder": "描述此 AI 成员应如何表现。",
+      "placeholder": "描述此 AI 成员的角色设定。",
       "attachTextFile": "附加文本文件",
       "loadingFile": "正在加载文件...",
       "done": "完成"

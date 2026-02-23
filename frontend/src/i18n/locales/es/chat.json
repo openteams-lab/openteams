@@ -83,9 +83,10 @@
     "noInstalledAgents": "No se detectaron agentes de código instalados en esta máquina.",
     "modelVariant": "Variante del modelo",
     "model": "Modelo",
-    "systemPrompt": "Prompt del sistema",
+    "systemPrompt": "Configuración del rol (obligatorio)",
     "expand": "Expandir",
-    "systemPromptPlaceholder": "Describe cómo debe comportarse este miembro IA.",
+    "systemPromptPlaceholder": "Describe la configuración del rol de este miembro IA.",
+    "roleSettingsRequired": "La configuración del rol es obligatoria.",
     "workspacePath": "Ruta del espacio de trabajo",
     "workspacePathPlaceholder": "Ruta absoluta para el trabajo de los miembros de IA",
     "workspacePathCannotBeModified": "La ruta del espacio de trabajo no se puede modificar",
@@ -144,10 +145,10 @@
       }
     },
     "promptEditor": {
-      "title": "Prompt del sistema",
-      "description": "Editar el prompt del sistema del miembro IA",
+      "title": "Configuración del rol",
+      "description": "Editar la configuración del rol del miembro IA",
       "close": "Cerrar editor de prompt",
-      "placeholder": "Describe cómo debe comportarse este miembro IA.",
+      "placeholder": "Describe la configuración del rol de este miembro IA.",
       "attachTextFile": "Adjuntar archivo de texto",
       "loadingFile": "Cargando archivo...",
       "done": "Hecho"

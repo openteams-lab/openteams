@@ -18,6 +18,7 @@ import {
   type ChatTeamPreset,
 } from 'shared/types';
 import { cn } from '@/lib/utils';
+import { getWorkspacePathExample } from '@/utils/platform';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
 import { toPrettyCase } from '@/utils/string';
@@ -180,6 +181,7 @@ export function AiMembersSidebar({
   const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
   const [presetsExpanded, setPresetsExpanded] = useState(false);
+  const workspacePathPlaceholder = getWorkspacePathExample();
 
   return (
     <aside
@@ -527,7 +529,7 @@ export function AiMembersSidebar({
                 <input
                   value={newMemberWorkspace}
                   onChange={(event) => onWorkspaceChange(event.target.value)}
-                  placeholder={t('members.workspacePathPlaceholder')}
+                  placeholder={workspacePathPlaceholder}
                   disabled={!!editingMember}
                   title={
                     editingMember
@@ -641,7 +643,7 @@ export function AiMembersSidebar({
                               workspacePath: event.target.value,
                             })
                           }
-                          placeholder={t('members.workspacePathPlaceholder')}
+                          placeholder={workspacePathPlaceholder}
                           disabled={isImportingTeam}
                           className={cn(
                             'chat-session-member-field w-full rounded-sm border bg-panel px-2 py-1',

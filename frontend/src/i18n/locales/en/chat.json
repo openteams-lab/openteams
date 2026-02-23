@@ -83,9 +83,10 @@
     "noInstalledAgents": "No installed code agents detected on this machine.",
     "modelVariant": "Model variant",
     "model": "Model",
-    "systemPrompt": "System prompt",
+    "systemPrompt": "Role settings (required)",
     "expand": "Expand",
-    "systemPromptPlaceholder": "Describe how this AI member should behave.",
+    "systemPromptPlaceholder": "Describe this AI member's role settings.",
+    "roleSettingsRequired": "Role settings are required.",
     "workspacePath": "Workspace path",
     "workspacePathPlaceholder": "AI member working absolute path",
     "workspacePathCannotBeModified": "Workspace path cannot be modified",
@@ -144,10 +145,10 @@
       }
     },
     "promptEditor": {
-      "title": "System Prompt",
-      "description": "Edit the AI member system prompt",
+      "title": "Role settings",
+      "description": "Edit the AI member role settings",
       "close": "Close prompt editor",
-      "placeholder": "Describe how this AI member should behave.",
+      "placeholder": "Describe this AI member's role settings.",
       "attachTextFile": "Attach text file",
       "loadingFile": "Loading file...",
       "done": "Done"

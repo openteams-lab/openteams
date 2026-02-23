@@ -46,16 +46,15 @@ pub async fn update_agent(
     // If runner_type changed, clear the agent_session_id and agent_message_id
     // from all ChatSessionAgent records using this agent, as the old session IDs
     // are no longer valid for the new model.
-    if runner_type_changing {
-        if let Err(err) =
+    if runner_type_changing
+        && let Err(err) =
             ChatSessionAgent::clear_session_ids_for_agent(&deployment.db().pool, agent.id).await
-        {
-            tracing::warn!(
-                agent_id = %agent.id,
-                error = %err,
-                "Failed to clear session IDs after runner_type change"
-            );
-        }
+    {
+        tracing::warn!(
+            agent_id = %agent.id,
+            error = %err,
+            "Failed to clear session IDs after runner_type change"
+        );
     }
 
     Ok(ResponseJson(ApiResponse::success(updated)))
