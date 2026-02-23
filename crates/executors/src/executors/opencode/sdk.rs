@@ -212,6 +212,10 @@ pub enum ControlEvent {
     Disconnected,
 }
 
+/// If OpenCode keeps retrying the same request (e.g. provider rate-limit) and never
+/// reaches `session.idle`, fail the run instead of waiting forever.
+const SESSION_RETRY_LIMIT_BEFORE_FAIL: u64 = 6;
+
 pub async fn run_session(
     config: RunConfig,
     log_writer: LogWriter,
@@ -394,16 +398,6 @@ pub(super) fn build_default_headers(directory: &str, password: &str) -> HeaderMa
     headers
 }
 
-fn append_session_error(session_error: &mut Option<String>, message: String) {
-    match session_error {
-        Some(existing) => {
-            existing.push('\n');
-            existing.push_str(&message);
-        }
-        None => *session_error = Some(message),
-    }
-}
-
 pub async fn run_request_with_control<F>(
     mut request_fut: F,
     control_rx: &mut mpsc::UnboundedReceiver<ControlEvent>,
@@ -413,7 +407,6 @@ where
     F: Future<Output = Result<(), ExecutorError>> + Unpin,
 {
     let mut idle_seen = false;
-    let mut session_error: Option<String> = None;
 
     let request_result = loop {
         tokio::select! {
@@ -421,7 +414,9 @@ where
             res = &mut request_fut => break res,
             event = control_rx.recv() => match event {
                 Some(ControlEvent::AuthRequired { message }) => return Err(ExecutorError::AuthRequired(message)),
-                Some(ControlEvent::SessionError { message }) => append_session_error(&mut session_error, message),
+                Some(ControlEvent::SessionError { message }) => {
+                    return Err(ExecutorError::Io(io::Error::other(message)));
+                }
                 Some(ControlEvent::Disconnected) if !cancel.is_cancelled() => {
                     return Err(ExecutorError::Io(io::Error::other("OpenCode event stream disconnected while request was running")));
                 }
@@ -442,29 +437,22 @@ where
     if !idle_seen {
         // The OpenCode server streams events independently; wait for `session.idle` so we capture
         // tail updates reliably (e.g. final tool completion events).
-        loop {
-            tokio::select! {
-                _ = cancel.cancelled() => return Ok(()),
-                event = control_rx.recv() => match event {
-                    Some(ControlEvent::Idle) | None => break,
-                    Some(ControlEvent::AuthRequired { message }) => return Err(ExecutorError::AuthRequired(message)),
-                    Some(ControlEvent::SessionError { message }) => append_session_error(&mut session_error, message),
-                    Some(ControlEvent::Disconnected) if !cancel.is_cancelled() => {
-                        return Err(ExecutorError::Io(io::Error::other(
-                            "OpenCode event stream disconnected while waiting for session to go idle",
-                        )));
-                    }
-                    Some(ControlEvent::Disconnected) => return Ok(()),
+        tokio::select! {
+            _ = cancel.cancelled() => return Ok(()),
+            event = control_rx.recv() => match event {
+                Some(ControlEvent::Idle) | None => {}
+                Some(ControlEvent::AuthRequired { message }) => return Err(ExecutorError::AuthRequired(message)),
+                Some(ControlEvent::SessionError { message }) => {
+                    return Err(ExecutorError::Io(io::Error::other(message)));
                 }
+                Some(ControlEvent::Disconnected) if !cancel.is_cancelled() => {
+                    return Err(ExecutorError::Io(io::Error::other(
+                        "OpenCode event stream disconnected while waiting for session to go idle",
+                    )));
+                }
+                Some(ControlEvent::Disconnected) => return Ok(()),
             }
         }
-    }
-
-    if let Some(message) = session_error {
-        if cancel.is_cancelled() {
-            return Ok(());
-        }
-        return Err(ExecutorError::Io(io::Error::other(message)));
     }
 
     Ok(())
@@ -1165,6 +1153,27 @@ fn exponential_backoff(base: Duration, attempt: u32) -> Duration {
         .min(Duration::from_secs(30))
 }
 
+fn extract_retry_status(event: &Value) -> Option<(u64, String)> {
+    let status_type = event
+        .pointer("/properties/status/type")
+        .and_then(Value::as_str)?;
+    if status_type != "retry" {
+        return None;
+    }
+
+    let attempt = event
+        .pointer("/properties/status/attempt")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let message = event
+        .pointer("/properties/status/message")
+        .and_then(Value::as_str)
+        .unwrap_or("OpenCode request is retrying")
+        .to_string();
+
+    Some((attempt, message))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EventStreamOutcome {
     Idle,
@@ -1249,6 +1258,16 @@ async fn process_event_stream(
         match event_type {
             "message.updated" => {
                 maybe_emit_token_usage(&ctx, &data).await;
+            }
+            "session.status" => {
+                if let Some((attempt, message)) = extract_retry_status(&data)
+                    && attempt >= SESSION_RETRY_LIMIT_BEFORE_FAIL
+                {
+                    let message =
+                        format!("OpenCode request exceeded retry limit ({attempt}): {message}");
+                    let _ = ctx.control_tx.send(ControlEvent::SessionError { message });
+                    return Ok(EventStreamOutcome::Terminal);
+                }
             }
             "session.idle" => {
                 let _ = ctx.control_tx.send(ControlEvent::Idle);
@@ -1451,5 +1470,70 @@ async fn request_permission_approval(
             ExecutorApprovalError::ServiceUnavailable | ExecutorApprovalError::SessionNotRegistered,
         ) => Ok(ApprovalStatus::Approved),
         Err(err) => Err(err),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::future;
+
+    use serde_json::json;
+    use tokio::sync::mpsc;
+
+    use super::{ControlEvent, extract_retry_status, run_request_with_control};
+    use crate::executors::ExecutorError;
+
+    #[test]
+    fn extract_retry_status_parses_retry_payload() {
+        let payload = json!({
+            "type": "session.status",
+            "properties": {
+                "status": {
+                    "type": "retry",
+                    "attempt": 7,
+                    "message": "Too Many Requests"
+                }
+            }
+        });
+
+        let parsed = extract_retry_status(&payload).expect("retry status");
+        assert_eq!(parsed.0, 7);
+        assert_eq!(parsed.1, "Too Many Requests");
+    }
+
+    #[test]
+    fn extract_retry_status_ignores_non_retry_payload() {
+        let payload = json!({
+            "type": "session.status",
+            "properties": {
+                "status": {
+                    "type": "busy"
+                }
+            }
+        });
+
+        assert!(extract_retry_status(&payload).is_none());
+    }
+
+    #[tokio::test]
+    async fn run_request_with_control_fails_immediately_on_session_error() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tx.send(ControlEvent::SessionError {
+            message: "retry limit reached".to_string(),
+        })
+        .expect("send control event");
+
+        let result = run_request_with_control(
+            future::pending::<Result<(), ExecutorError>>(),
+            &mut rx,
+            tokio_util::sync::CancellationToken::new(),
+        )
+        .await;
+
+        let err = result.expect_err("session error should fail request");
+        let ExecutorError::Io(err) = err else {
+            panic!("expected io error");
+        };
+        assert!(err.to_string().contains("retry limit reached"));
     }
 }
