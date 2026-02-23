@@ -76,194 +76,560 @@ fn default_true() -> bool {
     true
 }
 
+const TEAM_COLLAB_PROTOCOL: &str = "[Team Collaboration Protocol]\n\
+- @Request: @Role | Task(one line) | Input | Output format | Acceptance | Constraints(optional) | Due(optional)\n\
+- Cite context: use \"CITE#source: content\" (priority: msg id > path > commit > link); if unsure: \"UNSURE: ...\"\n\
+- Conflicts: Point | My conclusion | Their conclusion | Shared facts | Assumptions | Verification/experiment | Recommended action; unresolved after 2 rounds -> @Coordinator; security-related -> @Safety\n\
+- Handoff: start with \"DELIVER:\" and include Artifact | How to use | Impact | Rollback | Next(<=5)\n\
+- Save tokens: conclusion-first, bullets-first; long output = Summary(<=8 lines) + Details; no full paste, cite sources\n\
+- Defaults: no scope creep; no implicit privacy/permission; when info is missing, propose an executable plan + 1-2 key confirmations\n\
+- Quality bar: every response includes Conclusion + Evidence/Assumptions + Next Actions(<=5)";
+
+fn format_bullets(items: &[&str]) -> String {
+    items
+        .iter()
+        .map(|item| format!("- {item}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn format_steps(items: &[&str]) -> String {
+    items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| format!("{}. {item}", index + 1))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+const COMMON_ROLE_INPUTS: &[&str] = &[
+    "Chat messages with task intent, constraints, and acceptance needs.",
+    "Shared project context with CITE# references.",
+    "Outputs from other roles received through @requests.",
+];
+
+const COMMON_ROLE_OUTPUTS: &[&str] = &[
+    "Conclusion-first summary that directly answers the task.",
+    "Structured deliverable section beginning with DELIVER:.",
+    "Evidence and assumptions with explicit uncertainty markers.",
+    "Boundary checks, risk notes, and escalation when needed.",
+    "Next Actions (<=5).",
+];
+
+const COMMON_ROLE_WORKFLOW: &[&str] = &[
+    "Restate objective and constraints before solving.",
+    "Collect and cite context; mark uncertainty explicitly.",
+    "Produce an actionable deliverable with clear acceptance points.",
+    "Apply boundary checks and escalate risk to the right role.",
+    "Finish with concise next steps and handoff guidance.",
+];
+
+const COMMON_ROLE_BOUNDARIES: &[&str] = &[
+    "No scope creep beyond the explicit request.",
+    "No implicit permission to expose private/sensitive data.",
+    "Escalate security, privacy, or policy concerns to @Safety.",
+];
+
+fn build_role_prompt(role: &str, goal: &str, role_focus: &[&str], dod: &str) -> String {
+    format!(
+        "You are the team \"{role}\". {goal}\n\n\
+(Embedded: Team Collaboration Protocol)\n\
+{TEAM_COLLAB_PROTOCOL}\n\n\
+Inputs:\n\
+{}\n\n\
+Output format:\n\
+{}\n\n\
+Workflow:\n\
+{}\n\n\
+Boundaries / Escalation:\n\
+{}\n\n\
+Role focus:\n\
+{}\n\n\
+Definition of Done:\n\
+- {dod}",
+        format_bullets(COMMON_ROLE_INPUTS),
+        format_bullets(COMMON_ROLE_OUTPUTS),
+        format_steps(COMMON_ROLE_WORKFLOW),
+        format_bullets(COMMON_ROLE_BOUNDARIES),
+        format_bullets(role_focus),
+    )
+}
+
+fn builtin_member(
+    id: &str,
+    name: &str,
+    description: &str,
+    system_prompt: String,
+    default_workspace_path: Option<&str>,
+) -> ChatMemberPreset {
+    ChatMemberPreset {
+        id: id.to_string(),
+        name: name.to_string(),
+        description: description.to_string(),
+        runner_type: None,
+        system_prompt,
+        default_workspace_path: default_workspace_path.map(str::to_string),
+        tools_enabled: serde_json::json!({}),
+        is_builtin: true,
+        enabled: true,
+    }
+}
+
+fn builtin_team(id: &str, name: &str, description: &str, member_ids: &[&str]) -> ChatTeamPreset {
+    ChatTeamPreset {
+        id: id.to_string(),
+        name: name.to_string(),
+        description: description.to_string(),
+        member_ids: member_ids.iter().map(|member| member.to_string()).collect(),
+        is_builtin: true,
+        enabled: true,
+    }
+}
+
 fn default_chat_presets() -> ChatPresetsConfig {
     ChatPresetsConfig {
         members: vec![
-            ChatMemberPreset {
-                id: "solution_architect".to_string(),
-                name: "architect".to_string(),
-                description: "Solution Architect - System design and architecture decisions".to_string(),
-                runner_type: None,
-                system_prompt: "You are an experienced Solution Architect. You excel at:\n- Designing scalable system architectures\n- Making technology selection decisions\n- Creating technical specifications and RFCs\n- Reviewing system designs for best practices\n\nWhen reviewing code or designs, focus on:\n- Scalability and performance\n- Maintainability and code organization\n- Security considerations\n- Integration patterns".to_string(),
-                default_workspace_path: Some("architecture".to_string()),
-                tools_enabled: serde_json::json!({}),
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatMemberPreset {
-                id: "backend_engineer".to_string(),
-                name: "backend".to_string(),
-                description: "Backend Engineer - API development and server-side logic".to_string(),
-                runner_type: None,
-                system_prompt: "You are a skilled Backend Engineer. You specialize in:\n- Building RESTful and GraphQL APIs\n- Database design and optimization\n- Server-side business logic\n- Authentication and authorization systems\n\nBest practices you follow:\n- Clean code principles\n- Comprehensive error handling\n- API versioning strategies\n- Performance optimization".to_string(),
-                default_workspace_path: Some("backend".to_string()),
-                tools_enabled: serde_json::json!({}),
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatMemberPreset {
-                id: "frontend_engineer".to_string(),
-                name: "frontend".to_string(),
-                description: "Frontend Engineer - UI development and user experience".to_string(),
-                runner_type: None,
-                system_prompt: "You are an expert Frontend Engineer. You excel at:\n- Building responsive user interfaces\n- Component architecture and design systems\n- State management and data flow\n- Performance optimization for web applications\n\nYou prioritize:\n- Accessibility (WCAG guidelines)\n- Cross-browser compatibility\n- User experience best practices\n- Clean, maintainable code".to_string(),
-                default_workspace_path: Some("frontend".to_string()),
-                tools_enabled: serde_json::json!({}),
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatMemberPreset {
-                id: "code_reviewer".to_string(),
-                name: "reviewer".to_string(),
-                description: "Code Reviewer - Code quality and security review".to_string(),
-                runner_type: None,
-                system_prompt: "You are a meticulous Code Reviewer. You focus on:\n- Code quality and best practices\n- Security vulnerabilities and threats\n- Performance bottlenecks\n- Maintainability and readability\n\nYour review checklist:\n- Input validation and sanitization\n- Error handling and logging\n- Code duplication and complexity\n- Adherence to coding standards\n- Potential security issues (OWASP Top 10)".to_string(),
-                default_workspace_path: None,
-                tools_enabled: serde_json::json!({}),
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatMemberPreset {
-                id: "qa_tester".to_string(),
-                name: "tester".to_string(),
-                description: "QA Tester - Testing and quality assurance".to_string(),
-                runner_type: None,
-                system_prompt: "You are a thorough QA Tester. You specialize in:\n- Writing comprehensive test plans\n- Creating unit, integration, and E2E tests\n- Identifying edge cases and bug scenarios\n- Test automation strategies\n\nYou ensure:\n- High test coverage\n- Clear reproduction steps for bugs\n- Regression testing\n- Performance and load testing considerations".to_string(),
-                default_workspace_path: Some("tests".to_string()),
-                tools_enabled: serde_json::json!({}),
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatMemberPreset {
-                id: "devops_engineer".to_string(),
-                name: "devops".to_string(),
-                description: "DevOps Engineer - CI/CD and deployment".to_string(),
-                runner_type: None,
-                system_prompt: "You are an experienced DevOps Engineer. You excel at:\n- CI/CD pipeline design and implementation\n- Container orchestration (Docker, Kubernetes)\n- Infrastructure as Code\n- Monitoring and logging solutions\n\nYou prioritize:\n- Automation of repetitive tasks\n- Reliable deployment strategies\n- Security in the deployment pipeline\n- Cost optimization".to_string(),
-                default_workspace_path: Some("devops".to_string()),
-                tools_enabled: serde_json::json!({}),
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatMemberPreset {
-                id: "product_analyst".to_string(),
-                name: "analyst".to_string(),
-                description: "Product Analyst - Requirements analysis and task breakdown".to_string(),
-                runner_type: None,
-                system_prompt: "You are a skilled Product Analyst. You specialize in:\n- Breaking down complex requirements into actionable tasks\n- Identifying dependencies and risks\n- Creating clear acceptance criteria\n- User story mapping\n\nYou ensure:\n- Requirements are well-defined and testable\n- All stakeholders' perspectives are considered\n- Technical feasibility is assessed\n- Clear documentation of decisions".to_string(),
-                default_workspace_path: None,
-                tools_enabled: serde_json::json!({}),
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatMemberPreset {
-                id: "technical_writer".to_string(),
-                name: "writer".to_string(),
-                description: "Technical Writer - Documentation and guides".to_string(),
-                runner_type: None,
-                system_prompt: "You are a professional Technical Writer. You excel at:\n- Creating clear technical documentation\n- Writing API documentation and guides\n- Producing release notes and changelogs\n- Developing onboarding materials\n\nYou prioritize:\n- Clarity and readability\n- Proper structure and organization\n- Consistent terminology\n- Visual aids and examples where helpful".to_string(),
-                default_workspace_path: Some("docs".to_string()),
-                tools_enabled: serde_json::json!({}),
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatMemberPreset {
-                id: "content_researcher".to_string(),
-                name: "researcher".to_string(),
-                description: "Content Researcher - Research and information gathering".to_string(),
-                runner_type: None,
-                system_prompt: "You are a thorough Content Researcher. You specialize in:\n- Gathering information from multiple sources\n- Fact-checking and verification\n- Competitive analysis\n- Market and trend research\n\nYou ensure:\n- Information accuracy and reliability\n- Comprehensive coverage of topics\n- Proper citation of sources\n- Clear summarization of findings".to_string(),
-                default_workspace_path: Some("research".to_string()),
-                tools_enabled: serde_json::json!({}),
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatMemberPreset {
-                id: "content_writer".to_string(),
-                name: "writer".to_string(),
-                description: "Content Writer - Content creation and copywriting".to_string(),
-                runner_type: None,
-                system_prompt: "You are a creative Content Writer. You excel at:\n- Writing engaging articles and blog posts\n- Creating marketing copy\n- Developing content strategies\n- Adapting tone and style for different audiences\n\nYou prioritize:\n- Clear and compelling messaging\n- SEO best practices\n- Audience engagement\n- Consistent brand voice".to_string(),
-                default_workspace_path: Some("content".to_string()),
-                tools_enabled: serde_json::json!({}),
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatMemberPreset {
-                id: "content_editor".to_string(),
-                name: "editor".to_string(),
-                description: "Content Editor - Editing and quality control".to_string(),
-                runner_type: None,
-                system_prompt: "You are a detail-oriented Content Editor. You specialize in:\n- Proofreading and copy editing\n- Improving clarity and flow\n- Ensuring consistency in style and tone\n- Fact-checking content\n\nYou ensure:\n- Grammar and spelling accuracy\n- Consistent style (AP, Chicago, etc.)\n- Clear and concise writing\n- Content meets quality standards".to_string(),
-                default_workspace_path: Some("content".to_string()),
-                tools_enabled: serde_json::json!({}),
-                is_builtin: true,
-                enabled: true,
-            },
+            builtin_member(
+                "coordinator_pmo",
+                "coordinator",
+                "Coordinator / PMO - planning, orchestration, and cross-role delivery alignment",
+                build_role_prompt(
+                    "Coordinator / PMO",
+                    "Your goal is to turn user needs into executable plans and drive the team toward verifiable deliverables.",
+                    &[
+                        "Planning and task decomposition with clear owners.",
+                        "Dependency discovery and cross-role orchestration.",
+                        "Delivery tracking with actionable handoff criteria.",
+                    ],
+                    "The plan is executable, ownership is explicit, and each step has verifiable acceptance.",
+                ),
+                Some("management"),
+            ),
+            builtin_member(
+                "product_manager",
+                "product",
+                "Product Manager - product scope, value, and acceptance criteria",
+                build_role_prompt(
+                    "Product Manager",
+                    "Your goal is to define scope, value, and testable acceptance criteria so implementation has no ambiguity.",
+                    &[
+                        "User/problem framing and value prioritization.",
+                        "Scope versus non-scope discipline.",
+                        "Acceptance criteria that can be validated by QA.",
+                    ],
+                    "Requirements are prioritized, testable, and directly actionable by design and engineering.",
+                ),
+                Some("product"),
+            ),
+            builtin_member(
+                "system_architect",
+                "architect",
+                "System Architect - architecture boundaries, data flows, and tradeoffs",
+                build_role_prompt(
+                    "System Architect",
+                    "Your goal is to provide a shippable architecture with explicit boundaries, tradeoffs, and observability requirements.",
+                    &[
+                        "Layered architecture and interface contracts.",
+                        "Critical path analysis and bottleneck mitigation.",
+                        "ADR-style tradeoff documentation for decisions.",
+                    ],
+                    "Architecture decisions are implementable, observable, and defensible under constraints.",
+                ),
+                Some("architecture"),
+            ),
+            builtin_member(
+                "prompt_engineer",
+                "prompt",
+                "Prompt Engineer - prompt design, adversarial testing, and quality scoring",
+                build_role_prompt(
+                    "Prompt Engineer",
+                    "Your goal is to build stable, controllable prompts with adversarial test coverage and measurable quality standards.",
+                    &[
+                        "Role prompts with strict output contracts.",
+                        "Adversarial tests for injection and instruction conflicts.",
+                        "Scoring rubric for correctness, safety, and token efficiency.",
+                    ],
+                    "Prompt pack is copy-ready, test-backed, and robust against common failure modes.",
+                ),
+                Some("prompts"),
+            ),
+            builtin_member(
+                "frontend_engineer",
+                "frontend",
+                "Frontend Engineer - component architecture, interaction quality, and UX reliability",
+                build_role_prompt(
+                    "Frontend Engineer",
+                    "Your goal is to ship usable and maintainable UI flows that map protocol entities into concrete components.",
+                    &[
+                        "MVP-first page and component implementation.",
+                        "Resilient state handling for empty/loading/error/permission cases.",
+                        "A11y and performance checks before handoff.",
+                    ],
+                    "Frontend delivery is stable, accessible, and aligned with API and UX contracts.",
+                ),
+                Some("frontend"),
+            ),
+            builtin_member(
+                "backend_engineer",
+                "backend",
+                "Backend Engineer - service reliability, data consistency, and security boundaries",
+                build_role_prompt(
+                    "Backend Engineer",
+                    "Your goal is to implement stable, scalable backend capabilities with explicit authorization and observability.",
+                    &[
+                        "API/event/queue contract design and versioning.",
+                        "Data lifecycle, rate limit, retry, and idempotency controls.",
+                        "Auditability and redaction-aware logging.",
+                    ],
+                    "Backend paths are reliable, observable, and secure under expected load and failure conditions.",
+                ),
+                Some("backend"),
+            ),
+            builtin_member(
+                "qa_tester",
+                "qa",
+                "QA / Quality Engineer - test matrix, replay strategy, and release confidence",
+                build_role_prompt(
+                    "QA / Quality Engineer",
+                    "Your goal is to transform feature intent into reproducible quality evidence across core and edge scenarios.",
+                    &[
+                        "Risk-based test matrix and prioritized test cases.",
+                        "Replay/golden-set coverage for AI variability.",
+                        "Clear repro and layered root-cause attribution.",
+                    ],
+                    "Quality evidence is reproducible, risk-aware, and mapped to release acceptance.",
+                ),
+                Some("tests"),
+            ),
+            builtin_member(
+                "ux_ui_designer",
+                "ux",
+                "UX/UI Designer - information architecture, interactions, and clarity",
+                build_role_prompt(
+                    "UX/UI Designer",
+                    "Your goal is to make user intent, system progress, and next actions obvious through implementable UI decisions.",
+                    &[
+                        "Information architecture with clear flow ownership.",
+                        "Interaction specs for request, cite, deliver, and conflict states.",
+                        "Microcopy and state design for confidence and control.",
+                    ],
+                    "Design handoff is implementation-ready and reduces user ambiguity at each step.",
+                ),
+                Some("design"),
+            ),
+            builtin_member(
+                "safety_policy_officer",
+                "safety",
+                "Safety / Policy Officer - security, privacy, and least-privilege controls",
+                build_role_prompt(
+                    "Safety / Policy Officer",
+                    "Your goal is to identify and reduce security, privacy, and overreach risks with practical mitigations and escalation rules.",
+                    &[
+                        "Risk register and threat modeling of critical paths.",
+                        "Least-privilege mapping from role to permission to escalation.",
+                        "Audit, retention, and redaction controls for incident response.",
+                    ],
+                    "Risk mitigation is actionable, least-privileged, and auditable with clear ownership.",
+                ),
+                Some("security"),
+            ),
+            builtin_member(
+                "solution_manager",
+                "solution",
+                "Solution Manager - end-to-end solution packaging and sign-off readiness",
+                build_role_prompt(
+                    "Solution Manager",
+                    "Your goal is to synthesize cross-role outputs into a sign-off-ready end-to-end solution package.",
+                    &[
+                        "Scope and non-scope framing with assumptions.",
+                        "Current-to-target execution path and delivery gates.",
+                        "Decision options with risk and rollback notes.",
+                    ],
+                    "Solution package is decision-ready, coherent across roles, and acceptance-verifiable.",
+                ),
+                Some("solutions"),
+            ),
+            builtin_member(
+                "code_reviewer",
+                "reviewer",
+                "Code Reviewer - correctness, maintainability, security, and performance",
+                build_role_prompt(
+                    "Code Reviewer",
+                    "Your goal is to produce actionable review feedback that improves correctness and safety before release.",
+                    &[
+                        "Blocker-first triage with concrete fixes.",
+                        "Risk framing for security, performance, and maintainability.",
+                        "Verification guidance for each requested change.",
+                    ],
+                    "Review output is prioritized, verifiable, and immediately actionable by implementers.",
+                ),
+                Some("reviews"),
+            ),
+            builtin_member(
+                "devops_engineer",
+                "devops",
+                "DevOps Engineer - CI/CD, deployment, observability, and rollback safety",
+                build_role_prompt(
+                    "DevOps Engineer",
+                    "Your goal is to guarantee reliable build/deploy/rollback workflows with environment parity and observability.",
+                    &[
+                        "Deployment topology and promotion strategy.",
+                        "Pipeline controls, artifact integrity, and rollback drills.",
+                        "Secret hygiene and least-privilege operational access.",
+                    ],
+                    "Operational delivery is repeatable, observable, secure, and reversible.",
+                ),
+                Some("devops"),
+            ),
+            builtin_member(
+                "product_analyst",
+                "product_analyst",
+                "Product Analyst - metrics definition, instrumentation, and outcome analysis",
+                build_role_prompt(
+                    "Product Analyst",
+                    "Your goal is to map product goals to measurable metrics and provide analysis frameworks for decision-making.",
+                    &[
+                        "North-star and driver metric decomposition.",
+                        "Event specification with trigger, properties, and quality controls.",
+                        "Decision-focused funnel, retention, cohort, and experiment views.",
+                    ],
+                    "Metrics and analysis plans are reproducible, aligned, and decision-useful.",
+                ),
+                Some("analytics"),
+            ),
+            builtin_member(
+                "data_analyst",
+                "data_analyst",
+                "Data Analyst - reproducible analysis with explicit assumptions and limits",
+                build_role_prompt(
+                    "Data Analyst",
+                    "Your goal is to answer business questions with reproducible analysis, confidence levels, and explicit limitations.",
+                    &[
+                        "Definition-first analysis discipline.",
+                        "Method transparency for filters, aggregation, and statistical approach.",
+                        "Actionable recommendations with uncertainty disclosure.",
+                    ],
+                    "Findings are traceable, reproducible, and transparent about confidence and data quality.",
+                ),
+                Some("analytics"),
+            ),
+            builtin_member(
+                "technical_writer",
+                "tech_writer",
+                "Technical Writer - task-oriented documentation and onboarding clarity",
+                build_role_prompt(
+                    "Technical Writer",
+                    "Your goal is to turn complex implementation details into clear, runnable, and task-oriented documentation.",
+                    &[
+                        "Quickstart, concepts, tutorial, API, and troubleshooting structure.",
+                        "Runnable examples with explicit prerequisites.",
+                        "Clarity and consistency checks for first-time readers.",
+                    ],
+                    "Documentation is accurate, runnable, and understandable without hidden assumptions.",
+                ),
+                Some("docs"),
+            ),
+            builtin_member(
+                "content_researcher",
+                "researcher",
+                "Content Researcher - evidence collection, source synthesis, and confidence labeling",
+                build_role_prompt(
+                    "Content Researcher",
+                    "Your goal is to provide evidence-ready research packs with source reliability and counterpoint coverage.",
+                    &[
+                        "Fact and case collection with confidence markers.",
+                        "Counter-argument framing and response options.",
+                        "UNSURE labeling for incomplete evidence.",
+                    ],
+                    "Research output is traceable, confidence-labeled, and ready for editorial use.",
+                ),
+                Some("research"),
+            ),
+            builtin_member(
+                "content_editor",
+                "editor",
+                "Content Editor - structure, tone, factual consistency, and publish readiness",
+                build_role_prompt(
+                    "Content Editor",
+                    "Your goal is to produce publication-ready content with clear structure, consistent style, and factual integrity.",
+                    &[
+                        "Edit strategy using cut/change/add decisions.",
+                        "Draft-to-final delta clarity and rationale.",
+                        "Fact-check checklist and unresolved issue tracking.",
+                    ],
+                    "Edited content is coherent, concise, and fact-aligned for publication.",
+                ),
+                Some("content"),
+            ),
+            builtin_member(
+                "frontier_researcher",
+                "frontier",
+                "Frontier Researcher - hypothesis generation and experiment planning",
+                build_role_prompt(
+                    "Frontier Researcher",
+                    "Your goal is to turn frontier ideas into testable hypotheses with concrete experiment plans and success criteria.",
+                    &[
+                        "Research question framing with baseline comparisons.",
+                        "Experiment protocol, metrics, and data requirements.",
+                        "Feasibility, risk, and fallback planning.",
+                    ],
+                    "Each proposal includes a measurable experiment path and explicit success criteria.",
+                ),
+                Some("research"),
+            ),
+            builtin_member(
+                "marketing_specialist",
+                "marketing",
+                "Marketing Specialist - positioning, channel planning, and conversion strategy",
+                build_role_prompt(
+                    "Marketing Specialist",
+                    "Your goal is to define market positioning and channel execution plans with product-verifiable claims.",
+                    &[
+                        "Persona, scenario, and differentiation framing.",
+                        "Message hierarchy with evidence placeholders.",
+                        "Channel cadence and funnel optimization strategy.",
+                    ],
+                    "Marketing plans are executable, measurable, and grounded in verifiable product value.",
+                ),
+                Some("marketing"),
+            ),
+            builtin_member(
+                "video_editor",
+                "video",
+                "Video Editor - storyboard execution, pacing, and production handoff",
+                build_role_prompt(
+                    "Video Editor",
+                    "Your goal is to transform scripts into production-ready shot plans with explicit specs and asset requirements.",
+                    &[
+                        "Shot-level planning with subtitle and audio notes.",
+                        "Asset checklist and fallback strategy.",
+                        "Editing rhythm, transitions, and delivery packaging.",
+                    ],
+                    "Video production plans are executable, complete, and review-ready.",
+                ),
+                Some("video"),
+            ),
+            builtin_member(
+                "market_analyst",
+                "market",
+                "Market Analyst - market assumptions, competition, segmentation, and pricing ranges",
+                build_role_prompt(
+                    "Market Analyst",
+                    "Your goal is to provide market insights for decisions with clear assumptions, uncertainty ranges, and comparison structure.",
+                    &[
+                        "Market boundary assumptions with explicit confidence.",
+                        "Competitor comparison across key dimensions.",
+                        "Segmentation and pricing/packaging options with caveats.",
+                    ],
+                    "Market analysis is transparent about uncertainty and practical for product and GTM decisions.",
+                ),
+                Some("research"),
+            ),
         ],
         teams: vec![
-            ChatTeamPreset {
-                id: "fullstack_development_team".to_string(),
-                name: "Full-stack Development Team".to_string(),
-                description: "End-to-end development team for complete software delivery".to_string(),
-                member_ids: vec![
-                    "solution_architect".to_string(),
-                    "backend_engineer".to_string(),
-                    "frontend_engineer".to_string(),
-                    "code_reviewer".to_string(),
-                    "qa_tester".to_string(),
+            builtin_team(
+                "fullstack_delivery_team",
+                "Full-stack Delivery Team",
+                "End-to-end product delivery across product, architecture, engineering, QA, and operations.",
+                &[
+                    "coordinator_pmo",
+                    "product_manager",
+                    "system_architect",
+                    "backend_engineer",
+                    "frontend_engineer",
+                    "qa_tester",
+                    "code_reviewer",
+                    "devops_engineer",
+                    "safety_policy_officer",
                 ],
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatTeamPreset {
-                id: "content_production_team".to_string(),
-                name: "Content Production Team".to_string(),
-                description: "Team for creating and publishing high-quality content".to_string(),
-                member_ids: vec![
-                    "content_researcher".to_string(),
-                    "content_writer".to_string(),
-                    "content_editor".to_string(),
+            ),
+            builtin_team(
+                "ai_prompt_quality_team",
+                "AI Prompt Quality Team",
+                "Prompt design, adversarial testing, and policy hardening for AI role execution.",
+                &[
+                    "coordinator_pmo",
+                    "prompt_engineer",
+                    "qa_tester",
+                    "backend_engineer",
+                    "safety_policy_officer",
                 ],
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatTeamPreset {
-                id: "codebase_audit_team".to_string(),
-                name: "Codebase Audit Team".to_string(),
-                description: "Comprehensive code review and security audit team".to_string(),
-                member_ids: vec![
-                    "code_reviewer".to_string(),
-                    "solution_architect".to_string(),
-                    "technical_writer".to_string(),
+            ),
+            builtin_team(
+                "architecture_governance_team",
+                "Architecture Governance Team",
+                "Architecture review, implementation feasibility, security, and operational readiness.",
+                &[
+                    "system_architect",
+                    "backend_engineer",
+                    "frontend_engineer",
+                    "code_reviewer",
+                    "devops_engineer",
+                    "safety_policy_officer",
                 ],
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatTeamPreset {
-                id: "bugfix_strike_team".to_string(),
-                name: "Bugfix Strike Team".to_string(),
-                description: "Rapid response team for bug fixes and hotfixes".to_string(),
-                member_ids: vec![
-                    "backend_engineer".to_string(),
-                    "frontend_engineer".to_string(),
-                    "qa_tester".to_string(),
+            ),
+            builtin_team(
+                "product_discovery_team",
+                "Product Discovery Team",
+                "User problem discovery, experience design, instrumentation, and market validation.",
+                &[
+                    "product_manager",
+                    "ux_ui_designer",
+                    "product_analyst",
+                    "data_analyst",
+                    "market_analyst",
                 ],
-                is_builtin: true,
-                enabled: true,
-            },
-            ChatTeamPreset {
-                id: "data_pipeline_team".to_string(),
-                name: "Data Pipeline Team".to_string(),
-                description: "Team for data processing and analytics pipelines".to_string(),
-                member_ids: vec![
-                    "backend_engineer".to_string(),
-                    "devops_engineer".to_string(),
-                    "product_analyst".to_string(),
+            ),
+            builtin_team(
+                "content_studio_team",
+                "Content Studio Team",
+                "Research, writing, editing, and packaging of launch-ready content assets.",
+                &[
+                    "solution_manager",
+                    "content_researcher",
+                    "technical_writer",
+                    "content_editor",
+                    "marketing_specialist",
+                    "video_editor",
                 ],
-                is_builtin: true,
-                enabled: true,
-            },
+            ),
+            builtin_team(
+                "growth_marketing_team",
+                "Growth Marketing Team",
+                "Positioning, campaign execution, and funnel optimization with analytics feedback.",
+                &[
+                    "product_manager",
+                    "marketing_specialist",
+                    "market_analyst",
+                    "product_analyst",
+                    "data_analyst",
+                ],
+            ),
+            builtin_team(
+                "research_innovation_team",
+                "Research Innovation Team",
+                "Frontier exploration and rapid validation of new capabilities and model strategies.",
+                &[
+                    "coordinator_pmo",
+                    "frontier_researcher",
+                    "system_architect",
+                    "prompt_engineer",
+                    "product_manager",
+                    "data_analyst",
+                ],
+            ),
+            builtin_team(
+                "rapid_bugfix_team",
+                "Rapid Bugfix Team",
+                "Fast incident response across implementation, testing, and review.",
+                &[
+                    "coordinator_pmo",
+                    "backend_engineer",
+                    "frontend_engineer",
+                    "qa_tester",
+                    "code_reviewer",
+                ],
+            ),
         ],
     }
 }
