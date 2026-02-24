@@ -1729,23 +1729,24 @@ export function ChatSessions() {
   const handleUpdateTeamImportPlanEntry = useCallback(
     (
       index: number,
-      updates: { finalName?: string; workspacePath?: string; runnerType?: string }
+      updates: {
+        finalName?: string;
+        workspacePath?: string;
+        runnerType?: string;
+        systemPrompt?: string;
+        toolsEnabled?: JsonValue;
+      }
     ) => {
       setTeamImportPlan((prev) => {
         if (!prev || index < 0 || index >= prev.length) return prev;
         const next = [...prev];
-        next[index] = {
-          ...next[index],
-          ...(updates.finalName !== undefined
-            ? { finalName: updates.finalName }
-            : {}),
-          ...(updates.workspacePath !== undefined
-            ? { workspacePath: updates.workspacePath }
-            : {}),
-          ...(updates.runnerType !== undefined
-            ? { runnerType: updates.runnerType }
-            : {}),
-        };
+        const patch: Partial<MemberPresetImportPlan> = {};
+        if (updates.finalName !== undefined) patch.finalName = updates.finalName;
+        if (updates.workspacePath !== undefined) patch.workspacePath = updates.workspacePath;
+        if (updates.runnerType !== undefined) patch.runnerType = updates.runnerType;
+        if (updates.systemPrompt !== undefined) patch.systemPrompt = updates.systemPrompt;
+        if (updates.toolsEnabled !== undefined) patch.toolsEnabled = updates.toolsEnabled;
+        next[index] = { ...next[index], ...patch };
         return next;
       });
     },
@@ -2563,6 +2564,7 @@ export function ChatSessions() {
         getModelName={getModelName}
         getModelDisplayName={getModelDisplayName}
         getVariantLabel={getVariantLabel}
+        getVariantOptions={getVariantOptions}
         onOpenAddMember={() => {
           setIsAddMemberOpen(true);
           setMemberError(null);
