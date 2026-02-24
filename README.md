@@ -105,7 +105,7 @@ npx agents-chatgroup
 
 Stop configuring the same agents over and over. AgentsChatGroup includes **21 built-in member presets** and **8 built-in team presets** you can import in one click.
 
-![AgentsChatGroup_AddTeam](docs/images/add_team.png)
+![AgentsChatGroup_AddTeam](docs/images/add_team_en.png)
 
 You can also build and save your own custom presets. When importing a team, a preview shows exactly which members will be created, reused, or renamed — so there are no surprises.
 

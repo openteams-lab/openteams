@@ -475,7 +475,9 @@ export function ChatMessageItem({
               return tokenCount !== null ? (
                 <div className="chat-session-message-tokens flex justify-end mt-1">
                   <span className="text-xs text-low opacity-60">
-                    {formatTokenCount(tokenCount)} tokens
+                    {t('message.replyTokenUsage', {
+                      value: formatTokenCount(tokenCount),
+                    })}
                   </span>
                 </div>
               ) : null;
