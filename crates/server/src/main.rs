@@ -126,7 +126,22 @@ async fn main() -> Result<(), AgentChatgroupError> {
         }); // Use 0 to find free port if no specific port provided
 
     let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let listener = tokio::net::TcpListener::bind(format!("{host}:{port}")).await?;
+    let bind_addr = format!("{host}:{port}");
+    let listener = match tokio::net::TcpListener::bind(&bind_addr).await {
+        Ok(listener) => listener,
+        Err(err)
+            if cfg!(debug_assertions)
+                && err.kind() == std::io::ErrorKind::AddrInUse
+                && port != 0 =>
+        {
+            tracing::warn!(
+                "Requested backend port {port} ({bind_addr}) is already in use; \
+                 falling back to an ephemeral port for this debug run"
+            );
+            tokio::net::TcpListener::bind(format!("{host}:0")).await?
+        }
+        Err(err) => return Err(err.into()),
+    };
     let actual_port = listener.local_addr()?.port(); // get 鈫?53427 (example)
 
     tracing::info!("Server running on http://{host}:{actual_port}");

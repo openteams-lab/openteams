@@ -27,7 +27,9 @@ use executors::{
         BaseCodingAgent, CancellationToken, ExecutorError, ExecutorExitSignal,
         StandardCodingAgentExecutor,
     },
-    logs::{NormalizedEntryType, TokenUsageInfo, utils::patch::extract_normalized_entry_from_patch},
+    logs::{
+        NormalizedEntryType, TokenUsageInfo, utils::patch::extract_normalized_entry_from_patch,
+    },
     profile::{ExecutorConfigs, ExecutorProfileId, canonical_variant_key},
 };
 use futures::StreamExt;
@@ -1482,6 +1484,144 @@ impl ChatRunner {
         });
     }
 
+    fn parse_token_usage_from_stdout_line(line: &str) -> Option<TokenUsageInfo> {
+        let value: serde_json::Value = serde_json::from_str(line).ok()?;
+        let value_obj = value.as_object()?;
+
+        if value_obj.get("type").and_then(|v| v.as_str()) == Some("token_usage") {
+            let total_tokens = value_obj
+                .get("total_tokens")
+                .and_then(|v| v.as_u64())
+                .and_then(|v| u32::try_from(v).ok())?;
+            let model_context_window = value_obj
+                .get("model_context_window")
+                .and_then(|v| v.as_u64())
+                .and_then(|v| u32::try_from(v).ok())?;
+            return Some(TokenUsageInfo {
+                total_tokens,
+                model_context_window,
+            });
+        }
+
+        if value_obj.get("method").and_then(|v| v.as_str()) != Some("codex/event/token_count") {
+            return None;
+        }
+
+        let info = value_obj
+            .get("params")
+            .and_then(|v| v.get("msg"))
+            .and_then(|v| v.get("info"))?;
+
+        let total_tokens = info
+            .get("last_token_usage")
+            .and_then(|v| v.get("total_tokens"))
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u32::try_from(v).ok())?;
+        let model_context_window = info
+            .get("model_context_window")
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u32::try_from(v).ok())
+            .unwrap_or(0);
+
+        Some(TokenUsageInfo {
+            total_tokens,
+            model_context_window,
+        })
+    }
+
+    fn update_token_usage_from_stdout_chunk(
+        stdout_line_buffer: &mut String,
+        last_token_usage: &mut Option<TokenUsageInfo>,
+        chunk: &str,
+    ) {
+        stdout_line_buffer.push_str(chunk);
+
+        while let Some(newline_index) = stdout_line_buffer.find('\n') {
+            let mut line: String = stdout_line_buffer.drain(..=newline_index).collect();
+            if line.ends_with('\n') {
+                line.pop();
+            }
+            if line.ends_with('\r') {
+                line.pop();
+            }
+            if line.is_empty() {
+                continue;
+            }
+            if let Some(usage) = Self::parse_token_usage_from_stdout_line(&line) {
+                *last_token_usage = Some(usage);
+            }
+        }
+    }
+
+    fn flush_token_usage_buffer(
+        stdout_line_buffer: &mut String,
+        last_token_usage: &mut Option<TokenUsageInfo>,
+    ) {
+        if stdout_line_buffer.is_empty() {
+            return;
+        }
+        let line = stdout_line_buffer.trim_end_matches(['\n', '\r']);
+        if !line.is_empty()
+            && let Some(usage) = Self::parse_token_usage_from_stdout_line(line)
+        {
+            *last_token_usage = Some(usage);
+        }
+        stdout_line_buffer.clear();
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn process_stream_patch(
+        patch: json_patch::Patch,
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        run_id: Uuid,
+        sender: &broadcast::Sender<ChatStreamEvent>,
+        last_content: &mut HashMap<usize, String>,
+        latest_assistant: &mut String,
+        last_token_usage: &mut Option<TokenUsageInfo>,
+    ) {
+        if let Some((index, entry)) = extract_normalized_entry_from_patch(&patch) {
+            let stream_type = match &entry.entry_type {
+                NormalizedEntryType::AssistantMessage => Some(ChatStreamDeltaType::Assistant),
+                NormalizedEntryType::Thinking => Some(ChatStreamDeltaType::Thinking),
+                NormalizedEntryType::TokenUsageInfo(usage) => {
+                    *last_token_usage = Some(usage.clone());
+                    None
+                }
+                _ => None,
+            };
+
+            if let Some(stream_type) = stream_type {
+                let current = entry.content;
+                let previous = last_content.get(&index).cloned().unwrap_or_default();
+                let (delta, is_delta) = if current.starts_with(&previous) {
+                    (current[previous.len()..].to_string(), true)
+                } else {
+                    (current.clone(), false)
+                };
+
+                last_content.insert(index, current.clone());
+                if matches!(stream_type, ChatStreamDeltaType::Assistant) {
+                    *latest_assistant = current.clone();
+                }
+
+                if !delta.is_empty() {
+                    let _ = sender.send(ChatStreamEvent::AgentDelta {
+                        session_id,
+                        session_agent_id,
+                        agent_id,
+                        run_id,
+                        stream_type,
+                        content: delta,
+                        delta: is_delta,
+                        is_final: false,
+                    });
+                }
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn spawn_stream_bridge(
         &self,
@@ -1512,6 +1652,7 @@ impl ChatRunner {
             let mut agent_session_id: Option<String> = None;
             let mut agent_message_id: Option<String> = None;
             let mut last_token_usage: Option<TokenUsageInfo> = None;
+            let mut stdout_line_buffer = String::new();
 
             while let Some(item) = stream.next().await {
                 match item {
@@ -1537,53 +1678,101 @@ impl ChatRunner {
                             .await;
                         }
                     }
+                    Ok(LogMsg::Stdout(chunk)) => {
+                        Self::update_token_usage_from_stdout_chunk(
+                            &mut stdout_line_buffer,
+                            &mut last_token_usage,
+                            &chunk,
+                        );
+                    }
                     Ok(LogMsg::JsonPatch(patch)) => {
-                        if let Some((index, entry)) = extract_normalized_entry_from_patch(&patch) {
-                            let stream_type = match &entry.entry_type {
-                                NormalizedEntryType::AssistantMessage => {
-                                    Some(ChatStreamDeltaType::Assistant)
-                                }
-                                NormalizedEntryType::Thinking => {
-                                    Some(ChatStreamDeltaType::Thinking)
-                                }
-                                NormalizedEntryType::TokenUsageInfo(usage) => {
-                                    last_token_usage = Some(usage.clone());
-                                    None
-                                }
-                                _ => None,
+                        Self::process_stream_patch(
+                            patch,
+                            session_id,
+                            session_agent_id,
+                            agent_id,
+                            run_id,
+                            &sender,
+                            &mut last_content,
+                            &mut latest_assistant,
+                            &mut last_token_usage,
+                        );
+                    }
+                    Ok(LogMsg::Finished) => {
+                        Self::flush_token_usage_buffer(
+                            &mut stdout_line_buffer,
+                            &mut last_token_usage,
+                        );
+
+                        // Drain tail messages briefly to handle out-of-order `Finished` vs stdout/json patches.
+                        let drain_deadline =
+                            tokio::time::Instant::now() + std::time::Duration::from_millis(350);
+                        loop {
+                            let now = tokio::time::Instant::now();
+                            if now >= drain_deadline {
+                                break;
+                            }
+                            let remaining = drain_deadline.duration_since(now);
+                            let Ok(next_item) =
+                                tokio::time::timeout(remaining, stream.next()).await
+                            else {
+                                break;
                             };
-
-                            if let Some(stream_type) = stream_type {
-                                let current = entry.content;
-                                let previous =
-                                    last_content.get(&index).cloned().unwrap_or_default();
-                                let (delta, is_delta) = if current.starts_with(&previous) {
-                                    (current[previous.len()..].to_string(), true)
-                                } else {
-                                    (current.clone(), false)
-                                };
-
-                                last_content.insert(index, current.clone());
-                                if matches!(stream_type, ChatStreamDeltaType::Assistant) {
-                                    latest_assistant = current.clone();
+                            let Some(next_item) = next_item else {
+                                break;
+                            };
+                            match next_item {
+                                Ok(LogMsg::SessionId(session_id_value)) => {
+                                    if agent_session_id.as_deref() != Some(&session_id_value) {
+                                        agent_session_id = Some(session_id_value.clone());
+                                        let _ = ChatSessionAgent::update_agent_session_id(
+                                            &db.pool,
+                                            session_agent_id,
+                                            Some(session_id_value),
+                                        )
+                                        .await;
+                                    }
                                 }
-
-                                if !delta.is_empty() {
-                                    let _ = sender.send(ChatStreamEvent::AgentDelta {
+                                Ok(LogMsg::MessageId(message_id_value)) => {
+                                    if agent_message_id.as_deref() != Some(&message_id_value) {
+                                        agent_message_id = Some(message_id_value.clone());
+                                        let _ = ChatSessionAgent::update_agent_message_id(
+                                            &db.pool,
+                                            session_agent_id,
+                                            Some(message_id_value),
+                                        )
+                                        .await;
+                                    }
+                                }
+                                Ok(LogMsg::Stdout(chunk)) => {
+                                    Self::update_token_usage_from_stdout_chunk(
+                                        &mut stdout_line_buffer,
+                                        &mut last_token_usage,
+                                        &chunk,
+                                    );
+                                }
+                                Ok(LogMsg::JsonPatch(patch)) => {
+                                    Self::process_stream_patch(
+                                        patch,
                                         session_id,
                                         session_agent_id,
                                         agent_id,
                                         run_id,
-                                        stream_type,
-                                        content: delta,
-                                        delta: is_delta,
-                                        is_final: false,
-                                    });
+                                        &sender,
+                                        &mut last_content,
+                                        &mut latest_assistant,
+                                        &mut last_token_usage,
+                                    );
                                 }
+                                _ => {}
                             }
                         }
-                    }
-                    Ok(LogMsg::Finished) => {
+
+                        Self::flush_token_usage_buffer(
+                            &mut stdout_line_buffer,
+                            &mut last_token_usage,
+                        );
+
                         let _ = fs::write(&output_path, &latest_assistant).await;
 
                         let diff_info =
@@ -1914,5 +2103,26 @@ impl ChatRunner {
         self.cancellation_tokens.remove(&session_agent_id);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ChatRunner;
+
+    #[test]
+    fn parse_token_usage_from_codex_token_count_line() {
+        let line = r#"{"method":"codex/event/token_count","params":{"msg":{"info":{"last_token_usage":{"total_tokens":53002},"model_context_window":258400}}}}"#;
+        let usage = ChatRunner::parse_token_usage_from_stdout_line(line).expect("usage");
+        assert_eq!(usage.total_tokens, 53002);
+        assert_eq!(usage.model_context_window, 258400);
+    }
+
+    #[test]
+    fn parse_token_usage_from_plain_token_usage_line() {
+        let line = r#"{"type":"token_usage","total_tokens":14596,"model_context_window":258400}"#;
+        let usage = ChatRunner::parse_token_usage_from_stdout_line(line).expect("usage");
+        assert_eq!(usage.total_tokens, 14596);
+        assert_eq!(usage.model_context_window, 258400);
     }
 }

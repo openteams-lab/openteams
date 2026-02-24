@@ -186,13 +186,17 @@ export function ChatHeader({
         )}
         {activeSession && (
           <div className="chat-session-header-meta text-xs text-low">
+            {t('header.created')} {formatDateShortWithTime(activeSession.created_at)} /
+            {' '}
+            {t('header.totalMessages')}: {messageCount}
             {totalTokens !== undefined && totalTokens > 0 && (
-              <span className="mr-1">
-                {formatTokenCount(totalTokens)} tokens /
+              <span>
+                {' / '}
+                {t('header.tokenUsage', {
+                  value: formatTokenCount(totalTokens),
+                })}
               </span>
             )}
-            {t('header.created')} {formatDateShortWithTime(activeSession.created_at)} /
-            {t('header.totalMessages')}: {messageCount}
           </div>
         )}
       </div>
