@@ -17,6 +17,7 @@ import type {
 import { useUserSystem } from '@/components/ConfigProvider';
 import { cn } from '@/lib/utils';
 import { toPrettyCase } from '@/utils/string';
+import { PromptEditorModal } from '@/pages/ui-new/chat/components/PromptEditorModal';
 import { PrimaryButton } from '../../primitives/PrimaryButton';
 import {
   SettingsCard,
@@ -166,6 +167,8 @@ export function ChatPresetsSettingsSectionContent() {
   );
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [toolsDraft, setToolsDraft] = useState('{}');
+  const [isMemberPromptEditorOpen, setIsMemberPromptEditorOpen] =
+    useState(false);
   const [toolsError, setToolsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -230,6 +233,12 @@ export function ChatPresetsSettingsSectionContent() {
         : null,
     [draft.teams, selectedTeamId]
   );
+
+  useEffect(() => {
+    if (!selectedMember) {
+      setIsMemberPromptEditorOpen(false);
+    }
+  }, [selectedMember]);
 
   const getLocalizedMemberName = useCallback(
     (member: Pick<ChatMemberPreset, 'id' | 'name' | 'is_builtin'>): string => {
@@ -681,19 +690,30 @@ export function ChatPresetsSettingsSectionContent() {
                   <SettingsField
                     label={t('settings.presets.members.fields.systemPrompt')}
                   >
-                    <SettingsTextarea
-                      value={selectedMember.system_prompt}
-                      onChange={(value) =>
-                        updateMember(selectedMember.id, (current) => ({
-                          ...current,
-                          system_prompt: value,
-                        }))
-                      }
-                      rows={6}
-                      placeholder={t(
-                        'settings.presets.members.fields.systemPromptPlaceholder'
-                      )}
-                    />
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-end">
+                        <button
+                          type="button"
+                          className="chat-session-member-expand-btn text-xs"
+                          onClick={() => setIsMemberPromptEditorOpen(true)}
+                        >
+                          {tChat('members.expand')}
+                        </button>
+                      </div>
+                      <SettingsTextarea
+                        value={selectedMember.system_prompt}
+                        onChange={(value) =>
+                          updateMember(selectedMember.id, (current) => ({
+                            ...current,
+                            system_prompt: value,
+                          }))
+                        }
+                        rows={6}
+                        placeholder={t(
+                          'settings.presets.members.fields.systemPromptPlaceholder'
+                        )}
+                      />
+                    </div>
                   </SettingsField>
 
                   <SettingsField
@@ -912,6 +932,20 @@ export function ChatPresetsSettingsSectionContent() {
         saveDisabled={!!toolsError}
         onSave={handleSave}
         onDiscard={handleDiscard}
+      />
+      <PromptEditorModal
+        isOpen={isMemberPromptEditorOpen && !!selectedMember}
+        value={selectedMember?.system_prompt ?? ''}
+        onChange={(value) => {
+          if (!selectedMember) return;
+          updateMember(selectedMember.id, (current) => ({
+            ...current,
+            system_prompt: value,
+          }));
+        }}
+        onClose={() => setIsMemberPromptEditorOpen(false)}
+        showFileImport={false}
+        size="compact"
       />
     </>
   );
