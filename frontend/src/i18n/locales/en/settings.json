@@ -283,6 +283,18 @@
           "label": "Enable Workspaces Beta",
           "helper": "Use the new workspaces interface when viewing task attempts. Tasks will open in task view first, and attempts will open in the new workspaces view."
         }
+      },
+      "chatCompression": {
+        "title": "Chat History Compression",
+        "description": "Configure compression strategy for long conversations.",
+        "tokenThreshold": {
+          "label": "Token Threshold",
+          "helper": "Trigger compression when total tokens exceed this value (default: 50,000)."
+        },
+        "compressionPercentage": {
+          "label": "Compression Percentage",
+          "helper": "Percentage of messages to compress when threshold is exceeded (default: 25%)."
+        }
       }
     },
     "agents": {
