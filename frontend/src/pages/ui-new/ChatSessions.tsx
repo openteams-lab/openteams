@@ -523,12 +523,13 @@ export function ChatSessions() {
 
   const showDuplicateMemberNameWarning = useCallback(
     (name: string) => {
-      setMemberError(null);
+      const duplicateMessage = t('modals.confirm.messages.duplicateMemberName', {
+        name: `@${name}`,
+      });
+      setMemberError(duplicateMessage);
       setConfirmModal({
         title: t('modals.confirm.titles.duplicateMemberName'),
-        message: t('modals.confirm.messages.duplicateMemberName', {
-          name: `@${name}`,
-        }),
+        message: duplicateMessage,
         mode: 'alert',
         confirmText: tCommon('ok'),
         onConfirm: () => {},
