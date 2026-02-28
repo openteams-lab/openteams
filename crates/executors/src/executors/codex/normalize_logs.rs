@@ -1000,6 +1000,13 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 }
                 EventMsg::TokenCount(payload) => {
                     if let Some(info) = payload.info {
+                        let last = &info.last_token_usage;
+                        // Billable tokens = input + output (excluding cached_input_tokens)
+                        let billable_tokens = (last.input_tokens + last.output_tokens) as u32;
+                        let input = last.input_tokens as u32;
+                        let output = last.output_tokens as u32;
+                        let cache_read = last.cached_input_tokens as u32;
+
                         add_normalized_entry(
                             &msg_store,
                             &entry_index,
@@ -1007,16 +1014,21 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                                 timestamp: None,
                                 entry_type: NormalizedEntryType::TokenUsageInfo(
                                     crate::logs::TokenUsageInfo {
-                                        total_tokens: info.last_token_usage.total_tokens as u32,
+                                        total_tokens: billable_tokens,
                                         model_context_window: info
                                             .model_context_window
                                             .unwrap_or_default()
                                             as u32,
+                                        input_tokens: Some(input),
+                                        output_tokens: Some(output),
+                                        cache_read_tokens: Some(cache_read),
+                                        // Now accurate: input + output only
+                                        is_estimated: false,
                                     },
                                 ),
                                 content: format!(
                                     "Tokens used: {} / Context window: {}",
-                                    info.last_token_usage.total_tokens,
+                                    billable_tokens,
                                     info.model_context_window.unwrap_or_default()
                                 ),
                                 metadata: None,

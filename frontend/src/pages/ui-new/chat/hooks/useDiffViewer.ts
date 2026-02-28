@@ -1,7 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatApi } from '@/lib/api';
 import type { RunDiffState, UntrackedFileState } from '../types';
 import { splitUnifiedDiff } from '../utils';
+
+const MAX_INLINE_DIFF_CHARS = 1_000_000;
+const MAX_INLINE_DIFF_FILES = 120;
 
 export interface UseDiffViewerResult {
   diffViewerRunId: string | null;
@@ -30,14 +33,22 @@ export function useDiffViewer(): UseDiffViewerResult {
   const [diffViewerOpen, setDiffViewerOpen] = useState(false);
   const [diffViewerFullscreen, setDiffViewerFullscreen] = useState(false);
   const [runDiffs, setRunDiffs] = useState<Record<string, RunDiffState>>({});
+  const runDiffsRef = useRef<Record<string, RunDiffState>>({});
   const [untrackedContent, setUntrackedContent] = useState<
     Record<string, UntrackedFileState>
   >({});
 
+  useEffect(() => {
+    runDiffsRef.current = runDiffs;
+  }, [runDiffs]);
+
   const handleLoadDiff = useCallback(async (runId: string) => {
+    const existing = runDiffsRef.current[runId];
+    if (existing?.loading || existing?.files.length) {
+      return;
+    }
+
     setRunDiffs((prev) => {
-      const existing = prev[runId];
-      if (existing?.loading || existing?.files.length) return prev;
       return {
         ...prev,
         [runId]: { loading: true, error: null, files: [] },
@@ -46,7 +57,32 @@ export function useDiffViewer(): UseDiffViewerResult {
 
     try {
       const patch = await chatApi.getRunDiff(runId);
+      if (patch.length > MAX_INLINE_DIFF_CHARS) {
+        setRunDiffs((prev) => ({
+          ...prev,
+          [runId]: {
+            loading: false,
+            error: 'Diff is too large to render inline. Open raw diff instead.',
+            files: [],
+          },
+        }));
+        return;
+      }
+
       const files = splitUnifiedDiff(patch);
+      if (files.length > MAX_INLINE_DIFF_FILES) {
+        setRunDiffs((prev) => ({
+          ...prev,
+          [runId]: {
+            loading: false,
+            error:
+              'Diff has too many files to render inline. Open raw diff instead.',
+            files: [],
+          },
+        }));
+        return;
+      }
+
       setRunDiffs((prev) => ({
         ...prev,
         [runId]: { loading: false, error: null, files },

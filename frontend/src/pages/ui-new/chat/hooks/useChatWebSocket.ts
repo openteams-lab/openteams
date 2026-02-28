@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type {
-  ChatMessage,
-  ChatSessionAgent,
-  ChatSessionAgentState,
-  ChatStreamEvent,
+import {
+  type ChatMessage,
+  type ChatSessionAgent,
+  type ChatSessionAgentState,
+  type ChatStreamEvent,
+  type CompressionWarning,
 } from 'shared/types';
 import { chatApi } from '@/lib/api';
 import type { AgentStateInfo, MentionStatus, StreamRun } from '../types';
@@ -25,11 +26,211 @@ type AgentDeltaPayload = Extract<ChatStreamEvent, { type: 'agent_delta' }> & {
   stream_type?: 'assistant' | 'thinking';
 };
 
+type PersistedStreamRun = StreamRun & {
+  updatedAtMs: number;
+};
+
+type StreamingRunsBySession = Record<
+  string,
+  Record<string, PersistedStreamRun>
+>;
+
+type StreamingRunCachePayload = {
+  version: number;
+  runs_by_session: StreamingRunsBySession;
+};
+
+const STREAMING_RUN_CACHE_KEY = 'chat_streaming_runs_cache_v1';
+const STREAMING_RUN_CACHE_VERSION = 1;
+const STREAMING_RUN_TTL_MS = 6 * 60 * 60 * 1000;
+const INACTIVE_RUN_PRUNE_GRACE_MS = 15 * 1000;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const extractCompressionWarningFromMeta = (
+  meta: unknown
+): CompressionWarning | null => {
+  if (!isRecord(meta)) return null;
+  const rawWarning = meta.compression_warning;
+  if (!isRecord(rawWarning)) return null;
+
+  const code = rawWarning.code;
+  const message = rawWarning.message;
+  const splitFilePath = rawWarning.split_file_path;
+
+  if (
+    typeof code !== 'string' ||
+    typeof message !== 'string' ||
+    typeof splitFilePath !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    code,
+    message,
+    split_file_path: splitFilePath,
+  };
+};
+
+function pruneExpiredStreamingRuns(
+  runsBySession: StreamingRunsBySession,
+  nowMs: number = Date.now()
+): StreamingRunsBySession {
+  let changed = false;
+  const nextRunsBySession: StreamingRunsBySession = {};
+
+  for (const [sessionId, runs] of Object.entries(runsBySession)) {
+    const nextRuns: Record<string, PersistedStreamRun> = {};
+    const runEntries = Object.entries(runs);
+
+    for (const [runId, run] of runEntries) {
+      if (nowMs - run.updatedAtMs > STREAMING_RUN_TTL_MS) {
+        changed = true;
+        continue;
+      }
+      nextRuns[runId] = run;
+    }
+
+    if (Object.keys(nextRuns).length > 0) {
+      nextRunsBySession[sessionId] = nextRuns;
+    } else if (runEntries.length > 0) {
+      changed = true;
+    }
+
+    if (runEntries.length !== Object.keys(nextRuns).length) {
+      changed = true;
+    }
+  }
+
+  if (
+    !changed &&
+    Object.keys(nextRunsBySession).length === Object.keys(runsBySession).length
+  ) {
+    return runsBySession;
+  }
+
+  return nextRunsBySession;
+}
+
+function readStreamingRunsCache(): StreamingRunsBySession {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    const raw = window.localStorage.getItem(STREAMING_RUN_CACHE_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isRecord(parsed)) return {};
+    if (parsed.version !== STREAMING_RUN_CACHE_VERSION) return {};
+    if (!isRecord(parsed.runs_by_session)) return {};
+
+    const nowMs = Date.now();
+    const runsBySession: StreamingRunsBySession = {};
+
+    for (const [sessionId, rawRuns] of Object.entries(parsed.runs_by_session)) {
+      if (!isRecord(rawRuns)) continue;
+      const runs: Record<string, PersistedStreamRun> = {};
+
+      for (const [runId, rawRun] of Object.entries(rawRuns)) {
+        if (!isRecord(rawRun)) continue;
+
+        const agentId = rawRun.agentId;
+        const thinkingContent = rawRun.thinkingContent;
+        const assistantContent = rawRun.assistantContent;
+        const content = rawRun.content;
+        const isFinal = rawRun.isFinal;
+        const updatedAtMs = rawRun.updatedAtMs;
+
+        if (
+          typeof agentId !== 'string' ||
+          typeof thinkingContent !== 'string' ||
+          typeof assistantContent !== 'string' ||
+          typeof content !== 'string' ||
+          typeof isFinal !== 'boolean' ||
+          typeof updatedAtMs !== 'number' ||
+          !Number.isFinite(updatedAtMs)
+        ) {
+          continue;
+        }
+
+        if (nowMs - updatedAtMs > STREAMING_RUN_TTL_MS) {
+          continue;
+        }
+
+        runs[runId] = {
+          agentId,
+          thinkingContent,
+          assistantContent,
+          content,
+          isFinal,
+          updatedAtMs,
+        };
+      }
+
+      if (Object.keys(runs).length > 0) {
+        runsBySession[sessionId] = runs;
+      }
+    }
+
+    return runsBySession;
+  } catch (error) {
+    console.warn('Failed to read chat streaming run cache', error);
+    return {};
+  }
+}
+
+function writeStreamingRunsCache(runsBySession: StreamingRunsBySession) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    if (Object.keys(runsBySession).length === 0) {
+      window.localStorage.removeItem(STREAMING_RUN_CACHE_KEY);
+      return;
+    }
+
+    const payload: StreamingRunCachePayload = {
+      version: STREAMING_RUN_CACHE_VERSION,
+      runs_by_session: runsBySession,
+    };
+
+    window.localStorage.setItem(
+      STREAMING_RUN_CACHE_KEY,
+      JSON.stringify(payload)
+    );
+  } catch (error) {
+    console.warn('Failed to persist chat streaming run cache', error);
+  }
+}
+
+function removeRunFromSession(
+  runsBySession: StreamingRunsBySession,
+  sessionId: string,
+  runId: string
+): StreamingRunsBySession {
+  const sessionRuns = runsBySession[sessionId];
+  if (!sessionRuns || !sessionRuns[runId]) return runsBySession;
+
+  const nextSessionRuns = { ...sessionRuns };
+  delete nextSessionRuns[runId];
+
+  const nextRunsBySession = { ...runsBySession };
+  if (Object.keys(nextSessionRuns).length === 0) {
+    delete nextRunsBySession[sessionId];
+  } else {
+    nextRunsBySession[sessionId] = nextSessionRuns;
+  }
+
+  return nextRunsBySession;
+}
+
 export interface UseChatWebSocketResult {
   streamingRuns: Record<string, StreamRun>;
   agentStates: Record<string, ChatSessionAgentState>;
   agentStateInfos: Record<string, AgentStateInfo>;
   mentionStatuses: Map<string, Map<string, MentionStatus>>;
+  compressionWarning: CompressionWarning | null;
   setAgentStates: React.Dispatch<
     React.SetStateAction<Record<string, ChatSessionAgentState>>
   >;
@@ -39,15 +240,20 @@ export interface UseChatWebSocketResult {
   setMentionStatuses: React.Dispatch<
     React.SetStateAction<Map<string, Map<string, MentionStatus>>>
   >;
+  pruneStreamingRunsForSession: (
+    sessionId: string,
+    completedRunIds: Set<string>,
+    runningAgentIds: Set<string>
+  ) => void;
+  clearCompressionWarning: () => void;
 }
 
 export function useChatWebSocket(
   activeSessionId: string | null,
   onMessageReceived: (message: ChatMessage) => void
 ): UseChatWebSocketResult {
-  const [streamingRuns, setStreamingRuns] = useState<Record<string, StreamRun>>(
-    {}
-  );
+  const [streamingRunsBySession, setStreamingRunsBySession] =
+    useState<StreamingRunsBySession>(() => readStreamingRunsCache());
   const [agentStates, setAgentStates] = useState<
     Record<string, ChatSessionAgentState>
   >({});
@@ -57,28 +263,99 @@ export function useChatWebSocket(
   const [mentionStatuses, setMentionStatuses] = useState<
     Map<string, Map<string, MentionStatus>>
   >(new Map());
+  const [compressionWarning, setCompressionWarning] =
+    useState<CompressionWarning | null>(null);
   const queryClient = useQueryClient();
+
+  const streamingRuns = useMemo<Record<string, StreamRun>>(() => {
+    if (!activeSessionId) return {};
+    const sessionRuns = streamingRunsBySession[activeSessionId] ?? {};
+    const next: Record<string, StreamRun> = {};
+
+    for (const [runId, run] of Object.entries(sessionRuns)) {
+      next[runId] = {
+        agentId: run.agentId,
+        thinkingContent: run.thinkingContent,
+        assistantContent: run.assistantContent,
+        content: run.content,
+        isFinal: run.isFinal,
+      };
+    }
+
+    return next;
+  }, [activeSessionId, streamingRunsBySession]);
+
+  const clearCompressionWarning = useCallback(() => {
+    setCompressionWarning(null);
+  }, []);
+
+  const pruneStreamingRunsForSession = useCallback(
+    (
+      sessionId: string,
+      completedRunIds: Set<string>,
+      runningAgentIds: Set<string>
+    ) => {
+      if (!sessionId) return;
+
+      setStreamingRunsBySession((prev) => {
+        const sessionRuns = prev[sessionId];
+        if (!sessionRuns) return prev;
+
+        const nowMs = Date.now();
+        let changed = false;
+        const nextSessionRuns: Record<string, PersistedStreamRun> = {};
+
+        for (const [runId, run] of Object.entries(sessionRuns)) {
+          const isExpired = nowMs - run.updatedAtMs > STREAMING_RUN_TTL_MS;
+          const isCompleted = completedRunIds.has(runId);
+          const isInactiveTooLong =
+            !runningAgentIds.has(run.agentId) &&
+            nowMs - run.updatedAtMs > INACTIVE_RUN_PRUNE_GRACE_MS;
+
+          if (isExpired || isCompleted || isInactiveTooLong) {
+            changed = true;
+            continue;
+          }
+
+          nextSessionRuns[runId] = run;
+        }
+
+        if (!changed) return prev;
+
+        const next = { ...prev };
+        if (Object.keys(nextSessionRuns).length === 0) {
+          delete next[sessionId];
+        } else {
+          next[sessionId] = nextSessionRuns;
+        }
+        return next;
+      });
+    },
+    []
+  );
 
   const handleMessageNew = useCallback(
     (message: ChatMessage) => {
+      const metaWarning = extractCompressionWarningFromMeta(message.meta);
+      if (metaWarning) {
+        setCompressionWarning(metaWarning);
+      }
       onMessageReceived(message);
       const runId = extractRunId(message.meta);
-      if (runId) {
-        setStreamingRuns((prev) => {
-          if (!prev[runId]) return prev;
-          const next = { ...prev };
-          delete next[runId];
-          return next;
-        });
-      }
+      const sessionId = message.session_id;
+      if (!runId || !sessionId) return;
+      setStreamingRunsBySession((prev) =>
+        removeRunFromSession(prev, sessionId, runId)
+      );
     },
     [onMessageReceived]
   );
 
   const handleAgentDelta = useCallback(
     (payload: AgentDeltaPayload) => {
-      setStreamingRuns((prev) => {
-        const previous = prev[payload.run_id];
+      setStreamingRunsBySession((prev) => {
+        const sessionRuns = prev[payload.session_id] ?? {};
+        const previous = sessionRuns[payload.run_id];
         const streamType = payload.stream_type ?? 'assistant';
         const previousAssistant =
           previous?.assistantContent ?? previous?.content ?? '';
@@ -93,25 +370,28 @@ export function useChatWebSocket(
           streamType === 'thinking'
             ? applyDelta(previousThinking)
             : previousThinking;
+        const nowMs = Date.now();
+
         return {
           ...prev,
-          [payload.run_id]: {
-            agentId: payload.agent_id,
-            thinkingContent,
-            assistantContent,
-            content: assistantContent,
-            isFinal: payload.is_final,
+          [payload.session_id]: {
+            ...sessionRuns,
+            [payload.run_id]: {
+              agentId: payload.agent_id,
+              thinkingContent,
+              assistantContent,
+              content: assistantContent,
+              isFinal: payload.is_final,
+              updatedAtMs: nowMs,
+            },
           },
         };
       });
       if (payload.is_final) {
         setTimeout(() => {
-          setStreamingRuns((prev) => {
-            if (!prev[payload.run_id]) return prev;
-            const next = { ...prev };
-            delete next[payload.run_id];
-            return next;
-          });
+          setStreamingRunsBySession((prev) =>
+            removeRunFromSession(prev, payload.session_id, payload.run_id)
+          );
         }, 1500);
       }
     },
@@ -175,6 +455,20 @@ export function useChatWebSocket(
   );
 
   useEffect(() => {
+    setStreamingRunsBySession((prev) => pruneExpiredStreamingRuns(prev));
+  }, [activeSessionId]);
+
+  useEffect(() => {
+    const pruned = pruneExpiredStreamingRuns(streamingRunsBySession);
+    if (pruned !== streamingRunsBySession) {
+      setStreamingRunsBySession(pruned);
+      return;
+    }
+
+    writeStreamingRunsCache(streamingRunsBySession);
+  }, [streamingRunsBySession]);
+
+  useEffect(() => {
     if (!activeSessionId) return;
     let ws: WebSocket | null = null;
     let shouldReconnect = true;
@@ -211,6 +505,11 @@ export function useChatWebSocket(
 
           if (payload.type === 'agent_state') {
             handleAgentState(payload);
+            return;
+          }
+
+          if (payload.type === 'compression_warning') {
+            setCompressionWarning(payload.warning);
           }
         } catch (error) {
           console.warn('Failed to parse chat stream payload', error);
@@ -245,10 +544,10 @@ export function useChatWebSocket(
 
   // Reset state when session changes
   useEffect(() => {
-    setStreamingRuns({});
     setAgentStates({});
     setAgentStateInfos({});
     setMentionStatuses(new Map());
+    setCompressionWarning(null);
   }, [activeSessionId]);
 
   return {
@@ -256,8 +555,11 @@ export function useChatWebSocket(
     agentStates,
     agentStateInfos,
     mentionStatuses,
+    compressionWarning,
     setAgentStates,
     setAgentStateInfos,
     setMentionStatuses,
+    pruneStreamingRunsForSession,
+    clearCompressionWarning,
   };
 }

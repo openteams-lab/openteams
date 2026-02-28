@@ -283,6 +283,18 @@
           "label": "启用工作区 Beta",
           "helper": "查看任务尝试时使用新的工作区界面。任务将首先在任务视图中打开，尝试将在新的工作区视图中打开。"
         }
+      },
+      "chatCompression": {
+        "title": "聊天历史压缩",
+        "description": "配置长对话的压缩策略。",
+        "tokenThreshold": {
+          "label": "Token 阈值",
+          "helper": "当总 token 数超过此值时触发压缩（默认：50,000）。"
+        },
+        "compressionPercentage": {
+          "label": "压缩百分比",
+          "helper": "超过阈值时压缩的消息百分比（默认：25%）。"
+        }
       }
     },
     "agents": {

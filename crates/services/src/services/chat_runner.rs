@@ -50,9 +50,12 @@ use crate::services::chat::{self, ChatServiceError};
 
 const UNTRACKED_FILE_LIMIT: u64 = 1024 * 1024;
 const MAX_AGENT_CHAIN_DEPTH: u32 = 5;
-const AGENTS_CHATGROUP_DIR: &str = ".agents_chatgroup";
-const RUNS_DIR_NAME: &str = ".runs";
-const CONTEXT_DIR_NAME: &str = ".context";
+const AGENTS_CHATGROUP_HOME_DIR: &str = ".agents-chatgroup";
+const AGENTS_CHATGROUP_WORKSPACE_DIR: &str = ".agents_chatgroup";
+const RUNS_DIR_NAME: &str = "runs";
+const CONTEXT_DIR_NAME: &str = "context";
+const LEGACY_COMPACTED_CONTEXT_FILE_NAME: &str = "messages_compacted.background.jsonl";
+const RUN_RECORDS_DIR_NAME: &str = "run_records";
 const RESERVED_USER_HANDLE: &str = "you";
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
 
@@ -61,10 +64,10 @@ struct DiffInfo {
 }
 
 struct ContextSnapshot {
-    jsonl: String,
     workspace_path: PathBuf,
     run_path: PathBuf,
     context_compacted: bool,
+    compression_warning: Option<chat::CompressionWarning>,
 }
 
 struct ReferenceAttachment {
@@ -89,6 +92,24 @@ struct MessageAttachmentContext {
     attachments: Vec<ReferenceAttachment>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CompressionWarning {
+    pub code: String,
+    pub message: String,
+    pub split_file_path: String,
+}
+
+impl From<chat::CompressionWarning> for CompressionWarning {
+    fn from(value: chat::CompressionWarning) -> Self {
+        Self {
+            code: value.code,
+            message: value.message,
+            split_file_path: value.split_file_path,
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct SessionAgentSummary {
     session_agent_id: Uuid,
@@ -96,6 +117,9 @@ struct SessionAgentSummary {
     name: String,
     runner_type: String,
     state: ChatSessionAgentState,
+    /// Description of the agent for GROUP_MEMBERS display
+    description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     system_prompt: Option<String>,
     tools_enabled: serde_json::Value,
 }
@@ -139,6 +163,10 @@ pub enum ChatStreamEvent {
         mentioned_agent: String,
         agent_id: Uuid,
         status: MentionStatus,
+    },
+    CompressionWarning {
+        session_id: Uuid,
+        warning: CompressionWarning,
     },
 }
 
@@ -184,6 +212,9 @@ pub struct ChatRunner {
     // Message queue for each session_agent, keyed by session_agent_id
     // When an agent is running, new messages are queued here and processed after completion
     pending_messages: Arc<DashMap<Uuid, VecDeque<PendingMessage>>>,
+    // Session-level background context compaction dedupe.
+    // At most one compaction task per session is allowed at a time.
+    background_compaction_inflight: Arc<DashMap<Uuid, ()>>,
 }
 
 impl ChatRunner {
@@ -193,6 +224,7 @@ impl ChatRunner {
             streams: Arc::new(DashMap::new()),
             cancellation_tokens: Arc::new(DashMap::new()),
             pending_messages: Arc::new(DashMap::new()),
+            background_compaction_inflight: Arc::new(DashMap::new()),
         }
     }
 
@@ -719,12 +751,22 @@ impl ChatRunner {
                 .clone()
                 .unwrap_or_else(|| self.build_workspace_path(session_id, agent_id));
             fs::create_dir_all(&workspace_path).await?;
-            let runs_dir = Self::chat_runs_dir(&workspace_path);
-            fs::create_dir_all(&runs_dir).await?;
+            let run_records_dir = Self::workspace_run_records_dir(
+                PathBuf::from(&workspace_path).as_path(),
+                session_id,
+            );
+            fs::create_dir_all(&run_records_dir).await?;
+            tracing::info!(
+                session_id = %session_id,
+                workspace_path = %workspace_path,
+                runs_dir = %run_records_dir.display(),
+                "Using workspace runs directory"
+            );
 
             let run_index = ChatRun::next_run_index(&self.db.pool, session_agent_id).await?;
             let run_id = Uuid::new_v4();
-            let run_dir = runs_dir.join(format!("run_{:04}", run_index));
+            let run_dir =
+                run_records_dir.join(Self::run_records_prefix(session_agent_id, run_index));
             fs::create_dir_all(&run_dir).await?;
 
             let input_path = run_dir.join("input.md");
@@ -735,6 +777,15 @@ impl ChatRunner {
             let context_snapshot = self
                 .build_context_snapshot(session_id, &workspace_path, &run_dir)
                 .await?;
+            if let Some(warning) = context_snapshot.compression_warning.clone() {
+                self.emit(
+                    session_id,
+                    ChatStreamEvent::CompressionWarning {
+                        session_id,
+                        warning: warning.into(),
+                    },
+                );
+            }
             let context_dir = context_snapshot
                 .workspace_path
                 .parent()
@@ -750,7 +801,6 @@ impl ChatRunner {
             let prompt = self.build_prompt(
                 &agent,
                 source_message,
-                &context_snapshot.jsonl,
                 &context_snapshot.workspace_path,
                 &session_agents,
                 message_attachments.as_ref(),
@@ -841,6 +891,7 @@ impl ChatRunner {
                 failed_flag.clone(),
                 chain_depth,
                 context_snapshot.context_compacted,
+                context_snapshot.compression_warning.clone(),
                 self.clone(),
                 source_message.id,
                 agent.name.clone(),
@@ -900,16 +951,19 @@ impl ChatRunner {
             .to_string()
     }
 
-    fn chat_storage_root(workspace_path: &str) -> PathBuf {
-        PathBuf::from(workspace_path).join(AGENTS_CHATGROUP_DIR)
+    fn workspace_runs_dir(workspace_path: &Path, session_id: Uuid) -> PathBuf {
+        workspace_path
+            .join(AGENTS_CHATGROUP_WORKSPACE_DIR)
+            .join(RUNS_DIR_NAME)
+            .join(session_id.to_string())
     }
 
-    fn chat_runs_dir(workspace_path: &str) -> PathBuf {
-        Self::chat_storage_root(workspace_path).join(RUNS_DIR_NAME)
+    fn workspace_run_records_dir(workspace_path: &Path, session_id: Uuid) -> PathBuf {
+        Self::workspace_runs_dir(workspace_path, session_id).join(RUN_RECORDS_DIR_NAME)
     }
 
-    fn chat_context_dir(workspace_path: &str) -> PathBuf {
-        Self::chat_storage_root(workspace_path).join(CONTEXT_DIR_NAME)
+    fn run_records_prefix(session_agent_id: Uuid, run_index: i64) -> String {
+        format!("session_agent_{session_agent_id}_run_{run_index:04}")
     }
 
     fn parse_runner_type(&self, agent: &ChatAgent) -> Result<BaseCodingAgent, ChatRunnerError> {
@@ -962,16 +1016,8 @@ impl ChatRunner {
     }
 
     fn apply_reply_prefix(content: &str, handle: Option<&str>) -> String {
-        let Some(handle) = handle else {
-            return content.to_string();
-        };
-        let prefix = format!("@{handle} ");
-        let trimmed = content.trim_start();
-        if trimmed.starts_with(&prefix) {
-            content.to_string()
-        } else {
-            format!("{prefix}{trimmed}")
-        }
+        let _ = handle;
+        content.to_string()
     }
 
     async fn capture_git_diff(workspace_path: &Path, run_dir: &Path) -> Option<DiffInfo> {
@@ -1060,6 +1106,16 @@ impl ChatRunner {
             if rel.is_empty() {
                 continue;
             }
+            if rel == AGENTS_CHATGROUP_HOME_DIR
+                || rel.starts_with(&format!("{AGENTS_CHATGROUP_HOME_DIR}/"))
+                || rel.starts_with(&format!("{AGENTS_CHATGROUP_HOME_DIR}\\"))
+                || rel == AGENTS_CHATGROUP_WORKSPACE_DIR
+                || rel.starts_with(&format!("{AGENTS_CHATGROUP_WORKSPACE_DIR}/"))
+                || rel.starts_with(&format!("{AGENTS_CHATGROUP_WORKSPACE_DIR}\\"))
+            {
+                // Skip internal runtime artifacts generated by chat context snapshots.
+                continue;
+            }
             let rel_path = PathBuf::from(rel);
             if rel_path.is_absolute()
                 || rel_path
@@ -1107,45 +1163,126 @@ impl ChatRunner {
         workspace_path: &str,
         run_dir: &Path,
     ) -> Result<ContextSnapshot, ChatRunnerError> {
-        // Use LLM-based compacted context for better compression
-        // When messages > 20, compresses oldest 5 into 1 summary, keeping 16 total messages
-        let workspace_path_buf = PathBuf::from(workspace_path);
-        let compacted = crate::services::chat::build_compacted_context(
-            &self.db.pool,
-            session_id,
-            None, // runner_type - will be used for LLM summarization in future
-            Some(workspace_path_buf.as_path()),
-        )
-        .await?;
-
-        let context_compacted = compacted.messages.iter().any(|message| {
-            message
-                .get("compressed")
-                .and_then(serde_json::Value::as_bool)
-                .unwrap_or(false)
-        });
-
-        let jsonl = compacted.jsonl;
-
-        let context_dir = Self::chat_context_dir(workspace_path);
+        // Create context directory first (needed for cutoff files)
+        let context_dir = PathBuf::from(workspace_path)
+            .join(AGENTS_CHATGROUP_WORKSPACE_DIR)
+            .join(CONTEXT_DIR_NAME)
+            .join(session_id.to_string());
         fs::create_dir_all(&context_dir).await?;
+        let legacy_compacted_context_path = context_dir.join(LEGACY_COMPACTED_CONTEXT_FILE_NAME);
+        if let Err(err) = fs::remove_file(&legacy_compacted_context_path).await
+            && err.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!(
+                session_id = %session_id,
+                error = %err,
+                path = %legacy_compacted_context_path.display(),
+                "Failed to remove legacy background compacted context file"
+            );
+        }
+
+        // Main path must never block on summarization: always build full context synchronously.
+        let full_context =
+            crate::services::chat::build_full_context(&self.db.pool, session_id).await?;
+        let jsonl = full_context.jsonl;
         let context_path = context_dir.join("messages.jsonl");
         fs::write(&context_path, jsonl.as_bytes()).await?;
+        tracing::info!(
+            session_id = %session_id,
+            workspace_path = %workspace_path,
+            context_path = %context_path.display(),
+            "Using workspace context (full, non-blocking)"
+        );
 
-        let runs_dir = run_dir
-            .parent()
-            .map(|path| path.to_path_buf())
-            .unwrap_or_else(|| Self::chat_runs_dir(workspace_path));
-        fs::create_dir_all(&runs_dir).await?;
-        let run_context_path = runs_dir.join(format!("run_{session_id}.jsonl"));
+        // Kick off background compaction for future runs, without blocking current run.
+        self.spawn_background_context_compaction(
+            session_id,
+            workspace_path.to_string(),
+            context_dir.clone(),
+        );
+
+        fs::create_dir_all(run_dir).await?;
+        let run_context_path = run_dir.join("context.jsonl");
         fs::write(&run_context_path, jsonl.as_bytes()).await?;
 
         Ok(ContextSnapshot {
-            jsonl,
             workspace_path: context_path,
             run_path: run_context_path,
-            context_compacted,
+            context_compacted: false,
+            compression_warning: None,
         })
+    }
+
+    fn spawn_background_context_compaction(
+        &self,
+        session_id: Uuid,
+        workspace_path: String,
+        context_dir: PathBuf,
+    ) {
+        if self
+            .background_compaction_inflight
+            .contains_key(&session_id)
+        {
+            return;
+        }
+        self.background_compaction_inflight.insert(session_id, ());
+
+        let runner = self.clone();
+        tokio::spawn(async move {
+            let workspace_path_buf = PathBuf::from(&workspace_path);
+            let result = crate::services::chat::build_compacted_context(
+                &runner.db.pool,
+                session_id,
+                None,
+                Some(workspace_path_buf.as_path()),
+                Some(context_dir.as_path()),
+            )
+            .await;
+
+            match result {
+                Ok(compacted) => {
+                    if compacted.context_compacted {
+                        let workspace_context_path = context_dir.join("messages.jsonl");
+                        if let Err(err) =
+                            fs::write(&workspace_context_path, compacted.jsonl.as_bytes()).await
+                        {
+                            tracing::warn!(
+                                session_id = %session_id,
+                                error = %err,
+                                path = %workspace_context_path.display(),
+                                "Failed to update workspace context with compacted history"
+                            );
+                        } else {
+                            tracing::info!(
+                                session_id = %session_id,
+                                path = %workspace_context_path.display(),
+                                compacted_message_count = compacted.messages.len(),
+                                "Background context compaction completed and updated workspace context"
+                            );
+                        }
+                    }
+
+                    if let Some(warning) = compacted.compression_warning {
+                        runner.emit(
+                            session_id,
+                            ChatStreamEvent::CompressionWarning {
+                                session_id,
+                                warning: warning.into(),
+                            },
+                        );
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        error = %err,
+                        "Background context compaction failed"
+                    );
+                }
+            }
+
+            runner.background_compaction_inflight.remove(&session_id);
+        });
     }
 
     async fn build_reference_context(
@@ -1304,12 +1441,23 @@ impl ChatRunner {
                 continue;
             };
             let system_prompt = agent.system_prompt.trim();
+            // Extract description from first line of system prompt or use agent name
+            let description = if !system_prompt.is_empty() {
+                system_prompt
+                    .lines()
+                    .next()
+                    .map(|line| line.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            } else {
+                None
+            };
             summaries.push(SessionAgentSummary {
                 session_agent_id: session_agent.id,
                 agent_id: agent.id,
                 name: agent.name.clone(),
                 runner_type: agent.runner_type.clone(),
                 state: session_agent.state,
+                description,
                 system_prompt: if system_prompt.is_empty() {
                     None
                 } else {
@@ -1322,18 +1470,80 @@ impl ChatRunner {
         Ok(summaries)
     }
 
+    /// Build the system prompt containing agent role, group members, and critical instructions.
+    /// This is separated from the user message for potential future API-level system prompt support.
+    fn build_system_prompt(
+        &self,
+        agent: &ChatAgent,
+        session_agents: &[SessionAgentSummary],
+        chat_history_path: &Path,
+    ) -> String {
+        let mut system = String::new();
+
+        // 1. Agent role settings
+        if !agent.system_prompt.trim().is_empty() {
+            system.push_str("[AGENT_ROLE]\n");
+            system.push_str(agent.system_prompt.trim());
+            system.push_str("\n[/AGENT_ROLE]\n\n");
+        }
+
+        // 2. Group members info (separate from AGENT_ROLE)
+        system.push_str("[GROUP_MEMBERS]\n");
+        system.push_str("Current AI members in this group:\n");
+        if session_agents.is_empty() {
+            system.push_str("- No other AI members\n");
+        } else {
+            for member in session_agents {
+                let description = member.description.as_deref().unwrap_or("AI assistant");
+                system.push_str(&format!(
+                    "- {}: {} (state: {:?})\n",
+                    member.name, description, member.state
+                ));
+            }
+        }
+        system.push_str("[/GROUP_MEMBERS]\n\n");
+
+        // 3. Message routing protocol
+        system.push_str("[MESSAGE_ROUTING]\n");
+        system.push_str(
+            "When you want to forward work to another member, include an explicit routing marker in your reply:\n",
+        );
+        system.push_str("[sendMessageTo@@member_name]\n");
+        system.push_str("Rules:\n");
+        system.push_str("- Only this marker triggers forwarding.\n");
+        system.push_str("- Both [sendMessageTo@@member_name] and [sendMessageTo@@{member_name}] are accepted.\n");
+        system.push_str("- Plain @member text is normal content and never triggers forwarding.\n");
+        system.push_str("- member_name must exactly match a name in [GROUP_MEMBERS].\n");
+        system.push_str("- Multiple targets are allowed by adding multiple markers.\n");
+        system.push_str("[/MESSAGE_ROUTING]\n\n");
+
+        // 4. Critical instruction to read history file
+        system.push_str("[CRITICAL_INSTRUCTION]\n");
+        system
+            .push_str("Before doing any task, you must first read the group chat history file:\n");
+        system.push_str(&format!(
+            "file_path: {}\n",
+            chat_history_path.to_string_lossy()
+        ));
+        system.push_str("format: JSON, containing sender and content fields\n");
+        system.push_str("This is mandatory: understand group context first, then respond.\n");
+        system.push_str("[/CRITICAL_INSTRUCTION]\n");
+
+        system
+    }
+
+    /// Build the user message prompt (envelope, reference, attachments, message).
     #[allow(clippy::too_many_arguments)]
-    fn build_prompt(
+    fn build_user_prompt(
         &self,
         agent: &ChatAgent,
         message: &ChatMessage,
-        context_jsonl: &str,
-        context_path: &Path,
-        session_agents: &[SessionAgentSummary],
         message_attachments: Option<&MessageAttachmentContext>,
         reference: Option<&ReferenceContext>,
     ) -> String {
         let mut prompt = String::new();
+
+        // Envelope metadata
         prompt.push_str("[ENVELOPE]\n");
         prompt.push_str(&format!("session_id={}\n", message.session_id));
         let sender_handle = self.resolve_reply_handle(message);
@@ -1343,35 +1553,7 @@ impl ChatRunner {
         prompt.push_str(&format!("timestamp={}\n", message.created_at));
         prompt.push_str("[/ENVELOPE]\n\n");
 
-        if !agent.system_prompt.trim().is_empty() {
-            prompt.push_str("[AGENT_ROLE]\n");
-            prompt.push_str(agent.system_prompt.trim());
-            prompt.push_str("\n[/AGENT_ROLE]\n\n");
-        }
-
-        prompt.push_str("[SESSION_AGENTS]\n");
-        prompt.push_str("AI members in current session in JSONL format.\n");
-        if session_agents.is_empty() {
-            prompt.push_str("none\n");
-        } else {
-            for summary in session_agents {
-                if let Ok(line) = serde_json::to_string(summary) {
-                    prompt.push_str(&line);
-                    prompt.push('\n');
-                }
-            }
-        }
-        prompt.push_str("[/SESSION_AGENTS]\n\n");
-
-        prompt.push_str("[GROUP_CONTEXT]\n");
-        prompt.push_str("Historical group chat messages (oldest to newest) in JSONL format.\n");
-        prompt.push_str(&format!(
-            "context_path={}\n",
-            context_path.to_string_lossy()
-        ));
-        prompt.push_str(context_jsonl);
-        prompt.push_str("\n[/GROUP_CONTEXT]\n\n");
-
+        // Reference message (if any)
         if let Some(reference) = reference {
             prompt.push_str("[REFERENCE_MESSAGE]\n");
             prompt.push_str(
@@ -1402,6 +1584,7 @@ impl ChatRunner {
             prompt.push_str("\n[/REFERENCE_MESSAGE]\n\n");
         }
 
+        // Message attachments (if any)
         if let Some(message_attachments) = message_attachments
             && !message_attachments.attachments.is_empty()
         {
@@ -1421,11 +1604,38 @@ impl ChatRunner {
             prompt.push_str("[/MESSAGE_ATTACHMENTS]\n\n");
         }
 
+        // User message (simplified format: sender + content)
         prompt.push_str("[USER_MESSAGE]\n");
-        prompt.push_str(message.content.trim());
-        prompt.push_str("\n[/USER_MESSAGE]\n");
+        prompt.push_str(&format!("{}: {}\n", sender_handle, message.content.trim()));
+        prompt.push_str("[/USER_MESSAGE]\n");
 
         prompt
+    }
+
+    /// Build the full prompt by combining system prompt and user prompt.
+    /// This maintains backwards compatibility while allowing future separation.
+    #[allow(clippy::too_many_arguments)]
+    fn build_prompt(
+        &self,
+        agent: &ChatAgent,
+        message: &ChatMessage,
+        context_path: &Path,
+        session_agents: &[SessionAgentSummary],
+        message_attachments: Option<&MessageAttachmentContext>,
+        reference: Option<&ReferenceContext>,
+    ) -> String {
+        // Build system prompt with agent role, group members, and history file instruction
+        let system_prompt = self.build_system_prompt(agent, session_agents, context_path);
+
+        // Build user prompt with envelope, reference, attachments, and message
+        let user_prompt = self.build_user_prompt(agent, message, message_attachments, reference);
+
+        // Combine system and user prompts
+        let mut full_prompt = system_prompt;
+        full_prompt.push('\n');
+
+        full_prompt.push_str(&user_prompt);
+        full_prompt
     }
 
     fn spawn_log_forwarders(
@@ -1500,6 +1710,10 @@ impl ChatRunner {
             return Some(TokenUsageInfo {
                 total_tokens,
                 model_context_window,
+                input_tokens: None,
+                output_tokens: None,
+                cache_read_tokens: None,
+                is_estimated: false,
             });
         }
 
@@ -1526,6 +1740,10 @@ impl ChatRunner {
         Some(TokenUsageInfo {
             total_tokens,
             model_context_window,
+            input_tokens: None,
+            output_tokens: None,
+            cache_read_tokens: None,
+            is_estimated: false,
         })
     }
 
@@ -1567,6 +1785,19 @@ impl ChatRunner {
             *last_token_usage = Some(usage);
         }
         stdout_line_buffer.clear();
+    }
+
+    /// 浣跨敤tiktoken浼扮畻鏂囨湰鐨則oken鏁伴噺
+    fn estimate_tokens_with_tiktoken(text: &str) -> u32 {
+        use tiktoken_rs::cl100k_base;
+
+        match cl100k_base() {
+            Ok(bpe) => bpe.encode_with_special_tokens(text).len() as u32,
+            Err(_) => {
+                // fallback: 绾?涓瓧绗︿竴涓猼oken
+                (text.len() / 4) as u32
+            }
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1638,6 +1869,7 @@ impl ChatRunner {
         failed_flag: Arc<AtomicBool>,
         chain_depth: u32,
         context_compacted: bool,
+        compression_warning: Option<chat::CompressionWarning>,
         runner: ChatRunner,
         source_message_id: Uuid,
         agent_name: String,
@@ -1809,15 +2041,45 @@ impl ChatRunner {
                             "chain_depth": chain_depth + 1,
                         });
 
-                        if let Some(ref usage) = last_token_usage {
-                            meta["token_usage"] = serde_json::json!({
-                                "total_tokens": usage.total_tokens,
-                                "model_context_window": usage.model_context_window,
-                            });
-                        }
+                        // 濡傛灉娌℃湁token_usage锛屼娇鐢╰iktoken浼扮畻
+                        let token_usage = if let Some(ref usage) = last_token_usage {
+                            usage.clone()
+                        } else {
+                            // 璇诲彇input prompt杩涜浼扮畻
+                            let input_path = run_dir.join("input.txt");
+                            let prompt_content =
+                                fs::read_to_string(&input_path).await.unwrap_or_default();
+                            let estimated_input =
+                                Self::estimate_tokens_with_tiktoken(&prompt_content);
+                            let estimated_output =
+                                Self::estimate_tokens_with_tiktoken(&latest_assistant);
+                            TokenUsageInfo {
+                                total_tokens: estimated_input + estimated_output,
+                                model_context_window: 0,
+                                input_tokens: Some(estimated_input),
+                                output_tokens: Some(estimated_output),
+                                cache_read_tokens: None,
+                                is_estimated: true,
+                            }
+                        };
+
+                        meta["token_usage"] = serde_json::json!({
+                            "total_tokens": token_usage.total_tokens,
+                            "model_context_window": token_usage.model_context_window,
+                            "input_tokens": token_usage.input_tokens,
+                            "output_tokens": token_usage.output_tokens,
+                            "is_estimated": token_usage.is_estimated,
+                        });
 
                         if context_compacted {
                             meta["context_compacted"] = true.into();
+                        }
+                        if let Some(warning) = compression_warning.as_ref() {
+                            meta["compression_warning"] = serde_json::json!({
+                                "code": warning.code,
+                                "message": warning.message,
+                                "split_file_path": warning.split_file_path,
+                            });
                         }
 
                         if let Some(diff) = diff_info.as_ref() {
@@ -1849,8 +2111,8 @@ impl ChatRunner {
                             )
                             .await
                         {
-                            // Call handle_message to process @mentions in the agent's response
-                            // This enables AI-to-AI message routing (chain calls)
+                            // Call handle_message to process explicit routing directives
+                            // This enables AI-to-AI message forwarding (chain calls)
                             if let Ok(Some(session)) =
                                 ChatSession::find_by_id(&db.pool, session_id).await
                             {

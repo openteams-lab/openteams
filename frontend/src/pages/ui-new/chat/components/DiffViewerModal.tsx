@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowsOutSimpleIcon,
   ArrowsInSimpleIcon,
   XIcon,
+  CaretDownIcon,
 } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { DiffViewBody } from '@/components/ui-new/primitives/conversation/PierreConversationDiff';
@@ -23,6 +25,8 @@ export interface DiffViewerModalProps {
   onToggleUntracked: (runId: string, path: string) => void;
 }
 
+const MAX_INLINE_FILE_PATCH_CHARS = 300_000;
+
 export function DiffViewerModal({
   isOpen,
   runId,
@@ -37,6 +41,12 @@ export function DiffViewerModal({
   onToggleUntracked,
 }: DiffViewerModalProps) {
   const { t } = useTranslation('chat');
+  const [expandedFileKey, setExpandedFileKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    setExpandedFileKey(null);
+  }, [runId, isOpen]);
+
   if (!isOpen || !runId) return null;
 
   const DiffViewerIcon = isFullscreen
@@ -99,38 +109,69 @@ export function DiffViewerModal({
                     {t('modals.diffViewer.noTrackedDiff')}
                   </div>
                 )}
-              {runDiff?.files?.map((file) => (
-                <div
-                  key={`${runId}-${file.path}`}
-                  className="border border-border rounded-sm bg-panel"
-                >
-                  <div className="flex items-center justify-between px-base py-half text-xs text-normal border-b border-border">
-                    <span className="font-ibm-plex-mono break-all">
-                      {file.path}
-                    </span>
-                    <span className="text-xs text-low">
-                      {file.additions > 0 && (
-                        <span className="text-success">
-                          +{file.additions}
+              {runDiff?.files?.map((file, index) => {
+                const fileKey = `${runId}:${index}:${file.path}`;
+                const isExpanded = expandedFileKey === fileKey;
+
+                return (
+                  <div
+                    key={fileKey}
+                    className="border border-border rounded-sm bg-panel"
+                  >
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between gap-base px-base py-half text-xs text-normal border-b border-border"
+                      onClick={() =>
+                        setExpandedFileKey((prev) =>
+                          prev === fileKey ? null : fileKey
+                        )
+                      }
+                    >
+                      <span className="font-ibm-plex-mono break-all text-left">
+                        {file.path}
+                      </span>
+                      <span className="flex items-center gap-half shrink-0">
+                        <span className="text-xs text-low">
+                          {file.additions > 0 && (
+                            <span className="text-success">
+                              +{file.additions}
+                            </span>
+                          )}
+                          {file.additions > 0 && file.deletions > 0 && ' '}
+                          {file.deletions > 0 && (
+                            <span className="text-error">
+                              -{file.deletions}
+                            </span>
+                          )}
                         </span>
-                      )}
-                      {file.additions > 0 && file.deletions > 0 && ' '}
-                      {file.deletions > 0 && (
-                        <span className="text-error">-{file.deletions}</span>
-                      )}
-                    </span>
+                        <CaretDownIcon
+                          className={cn(
+                            'size-icon-sm text-low transition-transform',
+                            isExpanded ? 'rotate-180' : ''
+                          )}
+                        />
+                      </span>
+                    </button>
+                    {isExpanded &&
+                      (file.patch.length > MAX_INLINE_FILE_PATCH_CHARS ? (
+                        <div className="px-base py-half text-xs text-low">
+                          File diff too large to render inline. Open raw diff
+                          instead.
+                        </div>
+                      ) : (
+                        <DiffViewBody
+                          fileDiffMetadata={null}
+                          unifiedDiff={file.patch}
+                          isValid={file.patch.trim().length > 0}
+                          hideLineNumbers={false}
+                          theme={theme}
+                          wrapText={false}
+                          modeOverride="split"
+                        />
+                      ))}
                   </div>
-                  <DiffViewBody
-                    fileDiffMetadata={null}
-                    unifiedDiff={file.patch}
-                    isValid={file.patch.trim().length > 0}
-                    hideLineNumbers={false}
-                    theme={theme}
-                    wrapText={false}
-                    modeOverride="split"
-                  />
-                </div>
-              ))}
+                );
+              })}
               <div>
                 <button
                   type="button"

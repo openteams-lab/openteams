@@ -1,7 +1,6 @@
 import { parseDiffStats } from '@/utils/diffStatsParser';
 import type { TFunction } from 'i18next';
 import type {
-  ChatAgent,
   ChatMemberPreset,
   ChatTeamPreset,
   JsonValue,
@@ -39,6 +38,31 @@ export function extractMentions(content: string): Set<string> {
     if (name) mentions.add(name);
   }
   return mentions;
+}
+
+const sendMessageDirectiveRegex =
+  /\[sendMessageTo@@(?:\{([^}\]]+)\}|([^\]\s]+))\]/g;
+
+function isValidDirectiveTarget(target: string): boolean {
+  if (!target) return false;
+  return [...target].every((char) => {
+    if (char === '_' || char === '-') return true;
+    return /[\p{L}\p{N}]/u.test(char);
+  });
+}
+
+export function renderSendMessageDirectives(content: string): string {
+  return content.replace(
+    sendMessageDirectiveRegex,
+    (fullMatch, rawTargetWithBrace: string, rawTargetNoBrace: string) => {
+      const rawTarget = rawTargetWithBrace ?? rawTargetNoBrace ?? '';
+      const target = rawTarget.trim();
+      if (!isValidDirectiveTarget(target)) return fullMatch;
+      // Render as disabled in-app link to get consistent blue styling.
+      const anchor = `#session-agent-${encodeURIComponent(target)}`;
+      return `[${target}](${anchor})`;
+    }
+  );
 }
 
 export function extractRunId(meta: unknown): string | null {
@@ -458,6 +482,74 @@ export function getSessionWorkspacePath(
   return `chat/session_${sessionId}/agents/${agentName}`;
 }
 
+export function validateWorkspacePath(path: string): string | null {
+  const trimmed = path.trim();
+  if (!trimmed) {
+    return 'Workspace path is required.';
+  }
+
+  const hasControlChars = [...trimmed].some((char) => {
+    const code = char.codePointAt(0) ?? 0;
+    return code <= 0x1f || code === 0x7f;
+  });
+  if (hasControlChars) {
+    return 'Workspace path contains invalid characters.';
+  }
+
+  const normalized = trimmed.replace(/\\/g, '/');
+  const segments = normalized.split('/').filter((segment) => segment.length > 0);
+  if (segments.includes('..')) {
+    return "Workspace path cannot contain '..'.";
+  }
+
+  const isWindowsLikePath =
+    trimmed.includes('\\') || /^[a-zA-Z]:[\\/]/.test(trimmed) || trimmed.startsWith('\\\\');
+
+  if (isWindowsLikePath) {
+    const windowsReservedNames = new Set([
+      'CON',
+      'PRN',
+      'AUX',
+      'NUL',
+      'COM1',
+      'COM2',
+      'COM3',
+      'COM4',
+      'COM5',
+      'COM6',
+      'COM7',
+      'COM8',
+      'COM9',
+      'LPT1',
+      'LPT2',
+      'LPT3',
+      'LPT4',
+      'LPT5',
+      'LPT6',
+      'LPT7',
+      'LPT8',
+      'LPT9',
+    ]);
+
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index];
+      const isDrivePrefix = index === 0 && /^[a-zA-Z]:$/.test(segment);
+      if (isDrivePrefix) continue;
+
+      if (/[<>:"|?*]/.test(segment)) {
+        return 'Workspace path contains invalid Windows filename characters.';
+      }
+
+      const reservedCheck = segment.trim().replace(/\.+$/, '').toUpperCase();
+      if (windowsReservedNames.has(reservedCheck)) {
+        return `Workspace path contains reserved Windows name: ${segment}`;
+      }
+    }
+  }
+
+  return null;
+}
+
 export type MemberPresetImportAction = 'create' | 'reuse' | 'skip';
 
 export interface MemberPresetImportPlan {
@@ -506,7 +598,6 @@ export function getLocalizedMemberPresetNameById(
 export function buildMemberPresetImportPlan({
   preset,
   sessionId,
-  existingAgents,
   sessionMembers,
   defaultRunnerType,
   enabledRunnerTypes,
@@ -515,7 +606,6 @@ export function buildMemberPresetImportPlan({
 }: {
   preset: ChatMemberPreset;
   sessionId: string;
-  existingAgents: ChatAgent[];
   sessionMembers: SessionMember[];
   defaultRunnerType: string | null | undefined;
   enabledRunnerTypes: string[];
@@ -537,38 +627,23 @@ export function buildMemberPresetImportPlan({
     : preset.id;
   const systemPrompt = preset.system_prompt?.trim() ?? '';
   const toolsEnabled = normalizePresetToolsEnabled(preset.tools_enabled);
-  const sessionAgentIds = new Set(sessionMembers.map((item) => item.agent.id));
-
-  const sameNameAgents = existingAgents.filter(
-    (agent) => agent.name.toLowerCase() === presetName.toLowerCase()
+  const hasSameNameInSession = sessionMembers.some(
+    (member) => member.agent.name.toLowerCase() === presetName.toLowerCase()
   );
-  const reusableAgent = sameNameAgents.find(
-    (agent) =>
-      agent.runner_type === runnerType &&
-      (agent.system_prompt ?? '') === systemPrompt &&
-      areToolsEnabledEqual(agent.tools_enabled, toolsEnabled)
-  );
-
-  if (reusableAgent) {
-    const action: MemberPresetImportAction = sessionAgentIds.has(reusableAgent.id)
-      ? 'skip'
-      : 'reuse';
+  if (hasSameNameInSession) {
     return {
       presetId: preset.id,
       presetName: preset.name,
       runnerType,
-      finalName: reusableAgent.name,
+      finalName: presetName,
       systemPrompt,
       toolsEnabled,
-      action,
-      reason:
-        action === 'skip'
-          ? 'already-in-session'
-          : 'reuse-existing-agent',
-      agentId: reusableAgent.id,
+      action: 'skip',
+      reason: 'duplicate-name-in-session',
+      agentId: null,
       workspacePath:
         preset.default_workspace_path?.trim() ||
-        getSessionWorkspacePath(sessionId, reusableAgent.name),
+        getSessionWorkspacePath(sessionId, presetName),
     };
   }
 
