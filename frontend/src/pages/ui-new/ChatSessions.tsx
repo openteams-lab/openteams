@@ -508,12 +508,13 @@ export function ChatSessions() {
 
   const showDuplicateMemberNameWarning = useCallback(
     (name: string) => {
-      setMemberError(null);
+      const duplicateMessage = t('modals.confirm.messages.duplicateMemberName', {
+        name: `@${name}`,
+      });
+      setMemberError(duplicateMessage);
       setConfirmModal({
         title: t('modals.confirm.titles.duplicateMemberName'),
-        message: t('modals.confirm.messages.duplicateMemberName', {
-          name: `@${name}`,
-        }),
+        message: duplicateMessage,
         mode: 'alert',
         confirmText: tCommon('ok'),
         onConfirm: () => {},
@@ -1829,7 +1830,13 @@ export function ChatSessions() {
       setTeamImportName(null);
     } catch (error) {
       console.error('Failed to import team preset', error);
-      setMemberError('Failed to import team preset.');
+      if (error instanceof ApiError && error.message) {
+        setMemberError(error.message);
+      } else if (error instanceof Error && error.message) {
+        setMemberError(error.message);
+      } else {
+        setMemberError('Failed to import team preset.');
+      }
     } finally {
       setIsImportingTeam(false);
     }
