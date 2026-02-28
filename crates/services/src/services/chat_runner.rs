@@ -746,8 +746,10 @@ impl ChatRunner {
                 .clone()
                 .unwrap_or_else(|| self.build_workspace_path(session_id, agent_id));
             fs::create_dir_all(&workspace_path).await?;
-            let run_records_dir =
-                Self::workspace_run_records_dir(PathBuf::from(&workspace_path).as_path(), session_id);
+            let run_records_dir = Self::workspace_run_records_dir(
+                PathBuf::from(&workspace_path).as_path(),
+                session_id,
+            );
             fs::create_dir_all(&run_records_dir).await?;
             tracing::info!(
                 session_id = %session_id,
@@ -1163,6 +1165,13 @@ impl ChatRunner {
         workspace_path: &str,
         run_dir: &Path,
     ) -> Result<ContextSnapshot, ChatRunnerError> {
+        // Create context directory first (needed for cutoff files)
+        let context_dir = PathBuf::from(workspace_path)
+            .join(AGENTS_CHATGROUP_WORKSPACE_DIR)
+            .join(CONTEXT_DIR_NAME)
+            .join(session_id.to_string());
+        fs::create_dir_all(&context_dir).await?;
+
         // Use LLM-based compacted context for better compression
         // When messages > 20, compresses oldest 5 into 1 summary, keeping 16 total messages
         let workspace_path_buf = PathBuf::from(workspace_path);
@@ -1171,18 +1180,13 @@ impl ChatRunner {
             session_id,
             None, // runner_type - will be used for LLM summarization in future
             Some(workspace_path_buf.as_path()),
+            Some(context_dir.as_path()),
         )
         .await?;
 
         let context_compacted = compacted.context_compacted;
         let compression_warning = compacted.compression_warning;
         let jsonl = compacted.jsonl;
-
-        let context_dir = PathBuf::from(workspace_path)
-            .join(AGENTS_CHATGROUP_WORKSPACE_DIR)
-            .join(CONTEXT_DIR_NAME)
-            .join(session_id.to_string());
-        fs::create_dir_all(&context_dir).await?;
         let context_path = context_dir.join("messages.jsonl");
         fs::write(&context_path, jsonl.as_bytes()).await?;
         tracing::info!(
@@ -1950,11 +1954,12 @@ impl ChatRunner {
                         } else {
                             // 读取input prompt进行估算
                             let input_path = run_dir.join("input.txt");
-                            let prompt_content = fs::read_to_string(&input_path)
-                                .await
-                                .unwrap_or_default();
-                            let estimated_input = Self::estimate_tokens_with_tiktoken(&prompt_content);
-                            let estimated_output = Self::estimate_tokens_with_tiktoken(&latest_assistant);
+                            let prompt_content =
+                                fs::read_to_string(&input_path).await.unwrap_or_default();
+                            let estimated_input =
+                                Self::estimate_tokens_with_tiktoken(&prompt_content);
+                            let estimated_output =
+                                Self::estimate_tokens_with_tiktoken(&latest_assistant);
                             TokenUsageInfo {
                                 total_tokens: estimated_input + estimated_output,
                                 model_context_window: 0,

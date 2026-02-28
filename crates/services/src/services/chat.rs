@@ -11,7 +11,7 @@ use db::models::{
     chat_agent::ChatAgent,
     chat_message::{ChatMessage, ChatSenderType, CreateChatMessage},
     chat_session::{ChatSession, ChatSessionStatus},
-    chat_session_agent::ChatSessionAgent,
+    chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
 };
 use executors::{
     approvals::NoopExecutorApprovalService,
@@ -51,6 +51,8 @@ pub const DEFAULT_TOKEN_THRESHOLD: u32 = 10_000_000;
 pub const DEFAULT_COMPRESSION_PERCENTAGE: u8 = 25;
 const SUMMARY_EXECUTION_TIMEOUT: Duration = Duration::from_secs(120);
 const SUMMARY_DRAIN_TIMEOUT: Duration = Duration::from_millis(350);
+const SUMMARY_IDLE_AGENT_WAIT_TIMEOUT: Duration = Duration::from_secs(120);
+const SUMMARY_IDLE_AGENT_POLL_INTERVAL: Duration = Duration::from_millis(500);
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
 
 /// Result of the message compression process
@@ -364,6 +366,7 @@ fn simplified_to_context_value(message: &SimplifiedMessage) -> Value {
 /// * `session_id` - Chat session ID
 /// * `runner_type` - Runner type string for the agent (e.g., "CLAUDE_CODE", "CODEX")
 /// * `workspace_path` - Path to workspace for running LLM
+/// * `context_dir` - Path to context directory for storing cutoff files
 ///
 /// # Returns
 /// CompactedContext with messages and JSONL string
@@ -372,6 +375,7 @@ pub async fn build_compacted_context(
     session_id: Uuid,
     _runner_type: Option<&str>,
     workspace_path: Option<&std::path::Path>,
+    context_dir: Option<&std::path::Path>,
 ) -> Result<CompactedContext, ChatServiceError> {
     // Fetch all messages for the session
     let all_messages = ChatMessage::find_by_session_id(pool, session_id, None).await?;
@@ -397,6 +401,7 @@ pub async fn build_compacted_context(
         compression_percentage,
         &session_agents,
         workspace_path,
+        context_dir,
     )
     .await?;
 
@@ -513,6 +518,86 @@ Return only the summary body. Do not ask follow-up questions. Do not run any too
     prompt
 }
 
+fn has_idle_agent(session_agents: &[ChatSessionAgent]) -> bool {
+    session_agents
+        .iter()
+        .any(|agent| agent.state == ChatSessionAgentState::Idle)
+}
+
+fn all_agents_running(session_agents: &[ChatSessionAgent]) -> bool {
+    !session_agents.is_empty()
+        && session_agents
+            .iter()
+            .all(|agent| agent.state == ChatSessionAgentState::Running)
+}
+
+fn summary_agent_priority(state: ChatSessionAgentState) -> u8 {
+    match state {
+        ChatSessionAgentState::Idle => 0,
+        ChatSessionAgentState::WaitingApproval => 1,
+        ChatSessionAgentState::Dead => 2,
+        ChatSessionAgentState::Running => 3,
+    }
+}
+
+fn prioritize_summary_agents(session_agents: &[ChatSessionAgent]) -> Vec<ChatSessionAgent> {
+    let mut agents = session_agents.to_vec();
+    agents.sort_by_key(|agent| summary_agent_priority(agent.state.clone()));
+    agents
+}
+
+async fn wait_for_idle_agent_if_needed(
+    pool: &SqlitePool,
+    session_id: Uuid,
+    session_agents: &[ChatSessionAgent],
+) -> Result<Vec<ChatSessionAgent>, ChatServiceError> {
+    if !all_agents_running(session_agents) {
+        return Ok(session_agents.to_vec());
+    }
+
+    // Avoid waiting forever in single-agent sessions where the current run just marked it running.
+    if session_agents.len() == 1 {
+        tracing::debug!(
+            session_id = %session_id,
+            session_agent_id = %session_agents[0].id,
+            "Skipping idle-agent wait for summarization in single-agent running session"
+        );
+        return Ok(session_agents.to_vec());
+    }
+
+    tracing::info!(
+        session_id = %session_id,
+        wait_timeout_secs = SUMMARY_IDLE_AGENT_WAIT_TIMEOUT.as_secs(),
+        "All session agents are running; waiting for an idle agent for summarization"
+    );
+
+    let started_at = tokio::time::Instant::now();
+    let deadline = started_at + SUMMARY_IDLE_AGENT_WAIT_TIMEOUT;
+
+    loop {
+        let refreshed_agents = ChatSessionAgent::find_all_for_session(pool, session_id).await?;
+        if has_idle_agent(&refreshed_agents) {
+            tracing::info!(
+                session_id = %session_id,
+                waited_ms = started_at.elapsed().as_millis() as u64,
+                "Idle agent became available for summarization"
+            );
+            return Ok(refreshed_agents);
+        }
+
+        if tokio::time::Instant::now() >= deadline {
+            tracing::warn!(
+                session_id = %session_id,
+                waited_secs = started_at.elapsed().as_secs(),
+                "Timed out waiting for an idle agent for summarization"
+            );
+            return Ok(refreshed_agents);
+        }
+
+        tokio::time::sleep(SUMMARY_IDLE_AGENT_POLL_INTERVAL).await;
+    }
+}
+
 /// Try to summarize messages using available AI agents
 /// Returns Some(summary) if any agent succeeds, None if all fail
 async fn try_summarize_with_agents(
@@ -523,8 +608,28 @@ async fn try_summarize_with_agents(
     workspace_path: &Path,
 ) -> Option<String> {
     let summarize_prompt = build_summarization_prompt(messages_to_compress);
+    let candidate_agents =
+        match wait_for_idle_agent_if_needed(pool, session_id, session_agents).await {
+            Ok(agents) => agents,
+            Err(err) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    error = %err,
+                    "Failed to refresh session agents before summarization; using initial snapshot"
+                );
+                session_agents.to_vec()
+            }
+        };
 
-    for session_agent in session_agents {
+    if all_agents_running(&candidate_agents) {
+        tracing::warn!(
+            session_id = %session_id,
+            "Skipping AI summarization because all agents are still running"
+        );
+        return None;
+    }
+
+    for session_agent in prioritize_summary_agents(&candidate_agents) {
         // Get the agent details
         let agent = match ChatAgent::find_by_id(pool, session_agent.agent_id).await {
             Ok(Some(agent)) => agent,
@@ -752,7 +857,7 @@ fn extract_latest_assistant_from_history(history: &[LogMsg]) -> Option<String> {
 /// 3. If over threshold:
 ///    - Calculate 25% of messages to compress
 ///    - Try AI summarization with each session agent
-///    - If all agents fail, truncate to split file and return warning
+///    - If all agents fail, truncate to cutoff file and return warning
 ///
 /// # Arguments
 /// * `pool` - Database connection pool
@@ -762,6 +867,7 @@ fn extract_latest_assistant_from_history(history: &[LogMsg]) -> Option<String> {
 /// * `compression_percentage` - Percentage of messages to compress (default 25)
 /// * `session_agents` - AI agents in the session for summarization
 /// * `workspace_path` - Workspace path for running agents
+/// * `context_dir` - Path to context directory for storing cutoff files
 pub async fn compress_messages_if_needed(
     pool: &SqlitePool,
     session_id: Uuid,
@@ -770,6 +876,7 @@ pub async fn compress_messages_if_needed(
     compression_percentage: u8,
     session_agents: &[ChatSessionAgent],
     workspace_path: &Path,
+    context_dir: Option<&Path>,
 ) -> Result<CompressionResult, ChatServiceError> {
     // Calculate token count
     let token_count = estimate_token_count(&messages);
@@ -849,17 +956,47 @@ pub async fn compress_messages_if_needed(
         "AI summarization failed, falling back to truncation"
     );
 
-    // Write messages to split file
-    let split_path = append_to_split_file(session_id, messages_to_compress)
-        .await
-        .map_err(|e| {
+    // Write messages to cutoff file in context directory
+    let cutoff_path = if let Some(ctx_dir) = context_dir {
+        // Find next available cutoff index
+        let mut index = 0;
+        loop {
+            let candidate = ctx_dir.join(format!("cutoff_message_{}.json", index));
+            if !candidate.exists() {
+                break candidate;
+            }
+            index += 1;
+        }
+    } else {
+        // Fallback to legacy split file if no context_dir provided
+        append_to_split_file(session_id, messages_to_compress)
+            .await
+            .map_err(|e| {
+                ChatServiceError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to create split file: {}", e),
+                ))
+            })?
+    };
+
+    // Write cutoff messages to file
+    if context_dir.is_some() {
+        let cutoff_data = serde_json::json!({
+            "session_id": session_id,
+            "cutoff_at": chrono::Utc::now().to_rfc3339(),
+            "message_count": messages_to_compress_count,
+            "messages": messages_to_compress,
+        });
+        let json_str = serde_json::to_string_pretty(&cutoff_data).map_err(|e| {
             ChatServiceError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to create split file: {}", e),
+                std::io::ErrorKind::InvalidData,
+                format!("Failed to serialize cutoff data: {}", e),
             ))
         })?;
+        fs::write(&cutoff_path, json_str).await?;
+    }
 
-    let split_path_str = split_path.to_string_lossy().to_string();
+    let cutoff_path_str = cutoff_path.to_string_lossy().to_string();
 
     // Return remaining messages with warning
     Ok(CompressionResult {
@@ -868,21 +1005,24 @@ pub async fn compress_messages_if_needed(
         warning: Some(CompressionWarning {
             code: "COMPRESSION_FALLBACK".to_string(),
             message: format!(
-                "AI summarization failed; archived {} messages to split file",
+                "AI summarization failed; archived {} messages to cutoff file",
                 messages_to_compress_count
             ),
-            split_file_path: split_path_str,
+            split_file_path: cutoff_path_str,
         }),
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        CompressionType, SimplifiedMessage, compress_messages_if_needed, parse_mentions,
-    };
+    use db::models::chat_session_agent::{ChatSessionAgent, ChatSessionAgentState};
     use sqlx::SqlitePool;
     use uuid::Uuid;
+
+    use super::{
+        CompressionType, SimplifiedMessage, all_agents_running, compress_messages_if_needed,
+        parse_mentions, prioritize_summary_agents,
+    };
 
     #[test]
     fn parses_mentions_with_basic_tokens() {
@@ -900,6 +1040,54 @@ mod tests {
     fn de_dupes_mentions_in_order() {
         let mentions = parse_mentions("@a @a @b");
         assert_eq!(mentions, vec!["a", "b"]);
+    }
+
+    fn make_session_agent(state: ChatSessionAgentState) -> ChatSessionAgent {
+        ChatSessionAgent {
+            id: Uuid::new_v4(),
+            session_id: Uuid::new_v4(),
+            agent_id: Uuid::new_v4(),
+            state,
+            workspace_path: None,
+            pty_session_key: None,
+            agent_session_id: None,
+            agent_message_id: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn prioritize_summary_agents_prefers_idle_then_running_last() {
+        let running = make_session_agent(ChatSessionAgentState::Running);
+        let waiting = make_session_agent(ChatSessionAgentState::WaitingApproval);
+        let idle = make_session_agent(ChatSessionAgentState::Idle);
+        let dead = make_session_agent(ChatSessionAgentState::Dead);
+
+        let prioritized = prioritize_summary_agents(&[
+            running.clone(),
+            waiting.clone(),
+            idle.clone(),
+            dead.clone(),
+        ]);
+
+        assert_eq!(prioritized[0].id, idle.id);
+        assert_eq!(prioritized[1].id, waiting.id);
+        assert_eq!(prioritized[2].id, dead.id);
+        assert_eq!(prioritized[3].id, running.id);
+    }
+
+    #[test]
+    fn all_agents_running_only_true_when_non_empty_and_all_running() {
+        assert!(!all_agents_running(&[]));
+        assert!(!all_agents_running(&[
+            make_session_agent(ChatSessionAgentState::Running),
+            make_session_agent(ChatSessionAgentState::Idle),
+        ]));
+        assert!(all_agents_running(&[
+            make_session_agent(ChatSessionAgentState::Running),
+            make_session_agent(ChatSessionAgentState::Running),
+        ]));
     }
 
     #[test]
@@ -959,6 +1147,7 @@ mod tests {
             50,  // compress half
             &[], // no agents available
             workspace,
+            None, // no context_dir, use legacy split file
         )
         .await
         .expect("compression should succeed with fallback");
@@ -1004,6 +1193,7 @@ mod tests {
             25,
             &[],
             workspace,
+            None, // no context_dir
         )
         .await
         .expect("compression should pass");
