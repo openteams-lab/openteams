@@ -71,6 +71,9 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 OpencodeExecutorEvent::TokenUsage {
                     total_tokens,
                     model_context_window,
+                    input_tokens,
+                    output_tokens,
+                    cache_read_tokens,
                 } => {
                     add_normalized_entry(
                         &msg_store,
@@ -80,9 +83,9 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             entry_type: NormalizedEntryType::TokenUsageInfo(TokenUsageInfo {
                                 total_tokens,
                                 model_context_window,
-                                input_tokens: None,
-                                output_tokens: None,
-                                cache_read_tokens: None,
+                                input_tokens,
+                                output_tokens,
+                                cache_read_tokens,
                                 is_estimated: false,
                             }),
                             content: format!(
