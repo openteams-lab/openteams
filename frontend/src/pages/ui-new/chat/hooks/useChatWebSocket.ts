@@ -5,6 +5,7 @@ import type {
   ChatSessionAgent,
   ChatSessionAgentState,
   ChatStreamEvent,
+  CompressionWarning,
 } from 'shared/types';
 import { chatApi } from '@/lib/api';
 import type { AgentStateInfo, MentionStatus, StreamRun } from '../types';
@@ -30,6 +31,7 @@ export interface UseChatWebSocketResult {
   agentStates: Record<string, ChatSessionAgentState>;
   agentStateInfos: Record<string, AgentStateInfo>;
   mentionStatuses: Map<string, Map<string, MentionStatus>>;
+  compressionWarning: CompressionWarning | null;
   setAgentStates: React.Dispatch<
     React.SetStateAction<Record<string, ChatSessionAgentState>>
   >;
@@ -39,6 +41,7 @@ export interface UseChatWebSocketResult {
   setMentionStatuses: React.Dispatch<
     React.SetStateAction<Map<string, Map<string, MentionStatus>>>
   >;
+  clearCompressionWarning: () => void;
 }
 
 export function useChatWebSocket(
@@ -57,7 +60,13 @@ export function useChatWebSocket(
   const [mentionStatuses, setMentionStatuses] = useState<
     Map<string, Map<string, MentionStatus>>
   >(new Map());
+  const [compressionWarning, setCompressionWarning] =
+    useState<CompressionWarning | null>(null);
   const queryClient = useQueryClient();
+
+  const clearCompressionWarning = useCallback(() => {
+    setCompressionWarning(null);
+  }, []);
 
   const handleMessageNew = useCallback(
     (message: ChatMessage) => {
@@ -211,6 +220,11 @@ export function useChatWebSocket(
 
           if (payload.type === 'agent_state') {
             handleAgentState(payload);
+            return;
+          }
+
+          if (payload.type === 'compression_warning') {
+            setCompressionWarning(payload.warning);
           }
         } catch (error) {
           console.warn('Failed to parse chat stream payload', error);
@@ -249,6 +263,7 @@ export function useChatWebSocket(
     setAgentStates({});
     setAgentStateInfos({});
     setMentionStatuses(new Map());
+    setCompressionWarning(null);
   }, [activeSessionId]);
 
   return {
@@ -256,8 +271,10 @@ export function useChatWebSocket(
     agentStates,
     agentStateInfos,
     mentionStatuses,
+    compressionWarning,
     setAgentStates,
     setAgentStateInfos,
     setMentionStatuses,
+    clearCompressionWarning,
   };
 }

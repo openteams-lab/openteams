@@ -341,9 +341,11 @@ export function ChatSessions() {
     agentStates,
     agentStateInfos,
     mentionStatuses,
+    compressionWarning,
     setAgentStates,
     setAgentStateInfos,
     setMentionStatuses,
+    clearCompressionWarning,
   } = useChatWebSocket(activeSessionId, handleIncomingMessage);
 
   // Mutations
@@ -2357,6 +2359,26 @@ export function ChatSessions() {
           {isArchived && !isLoading && (
             <div className="text-xs text-low border border-border rounded-sm bg-secondary/60 px-base py-half">
               This session is archived. Messages and members are read-only.
+            </div>
+          )}
+          {compressionWarning && (
+            <div className="chat-session-compression-warning text-xs border border-yellow-500/50 rounded-sm bg-yellow-500/10 px-base py-half flex items-center justify-between">
+              <div className="flex items-center gap-half">
+                <span className="text-yellow-600 dark:text-yellow-400">⚠</span>
+                <span className="text-yellow-700 dark:text-yellow-300">
+                  {compressionWarning.message}
+                </span>
+                <span className="text-yellow-600/80 dark:text-yellow-400/80 ml-1">
+                  ({compressionWarning.split_file_path})
+                </span>
+              </div>
+              <button
+                type="button"
+                className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200 text-xs"
+                onClick={clearCompressionWarning}
+              >
+                ✕
+              </button>
             </div>
           )}
           {!isLoading && messageList.length === 0 && (

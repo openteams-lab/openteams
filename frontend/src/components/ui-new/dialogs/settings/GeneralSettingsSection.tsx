@@ -37,6 +37,7 @@ import {
   SettingsCheckbox,
   SettingsField,
   SettingsInput,
+  SettingsNumberInput,
   SettingsSaveBar,
   SettingsSelect,
   SettingsTextarea,
@@ -715,6 +716,53 @@ export function GeneralSettingsSection() {
             onClick={resetOnboarding}
           />
         </div>
+      </SettingsCard>
+
+      {/* Chat Compression */}
+      <SettingsCard
+        title={t('settings.general.chatCompression.title')}
+        description={t('settings.general.chatCompression.description')}
+      >
+        <SettingsField
+          label={t('settings.general.chatCompression.tokenThreshold.label')}
+          description={t('settings.general.chatCompression.tokenThreshold.helper')}
+        >
+          <SettingsNumberInput
+            value={draft?.chat_compression?.token_threshold ?? 50000}
+            onChange={(value) =>
+              updateDraft({
+                chat_compression: {
+                  ...draft?.chat_compression,
+                  token_threshold: value,
+                  compression_percentage: draft?.chat_compression?.compression_percentage ?? 25,
+                },
+              })
+            }
+            min={10000}
+            max={200000}
+            step={1000}
+          />
+        </SettingsField>
+        <SettingsField
+          label={t('settings.general.chatCompression.compressionPercentage.label')}
+          description={t('settings.general.chatCompression.compressionPercentage.helper')}
+        >
+          <SettingsNumberInput
+            value={draft?.chat_compression?.compression_percentage ?? 25}
+            onChange={(value) =>
+              updateDraft({
+                chat_compression: {
+                  ...draft?.chat_compression,
+                  token_threshold: draft?.chat_compression?.token_threshold ?? 50000,
+                  compression_percentage: value,
+                },
+              })
+            }
+            min={10}
+            max={50}
+            step={5}
+          />
+        </SettingsField>
       </SettingsCard>
 
       {/* Beta Features */}

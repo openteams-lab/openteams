@@ -283,6 +283,18 @@
           "label": "Habilitar Beta de Workspaces",
           "helper": "Usa la nueva interfaz de workspaces al ver intentos de tareas. Las tareas se abrirán primero en la vista de tareas, y los intentos se abrirán en la nueva vista de workspaces."
         }
+      },
+      "chatCompression": {
+        "title": "Compresión del Historial de Chat",
+        "description": "Configura la estrategia de compresión para conversaciones largas.",
+        "tokenThreshold": {
+          "label": "Umbral de Tokens",
+          "helper": "Activa la compresión cuando el total de tokens supere este valor (predeterminado: 50,000)."
+        },
+        "compressionPercentage": {
+          "label": "Porcentaje de Compresión",
+          "helper": "Porcentaje de mensajes a comprimir cuando se supera el umbral (predeterminado: 25%)."
+        }
       }
     },
     "agents": {

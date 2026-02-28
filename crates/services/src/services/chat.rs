@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::SqlitePool;
 use thiserror::Error;
+use ts_rs::TS;
 use tokio::{fs, io::AsyncWriteExt};
 use tokio_util::io::ReaderStream;
 use utils::{log_msg::LogMsg, msg_store::MsgStore};
@@ -80,6 +81,45 @@ pub enum ChatServiceError {
     SessionArchived,
     #[error("Validation error: {0}")]
     Validation(String),
+}
+
+/// Default token threshold for compression (50,000 tokens)
+pub const DEFAULT_TOKEN_THRESHOLD: u32 = 50_000;
+/// Default percentage of messages to compress (25%)
+pub const DEFAULT_COMPRESSION_PERCENTAGE: u8 = 25;
+
+/// Result of the message compression process
+#[derive(Debug, Clone)]
+pub struct CompressionResult {
+    /// The messages after compression (either with summary or truncated)
+    pub messages: Vec<super::chat_history_file::SimplifiedMessage>,
+    /// Type of compression that was applied
+    pub compression_type: CompressionType,
+    /// Warning if compression failed and fallback was used
+    pub warning: Option<CompressionWarning>,
+}
+
+/// Type of compression that was applied to messages
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompressionType {
+    /// No compression needed, messages were under threshold
+    None,
+    /// AI summarization was successful
+    AiSummarized,
+    /// All AI agents failed, messages were truncated to split file
+    Truncated,
+}
+
+/// Warning generated when compression falls back to truncation
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CompressionWarning {
+    /// Warning code for programmatic handling
+    pub code: String,
+    /// Human-readable warning message
+    pub message: String,
+    /// Path to the split file containing archived messages
+    pub split_file_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1020,6 +1060,284 @@ pub async fn export_session_archive(
     fs::write(&summary_path, summary).await?;
 
     Ok(archive_dir.to_string_lossy().to_string())
+}
+
+// ==========================================
+// New Token-Based Compression System
+// ==========================================
+
+use super::chat_history_file::{
+    SimplifiedMessage, append_to_split_file, estimate_token_count,
+};
+
+/// Convert ChatMessage to SimplifiedMessage format (sender + content only)
+pub fn to_simplified_message(message: &ChatMessage, agent_map: &HashMap<Uuid, String>) -> SimplifiedMessage {
+    let sender_handle = message
+        .meta
+        .0
+        .get("sender_handle")
+        .and_then(|value| value.as_str());
+    let sender_name = message.sender_id.and_then(|id| agent_map.get(&id).cloned());
+
+    let sender = match message.sender_type {
+        ChatSenderType::User => format!(
+            "user:{}",
+            sender_handle.unwrap_or("user")
+        ),
+        ChatSenderType::Agent => format!(
+            "agent:{}",
+            sender_name.unwrap_or_else(|| "agent".to_string())
+        ),
+        ChatSenderType::System => "system".to_string(),
+    };
+
+    SimplifiedMessage {
+        sender,
+        content: message.content.clone(),
+        timestamp: message.created_at.to_rfc3339(),
+    }
+}
+
+/// Convert all messages in a session to SimplifiedMessage format
+pub async fn build_simplified_messages(
+    pool: &SqlitePool,
+    session_id: Uuid,
+) -> Result<Vec<SimplifiedMessage>, ChatServiceError> {
+    let messages = ChatMessage::find_by_session_id(pool, session_id, None).await?;
+    let agents = ChatAgent::find_all(pool).await?;
+    let agent_map: HashMap<Uuid, String> = agents
+        .into_iter()
+        .map(|agent| (agent.id, agent.name))
+        .collect();
+
+    Ok(messages
+        .iter()
+        .map(|msg| to_simplified_message(msg, &agent_map))
+        .collect())
+}
+
+/// Build the prompt for AI summarization
+fn build_summarization_prompt(messages_to_compress: &[SimplifiedMessage]) -> String {
+    let mut prompt = String::from(
+        "请对以下群聊历史消息进行简要摘要，保留关键信息和上下文。\n\
+        摘要应包含：\n\
+        - 讨论的主要话题和决策\n\
+        - 提到的重要约束和要求\n\
+        - 参与者的关键观点\n\n\
+        请将摘要控制在500字以内，直接输出摘要内容，不要添加格式标记。\n\n\
+        需要摘要的消息：\n",
+    );
+
+    for msg in messages_to_compress {
+        prompt.push_str(&format!("{}: {}\n", msg.sender, msg.content));
+    }
+
+    prompt
+}
+
+/// Try to summarize messages using available AI agents
+/// Returns Some(summary) if any agent succeeds, None if all fail
+async fn try_summarize_with_agents(
+    pool: &SqlitePool,
+    session_id: Uuid,
+    session_agents: &[ChatSessionAgent],
+    messages_to_compress: &[SimplifiedMessage],
+    workspace_path: &Path,
+) -> Option<String> {
+    let summarize_prompt = build_summarization_prompt(messages_to_compress);
+
+    for session_agent in session_agents {
+        // Get the agent details
+        let agent = match ChatAgent::find_by_id(pool, session_agent.agent_id).await {
+            Ok(Some(agent)) => agent,
+            _ => continue,
+        };
+
+        tracing::debug!(
+            "Attempting to summarize with agent: {} ({})",
+            agent.name,
+            agent.id
+        );
+
+        // Try to call the agent for summarization
+        match call_agent_for_summary(&agent, &summarize_prompt, workspace_path).await {
+            Ok(summary) => {
+                tracing::info!(
+                    session_id = %session_id,
+                    agent = %agent.name,
+                    "AI summarization successful"
+                );
+                return Some(summary);
+            }
+            Err(e) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    agent = %agent.name,
+                    error = %e,
+                    "Agent failed to summarize, trying next agent"
+                );
+                continue;
+            }
+        }
+    }
+
+    tracing::warn!(
+        session_id = %session_id,
+        "All agents failed to summarize messages"
+    );
+    None
+}
+
+/// Call an agent to generate a summary
+/// This spawns a temporary agent process to summarize messages
+///
+/// Note: This is a simplified implementation that currently always returns an error.
+/// Full AI summarization can be implemented in a future iteration.
+async fn call_agent_for_summary(
+    agent: &ChatAgent,
+    _prompt: &str,
+    _workspace_path: &Path,
+) -> Result<String, ChatServiceError> {
+    // TODO: Implement full AI summarization using agent executors
+    // For now, we log the attempt and return an error so fallback is used
+    tracing::debug!(
+        agent_name = %agent.name,
+        "AI summarization not yet implemented, will use fallback"
+    );
+
+    Err(ChatServiceError::Validation(
+        "AI summarization not yet fully implemented".to_string(),
+    ))
+}
+
+/// Compress messages if they exceed the token threshold
+///
+/// This function implements the compression strategy:
+/// 1. Calculate total token count using tiktoken
+/// 2. If under threshold, return messages unchanged
+/// 3. If over threshold:
+///    - Calculate 25% of messages to compress
+///    - Try AI summarization with each session agent
+///    - If all agents fail, truncate to split file and return warning
+///
+/// # Arguments
+/// * `pool` - Database connection pool
+/// * `session_id` - Chat session ID
+/// * `messages` - Messages to potentially compress
+/// * `token_threshold` - Token count that triggers compression
+/// * `compression_percentage` - Percentage of messages to compress (default 25)
+/// * `session_agents` - AI agents in the session for summarization
+/// * `workspace_path` - Workspace path for running agents
+pub async fn compress_messages_if_needed(
+    pool: &SqlitePool,
+    session_id: Uuid,
+    messages: Vec<SimplifiedMessage>,
+    token_threshold: u32,
+    compression_percentage: u8,
+    session_agents: &[ChatSessionAgent],
+    workspace_path: &Path,
+) -> Result<CompressionResult, ChatServiceError> {
+    // Calculate token count
+    let token_count = estimate_token_count(&messages);
+
+    tracing::debug!(
+        session_id = %session_id,
+        token_count = token_count,
+        threshold = token_threshold,
+        "Checking if compression is needed"
+    );
+
+    // If under threshold, no compression needed
+    if token_count <= token_threshold {
+        return Ok(CompressionResult {
+            messages,
+            compression_type: CompressionType::None,
+            warning: None,
+        });
+    }
+
+    let total_messages = messages.len();
+    if total_messages == 0 {
+        return Ok(CompressionResult {
+            messages,
+            compression_type: CompressionType::None,
+            warning: None,
+        });
+    }
+
+    // Calculate number of messages to compress (default 25%)
+    let messages_to_compress_count =
+        ((total_messages as f64) * (compression_percentage as f64 / 100.0)).ceil() as usize;
+    let messages_to_compress_count = messages_to_compress_count.max(1).min(total_messages);
+
+    let (messages_to_compress, messages_to_keep) = messages.split_at(messages_to_compress_count);
+
+    tracing::info!(
+        session_id = %session_id,
+        total = total_messages,
+        to_compress = messages_to_compress_count,
+        to_keep = messages_to_keep.len(),
+        "Compressing messages"
+    );
+
+    // Try AI summarization with available agents
+    if !session_agents.is_empty() {
+        if let Some(summary) = try_summarize_with_agents(
+            pool,
+            session_id,
+            session_agents,
+            messages_to_compress,
+            workspace_path,
+        )
+        .await
+        {
+            // Create summary message and prepend to kept messages
+            let summary_message = SimplifiedMessage {
+                sender: "system:summary".to_string(),
+                content: format!("[历史消息摘要]\n{}", summary),
+                timestamp: Utc::now().to_rfc3339(),
+            };
+
+            let mut result_messages = vec![summary_message];
+            result_messages.extend(messages_to_keep.to_vec());
+
+            return Ok(CompressionResult {
+                messages: result_messages,
+                compression_type: CompressionType::AiSummarized,
+                warning: None,
+            });
+        }
+    }
+
+    // All agents failed - fallback to truncation
+    tracing::warn!(
+        session_id = %session_id,
+        "AI summarization failed, falling back to truncation"
+    );
+
+    // Write messages to split file
+    let split_path = append_to_split_file(session_id, messages_to_compress)
+        .await
+        .map_err(|e| ChatServiceError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to create split file: {}", e),
+        )))?;
+
+    let split_path_str = split_path.to_string_lossy().to_string();
+
+    // Return remaining messages with warning
+    Ok(CompressionResult {
+        messages: messages_to_keep.to_vec(),
+        compression_type: CompressionType::Truncated,
+        warning: Some(CompressionWarning {
+            code: "COMPRESSION_FALLBACK".to_string(),
+            message: format!(
+                "AI摘要失败，已将前{}条消息归档到单独文件",
+                messages_to_compress_count
+            ),
+            split_file_path: split_path_str,
+        }),
+    })
 }
 
 #[cfg(test)]

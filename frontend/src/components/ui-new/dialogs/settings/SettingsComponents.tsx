@@ -324,6 +324,47 @@ export function SettingsInput({
   );
 }
 
+// SettingsNumberInput - A numeric input field
+export function SettingsNumberInput({
+  value,
+  onChange,
+  placeholder,
+  min,
+  max,
+  step,
+  error,
+  disabled,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  error?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <input
+      type="number"
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      placeholder={placeholder}
+      min={min}
+      max={max}
+      step={step}
+      disabled={disabled}
+      className={cn(
+        'settings-number-input w-full bg-secondary border rounded-sm px-base py-half text-sm text-high',
+        'placeholder:text-low placeholder:opacity-80 focus:outline-none focus:ring-1 focus:ring-brand',
+        '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
+        error ? 'border-error' : 'border-border',
+        disabled && 'opacity-50 cursor-not-allowed'
+      )}
+    />
+  );
+}
+
 // SettingsTextarea - A multi-line text input
 export function SettingsTextarea({
   value,
