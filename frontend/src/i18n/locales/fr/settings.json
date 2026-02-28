@@ -283,6 +283,18 @@
           "label": "Activer la bêta des espaces de travail",
           "helper": "Utiliser la nouvelle interface des espaces de travail lors de la visualisation des tentatives de tâches. Les tâches s'ouvriront d'abord en vue tâche, et les tentatives s'ouvriront dans la nouvelle vue des espaces de travail."
         }
+      },
+      "chatCompression": {
+        "title": "Compression de l'historique de chat",
+        "description": "Configurer la stratégie de compression pour les longues conversations.",
+        "tokenThreshold": {
+          "label": "Seuil de tokens",
+          "helper": "Déclenche la compression lorsque le nombre total de tokens dépasse cette valeur (par défaut : 50 000)."
+        },
+        "compressionPercentage": {
+          "label": "Pourcentage de compression",
+          "helper": "Pourcentage de messages à compresser lorsque le seuil est dépassé (par défaut : 25%)."
+        }
       }
     },
     "agents": {

@@ -44,14 +44,28 @@ pub async fn get_run_diff(
         return Err(ApiError::BadRequest("Chat run not found".to_string()));
     };
 
-    let diff_path = PathBuf::from(run.run_dir).join("diff.patch");
-    let content = match tokio::fs::read_to_string(&diff_path).await {
+    let scoped_diff_path = PathBuf::from(&run.run_dir).join(format!(
+        "session_agent_{}_run_{:04}_diff.patch",
+        run.session_agent_id, run.run_index
+    ));
+    let prefixed_diff_path = PathBuf::from(&run.run_dir).join(format!(
+        "run_{:04}_diff.patch",
+        run.run_index
+    ));
+    let legacy_diff_path = PathBuf::from(&run.run_dir).join("diff.patch");
+    let content = match tokio::fs::read_to_string(&scoped_diff_path).await {
         Ok(content) => content,
-        Err(_) => {
-            return Err(ApiError::BadRequest(
-                "Chat run diff file not found".to_string(),
-            ));
-        }
+        Err(_) => match tokio::fs::read_to_string(&prefixed_diff_path).await {
+            Ok(content) => content,
+            Err(_) => match tokio::fs::read_to_string(&legacy_diff_path).await {
+                Ok(content) => content,
+                Err(_) => {
+                    return Err(ApiError::BadRequest(
+                        "Chat run diff file not found".to_string(),
+                    ));
+                }
+            },
+        },
     };
 
     Ok(([(CONTENT_TYPE, "text/plain; charset=utf-8")], content).into_response())
@@ -80,13 +94,32 @@ pub async fn get_run_untracked_file(
         return Err(ApiError::BadRequest("Invalid untracked path".to_string()));
     }
 
-    let file_path = PathBuf::from(run.run_dir).join("untracked").join(rel_path);
-    let content = match tokio::fs::read_to_string(&file_path).await {
+    let scoped_untracked_dir = PathBuf::from(&run.run_dir).join(format!(
+        "session_agent_{}_run_{:04}_untracked",
+        run.session_agent_id, run.run_index
+    ));
+    let prefixed_untracked_dir =
+        PathBuf::from(&run.run_dir).join(format!("run_{:04}_untracked", run.run_index));
+    let legacy_untracked_dir = PathBuf::from(&run.run_dir).join("untracked");
+    let scoped_path = scoped_untracked_dir.join(&rel_path);
+    let content = match tokio::fs::read_to_string(&scoped_path).await {
         Ok(content) => content,
         Err(_) => {
-            return Err(ApiError::BadRequest(
-                "Untracked file content not found".to_string(),
-            ));
+            let prefixed_path = prefixed_untracked_dir.join(&rel_path);
+            match tokio::fs::read_to_string(&prefixed_path).await {
+                Ok(content) => content,
+                Err(_) => {
+                    let legacy_path = legacy_untracked_dir.join(rel_path);
+                    match tokio::fs::read_to_string(&legacy_path).await {
+                        Ok(content) => content,
+                        Err(_) => {
+                            return Err(ApiError::BadRequest(
+                                "Untracked file content not found".to_string(),
+                            ));
+                        }
+                    }
+                }
+            }
         }
     };
 

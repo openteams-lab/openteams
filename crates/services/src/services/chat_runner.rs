@@ -50,9 +50,11 @@ use crate::services::chat::{self, ChatServiceError};
 
 const UNTRACKED_FILE_LIMIT: u64 = 1024 * 1024;
 const MAX_AGENT_CHAIN_DEPTH: u32 = 5;
-const AGENTS_CHATGROUP_DIR: &str = ".agents_chatgroup";
-const RUNS_DIR_NAME: &str = ".runs";
-const CONTEXT_DIR_NAME: &str = ".context";
+const AGENTS_CHATGROUP_HOME_DIR: &str = ".agents-chatgroup";
+const AGENTS_CHATGROUP_DATA_DIR: &str = "data";
+const RUNS_DIR_NAME: &str = "runs";
+const CONTEXT_DIR_NAME: &str = "context";
+const RUN_RECORDS_DIR_NAME: &str = "run_records";
 const RESERVED_USER_HANDLE: &str = "you";
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
 
@@ -61,7 +63,6 @@ struct DiffInfo {
 }
 
 struct ContextSnapshot {
-    jsonl: String,
     workspace_path: PathBuf,
     run_path: PathBuf,
     context_compacted: bool,
@@ -96,6 +97,9 @@ struct SessionAgentSummary {
     name: String,
     runner_type: String,
     state: ChatSessionAgentState,
+    /// Description of the agent for GROUP_MEMBERS display
+    description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     system_prompt: Option<String>,
     tools_enabled: serde_json::Value,
 }
@@ -139,6 +143,10 @@ pub enum ChatStreamEvent {
         mentioned_agent: String,
         agent_id: Uuid,
         status: MentionStatus,
+    },
+    CompressionWarning {
+        session_id: Uuid,
+        warning: super::chat::CompressionWarning,
     },
 }
 
@@ -719,12 +727,13 @@ impl ChatRunner {
                 .clone()
                 .unwrap_or_else(|| self.build_workspace_path(session_id, agent_id));
             fs::create_dir_all(&workspace_path).await?;
-            let runs_dir = Self::chat_runs_dir(&workspace_path);
-            fs::create_dir_all(&runs_dir).await?;
+            let run_records_dir = Self::chat_run_records_dir(session_id);
+            fs::create_dir_all(&run_records_dir).await?;
 
             let run_index = ChatRun::next_run_index(&self.db.pool, session_agent_id).await?;
             let run_id = Uuid::new_v4();
-            let run_dir = runs_dir.join(format!("run_{:04}", run_index));
+            let run_dir =
+                run_records_dir.join(Self::run_records_prefix(session_agent_id, run_index));
             fs::create_dir_all(&run_dir).await?;
 
             let input_path = run_dir.join("input.md");
@@ -750,7 +759,6 @@ impl ChatRunner {
             let prompt = self.build_prompt(
                 &agent,
                 source_message,
-                &context_snapshot.jsonl,
                 &context_snapshot.workspace_path,
                 &session_agents,
                 message_attachments.as_ref(),
@@ -900,16 +908,31 @@ impl ChatRunner {
             .to_string()
     }
 
-    fn chat_storage_root(workspace_path: &str) -> PathBuf {
-        PathBuf::from(workspace_path).join(AGENTS_CHATGROUP_DIR)
+    fn chat_data_root() -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from(r"C:\Users\Admin"))
+            .join(AGENTS_CHATGROUP_HOME_DIR)
+            .join(AGENTS_CHATGROUP_DATA_DIR)
     }
 
-    fn chat_runs_dir(workspace_path: &str) -> PathBuf {
-        Self::chat_storage_root(workspace_path).join(RUNS_DIR_NAME)
+    fn chat_storage_root(session_id: Uuid) -> PathBuf {
+        Self::chat_data_root().join(session_id.to_string())
     }
 
-    fn chat_context_dir(workspace_path: &str) -> PathBuf {
-        Self::chat_storage_root(workspace_path).join(CONTEXT_DIR_NAME)
+    fn chat_runs_dir(session_id: Uuid) -> PathBuf {
+        Self::chat_storage_root(session_id).join(RUNS_DIR_NAME)
+    }
+
+    fn chat_run_records_dir(session_id: Uuid) -> PathBuf {
+        Self::chat_runs_dir(session_id).join(RUN_RECORDS_DIR_NAME)
+    }
+
+    fn chat_context_dir(session_id: Uuid) -> PathBuf {
+        Self::chat_storage_root(session_id).join(CONTEXT_DIR_NAME)
+    }
+
+    fn run_records_prefix(session_agent_id: Uuid, run_index: i64) -> String {
+        format!("session_agent_{session_agent_id}_run_{run_index:04}")
     }
 
     fn parse_runner_type(&self, agent: &ChatAgent) -> Result<BaseCodingAgent, ChatRunnerError> {
@@ -1127,21 +1150,16 @@ impl ChatRunner {
 
         let jsonl = compacted.jsonl;
 
-        let context_dir = Self::chat_context_dir(workspace_path);
+        let context_dir = Self::chat_context_dir(session_id);
         fs::create_dir_all(&context_dir).await?;
         let context_path = context_dir.join("messages.jsonl");
         fs::write(&context_path, jsonl.as_bytes()).await?;
 
-        let runs_dir = run_dir
-            .parent()
-            .map(|path| path.to_path_buf())
-            .unwrap_or_else(|| Self::chat_runs_dir(workspace_path));
-        fs::create_dir_all(&runs_dir).await?;
-        let run_context_path = runs_dir.join(format!("run_{session_id}.jsonl"));
+        fs::create_dir_all(run_dir).await?;
+        let run_context_path = run_dir.join("context.jsonl");
         fs::write(&run_context_path, jsonl.as_bytes()).await?;
 
         Ok(ContextSnapshot {
-            jsonl,
             workspace_path: context_path,
             run_path: run_context_path,
             context_compacted,
@@ -1304,12 +1322,23 @@ impl ChatRunner {
                 continue;
             };
             let system_prompt = agent.system_prompt.trim();
+            // Extract description from first line of system prompt or use agent name
+            let description = if !system_prompt.is_empty() {
+                system_prompt
+                    .lines()
+                    .next()
+                    .map(|line| line.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            } else {
+                None
+            };
             summaries.push(SessionAgentSummary {
                 session_agent_id: session_agent.id,
                 agent_id: agent.id,
                 name: agent.name.clone(),
                 runner_type: agent.runner_type.clone(),
                 state: session_agent.state,
+                description,
                 system_prompt: if system_prompt.is_empty() {
                     None
                 } else {
@@ -1322,18 +1351,70 @@ impl ChatRunner {
         Ok(summaries)
     }
 
+    /// Build the system prompt containing agent role, group members, and critical instructions.
+    /// This is separated from the user message for potential future API-level system prompt support.
+    fn build_system_prompt(
+        &self,
+        agent: &ChatAgent,
+        session_agents: &[SessionAgentSummary],
+        chat_history_path: &Path,
+    ) -> String {
+        let mut system = String::new();
+
+        // 1. Agent role settings
+        if !agent.system_prompt.trim().is_empty() {
+            system.push_str("[AGENT_ROLE]\n");
+            system.push_str(agent.system_prompt.trim());
+            system.push_str("\n[/AGENT_ROLE]\n\n");
+        }
+
+        // 2. Group members info (separate from AGENT_ROLE)
+        system.push_str("[GROUP_MEMBERS]\n");
+        system.push_str("当前群聊中的AI成员:\n");
+        if session_agents.is_empty() {
+            system.push_str("- 无其他AI成员\n");
+        } else {
+            for member in session_agents {
+                let description = member
+                    .description
+                    .as_deref()
+                    .unwrap_or("AI助手");
+                system.push_str(&format!(
+                    "- @{}: {} (状态: {:?})\n",
+                    member.name,
+                    description,
+                    member.state
+                ));
+            }
+        }
+        system.push_str("[/GROUP_MEMBERS]\n\n");
+
+        // 3. Critical instruction to read history file
+        system.push_str("[CRITICAL_INSTRUCTION]\n");
+        system.push_str("在执行任何任务之前，你必须首先读取群聊历史消息文件:\n");
+        system.push_str(&format!(
+            "文件路径: {}\n",
+            chat_history_path.to_string_lossy()
+        ));
+        system.push_str("文件格式: JSON，包含 sender 和 content 字段\n");
+        system.push_str("这是强制性要求，必须先了解群聊上下文再回复。\n");
+        system.push_str("[/CRITICAL_INSTRUCTION]\n");
+
+        system
+    }
+
+    /// Build the user message prompt (envelope, reference, attachments, message).
     #[allow(clippy::too_many_arguments)]
-    fn build_prompt(
+    fn build_user_prompt(
         &self,
         agent: &ChatAgent,
         message: &ChatMessage,
-        context_jsonl: &str,
-        context_path: &Path,
-        session_agents: &[SessionAgentSummary],
         message_attachments: Option<&MessageAttachmentContext>,
         reference: Option<&ReferenceContext>,
     ) -> String {
         let mut prompt = String::new();
+
+        // Envelope metadata
         prompt.push_str("[ENVELOPE]\n");
         prompt.push_str(&format!("session_id={}\n", message.session_id));
         let sender_handle = self.resolve_reply_handle(message);
@@ -1343,35 +1424,7 @@ impl ChatRunner {
         prompt.push_str(&format!("timestamp={}\n", message.created_at));
         prompt.push_str("[/ENVELOPE]\n\n");
 
-        if !agent.system_prompt.trim().is_empty() {
-            prompt.push_str("[AGENT_ROLE]\n");
-            prompt.push_str(agent.system_prompt.trim());
-            prompt.push_str("\n[/AGENT_ROLE]\n\n");
-        }
-
-        prompt.push_str("[SESSION_AGENTS]\n");
-        prompt.push_str("AI members in current session in JSONL format.\n");
-        if session_agents.is_empty() {
-            prompt.push_str("none\n");
-        } else {
-            for summary in session_agents {
-                if let Ok(line) = serde_json::to_string(summary) {
-                    prompt.push_str(&line);
-                    prompt.push('\n');
-                }
-            }
-        }
-        prompt.push_str("[/SESSION_AGENTS]\n\n");
-
-        prompt.push_str("[GROUP_CONTEXT]\n");
-        prompt.push_str("Historical group chat messages (oldest to newest) in JSONL format.\n");
-        prompt.push_str(&format!(
-            "context_path={}\n",
-            context_path.to_string_lossy()
-        ));
-        prompt.push_str(context_jsonl);
-        prompt.push_str("\n[/GROUP_CONTEXT]\n\n");
-
+        // Reference message (if any)
         if let Some(reference) = reference {
             prompt.push_str("[REFERENCE_MESSAGE]\n");
             prompt.push_str(
@@ -1402,6 +1455,7 @@ impl ChatRunner {
             prompt.push_str("\n[/REFERENCE_MESSAGE]\n\n");
         }
 
+        // Message attachments (if any)
         if let Some(message_attachments) = message_attachments
             && !message_attachments.attachments.is_empty()
         {
@@ -1421,11 +1475,38 @@ impl ChatRunner {
             prompt.push_str("[/MESSAGE_ATTACHMENTS]\n\n");
         }
 
+        // User message (simplified format: sender + content)
         prompt.push_str("[USER_MESSAGE]\n");
-        prompt.push_str(message.content.trim());
-        prompt.push_str("\n[/USER_MESSAGE]\n");
+        prompt.push_str(&format!("{}: {}\n", sender_handle, message.content.trim()));
+        prompt.push_str("[/USER_MESSAGE]\n");
 
         prompt
+    }
+
+    /// Build the full prompt by combining system prompt and user prompt.
+    /// This maintains backwards compatibility while allowing future separation.
+    #[allow(clippy::too_many_arguments)]
+    fn build_prompt(
+        &self,
+        agent: &ChatAgent,
+        message: &ChatMessage,
+        context_path: &Path,
+        session_agents: &[SessionAgentSummary],
+        message_attachments: Option<&MessageAttachmentContext>,
+        reference: Option<&ReferenceContext>,
+    ) -> String {
+        // Build system prompt with agent role, group members, and history file instruction
+        let system_prompt = self.build_system_prompt(agent, session_agents, context_path);
+
+        // Build user prompt with envelope, reference, attachments, and message
+        let user_prompt = self.build_user_prompt(agent, message, message_attachments, reference);
+
+        // Combine system and user prompts
+        let mut full_prompt = system_prompt;
+        full_prompt.push_str("\n");
+
+        full_prompt.push_str(&user_prompt);
+        full_prompt
     }
 
     fn spawn_log_forwarders(
