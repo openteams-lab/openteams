@@ -283,6 +283,18 @@
           "label": "啟用工作區 Beta",
           "helper": "查看任務嘗試時使用新的工作區介面。任務將首先在任務檢視中開啟，嘗試將在新的工作區檢視中開啟。"
         }
+      },
+      "chatCompression": {
+        "title": "聊天歷史壓縮",
+        "description": "配置長對話的壓縮策略。",
+        "tokenThreshold": {
+          "label": "Token 閾值",
+          "helper": "當總 token 數超過此值時觸發壓縮（預設：50,000）。"
+        },
+        "compressionPercentage": {
+          "label": "壓縮百分比",
+          "helper": "超過閾值時壓縮的消息百分比（預設：25%）。"
+        }
       }
     },
     "agents": {

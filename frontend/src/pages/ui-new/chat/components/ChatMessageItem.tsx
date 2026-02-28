@@ -1,4 +1,4 @@
-import {
+﻿import {
   CheckCircleIcon,
   XCircleIcon,
   WarningCircleIcon,
@@ -35,6 +35,7 @@ import {
   extractAttachments,
   detectApiError,
   formatBytes,
+  renderSendMessageDirectives,
 } from '../utils';
 import { formatTokenCount } from '@/utils/string';
 
@@ -134,7 +135,9 @@ export function ChatMessageItem({
     !Array.isArray(message.meta) &&
     (message.meta as { context_compacted?: unknown }).context_compacted ===
       true;
-
+  const displayContent = isAgent
+    ? renderSendMessageDirectives(message.content)
+    : message.content;
   // System messages
   if (message.sender_type === ChatSenderType.system) {
     return (
@@ -172,7 +175,7 @@ export function ChatMessageItem({
         >
           <span className="chat-session-context-compacted-separator-line" />
           <span className="chat-session-context-compacted-separator-text">
-            ----{t('message.contextCompressed')}---
+            {t('message.contextCompressed')}
           </span>
           <span className="chat-session-context-compacted-separator-line" />
         </div>
@@ -330,7 +333,7 @@ export function ChatMessageItem({
                 </div>
               ) : null;
             })()}
-            <ChatMarkdown content={message.content} />
+            <ChatMarkdown content={displayContent} />
             {mentionList.length > 0 && (
               <div className="chat-session-mentions mt-half flex flex-wrap items-center gap-half text-xs text-low">
                 <span>{t('message.mentions')}:</span>
@@ -488,16 +491,18 @@ export function ChatMessageItem({
                 typeof meta === 'object' &&
                 !Array.isArray(meta) &&
                 'token_usage' in meta
-                  ? (meta as { token_usage?: { total_tokens?: number } })
+                  ? (meta as { token_usage?: { total_tokens?: number; is_estimated?: boolean } })
                       .token_usage
                   : null;
               const tokenCount =
                 typeof tokenUsage?.total_tokens === 'number'
                   ? tokenUsage.total_tokens
                   : null;
+              const isEstimated = tokenUsage?.is_estimated === true;
               return tokenCount !== null ? (
                 <div className="chat-session-message-tokens flex justify-end mt-1">
                   <span className="text-xs text-low opacity-60">
+                    {isEstimated && <span className="text-yellow-500 mr-0.5">~</span>}
                     {t('message.replyTokenUsage', {
                       value: formatTokenCount(tokenCount),
                     })}

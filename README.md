@@ -205,6 +205,12 @@ cd AgentsChatGroup
 
 # 2. Install dependencies
 pnpm i
+
+# 3. generate typescript type
+pnpm run generate-types
+
+# 4. run database migrate
+pnpm run prepare-db
 ```
 
 **Terminal A (backend)**
@@ -219,8 +225,8 @@ cargo run --bin server
 **Terminal B (frontend)**
 
 ```powershell
-$env:FRONTEND_PORT = node scripts/setup-dev-environment.js frontend
-$env:BACKEND_PORT = <backend port>
+$env:FRONTEND_PORT = <frontend port generated from terminal A>
+$env:BACKEND_PORT = <backend port generated from terminal A>
 cd frontend
 pnpm dev -- --port $env:FRONTEND_PORT --host
 ```

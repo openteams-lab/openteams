@@ -142,11 +142,13 @@ export type ChatArtifact = { id: string, session_id: string, name: string, path:
 
 export type ChatRun = { id: string, session_id: string, session_agent_id: string, run_index: bigint, run_dir: string, input_path: string | null, output_path: string | null, raw_log_path: string | null, meta_path: string | null, created_at: string, };
 
-export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, };
+export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, };
 
 export type ChatStreamDeltaType = "assistant" | "thinking";
 
 export type MentionStatus = "received" | "running" | "completed" | "failed";
+
+export type CompressionWarning = { code: string, message: string, split_file_path: string, };
 
 export type Image = { id: string, file_path: string, original_name: string, mime_type: string | null, size_bytes: bigint, hash: string, created_at: string, updated_at: string, };
 
@@ -464,7 +466,11 @@ export type Config = { config_version: string, theme: ThemeMode, executor_profil
 /**
  * Chat presets configuration (member and team templates)
  */
-chat_presets: ChatPresetsConfig, };
+chat_presets: ChatPresetsConfig, 
+/**
+ * Chat compression configuration
+ */
+chat_compression: ChatCompressionConfig, };
 
 export type NotificationConfig = { sound_enabled: boolean, push_enabled: boolean, sound_file: SoundFile, };
 
@@ -485,6 +491,16 @@ export type UiLanguage = "BROWSER" | "EN" | "FR" | "JA" | "ES" | "KO" | "ZH_HANS
 export type ShowcaseState = { seen_features: Array<string>, };
 
 export type SendMessageShortcut = "ModifierEnter" | "Enter";
+
+export type ChatCompressionConfig = { 
+/**
+ * Token threshold before compression kicks in (default: 10000000)
+ */
+token_threshold: number, 
+/**
+ * Percentage of messages to compress (default: 25)
+ */
+compression_percentage: number, };
 
 export type ChatPresetsConfig = { 
 /**
@@ -721,7 +737,7 @@ export type NormalizedEntry = { timestamp: string | null, entry_type: Normalized
 
 export type NormalizedEntryType = { "type": "user_message" } | { "type": "user_feedback", denied_tool: string, } | { "type": "assistant_message" } | { "type": "tool_use", tool_name: string, action_type: ActionType, status: ToolStatus, } | { "type": "system_message" } | { "type": "error_message", error_type: NormalizedEntryError, } | { "type": "thinking" } | { "type": "loading" } | { "type": "next_action", failed: boolean, execution_processes: number, needs_setup: boolean, } | { "type": "token_usage_info" } & TokenUsageInfo;
 
-export type TokenUsageInfo = { total_tokens: number, model_context_window: number, };
+export type TokenUsageInfo = { total_tokens: number, model_context_window: number, input_tokens: number | null, output_tokens: number | null, cache_read_tokens: number | null, is_estimated: boolean, };
 
 export type FileChange = { "action": "write", content: string, } | { "action": "delete" } | { "action": "rename", new_path: string, } | { "action": "edit", 
 /**

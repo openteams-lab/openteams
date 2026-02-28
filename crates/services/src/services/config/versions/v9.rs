@@ -74,6 +74,39 @@ pub struct ChatPresetsConfig {
     pub teams: Vec<ChatTeamPreset>,
 }
 
+/// Chat Compression Configuration
+#[derive(Clone, Debug, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export)]
+pub struct ChatCompressionConfig {
+    /// Token threshold before compression kicks in (default: 10000000)
+    #[serde(default = "default_token_threshold")]
+    pub token_threshold: u32,
+    /// Percentage of messages to compress (default: 25)
+    #[serde(default = "default_compression_percentage")]
+    pub compression_percentage: u8,
+}
+
+fn default_token_threshold() -> u32 {
+    10_000_000
+}
+
+fn default_compression_percentage() -> u8 {
+    25
+}
+
+impl Default for ChatCompressionConfig {
+    fn default() -> Self {
+        Self {
+            token_threshold: default_token_threshold(),
+            compression_percentage: default_compression_percentage(),
+        }
+    }
+}
+
+fn default_chat_compression() -> ChatCompressionConfig {
+    ChatCompressionConfig::default()
+}
+
 fn default_true() -> bool {
     true
 }
@@ -735,6 +768,9 @@ pub struct Config {
     /// Chat presets configuration (member and team templates)
     #[serde(default = "default_chat_presets")]
     pub chat_presets: ChatPresetsConfig,
+    /// Chat compression configuration
+    #[serde(default = "default_chat_compression")]
+    pub chat_compression: ChatCompressionConfig,
 }
 
 impl Config {
@@ -768,6 +804,7 @@ impl Config {
             commit_reminder_prompt: old_config.commit_reminder_prompt,
             send_message_shortcut: old_config.send_message_shortcut,
             chat_presets: default_chat_presets(),
+            chat_compression: ChatCompressionConfig::default(),
         }
         .with_completed_chat_presets()
     }
@@ -825,6 +862,7 @@ impl Default for Config {
             commit_reminder_prompt: None,
             send_message_shortcut: SendMessageShortcut::default(),
             chat_presets: default_chat_presets(),
+            chat_compression: ChatCompressionConfig::default(),
         }
     }
 }

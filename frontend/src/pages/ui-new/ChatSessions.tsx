@@ -1,4 +1,4 @@
-import {
+﻿import {
   type ChangeEvent,
   useCallback,
   useEffect,
@@ -38,6 +38,7 @@ import {
   type SessionMember,
   type RunHistoryItem,
   type MentionStatus,
+  type StreamRun,
   useChatData,
   useRunHistory,
   useChatMutations,
@@ -46,11 +47,14 @@ import {
   useDiffViewer,
   fallbackRunnerTypes,
   memberNameRegex,
+  mentionAllKeyword,
+  isMentionAllAlias,
   MAX_MEMBER_NAME_LENGTH,
   getMemberNameLength,
   getMessageTone,
   extractDiffMeta,
   extractMentions,
+  extractRunId,
   extractReferenceId,
   extractAttachments,
   truncateText,
@@ -60,6 +64,7 @@ import {
   buildMemberPresetImportPlan,
   getLocalizedMemberPresetName,
   getLocalizedTeamPresetName,
+  validateWorkspacePath,
   type MemberPresetImportPlan,
 } from './chat/utils';
 
@@ -69,7 +74,6 @@ import { ChatHeader } from './chat/components/ChatHeader';
 import { CleanupModeBar } from './chat/components/CleanupModeBar';
 import { ChatMessageItem } from './chat/components/ChatMessageItem';
 import { RunningAgentPlaceholder } from './chat/components/RunningAgentPlaceholder';
-import { StreamingRunEntry } from './chat/components/StreamingRunEntry';
 import { MessageInputArea } from './chat/components/MessageInputArea';
 import { AiMembersSidebar } from './chat/components/AiMembersSidebar';
 import { WorkspaceDrawer } from './chat/components/WorkspaceDrawer';
@@ -151,6 +155,7 @@ const getSessionTitleLength = (value: string) =>
 
 export function ChatSessions() {
   const { t } = useTranslation('chat');
+  const { t: tCommon } = useTranslation('common');
   const { sessionId } = useParams<{ sessionId?: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -341,9 +346,12 @@ export function ChatSessions() {
     agentStates,
     agentStateInfos,
     mentionStatuses,
+    compressionWarning,
     setAgentStates,
     setAgentStateInfos,
     setMentionStatuses,
+    pruneStreamingRunsForSession,
+    clearCompressionWarning,
   } = useChatWebSocket(activeSessionId, handleIncomingMessage);
 
   // Mutations
@@ -388,6 +396,7 @@ export function ChatSessions() {
     selectedMentions,
     setSelectedMentions,
     mentionQuery,
+    showMentionAllSuggestion,
     replyToMessage,
     setReplyToMessage,
     inputRef,
@@ -400,6 +409,17 @@ export function ChatSessions() {
     highlightedMentionIndex,
     handleMentionKeyDown,
   } = useMessageInput(mentionAgents);
+
+  const agentOptionsWithAll = useMemo(
+    () => [
+      {
+        value: mentionAllKeyword,
+        label: t('input.mentionAllOption'),
+      },
+      ...agentOptions,
+    ],
+    [agentOptions, t]
+  );
 
   // Diff viewer
   const {
@@ -475,6 +495,9 @@ export function ChatSessions() {
     title: string;
     message: string;
     onConfirm: () => void | Promise<void>;
+    mode?: 'confirm' | 'alert';
+    confirmText?: string;
+    cancelText?: string;
   } | null>(null);
   const [teamImportPlan, setTeamImportPlan] = useState<
     MemberPresetImportPlan[] | null
@@ -497,6 +520,23 @@ export function ChatSessions() {
     startHeight: number;
   } | null>(null);
   const lastExpandedLeftWidthRef = useRef(340);
+
+  const showDuplicateMemberNameWarning = useCallback(
+    (name: string) => {
+      const duplicateMessage = t('modals.confirm.messages.duplicateMemberName', {
+        name: `@${name}`,
+      });
+      setMemberError(duplicateMessage);
+      setConfirmModal({
+        title: t('modals.confirm.titles.duplicateMemberName'),
+        message: duplicateMessage,
+        mode: 'alert',
+        confirmText: tCommon('ok'),
+        onConfirm: () => {},
+      });
+    },
+    [t, tCommon]
+  );
 
   // Sync messages from query
   useEffect(() => {
@@ -774,14 +814,28 @@ export function ChatSessions() {
     () => Object.keys(streamingRuns).length,
     [streamingRuns]
   );
+  const streamingRunAgentIds = useMemo(
+    () => new Set(Object.values(streamingRuns).map((run) => run.agentId)),
+    [streamingRuns]
+  );
+  const runByAgentId = useMemo<Map<string, StreamRun>>(() => {
+    const next = new Map<string, StreamRun>();
+    for (const run of Object.values(streamingRuns)) {
+      next.set(run.agentId, run);
+    }
+    return next;
+  }, [streamingRuns]);
 
   const placeholderAgents = useMemo(
     () =>
       sessionMembers.filter((member) => {
         const state = agentStates[member.agent.id] ?? member.sessionAgent.state;
-        return state === ChatSessionAgentState.running;
+        return (
+          state === ChatSessionAgentState.running ||
+          streamingRunAgentIds.has(member.agent.id)
+        );
       }),
-    [agentStates, sessionMembers]
+    [agentStates, sessionMembers, streamingRunAgentIds]
   );
 
   const activeWorkspaceAgent = workspaceAgentId
@@ -819,6 +873,38 @@ export function ChatSessions() {
     !isUploadingAttachments;
 
   const diffViewerRun = diffViewerRunId ? runDiffs[diffViewerRunId] : null;
+
+  useEffect(() => {
+    if (!activeSessionId) return;
+
+    const completedRunIds = new Set<string>();
+    for (const message of messagesData) {
+      const runId = extractRunId(message.meta);
+      if (runId) {
+        completedRunIds.add(runId);
+      }
+    }
+
+    const runningAgentIds = new Set<string>();
+    for (const member of sessionMembers) {
+      const state = agentStates[member.agent.id] ?? member.sessionAgent.state;
+      if (state === ChatSessionAgentState.running) {
+        runningAgentIds.add(member.agent.id);
+      }
+    }
+
+    pruneStreamingRunsForSession(
+      activeSessionId,
+      completedRunIds,
+      runningAgentIds
+    );
+  }, [
+    activeSessionId,
+    agentStates,
+    messagesData,
+    pruneStreamingRunsForSession,
+    sessionMembers,
+  ]);
 
   // Check agent availability
   useEffect(() => {
@@ -1193,8 +1279,29 @@ export function ChatSessions() {
     if (!activeSessionId || isArchived) return;
     const trimmed = draft.trim();
     const contentMentions = extractMentions(draft);
-    const mentionsToInject = selectedMentions.filter(
-      (name) => !contentMentions.has(name)
+    const directContentMentions = new Set(
+      Array.from(contentMentions).filter(
+        (name) => !isMentionAllAlias(name)
+      )
+    );
+    const allMentionTokens = [
+      ...Array.from(contentMentions),
+      ...selectedMentions,
+    ];
+    const expandedMentions = new Set<string>();
+
+    for (const mention of allMentionTokens) {
+      if (isMentionAllAlias(mention)) {
+        for (const agent of mentionAgents) {
+          expandedMentions.add(agent.name);
+        }
+        continue;
+      }
+      expandedMentions.add(mention);
+    }
+
+    const mentionsToInject = Array.from(expandedMentions).filter(
+      (name) => !directContentMentions.has(name)
     );
     const mentionPrefix =
       mentionsToInject.length > 0
@@ -1204,7 +1311,7 @@ export function ChatSessions() {
 
     if (!content && attachedFiles.length === 0) return;
 
-    const allMentions = new Set([...contentMentions, ...selectedMentions]);
+    const allMentions = expandedMentions;
     const runningMentionedAgents: string[] = [];
     allMentions.forEach((name) => {
       const agentId = agentIdByName.get(name);
@@ -1404,9 +1511,8 @@ export function ChatSessions() {
       if (!activeSessionId) return [];
 
       const takenNamesLowercase = new Set(
-        agents.map((agent) => agent.name.toLowerCase())
+        sessionMembers.map((member) => member.agent.name.toLowerCase())
       );
-      const plannedAgentIds = new Set<string>();
       const plans: MemberPresetImportPlan[] = [];
 
       for (const memberPresetId of teamPreset.member_ids) {
@@ -1446,7 +1552,6 @@ export function ChatSessions() {
         const plan = buildMemberPresetImportPlan({
           preset,
           sessionId: activeSessionId,
-          existingAgents: agents,
           sessionMembers,
           defaultRunnerType: config?.executor_profile?.executor ?? null,
           enabledRunnerTypes,
@@ -1470,18 +1575,6 @@ export function ChatSessions() {
           continue;
         }
 
-        if (plan.agentId && plannedAgentIds.has(plan.agentId)) {
-          plans.push({
-            ...plan,
-            action: 'skip',
-            reason: 'duplicate-reused-agent',
-          });
-          continue;
-        }
-
-        if (plan.agentId) {
-          plannedAgentIds.add(plan.agentId);
-        }
         plans.push(plan);
       }
 
@@ -1489,7 +1582,6 @@ export function ChatSessions() {
     },
     [
       activeSessionId,
-      agents,
       availableRunnerTypes,
       config?.executor_profile?.executor,
       enabledRunnerTypes,
@@ -1543,8 +1635,8 @@ export function ChatSessions() {
 
   const validateAndPrepareImportPlan = useCallback(
     (plan: MemberPresetImportPlan[]): MemberPresetImportPlan[] | null => {
-      const existingAgentNamesLower = new Set(
-        agents.map((agent) => agent.name.toLowerCase())
+      const existingSessionMemberNamesLower = new Set(
+        sessionMembers.map((member) => member.agent.name.toLowerCase())
       );
       const enabledRunnerTypesSet = new Set(enabledRunnerTypes);
       const createNamesLower = new Set<string>();
@@ -1588,38 +1680,18 @@ export function ChatSessions() {
           return null;
         }
 
-        if (!workspacePath) {
-          setMemberError('Workspace path is required.');
+        const workspacePathError = validateWorkspacePath(workspacePath);
+        if (workspacePathError) {
+          setMemberError(workspacePathError);
           return null;
         }
 
-        let nextEntry: MemberPresetImportPlan = {
+        const nextEntry: MemberPresetImportPlan = {
           ...entry,
           finalName,
           workspacePath,
           runnerType,
         };
-
-        if (nextEntry.action === 'reuse') {
-          const reusableAgent = nextEntry.agentId
-            ? agents.find((agent) => agent.id === nextEntry.agentId)
-            : null;
-          if (!reusableAgent || reusableAgent.name !== finalName) {
-            nextEntry = {
-              ...nextEntry,
-              action: 'create',
-              reason: 'create-new-agent',
-              agentId: null,
-            };
-          } else if (reusableAgent.runner_type !== runnerType) {
-            nextEntry = {
-              ...nextEntry,
-              action: 'create',
-              reason: 'runner-changed-create-new-agent',
-              agentId: null,
-            };
-          }
-        }
 
         if (nextEntry.action === 'create') {
           const finalNameLower = finalName.toLowerCase();
@@ -1630,8 +1702,8 @@ export function ChatSessions() {
             setMemberError('AI member name cannot match the project name.');
             return null;
           }
-          if (existingAgentNamesLower.has(finalNameLower)) {
-            setMemberError('An AI member with this name already exists.');
+          if (existingSessionMemberNamesLower.has(finalNameLower)) {
+            showDuplicateMemberNameWarning(finalName);
             return null;
           }
           if (createNamesLower.has(finalNameLower)) {
@@ -1646,7 +1718,12 @@ export function ChatSessions() {
 
       return preparedPlan;
     },
-    [activeSessionTitle, agents, enabledRunnerTypes]
+    [
+      activeSessionTitle,
+      enabledRunnerTypes,
+      sessionMembers,
+      showDuplicateMemberNameWarning,
+    ]
   );
 
   const handleAddMemberPreset = useCallback(
@@ -1661,12 +1738,11 @@ export function ChatSessions() {
       }
 
       const takenNamesLowercase = new Set(
-        agents.map((agent) => agent.name.toLowerCase())
+        sessionMembers.map((member) => member.agent.name.toLowerCase())
       );
       const plan = buildMemberPresetImportPlan({
         preset,
         sessionId: activeSessionId,
-        existingAgents: agents,
         sessionMembers,
         defaultRunnerType: config?.executor_profile?.executor ?? null,
         enabledRunnerTypes,
@@ -1680,9 +1756,7 @@ export function ChatSessions() {
       }
 
       if (plan.action === 'skip') {
-        setMemberError(
-          'This preset is already represented in the current session.'
-        );
+        showDuplicateMemberNameWarning(plan.finalName);
         return;
       }
 
@@ -1692,12 +1766,12 @@ export function ChatSessions() {
     },
     [
       activeSessionId,
-      agents,
       availableRunnerTypes,
       config?.executor_profile?.executor,
       enabledRunnerTypes,
       isArchived,
       sessionMembers,
+      showDuplicateMemberNameWarning,
       t,
     ]
   );
@@ -1719,11 +1793,25 @@ export function ChatSessions() {
         return;
       }
 
+      const duplicateEntry = plan.find(
+        (entry) => entry.reason === 'duplicate-name-in-session'
+      );
+      if (duplicateEntry) {
+        showDuplicateMemberNameWarning(duplicateEntry.finalName);
+        return;
+      }
+
       setTeamImportName(getLocalizedTeamPresetName(teamPreset, t));
       setTeamImportPlan(plan);
       setMemberError(null);
     },
-    [activeSessionId, buildTeamImportPlan, isArchived, t]
+    [
+      activeSessionId,
+      buildTeamImportPlan,
+      isArchived,
+      showDuplicateMemberNameWarning,
+      t,
+    ]
   );
 
   const handleUpdateTeamImportPlanEntry = useCallback(
@@ -1778,7 +1866,13 @@ export function ChatSessions() {
       setTeamImportName(null);
     } catch (error) {
       console.error('Failed to import team preset', error);
-      setMemberError('Failed to import team preset.');
+      if (error instanceof ApiError && error.message) {
+        setMemberError(error.message);
+      } else if (error instanceof Error && error.message) {
+        setMemberError(error.message);
+      } else {
+        setMemberError('Failed to import team preset.');
+      }
     } finally {
       setIsImportingTeam(false);
     }
@@ -1846,8 +1940,9 @@ export function ChatSessions() {
       return;
     }
 
-    if (!workspacePathVal) {
-      setMemberError('Workspace path is required.');
+    const workspacePathError = validateWorkspacePath(workspacePathVal);
+    if (workspacePathError) {
+      setMemberError(workspacePathError);
       return;
     }
 
@@ -1873,13 +1968,13 @@ export function ChatSessions() {
         (editingMember.sessionAgent.workspace_path ?? '') !== workspacePathVal;
 
       if (nameChanged) {
-        const conflict = agents.find(
-          (agent) =>
-            agent.id !== editingMember.agent.id &&
-            agent.name.toLowerCase() === name.toLowerCase()
+        const conflict = sessionMembers.find(
+          (member) =>
+            member.sessionAgent.id !== editingMember.sessionAgent.id &&
+            member.agent.name.toLowerCase() === name.toLowerCase()
         );
         if (conflict) {
-          setMemberError('An AI member with this name already exists.');
+          showDuplicateMemberNameWarning(name);
           return;
         }
       }
@@ -1937,45 +2032,21 @@ export function ChatSessions() {
           );
         }
       } else {
-        const existing = agents.find((agent) => agent.name === name);
-        let agentId = existing?.id ?? null;
-        if (existing) {
-          const existingVariant =
-            extractExecutorProfileVariant(existing.tools_enabled) ?? 'DEFAULT';
-          const existingVariantChanged = existingVariant !== selectedVariant;
-          const existingToolsEnabled = withExecutorProfileVariant(
-            existing.tools_enabled,
-            selectedVariant
-          );
-          const updatePayload = {
-            name: null,
-            runner_type:
-              existing.runner_type !== runnerType ? runnerType : null,
-            system_prompt:
-              (existing.system_prompt ?? '') !== prompt ? prompt : null,
-            tools_enabled: existingVariantChanged ? existingToolsEnabled : null,
-          };
-
-          if (
-            updatePayload.runner_type ||
-            updatePayload.system_prompt ||
-            updatePayload.tools_enabled
-          ) {
-            const updated = await chatApi.updateAgent(
-              existing.id,
-              updatePayload
-            );
-            agentId = updated.id;
-          }
-        } else {
-          const created = await chatApi.createAgent({
-            name,
-            runner_type: runnerType,
-            system_prompt: prompt,
-            tools_enabled: withExecutorProfileVariant({}, selectedVariant),
-          });
-          agentId = created.id;
+        const conflict = sessionMembers.find(
+          (member) => member.agent.name.toLowerCase() === name.toLowerCase()
+        );
+        if (conflict) {
+          showDuplicateMemberNameWarning(name);
+          return;
         }
+
+        const created = await chatApi.createAgent({
+          name,
+          runner_type: runnerType,
+          system_prompt: prompt,
+          tools_enabled: withExecutorProfileVariant({}, selectedVariant),
+        });
+        const agentId = created.id;
 
         if (!agentId) {
           setMemberError('Unable to create AI member.');
@@ -2005,6 +2076,13 @@ export function ChatSessions() {
     } catch (error) {
       console.warn('Failed to add AI member', error);
       if (error instanceof ApiError && error.message) {
+        if (
+          error.message.includes('already exists in this session') ||
+          error.message.includes('An AI member with this name already exists.')
+        ) {
+          showDuplicateMemberNameWarning(name);
+          return;
+        }
         setMemberError(error.message);
       } else if (error instanceof Error && error.message) {
         setMemberError(error.message);
@@ -2073,7 +2151,7 @@ export function ChatSessions() {
     });
   };
 
-  // ── Preset import handlers ──────────────────────────────────────────────────
+  // 鈹€鈹€ Preset import handlers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   const handleSaveTitle = async () => {
     if (!activeSessionId) return;
@@ -2359,6 +2437,26 @@ export function ChatSessions() {
               This session is archived. Messages and members are read-only.
             </div>
           )}
+          {compressionWarning && (
+            <div className="chat-session-compression-warning text-xs border border-yellow-500/50 rounded-sm bg-yellow-500/10 px-base py-half flex items-center justify-between">
+              <div className="flex items-center gap-half">
+                <span className="text-yellow-600 dark:text-yellow-400">!</span>
+                <span className="text-yellow-700 dark:text-yellow-300">
+                  {compressionWarning.message}
+                </span>
+                <span className="text-yellow-600/80 dark:text-yellow-400/80 ml-1">
+                  ({compressionWarning.split_file_path})
+                </span>
+              </div>
+              <button
+                type="button"
+                className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200 text-xs"
+                onClick={clearCompressionWarning}
+              >
+                x
+              </button>
+            </div>
+          )}
           {!isLoading && messageList.length === 0 && (
             <div className="text-sm text-low">
               No messages yet. Start the conversation below.
@@ -2454,27 +2552,11 @@ export function ChatSessions() {
             <RunningAgentPlaceholder
               key={`placeholder-${member.agent.id}`}
               member={member}
+              run={runByAgentId.get(member.agent.id)}
               tone={getMessageTone(member.agent.id, false)}
               stateInfo={agentStateInfos[member.agent.id]}
               clock={clock}
               isStopping={stoppingAgents.has(member.agent.id)}
-              onStop={handleStopAgent}
-            />
-          ))}
-
-          {/* Streaming runs */}
-          {Object.entries(streamingRuns).map(([runId, run]) => (
-            <StreamingRunEntry
-              key={`stream-${runId}`}
-              runId={runId}
-              run={run}
-              agentName={agentById.get(run.agentId)?.name ?? 'Agent'}
-              runnerType={agentById.get(run.agentId)?.runner_type ?? null}
-              tone={getMessageTone(run.agentId, false)}
-              sessionAgent={sessionAgents.find(
-                (sa) => sa.agent_id === run.agentId
-              )}
-              isStopping={stoppingAgents.has(run.agentId)}
               onStop={handleStopAgent}
             />
           ))}
@@ -2495,9 +2577,10 @@ export function ChatSessions() {
           inputRef={inputRef}
           selectedMentions={selectedMentions}
           onSelectedMentionsChange={setSelectedMentions}
-          agentOptions={agentOptions}
+          agentOptions={agentOptionsWithAll}
           mentionAgentsCount={mentionAgents.length}
           mentionQuery={mentionQuery}
+          showMentionAllSuggestion={showMentionAllSuggestion}
           visibleMentionSuggestions={visibleMentionSuggestions}
           highlightedMentionIndex={highlightedMentionIndex}
           onMentionSelect={handleMentionSelect}
@@ -2654,6 +2737,9 @@ export function ChatSessions() {
         title={confirmModal?.title ?? t('modals.confirm.defaultTitle')}
         message={confirmModal?.message ?? ''}
         isLoading={isConfirmLoading}
+        mode={confirmModal?.mode}
+        confirmText={confirmModal?.confirmText}
+        cancelText={confirmModal?.cancelText}
         onConfirm={async () => {
           if (!confirmModal) return;
           setIsConfirmLoading(true);
