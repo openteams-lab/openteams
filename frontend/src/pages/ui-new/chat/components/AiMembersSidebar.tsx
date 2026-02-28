@@ -615,6 +615,10 @@ export function AiMembersSidebar({
         </div>
       )}
 
+      {memberError && (
+        <div className="text-xs text-error">{memberError}</div>
+      )}
+
       {/* Close button at bottom-right */}
       <div className="flex justify-end pt-half">
         <PrimaryButton
