@@ -1426,9 +1426,7 @@ export const migrationApi = {
 
 // Chat APIs
 export const chatApi = {
-  listSessions: async (
-    status?: ChatSessionStatus
-  ): Promise<ChatSession[]> => {
+  listSessions: async (status?: ChatSessionStatus): Promise<ChatSession[]> => {
     const queryParam = status ? `?status=${encodeURIComponent(status)}` : '';
     const response = await makeRequest(`/api/chat/sessions${queryParam}`);
     return handleApiResponse<ChatSession[]>(response);
@@ -1459,16 +1457,22 @@ export const chatApi = {
   },
 
   archiveSession: async (sessionId: string): Promise<ChatSession> => {
-    const response = await makeRequest(`/api/chat/sessions/${sessionId}/archive`, {
-      method: 'POST',
-    });
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/archive`,
+      {
+        method: 'POST',
+      }
+    );
     return handleApiResponse<ChatSession>(response);
   },
 
   restoreSession: async (sessionId: string): Promise<ChatSession> => {
-    const response = await makeRequest(`/api/chat/sessions/${sessionId}/restore`, {
-      method: 'POST',
-    });
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/restore`,
+      {
+        method: 'POST',
+      }
+    );
     return handleApiResponse<ChatSession>(response);
   },
 
@@ -1589,10 +1593,10 @@ export const chatApi = {
     return handleApiResponse<ChatAgent>(response);
   },
 
-  listSessionAgents: async (
-    sessionId: string
-  ): Promise<ChatSessionAgent[]> => {
-    const response = await makeRequest(`/api/chat/sessions/${sessionId}/agents`);
+  listSessionAgents: async (sessionId: string): Promise<ChatSessionAgent[]> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/agents`
+    );
     return handleApiResponse<ChatSessionAgent[]>(response);
   },
 
@@ -1655,10 +1659,7 @@ export const chatApi = {
     return response.text();
   },
 
-  getRunUntrackedFile: async (
-    runId: string,
-    path: string
-  ): Promise<string> => {
+  getRunUntrackedFile: async (runId: string, path: string): Promise<string> => {
     const response = await makeRequest(
       `/api/chat/runs/${runId}/untracked?path=${encodeURIComponent(path)}`
     );

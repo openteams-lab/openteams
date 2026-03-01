@@ -38,13 +38,8 @@ export function RunningAgentPlaceholder({
   const { t } = useTranslation('chat');
   const [thinkingExpanded, setThinkingExpanded] = useState(true);
   const startedAtStr = stateInfo?.startedAt;
-  const startedAtMs = startedAtStr
-    ? new Date(startedAtStr).getTime()
-    : clock;
-  const elapsedSeconds = Math.max(
-    0,
-    Math.floor((clock - startedAtMs) / 1000)
-  );
+  const startedAtMs = startedAtStr ? new Date(startedAtStr).getTime() : clock;
+  const elapsedSeconds = Math.max(0, Math.floor((clock - startedAtMs) / 1000));
   const avatarSeed = getAgentAvatarSeed(
     member.agent.id,
     member.agent.runner_type,
@@ -83,9 +78,7 @@ export function RunningAgentPlaceholder({
               'text-xs text-error hover:text-error/80',
               isStopping && 'opacity-50 cursor-not-allowed'
             )}
-            onClick={() =>
-              onStop(member.sessionAgent.id, member.agent.id)
-            }
+            onClick={() => onStop(member.sessionAgent.id, member.agent.id)}
             disabled={isStopping}
           >
             {isStopping ? t('agent.stopping') : t('agent.stop')}
@@ -125,10 +118,7 @@ export function RunningAgentPlaceholder({
           )}
 
           {hasAssistant ? (
-            <ChatMarkdown
-              content={assistantContent}
-              textClassName="text-sm"
-            />
+            <ChatMarkdown content={assistantContent} textClassName="text-sm" />
           ) : (
             <div className="text-sm text-low">{t('agent.processing')}</div>
           )}

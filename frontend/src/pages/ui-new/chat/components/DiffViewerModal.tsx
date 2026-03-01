@@ -69,8 +69,12 @@ export function DiffViewerModal({
       >
         <div className="flex items-center justify-between border-b border-border px-base py-half">
           <div>
-            <div className="text-sm text-normal font-medium">{t('modals.diffViewer.title')}</div>
-            <div className="text-xs text-low">{t('modals.diffViewer.run')} {runId.slice(0, 8)}</div>
+            <div className="text-sm text-normal font-medium">
+              {t('modals.diffViewer.title')}
+            </div>
+            <div className="text-xs text-low">
+              {t('modals.diffViewer.run')} {runId.slice(0, 8)}
+            </div>
           </div>
           <div className="flex items-center gap-half">
             <button
@@ -78,7 +82,9 @@ export function DiffViewerModal({
               className="text-low hover:text-normal"
               onClick={onToggleFullscreen}
               aria-label={
-                isFullscreen ? t('modals.diffViewer.exitFullScreen') : t('modals.diffViewer.fullScreen')
+                isFullscreen
+                  ? t('modals.diffViewer.exitFullScreen')
+                  : t('modals.diffViewer.fullScreen')
               }
             >
               <DiffViewerIcon className="size-icon-sm" />
@@ -97,7 +103,9 @@ export function DiffViewerModal({
           {hasDiff ? (
             <>
               {runDiff?.loading && (
-                <div className="text-xs text-low">{t('modals.diffViewer.loadingDiff')}</div>
+                <div className="text-xs text-low">
+                  {t('modals.diffViewer.loadingDiff')}
+                </div>
               )}
               {runDiff?.error && (
                 <div className="text-xs text-error">{runDiff.error}</div>
@@ -195,7 +203,9 @@ export function DiffViewerModal({
           )}
           {untrackedFiles.length > 0 && (
             <div className="space-y-half">
-              <div className="text-xs text-low">{t('modals.diffViewer.untrackedFiles')}</div>
+              <div className="text-xs text-low">
+                {t('modals.diffViewer.untrackedFiles')}
+              </div>
               {untrackedFiles.map((path) => {
                 const key = `${runId}:${path}`;
                 const entry = untrackedContent[key];
@@ -213,7 +223,9 @@ export function DiffViewerModal({
                         className="text-brand hover:text-brand-hover"
                         onClick={() => onToggleUntracked(runId, path)}
                       >
-                        {entry?.open ? t('modals.diffViewer.hide') : t('modals.diffViewer.view')}
+                        {entry?.open
+                          ? t('modals.diffViewer.hide')
+                          : t('modals.diffViewer.view')}
                       </button>
                     </div>
                     {entry?.open && (

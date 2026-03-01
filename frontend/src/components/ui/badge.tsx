@@ -31,7 +31,12 @@ function Badge({ className, variant, ...props }: BadgeProps) {
   const resolvedVariant = variant ?? 'default';
   return (
     <div
-      className={cn('ui-badge', `ui-badge-${resolvedVariant}`, badgeVariants({ variant }), className)}
+      className={cn(
+        'ui-badge',
+        `ui-badge-${resolvedVariant}`,
+        badgeVariants({ variant }),
+        className
+      )}
       {...props}
     />
   );

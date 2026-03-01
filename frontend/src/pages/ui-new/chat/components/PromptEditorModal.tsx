@@ -81,7 +81,9 @@ export function PromptEditorModal({
       >
         <div className="flex items-center justify-between border-b border-border px-base py-half">
           <div>
-            <div className="text-sm text-normal font-medium">{resolvedTitle}</div>
+            <div className="text-sm text-normal font-medium">
+              {resolvedTitle}
+            </div>
             <div className="text-xs text-low">{resolvedDescription}</div>
           </div>
           <button
@@ -127,7 +129,9 @@ export function PromptEditorModal({
                   onChange={onPromptFileChange}
                 />
                 {promptFileLoading && <span>{resolvedLoadingFileText}</span>}
-                {promptFileError && <span className="text-error">{promptFileError}</span>}
+                {promptFileError && (
+                  <span className="text-error">{promptFileError}</span>
+                )}
               </div>
             )}
             <PrimaryButton value={resolvedDoneText} onClick={onClose} />

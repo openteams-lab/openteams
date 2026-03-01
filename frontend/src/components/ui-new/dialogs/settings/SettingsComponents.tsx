@@ -193,7 +193,9 @@ export function SettingsField({
         </label>
       )}
       {children}
-      {error && <p className="settings-field-error text-sm text-error">{error}</p>}
+      {error && (
+        <p className="settings-field-error text-sm text-error">{error}</p>
+      )}
       {description && !error && (
         <p className="settings-field-description text-sm text-low">
           {description}
@@ -274,7 +276,10 @@ export function SettingsSelect<T extends string>({
       <DropdownMenuTrigger asChild>
         <DropdownMenuTriggerButton
           label={selectedOption?.label || placeholder}
-          className={cn('settings-select-trigger w-full justify-between', className)}
+          className={cn(
+            'settings-select-trigger w-full justify-between',
+            className
+          )}
           disabled={disabled}
         />
       </DropdownMenuTrigger>

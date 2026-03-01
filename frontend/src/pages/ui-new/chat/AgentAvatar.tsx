@@ -20,9 +20,7 @@ const avatarPalette: AvatarTone[] = [
   { bg: '#fdf2fb', border: '#efd0ea' },
 ];
 
-const knownBaseCodingAgents = new Set<string>(
-  Object.values(BaseCodingAgent)
-);
+const knownBaseCodingAgents = new Set<string>(Object.values(BaseCodingAgent));
 
 export function getAgentAvatarSeed(
   agentId: string | null | undefined,
@@ -54,10 +52,7 @@ interface AgentBrandIconProps {
   className?: string;
 }
 
-export function AgentBrandIcon({
-  runnerType,
-  className,
-}: AgentBrandIconProps) {
+export function AgentBrandIcon({ runnerType, className }: AgentBrandIconProps) {
   const baseCodingAgent = toBaseCodingAgent(runnerType);
 
   if (!baseCodingAgent) {
@@ -66,4 +61,3 @@ export function AgentBrandIcon({
 
   return <AgentIcon agent={baseCodingAgent} className={className} />;
 }
-

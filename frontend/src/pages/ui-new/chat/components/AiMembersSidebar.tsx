@@ -348,9 +348,7 @@ export function AiMembersSidebar({
             <button
               type="button"
               className="inline-flex items-center justify-center rounded-xs p-0.5 text-low hover:text-normal hover:bg-secondary/50 transition-colors"
-              onClick={() =>
-                setIsTeamPresetsExpanded((expanded) => !expanded)
-              }
+              onClick={() => setIsTeamPresetsExpanded((expanded) => !expanded)}
               aria-label={
                 isTeamPresetsExpanded
                   ? t('sidebar.collapseSidebar')
@@ -615,9 +613,7 @@ export function AiMembersSidebar({
         </div>
       )}
 
-      {memberError && (
-        <div className="text-xs text-error">{memberError}</div>
-      )}
+      {memberError && <div className="text-xs text-error">{memberError}</div>}
 
       {/* Close button at bottom-right */}
       <div className="flex justify-end pt-half">
@@ -633,9 +629,7 @@ export function AiMembersSidebar({
 
   const renderCustomTab = () => (
     <div className="space-y-half">
-      <div className="text-xs text-low">
-        {t('members.memberNameHint')}
-      </div>
+      <div className="text-xs text-low">{t('members.memberNameHint')}</div>
       <div className="space-y-half">
         <label className="text-xs text-low">
           {t('members.memberNameLabel')}
@@ -650,9 +644,7 @@ export function AiMembersSidebar({
           )}
         />
         {memberNameLengthError && (
-          <div className="text-xs text-error">
-            {memberNameLengthError}
-          </div>
+          <div className="text-xs text-error">{memberNameLengthError}</div>
         )}
       </div>
       <div className="space-y-half">
@@ -662,9 +654,7 @@ export function AiMembersSidebar({
         <select
           value={newMemberRunnerType}
           onChange={(event) => onRunnerTypeChange(event.target.value)}
-          disabled={
-            isCheckingAvailability || enabledRunnerTypes.length === 0
-          }
+          disabled={isCheckingAvailability || enabledRunnerTypes.length === 0}
           className={cn(
             'chat-session-member-field w-full rounded-sm border bg-panel px-base py-half',
             'text-sm text-normal focus:outline-none'
@@ -754,9 +744,7 @@ export function AiMembersSidebar({
         />
       </div>
       <div className="space-y-half">
-        <label className="text-xs text-low">
-          {t('members.workspacePath')}
-        </label>
+        <label className="text-xs text-low">{t('members.workspacePath')}</label>
         <input
           value={newMemberWorkspace}
           onChange={(event) => onWorkspaceChange(event.target.value)}
@@ -779,9 +767,7 @@ export function AiMembersSidebar({
           </p>
         )}
       </div>
-      {memberError && (
-        <div className="text-xs text-error">{memberError}</div>
-      )}
+      {memberError && <div className="text-xs text-error">{memberError}</div>}
       <div className="flex items-center justify-end gap-half pt-half">
         <PrimaryButton
           variant="tertiary"
@@ -794,9 +780,7 @@ export function AiMembersSidebar({
           value={editingMember ? t('members.save') : t('members.add')}
           actionIcon={isSavingMember ? 'spinner' : PlusIcon}
           onClick={onSaveMember}
-          disabled={
-            isSavingMember || isArchived || !!memberNameLengthError
-          }
+          disabled={isSavingMember || isArchived || !!memberNameLengthError}
           className="chat-session-member-btn"
         />
       </div>
@@ -804,7 +788,8 @@ export function AiMembersSidebar({
   );
 
   const importPromptEditorValue =
-    importPromptEditorIndex !== null && teamImportPlan?.[importPromptEditorIndex]
+    importPromptEditorIndex !== null &&
+    teamImportPlan?.[importPromptEditorIndex]
       ? teamImportPlan[importPromptEditorIndex].systemPrompt
       : '';
 
@@ -814,192 +799,193 @@ export function AiMembersSidebar({
         className="chat-session-members-panel border-l border-border flex flex-col min-h-0 shrink-0"
         style={{ width }}
       >
-      <div className="chat-session-members-header px-base py-base border-b border-border flex items-center justify-between">
-        <div className="chat-session-members-title text-sm text-normal font-medium">
-          {t('members.title')}
-        </div>
-        <div className="chat-session-members-count text-xs text-low">
-          {t('members.countInSession', { count: sessionMembers.length })}
-        </div>
-      </div>
-      <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto p-base space-y-base">
-        {!activeSessionId && (
-          <div className="chat-session-members-empty text-xs text-low mt-base">
-            {t('members.selectSessionToManage')}
+        <div className="chat-session-members-header px-base py-base border-b border-border flex items-center justify-between">
+          <div className="chat-session-members-title text-sm text-normal font-medium">
+            {t('members.title')}
           </div>
-        )}
-        {activeSessionId && sessionMembers.length === 0 && (
-          <div className="chat-session-members-empty text-xs text-low mt-base">
-            {t('members.noMembersYet')}
+          <div className="chat-session-members-count text-xs text-low">
+            {t('members.countInSession', { count: sessionMembers.length })}
           </div>
-        )}
-
-        {sessionMembers.map(({ agent, sessionAgent }) => {
-          const state = agentStates[agent.id] ?? ChatSessionAgentState.idle;
-          const memberVariant =
-            extractExecutorProfileVariant(agent.tools_enabled) ?? undefined;
-          const modelName = getModelName(agent.runner_type, memberVariant);
-          const modelDisplayName = getModelDisplayName(
-            agent.runner_type,
-            modelName
-          );
-          const fullText = `${toPrettyCase(agent.runner_type)} | ${agentStateLabels[state]}${modelDisplayName ? ` | ${modelDisplayName}` : ''}`;
-          const modelStatusPreview = truncateByChars(fullText, 15);
-          const avatarSeed = getAgentAvatarSeed(
-            agent.id,
-            agent.runner_type,
-            agent.name
-          );
-          const workspacePath = sessionAgent.workspace_path ?? '';
-          const shouldShowWorkspaceTooltip = workspacePath.length > 48;
-
-          return (
-            <div
-              key={sessionAgent.id}
-              className="chat-session-member-card border border-border rounded-sm px-base py-half space-y-half"
-            >
-              <div className="chat-session-member-header">
-                <div className="chat-session-member-primary flex items-center gap-half min-w-0">
-                  <span
-                    className={cn(
-                      'size-2 rounded-full',
-                      agentStateDotClass[state],
-                      state === ChatSessionAgentState.running && 'animate-pulse'
-                    )}
-                  />
-                  <span
-                    className="chat-session-member-avatar"
-                    style={getAgentAvatarStyle(avatarSeed)}
-                  >
-                    <AgentBrandIcon
-                      runnerType={agent.runner_type}
-                      className="chat-session-member-avatar-logo"
-                    />
-                  </span>
-                  <MemberNameWithTooltip name={agent.name} />
-                </div>
-                <div className="chat-session-member-actions flex items-center gap-half text-xs">
-                  <button
-                    type="button"
-                    className="chat-session-member-action workspace"
-                    onClick={() => onOpenWorkspace(agent.id)}
-                  >
-                    {t('members.workspace')}
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      'chat-session-member-action edit',
-                      isArchived && 'pointer-events-none opacity-50'
-                    )}
-                    onClick={() => onEditMember({ agent, sessionAgent })}
-                    disabled={isArchived}
-                  >
-                    {t('members.edit')}
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      'chat-session-member-action danger',
-                      isArchived && 'pointer-events-none opacity-50'
-                    )}
-                    onClick={() => onRemoveMember({ agent, sessionAgent })}
-                    disabled={isArchived}
-                  >
-                    {t('members.remove')}
-                  </button>
-                </div>
-              </div>
-              <Tooltip content={fullText} side="bottom">
-                <div className="chat-session-member-model text-xs text-low cursor-default">
-                  <div className="chat-session-member-model-full">
-                    {fullText}
-                  </div>
-                  <div className="chat-session-member-model-truncated">
-                    {modelStatusPreview}
-                  </div>
-                </div>
-              </Tooltip>
-              {workspacePath && (
-                <div className="chat-session-member-workspace-row">
-                  {shouldShowWorkspaceTooltip ? (
-                    <Tooltip content={workspacePath} side="bottom">
-                      <div className="chat-session-member-workspace text-xs text-low truncate cursor-default">
-                        {workspacePath}
-                      </div>
-                    </Tooltip>
-                  ) : (
-                    <div className="chat-session-member-workspace text-xs text-low truncate">
-                      {workspacePath}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Add Member Section */}
-        <div className="chat-session-member-form border-t border-border pt-base space-y-half">
-          {!isAddMemberOpen ? (
-            <button
-              type="button"
-              className="chat-session-add-member-btn"
-              onClick={onOpenAddMember}
-              disabled={!activeSessionId || isArchived}
-            >
-              {t('members.addAiMember')}
-              <PlusIcon className="size-icon-xs" weight="light" />
-            </button>
-          ) : (
-            <div className="chat-session-member-form-panel border border-border rounded-sm p-base space-y-half">
-              {/* Tab bar - only show when not editing */}
-              {!editingMember && (
-                <div className="flex border-b border-border">
-                  <button
-                    type="button"
-                    className={cn(
-                      'flex-1 text-xs py-1 text-center transition-colors',
-                      activeTab === 'preset'
-                        ? 'text-normal border-b-2 border-brand font-medium'
-                        : 'text-low hover:text-normal'
-                    )}
-                    onClick={() => setActiveTab('preset')}
-                  >
-                    {t('members.tabPreset')}
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      'flex-1 text-xs py-1 text-center transition-colors',
-                      activeTab === 'custom'
-                        ? 'text-normal border-b-2 border-brand font-medium'
-                        : 'text-low hover:text-normal'
-                    )}
-                    onClick={() => setActiveTab('custom')}
-                  >
-                    {t('members.tabCustom')}
-                  </button>
-                </div>
-              )}
-
-              {/* Edit mode header */}
-              {editingMember && (
-                <div className="text-sm text-normal font-medium">
-                  {t('members.editAiMember')}
-                </div>
-              )}
-
-              {/* Tab content */}
-              <div className="pt-half">
-                {activeTab === 'preset' && !editingMember
-                  ? renderPresetTab()
-                  : renderCustomTab()}
-              </div>
+        </div>
+        <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto p-base space-y-base">
+          {!activeSessionId && (
+            <div className="chat-session-members-empty text-xs text-low mt-base">
+              {t('members.selectSessionToManage')}
             </div>
           )}
+          {activeSessionId && sessionMembers.length === 0 && (
+            <div className="chat-session-members-empty text-xs text-low mt-base">
+              {t('members.noMembersYet')}
+            </div>
+          )}
+
+          {sessionMembers.map(({ agent, sessionAgent }) => {
+            const state = agentStates[agent.id] ?? ChatSessionAgentState.idle;
+            const memberVariant =
+              extractExecutorProfileVariant(agent.tools_enabled) ?? undefined;
+            const modelName = getModelName(agent.runner_type, memberVariant);
+            const modelDisplayName = getModelDisplayName(
+              agent.runner_type,
+              modelName
+            );
+            const fullText = `${toPrettyCase(agent.runner_type)} | ${agentStateLabels[state]}${modelDisplayName ? ` | ${modelDisplayName}` : ''}`;
+            const modelStatusPreview = truncateByChars(fullText, 15);
+            const avatarSeed = getAgentAvatarSeed(
+              agent.id,
+              agent.runner_type,
+              agent.name
+            );
+            const workspacePath = sessionAgent.workspace_path ?? '';
+            const shouldShowWorkspaceTooltip = workspacePath.length > 48;
+
+            return (
+              <div
+                key={sessionAgent.id}
+                className="chat-session-member-card border border-border rounded-sm px-base py-half space-y-half"
+              >
+                <div className="chat-session-member-header">
+                  <div className="chat-session-member-primary flex items-center gap-half min-w-0">
+                    <span
+                      className={cn(
+                        'size-2 rounded-full',
+                        agentStateDotClass[state],
+                        state === ChatSessionAgentState.running &&
+                          'animate-pulse'
+                      )}
+                    />
+                    <span
+                      className="chat-session-member-avatar"
+                      style={getAgentAvatarStyle(avatarSeed)}
+                    >
+                      <AgentBrandIcon
+                        runnerType={agent.runner_type}
+                        className="chat-session-member-avatar-logo"
+                      />
+                    </span>
+                    <MemberNameWithTooltip name={agent.name} />
+                  </div>
+                  <div className="chat-session-member-actions flex items-center gap-half text-xs">
+                    <button
+                      type="button"
+                      className="chat-session-member-action workspace"
+                      onClick={() => onOpenWorkspace(agent.id)}
+                    >
+                      {t('members.workspace')}
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        'chat-session-member-action edit',
+                        isArchived && 'pointer-events-none opacity-50'
+                      )}
+                      onClick={() => onEditMember({ agent, sessionAgent })}
+                      disabled={isArchived}
+                    >
+                      {t('members.edit')}
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        'chat-session-member-action danger',
+                        isArchived && 'pointer-events-none opacity-50'
+                      )}
+                      onClick={() => onRemoveMember({ agent, sessionAgent })}
+                      disabled={isArchived}
+                    >
+                      {t('members.remove')}
+                    </button>
+                  </div>
+                </div>
+                <Tooltip content={fullText} side="bottom">
+                  <div className="chat-session-member-model text-xs text-low cursor-default">
+                    <div className="chat-session-member-model-full">
+                      {fullText}
+                    </div>
+                    <div className="chat-session-member-model-truncated">
+                      {modelStatusPreview}
+                    </div>
+                  </div>
+                </Tooltip>
+                {workspacePath && (
+                  <div className="chat-session-member-workspace-row">
+                    {shouldShowWorkspaceTooltip ? (
+                      <Tooltip content={workspacePath} side="bottom">
+                        <div className="chat-session-member-workspace text-xs text-low truncate cursor-default">
+                          {workspacePath}
+                        </div>
+                      </Tooltip>
+                    ) : (
+                      <div className="chat-session-member-workspace text-xs text-low truncate">
+                        {workspacePath}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Add Member Section */}
+          <div className="chat-session-member-form border-t border-border pt-base space-y-half">
+            {!isAddMemberOpen ? (
+              <button
+                type="button"
+                className="chat-session-add-member-btn"
+                onClick={onOpenAddMember}
+                disabled={!activeSessionId || isArchived}
+              >
+                {t('members.addAiMember')}
+                <PlusIcon className="size-icon-xs" weight="light" />
+              </button>
+            ) : (
+              <div className="chat-session-member-form-panel border border-border rounded-sm p-base space-y-half">
+                {/* Tab bar - only show when not editing */}
+                {!editingMember && (
+                  <div className="flex border-b border-border">
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex-1 text-xs py-1 text-center transition-colors',
+                        activeTab === 'preset'
+                          ? 'text-normal border-b-2 border-brand font-medium'
+                          : 'text-low hover:text-normal'
+                      )}
+                      onClick={() => setActiveTab('preset')}
+                    >
+                      {t('members.tabPreset')}
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex-1 text-xs py-1 text-center transition-colors',
+                        activeTab === 'custom'
+                          ? 'text-normal border-b-2 border-brand font-medium'
+                          : 'text-low hover:text-normal'
+                      )}
+                      onClick={() => setActiveTab('custom')}
+                    >
+                      {t('members.tabCustom')}
+                    </button>
+                  </div>
+                )}
+
+                {/* Edit mode header */}
+                {editingMember && (
+                  <div className="text-sm text-normal font-medium">
+                    {t('members.editAiMember')}
+                  </div>
+                )}
+
+                {/* Tab content */}
+                <div className="pt-half">
+                  {activeTab === 'preset' && !editingMember
+                    ? renderPresetTab()
+                    : renderCustomTab()}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
       </aside>
       <PromptEditorModal
         isOpen={importPromptEditorIndex !== null}

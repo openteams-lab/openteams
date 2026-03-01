@@ -245,4 +245,3 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
 export const OnboardingDialog = defineModal<void, OnboardingResult>(
   OnboardingDialogImpl
 );
-

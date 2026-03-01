@@ -131,7 +131,6 @@ function AppContent() {
         OnboardingDialog.hide();
         return;
       }
-
     };
 
     showNextStep();

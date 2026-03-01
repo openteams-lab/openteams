@@ -1,11 +1,11 @@
 import { parseDiffStats } from '@/utils/diffStatsParser';
 import type { TFunction } from 'i18next';
-import type {
-  ChatMemberPreset,
-  ChatTeamPreset,
-  JsonValue,
-} from 'shared/types';
-import { mentionTokenRegex, messagePalette, userMessageTone } from './constants';
+import type { ChatMemberPreset, ChatTeamPreset, JsonValue } from 'shared/types';
+import {
+  mentionTokenRegex,
+  messagePalette,
+  userMessageTone,
+} from './constants';
 import type {
   ChatAttachment,
   DiffFileEntry,
@@ -99,7 +99,8 @@ export function extractDiffMeta(meta: unknown): DiffMeta {
     untracked_files?: unknown;
   };
   const runId = typeof raw.run_id === 'string' ? raw.run_id : null;
-  const preview = typeof raw.diff_preview === 'string' ? raw.diff_preview : null;
+  const preview =
+    typeof raw.diff_preview === 'string' ? raw.diff_preview : null;
   const truncated = raw.diff_truncated === true;
   const available = raw.diff_available === true || preview !== null;
   const untrackedFiles = Array.isArray(raw.untracked_files)
@@ -157,25 +158,44 @@ export function truncateText(value: string, maxLength: number): string {
  * Supports: Claude, OpenAI/Codex, QWen Coder, Azure OpenAI, Google AI, and other providers
  */
 export function detectApiError(content: string): {
-  type: 'quota_exceeded' | 'rate_limit' | 'overloaded' | 'credit_exhausted' | 'auth_error' | 'context_limit' | 'other_error';
+  type:
+    | 'quota_exceeded'
+    | 'rate_limit'
+    | 'overloaded'
+    | 'credit_exhausted'
+    | 'auth_error'
+    | 'context_limit'
+    | 'other_error';
   message: string;
   provider?: string;
 } | null {
   const lowered = content.toLowerCase();
 
   // === Anthropic/Claude specific errors ===
-  if (
-    lowered.includes('anthropic') ||
-    lowered.includes('claude')
-  ) {
-    if (lowered.includes('credit balance') || lowered.includes('credit exhausted')) {
-      return { type: 'credit_exhausted', message: 'Claude credit balance exhausted', provider: 'Anthropic' };
+  if (lowered.includes('anthropic') || lowered.includes('claude')) {
+    if (
+      lowered.includes('credit balance') ||
+      lowered.includes('credit exhausted')
+    ) {
+      return {
+        type: 'credit_exhausted',
+        message: 'Claude credit balance exhausted',
+        provider: 'Anthropic',
+      };
     }
     if (lowered.includes('rate limit') || lowered.includes('rate_limit')) {
-      return { type: 'rate_limit', message: 'Claude API rate limit exceeded', provider: 'Anthropic' };
+      return {
+        type: 'rate_limit',
+        message: 'Claude API rate limit exceeded',
+        provider: 'Anthropic',
+      };
     }
     if (lowered.includes('overloaded')) {
-      return { type: 'overloaded', message: 'Claude API is overloaded', provider: 'Anthropic' };
+      return {
+        type: 'overloaded',
+        message: 'Claude API is overloaded',
+        provider: 'Anthropic',
+      };
     }
   }
 
@@ -193,16 +213,41 @@ export function detectApiError(content: string): {
       lowered.includes('exceeded your current quota') ||
       lowered.includes('insufficient_quota')
     ) {
-      return { type: 'quota_exceeded', message: 'OpenAI quota exceeded', provider: 'OpenAI' };
+      return {
+        type: 'quota_exceeded',
+        message: 'OpenAI quota exceeded',
+        provider: 'OpenAI',
+      };
     }
-    if (lowered.includes('rate limit') || lowered.includes('rate_limit_exceeded')) {
-      return { type: 'rate_limit', message: 'OpenAI API rate limit exceeded', provider: 'OpenAI' };
+    if (
+      lowered.includes('rate limit') ||
+      lowered.includes('rate_limit_exceeded')
+    ) {
+      return {
+        type: 'rate_limit',
+        message: 'OpenAI API rate limit exceeded',
+        provider: 'OpenAI',
+      };
     }
-    if (lowered.includes('context_length_exceeded') || lowered.includes('maximum context length')) {
-      return { type: 'context_limit', message: 'OpenAI context length exceeded', provider: 'OpenAI' };
+    if (
+      lowered.includes('context_length_exceeded') ||
+      lowered.includes('maximum context length')
+    ) {
+      return {
+        type: 'context_limit',
+        message: 'OpenAI context length exceeded',
+        provider: 'OpenAI',
+      };
     }
-    if (lowered.includes('invalid_api_key') || lowered.includes('incorrect api key')) {
-      return { type: 'auth_error', message: 'OpenAI API key invalid', provider: 'OpenAI' };
+    if (
+      lowered.includes('invalid_api_key') ||
+      lowered.includes('incorrect api key')
+    ) {
+      return {
+        type: 'auth_error',
+        message: 'OpenAI API key invalid',
+        provider: 'OpenAI',
+      };
     }
   }
 
@@ -220,7 +265,11 @@ export function detectApiError(content: string): {
       lowered.includes('账户余额') ||
       lowered.includes('免费额度')
     ) {
-      return { type: 'quota_exceeded', message: 'QWen API 额度已用尽', provider: 'Alibaba' };
+      return {
+        type: 'quota_exceeded',
+        message: 'QWen API 额度已用尽',
+        provider: 'Alibaba',
+      };
     }
     if (
       lowered.includes('rate limit') ||
@@ -228,20 +277,39 @@ export function detectApiError(content: string): {
       lowered.includes('请求过于频繁') ||
       lowered.includes('qps')
     ) {
-      return { type: 'rate_limit', message: 'QWen API 请求频率超限', provider: 'Alibaba' };
+      return {
+        type: 'rate_limit',
+        message: 'QWen API 请求频率超限',
+        provider: 'Alibaba',
+      };
     }
-    if (lowered.includes('accessdenied') || lowered.includes('invalidaccesskey')) {
-      return { type: 'auth_error', message: 'QWen API 密钥无效', provider: 'Alibaba' };
+    if (
+      lowered.includes('accessdenied') ||
+      lowered.includes('invalidaccesskey')
+    ) {
+      return {
+        type: 'auth_error',
+        message: 'QWen API 密钥无效',
+        provider: 'Alibaba',
+      };
     }
   }
 
   // === Azure OpenAI specific errors ===
   if (lowered.includes('azure') && lowered.includes('openai')) {
     if (lowered.includes('quota') || lowered.includes('tokens per minute')) {
-      return { type: 'quota_exceeded', message: 'Azure OpenAI quota exceeded', provider: 'Azure' };
+      return {
+        type: 'quota_exceeded',
+        message: 'Azure OpenAI quota exceeded',
+        provider: 'Azure',
+      };
     }
     if (lowered.includes('rate limit') || lowered.includes('429')) {
-      return { type: 'rate_limit', message: 'Azure OpenAI rate limit exceeded', provider: 'Azure' };
+      return {
+        type: 'rate_limit',
+        message: 'Azure OpenAI rate limit exceeded',
+        provider: 'Azure',
+      };
     }
   }
 
@@ -253,20 +321,36 @@ export function detectApiError(content: string): {
     lowered.includes('vertex')
   ) {
     if (lowered.includes('quota') || lowered.includes('resource_exhausted')) {
-      return { type: 'quota_exceeded', message: 'Google AI quota exceeded', provider: 'Google' };
+      return {
+        type: 'quota_exceeded',
+        message: 'Google AI quota exceeded',
+        provider: 'Google',
+      };
     }
     if (lowered.includes('rate limit') || lowered.includes('429')) {
-      return { type: 'rate_limit', message: 'Google AI rate limit exceeded', provider: 'Google' };
+      return {
+        type: 'rate_limit',
+        message: 'Google AI rate limit exceeded',
+        provider: 'Google',
+      };
     }
   }
 
   // === DeepSeek specific errors ===
   if (lowered.includes('deepseek')) {
     if (lowered.includes('quota') || lowered.includes('balance')) {
-      return { type: 'quota_exceeded', message: 'DeepSeek 额度已用尽', provider: 'DeepSeek' };
+      return {
+        type: 'quota_exceeded',
+        message: 'DeepSeek 额度已用尽',
+        provider: 'DeepSeek',
+      };
     }
     if (lowered.includes('rate limit') || lowered.includes('429')) {
-      return { type: 'rate_limit', message: 'DeepSeek API 请求频率超限', provider: 'DeepSeek' };
+      return {
+        type: 'rate_limit',
+        message: 'DeepSeek API 请求频率超限',
+        provider: 'DeepSeek',
+      };
     }
   }
 
@@ -280,7 +364,8 @@ export function detectApiError(content: string): {
     lowered.includes('insufficient_quota') ||
     (lowered.includes('billing') && lowered.includes('limit')) ||
     lowered.includes('余额不足') ||
-    lowered.includes('额度') && (lowered.includes('用尽') || lowered.includes('不足'))
+    (lowered.includes('额度') &&
+      (lowered.includes('用尽') || lowered.includes('不足')))
   ) {
     return {
       type: 'quota_exceeded',
@@ -405,9 +490,7 @@ function stableStringifyJson(value: unknown): string {
     .join(',')}}`;
 }
 
-export function normalizePresetToolsEnabled(
-  value: unknown
-): JsonValue {
+export function normalizePresetToolsEnabled(value: unknown): JsonValue {
   if (value === null || value === undefined) {
     return {};
   }
@@ -418,8 +501,10 @@ export function normalizePresetToolsEnabled(
 }
 
 export function areToolsEnabledEqual(a: unknown, b: unknown): boolean {
-  return stableStringifyJson(normalizePresetToolsEnabled(a)) ===
-    stableStringifyJson(normalizePresetToolsEnabled(b));
+  return (
+    stableStringifyJson(normalizePresetToolsEnabled(a)) ===
+    stableStringifyJson(normalizePresetToolsEnabled(b))
+  );
 }
 
 export function resolvePresetRunnerType({
@@ -497,13 +582,17 @@ export function validateWorkspacePath(path: string): string | null {
   }
 
   const normalized = trimmed.replace(/\\/g, '/');
-  const segments = normalized.split('/').filter((segment) => segment.length > 0);
+  const segments = normalized
+    .split('/')
+    .filter((segment) => segment.length > 0);
   if (segments.includes('..')) {
     return "Workspace path cannot contain '..'.";
   }
 
   const isWindowsLikePath =
-    trimmed.includes('\\') || /^[a-zA-Z]:[\\/]/.test(trimmed) || trimmed.startsWith('\\\\');
+    trimmed.includes('\\') ||
+    /^[a-zA-Z]:[\\/]/.test(trimmed) ||
+    trimmed.startsWith('\\\\');
 
   if (isWindowsLikePath) {
     const windowsReservedNames = new Set([
@@ -622,9 +711,8 @@ export function buildMemberPresetImportPlan({
     return null;
   }
 
-  const presetName = preset.name.trim().length > 0
-    ? preset.name.trim()
-    : preset.id;
+  const presetName =
+    preset.name.trim().length > 0 ? preset.name.trim() : preset.id;
   const systemPrompt = preset.system_prompt?.trim() ?? '';
   const toolsEnabled = normalizePresetToolsEnabled(preset.tools_enabled);
   const hasSameNameInSession = sessionMembers.some(
