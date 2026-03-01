@@ -162,9 +162,7 @@ export function ChatPresetsSettingsSectionContent() {
   const [draft, setDraft] = useState<ChatPresetsConfig>(() =>
     cloneDeep(sourcePresets)
   );
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(
-    null
-  );
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [toolsDraft, setToolsDraft] = useState('{}');
   const [isMemberPromptEditorOpen, setIsMemberPromptEditorOpen] =
@@ -221,7 +219,8 @@ export function ChatPresetsSettingsSectionContent() {
   const selectedMember = useMemo(
     () =>
       selectedMemberId
-        ? draft.members.find((member) => member.id === selectedMemberId) ?? null
+        ? (draft.members.find((member) => member.id === selectedMemberId) ??
+          null)
         : null,
     [draft.members, selectedMemberId]
   );
@@ -229,7 +228,7 @@ export function ChatPresetsSettingsSectionContent() {
   const selectedTeam = useMemo(
     () =>
       selectedTeamId
-        ? draft.teams.find((team) => team.id === selectedTeamId) ?? null
+        ? (draft.teams.find((team) => team.id === selectedTeamId) ?? null)
         : null,
     [draft.teams, selectedTeamId]
   );
@@ -267,7 +266,11 @@ export function ChatPresetsSettingsSectionContent() {
       return;
     }
     setToolsDraft(
-      JSON.stringify(normalizeToolsEnabled(selectedMember.tools_enabled), null, 2)
+      JSON.stringify(
+        normalizeToolsEnabled(selectedMember.tools_enabled),
+        null,
+        2
+      )
     );
     setToolsError(null);
   }, [selectedMember]);
@@ -287,7 +290,10 @@ export function ChatPresetsSettingsSectionContent() {
   }, [profiles, t]);
 
   const updateMember = useCallback(
-    (memberId: string, updater: (current: ChatMemberPreset) => ChatMemberPreset) => {
+    (
+      memberId: string,
+      updater: (current: ChatMemberPreset) => ChatMemberPreset
+    ) => {
       setDraft((prev) => ({
         ...prev,
         members: prev.members.map((member) =>
@@ -302,7 +308,9 @@ export function ChatPresetsSettingsSectionContent() {
     (teamId: string, updater: (current: ChatTeamPreset) => ChatTeamPreset) => {
       setDraft((prev) => ({
         ...prev,
-        teams: prev.teams.map((team) => (team.id === teamId ? updater(team) : team)),
+        teams: prev.teams.map((team) =>
+          team.id === teamId ? updater(team) : team
+        ),
       }));
     },
     []
@@ -391,7 +399,9 @@ export function ChatPresetsSettingsSectionContent() {
     let nextId = '';
     setDraft((prev) => {
       const existingIds = new Set(prev.teams.map((team) => team.id));
-      const existingNames = new Set(prev.teams.map((team) => team.name.toLowerCase()));
+      const existingNames = new Set(
+        prev.teams.map((team) => team.name.toLowerCase())
+      );
       const id = makeUniqueId('custom_team_preset', existingIds);
       nextId = id;
       const name = makeUniqueName('team', existingNames);
@@ -415,7 +425,9 @@ export function ChatPresetsSettingsSectionContent() {
     let nextId = '';
     setDraft((prev) => {
       const existingIds = new Set(prev.teams.map((item) => item.id));
-      const existingNames = new Set(prev.teams.map((item) => item.name.toLowerCase()));
+      const existingNames = new Set(
+        prev.teams.map((item) => item.name.toLowerCase())
+      );
       const id = makeUniqueId(`${slugify(team.id)}_copy`, existingIds);
       nextId = id;
       const name = makeUniqueName(`${team.name} Copy`, existingNames);
@@ -624,13 +636,17 @@ export function ChatPresetsSettingsSectionContent() {
                           variant="tertiary"
                           value={t('settings.presets.actions.delete')}
                           actionIcon={TrashIcon}
-                          onClick={() => handleDeleteMemberPreset(selectedMember)}
+                          onClick={() =>
+                            handleDeleteMemberPreset(selectedMember)
+                          }
                         />
                       )}
                     </div>
                   </div>
 
-                  <SettingsField label={t('settings.presets.members.fields.id')}>
+                  <SettingsField
+                    label={t('settings.presets.members.fields.id')}
+                  >
                     <SettingsInput
                       value={selectedMember.id}
                       onChange={() => {}}
@@ -724,7 +740,8 @@ export function ChatPresetsSettingsSectionContent() {
                       onChange={(value) =>
                         updateMember(selectedMember.id, (current) => ({
                           ...current,
-                          default_workspace_path: value.length > 0 ? value : null,
+                          default_workspace_path:
+                            value.length > 0 ? value : null,
                         }))
                       }
                       placeholder={t(
@@ -841,7 +858,9 @@ export function ChatPresetsSettingsSectionContent() {
                     />
                   </SettingsField>
 
-                  <SettingsField label={t('settings.presets.teams.fields.name')}>
+                  <SettingsField
+                    label={t('settings.presets.teams.fields.name')}
+                  >
                     <SettingsInput
                       value={selectedTeam.name}
                       onChange={(value) =>
@@ -883,7 +902,9 @@ export function ChatPresetsSettingsSectionContent() {
                         </div>
                       )}
                       {draft.members.map((member) => {
-                        const checked = selectedTeam.member_ids.includes(member.id);
+                        const checked = selectedTeam.member_ids.includes(
+                          member.id
+                        );
                         return (
                           <label
                             key={member.id}

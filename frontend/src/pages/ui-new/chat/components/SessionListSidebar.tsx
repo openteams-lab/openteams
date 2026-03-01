@@ -1,7 +1,4 @@
-import {
-  ChatCircleDotsIcon,
-  PlusIcon,
-} from '@phosphor-icons/react';
+import { ChatCircleDotsIcon, PlusIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import type { ChatSession } from 'shared/types';
 import { cn } from '@/lib/utils';
@@ -59,9 +56,7 @@ export function SessionListSidebar({
 
   const renderSessionItem = (session: ChatSession) => {
     const isActive = session.id === activeSessionId;
-    const { fullTitle, displayTitle } = getDisplaySessionTitle(
-      session.title
-    );
+    const { fullTitle, displayTitle } = getDisplaySessionTitle(session.title);
 
     return (
       <button
@@ -77,10 +72,7 @@ export function SessionListSidebar({
       >
         <div className="chat-session-item-inner flex items-center gap-half">
           {isActive ? (
-            <span
-              className="chat-session-item-active-dot"
-              aria-hidden="true"
-            />
+            <span className="chat-session-item-active-dot" aria-hidden="true" />
           ) : (
             <ChatCircleDotsIcon className="chat-session-item-icon size-icon-xs" />
           )}
@@ -142,9 +134,7 @@ export function SessionListSidebar({
                 {t('sidebar.noActiveSessions')}
               </div>
             ) : (
-              activeSessions.map((session) =>
-                renderSessionItem(session)
-              )
+              activeSessions.map((session) => renderSessionItem(session))
             )}
           </div>
           <div
@@ -212,9 +202,7 @@ export function SessionListSidebar({
                     {t('sidebar.noActiveSessions')}
                   </div>
                 ) : (
-                  activeSessions.map((session) =>
-                    renderSessionItem(session)
-                  )
+                  activeSessions.map((session) => renderSessionItem(session))
                 )}
               </div>
             </div>
@@ -232,8 +220,10 @@ export function SessionListSidebar({
                       'opacity-60 cursor-not-allowed'
                   )}
                 >
-                  {showArchived ? t('sidebar.hideArchived') : t('sidebar.showArchived')} (
-                  {archivedSessions.length})
+                  {showArchived
+                    ? t('sidebar.hideArchived')
+                    : t('sidebar.showArchived')}{' '}
+                  ({archivedSessions.length})
                 </button>
               </div>
               <div className="chat-session-archived-list min-h-0 overflow-y-auto p-base space-y-half">
@@ -244,9 +234,7 @@ export function SessionListSidebar({
                 )}
                 {archivedSessions.length > 0 &&
                   showArchived &&
-                  archivedSessions.map((session) =>
-                    renderSessionItem(session)
-                  )}
+                  archivedSessions.map((session) => renderSessionItem(session))}
               </div>
             </div>
           </div>

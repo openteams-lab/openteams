@@ -182,15 +182,14 @@ export function ChatSessions() {
 
   const activeSessionExists = useMemo(
     () =>
-      !!sessionId &&
-      sortedSessions.some((session) => session.id === sessionId),
+      !!sessionId && sortedSessions.some((session) => session.id === sessionId),
     [sessionId, sortedSessions]
   );
   const activeSessionId = sessionId
     ? isSessionsLoading || activeSessionExists
       ? sessionId
       : null
-    : sortedSessions[0]?.id ?? null;
+    : (sortedSessions[0]?.id ?? null);
   const notificationsRef = useRef(config?.notifications ?? null);
   const sessionTitleByIdRef = useRef<Map<string, string>>(new Map());
   const agentByIdRef = useRef(agentById);
@@ -523,9 +522,12 @@ export function ChatSessions() {
 
   const showDuplicateMemberNameWarning = useCallback(
     (name: string) => {
-      const duplicateMessage = t('modals.confirm.messages.duplicateMemberName', {
-        name: `@${name}`,
-      });
+      const duplicateMessage = t(
+        'modals.confirm.messages.duplicateMemberName',
+        {
+          name: `@${name}`,
+        }
+      );
       setMemberError(duplicateMessage);
       setConfirmModal({
         title: t('modals.confirm.titles.duplicateMemberName'),
@@ -705,20 +707,13 @@ export function ChatSessions() {
 
   const getVariantLabel = useCallback(
     (runnerType: string, variant: string): string =>
-      getVariantDisplayLabel(
-        runnerType as BaseCodingAgent,
-        variant,
-        profiles
-      ),
+      getVariantDisplayLabel(runnerType as BaseCodingAgent, variant, profiles),
     [profiles]
   );
 
   const getVariantOptions = useCallback(
     (runnerType: string): string[] => {
-      return getExecutorVariantOptions(
-        runnerType as BaseCodingAgent,
-        profiles
-      );
+      return getExecutorVariantOptions(runnerType as BaseCodingAgent, profiles);
     },
     [profiles]
   );
@@ -1280,9 +1275,7 @@ export function ChatSessions() {
     const trimmed = draft.trim();
     const contentMentions = extractMentions(draft);
     const directContentMentions = new Set(
-      Array.from(contentMentions).filter(
-        (name) => !isMentionAllAlias(name)
-      )
+      Array.from(contentMentions).filter((name) => !isMentionAllAlias(name))
     );
     const allMentionTokens = [
       ...Array.from(contentMentions),
@@ -1829,11 +1822,16 @@ export function ChatSessions() {
         if (!prev || index < 0 || index >= prev.length) return prev;
         const next = [...prev];
         const patch: Partial<MemberPresetImportPlan> = {};
-        if (updates.finalName !== undefined) patch.finalName = updates.finalName;
-        if (updates.workspacePath !== undefined) patch.workspacePath = updates.workspacePath;
-        if (updates.runnerType !== undefined) patch.runnerType = updates.runnerType;
-        if (updates.systemPrompt !== undefined) patch.systemPrompt = updates.systemPrompt;
-        if (updates.toolsEnabled !== undefined) patch.toolsEnabled = updates.toolsEnabled;
+        if (updates.finalName !== undefined)
+          patch.finalName = updates.finalName;
+        if (updates.workspacePath !== undefined)
+          patch.workspacePath = updates.workspacePath;
+        if (updates.runnerType !== undefined)
+          patch.runnerType = updates.runnerType;
+        if (updates.systemPrompt !== undefined)
+          patch.systemPrompt = updates.systemPrompt;
+        if (updates.toolsEnabled !== undefined)
+          patch.toolsEnabled = updates.toolsEnabled;
         next[index] = { ...next[index], ...patch };
         return next;
       });

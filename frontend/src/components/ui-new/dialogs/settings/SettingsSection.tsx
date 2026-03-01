@@ -6,11 +6,7 @@ import { AgentsSettingsSectionContent } from './AgentsSettingsSection';
 import { McpSettingsSectionContent } from './McpSettingsSection';
 import { ChatPresetsSettingsSectionContent } from './ChatPresetsSettingsSection';
 
-export type SettingsSectionType =
-  | 'general'
-  | 'agents'
-  | 'mcp'
-  | 'presets';
+export type SettingsSectionType = 'general' | 'agents' | 'mcp' | 'presets';
 
 // Section-specific initial state types
 export type SettingsSectionInitialState = {
@@ -25,10 +21,7 @@ interface SettingsSectionProps {
   onClose?: () => void;
 }
 
-export function SettingsSection({
-  type,
-  onClose,
-}: SettingsSectionProps) {
+export function SettingsSection({ type, onClose }: SettingsSectionProps) {
   const { t } = useTranslation('settings');
 
   const renderContent = () => {

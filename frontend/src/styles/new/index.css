@@ -453,8 +453,8 @@
     --chat-session-send-blue-hover: #4b57f2;
     --chat-session-sidebar-divider: rgba(255, 255, 255, 0.24);
     --chat-session-archived-height-offset: 60px;
-    --chat-session-font-sans: 'Inter', -apple-system, BlinkMacSystemFont,
-      'Segoe UI', sans-serif;
+    --chat-session-font-sans:
+      'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --chat-session-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
     background: var(--chat-session-bg-secondary);
     color: var(--chat-session-text-primary);
@@ -593,7 +593,10 @@
     gap: 0;
     overflow: hidden;
     white-space: nowrap;
-    transition: width 0.2s ease, padding 0.2s ease, background 0.15s ease;
+    transition:
+      width 0.2s ease,
+      padding 0.2s ease,
+      background 0.15s ease;
     font-weight: 600;
   }
 
@@ -616,14 +619,19 @@
     overflow: hidden;
     margin-right: 0;
     transform: translateX(-4px);
-    transition: max-width 0.2s ease, opacity 0.15s ease,
-      transform 0.2s ease, margin-right 0.2s ease;
+    transition:
+      max-width 0.2s ease,
+      opacity 0.15s ease,
+      transform 0.2s ease,
+      margin-right 0.2s ease;
     font-size: 13px;
     line-height: 1;
   }
 
   .new-design .chat-session-left-new-btn:hover .chat-session-left-new-label,
-  .new-design .chat-session-left-new-btn:focus-visible .chat-session-left-new-label {
+  .new-design
+    .chat-session-left-new-btn:focus-visible
+    .chat-session-left-new-label {
     max-width: 38px;
     opacity: 1;
     margin-right: 6px;
@@ -643,10 +651,8 @@
   }
 
   .new-design .chat-session-active-panel {
-    flex: 0 0 max(
-      0px,
-      calc(66.666% - var(--chat-session-archived-height-offset))
-    );
+    flex: 0 0
+      max(0px, calc(66.666% - var(--chat-session-archived-height-offset)));
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -654,9 +660,7 @@
   }
 
   .new-design .chat-session-archived-panel {
-    flex: 0 0 calc(
-      33.333% + var(--chat-session-archived-height-offset)
-    );
+    flex: 0 0 calc(33.333% + var(--chat-session-archived-height-offset));
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -689,7 +693,9 @@
     border-radius: 10px;
     color: rgba(241, 247, 255, 0.84);
     margin-bottom: 4px;
-    transition: background 0.15s ease, border-color 0.15s ease,
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease,
       box-shadow 0.15s ease;
   }
 
@@ -795,7 +801,7 @@
     font-weight: 500;
     letter-spacing: normal;
     text-transform: none;
-     text-align: left;
+    text-align: left;
   }
 
   .new-design .chat-session-archived-toggle:hover {
@@ -894,8 +900,7 @@
     padding: 0 1px;
   }
 
-  .new-design .chat-session-page
-    ::highlight(chat-session-search-highlight) {
+  .new-design .chat-session-page ::highlight(chat-session-search-highlight) {
     background: #fde78a;
     color: inherit;
   }
@@ -942,8 +947,7 @@
     justify-content: center;
   }
 
-  .new-design
-    .chat-session-header-cancel-btn.primary-button-tertiary {
+  .new-design .chat-session-header-cancel-btn.primary-button-tertiary {
     background: #ffffff !important;
   }
 
@@ -1194,7 +1198,7 @@
   }
 
   .new-design .chat-session-textarea:focus {
-    border-color:#5353bf;
+    border-color: #5353bf;
   }
 
   .new-design .chat-session-mention-suggestions {
@@ -1325,7 +1329,10 @@
     background: #ffffff !important;
   }
 
-  .new-design .chat-settings-theme .settings-dialog-main > .settings-dialog-content,
+  .new-design
+    .chat-settings-theme
+    .settings-dialog-main
+    > .settings-dialog-content,
   .new-design .chat-settings-theme .settings-dialog-content {
     background: #ffffff !important;
   }
@@ -1335,7 +1342,9 @@
   }
 
   .new-design .chat-settings-theme .settings-dialog-nav-item-inactive:hover,
-  .new-design .chat-settings-theme .settings-dialog-nav-item-inactive:focus-visible {
+  .new-design
+    .chat-settings-theme
+    .settings-dialog-nav-item-inactive:focus-visible {
     background: var(--settings-surface-hover) !important;
     color: #1f2937 !important;
   }
@@ -1382,7 +1391,10 @@
     color: var(--settings-accent-text) !important;
   }
 
-  .new-design .chat-settings-theme .settings-two-column-item-selected .settings-two-column-item-label {
+  .new-design
+    .chat-settings-theme
+    .settings-two-column-item-selected
+    .settings-two-column-item-label {
     color: var(--settings-accent-text) !important;
   }
 
@@ -1437,7 +1449,10 @@
   .new-design .chat-settings-theme .ui-select-content {
     background: #ffffff !important;
     border-color: var(--settings-input-border) !important;
-    box-shadow: var(--chat-session-shadow-md, 0 4px 10px rgba(15, 23, 42, 0.08));
+    box-shadow: var(
+      --chat-session-shadow-md,
+      0 4px 10px rgba(15, 23, 42, 0.08)
+    );
   }
 
   .new-design .settings-select-dropdown {
@@ -1454,7 +1469,9 @@
   .new-design .chat-settings-theme .dropdown-menu-item:focus,
   .new-design .chat-settings-theme .dropdown-menu-item[data-highlighted],
   .new-design .chat-settings-theme .dropdown-menu-checkbox-item:focus,
-  .new-design .chat-settings-theme .dropdown-menu-checkbox-item[data-highlighted],
+  .new-design
+    .chat-settings-theme
+    .dropdown-menu-checkbox-item[data-highlighted],
   .new-design .chat-settings-theme .dropdown-menu-radio-item:focus,
   .new-design .chat-settings-theme .dropdown-menu-radio-item[data-highlighted],
   .new-design .chat-settings-theme .ui-select-item:focus,
@@ -1463,8 +1480,12 @@
     color: #111827 !important;
   }
 
-  .new-design .chat-settings-theme .dropdown-menu-checkbox-item[data-state='checked'],
-  .new-design .chat-settings-theme .dropdown-menu-radio-item[data-state='checked'] {
+  .new-design
+    .chat-settings-theme
+    .dropdown-menu-checkbox-item[data-state='checked'],
+  .new-design
+    .chat-settings-theme
+    .dropdown-menu-radio-item[data-state='checked'] {
     background: var(--settings-accent-bg);
     color: var(--settings-accent-text);
   }
@@ -1479,7 +1500,9 @@
     color: #ffffff !important;
   }
 
-  .new-design .chat-settings-theme .primary-button-default:hover:not(:disabled) {
+  .new-design
+    .chat-settings-theme
+    .primary-button-default:hover:not(:disabled) {
     background: var(--chat-session-send-blue-hover, #4b57f2) !important;
   }
 
@@ -1488,7 +1511,9 @@
     color: #3f4cb8 !important;
   }
 
-  .new-design .chat-settings-theme .primary-button-secondary:hover:not(:disabled) {
+  .new-design
+    .chat-settings-theme
+    .primary-button-secondary:hover:not(:disabled) {
     background: #dfe6ff !important;
   }
 
@@ -1498,7 +1523,9 @@
     color: #374151 !important;
   }
 
-  .new-design .chat-settings-theme .primary-button-tertiary:hover:not(:disabled) {
+  .new-design
+    .chat-settings-theme
+    .primary-button-tertiary:hover:not(:disabled) {
     background: var(--settings-surface-hover) !important;
   }
 
@@ -1651,29 +1678,49 @@
     pointer-events: none;
   }
 
-  .new-design .chat-session-member-actions:hover .chat-session-member-action.workspace,
-  .new-design .chat-session-member-actions:hover .chat-session-member-action.edit,
-  .new-design .chat-session-member-actions:focus-within .chat-session-member-action.workspace,
-  .new-design .chat-session-member-actions:focus-within .chat-session-member-action.edit {
+  .new-design
+    .chat-session-member-actions:hover
+    .chat-session-member-action.workspace,
+  .new-design
+    .chat-session-member-actions:hover
+    .chat-session-member-action.edit,
+  .new-design
+    .chat-session-member-actions:focus-within
+    .chat-session-member-action.workspace,
+  .new-design
+    .chat-session-member-actions:focus-within
+    .chat-session-member-action.edit {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
   }
 
-  .new-design .chat-session-member-card:has(.chat-session-member-actions:hover) .chat-session-member-name,
-  .new-design .chat-session-member-card:has(.chat-session-member-actions:focus-within) .chat-session-member-name {
+  .new-design
+    .chat-session-member-card:has(.chat-session-member-actions:hover)
+    .chat-session-member-name,
+  .new-design
+    .chat-session-member-card:has(.chat-session-member-actions:focus-within)
+    .chat-session-member-name {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
 
-  .new-design .chat-session-member-card:has(.chat-session-member-actions:hover) .chat-session-member-model-full,
-  .new-design .chat-session-member-card:has(.chat-session-member-actions:focus-within) .chat-session-member-model-full {
+  .new-design
+    .chat-session-member-card:has(.chat-session-member-actions:hover)
+    .chat-session-member-model-full,
+  .new-design
+    .chat-session-member-card:has(.chat-session-member-actions:focus-within)
+    .chat-session-member-model-full {
     display: none;
   }
 
-  .new-design .chat-session-member-card:has(.chat-session-member-actions:hover) .chat-session-member-model-truncated,
-  .new-design .chat-session-member-card:has(.chat-session-member-actions:focus-within) .chat-session-member-model-truncated {
+  .new-design
+    .chat-session-member-card:has(.chat-session-member-actions:hover)
+    .chat-session-member-model-truncated,
+  .new-design
+    .chat-session-member-card:has(.chat-session-member-actions:focus-within)
+    .chat-session-member-model-truncated {
     display: block;
   }
 
@@ -1794,9 +1841,15 @@
     background: #ffffff !important;
   }
 
-  .new-design .chat-session-member-form-panel .chat-session-member-btn.cancel:hover,
-  .new-design .chat-session-member-form-panel .chat-session-member-btn.cancel:focus-visible,
-  .new-design .chat-session-member-form-panel .chat-session-member-btn.cancel:disabled {
+  .new-design
+    .chat-session-member-form-panel
+    .chat-session-member-btn.cancel:hover,
+  .new-design
+    .chat-session-member-form-panel
+    .chat-session-member-btn.cancel:focus-visible,
+  .new-design
+    .chat-session-member-form-panel
+    .chat-session-member-btn.cancel:disabled {
     background: #ffffff !important;
   }
 
@@ -1855,8 +1908,12 @@
     background-clip: content-box;
   }
 
-  .new-design .chat-session-page .overflow-y-auto::-webkit-scrollbar-thumb:hover,
-  .new-design .chat-session-page .overflow-x-auto::-webkit-scrollbar-thumb:hover,
+  .new-design
+    .chat-session-page
+    .overflow-y-auto::-webkit-scrollbar-thumb:hover,
+  .new-design
+    .chat-session-page
+    .overflow-x-auto::-webkit-scrollbar-thumb:hover,
   .new-design .chat-session-list::-webkit-scrollbar-thumb:hover,
   .new-design .chat-session-active-list::-webkit-scrollbar-thumb:hover,
   .new-design .chat-session-archived-list::-webkit-scrollbar-thumb:hover,

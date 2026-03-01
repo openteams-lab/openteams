@@ -50,8 +50,7 @@ function ProjectCard({ project, isFocused, setError, onEdit }: Props) {
   }, [isFocused]);
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(t('confirmDelete', { name })))
-      return;
+    if (!window.confirm(t('confirmDelete', { name }))) return;
 
     try {
       await projectsApi.delete(id);

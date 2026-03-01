@@ -66,7 +66,9 @@ export function WorkspaceDrawer({
         </div>
 
         <div className="space-y-half">
-          <div className="text-sm text-normal font-medium">{t('modals.workspaceDrawer.runHistory')}</div>
+          <div className="text-sm text-normal font-medium">
+            {t('modals.workspaceDrawer.runHistory')}
+          </div>
           {runs.length === 0 && (
             <div className="text-xs text-low">
               {t('modals.workspaceDrawer.noRunsYet')}
@@ -78,7 +80,9 @@ export function WorkspaceDrawer({
               className="border border-border rounded-sm p-base space-y-half"
             >
               <div className="flex items-center justify-between text-xs text-low">
-                <span>{t('modals.workspaceDrawer.run')} {run.runId.slice(0, 8)}</span>
+                <span>
+                  {t('modals.workspaceDrawer.run')} {run.runId.slice(0, 8)}
+                </span>
                 <span>{formatDateShortWithTime(run.createdAt)}</span>
               </div>
               <div className="text-xs text-normal">{run.content}</div>
@@ -91,7 +95,9 @@ export function WorkspaceDrawer({
                   {t('modals.workspaceDrawer.viewLog')}
                 </button>
                 {logRunId === run.runId && (
-                  <span className="text-low">{t('modals.workspaceDrawer.selected')}</span>
+                  <span className="text-low">
+                    {t('modals.workspaceDrawer.selected')}
+                  </span>
                 )}
               </div>
             </div>
@@ -99,7 +105,9 @@ export function WorkspaceDrawer({
         </div>
 
         <div className="space-y-half">
-          <div className="text-sm text-normal font-medium">{t('modals.workspaceDrawer.runLog')}</div>
+          <div className="text-sm text-normal font-medium">
+            {t('modals.workspaceDrawer.runLog')}
+          </div>
           {!logRunId && (
             <div className="text-xs text-low">
               {t('modals.workspaceDrawer.selectRunToViewLog')}
@@ -108,7 +116,9 @@ export function WorkspaceDrawer({
           {logRunId && (
             <div className="border border-border rounded-sm bg-secondary p-base">
               <div className="flex items-center justify-between text-xs text-low pb-half">
-                <span>{t('modals.workspaceDrawer.run')} {logRunId.slice(0, 8)}</span>
+                <span>
+                  {t('modals.workspaceDrawer.run')} {logRunId.slice(0, 8)}
+                </span>
                 <button
                   type="button"
                   className="text-brand hover:text-brand-hover"
@@ -119,17 +129,19 @@ export function WorkspaceDrawer({
                 </button>
               </div>
               {logLoading && (
-                <div className="text-xs text-low">{t('modals.workspaceDrawer.loadingLog')}</div>
+                <div className="text-xs text-low">
+                  {t('modals.workspaceDrawer.loadingLog')}
+                </div>
               )}
-              {logError && (
-                <div className="text-xs text-error">{logError}</div>
-              )}
+              {logError && <div className="text-xs text-error">{logError}</div>}
               {!logLoading && !logError && (
                 <div className="max-h-64 overflow-y-auto border-t border-border pt-base">
                   {logContent ? (
                     <RawLogText content={logContent} />
                   ) : (
-                    <div className="text-xs text-low">{t('modals.workspaceDrawer.logEmpty')}</div>
+                    <div className="text-xs text-low">
+                      {t('modals.workspaceDrawer.logEmpty')}
+                    </div>
                   )}
                 </div>
               )}

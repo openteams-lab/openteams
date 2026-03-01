@@ -65,10 +65,7 @@ export function MultiSelectDropdown<T extends string = string>({
           <CaretDownIcon className="size-icon-2xs text-low" weight="bold" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        className={menuContentClassName}
-      >
+      <DropdownMenuContent align="start" className={menuContentClassName}>
         {menuLabel && (
           <>
             <DropdownMenuLabel>{menuLabel}</DropdownMenuLabel>

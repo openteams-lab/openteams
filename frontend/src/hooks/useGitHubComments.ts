@@ -145,4 +145,3 @@ export function useGitHubComments({
     getFirstCommentLineForFile,
   };
 }
-

@@ -162,7 +162,6 @@ export function Navbar({
             `right-${isDivider(item) ? 'divider' : item.id}-${index}`
           )
         )}
-
       </div>
     </nav>
   );

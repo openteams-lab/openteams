@@ -35,8 +35,7 @@ export function ConfirmModal({
   const isAlert = mode === 'alert';
   const resolvedConfirmText = isLoading
     ? t('modals.confirm.processing')
-    : confirmText ??
-      (isAlert ? t('common:ok') : t('modals.confirm.confirm'));
+    : (confirmText ?? (isAlert ? t('common:ok') : t('modals.confirm.confirm')));
   const resolvedCancelText = cancelText ?? t('modals.confirm.cancel');
 
   return (

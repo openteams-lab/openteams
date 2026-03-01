@@ -105,11 +105,7 @@ export function ChatMessageItem({
   const isUser = message.sender_type === ChatSenderType.user;
   const isAgent = message.sender_type === ChatSenderType.agent;
   const agentAvatarSeed = isAgent
-    ? getAgentAvatarSeed(
-        message.sender_id,
-        senderRunnerType,
-        senderLabel
-      )
+    ? getAgentAvatarSeed(message.sender_id, senderRunnerType, senderLabel)
     : '';
   const agentAvatarStyle = isAgent
     ? getAgentAvatarStyle(agentAvatarSeed)
@@ -123,10 +119,10 @@ export function ChatMessageItem({
   const referenceId =
     referenceMessage?.id ??
     (message.meta &&
-    typeof message.meta === 'object' &&
-    !Array.isArray(message.meta) &&
-    (message.meta as { reference?: { message_id?: string } }).reference
-      ?.message_id) ??
+      typeof message.meta === 'object' &&
+      !Array.isArray(message.meta) &&
+      (message.meta as { reference?: { message_id?: string } }).reference
+        ?.message_id) ??
     null;
   const contextCompacted =
     isAgent &&
@@ -149,10 +145,7 @@ export function ChatMessageItem({
             onClick={onToggleSelect}
           >
             {isSelected ? (
-              <CheckSquareIcon
-                className="size-icon text-brand"
-                weight="fill"
-              />
+              <CheckSquareIcon className="size-icon text-brand" weight="fill" />
             ) : (
               <SquareIcon className="size-icon text-low" />
             )}
@@ -194,10 +187,7 @@ export function ChatMessageItem({
             onClick={onToggleSelect}
           >
             {isSelected ? (
-              <CheckSquareIcon
-                className="size-icon text-brand"
-                weight="fill"
-              />
+              <CheckSquareIcon className="size-icon text-brand" weight="fill" />
             ) : (
               <SquareIcon className="size-icon text-low" />
             )}
@@ -261,7 +251,9 @@ export function ChatMessageItem({
               <div className="chat-session-reference-card mb-half border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
                 <div className="flex items-center justify-between gap-base">
                   <span className="font-medium text-normal">
-                    {t('message.replyingTo', { name: referenceSenderLabel ?? 'message' })}
+                    {t('message.replyingTo', {
+                      name: referenceSenderLabel ?? 'message',
+                    })}
                   </span>
                   <button
                     type="button"
@@ -279,7 +271,8 @@ export function ChatMessageItem({
                   </button>
                 </div>
                 <div className="mt-half">
-                  {referencePreview ?? t('message.referencedMessageUnavailable')}
+                  {referencePreview ??
+                    t('message.referencedMessageUnavailable')}
                 </div>
                 {referenceMessage &&
                   extractAttachments(referenceMessage.meta).length > 0 && (
@@ -295,9 +288,7 @@ export function ChatMessageItem({
               </div>
             )}
             {(() => {
-              const apiError = isAgent
-                ? detectApiError(message.content)
-                : null;
+              const apiError = isAgent ? detectApiError(message.content) : null;
               const isWarningApiError =
                 apiError?.type === 'quota_exceeded' ||
                 apiError?.type === 'rate_limit' ||
@@ -343,14 +334,12 @@ export function ChatMessageItem({
                   const isFallbackRunning =
                     !mentionStatusMap &&
                     !!agentId &&
-                    agentStates[agentId] ===
-                      ChatSessionAgentState.running;
+                    agentStates[agentId] === ChatSessionAgentState.running;
                   const isRunning =
                     mentionStatus === 'running' || isFallbackRunning;
                   const isCompleted = mentionStatus === 'completed';
                   const isFailed = mentionStatus === 'failed';
-                  const showCheck =
-                    !isFailed && (isRunning || isCompleted);
+                  const showCheck = !isFailed && (isRunning || isCompleted);
                   const pulse = mentionStatus === 'running';
                   return (
                     <Badge
@@ -408,10 +397,7 @@ export function ChatMessageItem({
                             className="text-brand hover:text-brand-hover px-1 py-0.5"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onAddAttachmentAsFile(
-                                message.id,
-                                attachment
-                              );
+                              onAddAttachmentAsFile(message.id, attachment);
                             }}
                             title={t('message.sendToAgent')}
                           >
@@ -448,7 +434,9 @@ export function ChatMessageItem({
             {hasDiffInfo && diffInfo && (
               <div className="chat-session-code-card mt-half border border-border rounded-sm bg-secondary/70 px-base py-half text-xs text-normal">
                 <div className="chat-session-code-card-header flex items-center justify-between gap-base">
-                  <span className="chat-session-code-card-title">{t('message.codeChanges')}</span>
+                  <span className="chat-session-code-card-title">
+                    {t('message.codeChanges')}
+                  </span>
                   <button
                     type="button"
                     className="chat-session-code-card-link text-brand hover:text-brand-hover"
@@ -491,8 +479,14 @@ export function ChatMessageItem({
                 typeof meta === 'object' &&
                 !Array.isArray(meta) &&
                 'token_usage' in meta
-                  ? (meta as { token_usage?: { total_tokens?: number; is_estimated?: boolean } })
-                      .token_usage
+                  ? (
+                      meta as {
+                        token_usage?: {
+                          total_tokens?: number;
+                          is_estimated?: boolean;
+                        };
+                      }
+                    ).token_usage
                   : null;
               const tokenCount =
                 typeof tokenUsage?.total_tokens === 'number'
@@ -502,7 +496,9 @@ export function ChatMessageItem({
               return tokenCount !== null ? (
                 <div className="chat-session-message-tokens flex justify-end mt-1">
                   <span className="text-xs text-low opacity-60">
-                    {isEstimated && <span className="text-yellow-500 mr-0.5">~</span>}
+                    {isEstimated && (
+                      <span className="text-yellow-500 mr-0.5">~</span>
+                    )}
                     {t('message.replyTokenUsage', {
                       value: formatTokenCount(tokenCount),
                     })}
@@ -519,10 +515,7 @@ export function ChatMessageItem({
             onClick={onToggleSelect}
           >
             {isSelected ? (
-              <CheckSquareIcon
-                className="size-icon text-brand"
-                weight="fill"
-              />
+              <CheckSquareIcon className="size-icon text-brand" weight="fill" />
             ) : (
               <SquareIcon className="size-icon text-low" />
             )}

@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cloneDeep, isEqual, merge } from 'lodash';
-import {
-  SpeakerHighIcon,
-  SpinnerIcon,
-} from '@phosphor-icons/react';
+import { SpeakerHighIcon, SpinnerIcon } from '@phosphor-icons/react';
 import {
   type BaseCodingAgent,
   type ExecutorProfileId,
@@ -462,7 +459,9 @@ export function GeneralSettingsSection() {
       >
         <SettingsField
           label={t('settings.general.chatCompression.tokenThreshold.label')}
-          description={t('settings.general.chatCompression.tokenThreshold.helper')}
+          description={t(
+            'settings.general.chatCompression.tokenThreshold.helper'
+          )}
         >
           <SettingsNumberInput
             value={draft?.chat_compression?.token_threshold ?? 50000}
@@ -471,7 +470,8 @@ export function GeneralSettingsSection() {
                 chat_compression: {
                   ...draft?.chat_compression,
                   token_threshold: value,
-                  compression_percentage: draft?.chat_compression?.compression_percentage ?? 25,
+                  compression_percentage:
+                    draft?.chat_compression?.compression_percentage ?? 25,
                 },
               })
             }
@@ -481,8 +481,12 @@ export function GeneralSettingsSection() {
           />
         </SettingsField>
         <SettingsField
-          label={t('settings.general.chatCompression.compressionPercentage.label')}
-          description={t('settings.general.chatCompression.compressionPercentage.helper')}
+          label={t(
+            'settings.general.chatCompression.compressionPercentage.label'
+          )}
+          description={t(
+            'settings.general.chatCompression.compressionPercentage.helper'
+          )}
         >
           <SettingsNumberInput
             value={draft?.chat_compression?.compression_percentage ?? 25}
@@ -490,7 +494,8 @@ export function GeneralSettingsSection() {
               updateDraft({
                 chat_compression: {
                   ...draft?.chat_compression,
-                  token_threshold: draft?.chat_compression?.token_threshold ?? 50000,
+                  token_threshold:
+                    draft?.chat_compression?.token_threshold ?? 50000,
                   compression_percentage: value,
                 },
               })
