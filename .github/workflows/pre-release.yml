@@ -1415,15 +1415,27 @@ jobs:
             const currentTag = '${{ needs.bump-version.outputs.new_tag }}';
             const npmPublished = process.env.NPM_PUBLISHED === 'true';
 
-            const { data: tags } = await github.rest.repos.listTags({
+            const tags = await github.paginate(github.rest.repos.listTags, {
               owner,
               repo,
               per_page: 100,
             });
-            const previousTag = tags.find((tag) => tag.name !== currentTag)?.name ?? null;
+            const releaseTags = tags
+              .map((tag) => tag.name)
+              .filter((name) => name.startsWith('v'));
+            const currentTagIndex = releaseTags.indexOf(currentTag);
+
+            let previousTag = null;
+            if (currentTagIndex >= 0) {
+              previousTag = releaseTags[currentTagIndex + 1] ?? null;
+            } else {
+              previousTag =
+                releaseTags.find((tagName) => tagName !== currentTag) ?? null;
+            }
 
             const contributors = new Set();
             const pullRequests = new Map();
+            const prNumbersFromMessages = new Set();
 
             if (previousTag) {
               const { data: compare } =
@@ -1433,18 +1445,43 @@ jobs:
                   basehead: `${previousTag}...${currentTag}`,
                 });
 
-              const prNumbers = new Set();
               for (const commit of compare.commits ?? []) {
                 const message = commit.commit?.message ?? '';
                 for (const match of message.matchAll(/#(\\d+)/g)) {
-                  prNumbers.add(Number(match[1]));
+                  prNumbersFromMessages.add(Number(match[1]));
                 }
                 if (commit.author?.login) {
                   contributors.add(`@${commit.author.login}`);
                 }
+                if (commit.committer?.login) {
+                  contributors.add(`@${commit.committer.login}`);
+                }
+
+                // Prefer GitHub's commit<->PR association API because commit
+                // messages often do not contain PR numbers.
+                try {
+                  const { data: associatedPrs } =
+                    await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                      owner,
+                      repo,
+                      commit_sha: commit.sha,
+                      per_page: 100,
+                    });
+                  for (const pr of associatedPrs ?? []) {
+                    if (!pr?.number || !pr.merged_at) continue;
+                    pullRequests.set(pr.number, pr);
+                    if (pr.user?.login) {
+                      contributors.add(`@${pr.user.login}`);
+                    }
+                  }
+                } catch (_error) {
+                  // Ignore API lookup errors; commit-message extraction fallback runs below.
+                }
               }
 
-              for (const number of prNumbers) {
+              // Fallback for repositories where commit association API misses some PRs.
+              for (const number of prNumbersFromMessages) {
+                if (pullRequests.has(number)) continue;
                 try {
                   const { data: pr } = await github.rest.pulls.get({
                     owner,

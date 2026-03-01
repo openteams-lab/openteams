@@ -1,7 +1,4 @@
-import type {
-  ChatAgent,
-  ChatSessionAgent,
-} from 'shared/types';
+import type { ChatAgent, ChatSessionAgent } from 'shared/types';
 
 export type StreamRun = {
   agentId: string;

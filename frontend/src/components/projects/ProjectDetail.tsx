@@ -39,8 +39,7 @@ export function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
 
   const handleDelete = async () => {
     if (!project) return;
-    if (!window.confirm(t('confirmDelete', { name: project.name })))
-      return;
+    if (!window.confirm(t('confirmDelete', { name: project.name }))) return;
 
     try {
       await projectsApi.delete(projectId);

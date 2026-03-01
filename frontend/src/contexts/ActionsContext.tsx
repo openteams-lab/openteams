@@ -310,7 +310,9 @@ export function ActionsProvider({ children }: ActionsProviderProps) {
         ConfirmDialog.show({
           title: t('error'),
           message:
-            error instanceof Error ? error.message : t('confirm.unexpectedError'),
+            error instanceof Error
+              ? error.message
+              : t('confirm.unexpectedError'),
           confirmText: t('ok'),
           showCancelButton: false,
           variant: 'destructive',

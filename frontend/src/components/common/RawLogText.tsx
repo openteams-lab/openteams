@@ -30,7 +30,8 @@ const formatJSONLog = (jsonStr: string): string => {
     const lines: string[] = [];
 
     // Extract common log fields
-    const timestamp = parsed.timestamp || parsed.time || parsed.ts || parsed.date;
+    const timestamp =
+      parsed.timestamp || parsed.time || parsed.ts || parsed.date;
     const level = parsed.level || parsed.severity || parsed.lvl;
     const message = parsed.message || parsed.msg || parsed.text;
 
@@ -45,8 +46,21 @@ const formatJSONLog = (jsonStr: string): string => {
     }
 
     // Add remaining fields as key-value pairs
-    const excludeKeys = new Set(['timestamp', 'time', 'ts', 'date', 'level', 'severity', 'lvl', 'message', 'msg', 'text']);
-    const remainingEntries = Object.entries(parsed).filter(([key]) => !excludeKeys.has(key));
+    const excludeKeys = new Set([
+      'timestamp',
+      'time',
+      'ts',
+      'date',
+      'level',
+      'severity',
+      'lvl',
+      'message',
+      'msg',
+      'text',
+    ]);
+    const remainingEntries = Object.entries(parsed).filter(
+      ([key]) => !excludeKeys.has(key)
+    );
 
     if (remainingEntries.length > 0) {
       for (const [key, value] of remainingEntries) {

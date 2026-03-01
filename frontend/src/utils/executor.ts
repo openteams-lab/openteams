@@ -17,7 +17,9 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-function normalizeVariantValue(value: string | null | undefined): string | null {
+function normalizeVariantValue(
+  value: string | null | undefined
+): string | null {
   const trimmed = value?.trim() ?? '';
   if (!trimmed || trimmed.toUpperCase() === 'DEFAULT') {
     return null;
@@ -31,7 +33,9 @@ export function isOpencodeExecutor(
   return (executor ?? '').toString().toUpperCase() === 'OPENCODE';
 }
 
-export function extractExecutorProfileVariant(toolsEnabled: unknown): string | null {
+export function extractExecutorProfileVariant(
+  toolsEnabled: unknown
+): string | null {
   if (!isObjectRecord(toolsEnabled)) return null;
   const rawValue = toolsEnabled[EXECUTOR_PROFILE_VARIANT_KEY];
   if (typeof rawValue !== 'string') return null;
@@ -43,7 +47,9 @@ export function withExecutorProfileVariant(
   variant: string | null | undefined
 ): JsonValue {
   const normalizedVariant = normalizeVariantValue(variant);
-  const nextToolsEnabled: Record<string, JsonValue> = isObjectRecord(toolsEnabled)
+  const nextToolsEnabled: Record<string, JsonValue> = isObjectRecord(
+    toolsEnabled
+  )
     ? ({ ...toolsEnabled } as Record<string, JsonValue>)
     : {};
 

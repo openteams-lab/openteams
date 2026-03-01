@@ -97,9 +97,7 @@ export function ChatHeader({
       const target = event.target as Node | null;
       if (!target) return;
 
-      if (
-        searchInputContainerRef.current?.contains(target)
-      ) {
+      if (searchInputContainerRef.current?.contains(target)) {
         return;
       }
 
@@ -181,13 +179,11 @@ export function ChatHeader({
             />
           </div>
         )}
-        {titleError && (
-          <div className="text-xs text-error">{titleError}</div>
-        )}
+        {titleError && <div className="text-xs text-error">{titleError}</div>}
         {activeSession && (
           <div className="chat-session-header-meta text-xs text-low">
-            {t('header.created')} {formatDateShortWithTime(activeSession.created_at)} /
-            {' '}
+            {t('header.created')}{' '}
+            {formatDateShortWithTime(activeSession.created_at)} /{' '}
             {t('header.totalMessages')}: {messageCount}
             {totalTokens !== undefined && totalTokens > 0 && (
               <span>
@@ -203,7 +199,9 @@ export function ChatHeader({
       <div className="chat-session-header-actions flex items-center gap-base">
         <div className="chat-session-header-members flex items-center gap-base text-xs text-low">
           <UsersIcon className="size-icon-xs" />
-          <span>{memberCount} {t('header.aiMembers')}</span>
+          <span>
+            {memberCount} {t('header.aiMembers')}
+          </span>
         </div>
         {activeSession && isSearchOpen && (
           <div
@@ -214,9 +212,7 @@ export function ChatHeader({
               <input
                 ref={searchInputRef}
                 value={searchQuery}
-                onChange={(event) =>
-                  onSearchQueryChange(event.target.value)
-                }
+                onChange={(event) => onSearchQueryChange(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape') {
                     event.preventDefault();
@@ -250,13 +246,18 @@ export function ChatHeader({
         {activeSession && (
           <div className="chat-session-header-ops flex items-center gap-half">
             {isArchived && (
-              <Badge variant="secondary" className="chat-session-archived-badge text-xs">
+              <Badge
+                variant="secondary"
+                className="chat-session-archived-badge text-xs"
+              >
                 {t('header.archived')}
               </Badge>
             )}
             <Tooltip
               content={
-                isArchived ? t('header.restoreSession') : t('header.archiveSession')
+                isArchived
+                  ? t('header.restoreSession')
+                  : t('header.archiveSession')
               }
               side="bottom"
             >
@@ -269,7 +270,9 @@ export function ChatHeader({
                 onClick={isArchived ? onRestore : onArchive}
                 disabled={isArchiving}
                 aria-label={
-                  isArchived ? t('header.restoreSession') : t('header.archiveSession')
+                  isArchived
+                    ? t('header.restoreSession')
+                    : t('header.archiveSession')
                 }
               >
                 {isArchived ? (
@@ -293,8 +296,7 @@ export function ChatHeader({
                   className={cn(
                     'chat-session-header-icon-btn chat-session-header-op-btn',
                     isCleanupMode && 'active',
-                    isDeletingMessages &&
-                      'opacity-50 cursor-not-allowed'
+                    isDeletingMessages && 'opacity-50 cursor-not-allowed'
                   )}
                   onClick={onToggleCleanupMode}
                   disabled={isDeletingMessages}
