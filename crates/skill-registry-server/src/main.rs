@@ -21,7 +21,7 @@ pub struct SkillMeta {
     pub id: String,
     pub name: String,
     pub description: String,
-    pub category: Option<String>,
+    pub category: Option<String>, 
     pub version: String,
     pub author: Option<String>,
     pub tags: Vec<String>,
