@@ -111,6 +111,25 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
                 .delete(skills::unassign_skill_from_agent),
         );
 
+    // Remote Skill Registry routes
+    let registry_router = Router::new()
+        .route(
+            "/skills",
+            get(skills::list_registry_skills),
+        )
+        .route(
+            "/skills/{skill_id}",
+            get(skills::get_registry_skill),
+        )
+        .route(
+            "/skills/{skill_id}/install",
+            axum::routing::post(skills::install_registry_skill),
+        )
+        .route(
+            "/categories",
+            get(skills::list_registry_categories),
+        );
+
     Router::new().nest(
         "/chat",
         Router::new()
@@ -119,6 +138,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             .nest("/messages", messages_router)
             .nest("/skills", skills_router)
             .nest("/agents/{agent_id}/skills", agent_skills_router)
+            .nest("/registry", registry_router)
             .route("/runs/{run_id}/log", get(runs::get_run_log))
             .route("/runs/{run_id}/diff", get(runs::get_run_diff))
             .route(

@@ -114,6 +114,9 @@ import {
   ChatAgentSkill,
   AssignSkillToAgent,
   UpdateAgentSkill,
+  RemoteSkillMeta,
+  RemoteSkillPackage,
+  SkillCategory,
 } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { createWorkspaceWithSession } from '@/types/attempt';
@@ -1800,6 +1803,50 @@ export const chatApi = {
       }
     );
     return handleApiResponse<void>(response);
+  },
+
+  // ─── Remote Skill Registry ───
+
+  listRegistrySkills: async (
+    registryUrl?: string
+  ): Promise<RemoteSkillMeta[]> => {
+    const url = registryUrl
+      ? `/api/chat/registry/skills?registry_url=${encodeURIComponent(registryUrl)}`
+      : '/api/chat/registry/skills';
+    const response = await makeRequest(url);
+    return handleApiResponse<RemoteSkillMeta[]>(response);
+  },
+
+  getRegistrySkill: async (
+    skillId: string,
+    registryUrl?: string
+  ): Promise<RemoteSkillPackage> => {
+    const url = registryUrl
+      ? `/api/chat/registry/skills/${skillId}?registry_url=${encodeURIComponent(registryUrl)}`
+      : `/api/chat/registry/skills/${skillId}`;
+    const response = await makeRequest(url);
+    return handleApiResponse<RemoteSkillPackage>(response);
+  },
+
+  listRegistryCategories: async (
+    registryUrl?: string
+  ): Promise<SkillCategory[]> => {
+    const url = registryUrl
+      ? `/api/chat/registry/categories?registry_url=${encodeURIComponent(registryUrl)}`
+      : '/api/chat/registry/categories';
+    const response = await makeRequest(url);
+    return handleApiResponse<SkillCategory[]>(response);
+  },
+
+  installRegistrySkill: async (
+    skillId: string,
+    registryUrl?: string
+  ): Promise<ChatSkill> => {
+    const url = registryUrl
+      ? `/api/chat/registry/skills/${skillId}/install?registry_url=${encodeURIComponent(registryUrl)}`
+      : `/api/chat/registry/skills/${skillId}/install`;
+    const response = await makeRequest(url, { method: 'POST' });
+    return handleApiResponse<ChatSkill>(response);
   },
 };
 

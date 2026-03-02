@@ -4,6 +4,11 @@ use db::models::{
     chat_skill::{ChatSkill, CreateChatSkill, UpdateChatSkill},
 };
 use deployment::Deployment;
+use services::services::skill_registry::{
+    RemoteSkillMeta, RemoteSkillPackage, SkillCategory, SkillRegistryClient,
+    install_skill_from_registry,
+};
+use serde::Deserialize;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
@@ -109,4 +114,68 @@ pub async fn unassign_skill_from_agent(
     } else {
         Ok(ResponseJson(ApiResponse::success(())))
     }
+}
+
+// ─── Remote Skill Registry ───
+
+#[derive(Debug, Deserialize)]
+pub struct RegistryQuery {
+    pub registry_url: Option<String>,
+}
+
+/// List available skills from the remote registry
+pub async fn list_registry_skills(
+    State(_deployment): State<DeploymentImpl>,
+    axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
+) -> Result<ResponseJson<ApiResponse<Vec<RemoteSkillMeta>>>, ApiError> {
+    let client = SkillRegistryClient::new(query.registry_url);
+    let skills = client.list_skills().await.map_err(|e| {
+        ApiError::BadRequest(format!("Failed to fetch skills from registry: {}", e))
+    })?;
+    Ok(ResponseJson(ApiResponse::success(skills)))
+}
+
+/// Get a specific skill from the registry
+pub async fn get_registry_skill(
+    State(_deployment): State<DeploymentImpl>,
+    axum::extract::Path(skill_id): axum::extract::Path<String>,
+    axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
+) -> Result<ResponseJson<ApiResponse<RemoteSkillPackage>>, ApiError> {
+    let client = SkillRegistryClient::new(query.registry_url);
+    let skill = client.get_skill(&skill_id).await.map_err(|e| {
+        ApiError::BadRequest(format!("Failed to fetch skill from registry: {}", e))
+    })?;
+    Ok(ResponseJson(ApiResponse::success(skill)))
+}
+
+/// List available categories from the registry
+pub async fn list_registry_categories(
+    State(_deployment): State<DeploymentImpl>,
+    axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
+) -> Result<ResponseJson<ApiResponse<Vec<SkillCategory>>>, ApiError> {
+    let client = SkillRegistryClient::new(query.registry_url);
+    let categories = client.list_categories().await.map_err(|e| {
+        ApiError::BadRequest(format!("Failed to fetch categories from registry: {}", e))
+    })?;
+    Ok(ResponseJson(ApiResponse::success(categories)))
+}
+
+/// Install a skill from the registry to the local database
+pub async fn install_registry_skill(
+    State(deployment): State<DeploymentImpl>,
+    axum::extract::Path(skill_id): axum::extract::Path<String>,
+    axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
+) -> Result<ResponseJson<ApiResponse<ChatSkill>>, ApiError> {
+    let client = SkillRegistryClient::new(query.registry_url);
+    let skill_package = client.get_skill(&skill_id).await.map_err(|e| {
+        ApiError::BadRequest(format!("Failed to fetch skill from registry: {}", e))
+    })?;
+
+    let installed = install_skill_from_registry(&deployment.db().pool, &skill_package)
+        .await
+        .map_err(|e| {
+            ApiError::BadRequest(format!("Failed to install skill: {}", e))
+        })?;
+
+    Ok(ResponseJson(ApiResponse::success(installed)))
 }
