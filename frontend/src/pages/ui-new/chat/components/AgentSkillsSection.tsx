@@ -7,6 +7,7 @@ import {
   ToggleRightIcon,
   LightningIcon,
   XIcon,
+  CloudArrowDownIcon,
 } from '@phosphor-icons/react';
 import type {
   ChatSkill,
@@ -17,6 +18,7 @@ import type {
 import { chatApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
+import { SkillMarketplace } from './SkillMarketplace';
 
 interface AgentSkillsSectionProps {
   /** The agent ID to manage skills for (null when creating a new agent) */
@@ -412,6 +414,13 @@ export function AgentSkillsSection({
           )}
 
           {error && <div className="text-xs text-error">{error}</div>}
+
+          {/* Skill Marketplace */}
+          <SkillMarketplace
+            readOnly={readOnly}
+            agentId={agentId}
+            onSkillInstalled={loadSkills}
+          />
         </div>
       )}
     </div>

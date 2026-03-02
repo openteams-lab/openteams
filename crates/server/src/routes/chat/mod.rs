@@ -130,6 +130,25 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             get(skills::list_registry_categories),
         );
 
+    // Built-in Skills routes (embedded from awesome-claude-skills)
+    let builtin_router = Router::new()
+        .route(
+            "/skills",
+            get(skills::list_builtin_skills_api),
+        )
+        .route(
+            "/skills/stats",
+            get(skills::get_builtin_skills_stats),
+        )
+        .route(
+            "/skills/{skill_id}",
+            get(skills::get_builtin_skill_api),
+        )
+        .route(
+            "/skills/{skill_id}/install",
+            axum::routing::post(skills::install_builtin_skill_api),
+        );
+
     Router::new().nest(
         "/chat",
         Router::new()
@@ -139,6 +158,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             .nest("/skills", skills_router)
             .nest("/agents/{agent_id}/skills", agent_skills_router)
             .nest("/registry", registry_router)
+            .nest("/builtin", builtin_router)
             .route("/runs/{run_id}/log", get(runs::get_run_log))
             .route("/runs/{run_id}/diff", get(runs::get_run_diff))
             .route(

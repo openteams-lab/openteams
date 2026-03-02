@@ -446,10 +446,16 @@ fn simplified_messages_to_jsonl(messages: &[SimplifiedMessage]) -> (Vec<Value>, 
     (context_messages, jsonl)
 }
 
-/// Build full (uncompressed) context.
+/// Maximum token limit for context to ensure it fits within model input limits.
+/// Most models support ~200k tokens; we use a conservative limit to leave room for
+/// system prompt, skills, and other context overhead.
+const MAX_CONTEXT_TOKENS: u32 = 150_000;
+
+/// Build full (uncompressed) context with a hard token limit.
 ///
 /// This is used by the non-blocking main execution path so agent runs are never
-/// delayed by summarization/compression.
+/// delayed by summarization/compression. If the context exceeds MAX_CONTEXT_TOKENS,
+/// it will be truncated to the most recent messages to fit within the limit.
 pub async fn build_full_context(
     pool: &SqlitePool,
     session_id: Uuid,
@@ -466,13 +472,76 @@ pub async fn build_full_context(
         .map(|message| to_simplified_message(message, &agent_map))
         .collect();
 
-    let (messages, jsonl) = simplified_messages_to_jsonl(&simplified_messages);
+    // Enforce hard token limit to prevent model input errors
+    let total_tokens = estimate_token_count(&simplified_messages);
+    let (messages, warning) = if total_tokens > MAX_CONTEXT_TOKENS {
+        tracing::warn!(
+            session_id = %session_id,
+            total_tokens = total_tokens,
+            max_tokens = MAX_CONTEXT_TOKENS,
+            "Context exceeds token limit; truncating to most recent messages"
+        );
+        let truncated = truncate_messages_to_token_limit(&simplified_messages, MAX_CONTEXT_TOKENS);
+        let warning = CompressionWarning {
+            code: "context_truncated".to_string(),
+            message: format!(
+                "Context was truncated from {} to {} tokens to fit within model limits",
+                total_tokens,
+                estimate_token_count(&truncated)
+            ),
+            split_file_path: String::new(),
+        };
+        (truncated, Some(warning))
+    } else {
+        (simplified_messages, None)
+    };
+
+    let (messages, jsonl) = simplified_messages_to_jsonl(&messages);
     Ok(CompactedContext {
         messages,
         jsonl,
         context_compacted: false,
-        compression_warning: None,
+        compression_warning: warning,
     })
+}
+
+/// Truncate messages to fit within a token limit, keeping the most recent messages.
+fn truncate_messages_to_token_limit(
+    messages: &[SimplifiedMessage],
+    max_tokens: u32,
+) -> Vec<SimplifiedMessage> {
+    if messages.is_empty() {
+        return Vec::new();
+    }
+
+    let total_tokens = estimate_token_count(messages);
+    if total_tokens <= max_tokens {
+        return messages.to_vec();
+    }
+
+    // Keep the most recent messages that fit within the token budget
+    let mut selected_rev: Vec<SimplifiedMessage> = Vec::new();
+    let mut selected_tokens = 0u32;
+
+    for message in messages.iter().rev() {
+        let message_tokens = estimate_token_count(std::slice::from_ref(message)).max(1);
+        if !selected_rev.is_empty() && selected_tokens.saturating_add(message_tokens) > max_tokens {
+            break;
+        }
+        selected_rev.push(message.clone());
+        selected_tokens = selected_tokens.saturating_add(message_tokens);
+        if selected_tokens >= max_tokens {
+            break;
+        }
+    }
+
+    if selected_rev.is_empty() {
+        // Always keep at least the most recent message
+        selected_rev.push(messages.last().unwrap().clone());
+    }
+
+    selected_rev.reverse();
+    selected_rev
 }
 
 /// Build compacted context with token-threshold based compression only.

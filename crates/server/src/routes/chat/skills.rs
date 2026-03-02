@@ -4,11 +4,13 @@ use db::models::{
     chat_skill::{ChatSkill, CreateChatSkill, UpdateChatSkill},
 };
 use deployment::Deployment;
+use serde::Deserialize;
 use services::services::skill_registry::{
     RemoteSkillMeta, RemoteSkillPackage, SkillCategory, SkillRegistryClient,
-    install_skill_from_registry,
+    install_skill_from_registry, install_builtin_skill, list_builtin_skills, get_builtin_skill,
+    search_builtin_skills, filter_builtin_skills_by_category, filter_builtin_skills_by_agent,
+    get_builtin_categories, builtin_skills_count,
 };
-use serde::Deserialize;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
@@ -172,6 +174,74 @@ pub async fn install_registry_skill(
     })?;
 
     let installed = install_skill_from_registry(&deployment.db().pool, &skill_package)
+        .await
+        .map_err(|e| {
+            ApiError::BadRequest(format!("Failed to install skill: {}", e))
+        })?;
+
+    Ok(ResponseJson(ApiResponse::success(installed)))
+}
+
+// ─── Built-in Skills (from awesome-claude-skills) ───
+
+#[derive(Debug, Deserialize)]
+pub struct BuiltinSkillsQuery {
+    pub category: Option<String>,
+    pub agent: Option<String>,
+    pub search: Option<String>,
+}
+
+/// List all built-in skills from the embedded registry
+pub async fn list_builtin_skills_api(
+    State(_deployment): State<DeploymentImpl>,
+    axum::extract::Query(query): axum::extract::Query<BuiltinSkillsQuery>,
+) -> Result<ResponseJson<ApiResponse<Vec<RemoteSkillMeta>>>, ApiError> {
+    let skills = if let Some(search) = &query.search {
+        search_builtin_skills(search)
+    } else if let Some(category) = &query.category {
+        filter_builtin_skills_by_category(category)
+    } else if let Some(agent) = &query.agent {
+        filter_builtin_skills_by_agent(agent)
+    } else {
+        list_builtin_skills()
+    };
+    Ok(ResponseJson(ApiResponse::success(skills)))
+}
+
+/// Get built-in skills statistics
+pub async fn get_builtin_skills_stats(
+    State(_deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<BuiltinSkillsStats>>, ApiError> {
+    let stats = BuiltinSkillsStats {
+        total_skills: builtin_skills_count(),
+        categories: get_builtin_categories(),
+    };
+    Ok(ResponseJson(ApiResponse::success(stats)))
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct BuiltinSkillsStats {
+    pub total_skills: usize,
+    pub categories: Vec<String>,
+}
+
+/// Get a specific built-in skill by ID
+pub async fn get_builtin_skill_api(
+    State(_deployment): State<DeploymentImpl>,
+    axum::extract::Path(skill_id): axum::extract::Path<String>,
+) -> Result<ResponseJson<ApiResponse<RemoteSkillPackage>>, ApiError> {
+    let skill = get_builtin_skill(&skill_id).ok_or_else(|| {
+        ApiError::BadRequest(format!("Skill not found: {}", skill_id))
+    })?;
+    Ok(ResponseJson(ApiResponse::success(skill)))
+}
+
+/// Install a built-in skill to the local database
+pub async fn install_builtin_skill_api(
+    State(deployment): State<DeploymentImpl>,
+    axum::extract::Path(skill_id): axum::extract::Path<String>,
+) -> Result<ResponseJson<ApiResponse<ChatSkill>>, ApiError> {
+    let installed = install_builtin_skill(&deployment.db().pool, &skill_id)
         .await
         .map_err(|e| {
             ApiError::BadRequest(format!("Failed to install skill: {}", e))
