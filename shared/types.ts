@@ -158,7 +158,7 @@ export type UpdateAgentSkill = { enabled: boolean | null, };
 
 export type RemoteSkillMeta = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: string[], compatible_agents: string[], source_url: string | null, };
 
-export type RemoteSkillPackage = { content: string, id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: string[], compatible_agents: string[], source_url: string | null, };
+export type RemoteSkillPackage = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: Array<string>, compatible_agents: Array<string>, source_url: string | null, content: string, };
 
 export type SkillCategory = { id: string, name: string, description: string | null, };
 
