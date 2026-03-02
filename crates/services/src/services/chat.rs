@@ -51,8 +51,8 @@ pub enum ChatServiceError {
     Validation(String),
 }
 
-/// Default token threshold for compression (10,000,000 tokens)
-pub const DEFAULT_TOKEN_THRESHOLD: u32 = 10_000_000;
+/// Default token threshold for compression (50,000 tokens)
+pub const DEFAULT_TOKEN_THRESHOLD: u32 = 50000;
 /// Default percentage of messages to compress (25%)
 pub const DEFAULT_COMPRESSION_PERCENTAGE: u8 = 25;
 const SUMMARY_EXECUTION_TIMEOUT: Duration = Duration::from_secs(120);
