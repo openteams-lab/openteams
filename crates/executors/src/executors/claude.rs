@@ -26,7 +26,7 @@ use workspace_utils::{
 
 use self::{
     client::{AUTO_APPROVE_CALLBACK_ID, ClaudeAgentClient, STOP_GIT_CHECK_CALLBACK_ID},
-    protocol::ProtocolPeer,
+    protocol::{ClaudeExitSignalSender, ProtocolPeer},
     types::{ControlRequestType, ControlResponseType, PermissionMode},
 };
 use crate::{
@@ -331,6 +331,8 @@ impl ClaudeCode {
             })?;
 
         let new_stdout = create_stdout_pipe_writer(&mut child)?;
+        let (exit_signal_tx, exit_signal_rx) = tokio::sync::oneshot::channel();
+        let exit_signal_tx = ClaudeExitSignalSender::new(exit_signal_tx);
         let permission_mode = self.permission_mode();
         let hooks = self.get_hooks(env.commit_reminder);
 
@@ -343,6 +345,7 @@ impl ClaudeCode {
         let repo_context = env.repo_context.clone();
         let commit_reminder_prompt = env.commit_reminder_prompt.clone();
         let cancel_for_task = cancel.clone();
+        let exit_signal_for_task = exit_signal_tx.clone();
         tokio::spawn(async move {
             let log_writer = LogWriter::new(new_stdout);
             let client = ClaudeAgentClient::new(
@@ -352,14 +355,22 @@ impl ClaudeCode {
                 commit_reminder_prompt,
                 cancel_for_task.clone(),
             );
-            let protocol_peer =
-                ProtocolPeer::spawn(child_stdin, child_stdout, client.clone(), cancel_for_task);
+            let protocol_peer = ProtocolPeer::spawn(
+                child_stdin,
+                child_stdout,
+                client.clone(),
+                cancel_for_task,
+                exit_signal_for_task.clone(),
+            );
 
             // Initialize control protocol
             if let Err(e) = protocol_peer.initialize(hooks).await {
                 tracing::error!("Failed to initialize control protocol: {e}");
                 let _ = log_writer
                     .log_raw(&format!("Error: Failed to initialize - {e}"))
+                    .await;
+                exit_signal_for_task
+                    .send_exit_signal(crate::executors::ExecutorExitResult::Failure)
                     .await;
                 return;
             }
@@ -374,12 +385,15 @@ impl ClaudeCode {
                 let _ = log_writer
                     .log_raw(&format!("Error: Failed to send prompt - {e}"))
                     .await;
+                exit_signal_for_task
+                    .send_exit_signal(crate::executors::ExecutorExitResult::Failure)
+                    .await;
             }
         });
 
         Ok(SpawnedChild {
             child,
-            exit_signal: None,
+            exit_signal: Some(exit_signal_rx),
             cancel: Some(cancel),
         })
     }

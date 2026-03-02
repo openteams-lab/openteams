@@ -113,7 +113,7 @@ npx agents-chatgroup
 | [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex` |
 | [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code@latest` |
 
-📚 [完整安装指南 →](https://docs.agentschatgroup.com/getting-started)
+📚 [更多Agent安装指南 →](https://docs.agentschatgroup.com/getting-started)
 
 ## AI 团队预设
 

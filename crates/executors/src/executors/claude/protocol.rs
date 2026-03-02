@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     process::{ChildStdin, ChildStdout},
-    sync::Mutex,
+    sync::{Mutex, oneshot},
 };
 use tokio_util::sync::CancellationToken;
 
@@ -11,7 +11,7 @@ use super::types::{CLIMessage, ControlRequestType, ControlResponseMessage, Contr
 use crate::{
     approvals::ExecutorApprovalError,
     executors::{
-        ExecutorError,
+        ExecutorError, ExecutorExitResult,
         claude::{
             client::ClaudeAgentClient,
             types::{Message, PermissionMode, SDKControlRequest, SDKControlRequestType},
@@ -25,12 +25,38 @@ pub struct ProtocolPeer {
     stdin: Arc<Mutex<ChildStdin>>,
 }
 
+#[derive(Clone)]
+pub struct ClaudeExitSignalSender {
+    inner: Arc<Mutex<Option<oneshot::Sender<ExecutorExitResult>>>>,
+}
+
+impl ClaudeExitSignalSender {
+    pub fn new(sender: oneshot::Sender<ExecutorExitResult>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(Some(sender))),
+        }
+    }
+
+    pub async fn send_exit_signal(&self, result: ExecutorExitResult) {
+        let mut guard = self.inner.lock().await;
+        if let Some(sender) = guard.take() {
+            let _ = sender.send(result);
+        }
+    }
+}
+
+enum ReadLoopExit {
+    ResultReceived,
+    Eof,
+}
+
 impl ProtocolPeer {
     pub fn spawn(
         stdin: ChildStdin,
         stdout: ChildStdout,
         client: Arc<ClaudeAgentClient>,
         cancel: CancellationToken,
+        exit_signal: ClaudeExitSignalSender,
     ) -> Self {
         let peer = Self {
             stdin: Arc::new(Mutex::new(stdin)),
@@ -38,8 +64,24 @@ impl ProtocolPeer {
 
         let reader_peer = peer.clone();
         tokio::spawn(async move {
-            if let Err(e) = reader_peer.read_loop(stdout, client, cancel).await {
-                tracing::error!("Protocol reader loop error: {}", e);
+            match reader_peer.read_loop(stdout, client, cancel).await {
+                Ok(ReadLoopExit::ResultReceived) => {
+                    exit_signal
+                        .send_exit_signal(ExecutorExitResult::Success)
+                        .await;
+                }
+                Ok(ReadLoopExit::Eof) => {
+                    tracing::warn!("Claude protocol stream reached EOF before result");
+                    exit_signal
+                        .send_exit_signal(ExecutorExitResult::Failure)
+                        .await;
+                }
+                Err(e) => {
+                    tracing::error!("Protocol reader loop error: {}", e);
+                    exit_signal
+                        .send_exit_signal(ExecutorExitResult::Failure)
+                        .await;
+                }
             }
         });
 
@@ -51,7 +93,7 @@ impl ProtocolPeer {
         stdout: ChildStdout,
         client: Arc<ClaudeAgentClient>,
         cancel: CancellationToken,
-    ) -> Result<(), ExecutorError> {
+    ) -> Result<ReadLoopExit, ExecutorError> {
         let mut reader = BufReader::new(stdout);
         let mut buffer = String::new();
         let mut interrupt_sent = false;
@@ -70,7 +112,7 @@ impl ProtocolPeer {
                 }
                 line_result = reader.read_line(&mut buffer) => {
                     match line_result {
-                        Ok(0) => break, // EOF
+                        Ok(0) => return Ok(ReadLoopExit::Eof), // EOF
                         Ok(_) => {
                             let line = buffer.trim();
                             if line.is_empty() {
@@ -88,20 +130,19 @@ impl ProtocolPeer {
                                         .await;
                                 }
                                 Ok(CLIMessage::Result(_)) => {
-                                    break;
+                                    return Ok(ReadLoopExit::ResultReceived);
                                 }
                                 _ => {}
                             }
                         }
                         Err(e) => {
                             tracing::error!("Error reading stdout: {}", e);
-                            break;
+                            return Err(ExecutorError::Io(e));
                         }
                     }
                 }
             }
         }
-        Ok(())
     }
 
     async fn handle_control_request(
