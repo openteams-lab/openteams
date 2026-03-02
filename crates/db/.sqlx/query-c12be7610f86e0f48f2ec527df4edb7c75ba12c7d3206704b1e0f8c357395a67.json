@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM chat_agent_skills WHERE agent_id = $1 AND skill_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "c12be7610f86e0f48f2ec527df4edb7c75ba12c7d3206704b1e0f8c357395a67"
+}

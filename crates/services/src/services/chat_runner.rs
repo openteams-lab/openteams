@@ -18,6 +18,7 @@ use db::{
         chat_run::{ChatRun, CreateChatRun},
         chat_session::ChatSession,
         chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
+        chat_skill::ChatSkill,
     },
 };
 use executors::{
@@ -798,6 +799,23 @@ impl ChatRunner {
                 .build_message_attachment_context(source_message, &context_dir)
                 .await?;
             let session_agents = self.build_session_agent_summaries(session_id).await?;
+
+            // Fetch skills assigned to this agent for prompt injection
+            let agent_skills =
+                ChatSkill::find_by_agent_id(&self.db.pool, agent_id).await?;
+
+            // Install skills natively for agents that support it (e.g. Claude Code slash commands)
+            if !agent_skills.is_empty() {
+                if let Ok(runner_type) = self.parse_runner_type(&agent) {
+                    Self::install_native_skills(
+                        &runner_type,
+                        &workspace_path,
+                        &agent_skills,
+                    )
+                    .await;
+                }
+            }
+
             let prompt = self.build_prompt(
                 &agent,
                 source_message,
@@ -805,6 +823,7 @@ impl ChatRunner {
                 &session_agents,
                 message_attachments.as_ref(),
                 reference_context.as_ref(),
+                &agent_skills,
             );
             fs::write(&input_path, &prompt).await?;
 
@@ -1470,13 +1489,15 @@ impl ChatRunner {
         Ok(summaries)
     }
 
-    /// Build the system prompt containing agent role, group members, and critical instructions.
+    /// Build the system prompt containing agent role, group members, skills, and critical instructions.
     /// This is separated from the user message for potential future API-level system prompt support.
     fn build_system_prompt(
         &self,
         agent: &ChatAgent,
         session_agents: &[SessionAgentSummary],
         chat_history_path: &Path,
+        skills: &[ChatSkill],
+        user_message_content: Option<&str>,
     ) -> String {
         let mut system = String::new();
 
@@ -1487,7 +1508,22 @@ impl ChatRunner {
             system.push_str("\n[/AGENT_ROLE]\n\n");
         }
 
-        // 2. Group members info (separate from AGENT_ROLE)
+        // 2. Skills injection
+        let active_skills = Self::filter_active_skills(skills, user_message_content);
+        if !active_skills.is_empty() {
+            system.push_str("[SKILLS]\n");
+            system.push_str("The following skills are activated for this agent. Follow these instructions:\n\n");
+            for skill in &active_skills {
+                system.push_str(&format!("### Skill: {}\n", skill.name));
+                if !skill.description.is_empty() {
+                    system.push_str(&format!("Description: {}\n", skill.description));
+                }
+                system.push_str(&format!("Instructions:\n{}\n\n", skill.content.trim()));
+            }
+            system.push_str("[/SKILLS]\n\n");
+        }
+
+        // 3. Group members info (separate from AGENT_ROLE)
         system.push_str("[GROUP_MEMBERS]\n");
         system.push_str("Current AI members in this group:\n");
         if session_agents.is_empty() {
@@ -1503,7 +1539,7 @@ impl ChatRunner {
         }
         system.push_str("[/GROUP_MEMBERS]\n\n");
 
-        // 3. Message routing protocol
+        // 4. Message routing protocol
         system.push_str("[MESSAGE_ROUTING]\n");
         system.push_str(
             "When you want to forward work to another member, include an explicit routing marker in your reply:\n",
@@ -1517,7 +1553,7 @@ impl ChatRunner {
         system.push_str("- Multiple targets are allowed by adding multiple markers.\n");
         system.push_str("[/MESSAGE_ROUTING]\n\n");
 
-        // 4. Critical instruction to read history file
+        // 5. Critical instruction to read history file
         system.push_str("[CRITICAL_INSTRUCTION]\n");
         system
             .push_str("Before doing any task, you must first read the group chat history file:\n");
@@ -1530,6 +1566,140 @@ impl ChatRunner {
         system.push_str("[/CRITICAL_INSTRUCTION]\n");
 
         system
+    }
+
+    /// Filter skills based on trigger type and message content.
+    /// - 'always' skills are always included
+    /// - 'keyword' skills are included if any keyword matches the message
+    /// - 'manual' skills are included if the message contains /skill_name
+    fn filter_active_skills<'a>(
+        skills: &'a [ChatSkill],
+        user_message: Option<&str>,
+    ) -> Vec<&'a ChatSkill> {
+        let message_lower = user_message
+            .map(|m| m.to_lowercase())
+            .unwrap_or_default();
+
+        skills
+            .iter()
+            .filter(|skill| {
+                match skill.trigger_type.as_str() {
+                    "always" => true,
+                    "keyword" => {
+                        if message_lower.is_empty() {
+                            return false;
+                        }
+                        skill.trigger_keywords.0.iter().any(|kw| {
+                            message_lower.contains(&kw.to_lowercase())
+                        })
+                    }
+                    "manual" => {
+                        if message_lower.is_empty() {
+                            return false;
+                        }
+                        // Check for /skill_name pattern
+                        let slash_cmd = format!("/{}", skill.name.to_lowercase().replace(' ', "-"));
+                        message_lower.contains(&slash_cmd)
+                    }
+                    _ => false,
+                }
+            })
+            .collect()
+    }
+
+    /// Install skills natively into CLI agent workspace directories.
+    /// - Claude Code: `.claude/commands/{skill_name}.md`
+    /// - Other agents: no-op (skills are injected via prompt `[SKILLS]` block)
+    async fn install_native_skills(
+        runner_type: &BaseCodingAgent,
+        workspace_path: &str,
+        skills: &[ChatSkill],
+    ) {
+        match runner_type {
+            BaseCodingAgent::ClaudeCode => {
+                let commands_dir = PathBuf::from(workspace_path).join(".claude").join("commands");
+                if let Err(err) = fs::create_dir_all(&commands_dir).await {
+                    tracing::warn!(
+                        workspace_path = %workspace_path,
+                        error = %err,
+                        "Failed to create .claude/commands directory for skill installation"
+                    );
+                    return;
+                }
+                for skill in skills {
+                    let file_name = format!(
+                        "{}.md",
+                        skill.name.to_lowercase().replace(' ', "-")
+                    );
+                    let file_path = commands_dir.join(&file_name);
+                    let mut content = String::new();
+                    // Write frontmatter with description
+                    if !skill.description.is_empty() {
+                        content.push_str("---\n");
+                        content.push_str(&format!("description: {}\n", skill.description));
+                        content.push_str("---\n\n");
+                    }
+                    content.push_str(skill.content.trim());
+                    content.push('\n');
+                    if let Err(err) = fs::write(&file_path, &content).await {
+                        tracing::warn!(
+                            skill_name = %skill.name,
+                            file_path = %file_path.display(),
+                            error = %err,
+                            "Failed to write Claude Code skill command file"
+                        );
+                    } else {
+                        tracing::info!(
+                            skill_name = %skill.name,
+                            file_path = %file_path.display(),
+                            "Installed Claude Code skill as custom command"
+                        );
+                    }
+                }
+            }
+            BaseCodingAgent::Codex => {
+                // Codex reads AGENTS.md — append skill instructions to it
+                let agents_md_path = PathBuf::from(workspace_path).join("AGENTS.md");
+                let existing = fs::read_to_string(&agents_md_path).await.unwrap_or_default();
+
+                // Build skills section
+                let mut skills_section = String::new();
+                skills_section.push_str("\n\n## Skills\n\n");
+                for skill in skills {
+                    skills_section.push_str(&format!("### {}\n", skill.name));
+                    if !skill.description.is_empty() {
+                        skills_section.push_str(&format!("{}\n\n", skill.description));
+                    }
+                    skills_section.push_str(skill.content.trim());
+                    skills_section.push_str("\n\n");
+                }
+
+                // Remove old skills section if present, then append new one
+                let cleaned = if let Some(idx) = existing.find("\n\n## Skills\n") {
+                    existing[..idx].to_string()
+                } else {
+                    existing
+                };
+                let final_content = format!("{}{}", cleaned.trim_end(), skills_section);
+
+                if let Err(err) = fs::write(&agents_md_path, &final_content).await {
+                    tracing::warn!(
+                        workspace_path = %workspace_path,
+                        error = %err,
+                        "Failed to write Codex AGENTS.md with skills"
+                    );
+                } else {
+                    tracing::info!(
+                        workspace_path = %workspace_path,
+                        skill_count = skills.len(),
+                        "Installed skills into Codex AGENTS.md"
+                    );
+                }
+            }
+            _ => {
+                // Other agents: skills are injected via prompt [SKILLS] block only
+            }
+        }
     }
 
     /// Build the user message prompt (envelope, reference, attachments, message).
@@ -1623,9 +1793,16 @@ impl ChatRunner {
         session_agents: &[SessionAgentSummary],
         message_attachments: Option<&MessageAttachmentContext>,
         reference: Option<&ReferenceContext>,
+        skills: &[ChatSkill],
     ) -> String {
-        // Build system prompt with agent role, group members, and history file instruction
-        let system_prompt = self.build_system_prompt(agent, session_agents, context_path);
+        // Build system prompt with agent role, group members, skills, and history file instruction
+        let system_prompt = self.build_system_prompt(
+            agent,
+            session_agents,
+            context_path,
+            skills,
+            Some(message.content.as_str()),
+        );
 
         // Build user prompt with envelope, reference, attachments, and message
         let user_prompt = self.build_user_prompt(agent, message, message_attachments, reference);

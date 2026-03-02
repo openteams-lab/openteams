@@ -59,6 +59,7 @@ import {
   getLocalizedTeamPresetName,
   type MemberPresetImportPlan,
 } from '../utils';
+import { AgentSkillsSection } from './AgentSkillsSection';
 
 const truncateByChars = (value: string, maxChars: number): string => {
   const chars = Array.from(value);
@@ -767,6 +768,11 @@ export function AiMembersSidebar({
           </p>
         )}
       </div>
+      {/* Skills section */}
+      <AgentSkillsSection
+        agentId={editingMember?.agent.id ?? null}
+        readOnly={isArchived}
+      />
       {memberError && <div className="text-xs text-error">{memberError}</div>}
       <div className="flex items-center justify-end gap-half pt-half">
         <PrimaryButton

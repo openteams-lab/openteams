@@ -142,6 +142,20 @@ export type ChatArtifact = { id: string, session_id: string, name: string, path:
 
 export type ChatRun = { id: string, session_id: string, session_agent_id: string, run_index: bigint, run_dir: string, input_path: string | null, output_path: string | null, raw_log_path: string | null, meta_path: string | null, created_at: string, };
 
+export type ChatSkill = { id: string, name: string, description: string, content: string, trigger_type: string, trigger_keywords: string[], enabled: boolean, created_at: string, updated_at: string, };
+
+export type ChatSkillTriggerType = "always" | "keyword" | "manual";
+
+export type CreateChatSkill = { name: string, description: string | null, content: string, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, };
+
+export type UpdateChatSkill = { name: string | null, description: string | null, content: string | null, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, };
+
+export type ChatAgentSkill = { id: string, agent_id: string, skill_id: string, enabled: boolean, created_at: string, };
+
+export type AssignSkillToAgent = { agent_id: string, skill_id: string, enabled: boolean | null, };
+
+export type UpdateAgentSkill = { enabled: boolean | null, };
+
 export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, };
 
 export type ChatStreamDeltaType = "assistant" | "thinking";
@@ -494,7 +508,7 @@ export type SendMessageShortcut = "ModifierEnter" | "Enter";
 
 export type ChatCompressionConfig = { 
 /**
- * Token threshold before compression kicks in (default: 50000)
+ * Token threshold before compression kicks in (default: 5000000)
  */
 token_threshold: number, 
 /**

@@ -2,6 +2,7 @@ pub mod agents;
 pub mod messages;
 pub mod runs;
 pub mod sessions;
+pub mod skills;
 
 use axum::{Router, extract::DefaultBodyLimit, middleware::from_fn_with_state, routing::get};
 
@@ -84,12 +85,40 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         get(messages::get_message).delete(messages::delete_message),
     );
 
+    // Skill CRUD routes
+    let skills_router = Router::new()
+        .route(
+            "/",
+            get(skills::get_skills).post(skills::create_skill),
+        )
+        .route(
+            "/{skill_id}",
+            get(skills::get_skill)
+                .put(skills::update_skill)
+                .delete(skills::delete_skill),
+        );
+
+    // Agent-Skill assignment routes
+    let agent_skills_router = Router::new()
+        .route(
+            "/",
+            get(skills::get_agent_skill_assignments)
+                .post(skills::assign_skill_to_agent),
+        )
+        .route(
+            "/{assignment_id}",
+            axum::routing::put(skills::update_agent_skill)
+                .delete(skills::unassign_skill_from_agent),
+        );
+
     Router::new().nest(
         "/chat",
         Router::new()
             .nest("/sessions", sessions_router)
             .nest("/agents", agents_router)
             .nest("/messages", messages_router)
+            .nest("/skills", skills_router)
+            .nest("/agents/{agent_id}/skills", agent_skills_router)
             .route("/runs/{run_id}/log", get(runs::get_run_log))
             .route("/runs/{run_id}/diff", get(runs::get_run_diff))
             .route(

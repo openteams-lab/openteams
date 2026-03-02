@@ -108,6 +108,12 @@ import {
   CreateChatSessionAgentRequest,
   UpdateChatSessionAgentRequest,
   UpdateChatAgent,
+  ChatSkill,
+  CreateChatSkill,
+  UpdateChatSkill,
+  ChatAgentSkill,
+  AssignSkillToAgent,
+  UpdateAgentSkill,
 } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { createWorkspaceWithSession } from '@/types/attempt';
@@ -1707,6 +1713,94 @@ export const chatApi = {
     content,
     meta: meta ?? null,
   }),
+
+  // ─── Skills ───
+
+  listSkills: async (): Promise<ChatSkill[]> => {
+    const response = await makeRequest('/api/chat/skills');
+    return handleApiResponse<ChatSkill[]>(response);
+  },
+
+  getSkill: async (skillId: string): Promise<ChatSkill> => {
+    const response = await makeRequest(`/api/chat/skills/${skillId}`);
+    return handleApiResponse<ChatSkill>(response);
+  },
+
+  createSkill: async (data: CreateChatSkill): Promise<ChatSkill> => {
+    const response = await makeRequest('/api/chat/skills', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<ChatSkill>(response);
+  },
+
+  updateSkill: async (
+    skillId: string,
+    data: UpdateChatSkill
+  ): Promise<ChatSkill> => {
+    const response = await makeRequest(`/api/chat/skills/${skillId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<ChatSkill>(response);
+  },
+
+  deleteSkill: async (skillId: string): Promise<void> => {
+    const response = await makeRequest(`/api/chat/skills/${skillId}`, {
+      method: 'DELETE',
+    });
+    return handleApiResponse<void>(response);
+  },
+
+  // ─── Agent-Skill Assignments ───
+
+  listAgentSkills: async (agentId: string): Promise<ChatAgentSkill[]> => {
+    const response = await makeRequest(
+      `/api/chat/agents/${agentId}/skills`
+    );
+    return handleApiResponse<ChatAgentSkill[]>(response);
+  },
+
+  assignSkillToAgent: async (
+    data: AssignSkillToAgent
+  ): Promise<ChatAgentSkill> => {
+    const response = await makeRequest(
+      `/api/chat/agents/${data.agent_id}/skills`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<ChatAgentSkill>(response);
+  },
+
+  updateAgentSkill: async (
+    agentId: string,
+    assignmentId: string,
+    data: UpdateAgentSkill
+  ): Promise<ChatAgentSkill> => {
+    const response = await makeRequest(
+      `/api/chat/agents/${agentId}/skills/${assignmentId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<ChatAgentSkill>(response);
+  },
+
+  unassignSkillFromAgent: async (
+    agentId: string,
+    assignmentId: string
+  ): Promise<void> => {
+    const response = await makeRequest(
+      `/api/chat/agents/${agentId}/skills/${assignmentId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    return handleApiResponse<void>(response);
+  },
 };
 
 // Search API (multi-repo file search)
