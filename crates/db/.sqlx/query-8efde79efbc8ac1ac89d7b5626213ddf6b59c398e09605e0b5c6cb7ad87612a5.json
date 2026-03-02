@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.id as \"id!: Uuid\",\n                      s.name,\n                      s.description,\n                      s.content,\n                      s.trigger_type,\n                      s.trigger_keywords as \"trigger_keywords!: sqlx::types::Json<Vec<String>>\",\n                      s.enabled as \"enabled!: bool\",\n                      s.source,\n                      s.source_url,\n                      s.version,\n                      s.author,\n                      s.tags as \"tags!: sqlx::types::Json<Vec<String>>\",\n                      s.category,\n                      s.compatible_agents as \"compatible_agents!: sqlx::types::Json<Vec<String>>\",\n                      s.created_at as \"created_at!: DateTime<Utc>\",\n                      s.updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM chat_skills s\n               INNER JOIN chat_agent_skills ags ON s.id = ags.skill_id\n               WHERE ags.agent_id = $1\n                 AND s.enabled = 1\n                 AND ags.enabled = 1\n               ORDER BY s.name ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "description",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "content",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "trigger_type",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "trigger_keywords!: sqlx::types::Json<Vec<String>>",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "enabled!: bool",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "source",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "source_url",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "version",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "author",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "tags!: sqlx::types::Json<Vec<String>>",
+        "ordinal": 11,
+        "type_info": "Text"
+      },
+      {
+        "name": "category",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "compatible_agents!: sqlx::types::Json<Vec<String>>",
+        "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 15,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8efde79efbc8ac1ac89d7b5626213ddf6b59c398e09605e0b5c6cb7ad87612a5"
+}
