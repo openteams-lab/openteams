@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/gin-gonic/gin"
 	"gopkg.in/yaml.v3"
 )
 
@@ -417,10 +417,10 @@ func (s *Server) downloadSkill(c *gin.Context) {
 		presignedURL, err := s.generatePresignedURL(key)
 		if err == nil {
 			c.JSON(http.StatusOK, gin.H{
-				"skill_id":         id,
-				"cdn_url":          presignedURL,
-				"files":            s.getSkillFiles(id),
-				"download_method":  "presigned",
+				"skill_id":        id,
+				"cdn_url":         presignedURL,
+				"files":           s.getSkillFiles(id),
+				"download_method": "presigned",
 			})
 			return
 		}
@@ -432,9 +432,9 @@ func (s *Server) downloadSkill(c *gin.Context) {
 		// Return CDN redirect
 		cdnURL := fmt.Sprintf("%s/%s.tar.gz", s.cdnConfig.BaseURL, id)
 		c.JSON(http.StatusOK, gin.H{
-			"skill_id":         id,
-			"cdn_url":          cdnURL,
-			"files":            s.getSkillFiles(id),
+			"skill_id":        id,
+			"cdn_url":         cdnURL,
+			"files":           s.getSkillFiles(id),
 			"download_method": "redirect",
 		})
 		return
