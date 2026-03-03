@@ -7,7 +7,6 @@ import {
   ToggleRightIcon,
   LightningIcon,
   XIcon,
-  CloudArrowDownIcon,
 } from '@phosphor-icons/react';
 import type {
   ChatSkill,
@@ -25,8 +24,6 @@ interface AgentSkillsSectionProps {
   agentId: string | null;
   /** Whether the section is in read-only mode (e.g. archived session) */
   readOnly?: boolean;
-  /** Optional workspace path to install skill files to */
-  workspacePath?: string;
 }
 
 type SkillFormMode = 'hidden' | 'create' | 'edit';
@@ -34,7 +31,6 @@ type SkillFormMode = 'hidden' | 'create' | 'edit';
 export function AgentSkillsSection({
   agentId,
   readOnly = false,
-  workspacePath,
 }: AgentSkillsSectionProps) {
   const [allSkills, setAllSkills] = useState<ChatSkill[]>([]);
   const [agentSkillAssignments, setAgentSkillAssignments] = useState<
@@ -109,6 +105,13 @@ export function AgentSkillsSection({
                 .filter(Boolean)
             : null,
         enabled: true,
+        source: null,
+        source_url: null,
+        version: null,
+        author: null,
+        tags: null,
+        category: null,
+        compatible_agents: null,
       };
       const skill = await chatApi.createSkill(data);
       // Auto-assign to current agent if editing
@@ -146,6 +149,13 @@ export function AgentSkillsSection({
                 .filter(Boolean)
             : null,
         enabled: true,
+        source: null,
+        source_url: null,
+        version: null,
+        author: null,
+        tags: null,
+        category: null,
+        compatible_agents: null,
       };
       await chatApi.updateSkill(editingSkillId, data);
       resetForm();
@@ -421,8 +431,6 @@ export function AgentSkillsSection({
           {/* Skill Marketplace */}
           <SkillMarketplace
             readOnly={readOnly}
-            agentId={agentId}
-            workspacePath={workspacePath}
             onSkillInstalled={loadSkills}
           />
         </div>

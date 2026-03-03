@@ -4,7 +4,6 @@ import {
   CheckIcon,
   MagnifyingGlassIcon,
   FolderIcon,
-  ArrowCounterClockwiseIcon,
   XIcon,
   LightningIcon,
 } from '@phosphor-icons/react';
@@ -21,10 +20,6 @@ import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 interface SkillMarketplaceProps {
   /** Whether the marketplace is in read-only mode */
   readOnly?: boolean;
-  /** Optional agent ID to auto-assign installed skills */
-  agentId?: string | null;
-  /** Optional workspace path to install skill files to */
-  workspacePath?: string;
   /** Callback when a skill is installed */
   onSkillInstalled?: (skill: ChatSkill) => void;
 }
@@ -33,8 +28,6 @@ type ViewMode = 'marketplace' | 'installed';
 
 export function SkillMarketplace({
   readOnly = false,
-  agentId,
-  workspacePath,
   onSkillInstalled,
 }: SkillMarketplaceProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('marketplace');
@@ -108,8 +101,7 @@ export function SkillMarketplace({
     try {
       const installed = await chatApi.installRegistrySkill(
         skillMeta.id,
-        undefined,
-        workspacePath
+        undefined
       );
       await loadInstalledSkills();
       onSkillInstalled?.(installed);

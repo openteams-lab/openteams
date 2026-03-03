@@ -1749,6 +1749,13 @@ impl StreamingContentState {
                     delta,
                     self.kind
                 );
+                tracing::debug!(
+                    kind = ?self.kind,
+                    delta = ?delta,
+                    buffer_len = self.buffer.len(),
+                    entry_index = ?self.entry_index,
+                    "Dropped streaming delta due to content kind mismatch"
+                );
             }
         }
     }
