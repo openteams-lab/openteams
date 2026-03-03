@@ -23,6 +23,8 @@ interface SkillMarketplaceProps {
   readOnly?: boolean;
   /** Optional agent ID to auto-assign installed skills */
   agentId?: string | null;
+  /** Optional workspace path to install skill files to */
+  workspacePath?: string;
   /** Callback when a skill is installed */
   onSkillInstalled?: (skill: ChatSkill) => void;
 }
@@ -32,6 +34,7 @@ type ViewMode = 'marketplace' | 'installed';
 export function SkillMarketplace({
   readOnly = false,
   agentId,
+  workspacePath,
   onSkillInstalled,
 }: SkillMarketplaceProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('marketplace');
@@ -103,7 +106,11 @@ export function SkillMarketplace({
     setInstallingSkillId(skillMeta.id);
     setError(null);
     try {
-      const installed = await chatApi.installRegistrySkill(skillMeta.id);
+      const installed = await chatApi.installRegistrySkill(
+        skillMeta.id,
+        undefined,
+        workspacePath
+      );
       await loadInstalledSkills();
       onSkillInstalled?.(installed);
     } catch (err) {

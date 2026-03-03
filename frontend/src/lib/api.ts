@@ -1840,11 +1840,18 @@ export const chatApi = {
 
   installRegistrySkill: async (
     skillId: string,
-    registryUrl?: string
+    registryUrl?: string,
+    workspacePath?: string
   ): Promise<ChatSkill> => {
-    const url = registryUrl
-      ? `/api/chat/registry/skills/${skillId}/install?registry_url=${encodeURIComponent(registryUrl)}`
-      : `/api/chat/registry/skills/${skillId}/install`;
+    const params = new URLSearchParams();
+    if (registryUrl) {
+      params.append('registry_url', registryUrl);
+    }
+    if (workspacePath) {
+      params.append('workspace_path', workspacePath);
+    }
+    const paramStr = params.toString();
+    const url = `/api/chat/registry/skills/${skillId}/install${paramStr ? '?' + paramStr : ''}`;
     const response = await makeRequest(url, { method: 'POST' });
     return handleApiResponse<ChatSkill>(response);
   },

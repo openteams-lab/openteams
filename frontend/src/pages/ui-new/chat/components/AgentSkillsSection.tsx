@@ -25,6 +25,8 @@ interface AgentSkillsSectionProps {
   agentId: string | null;
   /** Whether the section is in read-only mode (e.g. archived session) */
   readOnly?: boolean;
+  /** Optional workspace path to install skill files to */
+  workspacePath?: string;
 }
 
 type SkillFormMode = 'hidden' | 'create' | 'edit';
@@ -32,6 +34,7 @@ type SkillFormMode = 'hidden' | 'create' | 'edit';
 export function AgentSkillsSection({
   agentId,
   readOnly = false,
+  workspacePath,
 }: AgentSkillsSectionProps) {
   const [allSkills, setAllSkills] = useState<ChatSkill[]>([]);
   const [agentSkillAssignments, setAgentSkillAssignments] = useState<
@@ -419,6 +422,7 @@ export function AgentSkillsSection({
           <SkillMarketplace
             readOnly={readOnly}
             agentId={agentId}
+            workspacePath={workspacePath}
             onSkillInstalled={loadSkills}
           />
         </div>

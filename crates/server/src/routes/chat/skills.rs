@@ -7,10 +7,11 @@ use deployment::Deployment;
 use serde::Deserialize;
 use services::services::skill_registry::{
     RemoteSkillMeta, RemoteSkillPackage, SkillCategory, SkillRegistryClient,
-    install_skill_from_registry, install_builtin_skill, list_builtin_skills, get_builtin_skill,
+    install_skill_from_registry, install_skill_files_to_directory, install_builtin_skill, list_builtin_skills, get_builtin_skill,
     search_builtin_skills, filter_builtin_skills_by_category, filter_builtin_skills_by_agent,
     get_builtin_categories, builtin_skills_count,
 };
+use std::path::Path;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
@@ -123,6 +124,7 @@ pub async fn unassign_skill_from_agent(
 #[derive(Debug, Deserialize)]
 pub struct RegistryQuery {
     pub registry_url: Option<String>,
+    pub workspace_path: Option<String>,
 }
 
 /// List available skills from the remote registry
@@ -163,12 +165,13 @@ pub async fn list_registry_categories(
 }
 
 /// Install a skill from the registry to the local database
+/// and optionally download skill files to workspace directories
 pub async fn install_registry_skill(
     State(deployment): State<DeploymentImpl>,
     axum::extract::Path(skill_id): axum::extract::Path<String>,
     axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
 ) -> Result<ResponseJson<ApiResponse<ChatSkill>>, ApiError> {
-    let client = SkillRegistryClient::new(query.registry_url);
+    let client = SkillRegistryClient::new(query.registry_url.clone());
     let skill_package = client.get_skill(&skill_id).await.map_err(|e| {
         ApiError::BadRequest(format!("Failed to fetch skill from registry: {}", e))
     })?;
@@ -178,6 +181,22 @@ pub async fn install_registry_skill(
         .map_err(|e| {
             ApiError::BadRequest(format!("Failed to install skill: {}", e))
         })?;
+
+    // If workspace_path is provided, download skill files to .agents/skills and .claude/skills
+    if let Some(workspace_path) = &query.workspace_path {
+        let workspace = Path::new(workspace_path);
+        if workspace.exists() {
+            match install_skill_files_to_directory(workspace, &skill_id, query.registry_url.as_deref()).await {
+                Ok(files_count) => {
+                    tracing::info!("Downloaded {} skill files to workspace for skill: {}", files_count, skill_id);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to download skill files to workspace: {}", e);
+                    // Don't fail the whole operation if file download fails
+                }
+            }
+        }
+    }
 
     Ok(ResponseJson(ApiResponse::success(installed)))
 }

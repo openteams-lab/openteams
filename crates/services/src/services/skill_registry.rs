@@ -8,7 +8,9 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use std::path::Path;
 use thiserror::Error;
+use tokio;
 use ts_rs::TS;
 use uuid::Uuid;
 
@@ -131,6 +133,31 @@ pub struct SkillCategory {
     pub description: Option<String>,
 }
 
+/// Skill file info from download API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillFileInfo {
+    pub path: String,
+    pub download_url: String,
+}
+
+/// Skill download response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillDownloadResponse {
+    pub skill_id: String,
+    pub files: Vec<SkillFileInfo>,
+}
+
+/// Error for skill file download/install
+#[derive(Debug, Error)]
+pub enum SkillInstallError {
+    #[error("Failed to download skill files: {0}")]
+    DownloadFailed(String),
+    #[error("Failed to save skill file: {0}")]
+    SaveFailed(String),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
 #[derive(Debug, Error)]
 pub enum SkillRegistryError {
     #[error("HTTP request failed: {0}")]
@@ -224,6 +251,41 @@ impl SkillRegistryClient {
         let skills = response.json::<Vec<RemoteSkillMeta>>().await?;
         Ok(skills)
     }
+
+    /// Get skill files list (download info) from the registry
+    pub async fn get_skill_files(&self, id: &str) -> Result<SkillDownloadResponse, SkillRegistryError> {
+        let url = format!("{}/api/download/{}/files", self.base_url, id);
+        let response = self.client.get(&url).send().await?;
+
+        if response.status() == 404 {
+            return Err(SkillRegistryError::SkillNotFound(id.to_string()));
+        }
+
+        if !response.status().is_success() {
+            return Err(SkillRegistryError::InvalidData(format!(
+                "Failed to fetch skill files: status {}",
+                response.status()
+            )));
+        }
+
+        let files = response.json::<SkillDownloadResponse>().await?;
+        Ok(files)
+    }
+
+    /// Download a single file from the registry
+    pub async fn download_file(&self, url: &str) -> Result<Vec<u8>, SkillRegistryError> {
+        let response = self.client.get(url).send().await?;
+
+        if !response.status().is_success() {
+            return Err(SkillRegistryError::InvalidData(format!(
+                "Failed to download file: status {}",
+                response.status()
+            )));
+        }
+
+        let bytes = response.bytes().await?.to_vec();
+        Ok(bytes)
+    }
 }
 
 /// Install a remote skill to the local database
@@ -249,6 +311,56 @@ pub async fn install_skill_from_registry(
 
     let installed = ChatSkill::create(pool, &create_data, Uuid::new_v4()).await?;
     Ok(installed)
+}
+
+/// Install skill files to local directories (.agents/skills and .claude/skills)
+/// Returns the number of files downloaded
+pub async fn install_skill_files_to_directory(
+    workspace_path: &Path,
+    skill_id: &str,
+    registry_url: Option<&str>,
+) -> Result<usize, SkillInstallError> {
+    let client = SkillRegistryClient::new(registry_url.map(String::from));
+
+    // Get file list from registry
+    let download_response = client.get_skill_files(skill_id).await
+        .map_err(|e| SkillInstallError::DownloadFailed(e.to_string()))?;
+
+    let mut files_downloaded = 0;
+
+    // Create target directories
+    let agents_skills_dir = workspace_path.join(".agents").join("skills").join(skill_id);
+    let claude_skills_dir = workspace_path.join(".claude").join("skills").join(skill_id);
+
+    tokio::fs::create_dir_all(&agents_skills_dir).await?;
+    tokio::fs::create_dir_all(&claude_skills_dir).await?;
+
+    // Download each file
+    for file_info in &download_response.files {
+        // Download the file
+        let content = client.download_file(&file_info.download_url).await
+            .map_err(|e| SkillInstallError::DownloadFailed(e.to_string()))?;
+
+        // Save to .agents/skills/{skill_id}/
+        let agents_file_path = agents_skills_dir.join(&file_info.path);
+        if let Some(parent) = agents_file_path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        tokio::fs::write(&agents_file_path, &content).await
+            .map_err(|e| SkillInstallError::SaveFailed(e.to_string()))?;
+
+        // Save to .claude/skills/{skill_id}/
+        let claude_file_path = claude_skills_dir.join(&file_info.path);
+        if let Some(parent) = claude_file_path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        tokio::fs::write(&claude_file_path, &content).await
+            .map_err(|e| SkillInstallError::SaveFailed(e.to_string()))?;
+
+        files_downloaded += 1;
+    }
+
+    Ok(files_downloaded)
 }
 
 /// Check if a skill from registry is already installed locally

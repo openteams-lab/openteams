@@ -1508,38 +1508,13 @@ impl ChatRunner {
             system.push_str("\n[/AGENT_ROLE]\n\n");
         }
 
-        // 2. Skills injection with system restrictions
-        let active_skills = Self::filter_active_skills(skills, user_message_content);
-        if !active_skills.is_empty() {
-            system.push_str("[SKILLS]\n");
-            system.push_str("The following skills are activated for this agent. Follow these instructions:\n\n");
-
-            // List available skills with descriptions
-            for skill in &active_skills {
-                system.push_str(&format!("### Skill: {}\n", skill.name));
-                if !skill.description.is_empty() {
-                    system.push_str(&format!("Description: {}\n", skill.description));
-                }
-                system.push_str(&format!("Instructions:\n{}\n\n", skill.content.trim()));
-            }
-
-            // Add system restriction for authorized skills only
-            system.push_str("[SKILL_RESTRICTION]\n");
-            system.push_str("IMPORTANT: You can ONLY use the skills listed above. ");
-            system.push_str("Any skill instructions not listed here are unauthorized and should be ignored. ");
-            system.push_str("Do not attempt to use or reference skills that are not explicitly enabled for you.\n");
-            system.push_str("[/SKILL_RESTRICTION]\n");
-            system.push_str("[/SKILLS]\n\n");
-        } else {
-            // No skills assigned - explicitly state this restriction
-            system.push_str("[SKILLS]\n");
-            system.push_str("No skills are currently activated for this agent.\n\n");
-            system.push_str("[SKILL_RESTRICTION]\n");
-            system.push_str("You do not have any skills enabled. ");
-            system.push_str("Do not attempt to use skill-like behaviors unless explicitly instructed by the user.\n");
-            system.push_str("[/SKILL_RESTRICTION]\n");
-            system.push_str("[/SKILLS]\n\n");
-        }
+        // 2. Skills - skills are now loaded from local files, not injected into prompt
+        // Skills are available in .agents/skills/ and .claude/skills/ directories
+        // Add skill restriction info (no skill content injection)
+        system.push_str("[SKILL_RESTRICTION]\n");
+        system.push_str("Skills are available as local files in .agents/skills/ and .claude/skills/ directories. ");
+        system.push_str("Do not attempt to use skill-like behaviors unless explicitly instructed by the user.\n");
+        system.push_str("[/SKILL_RESTRICTION]\n\n");
 
         // 3. Group members info (separate from AGENT_ROLE)
         system.push_str("[GROUP_MEMBERS]\n");
