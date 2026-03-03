@@ -10,7 +10,6 @@ members = [
     "crates/local-deployment",
     "crates/deployment",
     "crates/review",
-    "crates/skill-registry-server",
 ]
 exclude = ["crates/remote", "src-tauri"]
 
