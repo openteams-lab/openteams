@@ -38,19 +38,33 @@ type SkillFrontmatter struct {
 	License     string `yaml:"license"`
 }
 
-// Skill metadata returned by API
+// Skill metadata returned by API (detail view)
 type SkillMeta struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Category    string   `json:"category,omitempty"`
-	Version     string   `json:"version"`
-	Author      string   `json:"author,omitempty"`
-	Tags        []string `json:"tags"`
-	SourceURL   string   `json:"source_url,omitempty"`
-	Files       []string `json:"files,omitempty"`
-	DownloadURL string   `json:"download_url,omitempty"`
-	Content     string   `json:"content,omitempty"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	Description      string   `json:"description"`
+	Category         string   `json:"category,omitempty"`
+	Version          string   `json:"version"`
+	Author           string   `json:"author,omitempty"`
+	Tags             []string `json:"tags"`
+	SourceURL        string   `json:"source_url,omitempty"`
+	Files            []string `json:"files,omitempty"`
+	DownloadURL      string   `json:"download_url,omitempty"`
+	Content          string   `json:"content,omitempty"`
+	CompatibleAgents []string `json:"compatible_agents"`
+}
+
+// Skill metadata for list view (no content, files, download_url)
+type SkillListItem struct {
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	Description      string   `json:"description"`
+	Category         string   `json:"category,omitempty"`
+	Version          string   `json:"version"`
+	Author           string   `json:"author,omitempty"`
+	Tags             []string `json:"tags"`
+	SourceURL        string   `json:"source_url,omitempty"`
+	CompatibleAgents []string `json:"compatible_agents"`
 }
 
 // Skill detail with full content
@@ -227,16 +241,17 @@ func (s *Server) loadSkillFromDir(dir string) (SkillMeta, error) {
 	}
 
 	return SkillMeta{
-		ID:          skillID,
-		Name:        skillMeta.Name,
-		Description: skillMeta.Description,
-		Category:    getCategoryFromName(skillMeta.Name),
-		Version:     "1.0.0",
-		Author:      "ComposioHQ",
-		Tags:        []string{skillID},
-		SourceURL:   fmt.Sprintf("https://github.com/ComposioHQ/awesome-claude-skills/tree/master/%s", skillID),
-		Files:       files,
-		Content:     content,
+		ID:               skillID,
+		Name:             skillMeta.Name,
+		Description:      skillMeta.Description,
+		Category:         getCategoryFromName(skillMeta.Name),
+		Version:          "1.0.0",
+		Author:           "ComposioHQ",
+		Tags:             []string{skillID},
+		SourceURL:        fmt.Sprintf("https://github.com/ComposioHQ/awesome-claude-skills/tree/master/%s", skillID),
+		Files:            files,
+		Content:          content,
+		CompatibleAgents: []string{"claude-code"},
 	}, nil
 }
 
@@ -335,7 +350,7 @@ func (s *Server) listSkills(c *gin.Context) {
 	search := c.Query("search")
 	category := c.Query("category")
 
-	var result []SkillMeta
+	var result []SkillListItem
 	for _, skill := range s.skills {
 		// Filter by search
 		if search != "" {
@@ -351,7 +366,18 @@ func (s *Server) listSkills(c *gin.Context) {
 			continue
 		}
 
-		result = append(result, skill)
+		// Convert to list item (exclude content, files, download_url)
+		result = append(result, SkillListItem{
+			ID:               skill.ID,
+			Name:             skill.Name,
+			Description:      skill.Description,
+			Category:         skill.Category,
+			Version:          skill.Version,
+			Author:           skill.Author,
+			Tags:             skill.Tags,
+			SourceURL:        skill.SourceURL,
+			CompatibleAgents: skill.CompatibleAgents,
+		})
 	}
 
 	c.JSON(http.StatusOK, result)
