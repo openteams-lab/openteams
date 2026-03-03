@@ -6,12 +6,12 @@ use db::models::{
 use deployment::Deployment;
 use serde::Deserialize;
 use services::services::skill_registry::{
-    RemoteSkillMeta, RemoteSkillPackage, SkillCategory, SkillRegistryClient,
-    install_skill_from_registry, install_skill_files_to_directory, install_builtin_skill, list_builtin_skills, get_builtin_skill,
-    search_builtin_skills, filter_builtin_skills_by_category, filter_builtin_skills_by_agent,
-    get_builtin_categories, builtin_skills_count,
+    RemoteSkillMeta, RemoteSkillPackage, SkillCategory, SkillRegistryClient, builtin_skills_count,
+    filter_builtin_skills_by_agent, filter_builtin_skills_by_category, get_builtin_categories,
+    get_builtin_skill, install_builtin_skill, install_skill_files_to_global_directory,
+    install_skill_from_registry, list_builtin_skills, search_builtin_skills,
+    uninstall_skill_files_from_global_directory,
 };
-use std::path::Path;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
@@ -57,6 +57,14 @@ pub async fn delete_skill(
     State(deployment): State<DeploymentImpl>,
     axum::extract::Path(skill_id): axum::extract::Path<Uuid>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    let skill = ChatSkill::find_by_id(&deployment.db().pool, skill_id)
+        .await?
+        .ok_or(ApiError::Database(sqlx::Error::RowNotFound))?;
+
+    uninstall_skill_files_from_global_directory(&skill)
+        .await
+        .map_err(|e| ApiError::BadRequest(format!("Failed to remove skill directory: {}", e)))?;
+
     let rows_affected = ChatSkill::delete(&deployment.db().pool, skill_id).await?;
     if rows_affected == 0 {
         Err(ApiError::Database(sqlx::Error::RowNotFound))
@@ -101,8 +109,7 @@ pub async fn update_agent_skill(
     axum::extract::Path((_agent_id, assignment_id)): axum::extract::Path<(Uuid, Uuid)>,
     Json(payload): Json<UpdateAgentSkill>,
 ) -> Result<ResponseJson<ApiResponse<ChatAgentSkill>>, ApiError> {
-    let assignment =
-        ChatAgentSkill::update(&deployment.db().pool, assignment_id, &payload).await?;
+    let assignment = ChatAgentSkill::update(&deployment.db().pool, assignment_id, &payload).await?;
     Ok(ResponseJson(ApiResponse::success(assignment)))
 }
 
@@ -124,7 +131,6 @@ pub async fn unassign_skill_from_agent(
 #[derive(Debug, Deserialize)]
 pub struct RegistryQuery {
     pub registry_url: Option<String>,
-    pub workspace_path: Option<String>,
 }
 
 /// List available skills from the remote registry
@@ -146,9 +152,10 @@ pub async fn get_registry_skill(
     axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
 ) -> Result<ResponseJson<ApiResponse<RemoteSkillPackage>>, ApiError> {
     let client = SkillRegistryClient::new(query.registry_url);
-    let skill = client.get_skill(&skill_id).await.map_err(|e| {
-        ApiError::BadRequest(format!("Failed to fetch skill from registry: {}", e))
-    })?;
+    let skill = client
+        .get_skill(&skill_id)
+        .await
+        .map_err(|e| ApiError::BadRequest(format!("Failed to fetch skill from registry: {}", e)))?;
     Ok(ResponseJson(ApiResponse::success(skill)))
 }
 
@@ -165,38 +172,37 @@ pub async fn list_registry_categories(
 }
 
 /// Install a skill from the registry to the local database
-/// and optionally download skill files to workspace directories
+/// and download full skill files to global user skill directories.
 pub async fn install_registry_skill(
     State(deployment): State<DeploymentImpl>,
     axum::extract::Path(skill_id): axum::extract::Path<String>,
     axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
 ) -> Result<ResponseJson<ApiResponse<ChatSkill>>, ApiError> {
     let client = SkillRegistryClient::new(query.registry_url.clone());
-    let skill_package = client.get_skill(&skill_id).await.map_err(|e| {
-        ApiError::BadRequest(format!("Failed to fetch skill from registry: {}", e))
-    })?;
+    let skill_package = client
+        .get_skill(&skill_id)
+        .await
+        .map_err(|e| ApiError::BadRequest(format!("Failed to fetch skill from registry: {}", e)))?;
+
+    let files_count =
+        install_skill_files_to_global_directory(&skill_id, query.registry_url.as_deref())
+            .await
+            .map_err(|e| {
+                ApiError::BadRequest(format!(
+                    "Failed to install skill files to global directories: {}",
+                    e
+                ))
+            })?;
+
+    tracing::info!(
+        skill_id = %skill_id,
+        files_count = files_count,
+        "Installed registry skill files to global user directories"
+    );
 
     let installed = install_skill_from_registry(&deployment.db().pool, &skill_package)
         .await
-        .map_err(|e| {
-            ApiError::BadRequest(format!("Failed to install skill: {}", e))
-        })?;
-
-    // If workspace_path is provided, download skill files to .agents/skills and .claude/skills
-    if let Some(workspace_path) = &query.workspace_path {
-        let workspace = Path::new(workspace_path);
-        if workspace.exists() {
-            match install_skill_files_to_directory(workspace, &skill_id, query.registry_url.as_deref()).await {
-                Ok(files_count) => {
-                    tracing::info!("Downloaded {} skill files to workspace for skill: {}", files_count, skill_id);
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to download skill files to workspace: {}", e);
-                    // Don't fail the whole operation if file download fails
-                }
-            }
-        }
-    }
+        .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
 
     Ok(ResponseJson(ApiResponse::success(installed)))
 }
@@ -249,9 +255,8 @@ pub async fn get_builtin_skill_api(
     State(_deployment): State<DeploymentImpl>,
     axum::extract::Path(skill_id): axum::extract::Path<String>,
 ) -> Result<ResponseJson<ApiResponse<RemoteSkillPackage>>, ApiError> {
-    let skill = get_builtin_skill(&skill_id).ok_or_else(|| {
-        ApiError::BadRequest(format!("Skill not found: {}", skill_id))
-    })?;
+    let skill = get_builtin_skill(&skill_id)
+        .ok_or_else(|| ApiError::BadRequest(format!("Skill not found: {}", skill_id)))?;
     Ok(ResponseJson(ApiResponse::success(skill)))
 }
 
@@ -262,9 +267,7 @@ pub async fn install_builtin_skill_api(
 ) -> Result<ResponseJson<ApiResponse<ChatSkill>>, ApiError> {
     let installed = install_builtin_skill(&deployment.db().pool, &skill_id)
         .await
-        .map_err(|e| {
-            ApiError::BadRequest(format!("Failed to install skill: {}", e))
-        })?;
+        .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
 
     Ok(ResponseJson(ApiResponse::success(installed)))
 }

@@ -3,23 +3,25 @@
 //! Provides functionality to fetch and install skills from a remote registry.
 //! Also provides built-in skills from the awesome-claude-skills repository.
 
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Component, Path, PathBuf},
+};
+
+use db::models::chat_skill::{ChatSkill, CreateChatSkill};
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use std::collections::HashMap;
-use std::path::Path;
 use thiserror::Error;
-use tokio;
 use ts_rs::TS;
 use uuid::Uuid;
-
-use db::models::chat_skill::{ChatSkill, CreateChatSkill};
 
 /// Default skill registry URL (can be configured)
 /// Use local server for development: http://127.0.0.1:3101
 /// Production: https://skills.agentschatgroup.com
 pub const DEFAULT_REGISTRY_URL: &str = "http://127.0.0.1:3101";
+const GLOBAL_SKILLS_DIR: &str = ".agents";
 
 /// Built-in skills data loaded from JSON
 static BUILTIN_SKILLS: Lazy<BuiltInSkillsData> = Lazy::new(|| {
@@ -154,6 +156,12 @@ pub enum SkillInstallError {
     DownloadFailed(String),
     #[error("Failed to save skill file: {0}")]
     SaveFailed(String),
+    #[error("Unable to locate user home directory")]
+    HomeDirNotFound,
+    #[error("Invalid skill file path: {0}")]
+    InvalidPath(String),
+    #[error("Failed to delete skill file or directory: {0}")]
+    DeleteFailed(String),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -237,7 +245,10 @@ impl SkillRegistryClient {
     }
 
     /// Search skills by query
-    pub async fn search_skills(&self, query: &str) -> Result<Vec<RemoteSkillMeta>, SkillRegistryError> {
+    pub async fn search_skills(
+        &self,
+        query: &str,
+    ) -> Result<Vec<RemoteSkillMeta>, SkillRegistryError> {
         let url = format!("{}/api/skills?search={}", self.base_url, query);
         let response = self.client.get(&url).send().await?;
 
@@ -253,7 +264,10 @@ impl SkillRegistryClient {
     }
 
     /// Get skill files list (download info) from the registry
-    pub async fn get_skill_files(&self, id: &str) -> Result<SkillDownloadResponse, SkillRegistryError> {
+    pub async fn get_skill_files(
+        &self,
+        id: &str,
+    ) -> Result<SkillDownloadResponse, SkillRegistryError> {
         let url = format!("{}/api/download/{}/files", self.base_url, id);
         let response = self.client.get(&url).send().await?;
 
@@ -268,7 +282,10 @@ impl SkillRegistryClient {
             )));
         }
 
-        let files = response.json::<SkillDownloadResponse>().await?;
+        let mut files = response.json::<SkillDownloadResponse>().await?;
+        for file in &mut files.files {
+            file.download_url = self.resolve_download_url(&file.download_url);
+        }
         Ok(files)
     }
 
@@ -285,6 +302,19 @@ impl SkillRegistryClient {
 
         let bytes = response.bytes().await?.to_vec();
         Ok(bytes)
+    }
+
+    fn resolve_download_url(&self, download_url: &str) -> String {
+        if download_url.starts_with("http://") || download_url.starts_with("https://") {
+            return download_url.to_string();
+        }
+
+        let base = self.base_url.trim_end_matches('/');
+        if download_url.starts_with('/') {
+            format!("{base}{download_url}")
+        } else {
+            format!("{base}/{download_url}")
+        }
     }
 }
 
@@ -313,49 +343,61 @@ pub async fn install_skill_from_registry(
     Ok(installed)
 }
 
-/// Install skill files to local directories (.agents/skills and .claude/skills)
-/// Returns the number of files downloaded
-pub async fn install_skill_files_to_directory(
-    workspace_path: &Path,
+/// Install skill files from registry into global user directories:
+/// - ~/.agents/skills/{skill_id}
+/// - ~/.claude/skills/{skill_id}
+/// - ~/.github/skills/{skill_id}
+/// - ~/.cursor/skills/{skill_id}
+/// - ~/.qwen/skills/{skill_id}
+/// - ~/.opencode/skills/{skill_id}
+/// - ~/.gemini/skills/{skill_id}
+/// - ~/.factory/skills/{skill_id}
+///
+/// Returns the number of downloaded source files.
+pub async fn install_skill_files_to_global_directory(
     skill_id: &str,
     registry_url: Option<&str>,
 ) -> Result<usize, SkillInstallError> {
     let client = SkillRegistryClient::new(registry_url.map(String::from));
 
     // Get file list from registry
-    let download_response = client.get_skill_files(skill_id).await
+    let download_response = client
+        .get_skill_files(skill_id)
+        .await
         .map_err(|e| SkillInstallError::DownloadFailed(e.to_string()))?;
+    if download_response.files.is_empty() {
+        return Err(SkillInstallError::DownloadFailed(format!(
+            "Registry returned zero files for skill: {skill_id}"
+        )));
+    }
+
+    let home_dir = resolve_home_dir()?;
+    let target_roots = global_skill_roots(&home_dir, skill_id);
+
+    for root in &target_roots {
+        tokio::fs::create_dir_all(root).await?;
+    }
 
     let mut files_downloaded = 0;
-
-    // Create target directories
-    let agents_skills_dir = workspace_path.join(".agents").join("skills").join(skill_id);
-    let claude_skills_dir = workspace_path.join(".claude").join("skills").join(skill_id);
-
-    tokio::fs::create_dir_all(&agents_skills_dir).await?;
-    tokio::fs::create_dir_all(&claude_skills_dir).await?;
-
     // Download each file
     for file_info in &download_response.files {
+        let relative_path = sanitize_skill_relative_path(&file_info.path)?;
+
         // Download the file
-        let content = client.download_file(&file_info.download_url).await
+        let content = client
+            .download_file(&file_info.download_url)
+            .await
             .map_err(|e| SkillInstallError::DownloadFailed(e.to_string()))?;
 
-        // Save to .agents/skills/{skill_id}/
-        let agents_file_path = agents_skills_dir.join(&file_info.path);
-        if let Some(parent) = agents_file_path.parent() {
-            tokio::fs::create_dir_all(parent).await?;
+        for root in &target_roots {
+            let file_path = root.join(&relative_path);
+            if let Some(parent) = file_path.parent() {
+                tokio::fs::create_dir_all(parent).await?;
+            }
+            tokio::fs::write(&file_path, &content)
+                .await
+                .map_err(|e| SkillInstallError::SaveFailed(e.to_string()))?;
         }
-        tokio::fs::write(&agents_file_path, &content).await
-            .map_err(|e| SkillInstallError::SaveFailed(e.to_string()))?;
-
-        // Save to .claude/skills/{skill_id}/
-        let claude_file_path = claude_skills_dir.join(&file_info.path);
-        if let Some(parent) = claude_file_path.parent() {
-            tokio::fs::create_dir_all(parent).await?;
-        }
-        tokio::fs::write(&claude_file_path, &content).await
-            .map_err(|e| SkillInstallError::SaveFailed(e.to_string()))?;
 
         files_downloaded += 1;
     }
@@ -363,8 +405,137 @@ pub async fn install_skill_files_to_directory(
     Ok(files_downloaded)
 }
 
+/// Remove installed skill files from global user directories.
+/// Missing paths are ignored.
+pub async fn uninstall_skill_files_from_global_directory(
+    skill: &ChatSkill,
+) -> Result<(), SkillInstallError> {
+    let home_dir = resolve_home_dir()?;
+    let base_roots = global_skill_base_roots(&home_dir);
+    let mut target_dirs = HashSet::new();
+
+    for identifier in skill_uninstall_identifiers(skill) {
+        let relative = sanitize_skill_relative_path(&identifier)?;
+        for root in &base_roots {
+            target_dirs.insert(root.join(&relative));
+        }
+    }
+
+    for dir in target_dirs {
+        match tokio::fs::remove_dir_all(&dir).await {
+            Ok(_) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => {
+                return Err(SkillInstallError::DeleteFailed(format!(
+                    "{} ({})",
+                    dir.display(),
+                    err
+                )));
+            }
+        }
+    }
+
+    // Claude slash-command file generated by native installer.
+    let command_file = home_dir
+        .join(".claude")
+        .join("commands")
+        .join(format!("{}.md", slugify_skill_name(&skill.name)));
+    match tokio::fs::remove_file(&command_file).await {
+        Ok(_) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => {
+            return Err(SkillInstallError::DeleteFailed(format!(
+                "{} ({})",
+                command_file.display(),
+                err
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn resolve_home_dir() -> Result<PathBuf, SkillInstallError> {
+    dirs::home_dir().ok_or(SkillInstallError::HomeDirNotFound)
+}
+
+fn global_skill_roots(home_dir: &Path, skill_id: &str) -> Vec<PathBuf> {
+    global_skill_base_roots(home_dir)
+        .into_iter()
+        .map(|root| root.join(skill_id))
+        .collect()
+}
+
+fn global_skill_base_roots(home_dir: &Path) -> Vec<PathBuf> {
+    let mut roots = vec![home_dir.join(GLOBAL_SKILLS_DIR).join("skills")];
+    for companion in [
+        ".claude",
+        ".github",
+        ".cursor",
+        ".qwen",
+        ".opencode",
+        ".gemini",
+        ".factory",
+    ] {
+        roots.push(home_dir.join(companion).join("skills"));
+    }
+    roots
+}
+
+fn slugify_skill_name(name: &str) -> String {
+    name.to_lowercase().replace(' ', "-")
+}
+
+fn skill_uninstall_identifiers(skill: &ChatSkill) -> Vec<String> {
+    let mut ids = vec![slugify_skill_name(&skill.name)];
+
+    if skill.source.eq_ignore_ascii_case("registry")
+        && let Some(url) = skill.source_url.as_deref()
+    {
+        let candidate = url
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .unwrap_or_default();
+        if !candidate.is_empty() && !candidate.contains('/') && !candidate.contains('\\') {
+            ids.push(candidate.to_string());
+        }
+    }
+
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+fn sanitize_skill_relative_path(path: &str) -> Result<PathBuf, SkillInstallError> {
+    let candidate = Path::new(path);
+    if candidate.is_absolute() {
+        return Err(SkillInstallError::InvalidPath(path.to_string()));
+    }
+
+    let mut clean = PathBuf::new();
+    for component in candidate.components() {
+        match component {
+            Component::Normal(part) => clean.push(part),
+            Component::CurDir => continue,
+            Component::ParentDir | Component::Prefix(_) | Component::RootDir => {
+                return Err(SkillInstallError::InvalidPath(path.to_string()));
+            }
+        }
+    }
+
+    if clean.as_os_str().is_empty() {
+        return Err(SkillInstallError::InvalidPath(path.to_string()));
+    }
+
+    Ok(clean)
+}
+
 /// Check if a skill from registry is already installed locally
-pub async fn is_skill_installed(pool: &SqlitePool, registry_id: &str) -> Result<bool, SkillRegistryError> {
+pub async fn is_skill_installed(
+    pool: &SqlitePool,
+    registry_id: &str,
+) -> Result<bool, SkillRegistryError> {
     let skills = ChatSkill::find_by_source(pool, "registry").await?;
 
     // Check if any skill has a source_url matching this registry_id
@@ -406,7 +577,10 @@ pub fn search_builtin_skills(query: &str) -> Vec<RemoteSkillMeta> {
         .filter(|skill| {
             skill.name.to_lowercase().contains(&query_lower)
                 || skill.description.to_lowercase().contains(&query_lower)
-                || skill.tags.iter().any(|tag| tag.to_lowercase().contains(&query_lower))
+                || skill
+                    .tags
+                    .iter()
+                    .any(|tag| tag.to_lowercase().contains(&query_lower))
         })
         .map(|s| s.to_meta())
         .collect()
@@ -418,7 +592,8 @@ pub fn filter_builtin_skills_by_category(category: &str) -> Vec<RemoteSkillMeta>
         .skills
         .iter()
         .filter(|skill| {
-            skill.category
+            skill
+                .category
                 .as_ref()
                 .map(|c| c.eq_ignore_ascii_case(category))
                 .unwrap_or(false)

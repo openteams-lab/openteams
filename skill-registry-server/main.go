@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -306,12 +307,19 @@ func listSkillFiles(dir string) ([]string, error) {
 			return nil
 		}
 
+		// Expose files only; directory entries cannot be downloaded as files.
+		if info.IsDir() {
+			return nil
+		}
+
 		// Get relative path
 		relPath, err := filepath.Rel(dir, path)
 		if err != nil {
 			return err
 		}
 
+		// Use stable slash separator for API responses across OSes.
+		relPath = filepath.ToSlash(relPath)
 		files = append(files, relPath)
 		return nil
 	})
@@ -516,7 +524,7 @@ func (s *Server) downloadSkillFiles(c *gin.Context) {
 	}
 	var fileList []FileInfo
 	for _, f := range files {
-		downloadURL := fmt.Sprintf("/api/download/%s/file/%s", id, strings.ReplaceAll(f, "/", "%2F"))
+		downloadURL := fmt.Sprintf("%s/api/download/%s/file/%s", baseURL(c), id, url.PathEscape(f))
 
 		// If S3 is configured, generate pre-signed URLs for each file
 		if s.cdnConfig != nil && s.cdnConfig.S3Client != nil && s.cdnConfig.Bucket != "" {
@@ -527,10 +535,7 @@ func (s *Server) downloadSkillFiles(c *gin.Context) {
 			}
 		}
 
-		fileList = append(fileList, FileInfo{
-			Path:     f,
-			Download: downloadURL,
-		})
+		fileList = append(fileList, FileInfo{Path: f, Download: downloadURL})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -542,10 +547,14 @@ func (s *Server) downloadSkillFiles(c *gin.Context) {
 // Download a single file from a skill
 func (s *Server) downloadSkillFile(c *gin.Context) {
 	id := c.Param("id")
-	filePath := c.Param("filepath")
+	filePath := strings.TrimPrefix(c.Param("filepath"), "/")
 
 	// Decode the filepath
-	decodedPath := strings.ReplaceAll(filePath, "%2F", "/")
+	decodedPath, err := url.PathUnescape(filePath)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path encoding"})
+		return
+	}
 
 	// Build the full file path
 	skillDir := filepath.Join(s.skillsDir, id)
@@ -569,6 +578,16 @@ func (s *Server) downloadSkillFile(c *gin.Context) {
 	c.Header("Content-Type", "application/octet-stream")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filepath.Base(decodedPath)))
 	c.File(fullPath)
+}
+
+func baseURL(c *gin.Context) string {
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	} else if forwardedProto := c.GetHeader("X-Forwarded-Proto"); forwardedProto != "" {
+		scheme = forwardedProto
+	}
+	return fmt.Sprintf("%s://%s", scheme, c.Request.Host)
 }
 
 func (s *Server) getSkillFiles(skillID string) []string {

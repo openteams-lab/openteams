@@ -772,7 +772,6 @@ export function AiMembersSidebar({
       <AgentSkillsSection
         agentId={editingMember?.agent.id ?? null}
         readOnly={isArchived}
-        workspacePath={newMemberWorkspace || undefined}
       />
       {memberError && <div className="text-xs text-error">{memberError}</div>}
       <div className="flex items-center justify-end gap-half pt-half">

@@ -87,10 +87,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
 
     // Skill CRUD routes
     let skills_router = Router::new()
-        .route(
-            "/",
-            get(skills::get_skills).post(skills::create_skill),
-        )
+        .route("/", get(skills::get_skills).post(skills::create_skill))
         .route(
             "/{skill_id}",
             get(skills::get_skill)
@@ -102,8 +99,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     let agent_skills_router = Router::new()
         .route(
             "/",
-            get(skills::get_agent_skill_assignments)
-                .post(skills::assign_skill_to_agent),
+            get(skills::get_agent_skill_assignments).post(skills::assign_skill_to_agent),
         )
         .route(
             "/{assignment_id}",
@@ -113,37 +109,19 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
 
     // Remote Skill Registry routes
     let registry_router = Router::new()
-        .route(
-            "/skills",
-            get(skills::list_registry_skills),
-        )
-        .route(
-            "/skills/{skill_id}",
-            get(skills::get_registry_skill),
-        )
+        .route("/skills", get(skills::list_registry_skills))
+        .route("/skills/{skill_id}", get(skills::get_registry_skill))
         .route(
             "/skills/{skill_id}/install",
             axum::routing::post(skills::install_registry_skill),
         )
-        .route(
-            "/categories",
-            get(skills::list_registry_categories),
-        );
+        .route("/categories", get(skills::list_registry_categories));
 
     // Built-in Skills routes (embedded from awesome-claude-skills)
     let builtin_router = Router::new()
-        .route(
-            "/skills",
-            get(skills::list_builtin_skills_api),
-        )
-        .route(
-            "/skills/stats",
-            get(skills::get_builtin_skills_stats),
-        )
-        .route(
-            "/skills/{skill_id}",
-            get(skills::get_builtin_skill_api),
-        )
+        .route("/skills", get(skills::list_builtin_skills_api))
+        .route("/skills/stats", get(skills::get_builtin_skills_stats))
+        .route("/skills/{skill_id}", get(skills::get_builtin_skill_api))
         .route(
             "/skills/{skill_id}/install",
             axum::routing::post(skills::install_builtin_skill_api),

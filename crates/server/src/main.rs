@@ -49,11 +49,59 @@ async fn main() -> Result<(), AgentChatgroupError> {
         "warn,server={level},services={level},db={level},executors={level},deployment={level},local_deployment={level},utils={level}",
         level = log_level
     );
-    let env_filter = EnvFilter::try_new(filter_string).expect("Failed to create tracing filter");
+    let env_filter =
+        EnvFilter::try_new(filter_string.clone()).expect("Failed to create tracing filter");
+
+    // In release builds, also persist logs to a local file for troubleshooting.
+    // Set AGENT_CHATGROUP_FILE_LOG=0 to disable file logging.
+    let mut file_log_guard = None;
+    let mut file_log_dir = None;
+    let file_log_layer = if !cfg!(debug_assertions)
+        && std::env::var("AGENT_CHATGROUP_FILE_LOG")
+            .map(|v| v != "0")
+            .unwrap_or(true)
+    {
+        let log_dir = asset_dir().join("logs");
+        match std::fs::create_dir_all(&log_dir) {
+            Ok(_) => {
+                let file_appender = tracing_appender::rolling::daily(&log_dir, "server.log");
+                let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+                file_log_guard = Some(guard);
+                file_log_dir = Some(log_dir);
+                Some(
+                    tracing_subscriber::fmt::layer()
+                        .with_ansi(false)
+                        .with_writer(non_blocking)
+                        .with_filter(
+                            EnvFilter::try_new(filter_string)
+                                .expect("Failed to create file tracing filter"),
+                        ),
+                )
+            }
+            Err(err) => {
+                eprintln!("Failed to create log directory: {}", err);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_filter(env_filter))
+        .with(file_log_layer)
         .with(sentry_layer())
         .init();
+
+    if let Some(log_dir) = &file_log_dir {
+        tracing::info!(
+            log_dir = %log_dir.display(),
+            "Release file logging is enabled"
+        );
+    }
+
+    // Keep the non-blocking file logging worker alive for the full process lifetime.
+    let _file_log_guard = file_log_guard;
 
     // Create asset directory if it doesn't exist
     if !asset_dir().exists() {

@@ -225,10 +225,7 @@ impl ChatSkill {
     }
 
     /// Find skills by source type
-    pub async fn find_by_source(
-        pool: &SqlitePool,
-        source: &str,
-    ) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_source(pool: &SqlitePool, source: &str) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             ChatSkill,
             r#"SELECT id as "id!: Uuid",
@@ -298,14 +295,13 @@ impl ChatSkill {
             .trigger_type
             .clone()
             .unwrap_or_else(|| "always".to_string());
-        let trigger_keywords = sqlx::types::Json(
-            data.trigger_keywords.clone().unwrap_or_default(),
-        );
+        let trigger_keywords = sqlx::types::Json(data.trigger_keywords.clone().unwrap_or_default());
         let enabled = data.enabled.unwrap_or(true);
         let source = data.source.clone().unwrap_or_else(|| "local".to_string());
         let version = data.version.clone().unwrap_or_else(|| "1.0.0".to_string());
         let tags = sqlx::types::Json(data.tags.clone().unwrap_or_default());
-        let compatible_agents = sqlx::types::Json(data.compatible_agents.clone().unwrap_or_default());
+        let compatible_agents =
+            sqlx::types::Json(data.compatible_agents.clone().unwrap_or_default());
 
         sqlx::query_as!(
             ChatSkill,
@@ -358,10 +354,7 @@ impl ChatSkill {
         let name = data.name.clone().unwrap_or(existing.name);
         let description = data.description.clone().unwrap_or(existing.description);
         let content = data.content.clone().unwrap_or(existing.content);
-        let trigger_type = data
-            .trigger_type
-            .clone()
-            .unwrap_or(existing.trigger_type);
+        let trigger_type = data.trigger_type.clone().unwrap_or(existing.trigger_type);
         let trigger_keywords = sqlx::types::Json(
             data.trigger_keywords
                 .clone()
@@ -375,7 +368,9 @@ impl ChatSkill {
         let tags = sqlx::types::Json(data.tags.clone().unwrap_or(existing.tags.0));
         let category = data.category.clone().or(existing.category);
         let compatible_agents = sqlx::types::Json(
-            data.compatible_agents.clone().unwrap_or(existing.compatible_agents.0)
+            data.compatible_agents
+                .clone()
+                .unwrap_or(existing.compatible_agents.0),
         );
 
         sqlx::query_as!(

@@ -801,18 +801,12 @@ impl ChatRunner {
             let session_agents = self.build_session_agent_summaries(session_id).await?;
 
             // Fetch skills assigned to this agent for prompt injection
-            let agent_skills =
-                ChatSkill::find_by_agent_id(&self.db.pool, agent_id).await?;
+            let agent_skills = ChatSkill::find_by_agent_id(&self.db.pool, agent_id).await?;
 
             // Install skills natively for agents that support it (e.g. Claude Code slash commands)
             if !agent_skills.is_empty() {
                 if let Ok(runner_type) = self.parse_runner_type(&agent) {
-                    Self::install_native_skills(
-                        &runner_type,
-                        &workspace_path,
-                        &agent_skills,
-                    )
-                    .await;
+                    Self::install_native_skills(&runner_type, &agent_skills).await;
                 }
             }
 
@@ -1508,12 +1502,21 @@ impl ChatRunner {
             system.push_str("\n[/AGENT_ROLE]\n\n");
         }
 
-        // 2. Skills - skills are now loaded from local files, not injected into prompt
-        // Skills are available in .agents/skills/ and .claude/skills/ directories
-        // Add skill restriction info (no skill content injection)
+        // 2. Skills - local file based; enforce an explicit allow-list for this turn.
+        let active_skills = Self::filter_active_skills(skills, user_message_content);
         system.push_str("[SKILL_RESTRICTION]\n");
-        system.push_str("Skills are available as local files in .agents/skills/ and .claude/skills/ directories. ");
-        system.push_str("Do not attempt to use skill-like behaviors unless explicitly instructed by the user.\n");
+        system.push_str("Skills are available as local files in ~/.agents/skills and companion directories (for example ~/.claude/skills, ~/.github/skills).\n");
+        if active_skills.is_empty() {
+            system.push_str("You have no skills enabled. Do not attempt to use any skill.\n");
+        } else {
+            system.push_str("You can ONLY use the skills listed below. Do not invent or use unlisted skills.\n\n");
+            system.push_str("[ALLOWED_SKILLS]\n");
+            for skill in &active_skills {
+                let description = &skill.description;
+                system.push_str(&format!("- {}: {}\n", skill.name, description));
+            }
+            system.push_str("[/ALLOWED_SKILLS]\n");
+        }
         system.push_str("[/SKILL_RESTRICTION]\n\n");
 
         // 3. Group members info (separate from AGENT_ROLE)
@@ -1569,9 +1572,7 @@ impl ChatRunner {
         skills: &'a [ChatSkill],
         user_message: Option<&str>,
     ) -> Vec<&'a ChatSkill> {
-        let message_lower = user_message
-            .map(|m| m.to_lowercase())
-            .unwrap_or_default();
+        let message_lower = user_message.map(|m| m.to_lowercase()).unwrap_or_default();
 
         skills
             .iter()
@@ -1582,9 +1583,11 @@ impl ChatRunner {
                         if message_lower.is_empty() {
                             return false;
                         }
-                        skill.trigger_keywords.0.iter().any(|kw| {
-                            message_lower.contains(&kw.to_lowercase())
-                        })
+                        skill
+                            .trigger_keywords
+                            .0
+                            .iter()
+                            .any(|kw| message_lower.contains(&kw.to_lowercase()))
                     }
                     "manual" => {
                         if message_lower.is_empty() {
@@ -1600,481 +1603,199 @@ impl ChatRunner {
             .collect()
     }
 
-    /// Install skills natively into CLI agent workspace directories.
-    /// Uses a two-level approach:
-    /// 1. Primary installation to `.agents/skills/` (universal across all agents)
-    /// 2. Agent-specific installation to each CLI's native directory
-    ///
-    /// Directory structures:
-    /// - Primary: `.agents/skills/{skill_name}/SKILL.md`
-    /// - Claude Code: `.claude/commands/{skill_name}.md`
-    /// - Codex: `AGENTS.md` (append to file)
-    /// - Cursor Agent: `.cursor/rules/{skill_name}.md`
-    /// - Qwen Code: `.qwen/commands/{skill_name}.md`
-    /// - Other agents: skills are injected via prompt `[SKILLS]` block only
-    async fn install_native_skills(
-        runner_type: &BaseCodingAgent,
-        workspace_path: &str,
-        skills: &[ChatSkill],
-    ) {
-        // Filter skills by compatible_agents if specified
-        let filtered_skills: Vec<&ChatSkill> = skills
-            .iter()
-            .filter(|skill| {
-                if skill.compatible_agents.0.is_empty() {
-                    return true;
-                }
-                let agent_name = match runner_type {
-                    BaseCodingAgent::ClaudeCode => "claude",
-                    BaseCodingAgent::Amp => "amp",
-                    BaseCodingAgent::Gemini => "gemini",
-                    BaseCodingAgent::Codex => "codex",
-                    BaseCodingAgent::Opencode => "opencode",
-                    BaseCodingAgent::CursorAgent => "cursor",
-                    BaseCodingAgent::QwenCode => "qwen",
-                    BaseCodingAgent::Copilot => "copilot",
-                    BaseCodingAgent::Droid => "droid",
-                    BaseCodingAgent::KimiCode => "kimi",
-                };
-                skill.compatible_agents.0.iter().any(|a| {
-                    a.to_lowercase() == agent_name || a.to_lowercase() == "all"
+    /// Install skills natively into global user directories.
+    /// Primary install target: `~/.agents/skills/{skill_name}/SKILL.md`
+    /// Agent-specific targets are under home (for example `~/.claude/skills`, `~/.github/skills`).
+    async fn install_native_skills(runner_type: &BaseCodingAgent, skills: &[ChatSkill]) {
+        // Filter skills by compatible_agents if specified.
+        let filtered_skills: Vec<&ChatSkill> =
+            skills
+                .iter()
+                .filter(|skill| {
+                    if skill.compatible_agents.0.is_empty() {
+                        return true;
+                    }
+                    let agent_name = match runner_type {
+                        BaseCodingAgent::ClaudeCode => "claude",
+                        BaseCodingAgent::Amp => "amp",
+                        BaseCodingAgent::Gemini => "gemini",
+                        BaseCodingAgent::Codex => "codex",
+                        BaseCodingAgent::Opencode => "opencode",
+                        BaseCodingAgent::CursorAgent => "cursor",
+                        BaseCodingAgent::QwenCode => "qwen",
+                        BaseCodingAgent::Copilot => "copilot",
+                        BaseCodingAgent::Droid => "droid",
+                        BaseCodingAgent::KimiCode => "kimi",
+                    };
+                    skill.compatible_agents.0.iter().any(|a| {
+                        a.eq_ignore_ascii_case(agent_name) || a.eq_ignore_ascii_case("all")
+                    })
                 })
-            })
-            .collect();
+                .collect();
 
         if filtered_skills.is_empty() {
             return;
         }
 
-        let workspace = PathBuf::from(workspace_path);
+        let Some(home_dir) = Self::resolve_home_dir() else {
+            tracing::warn!("Failed to resolve user home directory; skip native skill install");
+            return;
+        };
 
-        // === Step 1: Install to .agents/skills/ (primary version for all agents) ===
-        let agents_skills_dir = workspace.join(".agents").join("skills");
-        if let Err(err) = fs::create_dir_all(&agents_skills_dir).await {
-            tracing::warn!(
-                workspace_path = %workspace_path,
-                error = %err,
-                "Failed to create .agents/skills directory"
-            );
-        } else {
-            for skill in &filtered_skills {
-                let skill_dir = agents_skills_dir.join(skill.name.to_lowercase().replace(' ', "-"));
-                if let Err(err) = fs::create_dir_all(&skill_dir).await {
-                    tracing::warn!(
-                        skill_name = %skill.name,
-                        error = %err,
-                        "Failed to create skill directory in .agents/skills"
-                    );
-                    continue;
-                }
+        let primary_dir = home_dir.join(".agents").join("skills");
+        Self::install_skills_to_directory(&primary_dir, &filtered_skills, ".agents/skills").await;
 
-                let skill_file = skill_dir.join("SKILL.md");
-                let mut content = String::new();
-                content.push_str(&format!("# {}\n\n", skill.name));
-                if !skill.description.is_empty() {
-                    content.push_str(&format!("> {}\n\n", skill.description));
-                }
-                content.push_str(skill.content.trim());
-                content.push('\n');
-
-                if let Err(err) = fs::write(&skill_file, &content).await {
-                    tracing::warn!(
-                        skill_name = %skill.name,
-                        file_path = %skill_file.display(),
-                        error = %err,
-                        "Failed to write SKILL.md"
-                    );
-                } else {
-                    tracing::info!(
-                        skill_name = %skill.name,
-                        file_path = %skill_file.display(),
-                        "Installed skill to .agents/skills/ primary directory"
-                    );
-                }
-            }
-        }
-
-        // === Step 2: Install to agent-specific directories ===
         match runner_type {
             BaseCodingAgent::ClaudeCode => {
-                // Claude Code supports both .claude/skills/ (discovery) and .claude/commands/ (slash commands)
-                
-                // Install to .claude/skills/ for skill discovery
-                let skills_dir = workspace.join(".claude").join("skills");
-                if let Err(err) = fs::create_dir_all(&skills_dir).await {
-                    tracing::warn!(
-                        workspace_path = %workspace_path,
-                        error = %err,
-                        "Failed to create .claude/skills directory for skill installation"
-                    );
-                } else {
-                    for skill in &filtered_skills {
-                        let skill_dir = skills_dir.join(skill.name.to_lowercase().replace(' ', "-"));
-                        if let Err(err) = fs::create_dir_all(&skill_dir).await {
-                            tracing::warn!(
-                                skill_name = %skill.name,
-                                error = %err,
-                                "Failed to create Claude skill directory"
-                            );
-                            continue;
-                        }
-                        let skill_file = skill_dir.join("SKILL.md");
-                        let mut content = String::new();
-                        content.push_str(&format!("# {}\n\n", skill.name));
-                        if !skill.description.is_empty() {
-                            content.push_str(&format!("> {}\n\n", skill.description));
-                        }
-                        content.push_str(skill.content.trim());
-                        content.push('\n');
-                        if let Err(err) = fs::write(&skill_file, &content).await {
-                            tracing::warn!(
-                                skill_name = %skill.name,
-                                file_path = %skill_file.display(),
-                                error = %err,
-                                "Failed to write Claude SKILL.md"
-                            );
-                        } else {
-                            tracing::info!(
-                                skill_name = %skill.name,
-                                file_path = %skill_file.display(),
-                                "Installed Claude skill to .claude/skills/"
-                            );
-                        }
-                    }
-                }
-                
-                // Also install as slash commands to .claude/commands/
-                let commands_dir = workspace.join(".claude").join("commands");
-                if let Err(err) = fs::create_dir_all(&commands_dir).await {
-                    tracing::warn!(
-                        workspace_path = %workspace_path,
-                        error = %err,
-                        "Failed to create .claude/commands directory for skill installation"
-                    );
-                } else {
-                    for skill in &filtered_skills {
-                        let file_name = format!(
-                            "{}.md",
-                            skill.name.to_lowercase().replace(' ', "-")
-                        );
-                        let file_path = commands_dir.join(&file_name);
-                        let mut content = String::new();
-                        // Write frontmatter with description
-                        if !skill.description.is_empty() {
-                            content.push_str("---\n");
-                            content.push_str(&format!("description: {}\n", skill.description));
-                            content.push_str("---\n\n");
-                        }
-                        content.push_str(skill.content.trim());
-                        content.push('\n');
-                        if let Err(err) = fs::write(&file_path, &content).await {
-                            tracing::warn!(
-                                skill_name = %skill.name,
-                                file_path = %file_path.display(),
-                                error = %err,
-                                "Failed to write Claude Code skill command file"
-                            );
-                        } else {
-                            tracing::info!(
-                                skill_name = %skill.name,
-                                file_path = %file_path.display(),
-                                "Installed Claude Code skill as slash command"
-                            );
-                        }
-                    }
-                }
-            }
-            BaseCodingAgent::Codex => {
-                // Codex uses .agents/skills/ directory (already created in Step 1)
-                // No additional installation needed
-                tracing::info!(
-                    workspace_path = %workspace_path,
-                    skill_count = filtered_skills.len(),
-                    "Codex skills installed to .agents/skills/ (primary directory)"
-                );
+                let skills_dir = home_dir.join(".claude").join("skills");
+                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".claude/skills")
+                    .await;
+                Self::install_claude_command_files(&home_dir, &filtered_skills).await;
             }
             BaseCodingAgent::CursorAgent => {
-                // Cursor uses .cursor/skills/ directory for skills
-                let skills_dir = workspace.join(".cursor").join("skills");
-                if let Err(err) = fs::create_dir_all(&skills_dir).await {
-                    tracing::warn!(
-                        workspace_path = %workspace_path,
-                        error = %err,
-                        "Failed to create .cursor/skills directory for skill installation"
-                    );
-                    return;
-                }
-                for skill in &filtered_skills {
-                    let skill_dir = skills_dir.join(skill.name.to_lowercase().replace(' ', "-"));
-                    if let Err(err) = fs::create_dir_all(&skill_dir).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            error = %err,
-                            "Failed to create Cursor skill directory"
-                        );
-                        continue;
-                    }
-                    let skill_file = skill_dir.join("SKILL.md");
-                    let mut content = String::new();
-                    content.push_str(&format!("# {}\n\n", skill.name));
-                    if !skill.description.is_empty() {
-                        content.push_str(&format!("> {}\n\n", skill.description));
-                    }
-                    content.push_str(skill.content.trim());
-                    content.push('\n');
-                    if let Err(err) = fs::write(&skill_file, &content).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            error = %err,
-                            "Failed to write Cursor SKILL.md"
-                        );
-                    } else {
-                        tracing::info!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            "Installed Cursor skill to .cursor/skills/"
-                        );
-                    }
-                }
+                let skills_dir = home_dir.join(".cursor").join("skills");
+                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".cursor/skills")
+                    .await;
             }
             BaseCodingAgent::QwenCode => {
-                // Qwen Code uses .qwen/skills/ directory for skills
-                let skills_dir = workspace.join(".qwen").join("skills");
-                if let Err(err) = fs::create_dir_all(&skills_dir).await {
-                    tracing::warn!(
-                        workspace_path = %workspace_path,
-                        error = %err,
-                        "Failed to create .qwen/skills directory for skill installation"
-                    );
-                    return;
-                }
-                for skill in &filtered_skills {
-                    let skill_dir = skills_dir.join(skill.name.to_lowercase().replace(' ', "-"));
-                    if let Err(err) = fs::create_dir_all(&skill_dir).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            error = %err,
-                            "Failed to create Qwen skill directory"
-                        );
-                        continue;
-                    }
-                    let skill_file = skill_dir.join("SKILL.md");
-                    let mut content = String::new();
-                    content.push_str(&format!("# {}\n\n", skill.name));
-                    if !skill.description.is_empty() {
-                        content.push_str(&format!("> {}\n\n", skill.description));
-                    }
-                    content.push_str(skill.content.trim());
-                    content.push('\n');
-                    if let Err(err) = fs::write(&skill_file, &content).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            error = %err,
-                            "Failed to write Qwen SKILL.md"
-                        );
-                    } else {
-                        tracing::info!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            "Installed Qwen skill to .qwen/skills/"
-                        );
-                    }
-                }
+                let skills_dir = home_dir.join(".qwen").join("skills");
+                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".qwen/skills")
+                    .await;
             }
             BaseCodingAgent::Opencode => {
-                // Opencode uses .opencode/skills/ directory for skills
-                let skills_dir = workspace.join(".opencode").join("skills");
-                if let Err(err) = fs::create_dir_all(&skills_dir).await {
-                    tracing::warn!(
-                        workspace_path = %workspace_path,
-                        error = %err,
-                        "Failed to create .opencode/skills directory for skill installation"
-                    );
-                    return;
-                }
-                for skill in &filtered_skills {
-                    let skill_dir = skills_dir.join(skill.name.to_lowercase().replace(' ', "-"));
-                    if let Err(err) = fs::create_dir_all(&skill_dir).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            error = %err,
-                            "Failed to create Opencode skill directory"
-                        );
-                        continue;
-                    }
-                    let skill_file = skill_dir.join("SKILL.md");
-                    let mut content = String::new();
-                    content.push_str(&format!("# {}\n\n", skill.name));
-                    if !skill.description.is_empty() {
-                        content.push_str(&format!("> {}\n\n", skill.description));
-                    }
-                    content.push_str(skill.content.trim());
-                    content.push('\n');
-                    if let Err(err) = fs::write(&skill_file, &content).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            error = %err,
-                            "Failed to write Opencode SKILL.md"
-                        );
-                    } else {
-                        tracing::info!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            "Installed Opencode skill to .opencode/skills/"
-                        );
-                    }
-                }
+                let skills_dir = home_dir.join(".opencode").join("skills");
+                Self::install_skills_to_directory(
+                    &skills_dir,
+                    &filtered_skills,
+                    ".opencode/skills",
+                )
+                .await;
             }
             BaseCodingAgent::Copilot => {
-                // Copilot uses .github/skills/ directory for skills
-                let skills_dir = workspace.join(".github").join("skills");
-                if let Err(err) = fs::create_dir_all(&skills_dir).await {
-                    tracing::warn!(
-                        workspace_path = %workspace_path,
-                        error = %err,
-                        "Failed to create .github/skills directory for skill installation"
-                    );
-                    return;
-                }
-                for skill in &filtered_skills {
-                    let skill_dir = skills_dir.join(skill.name.to_lowercase().replace(' ', "-"));
-                    if let Err(err) = fs::create_dir_all(&skill_dir).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            error = %err,
-                            "Failed to create Copilot skill directory"
-                        );
-                        continue;
-                    }
-                    let skill_file = skill_dir.join("SKILL.md");
-                    let mut content = String::new();
-                    content.push_str(&format!("# {}\n\n", skill.name));
-                    if !skill.description.is_empty() {
-                        content.push_str(&format!("> {}\n\n", skill.description));
-                    }
-                    content.push_str(skill.content.trim());
-                    content.push('\n');
-                    if let Err(err) = fs::write(&skill_file, &content).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            error = %err,
-                            "Failed to write Copilot SKILL.md"
-                        );
-                    } else {
-                        tracing::info!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            "Installed Copilot skill to .github/skills/"
-                        );
-                    }
-                }
+                let skills_dir = home_dir.join(".github").join("skills");
+                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".github/skills")
+                    .await;
             }
             BaseCodingAgent::Gemini => {
-                // Gemini uses .gemini/skills/ directory for skills
-                let skills_dir = workspace.join(".gemini").join("skills");
-                if let Err(err) = fs::create_dir_all(&skills_dir).await {
-                    tracing::warn!(
-                        workspace_path = %workspace_path,
-                        error = %err,
-                        "Failed to create .gemini/skills directory for skill installation"
-                    );
-                    return;
-                }
-                for skill in &filtered_skills {
-                    let skill_dir = skills_dir.join(skill.name.to_lowercase().replace(' ', "-"));
-                    if let Err(err) = fs::create_dir_all(&skill_dir).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            error = %err,
-                            "Failed to create Gemini skill directory"
-                        );
-                        continue;
-                    }
-                    let skill_file = skill_dir.join("SKILL.md");
-                    let mut content = String::new();
-                    content.push_str(&format!("# {}\n\n", skill.name));
-                    if !skill.description.is_empty() {
-                        content.push_str(&format!("> {}\n\n", skill.description));
-                    }
-                    content.push_str(skill.content.trim());
-                    content.push('\n');
-                    if let Err(err) = fs::write(&skill_file, &content).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            error = %err,
-                            "Failed to write Gemini SKILL.md"
-                        );
-                    } else {
-                        tracing::info!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            "Installed Gemini skill to .gemini/skills/"
-                        );
-                    }
-                }
-            }
-            BaseCodingAgent::KimiCode => {
-                // Kimi Code uses .agents/skills/ (recommended), already created in Step 1
-                // No additional installation needed
-                tracing::info!(
-                    workspace_path = %workspace_path,
-                    skill_count = filtered_skills.len(),
-                    "Kimi Code skills installed to .agents/skills/ (primary directory)"
-                );
-            }
-            BaseCodingAgent::Amp => {
-                // Amp: skills are injected via prompt [SKILLS] block only
-                // They read from .agents/skills/ which is already created above
+                let skills_dir = home_dir.join(".gemini").join("skills");
+                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".gemini/skills")
+                    .await;
             }
             BaseCodingAgent::Droid => {
-                // Factory Droid uses .factory/skills/ directory for skills
-                let skills_dir = workspace.join(".factory").join("skills");
-                if let Err(err) = fs::create_dir_all(&skills_dir).await {
-                    tracing::warn!(
-                        workspace_path = %workspace_path,
-                        error = %err,
-                        "Failed to create .factory/skills directory for skill installation"
-                    );
-                    return;
-                }
-                for skill in &filtered_skills {
-                    let skill_dir = skills_dir.join(skill.name.to_lowercase().replace(' ', "-"));
-                    if let Err(err) = fs::create_dir_all(&skill_dir).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            error = %err,
-                            "Failed to create Droid skill directory"
-                        );
-                        continue;
-                    }
-                    let skill_file = skill_dir.join("SKILL.md");
-                    let mut content = String::new();
-                    content.push_str(&format!("# {}\n\n", skill.name));
-                    if !skill.description.is_empty() {
-                        content.push_str(&format!("> {}\n\n", skill.description));
-                    }
-                    content.push_str(skill.content.trim());
-                    content.push('\n');
-                    if let Err(err) = fs::write(&skill_file, &content).await {
-                        tracing::warn!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            error = %err,
-                            "Failed to write Droid SKILL.md"
-                        );
-                    } else {
-                        tracing::info!(
-                            skill_name = %skill.name,
-                            file_path = %skill_file.display(),
-                            "Installed Droid skill to .factory/skills/"
-                        );
-                    }
-                }
+                let skills_dir = home_dir.join(".factory").join("skills");
+                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".factory/skills")
+                    .await;
+            }
+            BaseCodingAgent::Codex | BaseCodingAgent::KimiCode | BaseCodingAgent::Amp => {
+                tracing::info!(
+                    skill_count = filtered_skills.len(),
+                    target_dir = %primary_dir.display(),
+                    "Native skills installed to global primary directory"
+                );
+            }
+        }
+    }
+
+    fn resolve_home_dir() -> Option<PathBuf> {
+        dirs::home_dir()
+            .or_else(|| std::env::var("HOME").ok().map(PathBuf::from))
+            .or_else(|| std::env::var("USERPROFILE").ok().map(PathBuf::from))
+    }
+
+    fn skill_slug(name: &str) -> String {
+        name.to_lowercase().replace(' ', "-")
+    }
+
+    fn render_skill_markdown(skill: &ChatSkill) -> String {
+        let mut content = String::new();
+        content.push_str(&format!("# {}\n\n", skill.name));
+        if !skill.description.is_empty() {
+            content.push_str(&format!("> {}\n\n", skill.description));
+        }
+        content.push_str(skill.content.trim());
+        content.push('\n');
+        content
+    }
+
+    async fn install_skills_to_directory(root: &Path, skills: &[&ChatSkill], label: &str) {
+        if let Err(err) = fs::create_dir_all(root).await {
+            tracing::warn!(
+                dir = %root.display(),
+                error = %err,
+                "Failed to create skill directory"
+            );
+            return;
+        }
+
+        for skill in skills {
+            let skill_dir = root.join(Self::skill_slug(&skill.name));
+            if let Err(err) = fs::create_dir_all(&skill_dir).await {
+                tracing::warn!(
+                    skill_name = %skill.name,
+                    dir = %skill_dir.display(),
+                    error = %err,
+                    "Failed to create skill subdirectory"
+                );
+                continue;
+            }
+
+            let skill_file = skill_dir.join("SKILL.md");
+            let content = Self::render_skill_markdown(skill);
+            if let Err(err) = fs::write(&skill_file, content).await {
+                tracing::warn!(
+                    skill_name = %skill.name,
+                    file_path = %skill_file.display(),
+                    error = %err,
+                    "Failed to write SKILL.md"
+                );
+            } else {
+                tracing::info!(
+                    skill_name = %skill.name,
+                    file_path = %skill_file.display(),
+                    target = label,
+                    "Installed native skill file"
+                );
+            }
+        }
+    }
+
+    async fn install_claude_command_files(home_dir: &Path, skills: &[&ChatSkill]) {
+        let commands_dir = home_dir.join(".claude").join("commands");
+        if let Err(err) = fs::create_dir_all(&commands_dir).await {
+            tracing::warn!(
+                dir = %commands_dir.display(),
+                error = %err,
+                "Failed to create .claude/commands directory"
+            );
+            return;
+        }
+
+        for skill in skills {
+            let file_name = format!("{}.md", Self::skill_slug(&skill.name));
+            let file_path = commands_dir.join(&file_name);
+
+            let mut content = String::new();
+            if !skill.description.is_empty() {
+                content.push_str("---\n");
+                content.push_str(&format!("description: {}\n", skill.description));
+                content.push_str("---\n\n");
+            }
+            content.push_str(skill.content.trim());
+            content.push('\n');
+
+            if let Err(err) = fs::write(&file_path, &content).await {
+                tracing::warn!(
+                    skill_name = %skill.name,
+                    file_path = %file_path.display(),
+                    error = %err,
+                    "Failed to write Claude command skill"
+                );
+            } else {
+                tracing::info!(
+                    skill_name = %skill.name,
+                    file_path = %file_path.display(),
+                    "Installed Claude command skill"
+                );
             }
         }
     }
