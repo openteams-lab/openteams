@@ -444,7 +444,7 @@ func (s *Server) downloadSkill(c *gin.Context) {
 	c.Header("Content-Type", "application/gzip")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.tar.gz", id))
 
-	if err := s.createTarGz(c, skillDir); err != nil {
+	if err := s.createTarGz(c.Writer, skillDir); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	}
 }
