@@ -21,7 +21,10 @@ export interface UseMessageInputResult {
   inputRef: React.RefObject<HTMLTextAreaElement>;
   handleDraftChange: (value: string) => void;
   handleMentionSelect: (name: string) => void;
-  handleReplySelect: (message: ChatMessage, mentionHandle: string | null) => void;
+  handleReplySelect: (
+    message: ChatMessage,
+    mentionHandle: string | null
+  ) => void;
   visibleMentionSuggestions: ChatAgent[];
   agentOptions: { value: string; label: string }[];
   resetInput: () => void;
@@ -37,7 +40,9 @@ export function useMessageInput(
   const [draft, setDraft] = useState('');
   const [selectedMentions, setSelectedMentions] = useState<string[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
+  const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(
+    null
+  );
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
 
   const handleDraftChange = useCallback((value: string) => {
@@ -106,9 +111,13 @@ export function useMessageInput(
     if (mentionQuery === null) return false;
     const query = mentionQuery.trim().toLowerCase();
     if (!query) return true;
-    return mentionAllAliases.some((alias) =>
-      alias.toLowerCase().startsWith(query)
-    ) || isMentionAllAlias(query) || mentionAllKeyword.startsWith(query);
+    return (
+      mentionAllAliases.some((alias) =>
+        alias.toLowerCase().startsWith(query)
+      ) ||
+      isMentionAllAlias(query) ||
+      mentionAllKeyword.startsWith(query)
+    );
   }, [mentionQuery]);
 
   // Handle keyboard navigation for mention suggestions
@@ -144,7 +153,8 @@ export function useMessageInput(
           handleMentionSelect(mentionAllKeyword);
           return true;
         }
-        const agentIndex = highlightedMentionIndex - (showMentionAllSuggestion ? 1 : 0);
+        const agentIndex =
+          highlightedMentionIndex - (showMentionAllSuggestion ? 1 : 0);
         const selectedAgent = visibleMentionSuggestions[agentIndex];
         if (selectedAgent) {
           handleMentionSelect(selectedAgent.name);
@@ -186,9 +196,10 @@ export function useMessageInput(
       return;
     }
     setSelectedMentions((prev) =>
-      prev.filter((mention) =>
-        mention === mentionAllKeyword ||
-        mentionAgents.some((agent) => agent.name === mention)
+      prev.filter(
+        (mention) =>
+          mention === mentionAllKeyword ||
+          mentionAgents.some((agent) => agent.name === mention)
       )
     );
   }, [mentionAgents]);

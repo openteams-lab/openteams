@@ -351,52 +351,49 @@ export function useChatWebSocket(
     [onMessageReceived]
   );
 
-  const handleAgentDelta = useCallback(
-    (payload: AgentDeltaPayload) => {
-      setStreamingRunsBySession((prev) => {
-        const sessionRuns = prev[payload.session_id] ?? {};
-        const previous = sessionRuns[payload.run_id];
-        const streamType = payload.stream_type ?? 'assistant';
-        const previousAssistant =
-          previous?.assistantContent ?? previous?.content ?? '';
-        const previousThinking = previous?.thinkingContent ?? '';
-        const applyDelta = (base: string) =>
-          payload.delta ? `${base}${payload.content}` : payload.content;
-        const assistantContent =
-          streamType === 'thinking'
-            ? previousAssistant
-            : applyDelta(previousAssistant);
-        const thinkingContent =
-          streamType === 'thinking'
-            ? applyDelta(previousThinking)
-            : previousThinking;
-        const nowMs = Date.now();
+  const handleAgentDelta = useCallback((payload: AgentDeltaPayload) => {
+    setStreamingRunsBySession((prev) => {
+      const sessionRuns = prev[payload.session_id] ?? {};
+      const previous = sessionRuns[payload.run_id];
+      const streamType = payload.stream_type ?? 'assistant';
+      const previousAssistant =
+        previous?.assistantContent ?? previous?.content ?? '';
+      const previousThinking = previous?.thinkingContent ?? '';
+      const applyDelta = (base: string) =>
+        payload.delta ? `${base}${payload.content}` : payload.content;
+      const assistantContent =
+        streamType === 'thinking'
+          ? previousAssistant
+          : applyDelta(previousAssistant);
+      const thinkingContent =
+        streamType === 'thinking'
+          ? applyDelta(previousThinking)
+          : previousThinking;
+      const nowMs = Date.now();
 
-        return {
-          ...prev,
-          [payload.session_id]: {
-            ...sessionRuns,
-            [payload.run_id]: {
-              agentId: payload.agent_id,
-              thinkingContent,
-              assistantContent,
-              content: assistantContent,
-              isFinal: payload.is_final,
-              updatedAtMs: nowMs,
-            },
+      return {
+        ...prev,
+        [payload.session_id]: {
+          ...sessionRuns,
+          [payload.run_id]: {
+            agentId: payload.agent_id,
+            thinkingContent,
+            assistantContent,
+            content: assistantContent,
+            isFinal: payload.is_final,
+            updatedAtMs: nowMs,
           },
-        };
-      });
-      if (payload.is_final) {
-        setTimeout(() => {
-          setStreamingRunsBySession((prev) =>
-            removeRunFromSession(prev, payload.session_id, payload.run_id)
-          );
-        }, 1500);
-      }
-    },
-    []
-  );
+        },
+      };
+    });
+    if (payload.is_final) {
+      setTimeout(() => {
+        setStreamingRunsBySession((prev) =>
+          removeRunFromSession(prev, payload.session_id, payload.run_id)
+        );
+      }, 1500);
+    }
+  }, []);
 
   const handleAgentState = useCallback(
     (

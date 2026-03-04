@@ -64,4 +64,3 @@ const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
 export const DisclaimerDialog = defineModal<void, 'accepted' | void>(
   DisclaimerDialogImpl
 );
-
