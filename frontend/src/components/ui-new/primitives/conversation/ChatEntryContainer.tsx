@@ -1,8 +1,4 @@
-import type {
-  CSSProperties,
-  ComponentType,
-  ReactNode,
-} from 'react';
+import type { CSSProperties, ComponentType, ReactNode } from 'react';
 import {
   CaretDownIcon,
   UserIcon,
@@ -126,10 +122,7 @@ export function ChatEntryContainer({
         >
           {icon ?? (
             <Icon
-              className={cn(
-                'size-icon-xs shrink-0 text-low',
-                iconClassName
-              )}
+              className={cn('size-icon-xs shrink-0 text-low', iconClassName)}
             />
           )}
         </span>

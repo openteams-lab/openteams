@@ -238,9 +238,9 @@ export function GeneralSettings() {
                 {Object.values(ThemeMode)
                   .filter((theme) => theme !== ThemeMode.DARK)
                   .map((theme) => (
-                  <SelectItem key={theme} value={theme}>
-                    {toPrettyCase(theme)}
-                  </SelectItem>
+                    <SelectItem key={theme} value={theme}>
+                      {toPrettyCase(theme)}
+                    </SelectItem>
                   ))}
               </SelectContent>
             </Select>

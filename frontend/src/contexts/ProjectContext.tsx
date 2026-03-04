@@ -67,4 +67,3 @@ export function useProject(): ProjectContextValue {
   }
   return context;
 }
-

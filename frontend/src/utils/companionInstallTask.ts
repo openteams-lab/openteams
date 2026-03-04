@@ -5,10 +5,10 @@ export const COMPANION_INSTALL_TASK_DESCRIPTION = `Goal: Install and integrate t
 
 Do:
 1) Detect package manager from lockfiles and use it:
-   - pnpm-lock.yaml â†?pnpm add agents-chatgroup-web-companion
-   - yarn.lock â†?yarn add agents-chatgroup-web-companion
-   - package-lock.json â†?npm i agents-chatgroup-web-companion
-   - bun.lockb â†?bun add agents-chatgroup-web-companion
+   - pnpm-lock.yaml ï¿½?pnpm add agents-chatgroup-web-companion
+   - yarn.lock ï¿½?yarn add agents-chatgroup-web-companion
+   - package-lock.json ï¿½?npm i agents-chatgroup-web-companion
+   - bun.lockb ï¿½?bun add agents-chatgroup-web-companion
    If already listed in package.json dependencies, skip install.
 
 2) Detect framework and app entry:
@@ -33,5 +33,3 @@ Acceptance:
 - agents-chatgroup-web-companion is installed in the correct package.
 - The component is rendered once at the app root without SSR/hydration errors.
 - Build/type-check passes.`;
-
-

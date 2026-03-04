@@ -1,9 +1,9 @@
-﻿<div align="center">
+<div align="center">
   <img src="frontend/public/agent-chatgroup-logo-white.png" alt="AgentsChatGroup" width="320">
 
   <h1>AgentsChatGroup</h1>
 
-  <p><strong>在一个群聊中运行一支 AI Agent 团队，它们可以相互 @、共享上下文并行工作。</strong></p>
+  <p><strong>在一个群聊中运行一支 AI Agent 团队：它们会互相 @mention、共享上下文、并行协作。</strong></p>
 
   <p>
     <a href="https://www.npmjs.com/package/agents-chatgroup"><img alt="npm" src="https://img.shields.io/npm/v/agents-chatgroup?style=flat-square" /></a>
@@ -14,80 +14,23 @@
   </p>
 
   <p>
-    <a href="https://your-demo-link.com">📺 观看演示</a> ·
-    <a href="#快速开始">⚡ 快速开始</a> ·
-    <a href="https://docs.agentschatgroup.com">📖 文档</a>
+    <a href="https://your-demo-link.com">观看演示</a> |
+    <a href="#快速开始">快速开始</a> |
+    <a href="https://docs.agentschatgroup.com">文档</a>
   </p>
 
   <p align="center">
-    <a href="./README.md">🇬🇧 English</a>
+    <a href="./README.md">English</a>
   </p>
   
 </div>
 
 ---
 
-<!-- 🔴 最高优先级：把这里换成动态 GIF，展示多 Agent 并行工作的聊天画面 -->
 ![AgentsChatGroup Demo](docs/images/demo.gif)
-
-任务：根据 GitHub 主页内容，设计并开发开源项目主页。
-
-```text
-[用户任务]
-   |
-   +--> UI 设计师：产出视觉方案
-   |        |
-   |        +--> @全栈工程师：实现页面
-   |
-   +--> QA 测试：并行制定测试计划
-            |
-            +--> 实现完成后执行测试
-                     |
-                     +--> 发现问题 -> @全栈修复 -> 回归测试 -> 通过
-```
 
 ---
 
-## 问题
-
-你可能每天都在使用 Claude Code、Gemini CLI 和 Codex，但你一定遇到过这些问题：
-
-- **你成了“中间人”。** 需要手动把一个 Agent 的输出复制粘贴给另一个。
-- **无法并行。** 任务只能排队执行，一个完成后下一个才能开始。
-- **上下文丢失。** 每次切换到新的 Agent 会话都要从零重新解释。
-- **频繁切窗口打断思路。** 在 4 个聊天窗口之间来回跳转非常消耗精力。
-
-**AI 越来越强，但开发者却越来越累。**
-
-## 解决方案
-
-AgentsChatGroup 把所有 AI Agent 放进**同一个群聊**。它们共享上下文、通过 @mention 自动交接任务，并行协作，就像一支真实团队。
-
-```
-╭─────────────────────────────────────────────────────────────╮
-│                    AgentsChatGroup 🧩                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  👤 You                                                     │
-│  │  @coder Build a user login feature                       │
-│                                                             │
-│  🤖 Coder                                    [parallel ⚡] │
-│  │  Writing the login module...                             │
-│  │  └─ @reviewer Done! Please review this.                  │
-│                                                             │
-│  🤖 Reviewer                                 [parallel ⚡] │
-│  │  Found 2 security issues:                                │
-│  │  1. Passwords need hashing                               │
-│  │  2. Add rate limiting                                    │
-│  │  └─ @coder Please fix these.                             │
-│                                                             │
-│  🤖 Coder                                                   │
-│  │  Fixed. Pushing now...                                   │
-│                                                             │
-╰─────────────────────────────────────────────────────────────╯
-```
-
-你只需分配一次任务，剩下的由 Agent 团队自行协作完成。
 
 ## 快速开始
 
@@ -113,54 +56,100 @@ npx agents-chatgroup
 | [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex` |
 | [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code@latest` |
 
-📚 [完整安装指南 →](https://docs.agentschatgroup.com/getting-started)
+📚 [更多 Agent 安装指南 →](https://docs.agentschatgroup.com/getting-started)
 
-## AI 团队预设
+## 为什么要开发这个应用？
 
-无需重复配置同一批 Agent。AgentsChatGroup 内置 **22 个成员预设** 和 **8 个团队预设**，可一键导入，直接复用提示词。
+你可能每天都在用 Claude Code、Gemini CLI、Codex。你是否遇到过这些问题？
 
-![AgentsChatGroup_AddTeam](docs/images/add_team.png)
+- **你成了中间人。** 需要手动把一个 Agent 的输出复制粘贴给另一个。
+- **无法并行。** 任务排队执行，一个结束后下一个才能开始。
+- **上下文丢失。** 每个新 Agent 会话都要从零开始解释背景。
+- **频繁切换窗口打断思路。** 在多个聊天窗口之间来回跳转非常消耗精力。
 
-你也可以创建并保存自己的自定义预设。导入团队时会先展示预览，明确哪些成员会被创建、复用或重命名，避免意外覆盖。
+**AI 越来越强，但开发者却越来越疲惫。**
 
-📚 [团队预设文档 →](https://docs.agentschatgroup.com/core-features/ai-team-presets)
+## 解决方案
 
-## 使用场景示例
+AgentsChatGroup 把所有 AI Agent 放进**同一个群聊**。它们共享上下文，通过 `@mention` 交接任务，并行协作，像一支真正的团队一样工作。
 
-**🧑‍💻 全栈开发团队**
-> 架构师设计 Schema → 开发 Agent 实现功能 → 审查 Agent 检查安全性 → 测试 Agent 编写覆盖。全流程在一个群聊里并行推进。
 
-**📝 内容生产团队**
-> 研究 Agent 收集资料 → 写作 Agent 起草内容 → 编辑 Agent 润色。无需在多个聊天窗口之间复制粘贴。
+```
+╭─────────────────────────────────────────────────────────────╮
+│                    AgentsChatGroup 🧩                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  👤 You                                                     │
+│  │  @coder Build a user login feature                       │
+│                                                             │
+│  🤖 Coder                                    [parallel ⚡] │
+│  │  Writing the login module...                             │
+│  │  └─ @reviewer Done! Please review this.                  │
+│                                                             │
+│  🤖 Reviewer                                 [parallel ⚡] │
+│  │  Found 2 security issues:                                │
+│  │  1. Passwords need hashing                               │
+│  │  2. Add rate limiting                                    │
+│  │  └─ @coder Please fix these.                             │
+│                                                             │
+│  🤖 Coder                                                   │
+│  │  Fixed. Pushing now...                                   │
+│                                                             │
+╰─────────────────────────────────────────────────────────────╯
+```
 
-**🔍 代码库审计团队**
-> 多个 Agent 同时扫描不同模块，在更短时间内产出完整报告。
+你只需要分配一次任务，剩下的交给 Agent 团队自己协同完成。
 
-**📊 数据管道协作团队**
-> 清洗 Agent 预处理数据 → 分析 Agent 执行查询 → 可视化 Agent 生成图表。每个 Agent 都能无缝承接上一步结果。
-
-更多好玩有用的AI团队等你来建设。
-
-## 有何不同
+## 有什么不同
 
 | | 传统单 Agent | 多窗口工作流 | Claude Code-Agent Team | AgentsChatGroup |
 |--|--|--|--|--|
-| 并行能力 | ❌ 串行 | ⚠️ 手动并行 | ✅ Claude 子代理 | ✅ 自动并行 |
-| 上下文共享 | ❌ | ❌ 需要手动复制粘贴 | ⚠️ 子代理上下文分裂 | ✅ 始终同步 |
-| 多模型协作 | ❌ | ⚠️ 手动切换 | ❌ 仅 Claude | ✅ Claude + Gemini + Codex + 更多 |
-| Agent 任务交接 | ❌ | ❌ 由你手动编排 | ⚠️ 仅在 Claude 内部委派 | ✅ @mention 自动交接 |
+| 并行能力 | 不支持（串行） | 部分支持（手动） | 支持（Claude 子代理） | 支持（自动） |
+| 上下文共享 | 不支持 | 不支持（复制粘贴） | 部分支持（子代理上下文分裂） | 支持（始终同步） |
+| 多模型协作 | 不支持 | 部分支持（手动切换） | 不支持（仅 Claude） | 支持（Claude + Gemini + Codex + 更多） |
+| Agent 任务交接 | 不支持 | 不支持（你手动编排） | 部分支持（仅 Claude 内委派） | 支持（@mention） |
 | 你的投入成本 | 高 | 很高 | 中 | 低 |
 
 ## 功能特性
 
 | 类别 | 详情 |
 |----------|---------|
-| **Agent 支持** | Claude Code · Gemini CLI · Codex · Amp · QWen Coder · 其他热门 Agent |
-| **协作能力** | 群聊 · 上下文共享 · @Mention 交接 · 任务追踪 · 会话归档 |
-| **团队预设** | 22 个内置成员预设 · 8 个内置团队预设 · 一键导入团队 · 支持完整 CRUD 的自定义预设 |
-| **配置管理** | 统一 MCP 配置 · 灵活环境变量 |
-| **平台支持** | 桌面应用（Windows / macOS / Linux） · Web页面应用 |
-| **即将推出** | 更紧凑的上下文优化 · 更多 Agent 集成 |
+| **Agent 支持** | Claude Code、Gemini CLI、Codex、Amp、QWen Coder，以及其他热门 Agent |
+| **协作能力** | 群聊、共享上下文、@mention 交接、任务追踪、会话归档 |
+| **团队预设** | 22 个内置成员预设、8 个内置团队预设、一键导入团队、支持完整 CRUD 的自定义预设 |
+| **配置管理** | 统一 MCP 配置、灵活环境变量 |
+| **平台支持** | 桌面应用（Windows / macOS / Linux）、Web 应用（npx） |
+| **即将推出** | 更紧凑的上下文优化、更多 Agent 集成 |
+
+
+## AI 团队预设
+
+不用再反复配置同一批 Agent。AgentsChatGroup 内置 **22 个成员预设** 和 **8 个团队预设**，可一键导入。
+
+![AgentsChatGroup_AddTeam](docs/images/add_team_en.png)
+
+你也可以创建并保存自己的自定义预设。导入团队时会显示预览，清楚标明哪些成员会被创建、复用或重命名，避免意外。
+
+📚 [团队预设文档](https://docs.agentschatgroup.com/core-features/ai-team-presets)
+
+---
+
+### 使用场景
+
+**全栈开发团队**
+> 架构师设计 schema -> 开发实现 -> 审查安全 -> 测试补覆盖。全程在一个群聊并行推进。
+
+**内容生产团队**
+> 研究收集资料 -> 写作起草 -> 编辑润色。无需在多个聊天之间复制粘贴。
+
+**代码库审计**
+> 多个 Agent 同时扫描不同模块，用更短时间得到完整报告。
+
+**数据管道协作**
+> 清洗预处理 -> 分析查询 -> 可视化产图。每个 Agent 都能无缝承接上一环节。
+
+组建更多 AI 团队，未来由你来创造。
+
 
 ## 技术栈
 
@@ -194,7 +183,7 @@ pnpm desktop:build
 
 #### Windows (PowerShell)：前后端分开启动
 
-`pnpm run dev` 无法在 Windows PowerShell 中运行。请使用以下命令分别启动后端和前端。
+`pnpm run dev` 无法在 Windows PowerShell 中运行。请使用下面的命令分别启动后端和前端。
 
 ```bash
 # 1. 克隆仓库
@@ -203,6 +192,12 @@ cd AgentsChatGroup
 
 # 2. 安装依赖
 pnpm i
+
+# 3. 生成 TypeScript 类型
+pnpm run generate-types
+
+# 4. 执行数据库迁移准备
+pnpm run prepare-db
 ```
 
 **终端 A（后端）**
@@ -210,14 +205,15 @@ pnpm i
 ```powershell
 $env:FRONTEND_PORT = node scripts/setup-dev-environment.js frontend
 $env:BACKEND_PORT = node scripts/setup-dev-environment.js backend
-$env:VK_ALLOWED_ORIGINS = "http://localhost:$env:FRONTEND_PORT"
+$env:RUST_LOG = "debug"
 cargo run --bin server
 ```
 
 **终端 B（前端）**
 
 ```powershell
-$env:FRONTEND_PORT = node scripts/setup-dev-environment.js frontend
+$env:FRONTEND_PORT = <frontend port generated from terminal A>
+$env:BACKEND_PORT = <backend port generated from terminal A>
 cd frontend
 pnpm dev -- --port $env:FRONTEND_PORT --host
 ```
@@ -226,19 +222,19 @@ pnpm dev -- --port $env:FRONTEND_PORT --host
 
 ## 贡献
 
-欢迎贡献！你可以先在 [Issues](https://github.com/StarterraAI/AgentsChatGroup/issues) 查看待办，或在 [Discussions](https://github.com/StarterraAI/AgentsChatGroup/discussions) 发起讨论。
+欢迎贡献！你可以在 [Issues](https://github.com/StarterraAI/AgentsChatGroup/issues) 查看待办，或在 [Discussion](https://github.com/StarterraAI/AgentsChatGroup/discussions) 发起讨论。
 
-1. Fork → feature branch → PR
-2. 大改动请先开 Issue 讨论
-3. 请遵守我们的[行为准则](./CODE_OF_CONDUCT.md)
+1. Fork -> 创建 feature 分支 -> 提交 PR
+2. 大改动请先开 issue 沟通
+3. 请遵守我们的 [Code of Conduct](./CODE_OF_CONDUCT.md)
 
 ## 社区
 
 | | |
 |--|--|
-| 🐛 **Bug 反馈** | [GitHub Issues](https://github.com/StarterraAI/AgentsChatGroup/issues) |
-| 💬 **讨论区** | [GitHub Discussions](https://github.com/StarterraAI/AgentsChatGroup/discussions) · [Discord](https://discord.gg/UuM87hQB) |
-| 💭 **社区群聊** | [Discord](https://discord.gg/UuM87hQB) |
+| **问题反馈** | [GitHub Issues](https://github.com/StarterraAI/AgentsChatGroup/issues) |
+| **讨论交流** | [GitHub Discussions](https://github.com/StarterraAI/AgentsChatGroup/discussions), [Discord](https://discord.gg/UuM87hQB) |
+| **社区聊天** | [Discord](https://discord.gg/UuM87hQB) |
 
 ## 致谢
 
