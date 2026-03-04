@@ -5,7 +5,11 @@ import { chatApi } from '@/lib/api';
 export interface UseChatMutationsResult {
   createSession: ReturnType<typeof useMutation<ChatSession, Error, void>>;
   updateSession: ReturnType<
-    typeof useMutation<ChatSession, Error, { sessionId: string; title: string | null }>
+    typeof useMutation<
+      ChatSession,
+      Error,
+      { sessionId: string; title: string | null }
+    >
   >;
   archiveSession: ReturnType<typeof useMutation<ChatSession, Error, string>>;
   restoreSession: ReturnType<typeof useMutation<ChatSession, Error, string>>;
@@ -18,7 +22,11 @@ export interface UseChatMutationsResult {
     >
   >;
   deleteMessages: ReturnType<
-    typeof useMutation<number, Error, { sessionId: string; messageIds: string[] }>
+    typeof useMutation<
+      number,
+      Error,
+      { sessionId: string; messageIds: string[] }
+    >
   >;
 }
 
@@ -115,7 +123,9 @@ export function useChatMutations(
     mutationFn: async (params: { sessionId: string; messageIds: string[] }) =>
       chatApi.deleteMessagesBatch(params.sessionId, params.messageIds),
     onSuccess: (count, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['chatMessages', variables.sessionId] });
+      queryClient.invalidateQueries({
+        queryKey: ['chatMessages', variables.sessionId],
+      });
       queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
       onMessagesDeleted?.(count);
     },

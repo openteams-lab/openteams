@@ -15,9 +15,7 @@ import { defineModal } from '@/lib/modals';
 import { usePortalContainer } from '@/contexts/PortalContainerContext';
 import { cn } from '@/lib/utils';
 import { SettingsSection } from './settings/SettingsSection';
-import type {
-  SettingsSectionType,
-} from './settings/SettingsSection';
+import type { SettingsSectionType } from './settings/SettingsSection';
 import {
   SettingsDirtyProvider,
   useSettingsDirty,

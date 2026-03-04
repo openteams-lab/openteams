@@ -494,7 +494,7 @@ export type SendMessageShortcut = "ModifierEnter" | "Enter";
 
 export type ChatCompressionConfig = { 
 /**
- * Token threshold before compression kicks in (default: 10000000)
+ * Token threshold before compression kicks in (default: 50000)
  */
 token_threshold: number, 
 /**

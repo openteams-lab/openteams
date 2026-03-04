@@ -56,7 +56,10 @@ export function FilePreviewModal({
         </div>
 
         <div className="p-4 border-t border-border flex justify-end">
-          <PrimaryButton value={t('modals.filePreview.close')} onClick={onClose} />
+          <PrimaryButton
+            value={t('modals.filePreview.close')}
+            onClick={onClose}
+          />
         </div>
       </div>
     </div>

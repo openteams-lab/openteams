@@ -42,7 +42,11 @@ export const FieldTemplate = (props: FieldTemplateProps) => {
           </p>
         )}
 
-        {rawHelp && <p className="settings-rjsf-field-help text-sm text-low leading-relaxed">{rawHelp}</p>}
+        {rawHelp && (
+          <p className="settings-rjsf-field-help text-sm text-low leading-relaxed">
+            {rawHelp}
+          </p>
+        )}
       </div>
 
       {/* Right column: Field content */}
@@ -52,7 +56,10 @@ export const FieldTemplate = (props: FieldTemplateProps) => {
         {rawErrors.length > 0 && (
           <div className="settings-rjsf-field-errors space-y-1">
             {rawErrors.map((error, index) => (
-              <p key={index} className="settings-rjsf-field-error text-sm text-error">
+              <p
+                key={index}
+                className="settings-rjsf-field-error text-sm text-error"
+              >
                 {error}
               </p>
             ))}

@@ -78,7 +78,7 @@ pub struct ChatPresetsConfig {
 #[derive(Clone, Debug, Serialize, Deserialize, TS, PartialEq, Eq)]
 #[ts(export)]
 pub struct ChatCompressionConfig {
-    /// Token threshold before compression kicks in (default: 10000000)
+    /// Token threshold before compression kicks in (default: 5000000)
     #[serde(default = "default_token_threshold")]
     pub token_threshold: u32,
     /// Percentage of messages to compress (default: 25)
@@ -87,7 +87,7 @@ pub struct ChatCompressionConfig {
 }
 
 fn default_token_threshold() -> u32 {
-    10_000_000
+    50000
 }
 
 fn default_compression_percentage() -> u8 {
