@@ -1,5 +1,8 @@
 use axum::{Json, extract::State, response::Json as ResponseJson};
 use db::models::{
+    analytics::{
+        track_skill_assign, track_skill_disable, track_skill_enable, track_skill_install,
+    },
     chat_agent_skill::{AssignSkillToAgent, ChatAgentSkill, UpdateAgentSkill},
     chat_skill::{ChatSkill, CreateChatSkill, UpdateChatSkill},
 };
@@ -100,6 +103,16 @@ pub async fn assign_skill_to_agent(
 ) -> Result<ResponseJson<ApiResponse<ChatAgentSkill>>, ApiError> {
     let assignment =
         ChatAgentSkill::assign(&deployment.db().pool, &payload, Uuid::new_v4()).await?;
+
+    // Track analytics: skill_assign
+    let _ = track_skill_assign(
+        &deployment.db().pool,
+        None,
+        payload.skill_id,
+        payload.agent_id,
+    )
+    .await;
+
     Ok(ResponseJson(ApiResponse::success(assignment)))
 }
 
@@ -110,6 +123,28 @@ pub async fn update_agent_skill(
     Json(payload): Json<UpdateAgentSkill>,
 ) -> Result<ResponseJson<ApiResponse<ChatAgentSkill>>, ApiError> {
     let assignment = ChatAgentSkill::update(&deployment.db().pool, assignment_id, &payload).await?;
+
+    // Track analytics: skill_enable or skill_disable
+    if let Some(enabled) = payload.enabled {
+        if enabled {
+            let _ = track_skill_enable(
+                &deployment.db().pool,
+                None,
+                assignment.skill_id,
+                assignment.agent_id,
+            )
+            .await;
+        } else {
+            let _ = track_skill_disable(
+                &deployment.db().pool,
+                None,
+                assignment.skill_id,
+                assignment.agent_id,
+            )
+            .await;
+        }
+    }
+
     Ok(ResponseJson(ApiResponse::success(assignment)))
 }
 
@@ -204,6 +239,16 @@ pub async fn install_registry_skill(
         .await
         .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
 
+    // Track analytics: skill_install
+    let _ = track_skill_install(
+        &deployment.db().pool,
+        None,
+        installed.id,
+        &installed.name,
+        "registry",
+    )
+    .await;
+
     Ok(ResponseJson(ApiResponse::success(installed)))
 }
 
@@ -268,6 +313,16 @@ pub async fn install_builtin_skill_api(
     let installed = install_builtin_skill(&deployment.db().pool, &skill_id)
         .await
         .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
+
+    // Track analytics: skill_install
+    let _ = track_skill_install(
+        &deployment.db().pool,
+        None,
+        installed.id,
+        &installed.name,
+        "builtin",
+    )
+    .await;
 
     Ok(ResponseJson(ApiResponse::success(installed)))
 }

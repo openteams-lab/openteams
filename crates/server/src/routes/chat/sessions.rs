@@ -9,6 +9,10 @@ use axum::{
     response::{IntoResponse, Json as ResponseJson},
 };
 use db::models::{
+    analytics::{
+        AnalyticsSessionStats, track_session_archive, track_session_create, track_session_delete,
+        track_session_restore,
+    },
     chat_agent::ChatAgent,
     chat_session::{ChatSession, ChatSessionStatus, CreateChatSession, UpdateChatSession},
     chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
@@ -45,6 +49,14 @@ pub async fn create_session(
     Json(payload): Json<CreateChatSession>,
 ) -> Result<ResponseJson<ApiResponse<ChatSession>>, ApiError> {
     let session = ChatSession::create(&deployment.db().pool, &payload, Uuid::new_v4()).await?;
+
+    // Track analytics: session_create
+    let title_length = payload.title.as_ref().map(|t| t.len()).unwrap_or(0);
+    let _ = track_session_create(&deployment.db().pool, session.id, None, title_length).await;
+
+    // Initialize session stats
+    let _ = AnalyticsSessionStats::upsert(&deployment.db().pool, session.id, None).await;
+
     Ok(ResponseJson(ApiResponse::success(session)))
 }
 
@@ -61,12 +73,23 @@ pub async fn delete_session(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    // Check if session had messages before deletion
+    let had_messages = AnalyticsSessionStats::find_by_id(&deployment.db().pool, session.id)
+        .await
+        .ok()
+        .flatten()
+        .map(|stats| stats.message_count > 0)
+        .unwrap_or(false);
+
     let rows_affected = ChatSession::delete(&deployment.db().pool, session.id).await?;
     if rows_affected == 0 {
-        Err(ApiError::Database(sqlx::Error::RowNotFound))
-    } else {
-        Ok(ResponseJson(ApiResponse::success(())))
+        return Err(ApiError::Database(sqlx::Error::RowNotFound));
     }
+
+    // Track analytics: session_delete
+    let _ = track_session_delete(&deployment.db().pool, session.id, None, had_messages).await;
+
+    Ok(ResponseJson(ApiResponse::success(())))
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -353,6 +376,12 @@ pub async fn archive_session(
         return Ok(ResponseJson(ApiResponse::success(session)));
     }
 
+    // Get session stats for analytics
+    let session_stats = AnalyticsSessionStats::find_by_id(&deployment.db().pool, session.id)
+        .await
+        .ok()
+        .flatten();
+
     let archive_dir = asset_dir()
         .join("chat")
         .join(format!("session_{}", session.id))
@@ -376,6 +405,20 @@ pub async fn archive_session(
     )
     .await?;
 
+    // Track analytics: session_archive
+    if let Some(stats) = session_stats {
+        let duration_seconds = (chrono::Utc::now() - session.created_at).num_seconds();
+        let _ = track_session_archive(
+            &deployment.db().pool,
+            session.id,
+            None,
+            duration_seconds,
+            stats.message_count,
+            stats.agent_count,
+        )
+        .await;
+    }
+
     Ok(ResponseJson(ApiResponse::success(updated)))
 }
 
@@ -398,6 +441,9 @@ pub async fn restore_session(
         },
     )
     .await?;
+
+    // Track analytics: session_restore
+    let _ = track_session_restore(&deployment.db().pool, session.id, None).await;
 
     Ok(ResponseJson(ApiResponse::success(updated)))
 }

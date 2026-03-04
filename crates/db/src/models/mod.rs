@@ -1,3 +1,4 @@
+pub mod analytics;
 pub mod chat_agent;
 pub mod chat_agent_skill;
 pub mod chat_artifact;
