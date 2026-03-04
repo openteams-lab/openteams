@@ -31,7 +31,7 @@ static BUILTIN_SKILLS: Lazy<BuiltInSkillsData> = Lazy::new(|| {
         Err(e) => {
             eprintln!("Failed to load built-in skills: {}", e);
             BuiltInSkillsData {
-                generated_at: String::new(),
+                _generated_at: String::new(),
                 total_skills: 0,
                 categories: Vec::new(),
                 skills: Vec::new(),
@@ -53,7 +53,8 @@ static SKILL_INDEX: Lazy<HashMap<String, usize>> = Lazy::new(|| {
 /// Built-in skills data structure
 #[derive(Debug, Clone, Deserialize)]
 struct BuiltInSkillsData {
-    generated_at: String,
+    #[serde(rename = "generated_at")]
+    _generated_at: String,
     total_skills: usize,
     categories: Vec<String>,
     skills: Vec<RemoteSkillPackage>,

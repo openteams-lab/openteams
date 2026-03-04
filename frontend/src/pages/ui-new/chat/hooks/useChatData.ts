@@ -45,6 +45,7 @@ export function useChatData(activeSessionId: string | null): UseChatDataResult {
       queryKey: ['chatSessionAgents', activeSessionId],
       queryFn: () => chatApi.listSessionAgents(activeSessionId!),
       enabled: !!activeSessionId,
+      staleTime: 0,
       refetchOnMount: 'always',
     });
 

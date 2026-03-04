@@ -481,6 +481,9 @@ export function useChatWebSocket(
         queryClient.invalidateQueries({
           queryKey: ['chatMessages', activeSessionId],
         });
+        queryClient.invalidateQueries({
+          queryKey: ['chatSessionAgents', activeSessionId],
+        });
       };
 
       ws.onmessage = (event) => {
