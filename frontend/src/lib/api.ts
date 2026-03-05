@@ -1682,8 +1682,30 @@ export const chatApi = {
     return response.text();
   },
 
-  getRunLog: async (runId: string): Promise<string> => {
-    const response = await makeRequest(`/api/chat/runs/${runId}/log`);
+  getRunLog: async (
+    runId: string,
+    options?: { offset?: number; limit?: number; tail?: boolean }
+  ): Promise<string> => {
+    const params = new URLSearchParams();
+    if (options?.offset !== undefined) {
+      params.set('offset', String(options.offset));
+    }
+    if (options?.limit !== undefined) {
+      params.set('limit', String(options.limit));
+    }
+    if (options?.tail !== undefined) {
+      params.set('tail', String(options.tail));
+    }
+    if (!params.has('limit')) {
+      params.set('limit', '262144');
+    }
+    if (!params.has('tail') && !params.has('offset')) {
+      params.set('tail', 'true');
+    }
+    const query = params.toString();
+    const response = await makeRequest(
+      `/api/chat/runs/${runId}/log${query ? `?${query}` : ''}`
+    );
     if (!response.ok) {
       throw new ApiError(
         response.statusText || 'Failed to fetch run log',

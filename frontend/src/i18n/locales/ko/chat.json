@@ -1,7 +1,7 @@
 {
   "sidebar": {
-    "title": "채팅 그룹",
-    "newSession": "새로 만들기",
+    "title": "세션",
+    "newSession": "새 세션",
     "noActiveSessions": "활성 세션이 없습니다.",
     "noArchivedSessions": "보관된 세션이 없습니다.",
     "showArchived": "보관된 항목 표시",
@@ -9,7 +9,12 @@
     "expandSidebar": "사이드바 펼치기",
     "collapseSidebar": "사이드바 접기",
     "createNewSession": "새 세션 만들기",
-    "untitledSession": "제목 없는 세션"
+    "untitledSession": "제목 없는 세션",
+    "sessionSection": "세션",
+    "automation": "자동화",
+    "skills": "스킬",
+    "archivedSection": "보관됨",
+    "settingsInSidebar": "설정"
   },
   "header": {
     "untitledSession": "제목 없는 세션",
