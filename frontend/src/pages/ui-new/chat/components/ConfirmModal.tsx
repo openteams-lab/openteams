@@ -61,6 +61,7 @@ export function ConfirmModal({
             value={resolvedCancelText}
             onClick={onCancel}
             disabled={isLoading}
+            className="!bg-white hover:!bg-white focus-visible:!bg-white active:!bg-white"
           />
         )}
         <PrimaryButton
@@ -68,6 +69,7 @@ export function ConfirmModal({
           value={resolvedConfirmText}
           onClick={onConfirm}
           disabled={isLoading}
+          className="!bg-[#EF4444] hover:!bg-[#DC2626] focus-visible:!bg-[#DC2626] active:!bg-[#B91C1C] !text-white"
         />
       </DialogFooter>
     </Dialog>

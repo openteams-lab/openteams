@@ -3,7 +3,6 @@ import {
   ArrowCounterClockwiseIcon,
   BoxArrowDownIcon,
   BroomIcon,
-  GearSixIcon,
   PencilSimpleIcon,
   TrashIcon,
   UsersIcon,
@@ -39,7 +38,6 @@ export interface ChatHeaderProps {
   onCancelTitleEdit: () => void;
   // Session actions
   onDeleteSession: () => void;
-  onOpenSettings: () => void;
   onArchive: () => void;
   onRestore: () => void;
   isArchiving: boolean;
@@ -68,7 +66,6 @@ export function ChatHeader({
   onSaveTitle,
   onCancelTitleEdit,
   onDeleteSession,
-  onOpenSettings,
   onArchive,
   onRestore,
   isArchiving,
@@ -313,17 +310,6 @@ export function ChatHeader({
                 </button>
               </Tooltip>
             )}
-            <Tooltip content={t('header.settings')} side="bottom">
-              <button
-                type="button"
-                className="chat-session-header-icon-btn chat-session-header-op-btn"
-                onClick={onOpenSettings}
-                aria-label={t('header.settings')}
-                title={t('header.settings')}
-              >
-                <GearSixIcon className="size-icon-xs" />
-              </button>
-            </Tooltip>
           </div>
         )}
       </div>
