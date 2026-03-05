@@ -153,6 +153,14 @@ const escapeSearchRegExp = (value: string) =>
 const getSessionTitleLength = (value: string) =>
   Array.from(value.trim()).length;
 
+const areSetsEqual = <T,>(a: Set<T>, b: Set<T>) => {
+  if (a.size !== b.size) return false;
+  for (const value of a) {
+    if (!b.has(value)) return false;
+  }
+  return true;
+};
+
 export function ChatSessions() {
   const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
@@ -479,6 +487,9 @@ export function ChatSessions() {
   const [clock, setClock] = useState(() => Date.now());
   const [stoppingAgents, setStoppingAgents] = useState<Set<string>>(new Set());
   const [showArchived, setShowArchived] = useState(false);
+  const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(
+    new Set()
+  );
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [titleError, setTitleError] = useState<string | null>(null);
@@ -519,6 +530,7 @@ export function ChatSessions() {
     startHeight: number;
   } | null>(null);
   const lastExpandedLeftWidthRef = useRef(340);
+  const sessionUpdatedAtByIdRef = useRef<Map<string, string>>(new Map());
 
   const showDuplicateMemberNameWarning = useCallback(
     (name: string) => {
@@ -646,6 +658,47 @@ export function ChatSessions() {
       navigate(`/chat/${sortedSessions[0].id}`, { replace: true });
     }
   }, [isSessionsLoading, navigate, sessionId, sortedSessions]);
+
+  useEffect(() => {
+    const nextUpdatedAtById = new Map(
+      sortedSessions.map((session) => [session.id, session.updated_at])
+    );
+
+    if (sessionUpdatedAtByIdRef.current.size === 0) {
+      sessionUpdatedAtByIdRef.current = nextUpdatedAtById;
+      return;
+    }
+
+    const newlyUnreadIds: string[] = [];
+    for (const session of sortedSessions) {
+      const previousUpdatedAt = sessionUpdatedAtByIdRef.current.get(session.id);
+      if (!previousUpdatedAt) continue;
+      if (
+        previousUpdatedAt !== session.updated_at &&
+        session.id !== activeSessionId
+      ) {
+        newlyUnreadIds.push(session.id);
+      }
+    }
+
+    sessionUpdatedAtByIdRef.current = nextUpdatedAtById;
+
+    setUnreadSessionIds((prev) => {
+      const next = new Set<string>();
+      for (const sessionIdValue of prev) {
+        if (
+          nextUpdatedAtById.has(sessionIdValue) &&
+          sessionIdValue !== activeSessionId
+        ) {
+          next.add(sessionIdValue);
+        }
+      }
+      for (const sessionIdValue of newlyUnreadIds) {
+        next.add(sessionIdValue);
+      }
+      return areSetsEqual(prev, next) ? prev : next;
+    });
+  }, [activeSessionId, sortedSessions]);
 
   // Derived state
   const availableRunnerTypes = useMemo(() => {
@@ -2301,11 +2354,41 @@ export function ChatSessions() {
         activeSessions={activeSessions}
         archivedSessions={archivedSessions}
         activeSessionId={activeSessionId}
+        unreadSessionIds={unreadSessionIds}
         showArchived={showArchived}
         onToggleArchived={() => setShowArchived((prev) => !prev)}
-        onSelectSession={(id) => navigate(`/chat/${id}`)}
+        onSelectSession={(id) => {
+          setUnreadSessionIds((prev) => {
+            if (!prev.has(id)) return prev;
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+          navigate(`/chat/${id}`);
+        }}
         onCreateSession={() => createSession.mutate()}
         isCreating={createSession.isPending}
+        onOpenAutomation={() => {
+          SettingsDialog.show({ initialSection: 'presets' });
+        }}
+        onOpenSkills={() => {
+          if (sessionMembers.length > 0) {
+            handleEditMember(sessionMembers[0]);
+            return;
+          }
+          setIsAddMemberOpen(true);
+          setMemberError(null);
+          setEditingMember(null);
+          setNewMemberName('');
+          setNewMemberVariant('DEFAULT');
+          setNewMemberPrompt('');
+          setNewMemberWorkspace('');
+          setIsPromptEditorOpen(false);
+          setPromptFileError(null);
+        }}
+        onOpenSettings={() => {
+          SettingsDialog.show();
+        }}
         width={leftSidebarWidth}
         isCollapsed={isLeftSidebarCollapsed}
         onToggleCollapsed={handleToggleLeftSidebar}
@@ -2362,9 +2445,6 @@ export function ChatSessions() {
                 await deleteSession.mutateAsync(activeSession.id);
               },
             });
-          }}
-          onOpenSettings={() => {
-            SettingsDialog.show();
           }}
           onArchive={() => {
             if (activeSessionId) archiveSession.mutate(activeSessionId);

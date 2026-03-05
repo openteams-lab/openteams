@@ -85,11 +85,27 @@ const ConfirmDialogImpl = NiceModal.create<ConfirmDialogProps>((props) => {
         </DialogHeader>
         <DialogFooter className="gap-2">
           {showCancelButton && (
-            <Button variant="outline" onClick={handleCancel}>
+            <Button
+              variant="outline"
+              onClick={handleCancel}
+              className={
+                variant === 'destructive'
+                  ? '!bg-white !text-foreground hover:!bg-white hover:!text-foreground focus-visible:!bg-white active:!bg-white'
+                  : undefined
+              }
+            >
               {cancelText}
             </Button>
           )}
-          <Button variant={getConfirmButtonVariant()} onClick={handleConfirm}>
+          <Button
+            variant={getConfirmButtonVariant()}
+            onClick={handleConfirm}
+            className={
+              variant === 'destructive'
+                ? '!bg-[#EF4444] !border-[#EF4444] !text-white hover:!bg-[#DC2626] hover:!border-[#DC2626] hover:!text-white focus-visible:!bg-[#DC2626] focus-visible:!border-[#DC2626] active:!bg-[#B91C1C] active:!border-[#B91C1C]'
+                : undefined
+            }
+          >
             {confirmText}
           </Button>
         </DialogFooter>

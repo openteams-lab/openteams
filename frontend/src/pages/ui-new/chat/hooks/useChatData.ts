@@ -33,6 +33,9 @@ export function useChatData(activeSessionId: string | null): UseChatDataResult {
   const { data: sessions = [], isLoading: isSessionsLoading } = useQuery({
     queryKey: ['chatSessions'],
     queryFn: () => chatApi.listSessions(),
+    staleTime: 0,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
   });
 
   const { data: agents = [], isLoading: isAgentsLoading } = useQuery({

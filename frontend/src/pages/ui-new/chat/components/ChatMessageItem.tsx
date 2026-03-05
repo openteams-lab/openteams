@@ -218,7 +218,7 @@ export function ChatMessageItem({
               <button
                 type="button"
                 className={cn(
-                  'chat-session-message-reply text-brand hover:text-brand-hover',
+                  'chat-session-message-reply',
                   isArchived && 'pointer-events-none opacity-50'
                 )}
                 onClick={() => onReply(message)}
@@ -233,7 +233,7 @@ export function ChatMessageItem({
             'chat-session-message-card max-w-[760px] w-full md:w-[84%] shadow-sm rounded-2xl',
             isUser && 'chat-session-message-card-self ml-auto',
             !isUser && 'chat-session-message-card-agent',
-            isCleanupMode && isSelected && 'ring-2 ring-brand'
+            isCleanupMode && isSelected && 'ring-2 ring-[#EF4444]'
           )}
           headerClassName="chat-session-message-header"
           bodyClassName="chat-session-message-body"
@@ -241,9 +241,12 @@ export function ChatMessageItem({
             backgroundColor: isUser
               ? `var(--chat-session-message-self-bg, ${tone.bg})`
               : `var(--chat-session-message-other-bg, ${tone.bg})`,
-            borderColor: isUser
-              ? `var(--chat-session-message-self-border, ${tone.border})`
-              : `var(--chat-session-message-other-border, ${tone.border})`,
+            borderColor:
+              isCleanupMode && isSelected
+                ? '#EF4444'
+                : isUser
+                  ? `var(--chat-session-message-self-border, ${tone.border})`
+                  : `var(--chat-session-message-other-border, ${tone.border})`,
           }}
         >
           <div>
@@ -298,8 +301,8 @@ export function ChatMessageItem({
                   className={cn(
                     'mb-half flex items-center gap-half rounded-sm border px-base py-half text-xs',
                     isWarningApiError
-                      ? 'bg-warning/10 border-warning/30 text-warning'
-                      : 'bg-error/10 border-error/30 text-error'
+                      ? 'bg-[rgba(245,158,11,0.10)] border-[rgba(245,158,11,0.35)] text-[#F59E0B]'
+                      : 'bg-[rgba(239,68,68,0.10)] border-[rgba(239,68,68,0.35)] text-[#EF4444]'
                   )}
                 >
                   {isWarningApiError ? (
@@ -316,7 +319,9 @@ export function ChatMessageItem({
                   <span className="font-medium">{apiError.message}</span>
                   <span
                     className={
-                      isWarningApiError ? 'text-warning/70' : 'text-error/70'
+                      isWarningApiError
+                        ? 'text-[rgba(245,158,11,0.78)]'
+                        : 'text-[rgba(239,68,68,0.78)]'
                     }
                   >
                     - {t('message.apiError.checkQuota')}
@@ -432,14 +437,14 @@ export function ChatMessageItem({
               </div>
             )}
             {hasDiffInfo && diffInfo && (
-              <div className="chat-session-code-card mt-half border border-border rounded-sm bg-secondary/70 px-base py-half text-xs text-normal">
+              <div className="chat-session-code-card mt-half border border-border rounded-sm px-base py-half text-xs text-normal">
                 <div className="chat-session-code-card-header flex items-center justify-between gap-base">
                   <span className="chat-session-code-card-title">
                     {t('message.codeChanges')}
                   </span>
                   <button
                     type="button"
-                    className="chat-session-code-card-link text-brand hover:text-brand-hover"
+                    className="chat-session-code-card-link"
                     onClick={() =>
                       onOpenDiffViewer(
                         diffRunId,

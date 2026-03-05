@@ -46,7 +46,7 @@ export const agentStateLabels: Record<ChatSessionAgentState, string> = {
 
 export const agentStateDotClass: Record<ChatSessionAgentState, string> = {
   idle: 'bg-low',
-  running: 'bg-brand',
+  running: 'chat-session-agent-state-dot-running',
   waitingapproval: 'bg-brand-secondary',
   dead: 'bg-error',
 };

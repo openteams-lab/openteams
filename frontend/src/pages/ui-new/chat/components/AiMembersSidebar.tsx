@@ -153,6 +153,48 @@ function MemberNameWithTooltip({ name }: { name: string }) {
   );
 }
 
+function WorkspacePathWithTooltip({ path }: { path: string }) {
+  const textRef = useRef<HTMLDivElement | null>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
+
+  const updateTruncation = useCallback(() => {
+    const el = textRef.current;
+    if (!el) return;
+    setIsTruncated(el.scrollWidth > el.clientWidth + 1);
+  }, []);
+
+  useLayoutEffect(() => {
+    updateTruncation();
+  }, [path, updateTruncation]);
+
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      updateTruncation();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [updateTruncation]);
+
+  const pathNode = (
+    <div
+      ref={textRef}
+      className="chat-session-member-workspace text-xs text-low truncate"
+    >
+      {path}
+    </div>
+  );
+
+  if (!isTruncated) return pathNode;
+
+  return (
+    <Tooltip content={path} side="bottom">
+      <div className="cursor-default">{pathNode}</div>
+    </Tooltip>
+  );
+}
+
 type AddMemberTab = 'preset' | 'custom';
 
 export interface AiMembersSidebarProps {
@@ -325,7 +367,7 @@ export function AiMembersSidebar({
                 <button
                   key={preset.id}
                   type="button"
-                  className="flex w-full items-center gap-2 rounded-sm border border-border px-2 py-1 text-left text-xs hover:bg-secondary/50"
+                  className="flex w-full items-center gap-2 rounded-sm border border-[#EEF2FF] px-2 py-1 text-left text-xs hover:bg-[#EEF2FF]"
                   onClick={() => onAddMemberPreset(preset)}
                 >
                   <RoleIcon className="size-3.5 shrink-0 text-low" />
@@ -378,7 +420,7 @@ export function AiMembersSidebar({
                   <button
                     key={team.id}
                     type="button"
-                    className="flex w-full items-center gap-2 rounded-sm border border-border px-2 py-1 text-left text-xs hover:bg-secondary/50"
+                    className="flex w-full items-center gap-2 rounded-sm border border-[#EEF2FF] px-2 py-1 text-left text-xs hover:bg-[#EEF2FF]"
                     onClick={() => onImportTeamPreset(team)}
                     disabled={!!teamImportPlan}
                   >
@@ -397,11 +439,8 @@ export function AiMembersSidebar({
 
       {/* Team Import Preview (inline within preset tab) */}
       {teamImportPlan && (
-        <div className="chat-session-member-import-preview border border-border rounded-sm p-base space-y-half mt-half">
-          <p className="text-xs text-low">
-            {t('members.importPreview.description')}
-          </p>
-          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+        <div className="chat-session-member-import-preview px-1 py-2 space-y-2 mt-half">
+          <div className="chat-session-member-import-list space-y-3 max-h-[400px] overflow-y-auto">
             {teamImportPlan.map((plan, index) => {
               const planVariant =
                 extractExecutorProfileVariant(plan.toolsEnabled) ?? 'DEFAULT';
@@ -410,7 +449,7 @@ export function AiMembersSidebar({
               return (
                 <div
                   key={`${plan.presetId}-${index}`}
-                  className="rounded-sm border border-border px-2 py-1.5 space-y-1"
+                  className="chat-session-member-import-card px-2 py-2 space-y-1.5"
                 >
                   <div className="flex items-center gap-2 text-xs">
                     <span className="font-medium truncate max-w-[180px]">
@@ -585,13 +624,13 @@ export function AiMembersSidebar({
               );
             })}
           </div>
-          <div className="flex items-center justify-end gap-half pt-half">
+          <div className="flex items-center justify-end gap-2 pt-2">
             <PrimaryButton
               variant="tertiary"
               value={t('members.importPreview.cancel')}
               onClick={onCancelTeamImport}
               disabled={isImportingTeam}
-              className="chat-session-member-btn cancel h-7 min-w-[56px] px-2 text-xs"
+              className="chat-session-member-btn cancel"
             />
             <PrimaryButton
               value={
@@ -602,7 +641,7 @@ export function AiMembersSidebar({
               actionIcon={isImportingTeam ? 'spinner' : UsersThreeIcon}
               onClick={onConfirmTeamImport}
               disabled={isImportingTeam || isArchived}
-              className="chat-session-member-btn h-7 min-w-[56px] px-2 text-xs"
+              className="chat-session-member-btn chat-session-member-btn-primary"
             />
           </div>
         </div>
@@ -617,7 +656,7 @@ export function AiMembersSidebar({
       {memberError && <div className="text-xs text-error">{memberError}</div>}
 
       {/* Close button at bottom-right */}
-      <div className="flex justify-end pt-half">
+      <div className="flex justify-end pt-2">
         <PrimaryButton
           variant="tertiary"
           value={t('members.closePanel')}
@@ -774,7 +813,7 @@ export function AiMembersSidebar({
         readOnly={isArchived}
       />
       {memberError && <div className="text-xs text-error">{memberError}</div>}
-      <div className="flex items-center justify-end gap-half pt-half">
+      <div className="flex items-center justify-end gap-2 pt-2">
         <PrimaryButton
           variant="tertiary"
           value={tCommon('buttons.cancel')}
@@ -787,7 +826,7 @@ export function AiMembersSidebar({
           actionIcon={isSavingMember ? 'spinner' : PlusIcon}
           onClick={onSaveMember}
           disabled={isSavingMember || isArchived || !!memberNameLengthError}
-          className="chat-session-member-btn"
+          className="chat-session-member-btn chat-session-member-btn-primary"
         />
       </div>
     </div>
@@ -802,10 +841,10 @@ export function AiMembersSidebar({
   return (
     <>
       <aside
-        className="chat-session-members-panel border-l border-border flex flex-col min-h-0 shrink-0"
+        className="chat-session-members-panel flex flex-col min-h-0 shrink-0"
         style={{ width }}
       >
-        <div className="chat-session-members-header px-base py-base border-b border-border flex items-center justify-between">
+        <div className="chat-session-members-header px-base py-base flex items-center justify-between">
           <div className="chat-session-members-title text-sm text-normal font-medium">
             {t('members.title')}
           </div>
@@ -842,12 +881,11 @@ export function AiMembersSidebar({
               agent.name
             );
             const workspacePath = sessionAgent.workspace_path ?? '';
-            const shouldShowWorkspaceTooltip = workspacePath.length > 48;
 
             return (
               <div
                 key={sessionAgent.id}
-                className="chat-session-member-card border border-border rounded-sm px-base py-half space-y-half"
+                className="chat-session-member-card rounded-sm px-base py-half space-y-half"
               >
                 <div className="chat-session-member-header">
                   <div className="chat-session-member-primary flex items-center gap-half min-w-0">
@@ -914,17 +952,7 @@ export function AiMembersSidebar({
                 </Tooltip>
                 {workspacePath && (
                   <div className="chat-session-member-workspace-row">
-                    {shouldShowWorkspaceTooltip ? (
-                      <Tooltip content={workspacePath} side="bottom">
-                        <div className="chat-session-member-workspace text-xs text-low truncate cursor-default">
-                          {workspacePath}
-                        </div>
-                      </Tooltip>
-                    ) : (
-                      <div className="chat-session-member-workspace text-xs text-low truncate">
-                        {workspacePath}
-                      </div>
-                    )}
+                    <WorkspacePathWithTooltip path={workspacePath} />
                   </div>
                 )}
               </div>
@@ -932,7 +960,7 @@ export function AiMembersSidebar({
           })}
 
           {/* Add Member Section */}
-          <div className="chat-session-member-form border-t border-border pt-base space-y-half">
+          <div className="chat-session-member-form pt-base space-y-half">
             {!isAddMemberOpen ? (
               <button
                 type="button"
@@ -944,17 +972,17 @@ export function AiMembersSidebar({
                 <PlusIcon className="size-icon-xs" weight="light" />
               </button>
             ) : (
-              <div className="chat-session-member-form-panel border border-border rounded-sm p-base space-y-half">
+              <div className="chat-session-member-form-panel rounded-sm p-base space-y-half">
                 {/* Tab bar - only show when not editing */}
                 {!editingMember && (
-                  <div className="flex border-b border-border">
+                  <div className="chat-session-member-form-tabs flex gap-1 rounded-sm p-1">
                     <button
                       type="button"
                       className={cn(
-                        'flex-1 text-xs py-1 text-center transition-colors',
+                        'flex-1 text-xs py-1 text-center rounded-sm transition-colors',
                         activeTab === 'preset'
-                          ? 'text-normal border-b-2 border-brand font-medium'
-                          : 'text-low hover:text-normal'
+                          ? 'text-normal bg-[#EEF2FF] font-medium'
+                          : 'text-low hover:text-normal hover:bg-[#EEF2FF]'
                       )}
                       onClick={() => setActiveTab('preset')}
                     >
@@ -963,10 +991,10 @@ export function AiMembersSidebar({
                     <button
                       type="button"
                       className={cn(
-                        'flex-1 text-xs py-1 text-center transition-colors',
+                        'flex-1 text-xs py-1 text-center rounded-sm transition-colors',
                         activeTab === 'custom'
-                          ? 'text-normal border-b-2 border-brand font-medium'
-                          : 'text-low hover:text-normal'
+                          ? 'text-normal bg-[#EEF2FF] font-medium'
+                          : 'text-low hover:text-normal hover:bg-[#EEF2FF]'
                       )}
                       onClick={() => setActiveTab('custom')}
                     >

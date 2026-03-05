@@ -1,7 +1,7 @@
 {
   "sidebar": {
-    "title": "Chat Groups",
-    "newSession": "New",
+    "title": "Sessions",
+    "newSession": "New Session",
     "noActiveSessions": "No active sessions.",
     "noArchivedSessions": "No archived sessions.",
     "showArchived": "Show Archived",
@@ -9,7 +9,12 @@
     "expandSidebar": "Expand sidebar",
     "collapseSidebar": "Collapse sidebar",
     "createNewSession": "Create new session",
-    "untitledSession": "Untitled session"
+    "untitledSession": "Untitled session",
+    "sessionSection": "Sessions",
+    "automation": "Automations",
+    "skills": "Skills",
+    "archivedSection": "Archived",
+    "settingsInSidebar": "Settings"
   },
   "header": {
     "untitledSession": "Untitled session",

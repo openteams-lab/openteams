@@ -1,7 +1,7 @@
 {
   "sidebar": {
-    "title": "Groupes de discussion",
-    "newSession": "Nouveau",
+    "title": "Sessions",
+    "newSession": "Nouvelle session",
     "noActiveSessions": "Aucune session active.",
     "noArchivedSessions": "Aucune session archivée.",
     "showArchived": "Afficher les archives",
@@ -9,7 +9,12 @@
     "expandSidebar": "Développer la barre latérale",
     "collapseSidebar": "Réduire la barre latérale",
     "createNewSession": "Créer une nouvelle session",
-    "untitledSession": "Session sans titre"
+    "untitledSession": "Session sans titre",
+    "sessionSection": "Sessions",
+    "automation": "Automatisations",
+    "skills": "Compétences",
+    "archivedSection": "Archivées",
+    "settingsInSidebar": "Paramètres"
   },
   "header": {
     "untitledSession": "Session sans titre",
