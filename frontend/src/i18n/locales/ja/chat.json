@@ -1,7 +1,7 @@
 {
   "sidebar": {
-    "title": "チャットグループ",
-    "newSession": "新規",
+    "title": "セッション",
+    "newSession": "新しいセッション",
     "noActiveSessions": "アクティブなセッションはありません。",
     "noArchivedSessions": "アーカイブされたセッションはありません。",
     "showArchived": "アーカイブを表示",
@@ -9,7 +9,12 @@
     "expandSidebar": "サイドバーを展開",
     "collapseSidebar": "サイドバーを折りたたむ",
     "createNewSession": "新しいセッションを作成",
-    "untitledSession": "無題のセッション"
+    "untitledSession": "無題のセッション",
+    "sessionSection": "セッション",
+    "automation": "自動化",
+    "skills": "スキル",
+    "archivedSection": "アーカイブ",
+    "settingsInSidebar": "設定"
   },
   "header": {
     "untitledSession": "無題のセッション",

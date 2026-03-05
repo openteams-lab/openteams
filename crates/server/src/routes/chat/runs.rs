@@ -8,13 +8,28 @@ use axum::{
 use db::models::chat_run::ChatRun;
 use deployment::Deployment;
 use serde::Deserialize;
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, AsyncSeekExt, SeekFrom},
+};
 use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError};
 
+const DEFAULT_LOG_CHUNK_BYTES: u64 = 256 * 1024;
+const MAX_LOG_CHUNK_BYTES: u64 = 2 * 1024 * 1024;
+
+#[derive(Debug, Deserialize)]
+pub struct RunLogQuery {
+    offset: Option<u64>,
+    limit: Option<u64>,
+    tail: Option<bool>,
+}
+
 pub async fn get_run_log(
     State(deployment): State<DeploymentImpl>,
     Path(run_id): Path<Uuid>,
+    Query(query): Query<RunLogQuery>,
 ) -> Result<Response, ApiError> {
     let Some(run) = ChatRun::find_by_id(&deployment.db().pool, run_id).await? else {
         return Err(ApiError::BadRequest("Chat run not found".to_string()));
@@ -24,14 +39,56 @@ pub async fn get_run_log(
         return Err(ApiError::BadRequest("Chat run has no log".to_string()));
     };
 
-    let content = match tokio::fs::read_to_string(&log_path).await {
-        Ok(content) => content,
+    let mut file = match File::open(&log_path).await {
+        Ok(file) => file,
         Err(_) => {
             return Err(ApiError::BadRequest(
                 "Chat run log file not found".to_string(),
             ));
         }
     };
+
+    let file_size = match file.metadata().await {
+        Ok(metadata) => metadata.len(),
+        Err(_) => {
+            return Err(ApiError::BadRequest(
+                "Chat run log file not found".to_string(),
+            ));
+        }
+    };
+
+    let limit = query
+        .limit
+        .unwrap_or(DEFAULT_LOG_CHUNK_BYTES)
+        .clamp(1, MAX_LOG_CHUNK_BYTES);
+    let start = match query.offset {
+        Some(offset) => offset.min(file_size),
+        None => {
+            if query.tail.unwrap_or(true) {
+                file_size.saturating_sub(limit)
+            } else {
+                0
+            }
+        }
+    };
+    let read_len = file_size.saturating_sub(start).min(limit);
+
+    if file.seek(SeekFrom::Start(start)).await.is_err() {
+        return Err(ApiError::BadRequest(
+            "Chat run log file not found".to_string(),
+        ));
+    }
+
+    let mut buffer = Vec::with_capacity(read_len as usize);
+    {
+        let mut reader = file.take(read_len);
+        if reader.read_to_end(&mut buffer).await.is_err() {
+            return Err(ApiError::BadRequest(
+                "Chat run log file not found".to_string(),
+            ));
+        }
+    }
+    let content = String::from_utf8_lossy(&buffer).into_owned();
 
     Ok(([(CONTENT_TYPE, "text/plain; charset=utf-8")], content).into_response())
 }

@@ -1,7 +1,7 @@
 {
   "sidebar": {
-    "title": "聊天群組",
-    "newSession": "新建",
+    "title": "會話",
+    "newSession": "新會話",
     "noActiveSessions": "暫無活躍會話。",
     "noArchivedSessions": "暫無已歸檔會話。",
     "showArchived": "顯示已歸檔",
@@ -9,7 +9,12 @@
     "expandSidebar": "展開側邊欄",
     "collapseSidebar": "收起側邊欄",
     "createNewSession": "建立新會話",
-    "untitledSession": "未命名會話"
+    "untitledSession": "未命名會話",
+    "sessionSection": "會話",
+    "automation": "自動化",
+    "skills": "技能",
+    "archivedSection": "已歸檔",
+    "settingsInSidebar": "設定"
   },
   "header": {
     "untitledSession": "未命名會話",
