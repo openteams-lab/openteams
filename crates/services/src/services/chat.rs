@@ -34,7 +34,7 @@ use thiserror::Error;
 use tokio::{fs, io::AsyncWriteExt};
 use tokio_util::io::ReaderStream;
 use ts_rs::TS;
-use utils::{assets::config_path, log_msg::LogMsg, msg_store::MsgStore};
+use utils::{assets::config_path, log_msg::LogMsg, msg_store::MsgStore, utf8::Utf8LossyDecoder};
 use uuid::Uuid;
 
 #[derive(Debug, Error)]
@@ -1039,32 +1039,48 @@ fn spawn_summary_log_forwarders(
     let stdout_store = msg_store.clone();
     tokio::spawn(async move {
         let mut stream = ReaderStream::new(stdout);
+        let mut decoder = Utf8LossyDecoder::new();
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(bytes) => {
-                    let text = String::from_utf8_lossy(&bytes).into_owned();
-                    stdout_store.push(LogMsg::Stdout(text));
+                    let text = decoder.decode_chunk(&bytes);
+                    if !text.is_empty() {
+                        stdout_store.push(LogMsg::Stdout(text));
+                    }
                 }
                 Err(err) => {
                     stdout_store.push(LogMsg::Stderr(format!("stdout error: {err}")));
                 }
             }
         }
+
+        let tail = decoder.finish();
+        if !tail.is_empty() {
+            stdout_store.push(LogMsg::Stdout(tail));
+        }
     });
 
     let stderr_store = msg_store;
     tokio::spawn(async move {
         let mut stream = ReaderStream::new(stderr);
+        let mut decoder = Utf8LossyDecoder::new();
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(bytes) => {
-                    let text = String::from_utf8_lossy(&bytes).into_owned();
-                    stderr_store.push(LogMsg::Stderr(text));
+                    let text = decoder.decode_chunk(&bytes);
+                    if !text.is_empty() {
+                        stderr_store.push(LogMsg::Stderr(text));
+                    }
                 }
                 Err(err) => {
                     stderr_store.push(LogMsg::Stderr(format!("stderr error: {err}")));
                 }
             }
+        }
+
+        let tail = decoder.finish();
+        if !tail.is_empty() {
+            stderr_store.push(LogMsg::Stderr(tail));
         }
     });
 

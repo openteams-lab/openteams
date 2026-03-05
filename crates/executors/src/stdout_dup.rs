@@ -13,6 +13,7 @@ use futures::{StreamExt, stream::BoxStream};
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::io::ReaderStream;
+use workspace_utils::utf8::Utf8LossyDecoder;
 
 use crate::executors::{ExecutorError, SpawnedChild};
 
@@ -55,20 +56,28 @@ pub fn duplicate_stdout(
     // Read original stdout and write to both new ChildStdout and duplicate stream
     tokio::spawn(async move {
         let mut stdout_stream = ReaderStream::new(original_stdout);
+        let mut decoder = Utf8LossyDecoder::new();
 
         while let Some(res) = stdout_stream.next().await {
             match res {
                 Ok(data) => {
                     let _ = fd_writer.write_all(&data).await;
 
-                    let string_chunk = String::from_utf8_lossy(&data).into_owned();
-                    let _ = dup_writer.send(Ok(string_chunk));
+                    let string_chunk = decoder.decode_chunk(&data);
+                    if !string_chunk.is_empty() {
+                        let _ = dup_writer.send(Ok(string_chunk));
+                    }
                 }
                 Err(err) => {
                     tracing::error!("Error reading from child stdout: {}", err);
                     let _ = dup_writer.send(Err(err));
                 }
             }
+        }
+
+        let tail = decoder.finish();
+        if !tail.is_empty() {
+            let _ = dup_writer.send(Ok(tail));
         }
     });
 
@@ -127,6 +136,7 @@ pub fn tee_stdout_with_appender(
         let shared_writer = shared_writer.clone();
         tokio::spawn(async move {
             let mut stdout_stream = ReaderStream::new(original_stdout);
+            let mut decoder = Utf8LossyDecoder::new();
             while let Some(res) = stdout_stream.next().await {
                 match res {
                     Ok(data) => {
@@ -134,13 +144,20 @@ pub fn tee_stdout_with_appender(
                         let mut w = shared_writer.lock().await;
                         let _ = w.write_all(&data).await;
                         // publish duplicate
-                        let string_chunk = String::from_utf8_lossy(&data).into_owned();
-                        let _ = dup_tx.send(Ok(string_chunk));
+                        let string_chunk = decoder.decode_chunk(&data);
+                        if !string_chunk.is_empty() {
+                            let _ = dup_tx.send(Ok(string_chunk));
+                        }
                     }
                     Err(err) => {
                         let _ = dup_tx.send(Err(err));
                     }
                 }
+            }
+
+            let tail = decoder.finish();
+            if !tail.is_empty() {
+                let _ = dup_tx.send(Ok(tail));
             }
         });
     }

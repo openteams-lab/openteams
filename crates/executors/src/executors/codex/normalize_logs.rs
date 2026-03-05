@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use workspace_utils::{
     approvals::ApprovalStatus, diff::normalize_unified_diff, msg_store::MsgStore,
-    path::make_path_relative,
+    path::make_path_relative, utf8::Utf8LossyDecoder,
 };
 
 use crate::{
@@ -72,6 +72,8 @@ struct CommandState {
     command: String,
     stdout: String,
     stderr: String,
+    stdout_decoder: Utf8LossyDecoder,
+    stderr_decoder: Utf8LossyDecoder,
     formatted_output: Option<String>,
     status: ToolStatus,
     exit_code: Option<i32>,
@@ -107,6 +109,33 @@ impl ToNormalizedEntry for CommandState {
                 tool_call_id: self.call_id.clone(),
             })
             .ok(),
+        }
+    }
+}
+
+impl CommandState {
+    fn append_output_chunk(&mut self, stream: ExecOutputStream, chunk: &[u8]) {
+        let decoded = match stream {
+            ExecOutputStream::Stdout => self.stdout_decoder.decode_chunk(chunk),
+            ExecOutputStream::Stderr => self.stderr_decoder.decode_chunk(chunk),
+        };
+        if decoded.is_empty() {
+            return;
+        }
+        match stream {
+            ExecOutputStream::Stdout => self.stdout.push_str(&decoded),
+            ExecOutputStream::Stderr => self.stderr.push_str(&decoded),
+        }
+    }
+
+    fn finalize_output_decoding(&mut self) {
+        let stdout_tail = self.stdout_decoder.finish();
+        if !stdout_tail.is_empty() {
+            self.stdout.push_str(&stdout_tail);
+        }
+        let stderr_tail = self.stderr_decoder.finish();
+        if !stderr_tail.is_empty() {
+            self.stderr.push_str(&stderr_tail);
         }
     }
 }
@@ -592,6 +621,8 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             command: command_text,
                             stdout: String::new(),
                             stderr: String::new(),
+                            stdout_decoder: Utf8LossyDecoder::new(),
+                            stderr_decoder: Utf8LossyDecoder::new(),
                             formatted_output: None,
                             status: ToolStatus::Created,
                             exit_code: None,
@@ -613,14 +644,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     chunk,
                 }) => {
                     if let Some(command_state) = state.commands.get_mut(&call_id) {
-                        let chunk = String::from_utf8_lossy(&chunk);
-                        if chunk.is_empty() {
-                            continue;
-                        }
-                        match stream {
-                            ExecOutputStream::Stdout => command_state.stdout.push_str(&chunk),
-                            ExecOutputStream::Stderr => command_state.stderr.push_str(&chunk),
-                        }
+                        command_state.append_output_chunk(stream, &chunk);
                         let Some(index) = command_state.index else {
                             tracing::error!("missing entry index for existing command state");
                             continue;
@@ -649,6 +673,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     process_id: _,
                 }) => {
                     if let Some(mut command_state) = state.commands.remove(&call_id) {
+                        command_state.finalize_output_decoding();
                         command_state.formatted_output = Some(formatted_output);
                         command_state.exit_code = Some(exit_code);
                         command_state.awaiting_approval = false;
