@@ -19,6 +19,7 @@ pub mod shell;
 pub mod stream_lines;
 pub mod text;
 pub mod tokio;
+pub mod utf8;
 pub mod version;
 
 /// Cache for WSL2 detection result

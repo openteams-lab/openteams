@@ -641,7 +641,10 @@ pub async fn get_agent_usage(
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::error(format!("Failed to query agent usage: {}", e))),
+            Json(ApiResponse::error(&format!(
+                "Failed to query agent usage: {}",
+                e
+            ))),
         )
     })?;
 
@@ -660,6 +663,7 @@ pub async fn get_agent_usage(
         .await
         .ok()
         .flatten()
+        .flatten()
         .unwrap_or_else(|| agent_id.clone());
 
         // Try to get runner_type
@@ -670,6 +674,7 @@ pub async fn get_agent_usage(
         .fetch_optional(pool)
         .await
         .ok()
+        .flatten()
         .flatten()
         .unwrap_or_else(|| "unknown".to_string());
 
@@ -725,7 +730,10 @@ pub async fn get_skill_usage(
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::error(format!("Failed to query skill usage: {}", e))),
+            Json(ApiResponse::error(&format!(
+                "Failed to query skill usage: {}",
+                e
+            ))),
         )
     })?;
 
@@ -746,7 +754,10 @@ pub async fn get_skill_usage(
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::error(format!("Failed to query skill installs: {}", e))),
+            Json(ApiResponse::error(&format!(
+                "Failed to query skill installs: {}",
+                e
+            ))),
         )
     })?
     .into_iter()
@@ -768,6 +779,7 @@ pub async fn get_skill_usage(
         .await
         .ok()
         .flatten()
+        .flatten()
         .unwrap_or_else(|| skill_id.clone());
 
         let source = sqlx::query_scalar::<_, Option<String>>(
@@ -777,6 +789,7 @@ pub async fn get_skill_usage(
         .fetch_optional(pool)
         .await
         .ok()
+        .flatten()
         .flatten()
         .unwrap_or_else(|| "unknown".to_string());
 

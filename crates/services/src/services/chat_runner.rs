@@ -44,7 +44,7 @@ use tokio::{
 };
 use tokio_util::io::ReaderStream;
 use ts_rs::TS;
-use utils::{assets::asset_dir, log_msg::LogMsg, msg_store::MsgStore};
+use utils::{assets::asset_dir, log_msg::LogMsg, msg_store::MsgStore, utf8::Utf8LossyDecoder};
 use uuid::Uuid;
 
 use crate::services::chat::{self, ChatServiceError};
@@ -1944,18 +1944,28 @@ impl ChatRunner {
         let stdout_log = raw_log_file.clone();
         tokio::spawn(async move {
             let mut stream = ReaderStream::new(stdout);
+            let mut decoder = Utf8LossyDecoder::new();
             while let Some(chunk) = stream.next().await {
                 match chunk {
                     Ok(bytes) => {
-                        let text = String::from_utf8_lossy(&bytes).into_owned();
-                        stdout_store.push(LogMsg::Stdout(text.clone()));
-                        let mut file = stdout_log.lock().await;
-                        let _ = file.write_all(text.as_bytes()).await;
+                        let text = decoder.decode_chunk(&bytes);
+                        if !text.is_empty() {
+                            stdout_store.push(LogMsg::Stdout(text.clone()));
+                            let mut file = stdout_log.lock().await;
+                            let _ = file.write_all(text.as_bytes()).await;
+                        }
                     }
                     Err(err) => {
                         stdout_store.push(LogMsg::Stderr(format!("stdout error: {err}")));
                     }
                 }
+            }
+
+            let tail = decoder.finish();
+            if !tail.is_empty() {
+                stdout_store.push(LogMsg::Stdout(tail.clone()));
+                let mut file = stdout_log.lock().await;
+                let _ = file.write_all(tail.as_bytes()).await;
             }
         });
 
@@ -1963,18 +1973,28 @@ impl ChatRunner {
         let stderr_log = raw_log_file.clone();
         tokio::spawn(async move {
             let mut stream = ReaderStream::new(stderr);
+            let mut decoder = Utf8LossyDecoder::new();
             while let Some(chunk) = stream.next().await {
                 match chunk {
                     Ok(bytes) => {
-                        let text = String::from_utf8_lossy(&bytes).into_owned();
-                        stderr_store.push(LogMsg::Stderr(text.clone()));
-                        let mut file = stderr_log.lock().await;
-                        let _ = file.write_all(text.as_bytes()).await;
+                        let text = decoder.decode_chunk(&bytes);
+                        if !text.is_empty() {
+                            stderr_store.push(LogMsg::Stderr(text.clone()));
+                            let mut file = stderr_log.lock().await;
+                            let _ = file.write_all(text.as_bytes()).await;
+                        }
                     }
                     Err(err) => {
                         stderr_store.push(LogMsg::Stderr(format!("stderr error: {err}")));
                     }
                 }
+            }
+
+            let tail = decoder.finish();
+            if !tail.is_empty() {
+                stderr_store.push(LogMsg::Stderr(tail.clone()));
+                let mut file = stderr_log.lock().await;
+                let _ = file.write_all(tail.as_bytes()).await;
             }
         });
     }
