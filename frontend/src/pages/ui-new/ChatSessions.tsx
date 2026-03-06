@@ -81,6 +81,7 @@ import { DiffViewerModal } from './chat/components/DiffViewerModal';
 import { PromptEditorModal } from './chat/components/PromptEditorModal';
 import { ConfirmModal } from './chat/components/ConfirmModal';
 import { FilePreviewModal } from './chat/components/FilePreviewModal';
+import { SkillsPanel } from './chat/components/SkillsPanel';
 
 const mentionStatusPriority: Record<MentionStatus, number> = {
   received: 0,
@@ -470,6 +471,9 @@ export function ChatSessions() {
   const [newMemberVariant, setNewMemberVariant] = useState('DEFAULT');
   const [newMemberPrompt, setNewMemberPrompt] = useState('');
   const [newMemberWorkspace, setNewMemberWorkspace] = useState('');
+  const [newMemberSkillIds, setNewMemberSkillIds] = useState<string[]>([]);
+  const [editingMemberInitialSkillIds, setEditingMemberInitialSkillIds] =
+    useState<string[]>([]);
   const memberNameLengthError =
     newMemberName.trim().length > 0 &&
     getMemberNameLength(newMemberName) > MAX_MEMBER_NAME_LENGTH
@@ -487,6 +491,7 @@ export function ChatSessions() {
   const [clock, setClock] = useState(() => Date.now());
   const [stoppingAgents, setStoppingAgents] = useState<Set<string>>(new Set());
   const [showArchived, setShowArchived] = useState(false);
+  const [isSkillsPanelOpen, setIsSkillsPanelOpen] = useState(false);
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(
     new Set()
   );
@@ -617,8 +622,11 @@ export function ChatSessions() {
     setNewMemberVariant('DEFAULT');
     setNewMemberPrompt('');
     setNewMemberWorkspace('');
+    setNewMemberSkillIds([]);
+    setEditingMemberInitialSkillIds([]);
     setMemberError(null);
     setEditingMember(null);
+    setIsSkillsPanelOpen(false);
     setLogRunId(null);
     setLogContent('');
     setLogError(null);
@@ -1575,6 +1583,7 @@ export function ChatSessions() {
             reason: 'member-preset-missing',
             agentId: null,
             workspacePath: '',
+            selectedSkillIds: [],
           });
           continue;
         }
@@ -1591,6 +1600,7 @@ export function ChatSessions() {
             reason: 'member-preset-disabled',
             agentId: null,
             workspacePath: '',
+            selectedSkillIds: [],
           });
           continue;
         }
@@ -1617,6 +1627,7 @@ export function ChatSessions() {
             reason: 'runner-not-available',
             agentId: null,
             workspacePath: '',
+            selectedSkillIds: [],
           });
           continue;
         }
@@ -1634,6 +1645,52 @@ export function ChatSessions() {
       memberPresetById,
       sessionMembers,
     ]
+  );
+
+  const syncAgentSkills = useCallback(
+    async (
+      agentId: string,
+      targetSkillIds: string[],
+      options?: { replace?: boolean }
+    ) => {
+      const replace = options?.replace ?? true;
+      const normalizedTargetIds = Array.from(
+        new Set(targetSkillIds.map((skillId) => skillId.trim()).filter(Boolean))
+      );
+      const targetSkillIdSet = new Set(normalizedTargetIds);
+
+      const currentAssignments = await chatApi.listAgentSkills(agentId);
+      const assignmentBySkillId = new Map(
+        currentAssignments.map((assignment) => [assignment.skill_id, assignment])
+      );
+
+      const operations: Array<Promise<unknown>> = [];
+
+      for (const skillId of targetSkillIdSet) {
+        if (!assignmentBySkillId.has(skillId)) {
+          operations.push(
+            chatApi.assignSkillToAgent({
+              agent_id: agentId,
+              skill_id: skillId,
+              enabled: true,
+            })
+          );
+        }
+      }
+
+      if (replace) {
+        for (const assignment of currentAssignments) {
+          if (!targetSkillIdSet.has(assignment.skill_id)) {
+            operations.push(chatApi.unassignSkillFromAgent(agentId, assignment.id));
+          }
+        }
+      }
+
+      if (operations.length > 0) {
+        await Promise.all(operations);
+      }
+    },
+    []
   );
 
   const importMembersFromPlan = useCallback(
@@ -1658,6 +1715,22 @@ export function ChatSessions() {
           agentId = created.id;
         }
 
+        const selectedSkillIds = Array.from(
+          new Set(
+            (entry.selectedSkillIds ?? [])
+              .map((skillId) => skillId.trim())
+              .filter(Boolean)
+          )
+        );
+
+        if (agentId) {
+          if (entry.action === 'create') {
+            await syncAgentSkills(agentId, selectedSkillIds, { replace: true });
+          } else if (selectedSkillIds.length > 0) {
+            await syncAgentSkills(agentId, selectedSkillIds, { replace: false });
+          }
+        }
+
         if (!agentId || attachedAgentIds.has(agentId)) {
           continue;
         }
@@ -1676,7 +1749,7 @@ export function ChatSessions() {
         }),
       ]);
     },
-    [activeSessionId, queryClient, sessionMembers]
+    [activeSessionId, queryClient, sessionMembers, syncAgentSkills]
   );
 
   const validateAndPrepareImportPlan = useCallback(
@@ -1732,11 +1805,20 @@ export function ChatSessions() {
           return null;
         }
 
+        const selectedSkillIds = Array.from(
+          new Set(
+            (entry.selectedSkillIds ?? [])
+              .map((skillId) => skillId.trim())
+              .filter(Boolean)
+          )
+        );
+
         const nextEntry: MemberPresetImportPlan = {
           ...entry,
           finalName,
           workspacePath,
           runnerType,
+          selectedSkillIds,
         };
 
         if (nextEntry.action === 'create') {
@@ -1869,6 +1951,7 @@ export function ChatSessions() {
         runnerType?: string;
         systemPrompt?: string;
         toolsEnabled?: JsonValue;
+        selectedSkillIds?: string[];
       }
     ) => {
       setTeamImportPlan((prev) => {
@@ -1885,6 +1968,8 @@ export function ChatSessions() {
           patch.systemPrompt = updates.systemPrompt;
         if (updates.toolsEnabled !== undefined)
           patch.toolsEnabled = updates.toolsEnabled;
+        if (updates.selectedSkillIds !== undefined)
+          patch.selectedSkillIds = updates.selectedSkillIds;
         next[index] = { ...next[index], ...patch };
         return next;
       });
@@ -1950,6 +2035,9 @@ export function ChatSessions() {
     const prompt = newMemberPrompt.trim();
     const workspacePathVal = newMemberWorkspace.trim();
     const selectedVariant = newMemberVariant.trim() || 'DEFAULT';
+    const normalizedSelectedSkillIds = Array.from(
+      new Set(newMemberSkillIds.map((skillId) => skillId.trim()).filter(Boolean))
+    );
 
     if (!name) {
       setMemberError('AI member name is required.');
@@ -2007,6 +2095,7 @@ export function ChatSessions() {
     let promptChanged = false;
     let variantChanged = false;
     let workspaceChanged = false;
+    let skillsChanged = false;
     if (editingMember) {
       nameChanged = editingMember.agent.name !== name;
       runnerChanged = editingMember.agent.runner_type !== runnerType;
@@ -2017,6 +2106,10 @@ export function ChatSessions() {
       variantChanged = existingVariant !== selectedVariant;
       workspaceChanged =
         (editingMember.sessionAgent.workspace_path ?? '') !== workspacePathVal;
+      skillsChanged = !areSetsEqual(
+        new Set(normalizedSelectedSkillIds),
+        new Set(editingMemberInitialSkillIds)
+      );
 
       if (nameChanged) {
         const conflict = sessionMembers.find(
@@ -2035,7 +2128,8 @@ export function ChatSessions() {
         !runnerChanged &&
         !promptChanged &&
         !variantChanged &&
-        !workspaceChanged
+        !workspaceChanged &&
+        !skillsChanged
       ) {
         setEditingMember(null);
         setIsAddMemberOpen(false);
@@ -2082,6 +2176,12 @@ export function ChatSessions() {
             { workspace_path: workspacePathVal }
           );
         }
+
+        if (skillsChanged) {
+          await syncAgentSkills(agentId, normalizedSelectedSkillIds, {
+            replace: true,
+          });
+        }
       } else {
         const conflict = sessionMembers.find(
           (member) => member.agent.name.toLowerCase() === name.toLowerCase()
@@ -2104,6 +2204,10 @@ export function ChatSessions() {
           return;
         }
 
+        await syncAgentSkills(agentId, normalizedSelectedSkillIds, {
+          replace: true,
+        });
+
         await chatApi.createSessionAgent(activeSessionId, {
           agent_id: agentId,
           workspace_path: workspacePathVal,
@@ -2121,6 +2225,8 @@ export function ChatSessions() {
       setNewMemberVariant('DEFAULT');
       setNewMemberPrompt('');
       setNewMemberWorkspace('');
+      setNewMemberSkillIds([]);
+      setEditingMemberInitialSkillIds([]);
       setMemberError(null);
       setEditingMember(null);
       setIsAddMemberOpen(false);
@@ -2162,11 +2268,26 @@ export function ChatSessions() {
     );
     setNewMemberPrompt(member.agent.system_prompt ?? '');
     setNewMemberWorkspace(member.sessionAgent.workspace_path ?? '');
+    setNewMemberSkillIds([]);
+    setEditingMemberInitialSkillIds([]);
     setMemberError(null);
     setIsPromptEditorOpen(false);
     setPromptFileError(null);
     setPromptFileLoading(false);
     setIsAddMemberOpen(true);
+
+    void chatApi
+      .listAgentSkills(member.agent.id)
+      .then((assignments) => {
+        const assignedSkillIds = Array.from(
+          new Set(assignments.map((assignment) => assignment.skill_id))
+        );
+        setNewMemberSkillIds(assignedSkillIds);
+        setEditingMemberInitialSkillIds(assignedSkillIds);
+      })
+      .catch((error) => {
+        console.warn('Failed to load member skills', error);
+      });
   };
 
   const handleRemoveMember = async (member: SessionMember) => {
@@ -2347,6 +2468,10 @@ export function ChatSessions() {
     };
   }, [isResizing]);
 
+  const skillsPanelLeftOffset = isLeftSidebarCollapsed
+    ? COLLAPSED_LEFT_SIDEBAR_WIDTH
+    : leftSidebarWidth + 1;
+
   return (
     <div className="chat-session-page relative flex h-full min-h-0 overflow-hidden select-none">
       {/* Session List Sidebar */}
@@ -2372,23 +2497,12 @@ export function ChatSessions() {
           SettingsDialog.show({ initialSection: 'presets' });
         }}
         onOpenSkills={() => {
-          if (sessionMembers.length > 0) {
-            handleEditMember(sessionMembers[0]);
-            return;
-          }
-          setIsAddMemberOpen(true);
-          setMemberError(null);
-          setEditingMember(null);
-          setNewMemberName('');
-          setNewMemberVariant('DEFAULT');
-          setNewMemberPrompt('');
-          setNewMemberWorkspace('');
-          setIsPromptEditorOpen(false);
-          setPromptFileError(null);
+          setIsSkillsPanelOpen((prev) => !prev);
         }}
         onOpenSettings={() => {
           SettingsDialog.show();
         }}
+        isSkillsActive={isSkillsPanelOpen}
         width={leftSidebarWidth}
         isCollapsed={isLeftSidebarCollapsed}
         onToggleCollapsed={handleToggleLeftSidebar}
@@ -2708,12 +2822,14 @@ export function ChatSessions() {
         newMemberVariant={newMemberVariant}
         newMemberPrompt={newMemberPrompt}
         newMemberWorkspace={newMemberWorkspace}
+        newMemberSkillIds={newMemberSkillIds}
         memberNameLengthError={memberNameLengthError}
         onNameChange={setNewMemberName}
         onRunnerTypeChange={setNewMemberRunnerType}
         onVariantChange={setNewMemberVariant}
         onPromptChange={setNewMemberPrompt}
         onWorkspaceChange={setNewMemberWorkspace}
+        onMemberSkillIdsChange={setNewMemberSkillIds}
         memberError={memberError}
         isSavingMember={isSavingMember}
         availableRunnerTypes={availableRunnerTypes}
@@ -2734,6 +2850,8 @@ export function ChatSessions() {
           setNewMemberVariant('DEFAULT');
           setNewMemberPrompt('');
           setNewMemberWorkspace('');
+          setNewMemberSkillIds([]);
+          setEditingMemberInitialSkillIds([]);
           setIsPromptEditorOpen(false);
           setPromptFileError(null);
         }}
@@ -2742,6 +2860,8 @@ export function ChatSessions() {
           setMemberError(null);
           setEditingMember(null);
           setNewMemberVariant('DEFAULT');
+          setNewMemberSkillIds([]);
+          setEditingMemberInitialSkillIds([]);
           setIsPromptEditorOpen(false);
           setPromptFileError(null);
         }}
@@ -2766,6 +2886,13 @@ export function ChatSessions() {
         onUpdateTeamImportPlanEntry={handleUpdateTeamImportPlanEntry}
         onConfirmTeamImport={handleConfirmTeamImport}
         onCancelTeamImport={handleCancelTeamImport}
+      />
+
+      <SkillsPanel
+        isOpen={isSkillsPanelOpen}
+        leftOffset={skillsPanelLeftOffset}
+        allAgents={agents}
+        onClose={() => setIsSkillsPanelOpen(false)}
       />
 
       {/* Workspace Drawer */}

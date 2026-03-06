@@ -211,12 +211,14 @@ export interface AiMembersSidebarProps {
   newMemberVariant: string;
   newMemberPrompt: string;
   newMemberWorkspace: string;
+  newMemberSkillIds: string[];
   memberNameLengthError: string | null;
   onNameChange: (value: string) => void;
   onRunnerTypeChange: (value: string) => void;
   onVariantChange: (value: string) => void;
   onPromptChange: (value: string) => void;
   onWorkspaceChange: (value: string) => void;
+  onMemberSkillIdsChange: (skillIds: string[]) => void;
   memberError: string | null;
   isSavingMember: boolean;
   // Runner availability
@@ -257,6 +259,7 @@ export interface AiMembersSidebarProps {
       runnerType?: string;
       systemPrompt?: string;
       toolsEnabled?: JsonValue;
+      selectedSkillIds?: string[];
     }
   ) => void;
   onConfirmTeamImport: () => void;
@@ -276,12 +279,14 @@ export function AiMembersSidebar({
   newMemberVariant,
   newMemberPrompt,
   newMemberWorkspace,
+  newMemberSkillIds,
   memberNameLengthError,
   onNameChange,
   onRunnerTypeChange,
   onVariantChange,
   onPromptChange,
   onWorkspaceChange,
+  onMemberSkillIdsChange,
   memberError,
   isSavingMember,
   availableRunnerTypes,
@@ -614,6 +619,19 @@ export function AiMembersSidebar({
                           )}
                         />
                       </div>
+                      <AgentSkillsSection
+                        agentId={plan.action === 'reuse' ? plan.agentId : null}
+                        runnerType={plan.runnerType || null}
+                        selectedSkillIds={plan.selectedSkillIds ?? []}
+                        onSelectedSkillIdsChange={(skillIds) =>
+                          onUpdateTeamImportPlanEntry(index, {
+                            selectedSkillIds: skillIds,
+                          })
+                        }
+                        readOnly={isArchived || isImportingTeam}
+                        title="Skills"
+                        maxHeightClass="max-h-32"
+                      />
                     </div>
                   ) : (
                     <div className="text-xs text-low truncate">
@@ -810,7 +828,10 @@ export function AiMembersSidebar({
       {/* Skills section */}
       <AgentSkillsSection
         agentId={editingMember?.agent.id ?? null}
-        readOnly={isArchived}
+        runnerType={newMemberRunnerType || null}
+        selectedSkillIds={newMemberSkillIds}
+        onSelectedSkillIdsChange={onMemberSkillIdsChange}
+        readOnly={isArchived || isSavingMember}
       />
       {memberError && <div className="text-xs text-error">{memberError}</div>}
       <div className="flex items-center justify-end gap-2 pt-2">
