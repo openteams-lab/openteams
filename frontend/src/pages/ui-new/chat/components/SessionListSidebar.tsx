@@ -181,7 +181,10 @@ export function SessionListSidebar({
               type="button"
               onClick={onCreateSession}
               disabled={isCreating}
-              className="chat-session-function-btn chat-session-function-btn-primary"
+              className={cn(
+                'chat-session-function-btn',
+                isCreating && 'opacity-60 cursor-not-allowed'
+              )}
               aria-label={t('sidebar.createNewSession')}
               title={t('sidebar.createNewSession')}
             >
