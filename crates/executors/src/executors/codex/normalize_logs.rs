@@ -117,6 +117,22 @@ impl ToNormalizedEntry for CommandState {
 }
 
 impl CommandState {
+    fn new(command: String, call_id: String) -> Self {
+        Self {
+            index: None,
+            command,
+            stdout: String::new(),
+            stderr: String::new(),
+            stdout_decoder: Utf8LossyDecoder::new(),
+            stderr_decoder: Utf8LossyDecoder::new(),
+            formatted_output: None,
+            status: ToolStatus::Created,
+            exit_code: None,
+            awaiting_approval: false,
+            call_id,
+        }
+    }
+
     fn append_output_chunk(&mut self, stream: ExecOutputStream, chunk: &[u8]) {
         let decoded = match stream {
             ExecOutputStream::Stdout => self.stdout_decoder.decode_chunk(chunk),
@@ -669,19 +685,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     }
                     state.commands.insert(
                         call_id.clone(),
-                        CommandState {
-                            index: None,
-                            command: command_text,
-                            stdout: String::new(),
-                            stderr: String::new(),
-                            stdout_decoder: Utf8LossyDecoder::new(),
-                            stderr_decoder: Utf8LossyDecoder::new(),
-                            formatted_output: None,
-                            status: ToolStatus::Created,
-                            exit_code: None,
-                            awaiting_approval: false,
-                            call_id: call_id.clone(),
-                        },
+                        CommandState::new(command_text, call_id.clone()),
                     );
                     let command_state = state.commands.get_mut(&call_id).unwrap();
                     let index = add_normalized_entry(
@@ -1184,19 +1188,14 @@ fn handle_jsonrpc_request(
             let command_state = state
                 .commands
                 .entry(params.item_id.clone())
-                .or_insert_with(|| CommandState {
-                    index: None,
-                    command: params
-                        .reason
-                        .clone()
-                        .unwrap_or_else(|| "command execution".to_string()),
-                    stdout: String::new(),
-                    stderr: String::new(),
-                    formatted_output: None,
-                    status: ToolStatus::Created,
-                    exit_code: None,
-                    awaiting_approval: false,
-                    call_id: params.item_id.clone(),
+                .or_insert_with(|| {
+                    CommandState::new(
+                        params
+                            .reason
+                            .clone()
+                            .unwrap_or_else(|| "command execution".to_string()),
+                        params.item_id.clone(),
+                    )
                 });
             command_state.awaiting_approval = true;
             if let Some(index) = command_state.index {
@@ -1422,17 +1421,10 @@ fn handle_v2_item_started(
         } => {
             state.assistant = None;
             state.thinking = None;
-            let command_state = state.commands.entry(id.clone()).or_insert(CommandState {
-                index: None,
-                command: command.clone(),
-                stdout: String::new(),
-                stderr: String::new(),
-                formatted_output: aggregated_output.clone(),
-                status: ToolStatus::Created,
-                exit_code,
-                awaiting_approval: false,
-                call_id: id.clone(),
-            });
+            let command_state = state
+                .commands
+                .entry(id.clone())
+                .or_insert_with(|| CommandState::new(command.clone(), id.clone()));
             command_state.command = command;
             command_state.formatted_output = aggregated_output;
             command_state.exit_code = exit_code;

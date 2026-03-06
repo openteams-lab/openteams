@@ -1,15 +1,11 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import type { UIEvent } from 'react';
 import {
   ArrowClockwiseIcon,
-  ArrowSquareOutIcon,
   DownloadIcon,
   MagnifyingGlassIcon,
-  PlayIcon,
   PlusIcon,
   TrashIcon,
-  XIcon,
 } from '@phosphor-icons/react';
 import { BaseCodingAgent } from 'shared/types';
 import type {
@@ -20,10 +16,9 @@ import type {
   RemoteSkillPackage,
   UpdateChatSkill,
 } from 'shared/types';
-import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
-import { usePortalContainer } from '@/contexts/PortalContainerContext';
 import { chatApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { SkillDetailModal } from './SkillDetailModal';
 import { filterSkillsByRunner } from '../skillCompatibility';
 
 type MarketSource = 'registry' | 'builtin';
@@ -82,7 +77,11 @@ function inferSkillNameFromPath(path: string): string {
   return segment;
 }
 
-function getSkillSearchText(name: string, description: string, tags: string[]): string {
+function getSkillSearchText(
+  name: string,
+  description: string,
+  tags: string[]
+): string {
   return [name, description, ...tags].join(' ').toLowerCase();
 }
 
@@ -92,25 +91,6 @@ function toRunnerLabel(runnerType: string): string {
     .split(/[_\s-]+/)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(' ');
-}
-
-function getSourceHref(sourceUrl: string | null | undefined): string | null {
-  if (!sourceUrl) return null;
-  const trimmed = sourceUrl.trim();
-  if (!trimmed) return null;
-
-  if (/^https?:\/\//i.test(trimmed) || /^file:\/\//i.test(trimmed)) {
-    return trimmed;
-  }
-
-  const normalizedPath = trimmed.replace(/\\/g, '/');
-  if (/^[a-zA-Z]:\//.test(normalizedPath)) {
-    return `file:///${encodeURI(normalizedPath)}`;
-  }
-  if (normalizedPath.startsWith('/')) {
-    return `file://${encodeURI(normalizedPath)}`;
-  }
-  return null;
 }
 
 function buildSkillEnabledPayload(enabled: boolean): UpdateChatSkill {
@@ -147,13 +127,17 @@ function ToggleSwitch({
       onClick={onClick}
       className={cn(
         'relative h-5 w-9 shrink-0 rounded-full border appearance-none transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338CA]/40',
-        checked ? 'bg-[#4F46E5] border-[#4F46E5]' : 'bg-[#e5e5e8] border-[#e5e5e8]',
+        checked
+          ? 'bg-[#4F46E5] border-[#4F46E5]'
+          : 'bg-[#e5e5e8] border-[#e5e5e8]'
       )}
     >
       <span
         className={cn(
           'absolute top-[0.5px] size-4 rounded-full border border-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.2)] transition-all duration-200',
-          checked ? 'left-[18px] bg-white border-white' : 'left-0.5 bg-[#f3f3f5]'
+          checked
+            ? 'left-[18px] bg-white border-white'
+            : 'left-0.5 bg-[#f3f3f5]'
         )}
       />
     </button>
@@ -194,10 +178,11 @@ export function SkillsPanel({
   allAgents,
   onClose,
 }: SkillsPanelProps) {
-  const portalContainer = usePortalContainer();
   const [installedSkills, setInstalledSkills] = useState<ChatSkill[]>([]);
   const [marketSkills, setMarketSkills] = useState<MarketSkill[]>([]);
-  const [agentAssignments, setAgentAssignments] = useState<ChatAgentSkill[]>([]);
+  const [agentAssignments, setAgentAssignments] = useState<ChatAgentSkill[]>(
+    []
+  );
   const [availableAgents, setAvailableAgents] = useState<ChatAgent[]>([]);
 
   const [selectedRunnerKey, setSelectedRunnerKey] = useState('');
@@ -225,9 +210,8 @@ export function SkillsPanel({
   const [customSkillPath, setCustomSkillPath] = useState('');
   const [customSkillAgentId, setCustomSkillAgentId] = useState('');
   const [isCreatingSkill, setIsCreatingSkill] = useState(false);
-  const [marketInstallTarget, setMarketInstallTarget] = useState<MarketSkill | null>(
-    null
-  );
+  const [marketInstallTarget, setMarketInstallTarget] =
+    useState<MarketSkill | null>(null);
   const [marketInstallAgentId, setMarketInstallAgentId] = useState('');
   const [marketVisibleCount, setMarketVisibleCount] = useState(
     marketRenderBatchSize
@@ -235,7 +219,8 @@ export function SkillsPanel({
 
   const runnerOptions = useMemo<RunnerOption[]>(() => {
     const map = new Map<string, RunnerOption>();
-    const sourceAgents = availableAgents.length > 0 ? availableAgents : allAgents;
+    const sourceAgents =
+      availableAgents.length > 0 ? availableAgents : allAgents;
     for (const agent of sourceAgents) {
       const key = agent.runner_type.trim().toUpperCase();
       if (!key || !supportedRunnerTypeSet.has(key)) continue;
@@ -251,11 +236,14 @@ export function SkillsPanel({
         });
       }
     }
-    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+    return Array.from(map.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
   }, [allAgents, availableAgents]);
 
   const selectedRunnerOption = useMemo(
-    () => runnerOptions.find((option) => option.key === selectedRunnerKey) ?? null,
+    () =>
+      runnerOptions.find((option) => option.key === selectedRunnerKey) ?? null,
     [runnerOptions, selectedRunnerKey]
   );
 
@@ -267,7 +255,10 @@ export function SkillsPanel({
   );
 
   const assignmentBySkillId = useMemo(
-    () => new Map(agentAssignments.map((assignment) => [assignment.skill_id, assignment])),
+    () =>
+      new Map(
+        agentAssignments.map((assignment) => [assignment.skill_id, assignment])
+      ),
     [agentAssignments]
   );
 
@@ -300,13 +291,21 @@ export function SkillsPanel({
     setMarketError(null);
     try {
       const skills = await chatApi.listRegistrySkills();
-      setMarketSkills(skills.map((skill) => ({ ...skill, source: 'registry' })));
+      setMarketSkills(
+        skills.map((skill) => ({ ...skill, source: 'registry' }))
+      );
     } catch (registryError) {
       try {
         const skills = await chatApi.listBuiltinSkills();
-        setMarketSkills(skills.map((skill) => ({ ...skill, source: 'builtin' })));
+        setMarketSkills(
+          skills.map((skill) => ({ ...skill, source: 'builtin' }))
+        );
       } catch (builtinError) {
-        console.error('Failed to load skill marketplace', registryError, builtinError);
+        console.error(
+          'Failed to load skill marketplace',
+          registryError,
+          builtinError
+        );
         setMarketError('加载技能市场失败。');
       }
     } finally {
@@ -339,7 +338,9 @@ export function SkillsPanel({
       setSelectedRunnerKey('');
       return;
     }
-    const hasSelected = runnerOptions.some((option) => option.key === selectedRunnerKey);
+    const hasSelected = runnerOptions.some(
+      (option) => option.key === selectedRunnerKey
+    );
     if (!selectedRunnerKey || !hasSelected) {
       setSelectedRunnerKey(runnerOptions[0].key);
     }
@@ -385,7 +386,8 @@ export function SkillsPanel({
   );
 
   const installedByName = useMemo(
-    () => new Set(installedSkills.map((skill) => skill.name.trim().toLowerCase())),
+    () =>
+      new Set(installedSkills.map((skill) => skill.name.trim().toLowerCase())),
     [installedSkills]
   );
 
@@ -399,7 +401,8 @@ export function SkillsPanel({
             normalizedSource.length > 0
         ) ??
         installedSkills.find(
-          (skill) => skill.name.trim().toLowerCase() === meta.name.trim().toLowerCase()
+          (skill) =>
+            skill.name.trim().toLowerCase() === meta.name.trim().toLowerCase()
         ) ??
         null
       );
@@ -409,7 +412,8 @@ export function SkillsPanel({
   const isMarketSkillInstalled = useCallback(
     (meta: MarketSkill): boolean => {
       const normalizedSource = normalizeSourceUrl(meta.source_url);
-      if (normalizedSource && installedBySourceUrl.has(normalizedSource)) return true;
+      if (normalizedSource && installedBySourceUrl.has(normalizedSource))
+        return true;
       return installedByName.has(meta.name.trim().toLowerCase());
     },
     [installedByName, installedBySourceUrl]
@@ -426,9 +430,11 @@ export function SkillsPanel({
     return marketSkills.filter((skill) => {
       if (isMarketSkillInstalled(skill)) return false;
       if (!searchLower) return true;
-      return getSkillSearchText(skill.name, skill.description, skill.tags).includes(
-        searchLower
-      );
+      return getSkillSearchText(
+        skill.name,
+        skill.description,
+        skill.tags
+      ).includes(searchLower);
     });
   }, [isMarketSkillInstalled, marketSkills, searchLower]);
 
@@ -453,7 +459,10 @@ export function SkillsPanel({
 
       setMarketVisibleCount((prev) => {
         if (prev >= displayedMarketSkills.length) return prev;
-        return Math.min(prev + marketRenderBatchSize, displayedMarketSkills.length);
+        return Math.min(
+          prev + marketRenderBatchSize,
+          displayedMarketSkills.length
+        );
       });
     },
     [displayedMarketSkills.length, isLoadingMarket]
@@ -591,7 +600,9 @@ export function SkillsPanel({
         detailData.installedSkillId,
         buildSkillEnabledPayload(nextEnabled)
       );
-      setDetailData((prev) => (prev ? { ...prev, enabled: nextEnabled } : prev));
+      setDetailData((prev) =>
+        prev ? { ...prev, enabled: nextEnabled } : prev
+      );
       await loadInstalledSkills();
     } catch (error) {
       console.error('Failed to toggle skill enabled', error);
@@ -610,7 +621,9 @@ export function SkillsPanel({
       await chatApi.deleteSkill(detailData.installedSkillId);
       await Promise.all([
         loadInstalledSkills(),
-        selectedAgentId ? loadAgentAssignments(selectedAgentId) : Promise.resolve(),
+        selectedAgentId
+          ? loadAgentAssignments(selectedAgentId)
+          : Promise.resolve(),
       ]);
       closeDetail();
     } catch (error) {
@@ -660,7 +673,9 @@ export function SkillsPanel({
 
       await Promise.all([
         loadInstalledSkills(),
-        customSkillAgentId ? loadAgentAssignments(customSkillAgentId) : Promise.resolve(),
+        customSkillAgentId
+          ? loadAgentAssignments(customSkillAgentId)
+          : Promise.resolve(),
       ]);
 
       setIsCreateModalOpen(false);
@@ -695,8 +710,11 @@ export function SkillsPanel({
         }
 
         if (targetAgentId) {
-          const existingAssignments = await chatApi.listAgentSkills(targetAgentId);
-          const assignedIds = new Set(existingAssignments.map((item) => item.skill_id));
+          const existingAssignments =
+            await chatApi.listAgentSkills(targetAgentId);
+          const assignedIds = new Set(
+            existingAssignments.map((item) => item.skill_id)
+          );
           if (!assignedIds.has(installed.id)) {
             await chatApi.assignSkillToAgent({
               agent_id: targetAgentId,
@@ -709,7 +727,9 @@ export function SkillsPanel({
         await Promise.all([
           loadInstalledSkills(),
           loadMarketSkills(),
-          selectedAgentId ? loadAgentAssignments(selectedAgentId) : Promise.resolve(),
+          selectedAgentId
+            ? loadAgentAssignments(selectedAgentId)
+            : Promise.resolve(),
         ]);
       } catch (error) {
         console.error('Failed to install market skill', error);
@@ -760,159 +780,28 @@ export function SkillsPanel({
     marketInstallTarget,
   ]);
 
-  const detailSourceHref = getSourceHref(detailData?.sourceUrl);
   const isDetailInstallAction =
     detailTarget?.kind === 'market' && !detailData?.installedSkillId;
-  const detailModal = detailTarget ? (
-    <>
-      <div
-        className="fixed inset-0 z-[9998] bg-black/50 animate-in fade-in-0 duration-200"
-        onClick={closeDetail}
-      />
-      <div className="fixed z-[9999] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <div
-          className={cn(
-            'skill-detail-modal-surface flex flex-col overflow-hidden',
-            'shadow-xl animate-in fade-in-0 slide-in-from-bottom-4 duration-200',
-            'rounded-2xl p-4'
-          )}
-          style={{
-            height: 'min(70vh, 710px)',
-            width: 'min(86vw, 760px)',
-            minHeight: '320px',
-            maxHeight: '82vh',
-            maxWidth: '92vw',
-            backgroundColor: '#f7f8fc',
-          }}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="flex min-w-0 items-center justify-between">
-            <SkillTileIcon
-              name={detailData?.name ?? detailTarget.skill.name}
-              bordered={false}
-            />
-            <button
-              type="button"
-              onClick={closeDetail}
-              className="inline-flex size-10 items-center justify-center rounded-xl text-low hover:bg-secondary/70 hover:text-normal"
-            >
-              <XIcon size={22} />
-            </button>
-          </div>
-
-          <div className="mt-5 flex min-w-0 items-start justify-between gap-4">
-            <div className="min-w-0 text-2xl leading-tight font-semibold text-normal">
-              {detailData?.name ?? detailTarget.skill.name}
-            </div>
-            {detailSourceHref ? (
-              <a
-                href={detailSourceHref}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-low hover:text-normal"
-              >
-                打开文件夹
-                <ArrowSquareOutIcon size={16} />
-              </a>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-sm text-low/60">
-                打开文件夹
-                <ArrowSquareOutIcon size={16} />
-              </span>
-            )}
-          </div>
-
-          <div className="mt-3 text-sm leading-6 text-normal/80">
-            {isLoadingDetail ? '正在加载技能详情...' : detailData?.description || '暂无技能描述。'}
-          </div>
-
-          <div
-            className="mt-4 min-h-0 min-w-0 flex-1 overflow-auto rounded-[14px] p-3"
-            style={{
-              backgroundColor: '#e7ebf5',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55)',
-            }}
-          >
-            {isLoadingDetail ? (
-              <div className="text-sm text-low">加载中...</div>
-            ) : (
-              <ChatMarkdown
-                content={detailData?.content || '暂无内容。'}
-                maxWidth="100%"
-                textClassName="text-[13px] leading-5 text-normal/85"
-              />
-            )}
-          </div>
-          <div className="mt-3">
-            {detailError && <div className="text-sm text-error">{detailError}</div>}
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {detailData?.installedSkillId && (
-                <button
-                  type="button"
-                  onClick={() => void handleDeleteSkill()}
-                  disabled={isDeletingSkill}
-                  className={cn(
-                    'inline-flex h-10 items-center gap-1 rounded-2xl bg-[#fff1eb] px-4 text-sm !text-[#ff7f50]',
-                    isDeletingSkill && 'opacity-60 cursor-not-allowed'
-                  )}
-                  style={{ color: '#ff7f50' }}
-                >
-                  <TrashIcon size={16} />
-                  {isDeletingSkill ? '卸载中' : '卸载'}
-                </button>
-              )}
-
-              {detailData?.installedSkillId && detailData.enabled !== null && (
-                <button
-                  type="button"
-                  onClick={() => void handleToggleSkillEnabled()}
-                  disabled={isTogglingSkill}
-                  className={cn(
-                    'inline-flex h-10 items-center rounded-2xl bg-[#ebebef] px-4 text-sm text-normal',
-                    isTogglingSkill && 'opacity-60 cursor-not-allowed'
-                  )}
-                >
-                  {isTogglingSkill
-                    ? '更新中'
-                    : detailData.enabled
-                      ? '禁用'
-                      : '启用'}
-                </button>
-              )}
-            </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (isDetailInstallAction) {
-                    handleInstallFromDetail();
-                    return;
-                  }
-                  void handleEnableSkill();
-                }}
-                disabled={isLoadingDetail || (!isDetailInstallAction && isTryingSkill)}
-                className={cn(
-                  'inline-flex h-10 min-w-[136px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-black px-6 text-base font-medium text-white',
-                  isLoadingDetail || (!isDetailInstallAction && isTryingSkill)
-                    ? 'opacity-60 cursor-not-allowed'
-                    : 'hover:bg-black/85'
-                )}
-            >
-              {isDetailInstallAction ? (
-                <DownloadIcon size={16} weight="bold" />
-              ) : (
-                <PlayIcon size={16} />
-              )}
-              {isDetailInstallAction ? '安装' : isTryingSkill ? '处理中' : '启用'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
-  ) : null;
+  const detailPrimaryAction = detailTarget
+    ? {
+        label: isDetailInstallAction
+          ? '安装'
+          : isTryingSkill
+            ? '处理中'
+            : '启用',
+        onClick: () => {
+          if (isDetailInstallAction) {
+            handleInstallFromDetail();
+            return;
+          }
+          void handleEnableSkill();
+        },
+        disabled: isLoadingDetail || (!isDetailInstallAction && isTryingSkill),
+        icon: isDetailInstallAction ? (
+          <DownloadIcon size={16} weight="bold" />
+        ) : null,
+      }
+    : null;
 
   if (!isOpen) return null;
 
@@ -928,7 +817,9 @@ export function SkillsPanel({
               <h2 className="text-[52px] leading-[1.05] font-semibold tracking-tight text-normal">
                 技能
               </h2>
-              <p className="mt-3 text-base text-low">赋予 Codex 更强大的能力。</p>
+              <p className="mt-3 text-base text-low">
+                赋予 Codex 更强大的能力。
+              </p>
             </div>
 
             <div className="flex items-center gap-3 pt-1">
@@ -946,7 +837,9 @@ export function SkillsPanel({
                 onClick={() => {
                   setCustomSkillPath('');
                   setCustomSkillAgentId(
-                    selectedAgentId || runnerOptions[0]?.representativeAgentId || ''
+                    selectedAgentId ||
+                      runnerOptions[0]?.representativeAgentId ||
+                      ''
                   );
                   setIsCreateModalOpen(true);
                 }}
@@ -969,7 +862,9 @@ export function SkillsPanel({
                   'text-xs text-normal focus:outline-none'
                 )}
               >
-                {runnerOptions.length === 0 && <option value="">暂无 Agent</option>}
+                {runnerOptions.length === 0 && (
+                  <option value="">暂无 Agent</option>
+                )}
                 {runnerOptions.map((option) => (
                   <option key={option.key} value={option.key}>
                     {option.label}
@@ -980,7 +875,9 @@ export function SkillsPanel({
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {isLoadingInstalled && (
-                <div className="col-span-full text-sm text-low py-4">加载中...</div>
+                <div className="col-span-full text-sm text-low py-4">
+                  加载中...
+                </div>
               )}
 
               {!isLoadingInstalled && displayedInstalledSkills.length === 0 && (
@@ -1012,14 +909,20 @@ export function SkillsPanel({
                       <div className="flex items-center gap-2.5">
                         <SkillTileIcon name={skill.name} compact />
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-base font-medium text-normal">{skill.name}</div>
-                          <p className="truncate text-xs text-low">{skill.description || '暂无描述'}</p>
+                          <div className="truncate text-base font-medium text-normal">
+                            {skill.name}
+                          </div>
+                          <p className="truncate text-xs text-low">
+                            {skill.description || '暂无描述'}
+                          </p>
                         </div>
                         <div onClick={(event) => event.stopPropagation()}>
                           <ToggleSwitch
                             checked={assigned}
                             disabled={disabled}
-                            onClick={() => void handleToggleAgentSkill(skill.id)}
+                            onClick={() =>
+                              void handleToggleAgentSkill(skill.id)
+                            }
                           />
                         </div>
                       </div>
@@ -1051,7 +954,9 @@ export function SkillsPanel({
             >
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 {isLoadingMarket && (
-                  <div className="col-span-full text-sm text-low py-4">加载中...</div>
+                  <div className="col-span-full text-sm text-low py-4">
+                    加载中...
+                  </div>
                 )}
 
                 {!isLoadingMarket && displayedMarketSkills.length === 0 && (
@@ -1063,7 +968,8 @@ export function SkillsPanel({
                 {!isLoadingMarket &&
                   visibleMarketSkills.map((skill) => {
                     const marketKey = `${skill.source}:${skill.id}`;
-                    const isInstalling = isInstallingMarketSkillKey === marketKey;
+                    const isInstalling =
+                      isInstallingMarketSkillKey === marketKey;
 
                     return (
                       <div
@@ -1082,8 +988,12 @@ export function SkillsPanel({
                         <div className="flex items-center gap-2.5">
                           <SkillTileIcon name={skill.name} compact />
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-base font-medium text-normal">{skill.name}</div>
-                            <p className="truncate text-xs text-low">{skill.description || '暂无描述'}</p>
+                            <div className="truncate text-base font-medium text-normal">
+                              {skill.name}
+                            </div>
+                            <p className="truncate text-xs text-low">
+                              {skill.description || '暂无描述'}
+                            </p>
                           </div>
                           <button
                             type="button"
@@ -1118,15 +1028,61 @@ export function SkillsPanel({
           </section>
 
           {(installedError || marketError) && (
-            <div className="mt-2 text-sm text-error">{installedError ?? marketError}</div>
+            <div className="mt-2 text-sm text-error">
+              {installedError ?? marketError}
+            </div>
           )}
         </div>
       </div>
 
-      {detailModal &&
-        (portalContainer
-          ? createPortal(detailModal, portalContainer)
-          : detailModal)}
+      <SkillDetailModal
+        isOpen={Boolean(detailTarget)}
+        name={detailData?.name ?? detailTarget?.skill.name ?? ''}
+        description={detailData?.description}
+        content={detailData?.content}
+        sourceUrl={detailData?.sourceUrl}
+        isLoading={isLoadingDetail}
+        error={detailError}
+        onClose={closeDetail}
+        footerLeading={
+          <>
+            {detailData?.installedSkillId && (
+              <button
+                type="button"
+                onClick={() => void handleDeleteSkill()}
+                disabled={isDeletingSkill}
+                className={cn(
+                  'inline-flex h-10 items-center gap-1 rounded-2xl bg-[#fff1eb] px-4 text-sm !text-[#ff7f50]',
+                  isDeletingSkill && 'cursor-not-allowed opacity-60'
+                )}
+                style={{ color: '#ff7f50' }}
+              >
+                <TrashIcon size={16} />
+                {isDeletingSkill ? '卸载中' : '卸载'}
+              </button>
+            )}
+
+            {detailData?.installedSkillId && detailData.enabled !== null && (
+              <button
+                type="button"
+                onClick={() => void handleToggleSkillEnabled()}
+                disabled={isTogglingSkill}
+                className={cn(
+                  'inline-flex h-10 items-center rounded-2xl bg-[#ebebef] px-4 text-sm text-normal',
+                  isTogglingSkill && 'cursor-not-allowed opacity-60'
+                )}
+              >
+                {isTogglingSkill
+                  ? '更新中'
+                  : detailData.enabled
+                    ? '禁用'
+                    : '启用'}
+              </button>
+            )}
+          </>
+        }
+        primaryAction={detailPrimaryAction ?? undefined}
+      />
 
       {marketInstallTarget && (
         <div className="absolute inset-0 z-[75] flex items-center justify-center bg-black/30 p-5">
@@ -1143,15 +1099,14 @@ export function SkillsPanel({
               <label className="text-xs text-low">目标 Agent</label>
               <select
                 value={marketInstallAgentId}
-                onChange={(event) => setMarketInstallAgentId(event.target.value)}
+                onChange={(event) =>
+                  setMarketInstallAgentId(event.target.value)
+                }
                 className="chat-session-member-field w-full rounded-xl border bg-panel px-3 py-2 text-sm text-normal focus:outline-none"
               >
                 <option value="">请选择 Agent</option>
                 {runnerOptions.map((option) => (
-                  <option
-                    key={option.key}
-                    value={option.representativeAgentId}
-                  >
+                  <option key={option.key} value={option.representativeAgentId}>
                     {option.label}
                   </option>
                 ))}
@@ -1170,7 +1125,9 @@ export function SkillsPanel({
               <button
                 type="button"
                 onClick={() => void handleConfirmInstallWithAgent()}
-                disabled={!marketInstallAgentId || Boolean(isInstallingMarketSkillKey)}
+                disabled={
+                  !marketInstallAgentId || Boolean(isInstallingMarketSkillKey)
+                }
                 className={cn(
                   'inline-flex h-9 items-center gap-1 rounded-xl bg-black px-4 text-sm text-white',
                   !marketInstallAgentId || Boolean(isInstallingMarketSkillKey)
@@ -1209,10 +1166,7 @@ export function SkillsPanel({
               >
                 <option value="">暂不分配</option>
                 {runnerOptions.map((option) => (
-                  <option
-                    key={option.key}
-                    value={option.representativeAgentId}
-                  >
+                  <option key={option.key} value={option.representativeAgentId}>
                     {option.label}
                   </option>
                 ))}
@@ -1230,7 +1184,9 @@ export function SkillsPanel({
               <button
                 type="button"
                 onClick={() => void handleCreateSkillFromPath()}
-                disabled={isCreatingSkill || customSkillPath.trim().length === 0}
+                disabled={
+                  isCreatingSkill || customSkillPath.trim().length === 0
+                }
                 className={cn(
                   'inline-flex h-9 items-center gap-1 rounded-xl bg-[var(--chat-session-send-blue,#4f46e5)] px-4 text-sm text-white',
                   isCreatingSkill || customSkillPath.trim().length === 0

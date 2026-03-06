@@ -12,7 +12,7 @@
     "untitledSession": "제목 없는 세션",
     "sessionSection": "세션",
     "automation": "자동화",
-    "skills": "스킬",
+    "skills": "스킬 라이브러리",
     "archivedSection": "보관됨",
     "settingsInSidebar": "설정"
   },
@@ -101,6 +101,43 @@
     "workspacePathCannotBeModified": "워크스페이스 경로는 수정할 수 없습니다",
     "add": "추가",
     "save": "저장",
+    "skills": {
+      "label": "스킬",
+      "selected": "선택된 스킬",
+      "searchPlaceholder": "스킬 검색",
+      "loading": "스킬을 불러오는 중...",
+      "noCompatible": "{{runnerType}}에 호환되는 스킬이 없습니다.",
+      "noneAvailable": "사용 가능한 스킬이 없습니다.",
+      "noneInstalledForRunner": "{{runnerType}} Agent에는 설치된 스킬이 없습니다.",
+      "noneInstalled": "이 Agent에는 설치된 스킬이 없습니다.",
+      "collapsedCount": "+{{count}}",
+      "selectedCount": "{{count}}개 선택됨",
+      "noMatching": "일치하는 스킬이 없습니다.",
+      "remove": "{{name}} 제거",
+      "selectAction": "{{name}} 선택",
+      "unselectAction": "{{name}} 선택 해제",
+      "closeDetails": "{{name}} 세부정보 닫기",
+      "category": "카테고리",
+      "info": "정보",
+      "tags": "태그",
+      "content": "스킬 내용",
+      "detail": {
+        "viewDetails": "{{name}} 상세 보기",
+        "openSource": "원본 열기",
+        "loadingDescription": "스킬 상세 정보를 불러오는 중...",
+        "emptyDescription": "스킬 설명이 없습니다.",
+        "loadingContent": "불러오는 중...",
+        "emptyContent": "내용이 없습니다.",
+        "select": "선택",
+        "selecting": "선택 중..."
+      },
+      "errors": {
+        "load": "스킬을 불러오지 못했습니다.",
+        "assignedLoad": "할당된 스킬을 불러오지 못했습니다.",
+        "detail": "스킬 상세 정보를 불러오지 못했습니다.",
+        "update": "스킬 할당을 업데이트하지 못했습니다."
+      }
+    },
     "tabPreset": "프리셋 AI",
     "tabCustom": "커스텀 AI",
     "closePanel": "닫기",
@@ -110,6 +147,9 @@
     "addFromMemberPreset": "멤버 프리셋 추가",
     "importTeamPreset": "팀 프리셋 가져오기",
     "noEnabledPresets": "활성화된 프리셋이 없습니다. 설정 -> 프리셋에서 구성하세요.",
+    "presetSearchPlaceholder": "프리셋 AI 또는 팀 검색",
+    "noPresetSearchResults": "일치하는 프리셋 AI 또는 팀이 없습니다.",
+    "noPresetSearchResultsHint": "다른 키워드를 시도하거나 사용자 정의 AI로 전환하세요.",
     "importPreview": {
       "title": "팀 가져오기: {{teamName}}",
       "description": "다음 멤버가 이 세션에 추가됩니다:",
@@ -118,7 +158,22 @@
       "actionSkip": "이미 세션에 있음(건너뜀)",
       "confirmImport": "팀 가져오기",
       "cancel": "취소",
-      "importing": "가져오는 중..."
+      "importing": "가져오는 중...",
+      "previewEyebrow": "프리셋 미리보기",
+      "memberCounter": "멤버 {{index}} / {{total}}",
+      "membersLabel": "팀 멤버",
+      "switchHint": "스크롤하거나 멤버를 선택해 구성을 확인하세요.",
+      "sections": {
+        "basics": "기본 정보",
+        "basicsDescription": "이름, 실행기, 모델 프로필을 설정합니다.",
+        "prompt": "핵심 프롬프트",
+        "promptDescription": "역할, 톤, 실행 경계를 정의합니다.",
+        "environment": "환경 설정",
+        "environmentDescription": "워크스페이스 경로와 설치된 스킬을 관리합니다."
+      },
+      "promptBadge": "프롬프트 에디터",
+      "promptHint": "명확하고 구체적인 지시로 멤버의 동작을 정의하세요.",
+      "memberPage": "멤버 {{index}} / {{total}}로 전환"
     },
     "roleSettingsRequired": "역할 설정은 필수입니다.",
     "presetDisplay": {
