@@ -55,11 +55,11 @@ import {
 } from '../AgentAvatar';
 import {
   getLocalizedMemberPresetName,
-  getLocalizedMemberPresetNameById,
   getLocalizedTeamPresetName,
   type MemberPresetImportPlan,
 } from '../utils';
 import { AgentSkillsSection } from './AgentSkillsSection';
+import { TeamImportPreviewModal } from './TeamImportPreviewModal';
 
 const truncateByChars = (value: string, maxChars: number): string => {
   const chars = Array.from(value);
@@ -195,6 +195,83 @@ function WorkspacePathWithTooltip({ path }: { path: string }) {
   );
 }
 
+function SidebarEmptyState({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: Icon;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="chat-session-members-empty-state">
+      <div className="chat-session-members-empty-state-icon">
+        <Icon className="size-5" weight="duotone" />
+      </div>
+      <div className="chat-session-members-empty-state-title">{title}</div>
+      {description ? (
+        <div className="chat-session-members-empty-state-description">
+          {description}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PresetOptionCard({
+  icon: Icon,
+  title,
+  subtitle,
+  seed,
+  type,
+  disabled = false,
+  onClick,
+}: {
+  icon: Icon;
+  title: string;
+  subtitle: string;
+  seed: string;
+  type: 'member' | 'team';
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        'chat-session-member-preset-card',
+        type === 'team' && 'team',
+        disabled && 'opacity-60 cursor-not-allowed'
+      )}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <span
+        className={cn(
+          'chat-session-member-preset-avatar',
+          type === 'team' && 'team'
+        )}
+        style={getAgentAvatarStyle(seed)}
+      >
+        <Icon
+          className="chat-session-member-preset-avatar-icon"
+          weight="fill"
+        />
+      </span>
+
+      <span className="min-w-0 flex-1 text-left">
+        <span className="chat-session-member-preset-title">{title}</span>
+        <span className="chat-session-member-preset-subtitle">{subtitle}</span>
+      </span>
+
+      <span className="chat-session-member-preset-add">
+        <PlusIcon className="size-3.5" weight="bold" />
+      </span>
+    </button>
+  );
+}
+
 type AddMemberTab = 'preset' | 'custom';
 
 export interface AiMembersSidebarProps {
@@ -311,6 +388,7 @@ export function AiMembersSidebar({
   onAddMemberPreset,
   onImportTeamPreset,
   teamImportPlan,
+  teamImportName,
   isImportingTeam,
   onUpdateTeamImportPlanEntry,
   onConfirmTeamImport,
@@ -319,6 +397,7 @@ export function AiMembersSidebar({
   const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
   const [activeTab, setActiveTab] = useState<AddMemberTab>('preset');
+  const [presetSearchQuery, setPresetSearchQuery] = useState('');
   const [isTeamPresetsExpanded, setIsTeamPresetsExpanded] = useState(true);
   const [importPromptEditorIndex, setImportPromptEditorIndex] = useState<
     number | null
@@ -327,6 +406,21 @@ export function AiMembersSidebar({
 
   const hasPresets =
     enabledMemberPresets.length > 0 || enabledTeamPresets.length > 0;
+  const normalizedPresetSearch = presetSearchQuery.trim().toLowerCase();
+  const filteredMemberPresets = enabledMemberPresets.filter((preset) =>
+    getLocalizedMemberPresetName(preset, t)
+      .toLowerCase()
+      .includes(normalizedPresetSearch)
+  );
+  const filteredTeamPresets = enabledTeamPresets.filter((team) =>
+    getLocalizedTeamPresetName(team, t)
+      .toLowerCase()
+      .includes(normalizedPresetSearch)
+  );
+  const hasPresetSearchResults =
+    filteredMemberPresets.length > 0 || filteredTeamPresets.length > 0;
+  const shouldShowExpandedTeams =
+    isTeamPresetsExpanded || normalizedPresetSearch.length > 0;
 
   // When entering edit mode, switch to custom tab
   useEffect(() => {
@@ -357,45 +451,65 @@ export function AiMembersSidebar({
     [onUpdateTeamImportPlanEntry]
   );
 
+  const getImportPlanVariant = useCallback(
+    (toolsEnabled: JsonValue) =>
+      extractExecutorProfileVariant(toolsEnabled) ?? 'DEFAULT',
+    []
+  );
+
   const renderPresetTab = () => (
-    <div className="space-y-half">
-      {enabledMemberPresets.length > 0 && (
+    <div className="space-y-3">
+      {!editingMember && (
+        <div className="chat-session-member-search">
+          <MagnifyingGlassIcon className="chat-session-member-search-icon" />
+          <input
+            value={presetSearchQuery}
+            onChange={(event) => setPresetSearchQuery(event.target.value)}
+            placeholder={t('members.presetSearchPlaceholder')}
+            className="chat-session-member-search-input"
+          />
+        </div>
+      )}
+
+      {filteredMemberPresets.length > 0 && (
         <div>
-          <div className="flex items-center gap-1 text-xs text-low mb-1">
-            <UserPlusIcon className="size-3" />
+          <div className="chat-session-member-preset-group-title">
+            <UserPlusIcon className="size-3.5" />
             <span>{t('members.presetMemberSection')}</span>
           </div>
-          <div className="space-y-0.5 max-h-40 overflow-y-auto">
-            {enabledMemberPresets.map((preset) => {
+          <div className="space-y-2">
+            {filteredMemberPresets.map((preset) => {
               const RoleIcon = getPresetIcon(preset.id);
               return (
-                <button
+                <PresetOptionCard
                   key={preset.id}
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-sm border border-[#EEF2FF] px-2 py-1 text-left text-xs hover:bg-[#EEF2FF]"
+                  icon={RoleIcon}
+                  title={getLocalizedMemberPresetName(preset, t)}
+                  subtitle={t('members.presetMemberSection')}
+                  seed={getAgentAvatarSeed(
+                    preset.id,
+                    'PRESET_MEMBER',
+                    preset.name
+                  )}
                   onClick={() => onAddMemberPreset(preset)}
-                >
-                  <RoleIcon className="size-3.5 shrink-0 text-low" />
-                  <span className="font-medium text-normal truncate">
-                    {getLocalizedMemberPresetName(preset, t)}
-                  </span>
-                  <PlusIcon className="size-3 shrink-0 text-low ml-auto" />
-                </button>
+                  type="member"
+                />
               );
             })}
           </div>
         </div>
       )}
-      {enabledTeamPresets.length > 0 && (
+
+      {filteredTeamPresets.length > 0 && (
         <div>
-          <div className="flex items-center justify-between gap-1 text-xs text-low mb-1 mt-half">
-            <div className="flex items-center gap-1">
-              <UsersThreeIcon className="size-3" />
+          <div className="chat-session-member-preset-group-row">
+            <div className="chat-session-member-preset-group-title">
+              <UsersThreeIcon className="size-3.5" />
               <span>{t('members.presetTeamSection')}</span>
             </div>
             <button
               type="button"
-              className="inline-flex items-center justify-center rounded-xs p-0.5 text-low hover:text-normal hover:bg-secondary/50 transition-colors"
+              className="chat-session-member-preset-group-toggle"
               onClick={() => setIsTeamPresetsExpanded((expanded) => !expanded)}
               aria-label={
                 isTeamPresetsExpanded
@@ -417,24 +531,21 @@ export function AiMembersSidebar({
               />
             </button>
           </div>
-          {isTeamPresetsExpanded && (
-            <div className="space-y-0.5 max-h-40 overflow-y-auto">
-              {enabledTeamPresets.map((team) => {
+          {shouldShowExpandedTeams && (
+            <div className="space-y-2">
+              {filteredTeamPresets.map((team) => {
                 const TeamIcon = getTeamIcon(team.id);
                 return (
-                  <button
+                  <PresetOptionCard
                     key={team.id}
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-sm border border-[#EEF2FF] px-2 py-1 text-left text-xs hover:bg-[#EEF2FF]"
+                    icon={TeamIcon}
+                    title={getLocalizedTeamPresetName(team, t)}
+                    subtitle={t('members.presetTeamSection')}
+                    seed={getAgentAvatarSeed(team.id, 'PRESET_TEAM', team.name)}
                     onClick={() => onImportTeamPreset(team)}
                     disabled={!!teamImportPlan}
-                  >
-                    <TeamIcon className="size-3.5 shrink-0 text-low" />
-                    <span className="font-medium text-normal truncate">
-                      {getLocalizedTeamPresetName(team, t)}
-                    </span>
-                    <UsersThreeIcon className="size-3 shrink-0 text-low ml-auto" />
-                  </button>
+                    type="team"
+                  />
                 );
               })}
             </div>
@@ -442,233 +553,19 @@ export function AiMembersSidebar({
         </div>
       )}
 
-      {/* Team Import Preview (inline within preset tab) */}
-      {teamImportPlan && (
-        <div className="chat-session-member-import-preview px-1 py-2 space-y-2 mt-half">
-          <div className="chat-session-member-import-list space-y-3 max-h-[400px] overflow-y-auto">
-            {teamImportPlan.map((plan, index) => {
-              const planVariant =
-                extractExecutorProfileVariant(plan.toolsEnabled) ?? 'DEFAULT';
-              const planVariantOptions = getVariantOptions(plan.runnerType);
-
-              return (
-                <div
-                  key={`${plan.presetId}-${index}`}
-                  className="chat-session-member-import-card px-2 py-2 space-y-1.5"
-                >
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="font-medium truncate max-w-[180px]">
-                      {getLocalizedMemberPresetNameById(
-                        plan.presetId,
-                        plan.presetName || plan.presetId,
-                        t
-                      )}
-                    </span>
-                    <span
-                      className={cn(
-                        'size-1.5 rounded-full shrink-0',
-                        plan.action === 'create' && 'bg-success',
-                        plan.action === 'reuse' && 'bg-brand',
-                        plan.action === 'skip' && 'bg-low'
-                      )}
-                    />
-                    <span className="text-low truncate">
-                      {plan.action === 'create' &&
-                        t('members.importPreview.actionCreate')}
-                      {plan.action === 'reuse' &&
-                        t('members.importPreview.actionReuse')}
-                      {plan.action === 'skip' &&
-                        t('members.importPreview.actionSkip')}
-                    </span>
-                  </div>
-                  {plan.action !== 'skip' ? (
-                    <div className="space-y-1">
-                      <div className="space-y-0.5">
-                        <label className="text-[11px] text-low">
-                          {t('members.memberNameLabel')}
-                        </label>
-                        <input
-                          value={plan.finalName}
-                          onChange={(event) =>
-                            onUpdateTeamImportPlanEntry(index, {
-                              finalName: event.target.value,
-                            })
-                          }
-                          placeholder={t('members.memberNamePlaceholder')}
-                          disabled={isImportingTeam}
-                          className={cn(
-                            'chat-session-member-field w-full rounded-sm border bg-panel px-2 py-1',
-                            'text-xs text-normal focus:outline-none disabled:opacity-50'
-                          )}
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <label className="text-[11px] text-low">
-                          {t('members.baseCodingAgent')}
-                        </label>
-                        <select
-                          value={plan.runnerType}
-                          onChange={(event) =>
-                            onUpdateTeamImportPlanEntry(index, {
-                              runnerType: event.target.value,
-                            })
-                          }
-                          disabled={
-                            isImportingTeam ||
-                            isCheckingAvailability ||
-                            enabledRunnerTypes.length === 0
-                          }
-                          className={cn(
-                            'chat-session-member-field w-full rounded-sm border bg-panel px-2 py-1',
-                            'text-xs text-normal focus:outline-none disabled:opacity-50'
-                          )}
-                        >
-                          {enabledRunnerTypes.length === 0 && (
-                            <option value="">
-                              {isCheckingAvailability
-                                ? t('members.checkingAgents')
-                                : t('members.noLocalAgentsDetected')}
-                            </option>
-                          )}
-                          {availableRunnerTypes.map((runner) => (
-                            <option
-                              key={runner}
-                              value={runner}
-                              disabled={!isRunnerAvailable(runner)}
-                            >
-                              {toPrettyCase(runner)}
-                              {availabilityLabel(runner)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      {planVariantOptions.length > 0 && (
-                        <div className="space-y-0.5">
-                          <label className="text-[11px] text-low">
-                            {t('members.modelVariant')}
-                          </label>
-                          <select
-                            value={planVariant}
-                            onChange={(event) =>
-                              handleImportPlanVariantChange(
-                                index,
-                                event.target.value,
-                                plan.toolsEnabled
-                              )
-                            }
-                            disabled={isImportingTeam}
-                            className={cn(
-                              'chat-session-member-field w-full rounded-sm border bg-panel px-2 py-1',
-                              'text-xs text-normal focus:outline-none disabled:opacity-50'
-                            )}
-                          >
-                            {planVariantOptions.map((variant) => (
-                              <option key={variant} value={variant}>
-                                {getVariantLabel(plan.runnerType, variant)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                      <div className="space-y-0.5">
-                        <div className="flex items-center justify-between gap-1">
-                          <label className="text-[11px] text-low">
-                            {t('members.systemPrompt')}
-                          </label>
-                          <button
-                            type="button"
-                            className="chat-session-member-expand-btn text-[11px]"
-                            onClick={() => setImportPromptEditorIndex(index)}
-                            disabled={isImportingTeam}
-                          >
-                            {t('members.expand')}
-                          </button>
-                        </div>
-                        <textarea
-                          value={plan.systemPrompt}
-                          onChange={(event) =>
-                            onUpdateTeamImportPlanEntry(index, {
-                              systemPrompt: event.target.value,
-                            })
-                          }
-                          rows={2}
-                          placeholder={t('members.systemPromptPlaceholder')}
-                          disabled={isImportingTeam}
-                          className={cn(
-                            'chat-session-member-field w-full resize-none rounded-sm border bg-panel px-2 py-1',
-                            'text-xs text-normal focus:outline-none disabled:opacity-50'
-                          )}
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <label className="text-[11px] text-low">
-                          {t('members.workspacePath')}
-                        </label>
-                        <input
-                          value={plan.workspacePath}
-                          onChange={(event) =>
-                            onUpdateTeamImportPlanEntry(index, {
-                              workspacePath: event.target.value,
-                            })
-                          }
-                          placeholder={workspacePathPlaceholder}
-                          disabled={isImportingTeam}
-                          className={cn(
-                            'chat-session-member-field w-full rounded-sm border bg-panel px-2 py-1',
-                            'text-xs text-normal focus:outline-none disabled:opacity-50'
-                          )}
-                        />
-                      </div>
-                      <AgentSkillsSection
-                        agentId={plan.action === 'reuse' ? plan.agentId : null}
-                        runnerType={plan.runnerType || null}
-                        selectedSkillIds={plan.selectedSkillIds ?? []}
-                        onSelectedSkillIdsChange={(skillIds) =>
-                          onUpdateTeamImportPlanEntry(index, {
-                            selectedSkillIds: skillIds,
-                          })
-                        }
-                        readOnly={isArchived || isImportingTeam}
-                        title="Skills"
-                        maxHeightClass="max-h-32"
-                      />
-                    </div>
-                  ) : (
-                    <div className="text-xs text-low truncate">
-                      @{plan.finalName}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <PrimaryButton
-              variant="tertiary"
-              value={t('members.importPreview.cancel')}
-              onClick={onCancelTeamImport}
-              disabled={isImportingTeam}
-              className="chat-session-member-btn cancel"
-            />
-            <PrimaryButton
-              value={
-                isImportingTeam
-                  ? t('members.importPreview.importing')
-                  : t('members.importPreview.confirmImport')
-              }
-              actionIcon={isImportingTeam ? 'spinner' : UsersThreeIcon}
-              onClick={onConfirmTeamImport}
-              disabled={isImportingTeam || isArchived}
-              className="chat-session-member-btn chat-session-member-btn-primary"
-            />
-          </div>
-        </div>
+      {!hasPresets && (
+        <SidebarEmptyState
+          icon={UserPlusIcon}
+          title={t('members.noEnabledPresets')}
+        />
       )}
 
-      {!hasPresets && (
-        <div className="text-xs text-low py-base text-center">
-          {t('members.noEnabledPresets')}
-        </div>
+      {hasPresets && !hasPresetSearchResults && (
+        <SidebarEmptyState
+          icon={MagnifyingGlassIcon}
+          title={t('members.noPresetSearchResults')}
+          description={t('members.noPresetSearchResultsHint')}
+        />
       )}
 
       {memberError && <div className="text-xs text-error">{memberError}</div>}
@@ -689,9 +586,6 @@ export function AiMembersSidebar({
     <div className="space-y-half">
       <div className="text-xs text-low">{t('members.memberNameHint')}</div>
       <div className="space-y-half">
-        <label className="text-xs text-low">
-          {t('members.memberNameLabel')}
-        </label>
         <input
           value={newMemberName}
           onChange={(event) => onNameChange(event.target.value)}
@@ -819,11 +713,6 @@ export function AiMembersSidebar({
             editingMember && 'opacity-50 cursor-not-allowed'
           )}
         />
-        {editingMember && (
-          <p className="text-xs text-low">
-            {t('members.workspacePathCannotBeModified')}
-          </p>
-        )}
       </div>
       {/* Skills section */}
       <AgentSkillsSection
@@ -875,14 +764,16 @@ export function AiMembersSidebar({
         </div>
         <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto p-base space-y-base">
           {!activeSessionId && (
-            <div className="chat-session-members-empty text-xs text-low mt-base">
-              {t('members.selectSessionToManage')}
-            </div>
+            <SidebarEmptyState
+              icon={UsersThreeIcon}
+              title={t('members.selectSessionToManage')}
+            />
           )}
           {activeSessionId && sessionMembers.length === 0 && (
-            <div className="chat-session-members-empty text-xs text-low mt-base">
-              {t('members.noMembersYet')}
-            </div>
+            <SidebarEmptyState
+              icon={UserPlusIcon}
+              title={t('members.noMembersYet')}
+            />
           )}
 
           {sessionMembers.map(({ agent, sessionAgent }) => {
@@ -996,14 +887,14 @@ export function AiMembersSidebar({
               <div className="chat-session-member-form-panel rounded-sm p-base space-y-half">
                 {/* Tab bar - only show when not editing */}
                 {!editingMember && (
-                  <div className="chat-session-member-form-tabs flex gap-1 rounded-sm p-1">
+                  <div className="chat-session-member-form-tabs flex gap-1 rounded-xl p-1">
                     <button
                       type="button"
                       className={cn(
-                        'flex-1 text-xs py-1 text-center rounded-sm transition-colors',
+                        'chat-session-member-form-tab flex-1 text-xs py-2 text-center rounded-lg transition-all',
                         activeTab === 'preset'
-                          ? 'text-normal bg-[#EEF2FF] font-medium'
-                          : 'text-low hover:text-normal hover:bg-[#EEF2FF]'
+                          ? 'is-active text-white font-semibold'
+                          : 'text-low hover:text-normal'
                       )}
                       onClick={() => setActiveTab('preset')}
                     >
@@ -1012,10 +903,10 @@ export function AiMembersSidebar({
                     <button
                       type="button"
                       className={cn(
-                        'flex-1 text-xs py-1 text-center rounded-sm transition-colors',
+                        'chat-session-member-form-tab flex-1 text-xs py-2 text-center rounded-lg transition-all',
                         activeTab === 'custom'
-                          ? 'text-normal bg-[#EEF2FF] font-medium'
-                          : 'text-low hover:text-normal hover:bg-[#EEF2FF]'
+                          ? 'is-active text-white font-semibold'
+                          : 'text-low hover:text-normal'
                       )}
                       onClick={() => setActiveTab('custom')}
                     >
@@ -1053,6 +944,27 @@ export function AiMembersSidebar({
         }}
         onClose={() => setImportPromptEditorIndex(null)}
         showFileImport={false}
+      />
+      <TeamImportPreviewModal
+        isOpen={Boolean(teamImportPlan)}
+        importName={teamImportName}
+        importPlan={teamImportPlan}
+        isArchived={isArchived}
+        isImportingTeam={isImportingTeam}
+        isCheckingAvailability={isCheckingAvailability}
+        enabledRunnerTypes={enabledRunnerTypes}
+        availableRunnerTypes={availableRunnerTypes}
+        isRunnerAvailable={isRunnerAvailable}
+        availabilityLabel={availabilityLabel}
+        workspacePathPlaceholder={workspacePathPlaceholder}
+        getVariantOptions={getVariantOptions}
+        getVariantLabel={getVariantLabel}
+        getPlanVariant={getImportPlanVariant}
+        onVariantChange={handleImportPlanVariantChange}
+        onUpdatePlanEntry={onUpdateTeamImportPlanEntry}
+        onExpandPromptEditor={setImportPromptEditorIndex}
+        onConfirm={onConfirmTeamImport}
+        onCancel={onCancelTeamImport}
       />
     </>
   );

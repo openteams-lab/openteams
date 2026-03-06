@@ -12,7 +12,7 @@
     "untitledSession": "未命名会话",
     "sessionSection": "会话",
     "automation": "自动化",
-    "skills": "技能",
+    "skills": "技能库",
     "archivedSection": "已归档",
     "settingsInSidebar": "设置"
   },
@@ -101,6 +101,43 @@
     "workspacePathCannotBeModified": "工作区路径无法修改",
     "add": "添加",
     "save": "保存",
+    "skills": {
+      "label": "技能",
+      "selected": "已选技能",
+      "searchPlaceholder": "搜索技能",
+      "loading": "正在加载技能...",
+      "noCompatible": "{{runnerType}} 没有兼容的技能。",
+      "noneAvailable": "没有可用的技能。",
+      "noneInstalledForRunner": "{{runnerType}} Agent没有安装任何技能。",
+      "noneInstalled": "当前Agent没有安装任何技能。",
+      "collapsedCount": "+{{count}}",
+      "selectedCount": "已选择 {{count}} 项",
+      "noMatching": "没有匹配的技能。",
+      "remove": "移除 {{name}}",
+      "selectAction": "选择 {{name}}",
+      "unselectAction": "取消选择 {{name}}",
+      "closeDetails": "关闭 {{name}} 详情",
+      "category": "分类",
+      "info": "信息",
+      "tags": "标签",
+      "content": "技能内容",
+      "detail": {
+        "viewDetails": "查看 {{name}} 详情",
+        "openSource": "打开来源",
+        "loadingDescription": "正在加载技能详情...",
+        "emptyDescription": "暂无技能描述。",
+        "loadingContent": "加载中...",
+        "emptyContent": "暂无内容。",
+        "select": "选中",
+        "selecting": "处理中..."
+      },
+      "errors": {
+        "load": "加载技能失败。",
+        "assignedLoad": "加载已分配技能失败。",
+        "detail": "加载技能详情失败。",
+        "update": "更新技能分配失败。"
+      }
+    },
     "tabPreset": "预设AI",
     "tabCustom": "自定义AI",
     "closePanel": "关闭",
@@ -110,6 +147,9 @@
     "addFromMemberPreset": "添加成员预设",
     "importTeamPreset": "导入团队预设",
     "noEnabledPresets": "没有已启用的预设。请在 设置 -> 预设 中配置。",
+    "presetSearchPlaceholder": "搜索预设 AI 或团队",
+    "noPresetSearchResults": "没有匹配的预设 AI 或团队。",
+    "noPresetSearchResultsHint": "试试其他关键词，或切换到自定义AI。",
     "importPreview": {
       "title": "导入团队：{{teamName}}",
       "description": "以下成员将加入此会话：",
@@ -118,7 +158,22 @@
       "actionSkip": "已在会话中（将跳过）",
       "confirmImport": "导入团队",
       "cancel": "取消",
-      "importing": "导入中..."
+      "importing": "导入中...",
+      "previewEyebrow": "预设预览",
+      "memberCounter": "成员 {{index}} / {{total}}",
+      "membersLabel": "团队成员",
+      "switchHint": "可滚轮切换，或直接选择成员查看配置。",
+      "sections": {
+        "basics": "基础信息",
+        "basicsDescription": "身份、执行器与模型配置。",
+        "prompt": "核心设定",
+        "promptDescription": "定义角色、语气与执行边界。",
+        "environment": "环境配置",
+        "environmentDescription": "工作区路径与已安装技能。"
+      },
+      "promptBadge": "Prompt 编辑器",
+      "promptHint": "使用清晰、明确的指令来约束成员行为。",
+      "memberPage": "切换到第{{index}}个成员，共{{total}}个"
     },
     "roleSettingsRequired": "角色设定为必填项。",
     "presetDisplay": {

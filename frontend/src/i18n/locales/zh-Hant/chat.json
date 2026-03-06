@@ -12,7 +12,7 @@
     "untitledSession": "未命名會話",
     "sessionSection": "會話",
     "automation": "自動化",
-    "skills": "技能",
+    "skills": "技能庫",
     "archivedSection": "已歸檔",
     "settingsInSidebar": "設定"
   },
@@ -101,6 +101,43 @@
     "workspacePathCannotBeModified": "工作區路徑無法修改",
     "add": "新增",
     "save": "儲存",
+    "skills": {
+      "label": "技能",
+      "selected": "已選技能",
+      "searchPlaceholder": "搜尋技能",
+      "loading": "正在載入技能...",
+      "noCompatible": "{{runnerType}} 沒有相容的技能。",
+      "noneAvailable": "沒有可用的技能。",
+      "noneInstalledForRunner": "{{runnerType}} Agent沒有安裝任何技能。",
+      "noneInstalled": "目前Agent沒有安裝任何技能。",
+      "collapsedCount": "+{{count}}",
+      "selectedCount": "已選擇 {{count}} 項",
+      "noMatching": "沒有相符的技能。",
+      "remove": "移除 {{name}}",
+      "selectAction": "選擇 {{name}}",
+      "unselectAction": "取消選擇 {{name}}",
+      "closeDetails": "關閉 {{name}} 詳情",
+      "category": "分類",
+      "info": "資訊",
+      "tags": "標籤",
+      "content": "技能內容",
+      "errors": {
+        "load": "載入技能失敗。",
+        "assignedLoad": "載入已指派技能失敗。",
+        "update": "更新技能指派失敗。",
+        "detail": "載入技能詳情失敗。"
+      },
+      "detail": {
+        "viewDetails": "檢視 {{name}} 詳情",
+        "openSource": "打開來源",
+        "loadingDescription": "正在載入技能詳情...",
+        "emptyDescription": "暫無技能描述。",
+        "loadingContent": "載入中...",
+        "emptyContent": "暫無內容。",
+        "select": "選取",
+        "selecting": "處理中..."
+      }
+    },
     "tabPreset": "預設AI",
     "tabCustom": "自訂AI",
     "closePanel": "關閉",
@@ -110,6 +147,9 @@
     "addFromMemberPreset": "新增成員預設",
     "importTeamPreset": "匯入團隊預設",
     "noEnabledPresets": "沒有已啟用的預設。請在設定 -> 預設中進行設定。",
+    "presetSearchPlaceholder": "搜尋預設 AI 或團隊",
+    "noPresetSearchResults": "沒有符合的預設 AI 或團隊。",
+    "noPresetSearchResultsHint": "試試其他關鍵字，或切換到自訂AI。",
     "importPreview": {
       "title": "匯入團隊：{{teamName}}",
       "description": "以下成員將加入此會話：",
@@ -118,7 +158,22 @@
       "actionSkip": "已在會話中（將略過）",
       "confirmImport": "匯入團隊",
       "cancel": "取消",
-      "importing": "匯入中..."
+      "importing": "匯入中...",
+      "previewEyebrow": "預設預覽",
+      "memberCounter": "成員 {{index}} / {{total}}",
+      "membersLabel": "團隊成員",
+      "switchHint": "可用滾輪切換，或直接選擇成員查看設定。",
+      "sections": {
+        "basics": "基礎資訊",
+        "basicsDescription": "身份、執行器與模型配置。",
+        "prompt": "核心設定",
+        "promptDescription": "定義角色、語氣與執行邊界。",
+        "environment": "環境配置",
+        "environmentDescription": "工作區路徑與已安裝技能。"
+      },
+      "promptBadge": "Prompt 編輯器",
+      "promptHint": "使用清晰、明確的指令來約束成員行為。",
+      "memberPage": "切換到第{{index}}個成員，共{{total}}個"
     },
     "roleSettingsRequired": "角色設定為必填欄位。",
     "presetDisplay": {
