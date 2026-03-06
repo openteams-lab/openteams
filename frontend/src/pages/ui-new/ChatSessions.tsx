@@ -626,7 +626,6 @@ export function ChatSessions() {
     setEditingMemberInitialSkillIds([]);
     setMemberError(null);
     setEditingMember(null);
-    setIsSkillsPanelOpen(false);
     setLogRunId(null);
     setLogContent('');
     setLogError(null);
@@ -642,11 +641,16 @@ export function ChatSessions() {
     setPromptFileLoading(false);
     setTeamImportPlan(null);
     setTeamImportName(null);
-  }, [activeSessionId, resetInput, resetDiffViewer, setReplyToMessage]);
+  }, [
+    activeSessionId,
+    resetInput,
+    resetDiffViewer,
+    setReplyToMessage,
+  ]);
 
   // Navigate to first session if needed
   useEffect(() => {
-    if (isSessionsLoading) return;
+    if (isSessionsLoading || isSkillsPanelOpen) return;
 
     if (!sessionId && sortedSessions.length > 0) {
       navigate(`/chat/${sortedSessions[0].id}`, { replace: true });
@@ -665,7 +669,7 @@ export function ChatSessions() {
     ) {
       navigate(`/chat/${sortedSessions[0].id}`, { replace: true });
     }
-  }, [isSessionsLoading, navigate, sessionId, sortedSessions]);
+  }, [isSessionsLoading, isSkillsPanelOpen, navigate, sessionId, sortedSessions]);
 
   useEffect(() => {
     const nextUpdatedAtById = new Map(
@@ -2471,6 +2475,7 @@ export function ChatSessions() {
   const skillsPanelLeftOffset = isLeftSidebarCollapsed
     ? COLLAPSED_LEFT_SIDEBAR_WIDTH
     : leftSidebarWidth + 1;
+  const sidebarActiveSessionId = isSkillsPanelOpen ? null : activeSessionId;
 
   return (
     <div className="chat-session-page relative flex h-full min-h-0 overflow-hidden select-none">
@@ -2478,7 +2483,7 @@ export function ChatSessions() {
       <SessionListSidebar
         activeSessions={activeSessions}
         archivedSessions={archivedSessions}
-        activeSessionId={activeSessionId}
+        activeSessionId={sidebarActiveSessionId}
         unreadSessionIds={unreadSessionIds}
         showArchived={showArchived}
         onToggleArchived={() => setShowArchived((prev) => !prev)}
@@ -2489,6 +2494,7 @@ export function ChatSessions() {
             next.delete(id);
             return next;
           });
+          setIsSkillsPanelOpen(false);
           navigate(`/chat/${id}`);
         }}
         onCreateSession={() => createSession.mutate()}
@@ -2497,7 +2503,14 @@ export function ChatSessions() {
           SettingsDialog.show({ initialSection: 'presets' });
         }}
         onOpenSkills={() => {
-          setIsSkillsPanelOpen((prev) => !prev);
+          if (isSkillsPanelOpen) {
+            setIsSkillsPanelOpen(false);
+            return;
+          }
+          setIsSkillsPanelOpen(true);
+          if (sessionId) {
+            navigate('/chat');
+          }
         }}
         onOpenSettings={() => {
           SettingsDialog.show();
