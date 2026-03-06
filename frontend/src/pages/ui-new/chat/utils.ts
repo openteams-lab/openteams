@@ -648,6 +648,7 @@ export interface MemberPresetImportPlan {
   finalName: string;
   systemPrompt: string;
   toolsEnabled: JsonValue;
+  selectedSkillIds: string[];
   action: MemberPresetImportAction;
   reason: string;
   agentId: string | null;
@@ -732,6 +733,7 @@ export function buildMemberPresetImportPlan({
       workspacePath:
         preset.default_workspace_path?.trim() ||
         getSessionWorkspacePath(sessionId, presetName),
+      selectedSkillIds: [],
     };
   }
 
@@ -749,5 +751,6 @@ export function buildMemberPresetImportPlan({
     workspacePath:
       preset.default_workspace_path?.trim() ||
       getSessionWorkspacePath(sessionId, finalName),
+    selectedSkillIds: [],
   };
 }

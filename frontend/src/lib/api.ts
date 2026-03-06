@@ -156,6 +156,11 @@ export type Err<E> = { success: false; error: E | undefined; message?: string };
 // Result type for endpoints that need typed errors
 export type Result<T, E> = Ok<T> | Err<E>;
 
+interface BuiltinSkillsStats {
+  total_skills: number;
+  categories: string[];
+}
+
 // Special handler for Result-returning endpoints
 const handleApiResponseAsResult = async <T, E>(
   response: Response
@@ -1872,6 +1877,38 @@ export const chatApi = {
     const url = `/api/chat/registry/skills/${skillId}/install${paramStr ? '?' + paramStr : ''}`;
     const response = await makeRequest(url, { method: 'POST' });
     return handleApiResponse<ChatSkill>(response);
+  },
+
+  listBuiltinSkills: async (params?: {
+    category?: string;
+    agent?: string;
+    search?: string;
+  }): Promise<RemoteSkillMeta[]> => {
+    const query = new URLSearchParams();
+    if (params?.category) query.set('category', params.category);
+    if (params?.agent) query.set('agent', params.agent);
+    if (params?.search) query.set('search', params.search);
+    const response = await makeRequest(
+      `/api/chat/builtin/skills${query.toString() ? `?${query.toString()}` : ''}`
+    );
+    return handleApiResponse<RemoteSkillMeta[]>(response);
+  },
+
+  getBuiltinSkill: async (skillId: string): Promise<RemoteSkillPackage> => {
+    const response = await makeRequest(`/api/chat/builtin/skills/${skillId}`);
+    return handleApiResponse<RemoteSkillPackage>(response);
+  },
+
+  installBuiltinSkill: async (skillId: string): Promise<ChatSkill> => {
+    const response = await makeRequest(`/api/chat/builtin/skills/${skillId}/install`, {
+      method: 'POST',
+    });
+    return handleApiResponse<ChatSkill>(response);
+  },
+
+  getBuiltinSkillsStats: async (): Promise<BuiltinSkillsStats> => {
+    const response = await makeRequest('/api/chat/builtin/skills/stats');
+    return handleApiResponse<BuiltinSkillsStats>(response);
   },
 };
 

@@ -26,6 +26,7 @@ export interface SessionListSidebarProps {
   onOpenAutomation: () => void;
   onOpenSkills: () => void;
   onOpenSettings: () => void;
+  isSkillsActive?: boolean;
   width: number;
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
@@ -44,6 +45,7 @@ export function SessionListSidebar({
   onOpenAutomation,
   onOpenSkills,
   onOpenSettings,
+  isSkillsActive = false,
   width,
   isCollapsed,
   onToggleCollapsed,
@@ -203,7 +205,10 @@ export function SessionListSidebar({
             <button
               type="button"
               onClick={onOpenSkills}
-              className="chat-session-function-btn"
+              className={cn(
+                'chat-session-function-btn',
+                isSkillsActive && 'active'
+              )}
               aria-label={t('sidebar.skills', { defaultValue: 'Skills' })}
               title={t('sidebar.skills', { defaultValue: 'Skills' })}
             >
