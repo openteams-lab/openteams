@@ -12,7 +12,7 @@
     "untitledSession": "Untitled session",
     "sessionSection": "Sessions",
     "automation": "Automations",
-    "skills": "Skills",
+    "skills": "Skills Library",
     "archivedSection": "Archived",
     "settingsInSidebar": "Settings"
   },
@@ -102,6 +102,43 @@
     "workspacePathCannotBeModified": "Workspace path cannot be modified",
     "add": "Add",
     "save": "Save",
+    "skills": {
+      "label": "Skills",
+      "selected": "Selected skills",
+      "searchPlaceholder": "Search skills",
+      "loading": "Loading skills...",
+      "noCompatible": "No compatible skills for {{runnerType}}.",
+      "noneAvailable": "No skills available.",
+      "noneInstalledForRunner": "{{runnerType}} Agent has no installed skills.",
+      "noneInstalled": "This Agent has no installed skills.",
+      "collapsedCount": "+{{count}}",
+      "selectedCount": "{{count}} selected",
+      "noMatching": "No matching skills.",
+      "remove": "Remove {{name}}",
+      "selectAction": "Select {{name}}",
+      "unselectAction": "Unselect {{name}}",
+      "closeDetails": "Close {{name}} details",
+      "category": "Category",
+      "info": "Info",
+      "tags": "Tags",
+      "content": "Skill Content",
+      "detail": {
+        "viewDetails": "View {{name}} details",
+        "openSource": "Open source",
+        "loadingDescription": "Loading skill details...",
+        "emptyDescription": "No skill description.",
+        "loadingContent": "Loading...",
+        "emptyContent": "No content.",
+        "select": "Select",
+        "selecting": "Selecting..."
+      },
+      "errors": {
+        "load": "Failed to load skills.",
+        "assignedLoad": "Failed to load assigned skills.",
+        "detail": "Failed to load skill details.",
+        "update": "Failed to update skill assignment."
+      }
+    },
     "tabPreset": "Preset AI",
     "tabCustom": "Custom AI",
     "closePanel": "Close",
@@ -111,6 +148,9 @@
     "addFromMemberPreset": "Add member preset",
     "importTeamPreset": "Import team preset",
     "noEnabledPresets": "No enabled presets. Configure them in Settings -> Presets.",
+    "presetSearchPlaceholder": "Search preset AI or teams",
+    "noPresetSearchResults": "No matching preset AI or teams.",
+    "noPresetSearchResultsHint": "Try another keyword or switch to Custom AI.",
     "importPreview": {
       "title": "Import Team: {{teamName}}",
       "description": "The following members will be added to this session:",
@@ -119,7 +159,22 @@
       "actionSkip": "already in session (will be skipped)",
       "confirmImport": "Import Team",
       "cancel": "Cancel",
-      "importing": "Importing..."
+      "importing": "Importing...",
+      "previewEyebrow": "Preset Preview",
+      "memberCounter": "Member {{index}} of {{total}}",
+      "membersLabel": "Team Members",
+      "switchHint": "Scroll or select a member to review its configuration.",
+      "sections": {
+        "basics": "Basic Setup",
+        "basicsDescription": "Identity, runner and model profile.",
+        "prompt": "Core Prompt",
+        "promptDescription": "Define the role, tone and execution boundaries.",
+        "environment": "Environment",
+        "environmentDescription": "Workspace path and installed skills."
+      },
+      "promptBadge": "Prompt Editor",
+      "promptHint": "Use precise instructions to shape the member's behavior.",
+      "memberPage": "Switch to member {{index}} of {{total}}"
     },
     "presetDisplay": {
       "members": {

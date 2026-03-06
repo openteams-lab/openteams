@@ -1,8 +1,6 @@
 use axum::{Json, extract::State, response::Json as ResponseJson};
 use db::models::{
-    analytics::{
-        track_skill_assign, track_skill_disable, track_skill_enable, track_skill_install,
-    },
+    analytics::{track_skill_assign, track_skill_disable, track_skill_enable, track_skill_install},
     chat_agent_skill::{AssignSkillToAgent, ChatAgentSkill, UpdateAgentSkill},
     chat_skill::{ChatSkill, CreateChatSkill, UpdateChatSkill},
 };

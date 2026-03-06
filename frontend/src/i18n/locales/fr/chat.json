@@ -12,7 +12,7 @@
     "untitledSession": "Session sans titre",
     "sessionSection": "Sessions",
     "automation": "Automatisations",
-    "skills": "Compétences",
+    "skills": "Bibliothèque de compétences",
     "archivedSection": "Archivées",
     "settingsInSidebar": "Paramètres"
   },
@@ -101,6 +101,43 @@
     "workspacePathCannotBeModified": "Le chemin de l'espace de travail ne peut pas être modifié",
     "add": "Ajouter",
     "save": "Enregistrer",
+    "skills": {
+      "label": "Compétences",
+      "selected": "Compétences sélectionnées",
+      "searchPlaceholder": "Rechercher des compétences",
+      "loading": "Chargement des compétences...",
+      "noCompatible": "Aucune compétence compatible pour {{runnerType}}.",
+      "noneAvailable": "Aucune compétence disponible.",
+      "noneInstalledForRunner": "L'Agent {{runnerType}} n'a aucune compétence installée.",
+      "noneInstalled": "Cet Agent n'a aucune compétence installée.",
+      "collapsedCount": "+{{count}}",
+      "selectedCount": "{{count}} sélectionnées",
+      "noMatching": "Aucune compétence correspondante.",
+      "remove": "Retirer {{name}}",
+      "selectAction": "Sélectionner {{name}}",
+      "unselectAction": "Désélectionner {{name}}",
+      "closeDetails": "Fermer les détails de {{name}}",
+      "category": "Catégorie",
+      "info": "Infos",
+      "tags": "Tags",
+      "content": "Contenu de la compétence",
+      "detail": {
+        "viewDetails": "Voir les détails de {{name}}",
+        "openSource": "Ouvrir la source",
+        "loadingDescription": "Chargement des détails de la compétence...",
+        "emptyDescription": "Aucune description de la compétence.",
+        "loadingContent": "Chargement...",
+        "emptyContent": "Aucun contenu.",
+        "select": "Sélectionner",
+        "selecting": "Sélection en cours..."
+      },
+      "errors": {
+        "load": "Échec du chargement des compétences.",
+        "assignedLoad": "Échec du chargement des compétences attribuées.",
+        "detail": "Échec du chargement des détails de la compétence.",
+        "update": "Échec de la mise à jour de l'attribution des compétences."
+      }
+    },
     "tabPreset": "IA prédéfinie",
     "tabCustom": "IA personnalisée",
     "closePanel": "Fermer",
@@ -110,6 +147,9 @@
     "addFromMemberPreset": "Ajouter un préréglage de membre",
     "importTeamPreset": "Importer un préréglage d'équipe",
     "noEnabledPresets": "Aucun préréglage activé. Configurez-les dans Paramètres -> Préréglages.",
+    "presetSearchPlaceholder": "Rechercher des IA préréglées ou des équipes",
+    "noPresetSearchResults": "Aucune IA préréglée ou équipe correspondante.",
+    "noPresetSearchResultsHint": "Essayez un autre mot-clé ou passez à une IA personnalisée.",
     "importPreview": {
       "title": "Importer l'équipe : {{teamName}}",
       "description": "Les membres suivants seront ajoutés à cette session :",
@@ -118,7 +158,22 @@
       "actionSkip": "déjà dans la session (sera ignoré)",
       "confirmImport": "Importer l'équipe",
       "cancel": "Annuler",
-      "importing": "Importation..."
+      "importing": "Importation...",
+      "previewEyebrow": "Aperçu du preset",
+      "memberCounter": "Membre {{index}} sur {{total}}",
+      "membersLabel": "Membres de l'équipe",
+      "switchHint": "Faites défiler ou sélectionnez un membre pour revoir sa configuration.",
+      "sections": {
+        "basics": "Configuration de base",
+        "basicsDescription": "Identité, exécuteur et profil de modèle.",
+        "prompt": "Prompt principal",
+        "promptDescription": "Définissez le rôle, le ton et les limites d'exécution.",
+        "environment": "Environnement",
+        "environmentDescription": "Chemin de l'espace de travail et compétences installées."
+      },
+      "promptBadge": "Éditeur de prompt",
+      "promptHint": "Utilisez des instructions précises pour cadrer le comportement du membre.",
+      "memberPage": "Passer au membre {{index}} sur {{total}}"
     },
     "roleSettingsRequired": "Les paramètres du rôle sont obligatoires.",
     "presetDisplay": {

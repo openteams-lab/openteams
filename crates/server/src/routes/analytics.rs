@@ -102,7 +102,7 @@ pub struct FunnelMetricsResponse {
 /// Query parameters for usage statistics
 #[derive(Debug, Deserialize, TS)]
 pub struct UsageQueryParams {
-    pub period: Option<String>,  // 24h, 7d, 30d
+    pub period: Option<String>, // 24h, 7d, 30d
     pub limit: Option<i64>,
 }
 
@@ -352,7 +352,7 @@ pub async fn get_dashboard(
 
     // Total distinct users
     let total_users: i64 = sqlx::query_scalar(
-        "SELECT COUNT(DISTINCT user_id) FROM analytics_events WHERE user_id IS NOT NULL"
+        "SELECT COUNT(DISTINCT user_id) FROM analytics_events WHERE user_id IS NOT NULL",
     )
     .fetch_one(pool)
     .await
@@ -458,7 +458,7 @@ pub async fn get_dashboard(
 
     // Skills installed count
     let skills_installed_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM analytics_events WHERE event_type = 'skill_install'"
+        "SELECT COUNT(*) FROM analytics_events WHERE event_type = 'skill_install'",
     )
     .fetch_one(pool)
     .await
@@ -489,7 +489,7 @@ pub async fn get_funnel(
 
     // Total distinct users
     let total_users: i64 = sqlx::query_scalar(
-        "SELECT COUNT(DISTINCT user_id) FROM analytics_events WHERE user_id IS NOT NULL"
+        "SELECT COUNT(DISTINCT user_id) FROM analytics_events WHERE user_id IS NOT NULL",
     )
     .fetch_one(pool)
     .await
@@ -632,7 +632,7 @@ pub async fn get_agent_usage(
         GROUP BY json_extract(properties, '$.agent_id')
         ORDER BY usage_count DESC
         LIMIT ?
-        "#
+        "#,
     )
     .bind(since)
     .bind(limit)
@@ -722,7 +722,7 @@ pub async fn get_skill_usage(
             AND timestamp >= ?
             AND json_extract(properties, '$.skill_id') IS NOT NULL
         GROUP BY json_extract(properties, '$.skill_id')
-        "#
+        "#,
     )
     .bind(since)
     .fetch_all(pool)
@@ -747,7 +747,7 @@ pub async fn get_skill_usage(
         WHERE event_type = 'skill_install'
             AND json_extract(properties, '$.skill_id') IS NOT NULL
         GROUP BY json_extract(properties, '$.skill_id')
-        "#
+        "#,
     )
     .fetch_all(pool)
     .await
@@ -822,25 +822,23 @@ pub async fn get_user_profile(
     let user_id = &params.user_id;
 
     // Get first and last seen
-    let first_seen: Option<String> = sqlx::query_scalar(
-        "SELECT MIN(timestamp) FROM analytics_events WHERE user_id = ?"
-    )
-    .bind(user_id)
-    .fetch_optional(pool)
-    .await
-    .ok()
-    .flatten()
-    .map(|dt: chrono::DateTime<chrono::Utc>| dt.to_rfc3339());
+    let first_seen: Option<String> =
+        sqlx::query_scalar("SELECT MIN(timestamp) FROM analytics_events WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten()
+            .map(|dt: chrono::DateTime<chrono::Utc>| dt.to_rfc3339());
 
-    let last_seen: Option<String> = sqlx::query_scalar(
-        "SELECT MAX(timestamp) FROM analytics_events WHERE user_id = ?"
-    )
-    .bind(user_id)
-    .fetch_optional(pool)
-    .await
-    .ok()
-    .flatten()
-    .map(|dt: chrono::DateTime<chrono::Utc>| dt.to_rfc3339());
+    let last_seen: Option<String> =
+        sqlx::query_scalar("SELECT MAX(timestamp) FROM analytics_events WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten()
+            .map(|dt: chrono::DateTime<chrono::Utc>| dt.to_rfc3339());
 
     // Behavior flags
     let has_created_session: bool = sqlx::query_scalar(
@@ -880,7 +878,7 @@ pub async fn get_user_profile(
 
     // Stats
     let total_sessions: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM analytics_events WHERE user_id = ? AND event_type = 'session_create'"
+        "SELECT COUNT(*) FROM analytics_events WHERE user_id = ? AND event_type = 'session_create'",
     )
     .bind(user_id)
     .fetch_one(pool)
@@ -888,7 +886,7 @@ pub async fn get_user_profile(
     .unwrap_or(0);
 
     let total_messages: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM analytics_events WHERE user_id = ? AND event_type = 'message_send'"
+        "SELECT COUNT(*) FROM analytics_events WHERE user_id = ? AND event_type = 'message_send'",
     )
     .bind(user_id)
     .fetch_one(pool)
@@ -920,7 +918,7 @@ pub async fn get_user_profile(
         GROUP BY json_extract(properties, '$.agent_id')
         ORDER BY COUNT(*) DESC
         LIMIT 5
-        "#
+        "#,
     )
     .bind(user_id)
     .fetch_all(pool)
@@ -936,7 +934,7 @@ pub async fn get_user_profile(
         GROUP BY json_extract(properties, '$.skill_id')
         ORDER BY COUNT(*) DESC
         LIMIT 5
-        "#
+        "#,
     )
     .bind(user_id)
     .fetch_all(pool)
@@ -975,7 +973,16 @@ pub fn router() -> axum::Router<DeploymentImpl> {
         .route("/analytics/metrics", axum::routing::get(get_metrics))
         .route("/analytics/dashboard", axum::routing::get(get_dashboard))
         .route("/analytics/funnel", axum::routing::get(get_funnel))
-        .route("/analytics/agents/usage", axum::routing::get(get_agent_usage))
-        .route("/analytics/skills/usage", axum::routing::get(get_skill_usage))
-        .route("/analytics/user-profile", axum::routing::get(get_user_profile))
+        .route(
+            "/analytics/agents/usage",
+            axum::routing::get(get_agent_usage),
+        )
+        .route(
+            "/analytics/skills/usage",
+            axum::routing::get(get_skill_usage),
+        )
+        .route(
+            "/analytics/user-profile",
+            axum::routing::get(get_user_profile),
+        )
 }

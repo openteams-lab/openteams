@@ -12,7 +12,7 @@
     "untitledSession": "Sesión sin título",
     "sessionSection": "Sesiones",
     "automation": "Automatizaciones",
-    "skills": "Habilidades",
+    "skills": "Biblioteca de habilidades",
     "archivedSection": "Archivadas",
     "settingsInSidebar": "Configuración"
   },
@@ -102,6 +102,43 @@
     "workspacePathCannotBeModified": "La ruta del espacio de trabajo no se puede modificar",
     "add": "Añadir",
     "save": "Guardar",
+    "skills": {
+      "label": "Habilidades",
+      "selected": "Habilidades seleccionadas",
+      "searchPlaceholder": "Buscar habilidades",
+      "loading": "Cargando habilidades...",
+      "noCompatible": "No hay habilidades compatibles para {{runnerType}}.",
+      "noneAvailable": "No hay habilidades disponibles.",
+      "noneInstalledForRunner": "El Agent {{runnerType}} no tiene ninguna habilidad instalada.",
+      "noneInstalled": "Este Agent no tiene ninguna habilidad instalada.",
+      "collapsedCount": "+{{count}}",
+      "selectedCount": "{{count}} seleccionadas",
+      "noMatching": "No se encontraron habilidades.",
+      "remove": "Quitar {{name}}",
+      "selectAction": "Seleccionar {{name}}",
+      "unselectAction": "Deseleccionar {{name}}",
+      "closeDetails": "Cerrar detalles de {{name}}",
+      "category": "Categoría",
+      "info": "Información",
+      "tags": "Etiquetas",
+      "content": "Contenido de la habilidad",
+      "detail": {
+        "viewDetails": "Ver detalles de {{name}}",
+        "openSource": "Abrir origen",
+        "loadingDescription": "Cargando detalles de la habilidad...",
+        "emptyDescription": "No hay descripción de la habilidad.",
+        "loadingContent": "Cargando...",
+        "emptyContent": "No hay contenido.",
+        "select": "Seleccionar",
+        "selecting": "Seleccionando..."
+      },
+      "errors": {
+        "load": "No se pudieron cargar las habilidades.",
+        "assignedLoad": "No se pudieron cargar las habilidades asignadas.",
+        "detail": "No se pudieron cargar los detalles de la habilidad.",
+        "update": "No se pudo actualizar la asignación de habilidades."
+      }
+    },
     "tabPreset": "IA preajustada",
     "tabCustom": "IA personalizada",
     "closePanel": "Cerrar",
@@ -111,6 +148,9 @@
     "addFromMemberPreset": "Añadir preajuste de miembro",
     "importTeamPreset": "Importar preajuste de equipo",
     "noEnabledPresets": "No hay preajustes habilitados. Configúralos en Configuración -> Preajustes.",
+    "presetSearchPlaceholder": "Buscar IA predefinidas o equipos",
+    "noPresetSearchResults": "No hay IA predefinidas ni equipos que coincidan.",
+    "noPresetSearchResultsHint": "Prueba otra palabra clave o cambia a IA personalizada.",
     "importPreview": {
       "title": "Importar equipo: {{teamName}}",
       "description": "Los siguientes miembros se añadirán a esta sesión:",
@@ -119,7 +159,22 @@
       "actionSkip": "ya está en la sesión (se omitirá)",
       "confirmImport": "Importar equipo",
       "cancel": "Cancelar",
-      "importing": "Importando..."
+      "importing": "Importando...",
+      "previewEyebrow": "Vista previa del preset",
+      "memberCounter": "Miembro {{index}} de {{total}}",
+      "membersLabel": "Miembros del equipo",
+      "switchHint": "Desplázate o selecciona un miembro para revisar su configuración.",
+      "sections": {
+        "basics": "Configuración básica",
+        "basicsDescription": "Identidad, ejecutor y perfil del modelo.",
+        "prompt": "Prompt central",
+        "promptDescription": "Define el rol, el tono y los límites de ejecución.",
+        "environment": "Entorno",
+        "environmentDescription": "Ruta del espacio de trabajo y habilidades instaladas."
+      },
+      "promptBadge": "Editor de prompt",
+      "promptHint": "Usa instrucciones claras y precisas para definir el comportamiento.",
+      "memberPage": "Cambiar al miembro {{index}} de {{total}}"
     },
     "presetDisplay": {
       "members": {
