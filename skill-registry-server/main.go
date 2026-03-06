@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -53,6 +54,7 @@ type SkillMeta struct {
 	DownloadURL      string   `json:"download_url,omitempty"`
 	Content          string   `json:"content,omitempty"`
 	CompatibleAgents []string `json:"compatible_agents"`
+	DownloadCount    int64    `json:"download_count"` // Number of downloads from skills.sh
 }
 
 // Skill metadata for list view (no content, files, download_url)
@@ -66,6 +68,7 @@ type SkillListItem struct {
 	Tags             []string `json:"tags"`
 	SourceURL        string   `json:"source_url,omitempty"`
 	CompatibleAgents []string `json:"compatible_agents"`
+	DownloadCount    int64    `json:"download_count"` // Number of downloads from skills.sh
 }
 
 // Skill detail with full content
@@ -82,10 +85,13 @@ type SkillCategory struct {
 
 // Server state
 type Server struct {
-	skillsDir  string
-	cdnConfig  *CDNConfig
-	skills     []SkillMeta
-	categories map[string]string
+	skillsDir        string
+	cdnConfig        *CDNConfig
+	skills           []SkillMeta
+	categories       map[string]string
+	downloadCounts   map[string]int64 // skill_id -> download_count from skills.sh
+	skillsShData     *SkillsShData    // cached skills.sh data
+	skillsShDataPath string           // path to cache file
 }
 
 func main() {
@@ -127,9 +133,16 @@ func main() {
 	}
 
 	server := &Server{
-		skillsDir:  skillsDir,
-		cdnConfig:  cdnConfig,
-		categories: make(map[string]string),
+		skillsDir:        skillsDir,
+		cdnConfig:        cdnConfig,
+		categories:       make(map[string]string),
+		downloadCounts:   make(map[string]int64),
+		skillsShDataPath: "skills_sh_data.json",
+	}
+
+	// Load skills.sh data if available
+	if err := server.loadSkillsShData(); err != nil {
+		fmt.Printf("Warning: failed to load skills.sh data: %v\n", err)
 	}
 
 	// Initialize skills
@@ -162,6 +175,8 @@ func main() {
 		api.GET("/download/:id", server.downloadSkill)
 		api.GET("/download/:id/files", server.downloadSkillFiles)
 		api.GET("/download/:id/file/*filepath", server.downloadSkillFile)
+		api.POST("/sync", server.syncSkillsSh) // Sync from skills.sh
+		api.GET("/sync/status", server.getSyncStatus)
 	}
 
 	// Health check
@@ -385,6 +400,7 @@ func (s *Server) listSkills(c *gin.Context) {
 			Tags:             skill.Tags,
 			SourceURL:        skill.SourceURL,
 			CompatibleAgents: skill.CompatibleAgents,
+			DownloadCount:    skill.DownloadCount,
 		})
 	}
 
@@ -646,4 +662,104 @@ func (s *Server) createTarGz(w io.Writer, dir string) error {
 
 		return nil
 	})
+}
+
+// loadSkillsShData loads cached skills.sh data from file
+func (s *Server) loadSkillsShData() error {
+	data, err := os.ReadFile(s.skillsShDataPath)
+	if err != nil {
+		return err
+	}
+
+	var skillsShData SkillsShData
+	if err := json.Unmarshal(data, &skillsShData); err != nil {
+		return err
+	}
+
+	s.skillsShData = &skillsShData
+
+	// Build download counts map
+	s.downloadCounts = make(map[string]int64)
+	for _, skill := range skillsShData.Skills {
+		// Map skill ID patterns
+		s.downloadCounts[skill.ID] = skill.DownloadCount
+		// Also map by skill name for local matching
+		s.downloadCounts[skill.Name] = skill.DownloadCount
+	}
+
+	fmt.Printf("Loaded %d skills.sh entries\n", len(skillsShData.Skills))
+	return nil
+}
+
+// saveSkillsShData saves skills.sh data to cache file
+func (s *Server) saveSkillsShData() error {
+	if s.skillsShData == nil {
+		return nil
+	}
+
+	data, err := json.MarshalIndent(s.skillsShData, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(s.skillsShDataPath, data, 0644)
+}
+
+// syncSkillsSh syncs skills data from skills.sh
+func (s *Server) syncSkillsSh(c *gin.Context) {
+	fmt.Println("Starting skills.sh sync...")
+
+	data, err := ScrapeSkillsSh()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to scrape skills.sh",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	s.skillsShData = data
+
+	// Build download counts map
+	s.downloadCounts = make(map[string]int64)
+	for _, skill := range data.Skills {
+		s.downloadCounts[skill.ID] = skill.DownloadCount
+		s.downloadCounts[skill.Name] = skill.DownloadCount
+	}
+
+	// Update existing skills with download counts
+	for i := range s.skills {
+		if count, ok := s.downloadCounts[s.skills[i].ID]; ok {
+			s.skills[i].DownloadCount = count
+		} else if count, ok := s.downloadCounts[s.skills[i].Name]; ok {
+			s.skills[i].DownloadCount = count
+		}
+	}
+
+	// Save to cache
+	if err := s.saveSkillsShData(); err != nil {
+		fmt.Printf("Warning: failed to save skills.sh data: %v\n", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":         "success",
+		"total_skills":   data.TotalSkills,
+		"total_installs": data.TotalInstalls,
+		"generated_at":   data.GeneratedAt,
+	})
+}
+
+// getSyncStatus returns the current sync status
+func (s *Server) getSyncStatus(c *gin.Context) {
+	status := gin.H{
+		"has_data": s.skillsShData != nil,
+	}
+
+	if s.skillsShData != nil {
+		status["total_skills"] = s.skillsShData.TotalSkills
+		status["total_installs"] = s.skillsShData.TotalInstalls
+		status["generated_at"] = s.skillsShData.GeneratedAt
+	}
+
+	c.JSON(http.StatusOK, status)
 }
