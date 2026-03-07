@@ -85,6 +85,12 @@ function getSkillSearchText(
   return [name, description, ...tags].join(' ').toLowerCase();
 }
 
+function formatDownloadCount(count: number): string {
+  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+  return count.toString();
+}
+
 function toRunnerLabel(runnerType: string): string {
   return runnerType
     .toLowerCase()
@@ -988,8 +994,16 @@ export function SkillsPanel({
                         <div className="flex items-center gap-2.5">
                           <SkillTileIcon name={skill.name} compact />
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-base font-medium text-normal">
-                              {skill.name}
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate text-base font-medium text-normal">
+                                {skill.name}
+                              </span>
+                              {skill.download_count != null && skill.download_count > 0 && (
+                                <span className="shrink-0 text-[10px] text-low flex items-center gap-0.5">
+                                  <DownloadIcon size={10} />
+                                  {formatDownloadCount(skill.download_count)}
+                                </span>
+                              )}
                             </div>
                             <p className="truncate text-xs text-low">
                               {skill.description || '暂无描述'}
