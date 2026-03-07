@@ -14,7 +14,8 @@
     "automation": "자동화",
     "skills": "스킬 라이브러리",
     "archivedSection": "보관됨",
-    "settingsInSidebar": "설정"
+    "settingsInSidebar": "설정",
+    "generatedSessionTitle": "{{date}} ??"
   },
   "header": {
     "untitledSession": "제목 없는 세션",
@@ -32,7 +33,18 @@
     "restoreSession": "세션 복원",
     "cleanupMessages": "메시지 정리",
     "exitCleanupMode": "정리 모드 종료",
-    "settings": "설정"
+    "settings": "설정",
+    "moreActions": "추가 작업",
+    "generatedTitleBadge": "?? ??",
+    "contextMeter": "???? ???",
+    "contextUsage": "{{used}} / {{limit}}",
+    "contextUsageUnknown": "{{used}} ?? ?",
+    "contextLoadLow": "??? ???",
+    "contextLoadMedium": "??? ???",
+    "contextLoadHigh": "?? ???",
+    "openMembersPanel": "AI 멤버 목록 열기",
+    "closeMembersPanel": "AI 멤버 목록 닫기",
+    "latestArtifact": "?? ????"
   },
   "input": {
     "mentionAgents": "에이전트 멘션",
@@ -50,7 +62,9 @@
     "uploadingAttachments": "첨부 파일 업로드 중...",
     "sendHint": "Enter로 전송, Shift+Enter로 줄바꿈.",
     "addAttachment": "첨부 파일 추가",
-    "send": "전송"
+    "send": "전송",
+    "workbenchHint": "????? ????, ??? ?????, @? ??? ?? ??? ?????.",
+    "attachmentCount": "{{count}}? ?? ???"
   },
   "message": {
     "quote": "인용",
@@ -75,7 +89,7 @@
     "open": "열기"
   },
   "members": {
-    "title": "AI 멤버",
+    "title": "AI 멤버 목록",
     "countInSession": "세션에 {{count}}명",
     "selectSessionToManage": "AI 멤버를 관리할 세션을 선택하세요.",
     "noMembersYet": "아직 AI 멤버가 없습니다. @멘션을 활성화하려면 아래에서 추가하세요.",
@@ -293,7 +307,22 @@
       "selectRunToViewLog": "로그 출력을 보려면 실행을 선택하세요.",
       "refresh": "새로고침",
       "loadingLog": "로그 로드 중...",
-      "logEmpty": "로그가 비어 있습니다."
+      "logEmpty": "로그가 비어 있습니다.",
+      "workspaceTrail": "?????? ??"
     }
+  },
+  "workspacePreview": {
+    "title": "?????? ????",
+    "empty": "???? ?? ?? ??? ???? ???? ??? ? ????.",
+    "files": "??",
+    "added": "??",
+    "removed": "??",
+    "html": "HTML",
+    "image": "???",
+    "diff": "Diff",
+    "liveReport": "??? ????",
+    "imagePreview": "??? ????",
+    "filesChanged": "?? {{count}}?",
+    "runLabel": "?? {{id}}"
   }
 }

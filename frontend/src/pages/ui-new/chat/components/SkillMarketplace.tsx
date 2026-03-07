@@ -17,6 +17,12 @@ import { chatApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 
+function formatDownloadCount(count: number): string {
+  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+  return count.toString();
+}
+
 interface SkillMarketplaceProps {
   /** Whether the marketplace is in read-only mode */
   readOnly?: boolean;
@@ -254,6 +260,12 @@ export function SkillMarketplace({
                             <span className="text-xs text-normal truncate">
                               {skill.name}
                             </span>
+                            {skill.download_count != null && skill.download_count > 0 && (
+                              <span className="text-[10px] text-low shrink-0 flex items-center gap-0.5">
+                                <DownloadIcon size={10} />
+                                {formatDownloadCount(skill.download_count)}
+                              </span>
+                            )}
                             {skill.category && (
                               <span className="text-[10px] text-low shrink-0">
                                 [{skill.category}]
@@ -314,8 +326,16 @@ export function SkillMarketplace({
                       className="flex items-center gap-1 px-1 py-0.5 rounded bg-panel"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs text-normal truncate">
-                          {skill.name}
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-normal truncate">
+                            {skill.name}
+                          </span>
+                          {skill.download_count > 0 && (
+                            <span className="text-[10px] text-low shrink-0 flex items-center gap-0.5">
+                              <DownloadIcon size={10} />
+                              {formatDownloadCount(skill.download_count)}
+                            </span>
+                          )}
                         </div>
                         <p className="text-[10px] text-low truncate">
                           {skill.description || skill.content.slice(0, 50)}...

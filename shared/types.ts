@@ -142,13 +142,13 @@ export type ChatArtifact = { id: string, session_id: string, name: string, path:
 
 export type ChatRun = { id: string, session_id: string, session_agent_id: string, run_index: bigint, run_dir: string, input_path: string | null, output_path: string | null, raw_log_path: string | null, meta_path: string | null, created_at: string, };
 
-export type ChatSkill = { id: string, name: string, description: string, content: string, trigger_type: string, trigger_keywords: string[], enabled: boolean, source: string, source_url: string | null, version: string, author: string | null, tags: string[], category: string | null, compatible_agents: string[], created_at: string, updated_at: string, };
+export type ChatSkill = { id: string, name: string, description: string, content: string, trigger_type: string, trigger_keywords: string[], enabled: boolean, source: string, source_url: string | null, version: string, author: string | null, tags: string[], category: string | null, compatible_agents: string[], download_count: number, created_at: string, updated_at: string, };
 
 export type ChatSkillTriggerType = "always" | "keyword" | "manual";
 
-export type CreateChatSkill = { name: string, description: string | null, content: string, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, source: string | null, source_url: string | null, version: string | null, author: string | null, tags: Array<string> | null, category: string | null, compatible_agents: Array<string> | null, };
+export type CreateChatSkill = { name: string, description: string | null, content: string, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, source: string | null, source_url: string | null, version: string | null, author: string | null, tags: Array<string> | null, category: string | null, compatible_agents: Array<string> | null, download_count: number | null, };
 
-export type UpdateChatSkill = { name: string | null, description: string | null, content: string | null, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, source: string | null, source_url: string | null, version: string | null, author: string | null, tags: Array<string> | null, category: string | null, compatible_agents: Array<string> | null, };
+export type UpdateChatSkill = { name: string | null, description: string | null, content: string | null, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, source: string | null, source_url: string | null, version: string | null, author: string | null, tags: Array<string> | null, category: string | null, compatible_agents: Array<string> | null, download_count: number | null, };
 
 export type ChatAgentSkill = { id: string, agent_id: string, skill_id: string, enabled: boolean, created_at: string, };
 
@@ -156,9 +156,9 @@ export type AssignSkillToAgent = { agent_id: string, skill_id: string, enabled: 
 
 export type UpdateAgentSkill = { enabled: boolean | null, };
 
-export type RemoteSkillMeta = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: string[], compatible_agents: string[], source_url: string | null, };
+export type RemoteSkillMeta = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: string[], compatible_agents: string[], source_url: string | null, download_count: number | null, };
 
-export type RemoteSkillPackage = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: Array<string>, compatible_agents: Array<string>, source_url: string | null, content: string, };
+export type RemoteSkillPackage = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: Array<string>, compatible_agents: Array<string>, source_url: string | null, content: string, download_count: number | null, };
 
 export type SkillCategory = { id: string, name: string, description: string | null, };
 

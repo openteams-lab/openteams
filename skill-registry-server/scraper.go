@@ -135,42 +135,93 @@ func parseSkillsFromHTML(html string) []SkillsShSkill {
 
 // ScrapeSkillsSh uses simple HTTP requests to scrape skills.sh
 func ScrapeSkillsSh() (*SkillsShData, error) {
+	return ScrapeSkillsShWithOptions(false)
+}
+
+// ScrapeSkillsShWithOptions scrapes skills.sh with optional pagination
+// If fullScrape is true, it will fetch multiple pages to get more skills
+func ScrapeSkillsShWithOptions(fullScrape bool) (*SkillsShData, error) {
 	data := &SkillsShData{
 		GeneratedAt: time.Now(),
 		Skills:      make([]SkillsShSkill, 0),
 	}
 
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: 60 * time.Second,
 	}
 
-	// Fetch main page
-	resp, err := client.Get("https://skills.sh")
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch skills.sh: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+	// Endpoints to scrape for comprehensive coverage
+	endpoints := []string{
+		"https://skills.sh",
 	}
 
-	html := string(body)
+	if fullScrape {
+		// Add more endpoints for full coverage
+		endpoints = append(endpoints,
+			"https://skills.sh/hot",
+			"https://skills.sh?sort=installs",
+			"https://skills.sh?sort=recent",
+		)
+	}
 
-	// Parse HTML content
-	skills := parseSkillsFromHTML(html)
-	data.Skills = skills
-	data.TotalSkills = len(skills)
+	seenSkills := make(map[string]bool)
+
+	for _, endpoint := range endpoints {
+		fmt.Printf("Fetching %s...\n", endpoint)
+
+		resp, err := client.Get(endpoint)
+		if err != nil {
+			fmt.Printf("Warning: failed to fetch %s: %v\n", endpoint, err)
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			fmt.Printf("Warning: failed to read response from %s: %v\n", endpoint, err)
+			continue
+		}
+
+		html := string(body)
+		skills := parseSkillsFromHTML(html)
+
+		for _, skill := range skills {
+			if !seenSkills[skill.ID] {
+				seenSkills[skill.ID] = true
+				data.Skills = append(data.Skills, skill)
+			}
+		}
+
+		// Small delay between requests to be polite
+		if fullScrape {
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+
+	data.TotalSkills = len(data.Skills)
 
 	// Calculate total installs
 	var totalInstalls int64
-	for _, skill := range skills {
+	for _, skill := range data.Skills {
 		totalInstalls += skill.DownloadCount
 	}
 	data.TotalInstalls = totalInstalls
 
+	// Sort by download count descending
+	sortSkillsByDownloads(data.Skills)
+
 	return data, nil
+}
+
+// sortSkillsByDownloads sorts skills by download count in descending order
+func sortSkillsByDownloads(skills []SkillsShSkill) {
+	for i := 0; i < len(skills)-1; i++ {
+		for j := i + 1; j < len(skills); j++ {
+			if skills[j].DownloadCount > skills[i].DownloadCount {
+				skills[i], skills[j] = skills[j], skills[i]
+			}
+		}
+	}
 }
 
 // FetchSkillDetails fetches detailed skill information from a skill's GitHub page
@@ -301,9 +352,17 @@ func ReadSkillsData(inputPath string) (*SkillsShData, error) {
 
 // RunScraper runs the scraper and outputs to file
 func RunScraper(outputPath string) error {
-	fmt.Println("Starting skills.sh scraper...")
+	return RunScraperWithOptions(outputPath, false)
+}
 
-	data, err := ScrapeSkillsSh()
+// RunScraperWithOptions runs the scraper with optional full scrape
+func RunScraperWithOptions(outputPath string, fullScrape bool) error {
+	fmt.Println("Starting skills.sh scraper...")
+	if fullScrape {
+		fmt.Println("Full scrape mode enabled - fetching multiple pages")
+	}
+
+	data, err := ScrapeSkillsShWithOptions(fullScrape)
 	if err != nil {
 		return fmt.Errorf("failed to scrape skills.sh: %w", err)
 	}

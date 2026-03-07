@@ -60,6 +60,10 @@ export interface ChatMessageItemProps {
     messageId: string,
     attachment: ChatAttachment
   ) => void;
+  onPreviewAttachment: (
+    message: ChatMessage,
+    attachment: ChatAttachment
+  ) => void;
   // Diff
   diffInfo: DiffMeta | null;
   runDiffs: Record<string, RunDiffState>;
@@ -92,6 +96,7 @@ export function ChatMessageItem({
   attachments,
   activeSessionId,
   onAddAttachmentAsFile,
+  onPreviewAttachment,
   diffInfo,
   runDiffs,
   onOpenDiffViewer,
@@ -387,15 +392,32 @@ export function ChatMessageItem({
                   const isImage =
                     attachment.kind === 'image' ||
                     (attachment.mime_type ?? '').startsWith('image/');
+                  const isHtml =
+                    (attachment.mime_type ?? '').includes('html') ||
+                    attachment.name.toLowerCase().endsWith('.html') ||
+                    attachment.name.toLowerCase().endsWith('.htm');
+                  const canPreviewInline = isImage || isHtml;
                   return (
                     <div
                       key={attachment.id}
                       className="chat-session-attachment-card border border-border rounded-sm bg-panel px-base py-half text-xs text-normal"
                     >
                       <div className="flex items-center justify-between gap-base">
-                        <span className="font-ibm-plex-mono break-all">
-                          {attachment.name}
-                        </span>
+                        {canPreviewInline ? (
+                          <button
+                            type="button"
+                            className="chat-session-attachment-name-btn font-ibm-plex-mono break-all text-left"
+                            onClick={() =>
+                              onPreviewAttachment(message, attachment)
+                            }
+                          >
+                            {attachment.name}
+                          </button>
+                        ) : (
+                          <span className="font-ibm-plex-mono break-all">
+                            {attachment.name}
+                          </span>
+                        )}
                         <div className="flex gap-half">
                           <button
                             type="button"
@@ -408,6 +430,17 @@ export function ChatMessageItem({
                           >
                             <PaperPlaneTiltIcon className="size-icon-sm" />
                           </button>
+                          {canPreviewInline && (
+                            <button
+                              type="button"
+                              className="text-brand hover:text-brand-hover"
+                              onClick={() =>
+                                onPreviewAttachment(message, attachment)
+                              }
+                            >
+                              {t('message.view')}
+                            </button>
+                          )}
                           <a
                             className="text-brand hover:text-brand-hover"
                             href={attachmentUrl}

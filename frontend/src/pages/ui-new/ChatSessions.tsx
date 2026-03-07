@@ -6,6 +6,7 @@
   useRef,
   useState,
 } from 'react';
+import { UsersThreeIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -21,8 +22,10 @@ import {
   type ChatTeamPreset,
 } from 'shared/types';
 import { ApiError, chatApi, configApi } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useTheme } from '@/components/ThemeProvider';
+import { formatDateShortWithTime } from '@/utils/date';
 import { getActualTheme } from '@/utils/theme';
 import {
   extractExecutorProfileVariant,
@@ -38,6 +41,8 @@ import {
   type SessionMember,
   type RunHistoryItem,
   type MentionStatus,
+  type ChatAttachment,
+  type RunDiffState,
   type StreamRun,
   useChatData,
   useRunHistory,
@@ -142,6 +147,18 @@ const COLLAPSED_LEFT_SIDEBAR_WIDTH = 52;
 const MESSAGE_SEARCH_HIGHLIGHT_NAME = 'chat-session-search-highlight';
 const MAX_MESSAGE_SEARCH_HIGHLIGHT_RANGES = 4000;
 const MESSAGE_SEARCH_DEBOUNCE_MS = 120;
+const UNTITLED_SESSION_TITLES = new Set([
+  'untitled session',
+  'unnamed session',
+  'session without title',
+  'sesion sin titulo',
+  'sesión sin título',
+  'session sans titre',
+  '無題のセッション',
+  '제목 없는 세션',
+  '未命名会话',
+  '未命名會話',
+]);
 
 type CSSHighlightRegistry = {
   set: (name: string, highlight: unknown) => void;
@@ -161,6 +178,391 @@ const areSetsEqual = <T,>(a: Set<T>, b: Set<T>) => {
   }
   return true;
 };
+
+type ArtifactSpotlight =
+  | {
+      kind: 'attachment';
+      name: string;
+      url: string;
+      previewType: 'image' | 'html';
+      sourceLabel: string;
+      createdAt: string;
+      pathLabel: string;
+    }
+  | {
+      kind: 'diff';
+      runId: string;
+      sourceLabel: string;
+      createdAt: string;
+      hasDiff: boolean;
+      untrackedFiles: string[];
+      previewText: string | null;
+    };
+
+const normalizeSessionTitle = (value: string | null | undefined) => {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return '';
+  const normalized = trimmed.toLocaleLowerCase();
+  return UNTITLED_SESSION_TITLES.has(normalized) ? '' : trimmed;
+};
+
+const summarizeDiffState = (
+  runDiff: RunDiffState | undefined,
+  untrackedFiles: string[]
+) => {
+  const files = runDiff?.files ?? [];
+  const additions = files.reduce((total, file) => total + file.additions, 0);
+  const deletions = files.reduce((total, file) => total + file.deletions, 0);
+  const fileCount = files.length || untrackedFiles.length;
+  const primaryPath = files[0]?.path ?? untrackedFiles[0] ?? null;
+
+  return {
+    additions,
+    deletions,
+    fileCount,
+    primaryPath,
+    files,
+  };
+};
+
+const getArtifactSpotlightKey = (artifact: ArtifactSpotlight | null) => {
+  if (!artifact) return null;
+  return artifact.kind === 'attachment'
+    ? `attachment:${artifact.url}`
+    : `diff:${artifact.runId}`;
+};
+
+function ArtifactSpotlightCard({
+  artifact,
+  title,
+  openLabel,
+  viewChangesLabel,
+  previewLabel,
+  diffState,
+  onSelectPreview,
+}: {
+  artifact: ArtifactSpotlight;
+  title: string;
+  openLabel: string;
+  viewChangesLabel: string;
+  previewLabel: string;
+  diffState?: RunDiffState;
+  onSelectPreview: (artifact: ArtifactSpotlight) => void;
+}) {
+  const { t } = useTranslation('chat');
+  const diffSummary =
+    artifact.kind === 'diff'
+      ? summarizeDiffState(diffState, artifact.untrackedFiles)
+      : null;
+
+  return (
+    <div
+      className="chat-session-artifact-spotlight"
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelectPreview(artifact)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelectPreview(artifact);
+        }
+      }}
+    >
+      <div className="chat-session-artifact-main">
+        <div className="chat-session-artifact-meta">
+          <div className="chat-session-artifact-label">{title}</div>
+          <div className="chat-session-artifact-title-row">
+            <div className="chat-session-artifact-title">
+              {artifact.kind === 'attachment'
+                ? artifact.name
+                : t('workspacePreview.runLabel', {
+                    id: artifact.runId.slice(0, 8),
+                  })}
+            </div>
+            <div className="chat-session-artifact-pills">
+              <span className="chat-session-artifact-pill">
+                {artifact.kind === 'attachment'
+                  ? artifact.previewType === 'html'
+                    ? t('workspacePreview.html')
+                    : t('workspacePreview.image')
+                  : t('workspacePreview.diff')}
+              </span>
+              {artifact.kind === 'attachment' ? (
+                <span
+                  className="chat-session-artifact-pill is-muted"
+                  title={artifact.pathLabel}
+                >
+                  {artifact.pathLabel}
+                </span>
+              ) : diffSummary?.primaryPath ? (
+                <span
+                  className="chat-session-artifact-pill is-muted"
+                  title={diffSummary.primaryPath}
+                >
+                  {diffSummary.primaryPath}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div className="chat-session-artifact-subtitle">
+            {artifact.sourceLabel} ·{' '}
+            {formatDateShortWithTime(artifact.createdAt)}
+          </div>
+        </div>
+        {artifact.kind === 'diff' ? (
+          <div className="chat-session-artifact-summary">
+            <span className="chat-session-artifact-stat">
+              {t('workspacePreview.filesChanged', {
+                count: diffSummary?.fileCount ?? 0,
+              })}
+            </span>
+            <span className="chat-session-artifact-stat is-positive">
+              +{diffSummary?.additions ?? 0}
+            </span>
+            <span className="chat-session-artifact-stat is-negative">
+              -{diffSummary?.deletions ?? 0}
+            </span>
+          </div>
+        ) : (
+          <div className="chat-session-artifact-summary">
+            <span className="chat-session-artifact-stat">
+              {artifact.previewType === 'html'
+                ? t('workspacePreview.liveReport')
+                : t('workspacePreview.imagePreview')}
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="chat-session-artifact-actions">
+        <button
+          type="button"
+          className="chat-session-artifact-action"
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelectPreview(artifact);
+          }}
+        >
+          {artifact.kind === 'diff' ? viewChangesLabel : previewLabel}
+        </button>
+        {artifact.kind === 'attachment' && (
+          <a
+            href={artifact.url}
+            target="_blank"
+            rel="noreferrer"
+            className="chat-session-artifact-action is-secondary"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {openLabel}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WorkspacePreviewPane({
+  artifact,
+  diffState,
+  title,
+  openLabel,
+  viewChangesLabel,
+  emptyLabel,
+  closeLabel,
+  loadingLabel,
+  filesLabel,
+  addedLabel,
+  removedLabel,
+  onClose,
+  onOpenDiffModal,
+}: {
+  artifact: ArtifactSpotlight | null;
+  diffState?: RunDiffState;
+  title: string;
+  openLabel: string;
+  viewChangesLabel: string;
+  emptyLabel: string;
+  closeLabel: string;
+  loadingLabel: string;
+  filesLabel: string;
+  addedLabel: string;
+  removedLabel: string;
+  onClose: () => void;
+  onOpenDiffModal: (
+    runId: string,
+    untrackedFiles: string[],
+    hasDiff: boolean
+  ) => void;
+}) {
+  const { t } = useTranslation('chat');
+  if (!artifact) {
+    return (
+      <aside className="chat-session-preview-panel is-empty">
+        <div className="chat-session-preview-empty">{emptyLabel}</div>
+      </aside>
+    );
+  }
+
+  const diffSummary =
+    artifact.kind === 'diff'
+      ? summarizeDiffState(diffState, artifact.untrackedFiles)
+      : null;
+
+  return (
+    <aside className="chat-session-preview-panel">
+      <div className="chat-session-preview-header">
+        <div className="chat-session-preview-meta">
+          <div className="chat-session-preview-label">{title}</div>
+          <div className="chat-session-preview-title">
+            {artifact.kind === 'attachment'
+              ? artifact.name
+              : t('workspacePreview.runLabel', {
+                  id: artifact.runId.slice(0, 8),
+                })}
+          </div>
+          <div className="chat-session-preview-subtitle">
+            {artifact.sourceLabel} ·{' '}
+            {formatDateShortWithTime(artifact.createdAt)}
+          </div>
+        </div>
+        <div className="chat-session-preview-header-actions">
+          {artifact.kind === 'attachment' ? (
+            <a
+              href={artifact.url}
+              target="_blank"
+              rel="noreferrer"
+              className="chat-session-preview-action"
+            >
+              {openLabel}
+            </a>
+          ) : (
+            <button
+              type="button"
+              className="chat-session-preview-action"
+              onClick={() =>
+                onOpenDiffModal(
+                  artifact.runId,
+                  artifact.untrackedFiles,
+                  artifact.hasDiff
+                )
+              }
+            >
+              {viewChangesLabel}
+            </button>
+          )}
+          <button
+            type="button"
+            className="chat-session-preview-close"
+            onClick={onClose}
+            aria-label={closeLabel}
+            title={closeLabel}
+          >
+            ×
+          </button>
+        </div>
+      </div>
+
+      <div className="chat-session-preview-body">
+        {artifact.kind === 'attachment' ? (
+          artifact.previewType === 'image' ? (
+            <div className="chat-session-preview-frame-shell">
+              <img
+                src={artifact.url}
+                alt={artifact.name}
+                className="chat-session-preview-image"
+              />
+            </div>
+          ) : (
+            <div className="chat-session-preview-frame-shell">
+              <iframe
+                src={artifact.url}
+                title={artifact.name}
+                sandbox="allow-scripts allow-same-origin"
+                className="chat-session-preview-frame"
+              />
+            </div>
+          )
+        ) : (
+          <div className="chat-session-preview-diff">
+            <div className="chat-session-preview-diff-stats">
+              <div className="chat-session-preview-stat-card">
+                <div className="chat-session-preview-stat-value">
+                  {diffSummary?.fileCount ?? 0}
+                </div>
+                <div className="chat-session-preview-stat-label">
+                  {filesLabel}
+                </div>
+              </div>
+              <div className="chat-session-preview-stat-card">
+                <div className="chat-session-preview-stat-value is-positive">
+                  +{diffSummary?.additions ?? 0}
+                </div>
+                <div className="chat-session-preview-stat-label">
+                  {addedLabel}
+                </div>
+              </div>
+              <div className="chat-session-preview-stat-card">
+                <div className="chat-session-preview-stat-value is-negative">
+                  -{diffSummary?.deletions ?? 0}
+                </div>
+                <div className="chat-session-preview-stat-label">
+                  {removedLabel}
+                </div>
+              </div>
+            </div>
+
+            {artifact.previewText && (
+              <pre className="chat-session-preview-diff-copy">
+                {artifact.previewText}
+              </pre>
+            )}
+
+            {artifact.hasDiff && diffState?.loading && (
+              <div className="chat-session-preview-diff-note">
+                {loadingLabel}
+              </div>
+            )}
+            {artifact.hasDiff && diffState?.error && (
+              <div className="chat-session-preview-diff-note is-error">
+                {diffState.error}
+              </div>
+            )}
+
+            <div className="chat-session-preview-file-list">
+              {(diffSummary?.files.length
+                ? diffSummary.files
+                : artifact.untrackedFiles.map((path) => ({
+                    path,
+                    additions: 0,
+                    deletions: 0,
+                  }))
+              )
+                .slice(0, 10)
+                .map((file) => (
+                  <div
+                    key={file.path}
+                    className="chat-session-preview-file-row"
+                  >
+                    <span
+                      className="chat-session-preview-file-path"
+                      title={file.path}
+                    >
+                      {file.path}
+                    </span>
+                    {'additions' in file && (
+                      <span className="chat-session-preview-file-delta">
+                        <span className="is-positive">+{file.additions}</span>
+                        <span className="is-negative">-{file.deletions}</span>
+                      </span>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
 
 export function ChatSessions() {
   const { t } = useTranslation('chat');
@@ -208,15 +610,6 @@ export function ChatSessions() {
   useEffect(() => {
     notificationsRef.current = config?.notifications ?? null;
   }, [config?.notifications]);
-
-  useEffect(() => {
-    sessionTitleByIdRef.current = new Map(
-      sortedSessions.map((session) => [
-        session.id,
-        session.title?.trim() || 'Group Chat',
-      ])
-    );
-  }, [sortedSessions]);
 
   useEffect(() => {
     agentByIdRef.current = agentById;
@@ -308,7 +701,9 @@ export function ChatSessions() {
       const sessionTitle =
         (message.session_id &&
           sessionTitleByIdRef.current.get(message.session_id)) ||
-        'Group Chat';
+        t('sidebar.generatedSessionTitle', {
+          date: formatDateShortWithTime(message.created_at),
+        });
 
       const showNotification = () => {
         try {
@@ -345,7 +740,7 @@ export function ChatSessions() {
           });
       }
     },
-    [upsertMessage]
+    [t, upsertMessage]
   );
 
   // WebSocket connection
@@ -441,6 +836,7 @@ export function ChatSessions() {
     handleOpenDiffViewer,
     handleCloseDiffViewer,
     handleToggleFullscreen,
+    handleLoadDiff,
     handleToggleUntracked,
     resetDiffViewer,
   } = useDiffViewer();
@@ -524,6 +920,10 @@ export function ChatSessions() {
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(340);
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+  const [isWorkspacePreviewOpen, setIsWorkspacePreviewOpen] = useState(false);
+  const [workspacePreviewArtifact, setWorkspacePreviewArtifact] =
+    useState<ArtifactSpotlight | null>(null);
   const [inputAreaHeight, setInputAreaHeight] = useState(160);
   const [isResizing, setIsResizing] = useState<
     'left' | 'right' | 'input' | null
@@ -641,12 +1041,7 @@ export function ChatSessions() {
     setPromptFileLoading(false);
     setTeamImportPlan(null);
     setTeamImportName(null);
-  }, [
-    activeSessionId,
-    resetInput,
-    resetDiffViewer,
-    setReplyToMessage,
-  ]);
+  }, [activeSessionId, resetInput, resetDiffViewer, setReplyToMessage]);
 
   // Navigate to first session if needed
   useEffect(() => {
@@ -669,7 +1064,13 @@ export function ChatSessions() {
     ) {
       navigate(`/chat/${sortedSessions[0].id}`, { replace: true });
     }
-  }, [isSessionsLoading, isSkillsPanelOpen, navigate, sessionId, sortedSessions]);
+  }, [
+    isSessionsLoading,
+    isSkillsPanelOpen,
+    navigate,
+    sessionId,
+    sortedSessions,
+  ]);
 
   useEffect(() => {
     const nextUpdatedAtById = new Map(
@@ -844,7 +1245,6 @@ export function ChatSessions() {
     }
     return sum;
   }, [messageList]);
-
   const runHistory = useRunHistory(messages);
 
   const activeSession = useMemo(
@@ -869,7 +1269,90 @@ export function ChatSessions() {
   }, [sessionMembers]);
 
   const isArchived = activeSession?.status === ChatSessionStatus.archived;
-  const activeSessionTitle = activeSession?.title ?? '';
+  const activeSessionTitle = normalizeSessionTitle(activeSession?.title);
+  const activeSessionSummary = activeSession?.summary_text?.trim() ?? '';
+  const firstUserPromptTitle = useMemo(() => {
+    const firstUserMessage = messageList.find(
+      (message) =>
+        message.sender_type === ChatSenderType.user &&
+        message.content.trim().length > 0
+    );
+    if (!firstUserMessage) return '';
+    return truncateText(
+      firstUserMessage.content.replace(/\s+/g, ' ').trim(),
+      52
+    );
+  }, [messageList]);
+  const activeSessionFallbackTitle = useMemo(() => {
+    if (!activeSession) {
+      return t('sidebar.generatedSessionTitle', {
+        date: formatDateShortWithTime(new Date().toISOString()),
+      });
+    }
+    if (activeSessionSummary) {
+      return truncateText(activeSessionSummary, 52);
+    }
+    if (firstUserPromptTitle) return firstUserPromptTitle;
+    return t('sidebar.generatedSessionTitle', {
+      date: formatDateShortWithTime(activeSession.created_at),
+    });
+  }, [activeSession, activeSessionSummary, firstUserPromptTitle, t]);
+  const activeSessionDisplayTitle =
+    activeSessionTitle.trim() || activeSessionFallbackTitle;
+  const isGeneratedActiveSessionTitle = activeSessionTitle.trim().length === 0;
+  const activeSessionEditableSuggestion = useMemo(() => {
+    if (!isGeneratedActiveSessionTitle) return activeSessionTitle;
+    return truncateText(activeSessionFallbackTitle, MAX_SESSION_TITLE_LENGTH);
+  }, [
+    activeSessionFallbackTitle,
+    activeSessionTitle,
+    isGeneratedActiveSessionTitle,
+  ]);
+  const sessionDisplayTitles = useMemo(() => {
+    const next = new Map<string, string>();
+    for (const session of sortedSessions) {
+      const explicitTitle = normalizeSessionTitle(session.title);
+      const summaryTitle = session.summary_text?.trim()
+        ? truncateText(session.summary_text.trim(), 52)
+        : '';
+      if (explicitTitle) {
+        next.set(session.id, explicitTitle);
+        continue;
+      }
+      if (summaryTitle) {
+        next.set(session.id, summaryTitle);
+        continue;
+      }
+      if (session.id === activeSession?.id && activeSessionDisplayTitle) {
+        next.set(session.id, activeSessionDisplayTitle);
+        continue;
+      }
+      next.set(
+        session.id,
+        t('sidebar.generatedSessionTitle', {
+          date: formatDateShortWithTime(session.created_at),
+        })
+      );
+    }
+    return next;
+  }, [activeSession?.id, activeSessionDisplayTitle, sortedSessions, t]);
+
+  useEffect(() => {
+    sessionTitleByIdRef.current = new Map(sessionDisplayTitles);
+  }, [sessionDisplayTitles]);
+
+  useEffect(() => {
+    if (isAddMemberOpen || editingMember || teamImportPlan) {
+      setIsRightSidebarOpen(true);
+    }
+  }, [editingMember, isAddMemberOpen, teamImportPlan]);
+
+  useEffect(() => {
+    if (activeSessionId && sessionMembers.length === 0) {
+      setIsRightSidebarOpen(true);
+    }
+  }, [activeSessionId, sessionMembers.length]);
+
   const streamingRunCount = useMemo(
     () => Object.keys(streamingRuns).length,
     [streamingRuns]
@@ -1157,6 +1640,137 @@ export function ChatSessions() {
       return 'System';
     },
     [agentById]
+  );
+
+  const artifactSpotlight = useMemo<ArtifactSpotlight | null>(() => {
+    if (!activeSessionId) return null;
+
+    for (let index = messageList.length - 1; index >= 0; index -= 1) {
+      const message = messageList[index];
+      const senderLabel = getMessageSenderLabel(message);
+      const attachments = extractAttachments(message.meta);
+
+      for (const attachment of attachments) {
+        const name = attachment.name ?? '';
+        const lowerName = name.toLowerCase();
+        const mimeType = attachment.mime_type ?? '';
+        const isImage =
+          attachment.kind === 'image' || mimeType.startsWith('image/');
+        const isHtml =
+          mimeType.includes('html') ||
+          lowerName.endsWith('.html') ||
+          lowerName.endsWith('.htm');
+
+        if (!isImage && !isHtml) continue;
+
+        return {
+          kind: 'attachment',
+          name,
+          url: chatApi.getChatAttachmentUrl(
+            activeSessionId,
+            message.id,
+            attachment.id
+          ),
+          previewType: isImage ? 'image' : 'html',
+          sourceLabel: senderLabel,
+          createdAt: message.created_at,
+          pathLabel: attachment.relative_path ?? name,
+        };
+      }
+
+      const diffInfo = extractDiffMeta(message.meta);
+      if (
+        diffInfo.runId &&
+        (diffInfo.available || diffInfo.untrackedFiles.length > 0)
+      ) {
+        return {
+          kind: 'diff',
+          runId: diffInfo.runId,
+          sourceLabel: senderLabel,
+          createdAt: message.created_at,
+          hasDiff: diffInfo.available,
+          untrackedFiles: diffInfo.untrackedFiles,
+          previewText: diffInfo.preview,
+        };
+      }
+    }
+
+    return null;
+  }, [activeSessionId, getMessageSenderLabel, messageList]);
+
+  const artifactSpotlightKey = useMemo(
+    () => getArtifactSpotlightKey(artifactSpotlight),
+    [artifactSpotlight]
+  );
+
+  useEffect(() => {
+    if (!artifactSpotlight) {
+      setWorkspacePreviewArtifact(null);
+      setIsWorkspacePreviewOpen(false);
+      return;
+    }
+
+    setWorkspacePreviewArtifact((current) => {
+      const currentKey = getArtifactSpotlightKey(current);
+      if (currentKey === artifactSpotlightKey) {
+        return current;
+      }
+      return artifactSpotlight;
+    });
+    setIsWorkspacePreviewOpen(true);
+  }, [artifactSpotlight, artifactSpotlightKey]);
+
+  useEffect(() => {
+    if (
+      isWorkspacePreviewOpen &&
+      workspacePreviewArtifact?.kind === 'diff' &&
+      workspacePreviewArtifact.hasDiff
+    ) {
+      handleLoadDiff(workspacePreviewArtifact.runId);
+    }
+  }, [handleLoadDiff, isWorkspacePreviewOpen, workspacePreviewArtifact]);
+
+  const handleSelectWorkspacePreview = useCallback(
+    (artifact: ArtifactSpotlight) => {
+      setWorkspacePreviewArtifact(artifact);
+      setIsWorkspacePreviewOpen(true);
+      if (artifact.kind === 'diff' && artifact.hasDiff) {
+        void handleLoadDiff(artifact.runId);
+      }
+    },
+    [handleLoadDiff]
+  );
+
+  const handlePreviewMessageAttachment = useCallback(
+    (message: ChatMessage, attachment: ChatAttachment) => {
+      if (!activeSessionId || !attachment.id) return;
+
+      const lowerName = (attachment.name ?? '').toLowerCase();
+      const mimeType = attachment.mime_type ?? '';
+      const isImage =
+        attachment.kind === 'image' || mimeType.startsWith('image/');
+      const isHtml =
+        mimeType.includes('html') ||
+        lowerName.endsWith('.html') ||
+        lowerName.endsWith('.htm');
+
+      if (!isImage && !isHtml) return;
+
+      handleSelectWorkspacePreview({
+        kind: 'attachment',
+        name: attachment.name ?? 'attachment',
+        url: chatApi.getChatAttachmentUrl(
+          activeSessionId,
+          message.id,
+          attachment.id
+        ),
+        previewType: isImage ? 'image' : 'html',
+        sourceLabel: getMessageSenderLabel(message),
+        createdAt: message.created_at,
+        pathLabel: attachment.relative_path ?? attachment.name ?? 'attachment',
+      });
+    },
+    [activeSessionId, getMessageSenderLabel, handleSelectWorkspacePreview]
   );
 
   const trimmedMessageSearchQuery = isMessageSearchOpen
@@ -1665,7 +2279,10 @@ export function ChatSessions() {
 
       const currentAssignments = await chatApi.listAgentSkills(agentId);
       const assignmentBySkillId = new Map(
-        currentAssignments.map((assignment) => [assignment.skill_id, assignment])
+        currentAssignments.map((assignment) => [
+          assignment.skill_id,
+          assignment,
+        ])
       );
 
       const operations: Array<Promise<unknown>> = [];
@@ -1685,7 +2302,9 @@ export function ChatSessions() {
       if (replace) {
         for (const assignment of currentAssignments) {
           if (!targetSkillIdSet.has(assignment.skill_id)) {
-            operations.push(chatApi.unassignSkillFromAgent(agentId, assignment.id));
+            operations.push(
+              chatApi.unassignSkillFromAgent(agentId, assignment.id)
+            );
           }
         }
       }
@@ -1731,7 +2350,9 @@ export function ChatSessions() {
           if (entry.action === 'create') {
             await syncAgentSkills(agentId, selectedSkillIds, { replace: true });
           } else if (selectedSkillIds.length > 0) {
-            await syncAgentSkills(agentId, selectedSkillIds, { replace: false });
+            await syncAgentSkills(agentId, selectedSkillIds, {
+              replace: false,
+            });
           }
         }
 
@@ -2040,7 +2661,9 @@ export function ChatSessions() {
     const workspacePathVal = newMemberWorkspace.trim();
     const selectedVariant = newMemberVariant.trim() || 'DEFAULT';
     const normalizedSelectedSkillIds = Array.from(
-      new Set(newMemberSkillIds.map((skillId) => skillId.trim()).filter(Boolean))
+      new Set(
+        newMemberSkillIds.map((skillId) => skillId.trim()).filter(Boolean)
+      )
     );
 
     if (!name) {
@@ -2533,9 +3156,10 @@ export function ChatSessions() {
       <section className="chat-session-main flex-1 min-w-0 min-h-0 flex flex-col">
         <ChatHeader
           activeSession={activeSession ?? null}
+          displayTitle={activeSessionDisplayTitle}
+          isGeneratedTitle={isGeneratedActiveSessionTitle}
           messageCount={messageList.length}
           totalTokens={totalTokens}
-          memberCount={sessionMembers.length}
           isSearchOpen={isMessageSearchOpen}
           searchQuery={messageSearchQuery}
           onCloseSearch={handleCloseMessageSearch}
@@ -2546,6 +3170,9 @@ export function ChatSessions() {
           titleError={titleError}
           isSavingTitle={updateSession.isPending}
           onStartEditTitle={() => {
+            if (isGeneratedActiveSessionTitle) {
+              setTitleDraft(activeSessionEditableSuggestion);
+            }
             setIsEditingTitle(true);
             setTitleError(null);
           }}
@@ -2566,7 +3193,7 @@ export function ChatSessions() {
             setConfirmModal({
               title: t('modals.confirm.titles.deleteSession'),
               message: t('modals.confirm.messages.deleteSession', {
-                title: activeSession.title || t('sidebar.untitledSession'),
+                title: activeSessionDisplayTitle,
               }),
               onConfirm: async () => {
                 await deleteSession.mutateAsync(activeSession.id);
@@ -2631,275 +3258,377 @@ export function ChatSessions() {
           />
         )}
 
-        {/* Messages */}
         <div
-          ref={messagesContainerRef}
-          className="chat-session-messages flex-1 min-h-0 overflow-y-auto p-base space-y-base"
+          className={cn(
+            'chat-session-workspace-shell flex-1 min-h-0',
+            isWorkspacePreviewOpen &&
+              workspacePreviewArtifact &&
+              'is-preview-open'
+          )}
         >
-          {isLoading && <div className="text-sm text-low">Loading chat...</div>}
-          {isArchived && !isLoading && (
-            <div className="text-xs text-low border border-border rounded-sm bg-secondary/60 px-base py-half">
-              This session is archived. Messages and members are read-only.
-            </div>
-          )}
-          {compressionWarning && (
-            <div className="chat-session-compression-warning text-xs border border-yellow-500/50 rounded-sm bg-yellow-500/10 px-base py-half flex items-center justify-between">
-              <div className="flex items-center gap-half">
-                <span className="text-yellow-600 dark:text-yellow-400">!</span>
-                <span className="text-yellow-700 dark:text-yellow-300">
-                  {compressionWarning.message}
-                </span>
-                <span className="text-yellow-600/80 dark:text-yellow-400/80 ml-1">
-                  ({compressionWarning.split_file_path})
-                </span>
-              </div>
-              <button
-                type="button"
-                className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200 text-xs"
-                onClick={clearCompressionWarning}
-              >
-                x
-              </button>
-            </div>
-          )}
-          {!isLoading && messageList.length === 0 && (
-            <div className="text-sm text-low">
-              No messages yet. Start the conversation below.
-            </div>
-          )}
-          {!isLoading &&
-            messageList.length > 0 &&
-            trimmedMessageSearchQuery &&
-            filteredMessageList.length === 0 && (
-              <div className="text-sm text-low">
-                No messages match "{messageSearchQuery.trim()}".
+          <div className="chat-session-workspace-chat min-h-0 flex-1 flex flex-col">
+            {artifactSpotlight && (
+              <div className="chat-session-artifact-strip shrink-0 px-base pt-base">
+                <div className="chat-session-content-shell">
+                  <ArtifactSpotlightCard
+                    artifact={artifactSpotlight}
+                    title={t('header.latestArtifact')}
+                    openLabel={t('message.open')}
+                    previewLabel={t('message.view')}
+                    viewChangesLabel={t('message.viewChanges')}
+                    diffState={
+                      artifactSpotlight.kind === 'diff'
+                        ? runDiffs[artifactSpotlight.runId]
+                        : undefined
+                    }
+                    onSelectPreview={handleSelectWorkspacePreview}
+                  />
+                </div>
               </div>
             )}
 
-          {filteredMessageList.map((message) => {
-            const isAgent = message.sender_type === ChatSenderType.agent;
-            const agentName =
-              isAgent && message.sender_id
-                ? (agentById.get(message.sender_id)?.name ?? 'Agent')
-                : null;
-            const diffMeta = isAgent ? extractDiffMeta(message.meta) : null;
-            const diffInfo = diffMeta && diffMeta.runId ? diffMeta : null;
-            const attachments = extractAttachments(message.meta);
-            const mentionList = Array.from(
-              new Set(message.mentions.filter((mention) => mention.length > 0))
-            );
-            const mentionStatusMap = mentionStatuses.get(message.id);
-            const referenceId = extractReferenceId(message.meta);
-            const referenceMessage = referenceId
-              ? messageById.get(referenceId)
-              : null;
-            const isUser = message.sender_type === ChatSenderType.user;
-            const toneKey = isUser
-              ? 'user'
-              : (message.sender_id ?? agentName ?? 'agent');
-            const tone = getMessageTone(String(toneKey), isUser);
+            {/* Messages */}
+            <div
+              ref={messagesContainerRef}
+              className="chat-session-messages flex-1 min-h-0 overflow-y-auto p-base space-y-base"
+            >
+              <div className="chat-session-message-column space-y-base">
+                {isLoading && (
+                  <div className="text-sm text-low">Loading chat...</div>
+                )}
+                {isArchived && !isLoading && (
+                  <div className="text-xs text-low border border-border rounded-sm bg-secondary/60 px-base py-half">
+                    This session is archived. Messages and members are
+                    read-only.
+                  </div>
+                )}
+                {compressionWarning && (
+                  <div className="chat-session-compression-warning text-xs border border-yellow-500/50 rounded-sm bg-yellow-500/10 px-base py-half flex items-center justify-between">
+                    <div className="flex items-center gap-half">
+                      <span className="text-yellow-600 dark:text-yellow-400">
+                        !
+                      </span>
+                      <span className="text-yellow-700 dark:text-yellow-300">
+                        {compressionWarning.message}
+                      </span>
+                      <span className="text-yellow-600/80 dark:text-yellow-400/80 ml-1">
+                        ({compressionWarning.split_file_path})
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200 text-xs"
+                      onClick={clearCompressionWarning}
+                    >
+                      x
+                    </button>
+                  </div>
+                )}
+                {!isLoading && messageList.length === 0 && (
+                  <div className="text-sm text-low">
+                    No messages yet. Start the conversation below.
+                  </div>
+                )}
+                {!isLoading &&
+                  messageList.length > 0 &&
+                  trimmedMessageSearchQuery &&
+                  filteredMessageList.length === 0 && (
+                    <div className="text-sm text-low">
+                      No messages match "{messageSearchQuery.trim()}".
+                    </div>
+                  )}
 
-            const isSelected = selectedMessageIds.has(message.id);
+                {filteredMessageList.map((message) => {
+                  const isAgent = message.sender_type === ChatSenderType.agent;
+                  const agentName =
+                    isAgent && message.sender_id
+                      ? (agentById.get(message.sender_id)?.name ?? 'Agent')
+                      : null;
+                  const diffMeta = isAgent
+                    ? extractDiffMeta(message.meta)
+                    : null;
+                  const diffInfo = diffMeta && diffMeta.runId ? diffMeta : null;
+                  const attachments = extractAttachments(message.meta);
+                  const mentionList = Array.from(
+                    new Set(
+                      message.mentions.filter((mention) => mention.length > 0)
+                    )
+                  );
+                  const mentionStatusMap = mentionStatuses.get(message.id);
+                  const referenceId = extractReferenceId(message.meta);
+                  const referenceMessage = referenceId
+                    ? messageById.get(referenceId)
+                    : null;
+                  const isUser = message.sender_type === ChatSenderType.user;
+                  const toneKey = isUser
+                    ? 'user'
+                    : (message.sender_id ?? agentName ?? 'agent');
+                  const tone = getMessageTone(String(toneKey), isUser);
 
-            return (
-              <ChatMessageItem
-                key={message.id}
-                message={message}
-                senderLabel={getMessageSenderLabel(message)}
-                senderRunnerType={
-                  isAgent && message.sender_id
-                    ? (agentById.get(message.sender_id)?.runner_type ?? null)
-                    : null
-                }
-                tone={tone}
-                referenceMessage={referenceMessage ?? null}
-                referenceSenderLabel={
-                  referenceMessage
-                    ? getMessageSenderLabel(referenceMessage)
-                    : null
-                }
-                referencePreview={
-                  referenceMessage
-                    ? getReferencePreview(referenceMessage)
-                    : null
-                }
-                mentionList={mentionList}
-                mentionStatusMap={mentionStatusMap}
-                agentStates={agentStates}
-                agentIdByName={agentIdByName}
-                attachments={attachments}
-                activeSessionId={activeSessionId}
-                onAddAttachmentAsFile={addAttachmentAsFile}
-                diffInfo={diffInfo}
-                runDiffs={runDiffs}
-                onOpenDiffViewer={handleOpenDiffViewer}
-                isArchived={isArchived}
-                onReply={handleLocalReplySelect}
-                isCleanupMode={isCleanupMode}
-                isSelected={isSelected}
-                onToggleSelect={() => {
-                  setSelectedMessageIds((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(message.id)) {
-                      next.delete(message.id);
-                    } else {
-                      next.add(message.id);
-                    }
-                    return next;
-                  });
-                }}
-              />
-            );
-          })}
+                  const isSelected = selectedMessageIds.has(message.id);
 
-          {/* Running placeholders */}
-          {placeholderAgents.map((member) => (
-            <RunningAgentPlaceholder
-              key={`placeholder-${member.agent.id}`}
-              member={member}
-              run={runByAgentId.get(member.agent.id)}
-              tone={getMessageTone(member.agent.id, false)}
-              stateInfo={agentStateInfos[member.agent.id]}
-              clock={clock}
-              isStopping={stoppingAgents.has(member.agent.id)}
-              onStop={handleStopAgent}
+                  return (
+                    <ChatMessageItem
+                      key={message.id}
+                      message={message}
+                      senderLabel={getMessageSenderLabel(message)}
+                      senderRunnerType={
+                        isAgent && message.sender_id
+                          ? (agentById.get(message.sender_id)?.runner_type ??
+                            null)
+                          : null
+                      }
+                      tone={tone}
+                      referenceMessage={referenceMessage ?? null}
+                      referenceSenderLabel={
+                        referenceMessage
+                          ? getMessageSenderLabel(referenceMessage)
+                          : null
+                      }
+                      referencePreview={
+                        referenceMessage
+                          ? getReferencePreview(referenceMessage)
+                          : null
+                      }
+                      mentionList={mentionList}
+                      mentionStatusMap={mentionStatusMap}
+                      agentStates={agentStates}
+                      agentIdByName={agentIdByName}
+                      attachments={attachments}
+                      activeSessionId={activeSessionId}
+                      onAddAttachmentAsFile={addAttachmentAsFile}
+                      onPreviewAttachment={handlePreviewMessageAttachment}
+                      diffInfo={diffInfo}
+                      runDiffs={runDiffs}
+                      onOpenDiffViewer={(runId, untrackedFiles, hasDiff) =>
+                        handleSelectWorkspacePreview({
+                          kind: 'diff',
+                          runId,
+                          sourceLabel: getMessageSenderLabel(message),
+                          createdAt: message.created_at,
+                          hasDiff,
+                          untrackedFiles,
+                          previewText: diffInfo?.preview ?? null,
+                        })
+                      }
+                      isArchived={isArchived}
+                      onReply={handleLocalReplySelect}
+                      isCleanupMode={isCleanupMode}
+                      isSelected={isSelected}
+                      onToggleSelect={() => {
+                        setSelectedMessageIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(message.id)) {
+                            next.delete(message.id);
+                          } else {
+                            next.add(message.id);
+                          }
+                          return next;
+                        });
+                      }}
+                    />
+                  );
+                })}
+
+                {placeholderAgents.map((member) => (
+                  <RunningAgentPlaceholder
+                    key={`placeholder-${member.agent.id}`}
+                    member={member}
+                    run={runByAgentId.get(member.agent.id)}
+                    tone={getMessageTone(member.agent.id, false)}
+                    stateInfo={agentStateInfos[member.agent.id]}
+                    clock={clock}
+                    isStopping={stoppingAgents.has(member.agent.id)}
+                    onStop={handleStopAgent}
+                  />
+                ))}
+
+                <div ref={bottomRef} />
+              </div>
+            </div>
+
+            {/* Input Area Resize Handle */}
+            <div
+              className="chat-session-resize-handle h-1 cursor-row-resize transition-colors shrink-0"
+              onMouseDown={(e) => handleResizeStart('input', e)}
             />
-          ))}
 
-          <div ref={bottomRef} />
+            {/* Message Input */}
+            <MessageInputArea
+              draft={draft}
+              onDraftChange={handleDraftChange}
+              inputRef={inputRef}
+              selectedMentions={selectedMentions}
+              onSelectedMentionsChange={setSelectedMentions}
+              agentOptions={agentOptionsWithAll}
+              mentionAgentsCount={mentionAgents.length}
+              mentionQuery={mentionQuery}
+              showMentionAllSuggestion={showMentionAllSuggestion}
+              visibleMentionSuggestions={visibleMentionSuggestions}
+              highlightedMentionIndex={highlightedMentionIndex}
+              onMentionSelect={handleMentionSelect}
+              onMentionKeyDown={handleMentionKeyDown}
+              replyToMessage={replyToMessage}
+              replyToSenderLabel={
+                replyToMessage ? getMessageSenderLabel(replyToMessage) : null
+              }
+              replyToPreview={
+                replyToMessage ? getReferencePreview(replyToMessage) : null
+              }
+              onCancelReply={() => setReplyToMessage(null)}
+              attachedFiles={attachedFiles}
+              attachmentError={attachmentError}
+              isUploadingAttachments={isUploadingAttachments}
+              onAttachmentInputChange={handleAttachmentInputChange}
+              onRemoveAttachedFile={removeAttachedFile}
+              onClearAttachedFiles={clearAttachedFiles}
+              onPreviewFile={previewAttachedFile}
+              fileInputRef={fileInputRef}
+              canSend={canSend}
+              isSending={sendMessage.isPending}
+              onSend={handleSend}
+              inputAreaHeight={inputAreaHeight}
+              isArchived={isArchived}
+              activeSessionId={activeSessionId}
+            />
+          </div>
+
+          {isWorkspacePreviewOpen && workspacePreviewArtifact && (
+            <WorkspacePreviewPane
+              artifact={workspacePreviewArtifact}
+              diffState={
+                workspacePreviewArtifact.kind === 'diff'
+                  ? runDiffs[workspacePreviewArtifact.runId]
+                  : undefined
+              }
+              title={t('workspacePreview.title')}
+              openLabel={t('message.open')}
+              viewChangesLabel={t('message.viewChanges')}
+              emptyLabel={t('workspacePreview.empty')}
+              closeLabel={tCommon('buttons.close')}
+              loadingLabel={t('message.loadingDiff')}
+              filesLabel={t('workspacePreview.files')}
+              addedLabel={t('workspacePreview.added')}
+              removedLabel={t('workspacePreview.removed')}
+              onClose={() => setIsWorkspacePreviewOpen(false)}
+              onOpenDiffModal={handleOpenDiffViewer}
+            />
+          )}
         </div>
-
-        {/* Input Area Resize Handle */}
-        <div
-          className="chat-session-resize-handle h-1 cursor-row-resize transition-colors shrink-0 border-t border-border"
-          onMouseDown={(e) => handleResizeStart('input', e)}
-        />
-
-        {/* Message Input */}
-        <MessageInputArea
-          draft={draft}
-          onDraftChange={handleDraftChange}
-          inputRef={inputRef}
-          selectedMentions={selectedMentions}
-          onSelectedMentionsChange={setSelectedMentions}
-          agentOptions={agentOptionsWithAll}
-          mentionAgentsCount={mentionAgents.length}
-          mentionQuery={mentionQuery}
-          showMentionAllSuggestion={showMentionAllSuggestion}
-          visibleMentionSuggestions={visibleMentionSuggestions}
-          highlightedMentionIndex={highlightedMentionIndex}
-          onMentionSelect={handleMentionSelect}
-          onMentionKeyDown={handleMentionKeyDown}
-          replyToMessage={replyToMessage}
-          replyToSenderLabel={
-            replyToMessage ? getMessageSenderLabel(replyToMessage) : null
-          }
-          replyToPreview={
-            replyToMessage ? getReferencePreview(replyToMessage) : null
-          }
-          onCancelReply={() => setReplyToMessage(null)}
-          attachedFiles={attachedFiles}
-          attachmentError={attachmentError}
-          isUploadingAttachments={isUploadingAttachments}
-          onAttachmentInputChange={handleAttachmentInputChange}
-          onRemoveAttachedFile={removeAttachedFile}
-          onClearAttachedFiles={clearAttachedFiles}
-          onPreviewFile={previewAttachedFile}
-          fileInputRef={fileInputRef}
-          canSend={canSend}
-          isSending={sendMessage.isPending}
-          onSend={handleSend}
-          inputAreaHeight={inputAreaHeight}
-          isArchived={isArchived}
-          activeSessionId={activeSessionId}
-        />
       </section>
 
       {/* Right Sidebar Resize Handle */}
-      <div
-        className="chat-session-resize-handle w-1 cursor-col-resize transition-colors shrink-0"
-        onMouseDown={(e) => handleResizeStart('right', e)}
-      />
+      {isRightSidebarOpen && (
+        <div
+          className="chat-session-resize-handle w-1 cursor-col-resize transition-colors shrink-0"
+          onMouseDown={(e) => handleResizeStart('right', e)}
+        />
+      )}
 
-      {/* AI Members Sidebar */}
-      <AiMembersSidebar
-        sessionMembers={sessionMembers}
-        agentStates={agentStates}
-        activeSessionId={activeSessionId}
-        isArchived={isArchived}
-        width={rightSidebarWidth}
-        isAddMemberOpen={isAddMemberOpen}
-        editingMember={editingMember}
-        newMemberName={newMemberName}
-        newMemberRunnerType={newMemberRunnerType}
-        newMemberVariant={newMemberVariant}
-        newMemberPrompt={newMemberPrompt}
-        newMemberWorkspace={newMemberWorkspace}
-        newMemberSkillIds={newMemberSkillIds}
-        memberNameLengthError={memberNameLengthError}
-        onNameChange={setNewMemberName}
-        onRunnerTypeChange={setNewMemberRunnerType}
-        onVariantChange={setNewMemberVariant}
-        onPromptChange={setNewMemberPrompt}
-        onWorkspaceChange={setNewMemberWorkspace}
-        onMemberSkillIdsChange={setNewMemberSkillIds}
-        memberError={memberError}
-        isSavingMember={isSavingMember}
-        availableRunnerTypes={availableRunnerTypes}
-        enabledRunnerTypes={enabledRunnerTypes}
-        isCheckingAvailability={isCheckingAvailability}
-        isRunnerAvailable={isRunnerAvailable}
-        availabilityLabel={availabilityLabel}
-        memberVariantOptions={memberVariantOptions}
-        getModelName={getModelName}
-        getModelDisplayName={getModelDisplayName}
-        getVariantLabel={getVariantLabel}
-        getVariantOptions={getVariantOptions}
-        onOpenAddMember={() => {
-          setIsAddMemberOpen(true);
-          setMemberError(null);
-          setEditingMember(null);
-          setNewMemberName('');
-          setNewMemberVariant('DEFAULT');
-          setNewMemberPrompt('');
-          setNewMemberWorkspace('');
-          setNewMemberSkillIds([]);
-          setEditingMemberInitialSkillIds([]);
-          setIsPromptEditorOpen(false);
-          setPromptFileError(null);
-        }}
-        onCancelMember={() => {
-          setIsAddMemberOpen(false);
-          setMemberError(null);
-          setEditingMember(null);
-          setNewMemberVariant('DEFAULT');
-          setNewMemberSkillIds([]);
-          setEditingMemberInitialSkillIds([]);
-          setIsPromptEditorOpen(false);
-          setPromptFileError(null);
-        }}
-        onSaveMember={handleAddMember}
-        onEditMember={handleEditMember}
-        onRemoveMember={handleRemoveMember}
-        onOpenWorkspace={(agentId) => {
-          setWorkspaceAgentId(agentId);
-          setWorkspaceDrawerOpen(true);
-        }}
-        onExpandPromptEditor={() => {
-          setIsPromptEditorOpen(true);
-          setPromptFileError(null);
-        }}
-        enabledMemberPresets={enabledMemberPresets}
-        enabledTeamPresets={enabledTeamPresets}
-        onAddMemberPreset={handleAddMemberPreset}
-        onImportTeamPreset={handleImportTeamPreset}
-        teamImportPlan={teamImportPlan}
-        teamImportName={teamImportName}
-        isImportingTeam={isImportingTeam}
-        onUpdateTeamImportPlanEntry={handleUpdateTeamImportPlanEntry}
-        onConfirmTeamImport={handleConfirmTeamImport}
-        onCancelTeamImport={handleCancelTeamImport}
-      />
+      {!isRightSidebarOpen && activeSessionId && (
+        <button
+          type="button"
+          className="chat-session-right-collapsed-toggle"
+          onClick={() => setIsRightSidebarOpen(true)}
+          aria-label={t('header.openMembersPanel')}
+          title={t('header.openMembersPanel')}
+        >
+          <UsersThreeIcon className="size-icon-xs" />
+          <span>
+            {sessionMembers.length} {t('header.aiMembers')}
+          </span>
+        </button>
+      )}
+
+      <div
+        className={cn(
+          'chat-session-right-drawer-shell shrink-0 min-h-0 overflow-hidden',
+          isRightSidebarOpen && 'is-open'
+        )}
+        style={{ width: isRightSidebarOpen ? rightSidebarWidth : 0 }}
+      >
+        <AiMembersSidebar
+          sessionMembers={sessionMembers}
+          agentStates={agentStates}
+          activeSessionId={activeSessionId}
+          isArchived={isArchived}
+          width={rightSidebarWidth}
+          isPanelOpen={isRightSidebarOpen}
+          onTogglePanel={() => setIsRightSidebarOpen((prev) => !prev)}
+          isAddMemberOpen={isAddMemberOpen}
+          editingMember={editingMember}
+          newMemberName={newMemberName}
+          newMemberRunnerType={newMemberRunnerType}
+          newMemberVariant={newMemberVariant}
+          newMemberPrompt={newMemberPrompt}
+          newMemberWorkspace={newMemberWorkspace}
+          newMemberSkillIds={newMemberSkillIds}
+          memberNameLengthError={memberNameLengthError}
+          onNameChange={setNewMemberName}
+          onRunnerTypeChange={setNewMemberRunnerType}
+          onVariantChange={setNewMemberVariant}
+          onPromptChange={setNewMemberPrompt}
+          onWorkspaceChange={setNewMemberWorkspace}
+          onMemberSkillIdsChange={setNewMemberSkillIds}
+          memberError={memberError}
+          isSavingMember={isSavingMember}
+          availableRunnerTypes={availableRunnerTypes}
+          enabledRunnerTypes={enabledRunnerTypes}
+          isCheckingAvailability={isCheckingAvailability}
+          isRunnerAvailable={isRunnerAvailable}
+          availabilityLabel={availabilityLabel}
+          memberVariantOptions={memberVariantOptions}
+          getModelName={getModelName}
+          getModelDisplayName={getModelDisplayName}
+          getVariantLabel={getVariantLabel}
+          getVariantOptions={getVariantOptions}
+          onOpenAddMember={() => {
+            setIsRightSidebarOpen(true);
+            setIsAddMemberOpen(true);
+            setMemberError(null);
+            setEditingMember(null);
+            setNewMemberName('');
+            setNewMemberVariant('DEFAULT');
+            setNewMemberPrompt('');
+            setNewMemberWorkspace('');
+            setNewMemberSkillIds([]);
+            setEditingMemberInitialSkillIds([]);
+            setIsPromptEditorOpen(false);
+            setPromptFileError(null);
+          }}
+          onCancelMember={() => {
+            setIsAddMemberOpen(false);
+            setMemberError(null);
+            setEditingMember(null);
+            setNewMemberVariant('DEFAULT');
+            setNewMemberSkillIds([]);
+            setEditingMemberInitialSkillIds([]);
+            setIsPromptEditorOpen(false);
+            setPromptFileError(null);
+          }}
+          onSaveMember={handleAddMember}
+          onEditMember={handleEditMember}
+          onRemoveMember={handleRemoveMember}
+          onOpenWorkspace={(agentId) => {
+            setWorkspaceAgentId(agentId);
+            setWorkspaceDrawerOpen(true);
+          }}
+          onExpandPromptEditor={() => {
+            setIsPromptEditorOpen(true);
+            setPromptFileError(null);
+          }}
+          enabledMemberPresets={enabledMemberPresets}
+          enabledTeamPresets={enabledTeamPresets}
+          onAddMemberPreset={handleAddMemberPreset}
+          onImportTeamPreset={handleImportTeamPreset}
+          teamImportPlan={teamImportPlan}
+          teamImportName={teamImportName}
+          isImportingTeam={isImportingTeam}
+          onUpdateTeamImportPlanEntry={handleUpdateTeamImportPlanEntry}
+          onConfirmTeamImport={handleConfirmTeamImport}
+          onCancelTeamImport={handleCancelTeamImport}
+        />
+      </div>
 
       <SkillsPanel
         isOpen={isSkillsPanelOpen}

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -149,6 +150,17 @@ func main() {
 	if err := server.loadSkills(); err != nil {
 		fmt.Printf("Error loading skills: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Start periodic sync if configured
+	syncInterval := os.Getenv("SYNC_INTERVAL")
+	if syncInterval != "" {
+		duration, err := time.ParseDuration(syncInterval)
+		if err != nil {
+			fmt.Printf("Warning: invalid SYNC_INTERVAL '%s', using default 6h\n", syncInterval)
+			duration = 6 * time.Hour
+		}
+		server.startPeriodicSync(duration)
 	}
 
 	// Setup Gin router
@@ -372,6 +384,9 @@ func getCategoryFromName(name string) string {
 func (s *Server) listSkills(c *gin.Context) {
 	search := c.Query("search")
 	category := c.Query("category")
+	sortBy := c.Query("sort")     // "downloads", "name", "recent"
+	limitStr := c.Query("limit")  // pagination
+	offsetStr := c.Query("offset") // pagination
 
 	var result []SkillListItem
 	for _, skill := range s.skills {
@@ -402,6 +417,58 @@ func (s *Server) listSkills(c *gin.Context) {
 			CompatibleAgents: skill.CompatibleAgents,
 			DownloadCount:    skill.DownloadCount,
 		})
+	}
+
+	// Sort results
+	switch sortBy {
+	case "downloads":
+		// Sort by download count descending
+		for i := 0; i < len(result)-1; i++ {
+			for j := i + 1; j < len(result); j++ {
+				if result[j].DownloadCount > result[i].DownloadCount {
+					result[i], result[j] = result[j], result[i]
+				}
+			}
+		}
+	case "name":
+		// Sort by name ascending
+		for i := 0; i < len(result)-1; i++ {
+			for j := i + 1; j < len(result); j++ {
+				if strings.ToLower(result[i].Name) > strings.ToLower(result[j].Name) {
+					result[i], result[j] = result[j], result[i]
+				}
+			}
+		}
+	default:
+		// Default: sort by downloads
+		for i := 0; i < len(result)-1; i++ {
+			for j := i + 1; j < len(result); j++ {
+				if result[j].DownloadCount > result[i].DownloadCount {
+					result[i], result[j] = result[j], result[i]
+				}
+			}
+		}
+	}
+
+	// Apply pagination
+	if limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err == nil && limit > 0 {
+			offset := 0
+			if offsetStr != "" {
+				offset, _ = strconv.Atoi(offsetStr)
+			}
+
+			if offset < len(result) {
+				end := offset + limit
+				if end > len(result) {
+					end = len(result)
+				}
+				result = result[offset:end]
+			} else {
+				result = []SkillListItem{}
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, result)
@@ -762,4 +829,50 @@ func (s *Server) getSyncStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, status)
+}
+
+// startPeriodicSync starts a background goroutine to sync skills.sh data periodically
+func (s *Server) startPeriodicSync(interval time.Duration) {
+	fmt.Printf("Starting periodic skills.sh sync every %v\n", interval)
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			fmt.Println("Running scheduled skills.sh sync...")
+
+			data, err := ScrapeSkillsShWithOptions(true) // Full scrape
+			if err != nil {
+				fmt.Printf("Scheduled sync failed: %v\n", err)
+				continue
+			}
+
+			s.skillsShData = data
+
+			// Build download counts map
+			s.downloadCounts = make(map[string]int64)
+			for _, skill := range data.Skills {
+				s.downloadCounts[skill.ID] = skill.DownloadCount
+				s.downloadCounts[skill.Name] = skill.DownloadCount
+			}
+
+			// Update existing skills with download counts
+			for i := range s.skills {
+				if count, ok := s.downloadCounts[s.skills[i].ID]; ok {
+					s.skills[i].DownloadCount = count
+				} else if count, ok := s.downloadCounts[s.skills[i].Name]; ok {
+					s.skills[i].DownloadCount = count
+				}
+			}
+
+			// Save to cache
+			if err := s.saveSkillsShData(); err != nil {
+				fmt.Printf("Warning: failed to save skills.sh data: %v\n", err)
+			}
+
+			fmt.Printf("Scheduled sync completed: %d skills, %d total installs\n",
+				data.TotalSkills, data.TotalInstalls)
+		}
+	}()
 }

@@ -75,6 +75,8 @@ pub struct RemoteSkillMeta {
     #[ts(type = "string[]")]
     pub compatible_agents: Vec<String>,
     pub source_url: Option<String>,
+    /// Download count from skills.sh registry
+    pub download_count: Option<i64>,
 }
 
 /// Full skill package from remote registry
@@ -91,6 +93,8 @@ pub struct RemoteSkillPackage {
     pub compatible_agents: Vec<String>,
     pub source_url: Option<String>,
     pub content: String,
+    /// Download count from skills.sh registry
+    pub download_count: Option<i64>,
 }
 
 /// Skill package without content (for listing)
@@ -106,6 +110,7 @@ impl From<RemoteSkillPackage> for RemoteSkillMeta {
             tags: pkg.tags,
             compatible_agents: pkg.compatible_agents,
             source_url: pkg.source_url,
+            download_count: pkg.download_count,
         }
     }
 }
@@ -123,6 +128,7 @@ impl RemoteSkillPackage {
             tags: self.tags.clone(),
             compatible_agents: self.compatible_agents.clone(),
             source_url: self.source_url.clone(),
+            download_count: self.download_count,
         }
     }
 }
@@ -338,6 +344,7 @@ pub async fn install_skill_from_registry(
         tags: Some(skill.tags.clone()),
         category: skill.category.clone(),
         compatible_agents: Some(skill.compatible_agents.clone()),
+        download_count: skill.download_count,
     };
 
     let installed = ChatSkill::create(pool, &create_data, Uuid::new_v4()).await?;

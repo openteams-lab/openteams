@@ -59,8 +59,9 @@ export function SessionListSidebar({
     ? t('sidebar.expandSidebar')
     : t('sidebar.collapseSidebar');
 
-  const getDisplaySessionTitle = (title: string | null) => {
-    const fullTitle = title?.trim() || t('sidebar.untitledSession');
+  const getDisplaySessionTitle = (session: ChatSession) => {
+    const fallbackTitle = session.title?.trim() || t('sidebar.untitledSession');
+    const fullTitle = fallbackTitle;
     if (fullTitle.length <= MAX_SESSION_TITLE_LENGTH) {
       return { fullTitle, displayTitle: fullTitle };
     }
@@ -73,7 +74,8 @@ export function SessionListSidebar({
   const renderSessionItem = (session: ChatSession) => {
     const isActive = session.id === activeSessionId;
     const hasUnread = !isActive && unreadSessionIds.has(session.id);
-    const { fullTitle, displayTitle } = getDisplaySessionTitle(session.title);
+    const { fullTitle, displayTitle } = getDisplaySessionTitle(session);
+    const summaryPreview = session.summary_text?.trim() ?? '';
 
     return (
       <button
@@ -103,6 +105,14 @@ export function SessionListSidebar({
               >
                 {displayTitle}
               </div>
+              {summaryPreview.length > 0 && (
+                <div
+                  className="chat-session-item-summary truncate"
+                  title={summaryPreview}
+                >
+                  {summaryPreview}
+                </div>
+              )}
             </div>
           )}
         </div>
