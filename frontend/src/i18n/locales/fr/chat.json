@@ -14,7 +14,8 @@
     "automation": "Automatisations",
     "skills": "Bibliothèque de compétences",
     "archivedSection": "Archivées",
-    "settingsInSidebar": "Paramètres"
+    "settingsInSidebar": "Paramètres",
+    "generatedSessionTitle": "D?marr?e {{date}}"
   },
   "header": {
     "untitledSession": "Session sans titre",
@@ -32,7 +33,18 @@
     "restoreSession": "Restaurer la session",
     "cleanupMessages": "Nettoyer les messages",
     "exitCleanupMode": "Quitter le mode nettoyage",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "moreActions": "Plus d'actions",
+    "generatedTitleBadge": "Titre auto",
+    "contextMeter": "Charge du contexte",
+    "contextUsage": "{{used}} / {{limit}}",
+    "contextUsageUnknown": "{{used}} utilis?s",
+    "contextLoadLow": "Usage l?ger",
+    "contextLoadMedium": "Usage actif",
+    "contextLoadHigh": "Usage ?lev?",
+    "openMembersPanel": "Ouvrir la liste des membres IA",
+    "closeMembersPanel": "Fermer la liste des membres IA",
+    "latestArtifact": "Dernier artefact"
   },
   "input": {
     "mentionAgents": "Mentionner des agents",
@@ -50,7 +62,9 @@
     "uploadingAttachments": "Téléchargement des pièces jointes...",
     "sendHint": "Appuyez sur Entrée pour envoyer, Maj+Entrée pour nouvelle ligne.",
     "addAttachment": "Ajouter des pièces jointes",
-    "send": "Envoyer"
+    "send": "Envoyer",
+    "workbenchHint": "Collez des captures, glissez des fichiers ou tapez @ pour orienter le travail.",
+    "attachmentCount": "{{count}} fichiers pr?ts"
   },
   "message": {
     "quote": "Citer",
@@ -75,7 +89,7 @@
     "open": "Ouvrir"
   },
   "members": {
-    "title": "Membres IA",
+    "title": "Liste des membres IA",
     "countInSession": "{{count}} dans la session",
     "selectSessionToManage": "Sélectionnez une session pour gérer les membres IA.",
     "noMembersYet": "Aucun membre IA pour l'instant. Ajoutez-en un ci-dessous pour activer les @mentions.",
@@ -293,7 +307,22 @@
       "selectRunToViewLog": "Sélectionnez une exécution pour voir sa sortie de journal.",
       "refresh": "Actualiser",
       "loadingLog": "Chargement du journal...",
-      "logEmpty": "Le journal est vide."
+      "logEmpty": "Le journal est vide.",
+      "workspaceTrail": "Chemin de l'espace de travail"
     }
+  },
+  "workspacePreview": {
+    "title": "Aper?u de l'espace de travail",
+    "empty": "S?lectionnez un artefact ou une modification de code pour l?inspecter ici.",
+    "files": "Fichiers",
+    "added": "Ajouts",
+    "removed": "Suppressions",
+    "html": "HTML",
+    "image": "Image",
+    "diff": "Diff",
+    "liveReport": "Aper?u du rapport",
+    "imagePreview": "Aper?u d?image",
+    "filesChanged": "{{count}} fichiers",
+    "runLabel": "Run {{id}}"
   }
 }

@@ -10,6 +10,7 @@
     "collapseSidebar": "Collapse sidebar",
     "createNewSession": "Create new session",
     "untitledSession": "Untitled session",
+    "generatedSessionTitle": "Started {{date}}",
     "sessionSection": "Sessions",
     "automation": "Automations",
     "skills": "Skills Library",
@@ -24,7 +25,17 @@
     "created": "Created",
     "totalMessages": "Total messages",
     "tokenUsage": "Token usage: {{value}}",
+    "generatedTitleBadge": "Auto title",
+    "contextMeter": "Context load",
+    "contextUsage": "{{used}} / {{limit}}",
+    "contextUsageUnknown": "{{used}} used",
+    "contextLoadLow": "Light usage",
+    "contextLoadMedium": "Active usage",
+    "contextLoadHigh": "Heavy usage",
     "aiMembers": "AI members",
+    "openMembersPanel": "Open AI member list",
+    "closeMembersPanel": "Close AI member list",
+    "latestArtifact": "Latest artifact",
     "searchMessages": "Search messages...",
     "clearSearch": "Clear search",
     "archived": "Archived",
@@ -32,7 +43,8 @@
     "restoreSession": "Restore session",
     "cleanupMessages": "Cleanup messages",
     "exitCleanupMode": "Exit cleanup mode",
-    "settings": "Settings"
+    "settings": "Settings",
+    "moreActions": "More actions"
   },
   "input": {
     "mentionAgents": "Mention agents",
@@ -49,6 +61,8 @@
     "inputPlaceholder": "Type your message and @mention agents...",
     "uploadingAttachments": "Uploading attachments...",
     "sendHint": "Press Enter to send, Shift+Enter for new line.",
+    "workbenchHint": "Paste screenshots, drag files, or type @ to route work.",
+    "attachmentCount": "{{count}} files ready",
     "addAttachment": "Add attachment files",
     "send": "Send"
   },
@@ -75,7 +89,7 @@
     "open": "Open"
   },
   "members": {
-    "title": "AI Members",
+    "title": "AI Member List",
     "countInSession": "{{count}} in session",
     "selectSessionToManage": "Select a session to manage AI members.",
     "noMembersYet": "No AI members yet. Add one below to enable @mentions.",
@@ -283,6 +297,7 @@
     "workspaceDrawer": {
       "agentWorkspace": "Agent workspace",
       "close": "Close",
+      "workspaceTrail": "Workspace trail",
       "workspacePathCreatedOnFirstRun": "Workspace path is created on first run.",
       "runHistory": "Run history",
       "noRunsYet": "No runs yet for this agent.",
@@ -295,5 +310,19 @@
       "loadingLog": "Loading log...",
       "logEmpty": "Log is empty."
     }
+  },
+  "workspacePreview": {
+    "title": "Workspace preview",
+    "empty": "Select an artifact or code change to inspect it here.",
+    "files": "Files",
+    "added": "Added",
+    "removed": "Removed",
+    "html": "HTML",
+    "image": "Image",
+    "diff": "Diff",
+    "liveReport": "Live report",
+    "imagePreview": "Image preview",
+    "filesChanged": "{{count}} files",
+    "runLabel": "Run {{id}}"
   }
 }

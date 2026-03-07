@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { XIcon } from '@phosphor-icons/react';
+import {
+  CaretRightIcon,
+  FolderNotchOpenIcon,
+  XIcon,
+} from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import type { ChatAgent } from 'shared/types';
 import RawLogText from '@/components/common/RawLogText';
@@ -40,17 +44,32 @@ export function WorkspaceDrawer({
 }: WorkspaceDrawerProps) {
   const { t } = useTranslation('chat');
   const [expandedRun, setExpandedRun] = useState<RunHistoryItem | null>(null);
+  const workspaceSegments = workspacePath
+    ? workspacePath
+        .split(/[\\/]+/)
+        .map((segment) => segment.trim())
+        .filter((segment) => segment.length > 0)
+    : [];
+  const condensedSegments =
+    workspaceSegments.length > 5
+      ? ['...', ...workspaceSegments.slice(-4)]
+      : workspaceSegments;
   return (
     <>
       <div
         className={cn(
-          'chat-session-workspace-drawer absolute top-0 right-0 h-full w-[420px] max-w-full border-l border-border shadow-lg transition-transform z-50 flex flex-col',
+          'chat-session-workspace-drawer absolute top-0 right-0 h-full w-[440px] max-w-full border-l border-border shadow-lg transition-transform z-50 flex flex-col',
           isOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
-        <div className="px-base py-base border-b border-border shrink-0 flex items-center justify-between">
-          <div className="text-sm text-normal font-medium">
-            {agent?.name ?? t('modals.workspaceDrawer.agentWorkspace')}
+        <div className="chat-session-workspace-drawer-header px-base py-base border-b border-border shrink-0 flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="chat-session-workspace-drawer-eyebrow">
+              {t('modals.workspaceDrawer.workspaceTrail')}
+            </div>
+            <div className="text-sm text-normal font-medium truncate">
+              {agent?.name ?? t('modals.workspaceDrawer.agentWorkspace')}
+            </div>
           </div>
           <button
             type="button"
@@ -69,10 +88,29 @@ export function WorkspaceDrawer({
             </div>
             {workspacePath && (
               <div
-                className="rounded-sm bg-[#ecedf1] px-base py-half text-xs font-mono text-normal truncate"
+                className="chat-session-workspace-path-card"
                 title={workspacePath}
               >
-                {workspacePath}
+                <div className="chat-session-workspace-path-label">
+                  <FolderNotchOpenIcon className="size-icon-xs" />
+                  <span>{t('modals.workspaceDrawer.workspaceTrail')}</span>
+                </div>
+                <div className="chat-session-workspace-breadcrumbs">
+                  {condensedSegments.map((segment, index) => (
+                    <div
+                      key={`${segment}-${index}`}
+                      className="chat-session-workspace-breadcrumb-segment"
+                    >
+                      {index > 0 && (
+                        <CaretRightIcon className="chat-session-workspace-breadcrumb-separator" />
+                      )}
+                      <span>{segment}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="chat-session-workspace-path-raw">
+                  {workspacePath}
+                </div>
               </div>
             )}
           </div>
@@ -89,7 +127,7 @@ export function WorkspaceDrawer({
             {runs.map((run: RunHistoryItem) => (
               <div
                 key={run.runId}
-                className="rounded-sm p-base space-y-half bg-[#e5e9f3]"
+                className="chat-session-workspace-run-card rounded-sm p-base space-y-half bg-[#e5e9f3]"
               >
                 <div className="flex items-center justify-between text-xs text-low">
                   <span>
@@ -137,7 +175,7 @@ export function WorkspaceDrawer({
               </div>
             )}
             {logRunId && (
-              <div className="rounded-sm bg-[#ecedf1] p-base">
+              <div className="chat-session-workspace-log-card rounded-sm bg-[#ecedf1] p-base">
                 <div className="flex items-center justify-between text-xs text-low pb-half">
                   <span>
                     {t('modals.workspaceDrawer.run')} {logRunId.slice(0, 8)}
@@ -156,9 +194,11 @@ export function WorkspaceDrawer({
                     {t('modals.workspaceDrawer.loadingLog')}
                   </div>
                 )}
-                {logError && <div className="text-xs text-error">{logError}</div>}
+                {logError && (
+                  <div className="text-xs text-error">{logError}</div>
+                )}
                 {!logLoading && !logError && (
-                  <div className="min-h-[320px] max-h-[420px] overflow-y-auto border-t border-[#d8dce6] bg-[#ecedf1] pt-base">
+                  <div className="chat-session-workspace-log-body min-h-[320px] max-h-[420px] overflow-y-auto border-t border-[#d8dce6] bg-[#ecedf1] pt-base">
                     {logContent ? (
                       <RawLogText content={logContent} />
                     ) : (

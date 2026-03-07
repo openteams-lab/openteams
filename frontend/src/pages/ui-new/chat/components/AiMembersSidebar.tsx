@@ -14,10 +14,12 @@ import {
   UserIcon,
   CodeIcon,
   BugBeetleIcon,
+  CaretRightIcon,
   MagnifyingGlassIcon,
   ShieldCheckIcon,
   PencilSimpleLineIcon,
   ChartBarIcon,
+  FolderNotchOpenIcon,
   LightbulbIcon,
   GearIcon,
   RocketIcon,
@@ -156,6 +158,12 @@ function MemberNameWithTooltip({ name }: { name: string }) {
 function WorkspacePathWithTooltip({ path }: { path: string }) {
   const textRef = useRef<HTMLDivElement | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
+  const pathSegments = path
+    .split(/[\\/]+/)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+  const condensedSegments =
+    pathSegments.length > 4 ? ['...', ...pathSegments.slice(-3)] : pathSegments;
 
   const updateTruncation = useCallback(() => {
     const el = textRef.current;
@@ -178,11 +186,21 @@ function WorkspacePathWithTooltip({ path }: { path: string }) {
   }, [updateTruncation]);
 
   const pathNode = (
-    <div
-      ref={textRef}
-      className="chat-session-member-workspace text-xs text-low truncate"
-    >
-      {path}
+    <div ref={textRef} className="chat-session-member-workspace" title={path}>
+      <FolderNotchOpenIcon className="chat-session-member-workspace-icon" />
+      <div className="chat-session-member-workspace-trail">
+        {condensedSegments.map((segment, index) => (
+          <div
+            key={`${segment}-${index}`}
+            className="chat-session-member-workspace-segment"
+          >
+            {index > 0 && (
+              <CaretRightIcon className="chat-session-member-workspace-separator" />
+            )}
+            <span className="truncate">{segment}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 
@@ -280,6 +298,8 @@ export interface AiMembersSidebarProps {
   activeSessionId: string | null;
   isArchived: boolean;
   width: number;
+  isPanelOpen: boolean;
+  onTogglePanel: () => void;
   // Member form
   isAddMemberOpen: boolean;
   editingMember: SessionMember | null;
@@ -349,6 +369,8 @@ export function AiMembersSidebar({
   activeSessionId,
   isArchived,
   width,
+  isPanelOpen,
+  onTogglePanel,
   isAddMemberOpen,
   editingMember,
   newMemberName,
@@ -758,11 +780,31 @@ export function AiMembersSidebar({
           <div className="chat-session-members-title text-sm text-normal font-medium">
             {t('members.title')}
           </div>
-          <div className="chat-session-members-count text-xs text-low">
-            {t('members.countInSession', { count: sessionMembers.length })}
-          </div>
+          <button
+            type="button"
+            className={cn(
+              'chat-session-header-member-toggle chat-session-members-header-toggle',
+              isPanelOpen && 'active'
+            )}
+            onClick={onTogglePanel}
+            aria-label={
+              isPanelOpen
+                ? t('header.closeMembersPanel')
+                : t('header.openMembersPanel')
+            }
+            title={
+              isPanelOpen
+                ? t('header.closeMembersPanel')
+                : t('header.openMembersPanel')
+            }
+          >
+            <UsersThreeIcon className="size-icon-xs" />
+            <span>
+              {sessionMembers.length} {t('header.aiMembers')}
+            </span>
+          </button>
         </div>
-        <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto p-base space-y-base">
+        <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto px-base pb-base pt-half space-y-base">
           {!activeSessionId && (
             <SidebarEmptyState
               icon={UsersThreeIcon}
@@ -806,7 +848,7 @@ export function AiMembersSidebar({
                         'size-2 rounded-full',
                         agentStateDotClass[state],
                         state === ChatSessionAgentState.running &&
-                          'animate-pulse'
+                          'chat-session-status-breathe'
                       )}
                     />
                     <span

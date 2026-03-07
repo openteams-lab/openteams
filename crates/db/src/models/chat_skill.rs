@@ -68,6 +68,8 @@ pub struct ChatSkill {
     pub category: Option<String>,
     #[ts(type = "string[]")]
     pub compatible_agents: sqlx::types::Json<Vec<String>>,
+    /// Download count from skills.sh registry
+    pub download_count: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -88,6 +90,8 @@ pub struct CreateChatSkill {
     pub tags: Option<Vec<String>>,
     pub category: Option<String>,
     pub compatible_agents: Option<Vec<String>>,
+    /// Download count from skills.sh registry
+    pub download_count: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -106,6 +110,8 @@ pub struct UpdateChatSkill {
     pub tags: Option<Vec<String>>,
     pub category: Option<String>,
     pub compatible_agents: Option<Vec<String>>,
+    /// Download count from skills.sh registry
+    pub download_count: Option<i64>,
 }
 
 impl ChatSkill {
@@ -126,6 +132,7 @@ impl ChatSkill {
                       tags as "tags!: sqlx::types::Json<Vec<String>>",
                       category,
                       compatible_agents as "compatible_agents!: sqlx::types::Json<Vec<String>>",
+                      download_count as "download_count!: i64",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM chat_skills
@@ -152,6 +159,7 @@ impl ChatSkill {
                       tags as "tags!: sqlx::types::Json<Vec<String>>",
                       category,
                       compatible_agents as "compatible_agents!: sqlx::types::Json<Vec<String>>",
+                      download_count as "download_count!: i64",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM chat_skills
@@ -179,6 +187,7 @@ impl ChatSkill {
                       tags as "tags!: sqlx::types::Json<Vec<String>>",
                       category,
                       compatible_agents as "compatible_agents!: sqlx::types::Json<Vec<String>>",
+                      download_count as "download_count!: i64",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM chat_skills
@@ -210,6 +219,7 @@ impl ChatSkill {
                       s.tags as "tags!: sqlx::types::Json<Vec<String>>",
                       s.category,
                       s.compatible_agents as "compatible_agents!: sqlx::types::Json<Vec<String>>",
+                      s.download_count as "download_count!: i64",
                       s.created_at as "created_at!: DateTime<Utc>",
                       s.updated_at as "updated_at!: DateTime<Utc>"
                FROM chat_skills s
@@ -242,6 +252,7 @@ impl ChatSkill {
                       tags as "tags!: sqlx::types::Json<Vec<String>>",
                       category,
                       compatible_agents as "compatible_agents!: sqlx::types::Json<Vec<String>>",
+                      download_count as "download_count!: i64",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM chat_skills
@@ -274,6 +285,7 @@ impl ChatSkill {
                       tags as "tags!: sqlx::types::Json<Vec<String>>",
                       category,
                       compatible_agents as "compatible_agents!: sqlx::types::Json<Vec<String>>",
+                      download_count as "download_count!: i64",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM chat_skills
@@ -302,11 +314,12 @@ impl ChatSkill {
         let tags = sqlx::types::Json(data.tags.clone().unwrap_or_default());
         let compatible_agents =
             sqlx::types::Json(data.compatible_agents.clone().unwrap_or_default());
+        let download_count = data.download_count.unwrap_or(0);
 
         sqlx::query_as!(
             ChatSkill,
-            r#"INSERT INTO chat_skills (id, name, description, content, trigger_type, trigger_keywords, enabled, source, source_url, version, author, tags, category, compatible_agents)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            r#"INSERT INTO chat_skills (id, name, description, content, trigger_type, trigger_keywords, enabled, source, source_url, version, author, tags, category, compatible_agents, download_count)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                RETURNING id as "id!: Uuid",
                          name,
                          description,
@@ -321,6 +334,7 @@ impl ChatSkill {
                          tags as "tags!: sqlx::types::Json<Vec<String>>",
                          category,
                          compatible_agents as "compatible_agents!: sqlx::types::Json<Vec<String>>",
+                         download_count as "download_count!: i64",
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>""#,
             id,
@@ -336,7 +350,8 @@ impl ChatSkill {
             data.author,
             tags,
             data.category,
-            compatible_agents
+            compatible_agents,
+            download_count
         )
         .fetch_one(pool)
         .await
@@ -372,6 +387,7 @@ impl ChatSkill {
                 .clone()
                 .unwrap_or(existing.compatible_agents.0),
         );
+        let download_count = data.download_count.unwrap_or(existing.download_count);
 
         sqlx::query_as!(
             ChatSkill,
@@ -389,6 +405,7 @@ impl ChatSkill {
                    tags = $12,
                    category = $13,
                    compatible_agents = $14,
+                   download_count = $15,
                    updated_at = datetime('now', 'subsec')
                WHERE id = $1
                RETURNING id as "id!: Uuid",
@@ -405,6 +422,7 @@ impl ChatSkill {
                          tags as "tags!: sqlx::types::Json<Vec<String>>",
                          category,
                          compatible_agents as "compatible_agents!: sqlx::types::Json<Vec<String>>",
+                         download_count as "download_count!: i64",
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>""#,
             id,
@@ -420,7 +438,8 @@ impl ChatSkill {
             author,
             tags,
             category,
-            compatible_agents
+            compatible_agents,
+            download_count
         )
         .fetch_one(pool)
         .await

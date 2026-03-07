@@ -14,7 +14,8 @@
     "automation": "自動化",
     "skills": "スキルライブラリ",
     "archivedSection": "アーカイブ",
-    "settingsInSidebar": "設定"
+    "settingsInSidebar": "設定",
+    "generatedSessionTitle": "{{date}} ???"
   },
   "header": {
     "untitledSession": "無題のセッション",
@@ -32,7 +33,18 @@
     "restoreSession": "セッションを復元",
     "cleanupMessages": "メッセージをクリーンアップ",
     "exitCleanupMode": "クリーンアップモードを終了",
-    "settings": "設定"
+    "settings": "設定",
+    "moreActions": "その他の操作",
+    "generatedTitleBadge": "??????",
+    "contextMeter": "????????",
+    "contextUsage": "{{used}} / {{limit}}",
+    "contextUsageUnknown": "{{used}} ??",
+    "contextLoadLow": "????",
+    "contextLoadMedium": "?????",
+    "contextLoadHigh": "????",
+    "openMembersPanel": "AIメンバー一覧を開く",
+    "closeMembersPanel": "AIメンバー一覧を閉じる",
+    "latestArtifact": "??????"
   },
   "input": {
     "mentionAgents": "エージェントをメンション",
@@ -50,7 +62,9 @@
     "uploadingAttachments": "添付ファイルをアップロード中...",
     "sendHint": "Enterで送信、Shift+Enterで改行。",
     "addAttachment": "添付ファイルを追加",
-    "send": "送信"
+    "send": "送信",
+    "workbenchHint": "??????????????????????????????? @ ????????????",
+    "attachmentCount": "{{count}} ???????????"
   },
   "message": {
     "quote": "引用",
@@ -75,7 +89,7 @@
     "open": "開く"
   },
   "members": {
-    "title": "AIメンバー",
+    "title": "AIメンバー一覧",
     "countInSession": "セッション内に{{count}}名",
     "selectSessionToManage": "AIメンバーを管理するセッションを選択してください。",
     "noMembersYet": "AIメンバーはまだいません。@メンションを有効にするには、下から追加してください。",
@@ -293,7 +307,22 @@
       "selectRunToViewLog": "ログ出力を表示するには実行を選択してください。",
       "refresh": "更新",
       "loadingLog": "ログを読み込み中...",
-      "logEmpty": "ログは空です。"
+      "logEmpty": "ログは空です。",
+      "workspaceTrail": "??????????"
     }
+  },
+  "workspacePreview": {
+    "title": "????????????",
+    "empty": "????????????????????????????",
+    "files": "????",
+    "added": "??",
+    "removed": "??",
+    "html": "HTML",
+    "image": "??",
+    "diff": "??",
+    "liveReport": "?????????",
+    "imagePreview": "???????",
+    "filesChanged": "{{count}} ??????",
+    "runLabel": "?? {{id}}"
   }
 }

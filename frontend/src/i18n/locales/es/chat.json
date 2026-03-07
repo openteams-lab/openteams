@@ -14,7 +14,8 @@
     "automation": "Automatizaciones",
     "skills": "Biblioteca de habilidades",
     "archivedSection": "Archivadas",
-    "settingsInSidebar": "Configuración"
+    "settingsInSidebar": "Configuración",
+    "generatedSessionTitle": "Iniciada {{date}}"
   },
   "header": {
     "untitledSession": "Sesión sin título",
@@ -32,7 +33,18 @@
     "restoreSession": "Restaurar sesión",
     "cleanupMessages": "Limpiar mensajes",
     "exitCleanupMode": "Salir del modo limpieza",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "moreActions": "Más acciones",
+    "generatedTitleBadge": "T?tulo autom?tico",
+    "contextMeter": "Carga de contexto",
+    "contextUsage": "{{used}} / {{limit}}",
+    "contextUsageUnknown": "{{used}} en uso",
+    "contextLoadLow": "Uso ligero",
+    "contextLoadMedium": "Uso activo",
+    "contextLoadHigh": "Uso alto",
+    "openMembersPanel": "Abrir la lista de miembros de IA",
+    "closeMembersPanel": "Cerrar la lista de miembros de IA",
+    "latestArtifact": "?ltimo artefacto"
   },
   "input": {
     "mentionAgents": "Mencionar agentes",
@@ -50,7 +62,9 @@
     "uploadingAttachments": "Subiendo archivos adjuntos...",
     "sendHint": "Presiona Enter para enviar, Shift+Enter para nueva línea.",
     "addAttachment": "Añadir archivos adjuntos",
-    "send": "Enviar"
+    "send": "Enviar",
+    "workbenchHint": "Pega capturas, arrastra archivos o escribe @ para dirigir el trabajo.",
+    "attachmentCount": "{{count}} archivos listos"
   },
   "message": {
     "quote": "Citar",
@@ -75,7 +89,7 @@
     "open": "Abrir"
   },
   "members": {
-    "title": "Miembros IA",
+    "title": "Lista de miembros IA",
     "countInSession": "{{count}} en la sesión",
     "selectSessionToManage": "Selecciona una sesión para gestionar miembros IA.",
     "noMembersYet": "Aún no hay miembros IA. Añade uno abajo para habilitar @menciones.",
@@ -293,7 +307,22 @@
       "selectRunToViewLog": "Selecciona una ejecución para ver su salida de registro.",
       "refresh": "Actualizar",
       "loadingLog": "Cargando registro...",
-      "logEmpty": "El registro está vacío."
+      "logEmpty": "El registro está vacío.",
+      "workspaceTrail": "Ruta del espacio de trabajo"
     }
+  },
+  "workspacePreview": {
+    "title": "Vista previa del espacio de trabajo",
+    "empty": "Selecciona un artefacto o cambio de c?digo para inspeccionarlo aqu?.",
+    "files": "Archivos",
+    "added": "A?adidas",
+    "removed": "Eliminadas",
+    "html": "HTML",
+    "image": "Imagen",
+    "diff": "Diff",
+    "liveReport": "Vista del reporte",
+    "imagePreview": "Vista de imagen",
+    "filesChanged": "{{count}} archivos",
+    "runLabel": "Run {{id}}"
   }
 }
