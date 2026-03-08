@@ -654,25 +654,26 @@ export function validateWorkspacePath(path: string): string | null {
 
 export function translateWorkspacePathError(
   error: string,
-  t: (key: string) => string
+  t: (key: string) => string,
+  prefix: 'importPreview.errors' | 'addMemberErrors' = 'importPreview.errors'
 ): string {
   if (error === 'Workspace path is required.') {
-    return t('members.importPreview.errors.workspacePathRequired');
+    return t(`members.${prefix}.workspacePathRequired`);
   }
   if (error === 'Workspace path must be an absolute path.') {
-    return t('members.importPreview.errors.workspacePathMustBeAbsolute');
+    return t(`members.${prefix}.workspacePathMustBeAbsolute`);
   }
   if (error === 'Workspace path does not exist.') {
-    return t('members.importPreview.errors.workspacePathNotExist');
+    return t(`members.${prefix}.workspacePathNotExist`);
   }
   if (error === 'Workspace path must be an existing directory.') {
-    return t('members.importPreview.errors.workspacePathNotDirectory');
+    return t(`members.${prefix}.workspacePathNotDirectory`);
   }
   if (error.startsWith('Workspace path is not accessible')) {
-    return t('members.importPreview.errors.workspacePathNotAccessible');
+    return t(`members.${prefix}.workspacePathNotAccessible`);
   }
   if (error === 'Invalid workspace path.') {
-    return t('members.importPreview.errors.invalidWorkspacePath');
+    return t(`members.${prefix}.invalidWorkspacePath`);
   }
   return error;
 }

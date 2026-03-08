@@ -96,36 +96,39 @@ export function RunningAgentPlaceholder({
           </div>
 
           {hasThinking && (
-            <div className="rounded-lg border border-border bg-secondary/40 px-base py-half">
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-base"
-                onClick={() =>
-                  setThinkingExpanded((prevExpanded) => !prevExpanded)
-                }
-                aria-expanded={thinkingExpanded}
-                aria-label={t('agent.thinking')}
-              >
-                <span className="text-xs text-low">{t('agent.thinking')}</span>
-                <CaretDownIcon
-                  className={cn(
-                    'size-icon-xs text-low transition-transform',
-                    !thinkingExpanded && '-rotate-90'
-                  )}
-                />
-              </button>
+            <div className="rounded-lg border border-border/50 bg-[#f9fafb] p-3">
+              <div className="mb-2.5 flex items-center justify-between text-xs font-medium text-low uppercase tracking-wide">
+                <span>{t('agent.thinking')}</span>
+                <button
+                  type="button"
+                  className="flex items-center gap-1"
+                  onClick={() =>
+                    setThinkingExpanded((prevExpanded) => !prevExpanded)
+                  }
+                  aria-expanded={thinkingExpanded}
+                  aria-label={t('agent.thinking')}
+                >
+                  <span>{thinkingExpanded ? t('collapse') : t('expand')}</span>
+                  <CaretDownIcon
+                    className={cn(
+                      'size-3 transition-transform',
+                      !thinkingExpanded && '-rotate-90'
+                    )}
+                  />
+                </button>
+              </div>
               {thinkingExpanded && (
-                <pre className="mt-half max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded border border-border/60 bg-primary/70 px-base py-half text-xs leading-5 text-low">
-                  {thinkingContent}
-                </pre>
+                <div className="rounded-[4px_8px_8px_4px] border-l-[3px] border-l-[#5094FB] bg-white px-4 py-3 shadow-sm">
+                  <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-ibm-plex-mono text-xs leading-relaxed text-low">
+                    {thinkingContent}
+                  </pre>
+                </div>
               )}
             </div>
           )}
 
-          {hasAssistant ? (
+          {hasAssistant && (
             <ChatMarkdown content={assistantContent} textClassName="text-sm" />
-          ) : (
-            <div className="text-sm text-low">{t('agent.processing')}</div>
           )}
         </div>
         </ChatEntryContainer>

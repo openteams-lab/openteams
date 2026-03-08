@@ -824,7 +824,7 @@ export function SkillsPanel({
                 技能
               </h2>
               <p className="mt-3 text-base text-low">
-                赋予 Codex 更强大的能力。
+                赋予 Agent 更强大的能力。
               </p>
             </div>
 
