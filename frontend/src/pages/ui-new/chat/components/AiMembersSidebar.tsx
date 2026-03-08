@@ -780,8 +780,8 @@ const renderPresetTab = () => (
 
   return (
     <>
-      <aside
-        className="chat-session-members-panel flex flex-col min-h-0 shrink-0"
+<aside
+        className="chat-session-members-panel flex flex-col min-h-0 h-full shrink-0"
         style={{ width }}
       >
         <div className="chat-session-members-header px-base py-base flex items-center justify-between">

@@ -1838,7 +1838,7 @@
 
   .new-design .chat-session-message-row {
     border-radius: 10px;
-    margin: 0 10px;
+    margin: 0 15px;
     padding: 8px;
     transition: background-color 0.15s ease;
   }

@@ -2680,6 +2680,7 @@ const resizeStartRef = useRef<{
       await importMembersFromPlan(preparedPlan);
       setTeamImportPlan(null);
       setTeamImportName(null);
+      setIsAddMemberOpen(false);
     } catch (error) {
       console.error('Failed to import team preset', error);
       if (error instanceof ApiError && error.message) {
@@ -2692,7 +2693,7 @@ const resizeStartRef = useRef<{
     } finally {
       setIsImportingTeam(false);
     }
-  }, [importMembersFromPlan, teamImportPlan, validateAndPrepareImportPlan]);
+  }, [importMembersFromPlan, setIsAddMemberOpen, teamImportPlan, t, validateAndPrepareImportPlan]);
 
   const handleCancelTeamImport = useCallback(() => {
     if (isImportingTeam) return;
@@ -2702,11 +2703,11 @@ const resizeStartRef = useRef<{
 
   const handleAddMember = async () => {
     if (!activeSessionId) {
-      setMemberError(t('members.importPreview.errors.selectSessionFirst'));
+      setMemberError(t('members.addMemberErrors.selectSessionFirst'));
       return;
     }
     if (isArchived) {
-      setMemberError(t('members.importPreview.errors.sessionArchived'));
+      setMemberError(t('members.addMemberErrors.sessionArchived'));
       return;
     }
 
@@ -2722,13 +2723,13 @@ const resizeStartRef = useRef<{
     );
 
     if (!name) {
-      setMemberError(t('members.importPreview.errors.memberNameRequired'));
+      setMemberError(t('members.addMemberErrors.memberNameRequired'));
       return;
     }
 
     if (getMemberNameLength(name) > MAX_MEMBER_NAME_LENGTH) {
       setMemberError(
-        t('members.importPreview.errors.memberNameTooLong', {
+        t('members.addMemberErrors.memberNameTooLong', {
           max: MAX_MEMBER_NAME_LENGTH,
         })
       );
@@ -2736,7 +2737,7 @@ const resizeStartRef = useRef<{
     }
 
     if (!memberNameRegex.test(name)) {
-      setMemberError(t('members.importPreview.errors.memberNameInvalidChars'));
+      setMemberError(t('members.addMemberErrors.memberNameInvalidChars'));
       return;
     }
 
@@ -2749,23 +2750,23 @@ const resizeStartRef = useRef<{
       isNameChange &&
       projectName.toLowerCase() === name.toLowerCase()
     ) {
-      setMemberError(t('members.importPreview.errors.memberNameMatchProject'));
+      setMemberError(t('members.addMemberErrors.memberNameMatchProject'));
       return;
     }
 
     if (!runnerType) {
-      setMemberError(t('members.importPreview.errors.baseCodingAgentRequired'));
+      setMemberError(t('members.addMemberErrors.baseCodingAgentRequired'));
       return;
     }
 
 if (!isRunnerAvailable(runnerType)) {
-      setMemberError(t('members.importPreview.errors.selectedCodingAgentUnavailable'));
+      setMemberError(t('members.addMemberErrors.selectedCodingAgentUnavailable'));
       return;
     }
 
     const workspacePathError = validateWorkspacePath(workspacePathVal);
     if (workspacePathError) {
-      setMemberError(translateWorkspacePathError(workspacePathError, t));
+      setMemberError(translateWorkspacePathError(workspacePathError, t, 'addMemberErrors'));
       return;
     }
 
@@ -2776,7 +2777,8 @@ if (!isRunnerAvailable(runnerType)) {
       setMemberError(
         translateWorkspacePathError(
           workspacePathValidation.error || 'Invalid workspace path.',
-          t
+          t,
+          'addMemberErrors'
         )
       );
       return;

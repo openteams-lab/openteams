@@ -117,6 +117,7 @@
     "model": "Modèle",
     "systemPrompt": "Paramètres du rôle (obligatoire)",
     "expand": "Développer",
+    "collapse": "Réduire",
     "systemPromptPlaceholder": "Décrivez les paramètres du rôle de ce membre IA.",
     "workspacePath": "Chemin de l'espace de travail",
     "workspacePathPlaceholder": "Chemin d'accès absolu pour le travail des membres IA",
@@ -216,6 +217,22 @@
         "noAvailableCodingAgent": "Échec de l'import : Aucun agent de codage disponible pour importer ce preset.",
         "failedToImportTeam": "Échec de l'importation du preset d'équipe."
       }
+    },
+    "addMemberErrors": {
+      "workspacePathRequired": "Échec de l'ajout : Le chemin de l'espace de travail est obligatoire.",
+      "workspacePathNotExist": "Échec de l'ajout : Le chemin de l'espace de travail n'existe pas.",
+      "workspacePathNotDirectory": "Échec de l'ajout : Le chemin de l'espace de travail doit être un répertoire existant.",
+      "workspacePathNotAccessible": "Échec de l'ajout : Le chemin de l'espace de travail n'est pas accessible.",
+      "workspacePathMustBeAbsolute": "Échec de l'ajout : Le chemin de l'espace de travail doit être un chemin absolu.",
+      "invalidWorkspacePath": "Échec de l'ajout : Chemin de l'espace de travail invalide.",
+      "baseCodingAgentRequired": "Échec de l'ajout : L'agent de codage de base est obligatoire.",
+      "selectedCodingAgentUnavailable": "Échec de l'ajout : L'agent de codage sélectionné n'est pas disponible.",
+      "memberNameRequired": "Échec de l'ajout : Le nom du membre IA est obligatoire.",
+      "memberNameInvalidChars": "Échec de l'ajout : Le nom ne peut contenir que des lettres, des chiffres, \"_\" ou \"-\".",
+      "memberNameTooLong": "Échec de l'ajout : Le nom du membre IA ne peut pas dépasser {{max}} caractères.",
+      "memberNameMatchProject": "Échec de l'ajout : Le nom du membre IA ne peut pas correspondre au nom du projet.",
+      "selectSessionFirst": "Veuillez d'abord sélectionner une session de chat.",
+      "sessionArchived": "Cette session est archivée et en lecture seule."
     },
     "roleSettingsRequired": "Les paramètres du rôle sont obligatoires.",
     "presetDisplay": {

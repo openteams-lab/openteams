@@ -117,6 +117,7 @@
     "model": "模型",
     "systemPrompt": "角色设定（必填）",
     "expand": "展开",
+    "collapse": "收起",
     "systemPromptPlaceholder": "描述此 AI 成员的角色设定。",
     "workspacePath": "工作区路径",
     "workspacePathPlaceholder": "AI成员工作的绝对路径",
@@ -216,6 +217,22 @@
         "noAvailableCodingAgent": "导入失败：没有可用的编程代理来导入此预设。",
         "failedToImportTeam": "导入团队预设失败。"
       }
+    },
+    "addMemberErrors": {
+      "workspacePathRequired": "添加失败：工作区路径为必填项。",
+      "workspacePathNotExist": "添加失败：工作区路径不存在。",
+      "workspacePathNotDirectory": "添加失败：工作区路径必须是一个已存在的目录。",
+      "workspacePathNotAccessible": "添加失败：工作区路径无法访问。",
+      "workspacePathMustBeAbsolute": "添加失败：工作区路径必须是绝对路径。",
+      "invalidWorkspacePath": "添加失败：无效的工作区路径。",
+      "baseCodingAgentRequired": "添加失败：基础编程代理为必填项。",
+      "selectedCodingAgentUnavailable": "添加失败：所选编程代理不可用。",
+      "memberNameRequired": "添加失败：AI成员名称为必填项。",
+      "memberNameInvalidChars": "添加失败：名称只能包含字母、数字、\"_\" 或 \"-\"。",
+      "memberNameTooLong": "添加失败：AI成员名称不能超过 {{max}} 个字符。",
+      "memberNameMatchProject": "添加失败：AI成员名称不能与项目名称相同。",
+      "selectSessionFirst": "请先选择一个聊天会话。",
+      "sessionArchived": "该会话已归档，只读。"
     },
     "roleSettingsRequired": "角色设定为必填项。",
     "presetDisplay": {
