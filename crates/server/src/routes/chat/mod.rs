@@ -137,6 +137,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             .nest("/agents/{agent_id}/skills", agent_skills_router)
             .nest("/registry", registry_router)
             .nest("/builtin", builtin_router)
+            .route(
+                "/validate-workspace-path",
+                axum::routing::post(sessions::validate_workspace_path_endpoint),
+            )
             .route("/runs/{run_id}/log", get(runs::get_run_log))
             .route("/runs/{run_id}/diff", get(runs::get_run_diff))
             .route(

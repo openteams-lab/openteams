@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent UI - 方案三：专业技感</title>
+    <style>
+        /* 1. 基础全局样式 */
+        :root {
+            --primary-color: #6366f1; /* 靛蓝色：代表逻辑与智慧 */
+            --bg-page: #f9fafb;
+            --bg-card: #ffffff;
+            --bg-inner: #f8fafc;
+            --border-color: #e5e7eb;
+            --text-main: #111827;
+            --text-sub: #4b5563;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            background-color: var(--bg-page);
+            font-family: -apple-system, "SF Pro Display", "PingFang SC", "Segoe UI", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 2. 卡片容器 */
+        .card {
+            width: 100%;
+            max-width: 520px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+        }
+
+        /* 3. 头部样式 */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .agent-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon-box {
+            width: 32px;
+            height: 32px;
+            background: #f0fdf4;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .agent-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--text-main);
+            letter-spacing: -0.01em;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            background: #10b981;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        /* 呼吸灯特效 */
+        .status-dot::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            70% { transform: scale(2.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 0; }
+        }
+
+        .btn-stop {
+            padding: 5px 12px;
+            border: 1px solid #fee2e2;
+            background: #fef2f2;
+            color: #ef4444;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-stop:hover {
+            background: #fee2e2;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.1);
+        }
+
+        /* 4. 内容区域 */
+        .status-msg {
+            font-size: 14px;
+            color: var(--text-sub);
+            margin-bottom: 16px;
+        }
+
+        /* 5. 核心：思考框设计 */
+        .thought-wrapper {
+            background-color: var(--bg-inner);
+            border-radius: 10px;
+            padding: 14px;
+            border: 1px solid #f1f5f9;
+        }
+
+        .thought-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .expand-btn {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .thought-body {
+            background-color: #ffffff;
+            border-left: 3px solid var(--primary-color);
+            padding: 12px 16px;
+            border-radius: 4px 8px 8px 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        }
+
+        .thought-body p {
+            margin: 0;
+            font-family: "JetBrains Mono", "Menlo", "Consolas", monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #475569;
+        }
+
+        /* 6. 底部提示 */
+        .footer-hint {
+            margin-top: 14px;
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* 简单的加载动画点 */
+        .loading-dots::after {
+            content: '...';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="header">
+            <div class="agent-info">
+                <div class="icon-box">⚛️</div>
+                <span class="agent-name">frontend-agent</span>
+                <div class="status-dot"></div>
+            </div>
+            <button class="btn-stop">停止</button>
+        </div>
+
+        <div class="status-msg">已持续运行 10.4s，正在规划 UI 组件架构</div>
+
+        <div class="thought-wrapper">
+            <div class="thought-header">
+                <span>思考中...</span>
+                <div class="expand-btn">展开 ⌵</div>
+            </div>
+            <div class="thought-body">
+                <p>
+                    Analyzing user request: "Create a video editing webpage."<br>
+                    - Reviewing historical design preferences...<br>
+                    - Initializing Tailwind CSS configuration...<br>
+                    - Drafting responsive grid layout for timeline view.
+                </p>
+            </div>
+        </div>
+
+        <div class="footer-hint">
+            <span class="loading-dots">正在处理您的请求</span>
+        </div>
+    </div>
+
+</body>
+</html>

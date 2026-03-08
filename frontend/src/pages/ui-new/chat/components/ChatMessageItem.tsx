@@ -142,6 +142,29 @@ export function ChatMessageItem({
   const displayContent = isAgent
     ? renderSendMessageDirectives(message.content)
     : message.content;
+
+  const meta = message.meta;
+  const tokenUsage =
+    isAgent &&
+    meta &&
+    typeof meta === 'object' &&
+    !Array.isArray(meta) &&
+    'token_usage' in meta
+      ? (
+          meta as {
+            token_usage?: {
+              total_tokens?: number;
+              is_estimated?: boolean;
+            };
+          }
+        ).token_usage
+      : null;
+  const tokenCount =
+    typeof tokenUsage?.total_tokens === 'number'
+      ? tokenUsage.total_tokens
+      : null;
+  const isEstimated = tokenUsage?.is_estimated === true;
+
   // System messages
   if (message.sender_type === ChatSenderType.system) {
     return (
@@ -222,15 +245,18 @@ export function ChatMessageItem({
           iconClassName={
             isUser ? 'chat-session-message-avatar-icon' : undefined
           }
-          headerRight={
-            <div className="chat-session-message-meta flex items-center gap-half text-xs text-low">
-              <span>{formatDateShortWithTime(message.created_at)}</span>
-            </div>
+headerRight={
+            isUser ? (
+              <div className="chat-session-message-meta flex items-center gap-half text-xs text-low">
+                <span>{formatDateShortWithTime(message.created_at)}</span>
+              </div>
+            ) : null
           }
           className={cn(
-            'chat-session-message-card w-[800px] max-w-full shadow-sm rounded-3xl',
-            isUser && 'chat-session-message-card-self ml-auto',
-            !isUser && 'chat-session-message-card-agent',
+            'chat-session-message-card max-w-full shadow-sm rounded-3xl',
+            isUser
+              ? 'w-[600px] chat-session-message-card-self is-user-message ml-auto'
+              : 'w-[600px] chat-session-message-card-agent is-agent-message',
             isCleanupMode && isSelected && 'ring-2 ring-[#EF4444]'
           )}
           headerClassName={cn(
@@ -240,14 +266,14 @@ export function ChatMessageItem({
           bodyClassName="chat-session-message-body"
           style={{
             backgroundColor: isUser
-              ? `var(--chat-session-message-self-bg, ${tone.bg})`
-              : `var(--chat-session-message-other-bg, ${tone.bg})`,
+              ? 'var(--chat-session-message-self-bg)'
+              : 'var(--chat-session-glass-bg)',
             borderColor:
               isCleanupMode && isSelected
                 ? '#EF4444'
                 : isUser
-                  ? `var(--chat-session-message-self-border, ${tone.border})`
-                  : `var(--chat-session-message-other-border, ${tone.border})`,
+                  ? 'var(--chat-session-message-self-border)'
+                  : 'var(--chat-session-glass-border)',
           }}
         >
           <div>
@@ -465,41 +491,21 @@ export function ChatMessageItem({
                 })}
               </div>
             )}
-            {(() => {
-              const meta = message.meta;
-              const tokenUsage =
-                isAgent &&
-                meta &&
-                typeof meta === 'object' &&
-                !Array.isArray(meta) &&
-                'token_usage' in meta
-                  ? (
-                      meta as {
-                        token_usage?: {
-                          total_tokens?: number;
-                          is_estimated?: boolean;
-                        };
-                      }
-                    ).token_usage
-                  : null;
-              const tokenCount =
-                typeof tokenUsage?.total_tokens === 'number'
-                  ? tokenUsage.total_tokens
-                  : null;
-              const isEstimated = tokenUsage?.is_estimated === true;
-              return tokenCount !== null ? (
-                <div className="chat-session-message-tokens flex justify-end mt-1">
-                  <span className="text-xs text-low opacity-60">
+            {isAgent && (
+              <div className="chat-session-message-footer mt-4 flex items-center justify-between opacity-50 text-[10px] font-ibm-plex-mono">
+                {tokenCount !== null && (
+                  <span>
                     {isEstimated && (
                       <span className="text-yellow-500 mr-0.5">~</span>
                     )}
-                    {t('message.replyTokenUsage', {
-                      value: formatTokenCount(tokenCount),
-                    })}
+                    Tokens: {formatTokenCount(tokenCount)}
                   </span>
-                </div>
-              ) : null;
-            })()}
+                )}
+                <span className={tokenCount !== null ? '' : 'ml-auto'}>
+                  {formatDateShortWithTime(message.created_at)}
+                </span>
+              </div>
+            )}
           </div>
         </ChatEntryContainer>
         {(isAgent || isUser) && (

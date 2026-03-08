@@ -64,7 +64,7 @@
     "clearAll": "Clear all",
     "preview": "Preview",
     "archivedPlaceholder": "This session is archived and read-only.",
-    "inputPlaceholder": "Type your message and @mention agents...",
+    "inputPlaceholder": "Use @ to send message to members...",
     "uploadingAttachments": "Uploading attachments...",
     "sendHint": "Press Enter to send, Shift+Enter for new line.",
     "workbenchHint": "Paste screenshots, drag files, or type @ to route work.",
@@ -100,7 +100,7 @@
     "title": "AI Member List",
     "countInSession": "{{count}} in session",
     "selectSessionToManage": "Select a session to manage AI members.",
-    "noMembersYet": "No AI members yet. Add one below to enable @mentions.",
+    "noMembersYet": "No AI members yet",
     "workspace": "Workspace",
     "edit": "Edit",
     "remove": "Remove",
@@ -176,7 +176,7 @@
     "importPreview": {
       "title": "Import Team: {{teamName}}",
       "description": "The following members will be added to this session:",
-      "actionCreate": "will be created",
+      "actionCreate": "",
       "actionReuse": "already exists (will be reused)",
       "actionSkip": "already in session (will be skipped)",
       "confirmImport": "Import Team",
@@ -196,7 +196,27 @@
       },
       "promptBadge": "Prompt Editor",
       "promptHint": "Use precise instructions to shape the member's behavior.",
-      "memberPage": "Switch to member {{index}} of {{total}}"
+      "memberPage": "Switch to member {{index}} of {{total}}",
+      "errors": {
+        "workspacePathRequired": "Import failed: Workspace path is required.",
+        "workspacePathNotExist": "Import failed: Workspace path does not exist.",
+        "workspacePathNotDirectory": "Import failed: Workspace path must be an existing directory.",
+        "workspacePathNotAccessible": "Import failed: Workspace path is not accessible.",
+        "workspacePathMustBeAbsolute": "Import failed: Workspace path must be an absolute path.",
+        "invalidWorkspacePath": "Import failed: Invalid workspace path.",
+        "nothingToImport": "Import failed: Nothing to import from this team preset.",
+        "baseCodingAgentRequired": "Import failed: Base coding agent is required.",
+        "selectedCodingAgentUnavailable": "Import failed: Selected coding agent is unavailable.",
+        "memberNameRequired": "Import failed: AI member name is required.",
+        "memberNameInvalidChars": "Import failed: Name can only include letters, numbers, \"_\" or \"-\".",
+        "memberNameTooLong": "Import failed: AI member name cannot exceed {{max}} characters.",
+        "memberNameMatchProject": "Import failed: AI member name cannot match the project name.",
+        "duplicateMemberNames": "Import failed: Duplicate AI member names in import plan.",
+        "selectSessionFirst": "Please select a chat session first.",
+        "sessionArchived": "This session is archived and read-only.",
+        "noAvailableCodingAgent": "Import failed: No available coding agent to import this preset.",
+        "failedToImportTeam": "Failed to import team preset."
+      }
     },
     "presetDisplay": {
       "members": {
