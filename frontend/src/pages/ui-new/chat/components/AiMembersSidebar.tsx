@@ -280,7 +280,9 @@ function PresetOptionCard({
 
       <span className="min-w-0 flex-1 text-left">
         <span className="chat-session-member-preset-title">{title}</span>
-        <span className="chat-session-member-preset-subtitle">{subtitle}</span>
+        {subtitle && (
+          <span className="chat-session-member-preset-subtitle">{subtitle}</span>
+        )}
       </span>
 
       <span className="chat-session-member-preset-add">
@@ -479,10 +481,10 @@ export function AiMembersSidebar({
     []
   );
 
-  const renderPresetTab = () => (
-    <div className="space-y-3">
+const renderPresetTab = () => (
+    <div className="flex flex-col min-h-0 flex-1">
       {!editingMember && (
-        <div className="chat-session-member-search">
+        <div className="chat-session-member-search shrink-0">
           <MagnifyingGlassIcon className="chat-session-member-search-icon" />
           <input
             value={presetSearchQuery}
@@ -493,107 +495,113 @@ export function AiMembersSidebar({
         </div>
       )}
 
-      {filteredMemberPresets.length > 0 && (
-        <div>
-          <div className="chat-session-member-preset-group-title">
-            <UserPlusIcon className="size-3.5" />
-            <span>{t('members.presetMemberSection')}</span>
-          </div>
-          <div className="space-y-2">
-            {filteredMemberPresets.map((preset) => {
-              const RoleIcon = getPresetIcon(preset.id);
-              return (
-                <PresetOptionCard
-                  key={preset.id}
-                  icon={RoleIcon}
-                  title={getLocalizedMemberPresetName(preset, t)}
-                  subtitle={t('members.presetMemberSection')}
-                  seed={getAgentAvatarSeed(
-                    preset.id,
-                    'PRESET_MEMBER',
-                    preset.name
+      <div className="space-y-3 pt-3">
+        {filteredTeamPresets.length > 0 && (
+          <div>
+            <div className="chat-session-member-preset-group-row">
+              <div className="chat-session-member-preset-group-title">
+                <UsersThreeIcon className="size-3.5" />
+                <span>{t('members.presetTeamSection')}</span>
+              </div>
+              <button
+                type="button"
+                className="chat-session-member-preset-group-toggle"
+                onClick={() => setIsTeamPresetsExpanded((expanded) => !expanded)}
+                aria-label={
+                  isTeamPresetsExpanded
+                    ? t('sidebar.collapseSidebar')
+                    : t('sidebar.expandSidebar')
+                }
+                title={
+                  isTeamPresetsExpanded
+                    ? t('sidebar.collapseSidebar')
+                    : t('sidebar.expandSidebar')
+                }
+              >
+                <CaretDownIcon
+                  className={cn(
+                    'size-3 transition-transform',
+                    !isTeamPresetsExpanded && '-rotate-90'
                   )}
-                  onClick={() => onAddMemberPreset(preset)}
-                  type="member"
+                  weight="bold"
                 />
-              );
-            })}
+              </button>
+            </div>
+            {shouldShowExpandedTeams && (
+              <div className="max-h-[280px] overflow-y-auto pr-1 -mr-1">
+                <div className="space-y-1.5">
+                  {filteredTeamPresets.map((team) => {
+                    const TeamIcon = getTeamIcon(team.id);
+                    return (
+                      <PresetOptionCard
+                        key={team.id}
+                        icon={TeamIcon}
+                        title={getLocalizedTeamPresetName(team, t)}
+                        subtitle=""
+                        seed={getAgentAvatarSeed(team.id, 'PRESET_TEAM', team.name)}
+                        onClick={() => onImportTeamPreset(team)}
+                        disabled={!!teamImportPlan}
+                        type="team"
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {filteredTeamPresets.length > 0 && (
-        <div>
-          <div className="chat-session-member-preset-group-row">
+        {filteredMemberPresets.length > 0 && (
+          <div>
             <div className="chat-session-member-preset-group-title">
-              <UsersThreeIcon className="size-3.5" />
-              <span>{t('members.presetTeamSection')}</span>
+              <UserPlusIcon className="size-3.5" />
+              <span>{t('members.presetMemberSection')}</span>
             </div>
-            <button
-              type="button"
-              className="chat-session-member-preset-group-toggle"
-              onClick={() => setIsTeamPresetsExpanded((expanded) => !expanded)}
-              aria-label={
-                isTeamPresetsExpanded
-                  ? t('sidebar.collapseSidebar')
-                  : t('sidebar.expandSidebar')
-              }
-              title={
-                isTeamPresetsExpanded
-                  ? t('sidebar.collapseSidebar')
-                  : t('sidebar.expandSidebar')
-              }
-            >
-              <CaretDownIcon
-                className={cn(
-                  'size-3 transition-transform',
-                  !isTeamPresetsExpanded && '-rotate-90'
-                )}
-                weight="bold"
-              />
-            </button>
+            <div className="max-h-[280px] overflow-y-auto pr-1 -mr-1">
+              <div className="space-y-1.5">
+                {filteredMemberPresets.map((preset) => {
+                  const RoleIcon = getPresetIcon(preset.id);
+                  return (
+                    <PresetOptionCard
+                      key={preset.id}
+                      icon={RoleIcon}
+                      title={getLocalizedMemberPresetName(preset, t)}
+                      subtitle=""
+                      seed={getAgentAvatarSeed(
+                        preset.id,
+                        'PRESET_MEMBER',
+                        preset.name
+                      )}
+                      onClick={() => onAddMemberPreset(preset)}
+                      type="member"
+                    />
+                  );
+                })}
+              </div>
+            </div>
           </div>
-          {shouldShowExpandedTeams && (
-            <div className="space-y-2">
-              {filteredTeamPresets.map((team) => {
-                const TeamIcon = getTeamIcon(team.id);
-                return (
-                  <PresetOptionCard
-                    key={team.id}
-                    icon={TeamIcon}
-                    title={getLocalizedTeamPresetName(team, t)}
-                    subtitle={t('members.presetTeamSection')}
-                    seed={getAgentAvatarSeed(team.id, 'PRESET_TEAM', team.name)}
-                    onClick={() => onImportTeamPreset(team)}
-                    disabled={!!teamImportPlan}
-                    type="team"
-                  />
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+        )}
 
-      {!hasPresets && (
-        <SidebarEmptyState
-          icon={UserPlusIcon}
-          title={t('members.noEnabledPresets')}
-        />
-      )}
+        {!hasPresets && (
+          <SidebarEmptyState
+            icon={UserPlusIcon}
+            title={t('members.noEnabledPresets')}
+          />
+        )}
 
-      {hasPresets && !hasPresetSearchResults && (
-        <SidebarEmptyState
-          icon={MagnifyingGlassIcon}
-          title={t('members.noPresetSearchResults')}
-          description={t('members.noPresetSearchResultsHint')}
-        />
-      )}
+        {hasPresets && !hasPresetSearchResults && (
+          <SidebarEmptyState
+            icon={MagnifyingGlassIcon}
+            title={t('members.noPresetSearchResults')}
+            description={t('members.noPresetSearchResultsHint')}
+          />
+        )}
 
-      {memberError && <div className="text-xs text-error">{memberError}</div>}
+        {memberError && <div className="text-xs text-error">{memberError}</div>}
+      </div>
 
       {/* Close button at bottom-right */}
-      <div className="flex justify-end pt-2">
+      <div className="flex justify-end pt-2 shrink-0">
         <PrimaryButton
           variant="tertiary"
           value={t('members.closePanel')}

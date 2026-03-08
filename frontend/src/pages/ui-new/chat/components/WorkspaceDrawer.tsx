@@ -142,14 +142,14 @@ export function WorkspaceDrawer({
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      className="text-[#4f46e5] hover:text-[#4338ca]"
+                      className="text-[#5094FB] hover:text-[#4084EB]"
                       onClick={() => onLoadLog(run.runId)}
                     >
                       {t('modals.workspaceDrawer.viewLog')}
                     </button>
                     <button
                       type="button"
-                      className="text-[#4f46e5] hover:text-[#4338ca]"
+                      className="text-[#5094FB] hover:text-[#4084EB]"
                       onClick={() => setExpandedRun(run)}
                     >
                       {t('members.expand')}
@@ -182,7 +182,7 @@ export function WorkspaceDrawer({
                   </span>
                   <button
                     type="button"
-                    className="text-[#4f46e5] hover:text-[#4338ca]"
+                    className="text-[#5094FB] hover:text-[#4084EB]"
                     onClick={() => onLoadLog(logRunId)}
                     disabled={logLoading}
                   >

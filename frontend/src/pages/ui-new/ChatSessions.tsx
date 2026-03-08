@@ -1,4 +1,4 @@
-﻿import {
+import {
   type ChangeEvent,
   useCallback,
   useEffect,
@@ -13,6 +13,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   ChatMessage,
   ChatSenderType,
+  ChatSession,
   ChatSessionStatus,
   ChatSessionAgentState,
   BaseCodingAgent,
@@ -394,173 +395,174 @@ function WorkspacePreviewPane({
   ) => void;
 }) {
   const { t } = useTranslation('chat');
-  if (!artifact) {
-    return (
-      <aside className="chat-session-preview-panel is-empty">
-        <div className="chat-session-preview-empty">{emptyLabel}</div>
-      </aside>
-    );
-  }
-
+  
   const diffSummary =
-    artifact.kind === 'diff'
+    artifact?.kind === 'diff'
       ? summarizeDiffState(diffState, artifact.untrackedFiles)
       : null;
 
   return (
-    <aside className="chat-session-preview-panel">
-      <div className="chat-session-preview-header">
-        <div className="chat-session-preview-meta">
-          <div className="chat-session-preview-label">{title}</div>
-          <div className="chat-session-preview-title">
-            {artifact.kind === 'attachment'
-              ? artifact.name
-              : t('workspacePreview.runLabel', {
-                  id: artifact.runId.slice(0, 8),
-                })}
+    <div className="chat-session-preview-overlay" onClick={onClose}>
+      <aside className="chat-session-preview-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-session-preview-header">
+          <div className="chat-session-preview-meta">
+            <div className="chat-session-preview-label">{title}</div>
+            <div className="chat-session-preview-title">
+              {artifact?.kind === 'attachment'
+                ? artifact.name
+                : artifact
+                  ? t('workspacePreview.runLabel', {
+                      id: artifact.runId.slice(0, 8),
+                    })
+                  : emptyLabel}
+            </div>
+            {artifact && (
+              <div className="chat-session-preview-subtitle">
+                {artifact.sourceLabel} ·{' '}
+                {formatDateShortWithTime(artifact.createdAt)}
+              </div>
+            )}
           </div>
-          <div className="chat-session-preview-subtitle">
-            {artifact.sourceLabel} ·{' '}
-            {formatDateShortWithTime(artifact.createdAt)}
-          </div>
-        </div>
-        <div className="chat-session-preview-header-actions">
-          {artifact.kind === 'attachment' ? (
-            <a
-              href={artifact.url}
-              target="_blank"
-              rel="noreferrer"
-              className="chat-session-preview-action"
-            >
-              {openLabel}
-            </a>
-          ) : (
+          <div className="chat-session-preview-header-actions">
+            {artifact?.kind === 'attachment' ? (
+              <a
+                href={artifact.url}
+                target="_blank"
+                rel="noreferrer"
+                className="chat-session-preview-action"
+              >
+                {openLabel}
+              </a>
+            ) : artifact?.kind === 'diff' ? (
+              <button
+                type="button"
+                className="chat-session-preview-action"
+                onClick={() =>
+                  onOpenDiffModal(
+                    artifact.runId,
+                    artifact.untrackedFiles,
+                    artifact.hasDiff
+                  )
+                }
+              >
+                {viewChangesLabel}
+              </button>
+            ) : null}
             <button
               type="button"
-              className="chat-session-preview-action"
-              onClick={() =>
-                onOpenDiffModal(
-                  artifact.runId,
-                  artifact.untrackedFiles,
-                  artifact.hasDiff
-                )
-              }
+              className="chat-session-preview-close"
+              onClick={onClose}
+              aria-label={closeLabel}
+              title={closeLabel}
             >
-              {viewChangesLabel}
+              ×
             </button>
-          )}
-          <button
-            type="button"
-            className="chat-session-preview-close"
-            onClick={onClose}
-            aria-label={closeLabel}
-            title={closeLabel}
-          >
-            ×
-          </button>
+          </div>
         </div>
-      </div>
 
-      <div className="chat-session-preview-body">
-        {artifact.kind === 'attachment' ? (
-          artifact.previewType === 'image' ? (
-            <div className="chat-session-preview-frame-shell">
-              <img
-                src={artifact.url}
-                alt={artifact.name}
-                className="chat-session-preview-image"
-              />
+        <div className="chat-session-preview-body">
+          {artifact?.kind === 'attachment' ? (
+            artifact.previewType === 'image' ? (
+              <div className="chat-session-preview-frame-shell">
+                <img
+                  src={artifact.url}
+                  alt={artifact.name}
+                  className="chat-session-preview-image"
+                />
+              </div>
+            ) : (
+              <div className="chat-session-preview-frame-shell">
+                <iframe
+                  src={artifact.url}
+                  title={artifact.name}
+                  sandbox="allow-scripts allow-same-origin"
+                  className="chat-session-preview-frame"
+                />
+              </div>
+            )
+          ) : artifact?.kind === 'diff' ? (
+            <div className="chat-session-preview-diff">
+              <div className="chat-session-preview-diff-stats">
+                <div className="chat-session-preview-stat-card">
+                  <div className="chat-session-preview-stat-value">
+                    {diffSummary?.fileCount ?? 0}
+                  </div>
+                  <div className="chat-session-preview-stat-label">
+                    {filesLabel}
+                  </div>
+                </div>
+                <div className="chat-session-preview-stat-card">
+                  <div className="chat-session-preview-stat-value is-positive">
+                    +{diffSummary?.additions ?? 0}
+                  </div>
+                  <div className="chat-session-preview-stat-label">
+                    {addedLabel}
+                  </div>
+                </div>
+                <div className="chat-session-preview-stat-card">
+                  <div className="chat-session-preview-stat-value is-negative">
+                    -{diffSummary?.deletions ?? 0}
+                  </div>
+                  <div className="chat-session-preview-stat-label">
+                    {removedLabel}
+                  </div>
+                </div>
+              </div>
+
+              {artifact.previewText && (
+                <pre className="chat-session-preview-diff-copy">
+                  {artifact.previewText}
+                </pre>
+              )}
+
+              {artifact.hasDiff && diffState?.loading && (
+                <div className="chat-session-preview-diff-note">
+                  {loadingLabel}
+                </div>
+              )}
+              {artifact.hasDiff && diffState?.error && (
+                <div className="chat-session-preview-diff-note is-error">
+                  {diffState.error}
+                </div>
+              )}
+
+              <div className="chat-session-preview-file-list">
+                {(diffSummary?.files.length
+                  ? diffSummary.files
+                  : artifact.untrackedFiles.map((path) => ({
+                      path,
+                      additions: 0,
+                      deletions: 0,
+                    }))
+                )
+                  .slice(0, 10)
+                  .map((file) => (
+                    <div
+                      key={file.path}
+                      className="chat-session-preview-file-row"
+                    >
+                      <span
+                        className="chat-session-preview-file-path"
+                        title={file.path}
+                      >
+                        {file.path}
+                      </span>
+                      {'additions' in file && (
+                        <span className="chat-session-preview-file-delta">
+                          <span className="is-positive">+{file.additions}</span>
+                          <span className="is-negative">-{file.deletions}</span>
+                        </span>
+                      )}
+                    </div>
+                  ))}
+              </div>
             </div>
           ) : (
-            <div className="chat-session-preview-frame-shell">
-              <iframe
-                src={artifact.url}
-                title={artifact.name}
-                sandbox="allow-scripts allow-same-origin"
-                className="chat-session-preview-frame"
-              />
-            </div>
-          )
-        ) : (
-          <div className="chat-session-preview-diff">
-            <div className="chat-session-preview-diff-stats">
-              <div className="chat-session-preview-stat-card">
-                <div className="chat-session-preview-stat-value">
-                  {diffSummary?.fileCount ?? 0}
-                </div>
-                <div className="chat-session-preview-stat-label">
-                  {filesLabel}
-                </div>
-              </div>
-              <div className="chat-session-preview-stat-card">
-                <div className="chat-session-preview-stat-value is-positive">
-                  +{diffSummary?.additions ?? 0}
-                </div>
-                <div className="chat-session-preview-stat-label">
-                  {addedLabel}
-                </div>
-              </div>
-              <div className="chat-session-preview-stat-card">
-                <div className="chat-session-preview-stat-value is-negative">
-                  -{diffSummary?.deletions ?? 0}
-                </div>
-                <div className="chat-session-preview-stat-label">
-                  {removedLabel}
-                </div>
-              </div>
-            </div>
-
-            {artifact.previewText && (
-              <pre className="chat-session-preview-diff-copy">
-                {artifact.previewText}
-              </pre>
-            )}
-
-            {artifact.hasDiff && diffState?.loading && (
-              <div className="chat-session-preview-diff-note">
-                {loadingLabel}
-              </div>
-            )}
-            {artifact.hasDiff && diffState?.error && (
-              <div className="chat-session-preview-diff-note is-error">
-                {diffState.error}
-              </div>
-            )}
-
-            <div className="chat-session-preview-file-list">
-              {(diffSummary?.files.length
-                ? diffSummary.files
-                : artifact.untrackedFiles.map((path) => ({
-                    path,
-                    additions: 0,
-                    deletions: 0,
-                  }))
-              )
-                .slice(0, 10)
-                .map((file) => (
-                  <div
-                    key={file.path}
-                    className="chat-session-preview-file-row"
-                  >
-                    <span
-                      className="chat-session-preview-file-path"
-                      title={file.path}
-                    >
-                      {file.path}
-                    </span>
-                    {'additions' in file && (
-                      <span className="chat-session-preview-file-delta">
-                        <span className="is-positive">+{file.additions}</span>
-                        <span className="is-negative">-{file.deletions}</span>
-                      </span>
-                    )}
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </aside>
+            <div className="chat-session-preview-empty">{emptyLabel}</div>
+          )}
+        </div>
+      </aside>
+    </div>
   );
 }
 
@@ -924,15 +926,15 @@ export function ChatSessions() {
   const [isWorkspacePreviewOpen, setIsWorkspacePreviewOpen] = useState(false);
   const [workspacePreviewArtifact, setWorkspacePreviewArtifact] =
     useState<ArtifactSpotlight | null>(null);
-  const [inputAreaHeight, setInputAreaHeight] = useState(160);
+  const [lastSeenArtifactKey, setLastSeenArtifactKey] = useState<string | null>(
+    null
+  );
   const [isResizing, setIsResizing] = useState<
-    'left' | 'right' | 'input' | null
+    'left' | 'right' | null
   >(null);
-  const resizeStartRef = useRef<{
+const resizeStartRef = useRef<{
     startX: number;
-    startY: number;
     startWidth: number;
-    startHeight: number;
   } | null>(null);
   const lastExpandedLeftWidthRef = useRef(340);
   const sessionUpdatedAtByIdRef = useRef<Map<string, string>>(new Map());
@@ -1717,7 +1719,6 @@ export function ChatSessions() {
       }
       return artifactSpotlight;
     });
-    setIsWorkspacePreviewOpen(true);
   }, [artifactSpotlight, artifactSpotlightKey]);
 
   useEffect(() => {
@@ -1730,16 +1731,51 @@ export function ChatSessions() {
     }
   }, [handleLoadDiff, isWorkspacePreviewOpen, workspacePreviewArtifact]);
 
+  // Sync lastSeenArtifactKey from session when it changes
+  useEffect(() => {
+    if (activeSession?.last_seen_diff_key) {
+      setLastSeenArtifactKey(activeSession.last_seen_diff_key);
+    }
+  }, [activeSession?.id, activeSession?.last_seen_diff_key]);
+
   const handleSelectWorkspacePreview = useCallback(
     (artifact: ArtifactSpotlight) => {
       setWorkspacePreviewArtifact(artifact);
       setIsWorkspacePreviewOpen(true);
+      // Mark changes as seen when user views them
+      const artifactKey = getArtifactSpotlightKey(artifact);
+      setLastSeenArtifactKey(artifactKey);
+      // Persist to backend and update cache
+      if (activeSessionId && artifactKey) {
+        chatApi
+          .markDiffSeen(activeSessionId, artifactKey)
+          .then((updatedSession) => {
+            // Update React Query cache directly
+            queryClient.setQueryData<ChatSession[]>(
+              ['chatSessions'],
+              (oldSessions) =>
+                oldSessions?.map((s) =>
+                  s.id === updatedSession.id ? updatedSession : s
+                )
+            );
+          })
+          .catch((err) => {
+            console.error('Failed to mark diff as seen:', err);
+          });
+      }
       if (artifact.kind === 'diff' && artifact.hasDiff) {
         void handleLoadDiff(artifact.runId);
       }
     },
-    [handleLoadDiff]
+    [activeSessionId, handleLoadDiff, queryClient]
   );
+
+  // Determine if there are new unseen changes
+  const hasNewChanges = useMemo(() => {
+    if (!artifactSpotlight || artifactSpotlight.kind !== 'diff') return false;
+    if (!artifactSpotlight.hasDiff) return false;
+    return artifactSpotlightKey !== lastSeenArtifactKey;
+  }, [artifactSpotlight, artifactSpotlightKey, lastSeenArtifactKey]);
 
   const handlePreviewMessageAttachment = useCallback(
     (message: ChatMessage, attachment: ChatAttachment) => {
@@ -3025,7 +3061,7 @@ export function ChatSessions() {
 
   // Resize handlers
   const handleResizeStart = useCallback(
-    (type: 'left' | 'right' | 'input', e: React.MouseEvent) => {
+    (type: 'left' | 'right', e: React.MouseEvent) => {
       e.preventDefault();
       if (type === 'left' && isLeftSidebarCollapsed) {
         return;
@@ -3033,13 +3069,10 @@ export function ChatSessions() {
       setIsResizing(type);
       resizeStartRef.current = {
         startX: e.clientX,
-        startY: e.clientY,
         startWidth: type === 'left' ? leftSidebarWidth : rightSidebarWidth,
-        startHeight: inputAreaHeight,
       };
     },
     [
-      inputAreaHeight,
       isLeftSidebarCollapsed,
       leftSidebarWidth,
       rightSidebarWidth,
@@ -3061,10 +3094,9 @@ export function ChatSessions() {
   useEffect(() => {
     if (!isResizing) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+const handleMouseMove = (e: MouseEvent) => {
       if (!resizeStartRef.current) return;
-      const { startX, startY, startWidth, startHeight } =
-        resizeStartRef.current;
+      const { startX, startWidth } = resizeStartRef.current;
 
       if (isResizing === 'left') {
         const delta = e.clientX - startX;
@@ -3074,10 +3106,6 @@ export function ChatSessions() {
         const delta = startX - e.clientX;
         const newWidth = Math.max(240, Math.min(600, startWidth + delta));
         setRightSidebarWidth(newWidth);
-      } else if (isResizing === 'input') {
-        const delta = startY - e.clientY;
-        const newHeight = Math.max(120, Math.min(500, startHeight + delta));
-        setInputAreaHeight(newHeight);
       }
     };
 
@@ -3158,8 +3186,6 @@ export function ChatSessions() {
           activeSession={activeSession ?? null}
           displayTitle={activeSessionDisplayTitle}
           isGeneratedTitle={isGeneratedActiveSessionTitle}
-          messageCount={messageList.length}
-          totalTokens={totalTokens}
           isSearchOpen={isMessageSearchOpen}
           searchQuery={messageSearchQuery}
           onCloseSearch={handleCloseMessageSearch}
@@ -3217,6 +3243,13 @@ export function ChatSessions() {
             }
           }}
           isDeletingMessages={isDeletingMessages}
+          hasChanges={artifactSpotlight?.kind === 'diff' && artifactSpotlight.hasDiff}
+          hasNewChanges={hasNewChanges}
+          onViewChanges={
+            artifactSpotlight?.kind === 'diff'
+              ? () => handleSelectWorkspacePreview(artifactSpotlight)
+              : undefined
+          }
         />
 
         {/* Cleanup mode controls */}
@@ -3254,7 +3287,11 @@ export function ChatSessions() {
                 },
               });
             }}
-            isDeletingMessages={isDeletingMessages}
+isDeletingMessages={isDeletingMessages}
+            onCancel={() => {
+              setSelectedMessageIds(new Set());
+              setIsCleanupMode(false);
+            }}
           />
         )}
 
@@ -3267,30 +3304,10 @@ export function ChatSessions() {
           )}
         >
           <div className="chat-session-workspace-chat min-h-0 flex-1 flex flex-col">
-            {artifactSpotlight && (
-              <div className="chat-session-artifact-strip shrink-0 px-base pt-base">
-                <div className="chat-session-content-shell">
-                  <ArtifactSpotlightCard
-                    artifact={artifactSpotlight}
-                    title={t('header.latestArtifact')}
-                    openLabel={t('message.open')}
-                    previewLabel={t('message.view')}
-                    viewChangesLabel={t('message.viewChanges')}
-                    diffState={
-                      artifactSpotlight.kind === 'diff'
-                        ? runDiffs[artifactSpotlight.runId]
-                        : undefined
-                    }
-                    onSelectPreview={handleSelectWorkspacePreview}
-                  />
-                </div>
-              </div>
-            )}
-
             {/* Messages */}
-            <div
+<div
               ref={messagesContainerRef}
-              className="chat-session-messages flex-1 min-h-0 overflow-y-auto p-base space-y-base"
+              className="chat-session-messages flex-1 min-h-0 overflow-y-auto p-base pb-[40px] space-y-base"
             >
               <div className="chat-session-message-column space-y-base">
                 {isLoading && (
@@ -3447,12 +3464,6 @@ export function ChatSessions() {
               </div>
             </div>
 
-            {/* Input Area Resize Handle */}
-            <div
-              className="chat-session-resize-handle h-1 cursor-row-resize transition-colors shrink-0"
-              onMouseDown={(e) => handleResizeStart('input', e)}
-            />
-
             {/* Message Input */}
             <MessageInputArea
               draft={draft}
@@ -3487,7 +3498,6 @@ export function ChatSessions() {
               canSend={canSend}
               isSending={sendMessage.isPending}
               onSend={handleSend}
-              inputAreaHeight={inputAreaHeight}
               isArchived={isArchived}
               activeSessionId={activeSessionId}
             />

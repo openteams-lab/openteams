@@ -1,10 +1,13 @@
-﻿import {
+import {
   CheckCircleIcon,
   XCircleIcon,
   WarningCircleIcon,
   PaperPlaneTiltIcon,
   CheckSquareIcon,
   SquareIcon,
+  CopyIcon,
+  ArrowClockwiseIcon,
+  QuotesIcon,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -178,10 +181,10 @@ export function ChatMessageItem({
           <span className="chat-session-context-compacted-separator-line" />
         </div>
       )}
-      <div
+<div
         id={`chat-message-${message.id}`}
         className={cn(
-          'chat-session-message-row flex items-start gap-base',
+          'chat-session-message-row group flex items-start gap-base',
           isUser ? 'is-user justify-end' : 'is-agent justify-start'
         )}
       >
@@ -198,9 +201,10 @@ export function ChatMessageItem({
             )}
           </button>
         )}
-        <ChatEntryContainer
+<div className="relative">
+          <ChatEntryContainer
           variant={isUser ? 'user' : 'system'}
-          title={senderLabel}
+          title={isUser ? undefined : senderLabel}
           icon={
             isAgent ? (
               <AgentBrandIcon
@@ -220,27 +224,19 @@ export function ChatMessageItem({
           }
           headerRight={
             <div className="chat-session-message-meta flex items-center gap-half text-xs text-low">
-              <button
-                type="button"
-                className={cn(
-                  'chat-session-message-reply',
-                  isArchived && 'pointer-events-none opacity-50'
-                )}
-                onClick={() => onReply(message)}
-                disabled={isArchived}
-              >
-                {t('message.quote')}
-              </button>
               <span>{formatDateShortWithTime(message.created_at)}</span>
             </div>
           }
           className={cn(
-            'chat-session-message-card max-w-[760px] w-full md:w-[84%] shadow-sm rounded-2xl',
+            'chat-session-message-card w-[800px] max-w-full shadow-sm rounded-3xl',
             isUser && 'chat-session-message-card-self ml-auto',
             !isUser && 'chat-session-message-card-agent',
             isCleanupMode && isSelected && 'ring-2 ring-[#EF4444]'
           )}
-          headerClassName="chat-session-message-header"
+          headerClassName={cn(
+            'chat-session-message-header',
+            isUser && 'hidden'
+          )}
           bodyClassName="chat-session-message-body"
           style={{
             backgroundColor: isUser
@@ -256,7 +252,7 @@ export function ChatMessageItem({
         >
           <div>
             {referenceId && (
-              <div className="chat-session-reference-card mb-half border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
+              <div className="chat-session-reference-card mb-half border rounded-sm px-base py-half text-xs text-low" style={{ backgroundColor: '#ecedf1', borderColor: 'var(--chat-session-message-self-bg, #e8f4fd)' }}>
                 <div className="flex items-center justify-between gap-base">
                   <span className="font-medium text-normal">
                     {t('message.replyingTo', {
@@ -265,7 +261,8 @@ export function ChatMessageItem({
                   </span>
                   <button
                     type="button"
-                    className="text-brand hover:text-brand-hover"
+                    className="hover:opacity-80"
+                    style={{ color: '#5094FB' }}
                     onClick={() => {
                       if (referenceMessage) {
                         const element = document.getElementById(
@@ -334,10 +331,9 @@ export function ChatMessageItem({
                 </div>
               ) : null;
             })()}
-            <ChatMarkdown content={displayContent} />
+            <ChatMarkdown content={displayContent} hideCopyButton />
             {mentionList.length > 0 && (
               <div className="chat-session-mentions mt-half flex flex-wrap items-center gap-half text-xs text-low">
-                <span>{t('message.mentions')}:</span>
                 {mentionList.map((mention) => {
                   const agentId = agentIdByName.get(mention);
                   const mentionStatus = mentionStatusMap?.get(mention);
@@ -469,46 +465,6 @@ export function ChatMessageItem({
                 })}
               </div>
             )}
-            {hasDiffInfo && diffInfo && (
-              <div className="chat-session-code-card mt-half border border-border rounded-sm px-base py-half text-xs text-normal">
-                <div className="chat-session-code-card-header flex items-center justify-between gap-base">
-                  <span className="chat-session-code-card-title">
-                    {t('message.codeChanges')}
-                  </span>
-                  <button
-                    type="button"
-                    className="chat-session-code-card-link"
-                    onClick={() =>
-                      onOpenDiffViewer(
-                        diffRunId,
-                        diffInfo.untrackedFiles,
-                        diffInfo.available
-                      )
-                    }
-                  >
-                    {t('message.viewChanges')}
-                  </button>
-                </div>
-                {diffInfo.available && runDiffs[diffRunId]?.loading && (
-                  <div className="chat-session-code-card-meta mt-half text-xs text-low">
-                    {t('message.loadingDiff')}
-                  </div>
-                )}
-                {diffInfo.available && runDiffs[diffRunId]?.error && (
-                  <div className="chat-session-code-card-meta mt-half text-xs text-error">
-                    {runDiffs[diffRunId]?.error}
-                  </div>
-                )}
-                {diffInfo.untrackedFiles.length > 0 && (
-                  <div className="chat-session-code-card-meta mt-half text-xs text-low">
-                    {diffInfo.untrackedFiles.length}{' '}
-                    {diffInfo.untrackedFiles.length === 1
-                      ? t('message.untrackedFile')
-                      : t('message.untrackedFiles')}
-                  </div>
-                )}
-              </div>
-            )}
             {(() => {
               const meta = message.meta;
               const tokenUsage =
@@ -546,6 +502,45 @@ export function ChatMessageItem({
             })()}
           </div>
         </ChatEntryContainer>
+        {(isAgent || isUser) && (
+          <div
+            className={cn(
+              'chat-session-message-actions absolute opacity-0 group-hover:opacity-100 flex items-center gap-2 -bottom-8 transition-opacity duration-200',
+              isAgent ? 'left-0' : 'right-0'
+            )}
+          >
+            <button
+              type="button"
+              className="p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors"
+              onClick={() => {
+                navigator.clipboard.writeText(message.content);
+              }}
+              title={t('message.copy')}
+            >
+              <CopyIcon className="size-icon-xs" />
+            </button>
+            <button
+              type="button"
+              className="p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors"
+              title={t('message.regenerate')}
+            >
+              <ArrowClockwiseIcon className="size-icon-xs" />
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors',
+                isArchived && 'pointer-events-none opacity-50'
+              )}
+              onClick={() => onReply(message)}
+              disabled={isArchived}
+              title={t('message.quote')}
+            >
+              <QuotesIcon className="size-icon-xs" />
+            </button>
+          </div>
+        )}
+      </div>
         {isCleanupMode && isUser && (
           <button
             type="button"

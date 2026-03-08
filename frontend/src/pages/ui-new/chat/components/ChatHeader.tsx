@@ -4,6 +4,7 @@ import {
   BoxArrowDownIcon,
   BroomIcon,
   DotsThreeIcon,
+  GitDiffIcon,
   PencilSimpleIcon,
   TrashIcon,
   XIcon,
@@ -20,15 +21,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui-new/primitives/Dropdown';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
-import { formatDateShortWithTime } from '@/utils/date';
-import { formatTokenCount } from '@/utils/string';
 
 export interface ChatHeaderProps {
   activeSession: ChatSession | null;
   displayTitle: string;
   isGeneratedTitle: boolean;
-  messageCount: number;
-  totalTokens?: number;
   isSearchOpen: boolean;
   searchQuery: string;
   onCloseSearch: () => void;
@@ -52,14 +49,16 @@ export interface ChatHeaderProps {
   isCleanupMode: boolean;
   onToggleCleanupMode: () => void;
   isDeletingMessages: boolean;
+  // View changes
+  hasChanges?: boolean;
+  hasNewChanges?: boolean;
+  onViewChanges?: () => void;
 }
 
 export function ChatHeader({
   activeSession,
   displayTitle,
   isGeneratedTitle,
-  messageCount,
-  totalTokens,
   isSearchOpen,
   searchQuery,
   onCloseSearch,
@@ -80,6 +79,9 @@ export function ChatHeader({
   isCleanupMode,
   onToggleCleanupMode,
   isDeletingMessages,
+  hasChanges,
+  hasNewChanges,
+  onViewChanges,
 }: ChatHeaderProps) {
   const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
@@ -116,12 +118,12 @@ export function ChatHeader({
   }, [isSearchOpen, onCloseSearch]);
 
   return (
-    <header className="chat-session-header border-b border-border">
+    <header className="chat-session-header">
       <div className="chat-session-header-shell flex items-center justify-between gap-base">
         <div className="chat-session-header-main min-w-0">
           {!isEditingTitle && (
             <>
-              <div className="chat-session-header-title-row flex items-center gap-half flex-wrap">
+              <div className="chat-session-header-title-row flex items-center gap-[12px] flex-wrap">
                 <div className="chat-session-header-title text-sm text-normal font-medium truncate">
                   {displayTitle}
                 </div>
@@ -200,24 +202,6 @@ export function ChatHeader({
                   </span>
                 )}
               </div>
-              {activeSession && (
-                <div className="chat-session-header-insights">
-                  <span className="chat-session-header-meta-pill">
-                    {t('header.created')}{' '}
-                    {formatDateShortWithTime(activeSession.created_at)}
-                  </span>
-                  <span className="chat-session-header-meta-pill">
-                    {t('header.totalMessages')}: {messageCount}
-                  </span>
-                  {totalTokens !== undefined && totalTokens > 0 && (
-                    <span className="chat-session-header-meta-pill">
-                      {t('header.tokenUsage', {
-                        value: formatTokenCount(totalTokens),
-                      })}
-                    </span>
-                  )}
-                </div>
-              )}
             </>
           )}
           {isEditingTitle && (
@@ -261,6 +245,20 @@ export function ChatHeader({
           {titleError && <div className="text-xs text-error">{titleError}</div>}
         </div>
         <div className="chat-session-header-actions flex items-center gap-base">
+          {hasChanges && onViewChanges && (
+            <button
+              type="button"
+              onClick={onViewChanges}
+              className="chat-session-header-view-changes-btn"
+              title={t('message.viewChanges')}
+              aria-label={t('message.viewChanges')}
+            >
+              <GitDiffIcon className="size-icon-sm" />
+              {hasNewChanges && (
+                <span className="chat-session-header-view-changes-dot" />
+              )}
+            </button>
+          )}
           {activeSession && isSearchOpen && (
             <div
               ref={searchInputContainerRef}

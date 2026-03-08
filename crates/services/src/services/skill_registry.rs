@@ -25,7 +25,10 @@ const GLOBAL_SKILLS_DIR: &str = ".agents";
 
 /// Built-in skills data loaded from JSON
 static BUILTIN_SKILLS: Lazy<BuiltInSkillsData> = Lazy::new(|| {
-    let json_data = include_str!("../../../db/seed/skills_registry.json");
+    let json_data = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../skill-registry-server/seed/skills_registry.json"
+    ));
     match serde_json::from_str(json_data) {
         Ok(data) => data,
         Err(e) => {
@@ -562,6 +565,85 @@ pub async fn is_skill_installed(
 /// List all built-in skills (without full content)
 pub fn list_builtin_skills() -> Vec<RemoteSkillMeta> {
     BUILTIN_SKILLS.skills.iter().map(|s| s.to_meta()).collect()
+}
+
+// ============================================================
+// Dual-Source Functions (Go server with BUILTIN fallback)
+// ============================================================
+
+/// List skills from registry with fallback to built-in skills
+/// This provides a dual-source architecture: Go server first, BUILTIN_SKILLS as backup
+pub async fn list_skills_with_fallback(registry_url: Option<String>) -> Vec<RemoteSkillMeta> {
+    let client = SkillRegistryClient::new(registry_url);
+
+    match client.list_skills().await {
+        Ok(skills) => {
+            tracing::debug!("Fetched {} skills from registry", skills.len());
+            skills
+        }
+        Err(e) => {
+            tracing::warn!("Failed to fetch from registry, using builtin: {}", e);
+            list_builtin_skills()
+        }
+    }
+}
+
+/// Get a specific skill with fallback to built-in skills
+pub async fn get_skill_with_fallback(
+    registry_url: Option<String>,
+    skill_id: &str,
+) -> Option<RemoteSkillPackage> {
+    let client = SkillRegistryClient::new(registry_url);
+
+    match client.get_skill(skill_id).await {
+        Ok(skill) => Some(skill),
+        Err(e) => {
+            tracing::warn!(
+                "Failed to fetch skill '{}' from registry, trying builtin: {}",
+                skill_id,
+                e
+            );
+            get_builtin_skill(skill_id)
+        }
+    }
+}
+
+/// Search skills with fallback to built-in skills
+pub async fn search_skills_with_fallback(
+    registry_url: Option<String>,
+    query: &str,
+) -> Vec<RemoteSkillMeta> {
+    let client = SkillRegistryClient::new(registry_url);
+
+    match client.search_skills(query).await {
+        Ok(skills) => skills,
+        Err(e) => {
+            tracing::warn!("Failed to search registry, using builtin: {}", e);
+            search_builtin_skills(query)
+        }
+    }
+}
+
+/// List categories with fallback to built-in categories
+pub async fn list_categories_with_fallback(
+    registry_url: Option<String>,
+) -> Vec<SkillCategory> {
+    let client = SkillRegistryClient::new(registry_url);
+
+    match client.list_categories().await {
+        Ok(categories) => categories,
+        Err(e) => {
+            tracing::warn!("Failed to fetch categories from registry, using builtin: {}", e);
+            get_builtin_categories()
+                .into_iter()
+                .map(|name| SkillCategory {
+                    id: name.to_lowercase(),
+                    name,
+                    description: None,
+                })
+                .collect()
+        }
+    }
 }
 
 /// Get total count of built-in skills

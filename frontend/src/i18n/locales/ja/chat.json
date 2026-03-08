@@ -1,4 +1,10 @@
 {
+  "relativeTime": {
+    "justNow": "たった今",
+    "minutesAgo": "{{count}}分",
+    "hoursAgo": "{{count}}時間",
+    "daysAgo": "{{count}}日"
+  },
   "sidebar": {
     "title": "セッション",
     "newSession": "新しいセッション",
@@ -68,6 +74,8 @@
   },
   "message": {
     "quote": "引用",
+    "copy": "コピー",
+    "regenerate": "再生成",
     "replyingTo": "{{name}}に返信",
     "view": "表示",
     "referencedMessageUnavailable": "参照メッセージは利用できません。",
@@ -229,6 +237,7 @@
   },
   "cleanup": {
     "selected": "選択済み: {{count}}",
+    "cancel": "キャンセル",
     "selectAll": "すべて選択",
     "deselectAll": "すべて選択解除",
     "deleteSelected": "選択項目を削除"

@@ -71,7 +71,7 @@ function PreviewSection({
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-2xl bg-white text-[11px] font-semibold tracking-[0.2em] text-indigo-500 shadow-sm">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-2xl bg-white text-[11px] font-semibold tracking-[0.2em] text-[#5094FB] shadow-sm">
           {step}
         </div>
         <div className="min-w-0">
@@ -240,7 +240,7 @@ export function TeamImportPreviewModal({
       >
         <div className="flex items-start justify-between gap-6 px-6 pb-3 pt-5">
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-indigo-500/85">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[#5094FB]">
               {t('members.importPreview.previewEyebrow')}
             </div>
             <div className="mt-3 text-[30px] font-semibold leading-none text-slate-950">
@@ -271,7 +271,7 @@ export function TeamImportPreviewModal({
                 key={`${currentPlan.presetId}-${activeCardIndex}`}
                 className="chat-session-member-import-card flex h-full min-w-0 flex-col overflow-hidden rounded-[24px] border border-white/75 bg-white/78 shadow-[0_18px_44px_rgba(148,163,184,0.14)] animate-in fade-in-0 duration-200"
               >
-                <div className="rounded-[22px] bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.18),_rgba(255,255,255,0)_42%),linear-gradient(180deg,_rgba(255,255,255,0.88)_0%,_rgba(241,245,249,0.72)_100%)] px-5 py-4">
+                <div className="rounded-[22px] bg-[radial-gradient(circle_at_top_left,_rgba(80,148,251,0.18),_rgba(255,255,255,0)_42%),linear-gradient(180deg,_rgba(255,255,255,0.88)_0%,_rgba(241,245,249,0.72)_100%)] px-5 py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
@@ -572,7 +572,7 @@ export function TeamImportPreviewModal({
                           className={cn(
                             'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-2xl text-[11px] font-semibold',
                             index === activeCardIndex
-                              ? 'bg-white text-indigo-600 shadow-sm'
+                              ? 'bg-white text-[#5094FB] shadow-sm'
                               : actionTone.step
                           )}
                         >

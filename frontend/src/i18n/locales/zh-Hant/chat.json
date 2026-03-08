@@ -1,4 +1,10 @@
 {
+  "relativeTime": {
+    "justNow": "剛剛",
+    "minutesAgo": "{{count}}分鐘",
+    "hoursAgo": "{{count}}小時",
+    "daysAgo": "{{count}}天"
+  },
   "sidebar": {
     "title": "會話",
     "newSession": "新會話",
@@ -68,6 +74,8 @@
   },
   "message": {
     "quote": "引用",
+    "copy": "複製",
+    "regenerate": "重新生成",
     "replyingTo": "回覆 {{name}}",
     "view": "檢視",
     "referencedMessageUnavailable": "引用的訊息不可用。",
@@ -229,6 +237,7 @@
   },
   "cleanup": {
     "selected": "已選擇: {{count}}",
+    "cancel": "取消",
     "selectAll": "全選",
     "deselectAll": "取消全選",
     "deleteSelected": "刪除所選"

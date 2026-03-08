@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UIEvent } from 'react';
 import {
   ArrowClockwiseIcon,
@@ -134,7 +134,7 @@ function ToggleSwitch({
       className={cn(
         'relative h-5 w-9 shrink-0 rounded-full border appearance-none transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338CA]/40',
         checked
-          ? 'bg-[#4F46E5] border-[#4F46E5]'
+          ? 'bg-[#A8C9FF] border-[#A8C9FF]'
           : 'bg-[#e5e5e8] border-[#e5e5e8]'
       )}
     >
@@ -1202,10 +1202,10 @@ export function SkillsPanel({
                   isCreatingSkill || customSkillPath.trim().length === 0
                 }
                 className={cn(
-                  'inline-flex h-9 items-center gap-1 rounded-xl bg-[var(--chat-session-send-blue,#4f46e5)] px-4 text-sm text-white',
+                  'inline-flex h-9 items-center gap-1 rounded-xl bg-[var(--chat-session-send-blue,#5094FB)] px-4 text-sm text-white',
                   isCreatingSkill || customSkillPath.trim().length === 0
                     ? 'opacity-60 cursor-not-allowed'
-                    : 'hover:bg-[var(--chat-session-send-blue-hover,#4338ca)]'
+                    : 'hover:bg-[var(--chat-session-send-blue-hover,#4084EB)]'
                 )}
               >
                 <PlusIcon size={14} />

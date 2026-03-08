@@ -1,4 +1,10 @@
 {
+  "relativeTime": {
+    "justNow": "刚刚",
+    "minutesAgo": "{{count}}分钟",
+    "hoursAgo": "{{count}}小时",
+    "daysAgo": "{{count}}天"
+  },
   "sidebar": {
     "title": "会话",
     "newSession": "新会话",
@@ -66,8 +72,10 @@
     "addAttachment": "添加附件",
     "send": "发送"
   },
-  "message": {
+"message": {
     "quote": "引用",
+    "copy": "复制",
+    "regenerate": "重新生成",
     "replyingTo": "回复 {{name}}",
     "view": "查看",
     "referencedMessageUnavailable": "引用的消息不可用。",
@@ -167,7 +175,7 @@
     "importPreview": {
       "title": "导入团队：{{teamName}}",
       "description": "以下成员将加入此会话：",
-      "actionCreate": "将创建",
+      "actionCreate": "",
       "actionReuse": "已存在（将复用）",
       "actionSkip": "已在会话中（将跳过）",
       "confirmImport": "导入团队",
@@ -229,6 +237,7 @@
   },
   "cleanup": {
     "selected": "已选择: {{count}}",
+    "cancel": "取消",
     "selectAll": "全选",
     "deselectAll": "取消全选",
     "deleteSelected": "删除所选"

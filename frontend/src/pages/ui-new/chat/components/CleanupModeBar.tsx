@@ -7,6 +7,7 @@ export interface CleanupModeBarProps {
   onToggleSelectAll: () => void;
   onDeleteSelected: () => void;
   isDeletingMessages: boolean;
+  onCancel: () => void;
 }
 
 export function CleanupModeBar({
@@ -15,6 +16,7 @@ export function CleanupModeBar({
   onToggleSelectAll,
   onDeleteSelected,
   isDeletingMessages,
+  onCancel,
 }: CleanupModeBarProps) {
   const { t } = useTranslation('chat');
   const allSelected = selectedCount === totalCount;
@@ -22,6 +24,13 @@ export function CleanupModeBar({
   return (
     <div className="chat-session-cleanup-bar px-base py-half border-b border-border text-xs text-low flex items-center justify-end gap-base">
       <span>{t('cleanup.selected', { count: selectedCount })}</span>
+      <button
+        type="button"
+        className="chat-session-cleanup-action"
+        onClick={onCancel}
+      >
+        {t('cleanup.cancel')}
+      </button>
       <button
         type="button"
         className="chat-session-cleanup-action"

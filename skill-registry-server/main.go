@@ -86,13 +86,16 @@ type SkillCategory struct {
 
 // Server state
 type Server struct {
-	skillsDir        string
-	cdnConfig        *CDNConfig
-	skills           []SkillMeta
-	categories       map[string]string
-	downloadCounts   map[string]int64 // skill_id -> download_count from skills.sh
-	skillsShData     *SkillsShData    // cached skills.sh data
-	skillsShDataPath string           // path to cache file
+	skillsDir          string
+	cdnConfig          *CDNConfig
+	skills             []SkillMeta
+	categories         map[string]string
+	downloadCounts     map[string]int64 // skill_id -> download_count from skills.sh
+	skillsShData       *SkillsShData    // cached skills.sh data
+	skillsShDataPath   string           // path to cache file
+	githubSkillsData   *GitHubSkillData // cached GitHub skills data
+	githubDataPath     string           // path to GitHub cache file
+	githubScraper      *GitHubScraper   // GitHub API scraper
 }
 
 func main() {
@@ -139,11 +142,18 @@ func main() {
 		categories:       make(map[string]string),
 		downloadCounts:   make(map[string]int64),
 		skillsShDataPath: "skills_sh_data.json",
+		githubDataPath:   "github_skills_data.json",
+		githubScraper:    NewGitHubScraper(),
 	}
 
 	// Load skills.sh data if available
 	if err := server.loadSkillsShData(); err != nil {
 		fmt.Printf("Warning: failed to load skills.sh data: %v\n", err)
+	}
+
+	// Load GitHub skills data if available
+	if err := server.loadGitHubSkillsData(); err != nil {
+		fmt.Printf("Warning: failed to load GitHub skills data: %v\n", err)
 	}
 
 	// Initialize skills
@@ -187,7 +197,9 @@ func main() {
 		api.GET("/download/:id", server.downloadSkill)
 		api.GET("/download/:id/files", server.downloadSkillFiles)
 		api.GET("/download/:id/file/*filepath", server.downloadSkillFile)
-		api.POST("/sync", server.syncSkillsSh) // Sync from skills.sh
+		api.POST("/sync", server.syncSkillsSh)       // Sync from skills.sh
+		api.POST("/sync/github", server.syncGitHub)  // Sync from GitHub
+		api.POST("/sync/all", server.syncAll)        // Sync from all sources
 		api.GET("/sync/status", server.getSyncStatus)
 	}
 
@@ -384,39 +396,89 @@ func getCategoryFromName(name string) string {
 func (s *Server) listSkills(c *gin.Context) {
 	search := c.Query("search")
 	category := c.Query("category")
-	sortBy := c.Query("sort")     // "downloads", "name", "recent"
-	limitStr := c.Query("limit")  // pagination
+	sortBy := c.Query("sort")      // "downloads", "name", "recent"
+	limitStr := c.Query("limit")   // pagination
 	offsetStr := c.Query("offset") // pagination
+	source := c.Query("source")    // "local", "github", "all" (default: all)
 
 	var result []SkillListItem
-	for _, skill := range s.skills {
-		// Filter by search
-		if search != "" {
-			searchLower := strings.ToLower(search)
-			if !strings.Contains(strings.ToLower(skill.Name), searchLower) &&
-				!strings.Contains(strings.ToLower(skill.Description), searchLower) {
+	seenIDs := make(map[string]bool)
+
+	// Add local skills
+	if source == "" || source == "all" || source == "local" {
+		for _, skill := range s.skills {
+			// Filter by search
+			if search != "" {
+				searchLower := strings.ToLower(search)
+				if !strings.Contains(strings.ToLower(skill.Name), searchLower) &&
+					!strings.Contains(strings.ToLower(skill.Description), searchLower) {
+					continue
+				}
+			}
+
+			// Filter by category
+			if category != "" && skill.Category != category {
 				continue
 			}
-		}
 
-		// Filter by category
-		if category != "" && skill.Category != category {
-			continue
-		}
+			seenIDs[skill.ID] = true
 
-		// Convert to list item (exclude content, files, download_url)
-		result = append(result, SkillListItem{
-			ID:               skill.ID,
-			Name:             skill.Name,
-			Description:      skill.Description,
-			Category:         skill.Category,
-			Version:          skill.Version,
-			Author:           skill.Author,
-			Tags:             skill.Tags,
-			SourceURL:        skill.SourceURL,
-			CompatibleAgents: skill.CompatibleAgents,
-			DownloadCount:    skill.DownloadCount,
-		})
+			// Convert to list item (exclude content, files, download_url)
+			result = append(result, SkillListItem{
+				ID:               skill.ID,
+				Name:             skill.Name,
+				Description:      skill.Description,
+				Category:         skill.Category,
+				Version:          skill.Version,
+				Author:           skill.Author,
+				Tags:             skill.Tags,
+				SourceURL:        skill.SourceURL,
+				CompatibleAgents: skill.CompatibleAgents,
+				DownloadCount:    skill.DownloadCount,
+			})
+		}
+	}
+
+	// Add GitHub skills if available
+	if (source == "" || source == "all" || source == "github") && s.githubSkillsData != nil {
+		for _, skill := range s.githubSkillsData.Skills {
+			// Skip if already seen from local
+			if seenIDs[skill.ID] {
+				continue
+			}
+
+			// Filter by search
+			if search != "" {
+				searchLower := strings.ToLower(search)
+				if !strings.Contains(strings.ToLower(skill.Name), searchLower) &&
+					!strings.Contains(strings.ToLower(skill.Description), searchLower) {
+					continue
+				}
+			}
+
+			// Get category
+			skillCategory := getCategoryFromName(skill.Name)
+
+			// Filter by category
+			if category != "" && skillCategory != category {
+				continue
+			}
+
+			seenIDs[skill.ID] = true
+
+			result = append(result, SkillListItem{
+				ID:               skill.ID,
+				Name:             skill.Name,
+				Description:      skill.Description,
+				Category:         skillCategory,
+				Version:          "1.0.0",
+				Author:           skill.Owner,
+				Tags:             skill.Topics,
+				SourceURL:        skill.SourceURL,
+				CompatibleAgents: []string{"claude-code"},
+				DownloadCount:    skill.DownloadCount,
+			})
+		}
 	}
 
 	// Sort results
@@ -819,60 +881,169 @@ func (s *Server) syncSkillsSh(c *gin.Context) {
 // getSyncStatus returns the current sync status
 func (s *Server) getSyncStatus(c *gin.Context) {
 	status := gin.H{
-		"has_data": s.skillsShData != nil,
+		"skills_sh": gin.H{
+			"has_data": s.skillsShData != nil,
+		},
+		"github": gin.H{
+			"has_data": s.githubSkillsData != nil,
+		},
+		"local_skills": len(s.skills),
 	}
 
 	if s.skillsShData != nil {
-		status["total_skills"] = s.skillsShData.TotalSkills
-		status["total_installs"] = s.skillsShData.TotalInstalls
-		status["generated_at"] = s.skillsShData.GeneratedAt
+		status["skills_sh"] = gin.H{
+			"has_data":       true,
+			"total_skills":   s.skillsShData.TotalSkills,
+			"total_installs": s.skillsShData.TotalInstalls,
+			"generated_at":   s.skillsShData.GeneratedAt,
+		}
+	}
+
+	if s.githubSkillsData != nil {
+		status["github"] = gin.H{
+			"has_data":     true,
+			"total_skills": s.githubSkillsData.TotalSkills,
+			"generated_at": s.githubSkillsData.GeneratedAt,
+		}
 	}
 
 	c.JSON(http.StatusOK, status)
 }
 
-// startPeriodicSync starts a background goroutine to sync skills.sh data periodically
+// startPeriodicSync starts a background goroutine to sync data periodically
 func (s *Server) startPeriodicSync(interval time.Duration) {
-	fmt.Printf("Starting periodic skills.sh sync every %v\n", interval)
+	fmt.Printf("Starting periodic sync every %v\n", interval)
 
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
 		for range ticker.C {
-			fmt.Println("Running scheduled skills.sh sync...")
-
-			data, err := ScrapeSkillsShWithOptions(true) // Full scrape
-			if err != nil {
-				fmt.Printf("Scheduled sync failed: %v\n", err)
-				continue
-			}
-
-			s.skillsShData = data
-
-			// Build download counts map
-			s.downloadCounts = make(map[string]int64)
-			for _, skill := range data.Skills {
-				s.downloadCounts[skill.ID] = skill.DownloadCount
-				s.downloadCounts[skill.Name] = skill.DownloadCount
-			}
-
-			// Update existing skills with download counts
-			for i := range s.skills {
-				if count, ok := s.downloadCounts[s.skills[i].ID]; ok {
-					s.skills[i].DownloadCount = count
-				} else if count, ok := s.downloadCounts[s.skills[i].Name]; ok {
-					s.skills[i].DownloadCount = count
-				}
-			}
-
-			// Save to cache
-			if err := s.saveSkillsShData(); err != nil {
-				fmt.Printf("Warning: failed to save skills.sh data: %v\n", err)
-			}
-
-			fmt.Printf("Scheduled sync completed: %d skills, %d total installs\n",
-				data.TotalSkills, data.TotalInstalls)
+			fmt.Println("Running scheduled sync (all sources)...")
+			s.doFullSync()
 		}
 	}()
+}
+
+// doFullSync syncs from all sources: GitHub and skills.sh
+func (s *Server) doFullSync() {
+	ctx := context.Background()
+
+	// 1. Sync from skills.sh for download counts
+	fmt.Println("Step 1: Syncing from skills.sh...")
+	shData, err := ScrapeSkillsShWithOptions(true)
+	if err != nil {
+		fmt.Printf("Warning: skills.sh sync failed: %v\n", err)
+	} else {
+		s.skillsShData = shData
+		s.buildDownloadCountsMap()
+		if err := s.saveSkillsShData(); err != nil {
+			fmt.Printf("Warning: failed to save skills.sh data: %v\n", err)
+		}
+		fmt.Printf("  skills.sh: %d skills, %d total installs\n", shData.TotalSkills, shData.TotalInstalls)
+	}
+
+	// 2. Sync from GitHub for full skill discovery
+	fmt.Println("Step 2: Syncing from GitHub...")
+	githubData, err := s.githubScraper.SearchSkills(ctx)
+	if err != nil {
+		fmt.Printf("Warning: GitHub sync failed: %v\n", err)
+	} else {
+		// Merge download counts from skills.sh
+		s.githubScraper.MergeWithSkillsSh(githubData, s.skillsShData)
+		s.githubSkillsData = githubData
+		if err := s.saveGitHubSkillsData(); err != nil {
+			fmt.Printf("Warning: failed to save GitHub data: %v\n", err)
+		}
+		fmt.Printf("  GitHub: %d skills found\n", githubData.TotalSkills)
+	}
+
+	// 3. Update local skills with download counts
+	s.updateSkillsDownloadCounts()
+
+	fmt.Println("Full sync completed")
+}
+
+// buildDownloadCountsMap builds the download counts map from skills.sh data
+func (s *Server) buildDownloadCountsMap() {
+	s.downloadCounts = make(map[string]int64)
+	if s.skillsShData == nil {
+		return
+	}
+	for _, skill := range s.skillsShData.Skills {
+		s.downloadCounts[skill.ID] = skill.DownloadCount
+		s.downloadCounts[skill.Name] = skill.DownloadCount
+	}
+}
+
+// updateSkillsDownloadCounts updates local skills with download counts
+func (s *Server) updateSkillsDownloadCounts() {
+	for i := range s.skills {
+		if count, ok := s.downloadCounts[s.skills[i].ID]; ok {
+			s.skills[i].DownloadCount = count
+		} else if count, ok := s.downloadCounts[s.skills[i].Name]; ok {
+			s.skills[i].DownloadCount = count
+		}
+	}
+}
+
+// loadGitHubSkillsData loads cached GitHub skills data from file
+func (s *Server) loadGitHubSkillsData() error {
+	data, err := ReadGitHubSkillsData(s.githubDataPath)
+	if err != nil {
+		return err
+	}
+	s.githubSkillsData = data
+	fmt.Printf("Loaded %d GitHub skills\n", len(data.Skills))
+	return nil
+}
+
+// saveGitHubSkillsData saves GitHub skills data to cache file
+func (s *Server) saveGitHubSkillsData() error {
+	if s.githubSkillsData == nil {
+		return nil
+	}
+	return WriteGitHubSkillsData(s.githubSkillsData, s.githubDataPath)
+}
+
+// syncGitHub syncs skills data from GitHub
+func (s *Server) syncGitHub(c *gin.Context) {
+	fmt.Println("Starting GitHub sync...")
+	ctx := c.Request.Context()
+
+	data, err := s.githubScraper.SearchSkills(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to search GitHub",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Merge with skills.sh download counts
+	s.githubScraper.MergeWithSkillsSh(data, s.skillsShData)
+	s.githubSkillsData = data
+
+	// Save to cache
+	if err := s.saveGitHubSkillsData(); err != nil {
+		fmt.Printf("Warning: failed to save GitHub data: %v\n", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":       "success",
+		"total_skills": data.TotalSkills,
+		"generated_at": data.GeneratedAt,
+	})
+}
+
+// syncAll syncs from all sources
+func (s *Server) syncAll(c *gin.Context) {
+	fmt.Println("Starting full sync (all sources)...")
+
+	go s.doFullSync()
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "started",
+		"message": "Full sync started in background",
+	})
 }

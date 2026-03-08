@@ -23,10 +23,10 @@ export function PrimaryButton({
   const variantStyles = disabled
     ? 'cursor-not-allowed bg-panel'
     : variant === 'default'
-      ? 'bg-[#4d55ad] hover:bg-[#444ca0] text-on-brand'
+      ? 'bg-[#5094FB] hover:bg-[#4084EB] text-on-brand'
       : variant === 'secondary'
-        ? 'bg-brand-secondary hover:bg-brand-hover text-on-brand'
-        : 'bg-panel hover:bg-secondary text-normal';
+        ? 'bg-[#4A69CC] hover:bg-[#5094FB] text-on-brand'
+        : 'bg-[#F0F3F9] hover:bg-[#e1e6f2] text-normal';
 
   return (
     <button
