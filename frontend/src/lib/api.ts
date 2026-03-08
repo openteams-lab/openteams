@@ -1470,6 +1470,23 @@ export const chatApi = {
     return handleApiResponse<ChatSession>(response);
   },
 
+  markDiffSeen: async (
+    sessionId: string,
+    diffKey: string
+  ): Promise<ChatSession> => {
+    const response = await makeRequest(`/api/chat/sessions/${sessionId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        title: null,
+        status: null,
+        summary_text: null,
+        archive_ref: null,
+        last_seen_diff_key: diffKey,
+      }),
+    });
+    return handleApiResponse<ChatSession>(response);
+  },
+
   archiveSession: async (sessionId: string): Promise<ChatSession> => {
     const response = await makeRequest(
       `/api/chat/sessions/${sessionId}/archive`,

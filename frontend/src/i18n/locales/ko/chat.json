@@ -1,4 +1,10 @@
 {
+  "relativeTime": {
+    "justNow": "방금",
+    "minutesAgo": "{{count}}분",
+    "hoursAgo": "{{count}}시간",
+    "daysAgo": "{{count}}일"
+  },
   "sidebar": {
     "title": "세션",
     "newSession": "새 세션",
@@ -68,6 +74,8 @@
   },
   "message": {
     "quote": "인용",
+    "copy": "복사",
+    "regenerate": "재생성",
     "replyingTo": "{{name}}에게 답장",
     "view": "보기",
     "referencedMessageUnavailable": "참조된 메시지를 사용할 수 없습니다.",
@@ -229,6 +237,7 @@
   },
   "cleanup": {
     "selected": "선택됨: {{count}}",
+    "cancel": "취소",
     "selectAll": "모두 선택",
     "deselectAll": "모두 선택 해제",
     "deleteSelected": "선택 항목 삭제"

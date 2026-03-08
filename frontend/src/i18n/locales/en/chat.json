@@ -1,4 +1,10 @@
 {
+  "relativeTime": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}}m",
+    "hoursAgo": "{{count}}h",
+    "daysAgo": "{{count}}d"
+  },
   "sidebar": {
     "title": "Sessions",
     "newSession": "New Session",
@@ -66,8 +72,10 @@
     "addAttachment": "Add attachment files",
     "send": "Send"
   },
-  "message": {
+"message": {
     "quote": "Quote",
+    "copy": "Copy",
+    "regenerate": "Regenerate",
     "replyingTo": "Replying to {{name}}",
     "view": "View",
     "referencedMessageUnavailable": "Referenced message unavailable.",
@@ -229,6 +237,7 @@
   },
   "cleanup": {
     "selected": "Selected: {{count}}",
+    "cancel": "Cancel",
     "selectAll": "Select All",
     "deselectAll": "Deselect All",
     "deleteSelected": "Delete Selected"

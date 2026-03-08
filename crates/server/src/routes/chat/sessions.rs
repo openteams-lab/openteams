@@ -401,6 +401,7 @@ pub async fn archive_session(
             status: Some(ChatSessionStatus::Archived),
             summary_text: None,
             archive_ref: Some(archive_ref),
+            last_seen_diff_key: None,
         },
     )
     .await?;
@@ -438,6 +439,7 @@ pub async fn restore_session(
             status: Some(ChatSessionStatus::Active),
             summary_text: None,
             archive_ref: None,
+            last_seen_diff_key: None,
         },
     )
     .await?;

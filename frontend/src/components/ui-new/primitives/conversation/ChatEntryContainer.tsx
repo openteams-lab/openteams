@@ -94,7 +94,7 @@ export function ChatEntryContainer({
   return (
     <div
       className={cn(
-        'rounded-sm w-full',
+        'rounded-lg w-full',
         config.border && 'border',
         config.border,
         config.bg,
@@ -106,7 +106,7 @@ export function ChatEntryContainer({
       {/* Header */}
       <div
         className={cn(
-          'flex items-center px-double py-base gap-base rounded-sm overflow-hidden',
+          'flex items-center px-double py-base gap-base rounded-lg overflow-hidden',
           config.headerBg,
           onToggle && 'cursor-pointer',
           headerClassName

@@ -1,4 +1,4 @@
-import type { ChangeEvent, RefObject } from 'react';
+import type { RefObject, ChangeEvent } from 'react';
 import {
   CaretRightIcon,
   ChatsTeardropIcon,
@@ -6,12 +6,12 @@ import {
   PaperPlaneRightIcon,
   XIcon,
   EyeIcon,
+  AtIcon,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import type { ChatAgent, ChatMessage } from 'shared/types';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 import { MultiSelectDropdown } from '@/components/ui-new/primitives/MultiSelectDropdown';
 import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
 import {
@@ -97,8 +97,6 @@ export interface MessageInputAreaProps {
   canSend: boolean;
   isSending: boolean;
   onSend: () => void;
-  // Layout
-  inputAreaHeight: number;
   // State
   isArchived: boolean;
   activeSessionId: string | null;
@@ -133,7 +131,6 @@ export function MessageInputArea({
   canSend,
   isSending,
   onSend,
-  inputAreaHeight,
   isArchived,
   activeSessionId,
 }: MessageInputAreaProps) {
@@ -226,7 +223,13 @@ export function MessageInputArea({
           <textarea
             ref={inputRef}
             value={draft}
-            onChange={(event) => onDraftChange(event.target.value)}
+            onChange={(event) => {
+              onDraftChange(event.target.value);
+              const textarea = event.target;
+              textarea.style.height = 'auto';
+              const newHeight = Math.min(textarea.scrollHeight, 200);
+              textarea.style.height = `${Math.max(44, newHeight)}px`;
+            }}
             onKeyDown={(event) => {
               if (onMentionKeyDown(event)) {
                 return;
@@ -242,7 +245,6 @@ export function MessageInputArea({
                 : t('input.inputPlaceholder')
             }
             disabled={isArchived || !activeSessionId}
-            style={{ height: inputAreaHeight }}
             className={cn(
               'chat-session-textarea w-full resize-none',
               'p-0 text-normal leading-relaxed focus:outline-none',
@@ -268,8 +270,8 @@ export function MessageInputArea({
                     'chat-session-mention-option w-full px-base py-half text-left text-sm',
                     'flex items-center justify-between',
                     index === highlightedMentionIndex
-                      ? 'bg-[#d5d5dc] text-normal'
-                      : 'text-normal hover:bg-[#d5d5dc]'
+                      ? 'bg-[#A8C9FF] text-normal'
+                      : 'text-normal hover:bg-[#A8C9FF]/40'
                   )}
                 >
                   <span className="flex items-center gap-half min-w-0">
@@ -342,22 +344,34 @@ export function MessageInputArea({
                 </button>
               </span>
             </Tooltip>
-            <MultiSelectDropdown
-              icon={ChatsTeardropIcon}
-              label={`@ ${t('input.mentionAgents')}`}
-              menuLabel={t('input.routeToAgents')}
-              values={selectedMentions}
-              options={agentOptions}
-              onChange={onSelectedMentionsChange}
-              triggerClassName={cn(
-                'chat-session-mention-trigger',
-                selectedMentions.length > 0 && 'is-active'
-              )}
-              menuContentClassName="chat-session-mention-menu"
-              disabled={
-                !activeSessionId || mentionAgentsCount === 0 || isArchived
-              }
-            />
+            <Tooltip content={t('input.mentionAgents')} side="top">
+              <span className="inline-flex">
+                <button
+                  type="button"
+                  className="chat-session-input-icon-btn"
+                  onClick={() => {
+                    if (inputRef.current) {
+                      const textarea = inputRef.current;
+                      const start = textarea.selectionStart;
+                      const end = textarea.selectionEnd;
+                      const value = draft;
+                      const newValue = value.substring(0, start) + '@' + value.substring(end);
+                      onDraftChange(newValue);
+                      textarea.focus();
+                      requestAnimationFrame(() => {
+                        textarea.setSelectionRange(start + 1, start + 1);
+                      });
+                    }
+                  }}
+                  disabled={
+                    !activeSessionId || mentionAgentsCount === 0 || isArchived
+                  }
+                  aria-label={t('input.mentionAgents')}
+                >
+                  <AtIcon className="size-icon-xs" />
+                </button>
+              </span>
+            </Tooltip>
             {selectedMentions.length > 0 && (
               <div className="chat-session-selected-mentions">
                 {selectedMentions.map((mention) => (
@@ -391,13 +405,21 @@ export function MessageInputArea({
                 {attachmentStatus}
               </div>
             )}
-            <PrimaryButton
-              value={tCommon('buttons.send')}
-              actionIcon={isSending ? 'spinner' : PaperPlaneRightIcon}
-              onClick={onSend}
-              disabled={!canSend}
-              className="chat-session-send-btn"
-            />
+            <Tooltip content={tCommon('buttons.send')} side="top">
+              <button
+                type="button"
+                className="chat-session-send-btn"
+                onClick={onSend}
+                disabled={!canSend}
+                aria-label={tCommon('buttons.send')}
+              >
+                {isSending ? (
+                  <span className="chat-session-send-spinner" />
+                ) : (
+                  <PaperPlaneRightIcon className="size-icon-xs" />
+                )}
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>

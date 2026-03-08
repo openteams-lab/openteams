@@ -10,6 +10,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { ChatSession } from 'shared/types';
 import { cn } from '@/lib/utils';
+import { formatRelativeDateWithI18n } from '@/utils/date';
 
 const MAX_SESSION_TITLE_LENGTH = 20;
 
@@ -76,6 +77,7 @@ export function SessionListSidebar({
     const hasUnread = !isActive && unreadSessionIds.has(session.id);
     const { fullTitle, displayTitle } = getDisplaySessionTitle(session);
     const summaryPreview = session.summary_text?.trim() ?? '';
+    const timeLabel = formatRelativeDateWithI18n(session.updated_at, t);
 
     return (
       <button
@@ -99,11 +101,14 @@ export function SessionListSidebar({
           )}
           {!isCollapsed && (
             <div className="chat-session-item-content min-w-0 flex-1">
-              <div
-                className="chat-session-item-title truncate"
-                title={fullTitle}
-              >
-                {displayTitle}
+              <div className="chat-session-item-title-row flex items-center gap-half">
+                <div
+                  className="chat-session-item-title truncate"
+                  title={fullTitle}
+                >
+                  {displayTitle}
+                </div>
+                <span className="chat-session-item-time">{timeLabel}</span>
               </div>
               {summaryPreview.length > 0 && (
                 <div

@@ -1,4 +1,10 @@
 {
+  "relativeTime": {
+    "justNow": "à l'instant",
+    "minutesAgo": "{{count}}min",
+    "hoursAgo": "{{count}}h",
+    "daysAgo": "{{count}}j"
+  },
   "sidebar": {
     "title": "Sessions",
     "newSession": "Nouvelle session",
@@ -68,6 +74,8 @@
   },
   "message": {
     "quote": "Citer",
+    "copy": "Copier",
+    "regenerate": "Régénérer",
     "replyingTo": "En réponse à {{name}}",
     "view": "Voir",
     "referencedMessageUnavailable": "Message référencé non disponible.",
@@ -229,6 +237,7 @@
   },
   "cleanup": {
     "selected": "Sélectionné : {{count}}",
+    "cancel": "Annuler",
     "selectAll": "Tout sélectionner",
     "deselectAll": "Tout désélectionner",
     "deleteSelected": "Supprimer la sélection"
