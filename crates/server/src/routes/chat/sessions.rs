@@ -18,7 +18,7 @@ use db::models::{
     chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
 };
 use deployment::Deployment;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utils::{assets::asset_dir, response::ApiResponse};
 use uuid::Uuid;
@@ -134,6 +134,30 @@ fn is_windows_reserved_name(name: &str) -> bool {
 }
 
 fn validate_workspace_path_legality(trimmed: &str) -> Result<PathBuf, ApiError> {
+    let is_absolute = {
+        #[cfg(windows)]
+        {
+            // Windows: C:\, D:\, etc., or UNC paths \\server\share
+            // Also allow ~ for home directory (will be expanded later)
+            (trimmed.len() >= 2
+                && trimmed.chars().nth(1) == Some(':')
+                && matches!(trimmed.chars().next(), Some('a'..='z' | 'A'..='Z')))
+                || trimmed.starts_with(r"\\")
+                || trimmed.starts_with('~')
+        }
+        #[cfg(not(windows))]
+        {
+            // Unix/macOS: /path or ~/path
+            trimmed.starts_with('/') || trimmed.starts_with('~')
+        }
+    };
+
+    if !is_absolute {
+        return Err(ApiError::BadRequest(
+            "Workspace path must be an absolute path.".to_string(),
+        ));
+    }
+
     if trimmed.chars().any(|ch| ch == '\0' || ch.is_control()) {
         return Err(ApiError::BadRequest(
             "Workspace path contains invalid characters.".to_string(),
@@ -517,4 +541,62 @@ pub async fn stop_session_agent(
         .await?;
 
     Ok(ResponseJson(ApiResponse::success(())))
+}
+
+#[derive(Debug, Deserialize, TS)]
+pub struct ValidateWorkspacePathRequest {
+    pub workspace_path: String,
+}
+
+#[derive(Debug, Serialize, TS)]
+pub struct ValidateWorkspacePathResponse {
+    pub valid: bool,
+    pub error: Option<String>,
+}
+
+pub async fn validate_workspace_path_endpoint(
+    Json(payload): Json<ValidateWorkspacePathRequest>,
+) -> Result<ResponseJson<ApiResponse<ValidateWorkspacePathResponse>>, ApiError> {
+    let trimmed = payload.workspace_path.trim();
+
+    if trimmed.is_empty() {
+        return Ok(ResponseJson(ApiResponse::success(ValidateWorkspacePathResponse {
+            valid: false,
+            error: Some("Workspace path is required.".to_string()),
+        })));
+    }
+
+    if let Err(e) = validate_workspace_path_legality(trimmed) {
+        return Ok(ResponseJson(ApiResponse::success(ValidateWorkspacePathResponse {
+            valid: false,
+            error: Some(e.to_string()),
+        })));
+    }
+
+    let parsed_path = PathBuf::from(trimmed);
+    match tokio::fs::metadata(&parsed_path).await {
+        Ok(metadata) => {
+            if metadata.is_dir() {
+                Ok(ResponseJson(ApiResponse::success(ValidateWorkspacePathResponse {
+                    valid: true,
+                    error: None,
+                })))
+            } else {
+                Ok(ResponseJson(ApiResponse::success(ValidateWorkspacePathResponse {
+                    valid: false,
+                    error: Some("Workspace path must be an existing directory.".to_string()),
+                })))
+            }
+        }
+        Err(err) => {
+            let error_msg = match err.kind() {
+                std::io::ErrorKind::NotFound => "Workspace path does not exist.".to_string(),
+                _ => format!("Workspace path is not accessible: {err}"),
+            };
+            Ok(ResponseJson(ApiResponse::success(ValidateWorkspacePathResponse {
+                valid: false,
+                error: Some(error_msg),
+            })))
+        }
+    }
 }

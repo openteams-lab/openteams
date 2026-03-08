@@ -1007,6 +1007,7 @@ const renderPresetTab = () => (
         isRunnerAvailable={isRunnerAvailable}
         availabilityLabel={availabilityLabel}
         workspacePathPlaceholder={workspacePathPlaceholder}
+        memberError={memberError}
         getVariantOptions={getVariantOptions}
         getVariantLabel={getVariantLabel}
         getPlanVariant={getImportPlanVariant}

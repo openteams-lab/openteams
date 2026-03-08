@@ -64,7 +64,7 @@
     "clearAll": "Borrar todo",
     "preview": "Vista previa",
     "archivedPlaceholder": "Esta sesión está archivada y es de solo lectura.",
-    "inputPlaceholder": "Escribe tu mensaje y @menciona agentes...",
+    "inputPlaceholder": "Usa @ para enviar mensaje a los miembros...",
     "uploadingAttachments": "Subiendo archivos adjuntos...",
     "sendHint": "Presiona Enter para enviar, Shift+Enter para nueva línea.",
     "addAttachment": "Añadir archivos adjuntos",
@@ -100,7 +100,7 @@
     "title": "Lista de miembros IA",
     "countInSession": "{{count}} en la sesión",
     "selectSessionToManage": "Selecciona una sesión para gestionar miembros IA.",
-    "noMembersYet": "Aún no hay miembros IA. Añade uno abajo para habilitar @menciones.",
+    "noMembersYet": "Aún no hay miembros IA",
     "workspace": "Espacio de trabajo",
     "edit": "Editar",
     "remove": "Eliminar",
@@ -196,7 +196,27 @@
       },
       "promptBadge": "Editor de prompt",
       "promptHint": "Usa instrucciones claras y precisas para definir el comportamiento.",
-      "memberPage": "Cambiar al miembro {{index}} de {{total}}"
+      "memberPage": "Cambiar al miembro {{index}} de {{total}}",
+      "errors": {
+        "workspacePathRequired": "Importación fallida: La ruta del espacio de trabajo es obligatoria.",
+        "workspacePathNotExist": "Importación fallida: La ruta del espacio de trabajo no existe.",
+        "workspacePathNotDirectory": "Importación fallida: La ruta del espacio de trabajo debe ser un directorio existente.",
+        "workspacePathNotAccessible": "Importación fallida: La ruta del espacio de trabajo no es accesible.",
+        "workspacePathMustBeAbsolute": "Importación fallida: La ruta del espacio de trabajo debe ser una ruta absoluta.",
+        "invalidWorkspacePath": "Importación fallida: Ruta del espacio de trabajo inválida.",
+        "nothingToImport": "Importación fallida: No hay nada que importar de este preset de equipo.",
+        "baseCodingAgentRequired": "Importación fallida: Se requiere un agente de codificación base.",
+        "selectedCodingAgentUnavailable": "Importación fallida: El agente de codificación seleccionado no está disponible.",
+        "memberNameRequired": "Importación fallida: El nombre del miembro IA es obligatorio.",
+        "memberNameInvalidChars": "Importación fallida: El nombre solo puede incluir letras, números, \"_\" o \"-\".",
+        "memberNameTooLong": "Importación fallida: El nombre del miembro IA no puede exceder {{max}} caracteres.",
+        "memberNameMatchProject": "Importación fallida: El nombre del miembro IA no puede coincidir con el nombre del proyecto.",
+        "duplicateMemberNames": "Importación fallida: Nombres de miembros IA duplicados en el plan de importación.",
+        "selectSessionFirst": "Por favor, selecciona primero una sesión de chat.",
+        "sessionArchived": "Esta sesión está archivada y es de solo lectura.",
+        "noAvailableCodingAgent": "Importación fallida: No hay agente de codificación disponible para importar este preset.",
+        "failedToImportTeam": "Error al importar el preset de equipo."
+      }
     },
     "presetDisplay": {
       "members": {

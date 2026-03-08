@@ -71,6 +71,7 @@ import {
   getLocalizedMemberPresetName,
   getLocalizedTeamPresetName,
   validateWorkspacePath,
+  translateWorkspacePathError,
   type MemberPresetImportPlan,
 } from './chat/utils';
 
@@ -2434,35 +2435,37 @@ const resizeStartRef = useRef<{
         const runnerType = entry.runnerType.trim();
 
         if (!runnerType) {
-          setMemberError('Base coding agent is required.');
+          setMemberError(t('members.importPreview.errors.baseCodingAgentRequired'));
           return null;
         }
 
         if (!enabledRunnerTypesSet.has(runnerType)) {
-          setMemberError('Selected coding agent is unavailable.');
+          setMemberError(t('members.importPreview.errors.selectedCodingAgentUnavailable'));
           return null;
         }
 
         if (!finalName) {
-          setMemberError('AI member name is required.');
+          setMemberError(t('members.importPreview.errors.memberNameRequired'));
           return null;
         }
 
         if (getMemberNameLength(finalName) > MAX_MEMBER_NAME_LENGTH) {
           setMemberError(
-            `AI member name cannot exceed ${MAX_MEMBER_NAME_LENGTH} characters.`
+            t('members.importPreview.errors.memberNameTooLong', {
+              max: MAX_MEMBER_NAME_LENGTH,
+            })
           );
           return null;
         }
 
         if (!memberNameRegex.test(finalName)) {
-          setMemberError('Name can only include letters, numbers, "_" or "-".');
+          setMemberError(t('members.importPreview.errors.memberNameInvalidChars'));
           return null;
         }
 
         const workspacePathError = validateWorkspacePath(workspacePath);
         if (workspacePathError) {
-          setMemberError(workspacePathError);
+          setMemberError(translateWorkspacePathError(workspacePathError, t));
           return null;
         }
 
@@ -2488,7 +2491,7 @@ const resizeStartRef = useRef<{
             projectNameLower.length > 0 &&
             finalNameLower === projectNameLower
           ) {
-            setMemberError('AI member name cannot match the project name.');
+            setMemberError(t('members.importPreview.errors.memberNameMatchProject'));
             return null;
           }
           if (existingSessionMemberNamesLower.has(finalNameLower)) {
@@ -2496,7 +2499,7 @@ const resizeStartRef = useRef<{
             return null;
           }
           if (createNamesLower.has(finalNameLower)) {
-            setMemberError('Duplicate AI member names in import plan.');
+            setMemberError(t('members.importPreview.errors.duplicateMemberNames'));
             return null;
           }
           createNamesLower.add(finalNameLower);
@@ -2518,11 +2521,11 @@ const resizeStartRef = useRef<{
   const handleAddMemberPreset = useCallback(
     (preset: ChatMemberPreset) => {
       if (!activeSessionId) {
-        setMemberError('Select a chat session first.');
+        setMemberError(t('members.importPreview.errors.selectSessionFirst'));
         return;
       }
       if (isArchived) {
-        setMemberError('This session is archived and read-only.');
+        setMemberError(t('members.importPreview.errors.sessionArchived'));
         return;
       }
 
@@ -2540,7 +2543,7 @@ const resizeStartRef = useRef<{
       });
 
       if (!plan) {
-        setMemberError('No available coding agent to import this preset.');
+        setMemberError(t('members.importPreview.errors.noAvailableCodingAgent'));
         return;
       }
 
@@ -2568,17 +2571,17 @@ const resizeStartRef = useRef<{
   const handleImportTeamPreset = useCallback(
     (teamPreset: ChatTeamPreset) => {
       if (!activeSessionId) {
-        setMemberError('Select a chat session first.');
+        setMemberError(t('members.importPreview.errors.selectSessionFirst'));
         return;
       }
       if (isArchived) {
-        setMemberError('This session is archived and read-only.');
+        setMemberError(t('members.importPreview.errors.sessionArchived'));
         return;
       }
 
       const plan = buildTeamImportPlan(teamPreset);
       if (plan.length === 0) {
-        setMemberError('Selected team has no member presets.');
+        setMemberError(t('members.importPreview.errors.nothingToImport'));
         return;
       }
 
@@ -2648,10 +2651,26 @@ const resizeStartRef = useRef<{
       (entry) => entry.action !== 'skip'
     );
     if (actionablePlan.length === 0) {
-      setMemberError('Nothing to import from this team preset.');
+      setMemberError(t('members.importPreview.errors.nothingToImport'));
       setTeamImportPlan(null);
       setTeamImportName(null);
       return;
+    }
+
+    const workspacePathsToValidate = new Set(
+      actionablePlan.map((entry) => entry.workspacePath.trim()).filter(Boolean)
+    );
+    for (const workspacePath of workspacePathsToValidate) {
+      const result = await chatApi.validateWorkspacePath(workspacePath);
+      if (!result.valid) {
+        setMemberError(
+          translateWorkspacePathError(
+            result.error || 'Invalid workspace path.',
+            t
+          )
+        );
+        return;
+      }
     }
 
     setIsImportingTeam(true);
@@ -2668,7 +2687,7 @@ const resizeStartRef = useRef<{
       } else if (error instanceof Error && error.message) {
         setMemberError(error.message);
       } else {
-        setMemberError('Failed to import team preset.');
+        setMemberError(t('members.importPreview.errors.failedToImportTeam'));
       }
     } finally {
       setIsImportingTeam(false);
@@ -2683,11 +2702,11 @@ const resizeStartRef = useRef<{
 
   const handleAddMember = async () => {
     if (!activeSessionId) {
-      setMemberError('Select a chat session first.');
+      setMemberError(t('members.importPreview.errors.selectSessionFirst'));
       return;
     }
     if (isArchived) {
-      setMemberError('This session is archived and read-only.');
+      setMemberError(t('members.importPreview.errors.sessionArchived'));
       return;
     }
 
@@ -2703,19 +2722,21 @@ const resizeStartRef = useRef<{
     );
 
     if (!name) {
-      setMemberError('AI member name is required.');
+      setMemberError(t('members.importPreview.errors.memberNameRequired'));
       return;
     }
 
     if (getMemberNameLength(name) > MAX_MEMBER_NAME_LENGTH) {
       setMemberError(
-        `AI member name cannot exceed ${MAX_MEMBER_NAME_LENGTH} characters.`
+        t('members.importPreview.errors.memberNameTooLong', {
+          max: MAX_MEMBER_NAME_LENGTH,
+        })
       );
       return;
     }
 
     if (!memberNameRegex.test(name)) {
-      setMemberError('Name can only include letters, numbers, "_" or "-".');
+      setMemberError(t('members.importPreview.errors.memberNameInvalidChars'));
       return;
     }
 
@@ -2728,23 +2749,36 @@ const resizeStartRef = useRef<{
       isNameChange &&
       projectName.toLowerCase() === name.toLowerCase()
     ) {
-      setMemberError('AI member name cannot match the project name.');
+      setMemberError(t('members.importPreview.errors.memberNameMatchProject'));
       return;
     }
 
     if (!runnerType) {
-      setMemberError('Choose a base coding agent.');
+      setMemberError(t('members.importPreview.errors.baseCodingAgentRequired'));
       return;
     }
 
-    if (!isRunnerAvailable(runnerType)) {
-      setMemberError('Selected coding agent is not available locally.');
+if (!isRunnerAvailable(runnerType)) {
+      setMemberError(t('members.importPreview.errors.selectedCodingAgentUnavailable'));
       return;
     }
 
     const workspacePathError = validateWorkspacePath(workspacePathVal);
     if (workspacePathError) {
-      setMemberError(workspacePathError);
+      setMemberError(translateWorkspacePathError(workspacePathError, t));
+      return;
+    }
+
+    const workspacePathValidation = await chatApi.validateWorkspacePath(
+      workspacePathVal
+    );
+    if (!workspacePathValidation.valid) {
+      setMemberError(
+        translateWorkspacePathError(
+          workspacePathValidation.error || 'Invalid workspace path.',
+          t
+        )
+      );
       return;
     }
 
@@ -3304,11 +3338,12 @@ isDeletingMessages={isDeletingMessages}
           )}
         >
           <div className="chat-session-workspace-chat min-h-0 flex-1 flex flex-col">
-            {/* Messages */}
-<div
-              ref={messagesContainerRef}
-              className="chat-session-messages flex-1 min-h-0 overflow-y-auto p-base pb-[40px] space-y-base"
-            >
+            <div className="chat-session-content-wrapper flex-1 min-h-0 flex flex-col">
+              {/* Messages */}
+              <div
+                ref={messagesContainerRef}
+                className="chat-session-messages flex-1 min-h-0 overflow-y-auto p-base pb-[40px] space-y-base"
+              >
               <div className="chat-session-message-column space-y-base">
                 {isLoading && (
                   <div className="text-sm text-low">Loading chat...</div>
@@ -3501,6 +3536,7 @@ isDeletingMessages={isDeletingMessages}
               isArchived={isArchived}
               activeSessionId={activeSessionId}
             />
+            </div>
           </div>
 
           {isWorkspacePreviewOpen && workspacePreviewArtifact && (

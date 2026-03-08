@@ -573,6 +573,19 @@ export function validateWorkspacePath(path: string): string | null {
     return 'Workspace path is required.';
   }
 
+  const isAbsolutePath =
+    // Windows: C:\, D:\, etc., or UNC paths \\server\share
+    /^[a-zA-Z]:[\\/]/.test(trimmed) ||
+    trimmed.startsWith('\\\\') ||
+    // Unix/macOS: /path
+    trimmed.startsWith('/') ||
+    // Home directory expansion (will be expanded by backend)
+    trimmed.startsWith('~');
+
+  if (!isAbsolutePath) {
+    return 'Workspace path must be an absolute path.';
+  }
+
   const hasControlChars = [...trimmed].some((char) => {
     const code = char.codePointAt(0) ?? 0;
     return code <= 0x1f || code === 0x7f;
@@ -637,6 +650,31 @@ export function validateWorkspacePath(path: string): string | null {
   }
 
   return null;
+}
+
+export function translateWorkspacePathError(
+  error: string,
+  t: (key: string) => string
+): string {
+  if (error === 'Workspace path is required.') {
+    return t('members.importPreview.errors.workspacePathRequired');
+  }
+  if (error === 'Workspace path must be an absolute path.') {
+    return t('members.importPreview.errors.workspacePathMustBeAbsolute');
+  }
+  if (error === 'Workspace path does not exist.') {
+    return t('members.importPreview.errors.workspacePathNotExist');
+  }
+  if (error === 'Workspace path must be an existing directory.') {
+    return t('members.importPreview.errors.workspacePathNotDirectory');
+  }
+  if (error.startsWith('Workspace path is not accessible')) {
+    return t('members.importPreview.errors.workspacePathNotAccessible');
+  }
+  if (error === 'Invalid workspace path.') {
+    return t('members.importPreview.errors.invalidWorkspacePath');
+  }
+  return error;
 }
 
 export type MemberPresetImportAction = 'create' | 'reuse' | 'skip';

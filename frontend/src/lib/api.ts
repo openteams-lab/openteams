@@ -1927,6 +1927,16 @@ export const chatApi = {
     const response = await makeRequest('/api/chat/builtin/skills/stats');
     return handleApiResponse<BuiltinSkillsStats>(response);
   },
+
+  validateWorkspacePath: async (
+    workspacePath: string
+  ): Promise<{ valid: boolean; error?: string }> => {
+    const response = await makeRequest('/api/chat/validate-workspace-path', {
+      method: 'POST',
+      body: JSON.stringify({ workspace_path: workspacePath }),
+    });
+    return handleApiResponse<{ valid: boolean; error?: string }>(response);
+  },
 };
 
 // Search API (multi-repo file search)

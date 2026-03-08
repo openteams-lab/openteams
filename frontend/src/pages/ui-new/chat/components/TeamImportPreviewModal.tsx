@@ -24,6 +24,7 @@ interface TeamImportPreviewModalProps {
   isRunnerAvailable: (runner: string) => boolean;
   availabilityLabel: (runner: string) => string;
   workspacePathPlaceholder: string;
+  memberError: string | null;
   getVariantOptions: (runnerType: string) => string[];
   getVariantLabel: (runnerType: string, variant: string) => string;
   getPlanVariant: (toolsEnabled: JsonValue) => string;
@@ -120,6 +121,7 @@ export function TeamImportPreviewModal({
   isRunnerAvailable,
   availabilityLabel,
   workspacePathPlaceholder,
+  memberError,
   getVariantOptions,
   getVariantLabel,
   getPlanVariant,
@@ -596,6 +598,9 @@ export function TeamImportPreviewModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 px-5 pb-5 pt-1">
+{memberError && (
+            <div className="flex-1 text-sm text-red-500">{memberError}</div>
+          )}
           <PrimaryButton
             variant="tertiary"
             value={t('members.importPreview.cancel')}

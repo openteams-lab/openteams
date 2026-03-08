@@ -52,39 +52,44 @@ export function RunningAgentPlaceholder({
 
   return (
     <div className="chat-session-message-row is-agent flex justify-start">
-      <ChatEntryContainer
-        variant="system"
-        title={member.agent.name}
-        icon={
-          <AgentBrandIcon
-            runnerType={member.agent.runner_type}
-            className="chat-session-agent-avatar-logo"
-          />
-        }
-        expanded
-        iconContainerClassName="chat-session-message-avatar chat-session-agent-avatar"
-        iconContainerStyle={getAgentAvatarStyle(avatarSeed)}
-        className="chat-session-message-card chat-session-message-card-agent max-w-[760px] w-full md:w-[84%] opacity-80 shadow-sm rounded-2xl"
-        headerClassName="chat-session-message-header"
-        bodyClassName="chat-session-message-body"
-        style={{
-          backgroundColor: `var(--chat-session-message-other-bg, ${tone.bg})`,
-          borderColor: `var(--chat-session-message-other-border, ${tone.border})`,
-        }}
-        headerRight={
-          <button
-            type="button"
-            className={cn(
-              'text-xs text-error hover:text-error/80',
-              isStopping && 'opacity-50 cursor-not-allowed'
-            )}
-            onClick={() => onStop(member.sessionAgent.id, member.agent.id)}
-            disabled={isStopping}
-          >
-            {isStopping ? t('agent.stopping') : t('agent.stop')}
-          </button>
-        }
-      >
+      <div className="relative p-[1px] rounded-2xl w-[600px] max-w-full overflow-hidden">
+        <div className="absolute inset-[-50%] animate-spin-slow" style={{ background: 'conic-gradient(from 0deg, transparent, #8BBEFF, transparent 30%)' }} />
+        <ChatEntryContainer
+          variant="system"
+          title={member.agent.name}
+          icon={
+            <AgentBrandIcon
+              runnerType={member.agent.runner_type}
+              className="chat-session-agent-avatar-logo"
+            />
+          }
+          expanded
+          iconContainerClassName="chat-session-message-avatar chat-session-agent-avatar"
+          iconContainerStyle={getAgentAvatarStyle(avatarSeed)}
+          className="chat-session-message-card chat-session-message-card-agent is-agent-message is-running shadow-sm rounded-2xl relative"
+          headerClassName="chat-session-message-header"
+          bodyClassName="chat-session-message-body"
+          style={{
+            backgroundColor: 'var(--chat-session-glass-bg, rgba(255, 255, 255, 0.78))',
+            borderColor: 'var(--chat-session-glass-border, rgba(255, 255, 255, 0.52))',
+          }}
+          headerRight={
+            <div className="flex items-center gap-2">
+              <div className="chat-session-running-indicator" />
+              <button
+                type="button"
+                className={cn(
+                  'chat-session-stop-btn',
+                  isStopping && 'opacity-50 cursor-not-allowed'
+                )}
+                onClick={() => onStop(member.sessionAgent.id, member.agent.id)}
+                disabled={isStopping}
+              >
+{isStopping ? t('agent.stopping') : t('agent.stop')}
+              </button>
+            </div>
+          }
+        >
         <div className="space-y-base">
           <div className="text-sm text-low">
             {t('agent.runningElapsed', { seconds: elapsedSeconds })}
@@ -123,7 +128,8 @@ export function RunningAgentPlaceholder({
             <div className="text-sm text-low">{t('agent.processing')}</div>
           )}
         </div>
-      </ChatEntryContainer>
+        </ChatEntryContainer>
+      </div>
     </div>
   );
 }
