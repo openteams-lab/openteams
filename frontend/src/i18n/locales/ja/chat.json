@@ -117,6 +117,7 @@
     "model": "モデル",
     "systemPrompt": "役割設定（必須）",
     "expand": "展開",
+    "collapse": "折りたたむ",
     "systemPromptPlaceholder": "このAIメンバーの役割設定を記述してください。",
     "workspacePath": "ワークスペースパス",
     "workspacePathPlaceholder": "AIメンバーの作業用絶対パス",
@@ -216,6 +217,22 @@
         "noAvailableCodingAgent": "インポート失敗：このプリセットをインポートする利用可能なコーディングエージェントがありません。",
         "failedToImportTeam": "チームプリセットのインポートに失敗しました。"
       }
+    },
+    "addMemberErrors": {
+      "workspacePathRequired": "追加失敗：ワークスペースパスは必須です。",
+      "workspacePathNotExist": "追加失敗：ワークスペースパスが存在しません。",
+      "workspacePathNotDirectory": "追加失敗：ワークスペースパスは既存のディレクトリである必要があります。",
+      "workspacePathNotAccessible": "追加失敗：ワークスペースパスにアクセスできません。",
+      "workspacePathMustBeAbsolute": "追加失敗：ワークスペースパスは絶対パスである必要があります。",
+      "invalidWorkspacePath": "追加失敗：無効なワークスペースパスです。",
+      "baseCodingAgentRequired": "追加失敗：ベースコーディングエージェントは必須です。",
+      "selectedCodingAgentUnavailable": "追加失敗：選択されたコーディングエージェントは利用できません。",
+      "memberNameRequired": "追加失敗：AIメンバー名は必須です。",
+      "memberNameInvalidChars": "追加失敗：名前には文字、数字、\"_\" または \"-\" のみ使用できます。",
+      "memberNameTooLong": "追加失敗：AIメンバー名は {{max}} 文字を超えることはできません。",
+      "memberNameMatchProject": "追加失敗：AIメンバー名はプロジェクト名と同じにできません。",
+      "selectSessionFirst": "まずチャットセッションを選択してください。",
+      "sessionArchived": "このセッションはアーカイブされ、読み取り専用です。"
     },
     "roleSettingsRequired": "役割設定は必須です。",
     "presetDisplay": {

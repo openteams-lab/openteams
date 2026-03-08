@@ -117,6 +117,7 @@
     "model": "模型",
     "systemPrompt": "角色設定（必填）",
     "expand": "展開",
+    "collapse": "收起",
     "systemPromptPlaceholder": "描述此 AI 成員的角色設定。",
     "workspacePath": "工作區路徑",
     "workspacePathPlaceholder": "AI成員工作的絕對路徑",
@@ -216,6 +217,22 @@
         "noAvailableCodingAgent": "匯入失敗：沒有可用的編程代理來匯入此預設。",
         "failedToImportTeam": "匯入團隊預設失敗。"
       }
+    },
+    "addMemberErrors": {
+      "workspacePathRequired": "新增失敗：工作區路徑為必填項。",
+      "workspacePathNotExist": "新增失敗：工作區路徑不存在。",
+      "workspacePathNotDirectory": "新增失敗：工作區路徑必須是一個已存在的目錄。",
+      "workspacePathNotAccessible": "新增失敗：工作區路徑無法存取。",
+      "workspacePathMustBeAbsolute": "新增失敗：工作區路徑必須是絕對路徑。",
+      "invalidWorkspacePath": "新增失敗：無效的工作區路徑。",
+      "baseCodingAgentRequired": "新增失敗：基礎編程代理為必填項。",
+      "selectedCodingAgentUnavailable": "新增失敗：所選編程代理不可用。",
+      "memberNameRequired": "新增失敗：AI成員名稱為必填項。",
+      "memberNameInvalidChars": "新增失敗：名稱只能包含字母、數字、\"_\" 或 \"-\"。",
+      "memberNameTooLong": "新增失敗：AI成員名稱不能超過 {{max}} 個字元。",
+      "memberNameMatchProject": "新增失敗：AI成員名稱不能與專案名稱相同。",
+      "selectSessionFirst": "請先選擇一個聊天會話。",
+      "sessionArchived": "該會話已歸檔，唯讀。"
     },
     "roleSettingsRequired": "角色設定為必填欄位。",
     "presetDisplay": {
