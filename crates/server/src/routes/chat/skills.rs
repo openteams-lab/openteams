@@ -9,8 +9,10 @@ use serde::Deserialize;
 use services::services::skill_registry::{
     RemoteSkillMeta, RemoteSkillPackage, SkillCategory, SkillRegistryClient, builtin_skills_count,
     filter_builtin_skills_by_agent, filter_builtin_skills_by_category, get_builtin_categories,
-    get_builtin_skill, install_builtin_skill, install_skill_files_to_global_directory,
-    install_skill_from_registry, list_builtin_skills, search_builtin_skills,
+    get_builtin_skill, get_skill_with_fallback, install_builtin_skill,
+    install_skill_files_to_global_directory, install_skill_from_registry,
+    list_categories_with_fallback, list_builtin_skills, list_skills_with_fallback,
+    search_builtin_skills, search_skills_with_fallback,
     uninstall_skill_files_from_global_directory,
 };
 use utils::response::ApiResponse;
@@ -192,15 +194,12 @@ pub async fn get_registry_skill(
     Ok(ResponseJson(ApiResponse::success(skill)))
 }
 
-/// List available categories from the registry
+/// List available categories from the registry with fallback
 pub async fn list_registry_categories(
     State(_deployment): State<DeploymentImpl>,
     axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
 ) -> Result<ResponseJson<ApiResponse<Vec<SkillCategory>>>, ApiError> {
-    let client = SkillRegistryClient::new(query.registry_url);
-    let categories = client.list_categories().await.map_err(|e| {
-        ApiError::BadRequest(format!("Failed to fetch categories from registry: {}", e))
-    })?;
+    let categories = list_categories_with_fallback(query.registry_url).await;
     Ok(ResponseJson(ApiResponse::success(categories)))
 }
 
@@ -259,20 +258,32 @@ pub struct BuiltinSkillsQuery {
     pub search: Option<String>,
 }
 
-/// List all built-in skills from the embedded registry
+/// List all skills using dual-source: Go server first, builtin as fallback
 pub async fn list_builtin_skills_api(
     State(_deployment): State<DeploymentImpl>,
     axum::extract::Query(query): axum::extract::Query<BuiltinSkillsQuery>,
 ) -> Result<ResponseJson<ApiResponse<Vec<RemoteSkillMeta>>>, ApiError> {
-    let skills = if let Some(search) = &query.search {
-        search_builtin_skills(search)
-    } else if let Some(category) = &query.category {
-        filter_builtin_skills_by_category(category)
-    } else if let Some(agent) = &query.agent {
-        filter_builtin_skills_by_agent(agent)
-    } else {
-        list_builtin_skills()
-    };
+    // For search queries, use the dual-source search
+    if let Some(search) = &query.search {
+        let skills = search_skills_with_fallback(None, search).await;
+        return Ok(ResponseJson(ApiResponse::success(skills)));
+    }
+
+    // For category/agent filters, still use builtin as we have them locally
+    // These filters may not be supported by the Go server yet
+    if let Some(category) = &query.category {
+        return Ok(ResponseJson(ApiResponse::success(
+            filter_builtin_skills_by_category(category),
+        )));
+    }
+    if let Some(agent) = &query.agent {
+        return Ok(ResponseJson(ApiResponse::success(
+            filter_builtin_skills_by_agent(agent),
+        )));
+    }
+
+    // Default: list all skills from Go server with builtin fallback
+    let skills = list_skills_with_fallback(None).await;
     Ok(ResponseJson(ApiResponse::success(skills)))
 }
 
@@ -293,12 +304,13 @@ pub struct BuiltinSkillsStats {
     pub categories: Vec<String>,
 }
 
-/// Get a specific built-in skill by ID
+/// Get a specific skill by ID using dual-source: Go server first, builtin as fallback
 pub async fn get_builtin_skill_api(
     State(_deployment): State<DeploymentImpl>,
     axum::extract::Path(skill_id): axum::extract::Path<String>,
 ) -> Result<ResponseJson<ApiResponse<RemoteSkillPackage>>, ApiError> {
-    let skill = get_builtin_skill(&skill_id)
+    let skill = get_skill_with_fallback(None, &skill_id)
+        .await
         .ok_or_else(|| ApiError::BadRequest(format!("Skill not found: {}", skill_id)))?;
     Ok(ResponseJson(ApiResponse::success(skill)))
 }
