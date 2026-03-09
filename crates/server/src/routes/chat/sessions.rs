@@ -560,32 +560,40 @@ pub async fn validate_workspace_path_endpoint(
     let trimmed = payload.workspace_path.trim();
 
     if trimmed.is_empty() {
-        return Ok(ResponseJson(ApiResponse::success(ValidateWorkspacePathResponse {
-            valid: false,
-            error: Some("Workspace path is required.".to_string()),
-        })));
+        return Ok(ResponseJson(ApiResponse::success(
+            ValidateWorkspacePathResponse {
+                valid: false,
+                error: Some("Workspace path is required.".to_string()),
+            },
+        )));
     }
 
     if let Err(e) = validate_workspace_path_legality(trimmed) {
-        return Ok(ResponseJson(ApiResponse::success(ValidateWorkspacePathResponse {
-            valid: false,
-            error: Some(e.to_string()),
-        })));
+        return Ok(ResponseJson(ApiResponse::success(
+            ValidateWorkspacePathResponse {
+                valid: false,
+                error: Some(e.to_string()),
+            },
+        )));
     }
 
     let parsed_path = PathBuf::from(trimmed);
     match tokio::fs::metadata(&parsed_path).await {
         Ok(metadata) => {
             if metadata.is_dir() {
-                Ok(ResponseJson(ApiResponse::success(ValidateWorkspacePathResponse {
-                    valid: true,
-                    error: None,
-                })))
+                Ok(ResponseJson(ApiResponse::success(
+                    ValidateWorkspacePathResponse {
+                        valid: true,
+                        error: None,
+                    },
+                )))
             } else {
-                Ok(ResponseJson(ApiResponse::success(ValidateWorkspacePathResponse {
-                    valid: false,
-                    error: Some("Workspace path must be an existing directory.".to_string()),
-                })))
+                Ok(ResponseJson(ApiResponse::success(
+                    ValidateWorkspacePathResponse {
+                        valid: false,
+                        error: Some("Workspace path must be an existing directory.".to_string()),
+                    },
+                )))
             }
         }
         Err(err) => {
@@ -593,10 +601,12 @@ pub async fn validate_workspace_path_endpoint(
                 std::io::ErrorKind::NotFound => "Workspace path does not exist.".to_string(),
                 _ => format!("Workspace path is not accessible: {err}"),
             };
-            Ok(ResponseJson(ApiResponse::success(ValidateWorkspacePathResponse {
-                valid: false,
-                error: Some(error_msg),
-            })))
+            Ok(ResponseJson(ApiResponse::success(
+                ValidateWorkspacePathResponse {
+                    valid: false,
+                    error: Some(error_msg),
+                },
+            )))
         }
     }
 }

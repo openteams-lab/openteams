@@ -610,13 +610,63 @@ export function SkillsPanel({
         prev ? { ...prev, enabled: nextEnabled } : prev
       );
       await loadInstalledSkills();
+      closeDetail();
     } catch (error) {
       console.error('Failed to toggle skill enabled', error);
       setDetailError('更新技能状态失败。');
     } finally {
       setIsTogglingSkill(false);
     }
-  }, [detailData, loadInstalledSkills]);
+  }, [closeDetail, detailData, loadInstalledSkills]);
+
+  const handleToggleInstalledDetailAssignment = useCallback(async () => {
+    if (!detailData?.installedSkillId || !selectedAgentId) return;
+
+    const skillId = detailData.installedSkillId;
+    const assignment = assignmentBySkillId.get(skillId);
+    const isAssigned = assignedSkillIds.has(skillId);
+
+    setIsSyncingSkillId(skillId);
+    setDetailError(null);
+
+    try {
+      if (!isAssigned && detailData.enabled === false) {
+        await chatApi.updateSkill(skillId, buildSkillEnabledPayload(true));
+        setDetailData((prev) => (prev ? { ...prev, enabled: true } : prev));
+        await loadInstalledSkills();
+      }
+
+      if (assignment?.enabled) {
+        await chatApi.unassignSkillFromAgent(selectedAgentId, assignment.id);
+      } else if (assignment) {
+        await chatApi.updateAgentSkill(selectedAgentId, assignment.id, {
+          enabled: true,
+        });
+      } else {
+        await chatApi.assignSkillToAgent({
+          agent_id: selectedAgentId,
+          skill_id: skillId,
+          enabled: true,
+        });
+      }
+
+      await loadAgentAssignments(selectedAgentId);
+      closeDetail();
+    } catch (error) {
+      console.error('Failed to toggle installed skill assignment', error);
+      setDetailError('更新技能启用状态失败。');
+    } finally {
+      setIsSyncingSkillId(null);
+    }
+  }, [
+    assignedSkillIds,
+    assignmentBySkillId,
+    closeDetail,
+    detailData,
+    loadAgentAssignments,
+    loadInstalledSkills,
+    selectedAgentId,
+  ]);
 
   const handleDeleteSkill = useCallback(async () => {
     if (!detailData?.installedSkillId) return;
@@ -808,6 +858,30 @@ export function SkillsPanel({
         ) : null,
       }
     : null;
+  const isInstalledDetail = detailTarget?.kind === 'installed';
+  const isInstalledDetailAssigned = detailData?.installedSkillId
+    ? assignedSkillIds.has(detailData.installedSkillId)
+    : false;
+  const isInstalledDetailSyncing = detailData?.installedSkillId
+    ? isSyncingSkillId === detailData.installedSkillId
+    : false;
+  const resolvedDetailPrimaryAction = isInstalledDetail
+    ? detailData?.installedSkillId && detailData.enabled !== null
+      ? {
+          label: isInstalledDetailSyncing
+            ? '更新中...'
+            : isInstalledDetailAssigned
+              ? '禁用'
+              : '启用',
+          onClick: () => {
+            void handleToggleInstalledDetailAssignment();
+          },
+          disabled:
+            isLoadingDetail || isInstalledDetailSyncing || !selectedAgentId,
+          className: 'min-w-[92px] px-4 text-sm',
+        }
+      : null
+    : detailPrimaryAction;
 
   if (!isOpen) return null;
 
@@ -1076,7 +1150,9 @@ export function SkillsPanel({
               </button>
             )}
 
-            {detailData?.installedSkillId && detailData.enabled !== null && (
+            {detailData?.installedSkillId &&
+              detailData.enabled !== null &&
+              !isInstalledDetail && (
               <button
                 type="button"
                 onClick={() => void handleToggleSkillEnabled()}
@@ -1092,10 +1168,10 @@ export function SkillsPanel({
                     ? '禁用'
                     : '启用'}
               </button>
-            )}
+              )}
           </>
         }
-        primaryAction={detailPrimaryAction ?? undefined}
+        primaryAction={resolvedDetailPrimaryAction ?? undefined}
       />
 
       {marketInstallTarget && (

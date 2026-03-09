@@ -53,6 +53,9 @@ static SKILL_INDEX: Lazy<HashMap<String, usize>> = Lazy::new(|| {
         .collect()
 });
 
+static DISCOVERED_SKILL_SYNC_LOCK: Lazy<tokio::sync::Mutex<()>> =
+    Lazy::new(|| tokio::sync::Mutex::new(()));
+
 /// Built-in skills data structure
 #[derive(Debug, Clone, Deserialize)]
 struct BuiltInSkillsData {
@@ -73,8 +76,10 @@ pub struct RemoteSkillMeta {
     pub category: Option<String>,
     pub version: String,
     pub author: Option<String>,
+    #[serde(default)]
     #[ts(type = "string[]")]
     pub tags: Vec<String>,
+    #[serde(default)]
     #[ts(type = "string[]")]
     pub compatible_agents: Vec<String>,
     pub source_url: Option<String>,
@@ -92,7 +97,9 @@ pub struct RemoteSkillPackage {
     pub category: Option<String>,
     pub version: String,
     pub author: Option<String>,
+    #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
     pub compatible_agents: Vec<String>,
     pub source_url: Option<String>,
     pub content: String,
@@ -186,6 +193,151 @@ pub enum SkillRegistryError {
     SkillNotFound(String),
     #[error("Invalid skill data: {0}")]
     InvalidData(String),
+}
+
+#[derive(Clone, Copy)]
+struct DiscoveryRoot {
+    folder: &'static str,
+    agent_hint: Option<&'static str>,
+}
+
+const DISCOVERY_ROOTS: [DiscoveryRoot; 8] = [
+    DiscoveryRoot {
+        folder: GLOBAL_SKILLS_DIR,
+        agent_hint: None,
+    },
+    DiscoveryRoot {
+        folder: ".claude",
+        agent_hint: Some("claude"),
+    },
+    DiscoveryRoot {
+        folder: ".github",
+        agent_hint: Some("copilot"),
+    },
+    DiscoveryRoot {
+        folder: ".cursor",
+        agent_hint: Some("cursor"),
+    },
+    DiscoveryRoot {
+        folder: ".qwen",
+        agent_hint: Some("qwen"),
+    },
+    DiscoveryRoot {
+        folder: ".opencode",
+        agent_hint: Some("opencode"),
+    },
+    DiscoveryRoot {
+        folder: ".gemini",
+        agent_hint: Some("gemini"),
+    },
+    DiscoveryRoot {
+        folder: ".factory",
+        agent_hint: Some("droid"),
+    },
+];
+
+#[derive(Debug, Default)]
+struct ParsedSkillFrontmatter {
+    name: Option<String>,
+    description: Option<String>,
+    version: Option<String>,
+    author: Option<String>,
+    tags: Vec<String>,
+    category: Option<String>,
+    compatible_agents: Vec<String>,
+    source_url: Option<String>,
+}
+
+#[derive(Debug, Default)]
+struct ParsedSkillMarkdown {
+    name: String,
+    description: String,
+    content: String,
+    version: Option<String>,
+    author: Option<String>,
+    tags: Vec<String>,
+    category: Option<String>,
+    compatible_agents: Vec<String>,
+    source_url: Option<String>,
+}
+
+#[derive(Debug, Default)]
+struct DiscoveredSkillDraft {
+    name: String,
+    description: String,
+    content: String,
+    version: Option<String>,
+    author: Option<String>,
+    tags: HashSet<String>,
+    category: Option<String>,
+    compatible_agents: HashSet<String>,
+    source_url: Option<String>,
+}
+
+impl DiscoveredSkillDraft {
+    fn from_parsed(parsed: ParsedSkillMarkdown) -> Self {
+        Self {
+            name: parsed.name,
+            description: parsed.description,
+            content: parsed.content,
+            version: parsed.version,
+            author: parsed.author,
+            tags: parsed.tags.into_iter().collect(),
+            category: parsed.category,
+            compatible_agents: parsed.compatible_agents.into_iter().collect(),
+            source_url: parsed.source_url,
+        }
+    }
+
+    fn merge(&mut self, other: Self) {
+        if self.name.is_empty() {
+            self.name = other.name;
+        }
+        if self.description.is_empty() && !other.description.is_empty() {
+            self.description = other.description;
+        }
+        if self.content.is_empty() && !other.content.is_empty() {
+            self.content = other.content;
+        }
+        if self.version.is_none() {
+            self.version = other.version;
+        }
+        if self.author.is_none() {
+            self.author = other.author;
+        }
+        if self.category.is_none() {
+            self.category = other.category;
+        }
+        if self.source_url.is_none() {
+            self.source_url = other.source_url;
+        }
+        self.tags.extend(other.tags);
+        self.compatible_agents.extend(other.compatible_agents);
+    }
+
+    fn into_create_data(self) -> CreateChatSkill {
+        let mut tags = self.tags.into_iter().collect::<Vec<_>>();
+        tags.sort();
+        let mut compatible_agents = self.compatible_agents.into_iter().collect::<Vec<_>>();
+        compatible_agents.sort();
+
+        CreateChatSkill {
+            name: self.name,
+            description: (!self.description.is_empty()).then_some(self.description),
+            content: self.content,
+            trigger_type: Some("always".to_string()),
+            trigger_keywords: None,
+            enabled: Some(false),
+            source: Some("local".to_string()),
+            source_url: self.source_url,
+            version: self.version,
+            author: self.author,
+            tags: Some(tags),
+            category: self.category,
+            compatible_agents: Some(compatible_agents),
+            download_count: Some(0),
+        }
+    }
 }
 
 /// Skill Registry client for fetching skills from a remote service
@@ -354,36 +506,195 @@ pub async fn install_skill_from_registry(
     Ok(installed)
 }
 
+/// Discover skills already present under agent home directories and add any missing
+/// entries to `chat_skills`. Discovered skills are synced as disabled by default.
+pub async fn sync_discovered_global_skills(pool: &SqlitePool) -> Result<usize, SkillRegistryError> {
+    let _guard = DISCOVERED_SKILL_SYNC_LOCK.lock().await;
+    let home_dir = match resolve_home_dir() {
+        Ok(path) => path,
+        Err(SkillInstallError::HomeDirNotFound) => return Ok(0),
+        Err(err) => {
+            return Err(SkillRegistryError::InvalidData(format!(
+                "Failed to resolve home directory: {}",
+                err
+            )));
+        }
+    };
+
+    let existing_skills = ChatSkill::find_all(pool).await?;
+    let mut existing_by_slug = existing_skills
+        .iter()
+        .map(|skill| (slugify_skill_name(&skill.name), skill.id))
+        .collect::<HashMap<_, _>>();
+
+    let discovered = discover_global_skills(&home_dir).await;
+    let mut synced_count = 0;
+
+    for (_, skill) in discovered {
+        let slug = slugify_skill_name(&skill.name);
+        if existing_by_slug.contains_key(&slug) {
+            continue;
+        }
+
+        let created = ChatSkill::create(pool, &skill.into_create_data(), Uuid::new_v4()).await?;
+        existing_by_slug.insert(slug, created.id);
+        synced_count += 1;
+    }
+
+    Ok(synced_count)
+}
+
+async fn discover_global_skills(home_dir: &Path) -> HashMap<String, DiscoveredSkillDraft> {
+    let mut discovered: HashMap<String, DiscoveredSkillDraft> = HashMap::new();
+
+    for root in discovery_root_paths(home_dir) {
+        let mut entries = match tokio::fs::read_dir(&root.path).await {
+            Ok(entries) => entries,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => {
+                tracing::warn!(
+                    path = %root.path.display(),
+                    error = %err,
+                    "Failed to scan skill discovery root"
+                );
+                continue;
+            }
+        };
+
+        loop {
+            match entries.next_entry().await {
+                Ok(Some(entry)) => {
+                    let file_type = match entry.file_type().await {
+                        Ok(file_type) => file_type,
+                        Err(err) => {
+                            tracing::warn!(
+                                path = %entry.path().display(),
+                                error = %err,
+                                "Failed to inspect discovered skill entry"
+                            );
+                            continue;
+                        }
+                    };
+
+                    if !file_type.is_dir() {
+                        continue;
+                    }
+
+                    let dir_name = entry.file_name().to_string_lossy().trim().to_string();
+                    if dir_name.is_empty() {
+                        continue;
+                    }
+
+                    let skill_dir = entry.path();
+                    let parsed =
+                        match load_discovered_skill(&skill_dir, &dir_name, root.agent_hint).await {
+                            Ok(Some(parsed)) => parsed,
+                            Ok(None) => continue,
+                            Err(err) => {
+                                tracing::warn!(
+                                    path = %skill_dir.display(),
+                                    error = %err,
+                                    "Failed to parse discovered skill directory"
+                                );
+                                continue;
+                            }
+                        };
+
+                    let key = slugify_skill_name(&parsed.name);
+                    if let Some(existing) = discovered.get_mut(&key) {
+                        existing.merge(parsed);
+                    } else {
+                        discovered.insert(key, parsed);
+                    }
+                }
+                Ok(None) => break,
+                Err(err) => {
+                    tracing::warn!(
+                        path = %root.path.display(),
+                        error = %err,
+                        "Failed while iterating discovered skill root"
+                    );
+                    break;
+                }
+            }
+        }
+    }
+
+    discovered.retain(|_, skill| !skill.name.trim().is_empty());
+    discovered
+}
+
+async fn load_discovered_skill(
+    skill_dir: &Path,
+    dir_name: &str,
+    agent_hint: Option<&'static str>,
+) -> Result<Option<DiscoveredSkillDraft>, SkillRegistryError> {
+    let skill_file = skill_dir.join("SKILL.md");
+    let metadata = match tokio::fs::metadata(&skill_file).await {
+        Ok(metadata) => metadata,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => {
+            return Err(SkillRegistryError::InvalidData(format!(
+                "Failed to stat {}: {}",
+                skill_file.display(),
+                err
+            )));
+        }
+    };
+
+    if !metadata.is_file() {
+        return Ok(None);
+    }
+
+    let raw = tokio::fs::read_to_string(&skill_file)
+        .await
+        .map_err(|err| {
+            SkillRegistryError::InvalidData(format!(
+                "Failed to read {}: {}",
+                skill_file.display(),
+                err
+            ))
+        })?;
+    let parsed = parse_discovered_skill_markdown(dir_name, &raw);
+    let mut draft = DiscoveredSkillDraft::from_parsed(parsed);
+    if let Some(agent) = agent_hint {
+        draft.compatible_agents.insert(agent.to_string());
+    }
+
+    Ok(Some(draft))
+}
+
 /// Install skill files from registry into global user directories:
-/// - ~/.agents/skills/{skill_id}
-/// - ~/.claude/skills/{skill_id}
-/// - ~/.github/skills/{skill_id}
-/// - ~/.cursor/skills/{skill_id}
-/// - ~/.qwen/skills/{skill_id}
-/// - ~/.opencode/skills/{skill_id}
-/// - ~/.gemini/skills/{skill_id}
-/// - ~/.factory/skills/{skill_id}
+/// - ~/.agents/skills/{skill_name}
+/// - ~/.claude/skills/{skill_name}
+/// - ~/.github/skills/{skill_name}
+/// - ~/.cursor/skills/{skill_name}
+/// - ~/.qwen/skills/{skill_name}
+/// - ~/.opencode/skills/{skill_name}
+/// - ~/.gemini/skills/{skill_name}
+/// - ~/.factory/skills/{skill_name}
 ///
 /// Returns the number of downloaded source files.
 pub async fn install_skill_files_to_global_directory(
-    skill_id: &str,
+    skill: &RemoteSkillPackage,
     registry_url: Option<&str>,
 ) -> Result<usize, SkillInstallError> {
     let client = SkillRegistryClient::new(registry_url.map(String::from));
 
     // Get file list from registry
     let download_response = client
-        .get_skill_files(skill_id)
+        .get_skill_files(&skill.id)
         .await
         .map_err(|e| SkillInstallError::DownloadFailed(e.to_string()))?;
     if download_response.files.is_empty() {
         return Err(SkillInstallError::DownloadFailed(format!(
-            "Registry returned zero files for skill: {skill_id}"
+            "Registry returned zero files for skill: {}",
+            skill.id
         )));
     }
 
     let home_dir = resolve_home_dir()?;
-    let target_roots = global_skill_roots(&home_dir, skill_id);
+    let target_roots = global_skill_roots(&home_dir, &skill.name);
 
     for root in &target_roots {
         tokio::fs::create_dir_all(root).await?;
@@ -470,31 +781,38 @@ fn resolve_home_dir() -> Result<PathBuf, SkillInstallError> {
     dirs::home_dir().ok_or(SkillInstallError::HomeDirNotFound)
 }
 
-fn global_skill_roots(home_dir: &Path, skill_id: &str) -> Vec<PathBuf> {
+fn global_skill_roots(home_dir: &Path, skill_name: &str) -> Vec<PathBuf> {
+    let install_dir_name = slugify_skill_name(skill_name);
     global_skill_base_roots(home_dir)
         .into_iter()
-        .map(|root| root.join(skill_id))
+        .map(|root| root.join(&install_dir_name))
         .collect()
 }
 
 fn global_skill_base_roots(home_dir: &Path) -> Vec<PathBuf> {
-    let mut roots = vec![home_dir.join(GLOBAL_SKILLS_DIR).join("skills")];
-    for companion in [
-        ".claude",
-        ".github",
-        ".cursor",
-        ".qwen",
-        ".opencode",
-        ".gemini",
-        ".factory",
-    ] {
-        roots.push(home_dir.join(companion).join("skills"));
-    }
-    roots
+    discovery_root_paths(home_dir)
+        .into_iter()
+        .map(|root| root.path)
+        .collect()
 }
 
 fn slugify_skill_name(name: &str) -> String {
     name.to_lowercase().replace(' ', "-")
+}
+
+struct DiscoveryRootPath {
+    path: PathBuf,
+    agent_hint: Option<&'static str>,
+}
+
+fn discovery_root_paths(home_dir: &Path) -> Vec<DiscoveryRootPath> {
+    DISCOVERY_ROOTS
+        .iter()
+        .map(|root| DiscoveryRootPath {
+            path: home_dir.join(root.folder).join("skills"),
+            agent_hint: root.agent_hint,
+        })
+        .collect()
 }
 
 fn skill_uninstall_identifiers(skill: &ChatSkill) -> Vec<String> {
@@ -540,6 +858,260 @@ fn sanitize_skill_relative_path(path: &str) -> Result<PathBuf, SkillInstallError
     }
 
     Ok(clean)
+}
+
+fn parse_discovered_skill_markdown(dir_name: &str, raw: &str) -> ParsedSkillMarkdown {
+    let normalized = raw.replace("\r\n", "\n");
+    let (frontmatter, body) = split_skill_frontmatter(&normalized);
+    let frontmatter = frontmatter
+        .and_then(parse_skill_frontmatter)
+        .unwrap_or_default();
+    let (heading, description_from_body, body_content) = strip_skill_title_and_description(body);
+
+    let name = frontmatter
+        .name
+        .unwrap_or_else(|| heading.unwrap_or_else(|| dir_name.to_string()));
+    let description = frontmatter
+        .description
+        .unwrap_or_else(|| description_from_body.unwrap_or_default());
+    let content = if body_content.trim().is_empty() {
+        body.trim().to_string()
+    } else {
+        body_content
+    };
+
+    ParsedSkillMarkdown {
+        name,
+        description,
+        content,
+        version: frontmatter.version,
+        author: frontmatter.author,
+        tags: frontmatter.tags,
+        category: frontmatter.category,
+        compatible_agents: frontmatter.compatible_agents,
+        source_url: frontmatter.source_url,
+    }
+}
+
+fn split_skill_frontmatter(content: &str) -> (Option<&str>, &str) {
+    if let Some(rest) = content.strip_prefix("---\n")
+        && let Some((frontmatter, body)) = rest.split_once("\n---\n")
+    {
+        return (Some(frontmatter), body);
+    }
+
+    (None, content)
+}
+
+fn parse_skill_frontmatter(frontmatter: &str) -> Option<ParsedSkillFrontmatter> {
+    let value = serde_yaml::from_str::<serde_yaml::Value>(frontmatter).ok()?;
+    let mapping = value.as_mapping()?;
+
+    Some(ParsedSkillFrontmatter {
+        name: yaml_string(mapping, "name"),
+        description: yaml_string(mapping, "description"),
+        version: yaml_string(mapping, "version"),
+        author: yaml_string(mapping, "author"),
+        tags: yaml_string_list(mapping, "tags"),
+        category: yaml_string(mapping, "category"),
+        compatible_agents: yaml_string_list(mapping, "compatible_agents"),
+        source_url: yaml_string(mapping, "source_url")
+            .or_else(|| yaml_string(mapping, "source"))
+            .filter(|value| value.contains("://") || value.starts_with("github.com/")),
+    })
+}
+
+fn yaml_string(mapping: &serde_yaml::Mapping, key: &str) -> Option<String> {
+    mapping.iter().find_map(|(candidate, value)| {
+        let candidate = candidate.as_str()?;
+        if !candidate.eq_ignore_ascii_case(key) {
+            return None;
+        }
+
+        match value {
+            serde_yaml::Value::String(value) => Some(clean_metadata_text(value)),
+            serde_yaml::Value::Number(value) => Some(value.to_string()),
+            serde_yaml::Value::Bool(value) => Some(value.to_string()),
+            _ => None,
+        }
+    })
+}
+
+fn yaml_string_list(mapping: &serde_yaml::Mapping, key: &str) -> Vec<String> {
+    mapping
+        .iter()
+        .find_map(|(candidate, value)| {
+            let candidate = candidate.as_str()?;
+            if !candidate.eq_ignore_ascii_case(key) {
+                return None;
+            }
+            Some(yaml_value_to_string_list(value))
+        })
+        .unwrap_or_default()
+}
+
+fn yaml_value_to_string_list(value: &serde_yaml::Value) -> Vec<String> {
+    match value {
+        serde_yaml::Value::Sequence(values) => values
+            .iter()
+            .filter_map(|entry| match entry {
+                serde_yaml::Value::String(value) => Some(clean_metadata_text(value)),
+                serde_yaml::Value::Number(value) => Some(value.to_string()),
+                serde_yaml::Value::Bool(value) => Some(value.to_string()),
+                _ => None,
+            })
+            .collect(),
+        serde_yaml::Value::String(value) => split_metadata_list(value),
+        _ => Vec::new(),
+    }
+}
+
+fn strip_skill_title_and_description(content: &str) -> (Option<String>, Option<String>, String) {
+    let mut lines = content.lines().peekable();
+
+    while matches!(lines.peek(), Some(line) if line.trim().is_empty()) {
+        lines.next();
+    }
+
+    let mut heading = None;
+    if let Some(line) = lines.peek().copied()
+        && let Some(title) = line.trim().strip_prefix("# ")
+    {
+        heading = Some(title.trim().to_string());
+        lines.next();
+        while matches!(lines.peek(), Some(line) if line.trim().is_empty()) {
+            lines.next();
+        }
+    }
+
+    let mut description_lines = Vec::new();
+    while let Some(line) = lines.peek().copied() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with('>') {
+            break;
+        }
+
+        description_lines.push(trimmed.trim_start_matches('>').trim().to_string());
+        lines.next();
+    }
+
+    if !description_lines.is_empty() {
+        while matches!(lines.peek(), Some(line) if line.trim().is_empty()) {
+            lines.next();
+        }
+    }
+
+    let description = (!description_lines.is_empty()).then(|| description_lines.join(" "));
+    let body = lines.collect::<Vec<_>>().join("\n").trim().to_string();
+
+    (heading, description, body)
+}
+
+fn split_metadata_list(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(clean_metadata_text)
+        .filter(|item| !item.is_empty())
+        .collect()
+}
+
+fn clean_metadata_text(value: &str) -> String {
+    let trimmed = value.trim();
+    trimmed
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim()
+        .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::{discover_global_skills, global_skill_roots, parse_discovered_skill_markdown};
+
+    #[test]
+    fn global_skill_roots_use_slugified_skill_name() {
+        let home_dir = Path::new("/tmp/test-home");
+        let roots = global_skill_roots(home_dir, "Apify Automation");
+
+        assert!(roots.iter().all(|root| root.ends_with("apify-automation")));
+    }
+
+    #[test]
+    fn parse_discovered_skill_markdown_extracts_frontmatter_and_body() {
+        let markdown = r#"---
+name: Apify Automation
+description: "Automate Apify tasks."
+author: Acme
+version: 2.1.0
+tags:
+  - integration
+  - automation
+compatible_agents:
+  - claude
+  - cursor
+---
+# Apify Automation
+
+> Automate Apify tasks.
+
+Use this skill to automate Apify workflows.
+"#;
+
+        let parsed = parse_discovered_skill_markdown("apify-automation", markdown);
+
+        assert_eq!(parsed.name, "Apify Automation");
+        assert_eq!(parsed.description, "Automate Apify tasks.");
+        assert_eq!(parsed.author.as_deref(), Some("Acme"));
+        assert_eq!(parsed.version.as_deref(), Some("2.1.0"));
+        assert_eq!(parsed.tags, vec!["integration", "automation"]);
+        assert_eq!(parsed.compatible_agents, vec!["claude", "cursor"]);
+        assert_eq!(
+            parsed.content,
+            "Use this skill to automate Apify workflows."
+        );
+    }
+
+    #[test]
+    fn parse_discovered_skill_markdown_falls_back_to_heading_and_quote() {
+        let markdown = r#"# Browser Automation
+
+> Drive browser tasks safely.
+
+Open the page and inspect it carefully.
+"#;
+
+        let parsed = parse_discovered_skill_markdown("browser-automation", markdown);
+
+        assert_eq!(parsed.name, "Browser Automation");
+        assert_eq!(parsed.description, "Drive browser tasks safely.");
+        assert_eq!(parsed.content, "Open the page and inspect it carefully.");
+    }
+
+    #[tokio::test]
+    async fn discover_global_skills_reads_agent_skill_directories() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let skill_dir = temp_dir
+            .path()
+            .join(".claude")
+            .join("skills")
+            .join("browser-automation");
+        std::fs::create_dir_all(&skill_dir).expect("create skill dir");
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            "# Browser Automation\n\n> Drive browser tasks safely.\n\nOpen the page.\n",
+        )
+        .expect("write skill file");
+
+        let discovered = discover_global_skills(temp_dir.path()).await;
+        let skill = discovered
+            .get("browser-automation")
+            .expect("discovered skill");
+
+        assert_eq!(skill.name, "Browser Automation");
+        assert!(skill.compatible_agents.contains("claude"));
+    }
 }
 
 /// Check if a skill from registry is already installed locally
@@ -625,15 +1197,16 @@ pub async fn search_skills_with_fallback(
 }
 
 /// List categories with fallback to built-in categories
-pub async fn list_categories_with_fallback(
-    registry_url: Option<String>,
-) -> Vec<SkillCategory> {
+pub async fn list_categories_with_fallback(registry_url: Option<String>) -> Vec<SkillCategory> {
     let client = SkillRegistryClient::new(registry_url);
 
     match client.list_categories().await {
         Ok(categories) => categories,
         Err(e) => {
-            tracing::warn!("Failed to fetch categories from registry, using builtin: {}", e);
+            tracing::warn!(
+                "Failed to fetch categories from registry, using builtin: {}",
+                e
+            );
             get_builtin_categories()
                 .into_iter()
                 .map(|name| SkillCategory {

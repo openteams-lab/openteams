@@ -744,9 +744,9 @@
   }
 
   .new-design .chat-session-conversation-action-btn.active {
-    background: #f0f4ff;
-    color: #3d4a95;
-    border-color: rgba(73, 90, 181, 0.45);
+    background: #5094FB;
+    color: #fff;
+    border-color: #5094FB;
   }
 
   .new-design .chat-session-conversation-list {
@@ -877,7 +877,7 @@
 
   .new-design .chat-session-archived-label {
     color: #68707f;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 500;
     line-height: 1.1;
   }
@@ -1396,6 +1396,18 @@
     .chat-session-workspace-shell.is-preview-open
     .chat-session-message-column {
     max-width: 900px;
+  }
+
+  .new-design
+    .chat-session-workspace-shell.is-sidebar-closed
+    .chat-session-content-wrapper,
+  .new-design
+    .chat-session-workspace-shell.is-sidebar-closed
+    .chat-session-content-shell,
+  .new-design
+    .chat-session-workspace-shell.is-sidebar-closed
+    .chat-session-message-column {
+    max-width: 1280px;
   }
 
   .new-design .chat-session-artifact-strip {

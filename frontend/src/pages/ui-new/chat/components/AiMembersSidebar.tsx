@@ -785,8 +785,19 @@ const renderPresetTab = () => (
         style={{ width }}
       >
         <div className="chat-session-members-header px-base py-base flex items-center justify-between">
-          <div className="chat-session-members-title text-sm text-normal font-medium">
-            {t('members.title')}
+          <div className="flex items-center gap-half">
+            <button
+              type="button"
+              className="flex items-center justify-center text-low hover:text-normal transition-colors"
+              onClick={onTogglePanel}
+              aria-label={t('header.closeMembersPanel')}
+              title={t('header.closeMembersPanel')}
+            >
+              <CaretRightIcon className="size-icon-xs" />
+            </button>
+            <div className="chat-session-members-title text-sm text-normal font-medium">
+              {t('members.title')}
+            </div>
           </div>
           <button
             type="button"

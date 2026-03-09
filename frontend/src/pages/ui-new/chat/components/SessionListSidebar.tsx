@@ -1,15 +1,30 @@
+import { useState } from 'react';
 import {
+  ArrowCounterClockwiseIcon,
+  BoxArrowDownIcon,
+  BroomIcon,
   ChatCircleDotsIcon,
   ClockIcon,
+  FileArchiveIcon,
   GearSixIcon,
   ListIcon,
+  PencilSimpleIcon,
   PlusIcon,
   SidebarSimpleIcon,
   SquaresFourIcon,
+  TrashIcon,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import type { ChatSession } from 'shared/types';
+import { ChatSessionStatus } from 'shared/types';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui-new/primitives/Dropdown';
 import { formatRelativeDateWithI18n } from '@/utils/date';
 
 const MAX_SESSION_TITLE_LENGTH = 20;
@@ -31,6 +46,13 @@ export interface SessionListSidebarProps {
   width: number;
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
+  onArchiveSession: (sessionId: string) => void;
+  onRestoreSession: (sessionId: string) => void;
+  onDeleteSession: (sessionId: string, sessionTitle: string) => void;
+  onEditSessionTitle: (sessionId: string) => void;
+  onToggleCleanupMode: (sessionId: string) => void;
+  isArchiving: boolean;
+  isDeletingMessages: boolean;
 }
 
 export function SessionListSidebar({
@@ -50,8 +72,16 @@ export function SessionListSidebar({
   width,
   isCollapsed,
   onToggleCollapsed,
+  onArchiveSession,
+  onRestoreSession,
+  onDeleteSession,
+  onEditSessionTitle,
+  onToggleCleanupMode,
+  isArchiving,
+  isDeletingMessages,
 }: SessionListSidebarProps) {
   const { t } = useTranslation('chat');
+  const [contextMenuSession, setContextMenuSession] = useState<ChatSession | null>(null);
   const appVersion = __APP_VERSION__.trim();
   const appVersionLabel = appVersion.startsWith('v')
     ? appVersion
@@ -72,30 +102,51 @@ export function SessionListSidebar({
     };
   };
 
+const handleContextMenu = (e: React.MouseEvent, session: ChatSession) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenuSession(session);
+  };
+
+  const closeContextMenu = () => {
+    setContextMenuSession(null);
+  };
+
   const renderSessionItem = (session: ChatSession) => {
     const isActive = session.id === activeSessionId;
     const hasUnread = !isActive && unreadSessionIds.has(session.id);
+    const isArchived = session.status === ChatSessionStatus.archived;
     const { fullTitle, displayTitle } = getDisplaySessionTitle(session);
     const summaryPreview = session.summary_text?.trim() ?? '';
     const timeLabel = formatRelativeDateWithI18n(session.updated_at, t);
 
     return (
-      <button
+      <DropdownMenu
         key={session.id}
-        type="button"
-        onClick={() => onSelectSession(session.id)}
-        className={cn(
-          'chat-session-item w-full text-left',
-          isActive && 'active',
-          isCollapsed && 'collapsed'
-        )}
-        title={fullTitle}
+        open={contextMenuSession?.id === session.id}
+        onOpenChange={(open) => {
+          if (!open) closeContextMenu();
+        }}
       >
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            onClick={() => onSelectSession(session.id)}
+            onContextMenu={(e) => handleContextMenu(e, session)}
+            className={cn(
+              'chat-session-item w-full text-left',
+              isActive && 'active',
+              isCollapsed && 'collapsed'
+            )}
+            title={fullTitle}
+          >
         <div className="chat-session-item-inner flex items-center gap-half">
           {isActive ? (
             <span className="chat-session-item-active-dot" aria-hidden="true" />
           ) : hasUnread ? (
             <span className="chat-session-item-unread-dot" aria-hidden="true" />
+          ) : isArchived ? (
+            <FileArchiveIcon className="chat-session-item-icon size-icon-xs" />
           ) : (
             <ChatCircleDotsIcon className="chat-session-item-icon size-icon-xs" />
           )}
@@ -121,7 +172,67 @@ export function SessionListSidebar({
             </div>
           )}
         </div>
-      </button>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          side="bottom"
+          sideOffset={4}
+          alignOffset={-4}
+          className="chat-session-header-more-menu w-[200px]"
+        >
+          <DropdownMenuItem
+            icon={PencilSimpleIcon}
+            className="chat-session-header-menu-item"
+            onSelect={() => {
+              onEditSessionTitle(session.id);
+              closeContextMenu();
+            }}
+          >
+            {t('contextMenu.editTitle')}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            icon={isArchived ? ArrowCounterClockwiseIcon : BoxArrowDownIcon}
+            className="chat-session-header-menu-item"
+            onSelect={() => {
+              if (isArchived) {
+                onRestoreSession(session.id);
+              } else {
+                onArchiveSession(session.id);
+              }
+              closeContextMenu();
+            }}
+            disabled={isArchiving}
+          >
+            {isArchived ? t('contextMenu.restore') : t('contextMenu.archive')}
+          </DropdownMenuItem>
+          {!isArchived && (
+            <DropdownMenuItem
+              icon={BroomIcon}
+              className="chat-session-header-menu-item"
+              onSelect={() => {
+                onToggleCleanupMode(session.id);
+                closeContextMenu();
+              }}
+              disabled={isDeletingMessages}
+            >
+              {t('contextMenu.cleanupMessages')}
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator className="chat-session-header-menu-separator" />
+          <DropdownMenuItem
+            icon={TrashIcon}
+            variant="destructive"
+            className="chat-session-header-menu-item chat-session-header-menu-item-danger"
+            onSelect={() => {
+              onDeleteSession(session.id, fullTitle);
+              closeContextMenu();
+            }}
+          >
+            {t('contextMenu.delete')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   };
 

@@ -2622,6 +2622,15 @@ const resizeStartRef = useRef<{
         if (!prev || index < 0 || index >= prev.length) return prev;
         const next = [...prev];
         const patch: Partial<MemberPresetImportPlan> = {};
+        const normalizePlanSkillIds = (skillIds: string[]) =>
+          Array.from(
+            new Set(
+              skillIds
+                .filter((skillId): skillId is string => typeof skillId === 'string')
+                .map((skillId) => skillId.trim())
+                .filter(Boolean)
+            )
+          );
         if (updates.finalName !== undefined)
           patch.finalName = updates.finalName;
         if (updates.workspacePath !== undefined)
@@ -2633,7 +2642,9 @@ const resizeStartRef = useRef<{
         if (updates.toolsEnabled !== undefined)
           patch.toolsEnabled = updates.toolsEnabled;
         if (updates.selectedSkillIds !== undefined)
-          patch.selectedSkillIds = updates.selectedSkillIds;
+          patch.selectedSkillIds = normalizePlanSkillIds(
+            updates.selectedSkillIds
+          );
         next[index] = { ...next[index], ...patch };
         return next;
       });
@@ -3184,7 +3195,10 @@ const handleMouseMove = (e: MouseEvent) => {
           setIsSkillsPanelOpen(false);
           navigate(`/chat/${id}`);
         }}
-        onCreateSession={() => createSession.mutate()}
+        onCreateSession={() => {
+            setIsSkillsPanelOpen(false);
+            createSession.mutate();
+          }}
         isCreating={createSession.isPending}
         onOpenAutomation={() => {
           SettingsDialog.show({ initialSection: 'presets' });
@@ -3202,10 +3216,33 @@ const handleMouseMove = (e: MouseEvent) => {
         onOpenSettings={() => {
           SettingsDialog.show();
         }}
-        isSkillsActive={isSkillsPanelOpen}
+isSkillsActive={isSkillsPanelOpen}
         width={leftSidebarWidth}
         isCollapsed={isLeftSidebarCollapsed}
         onToggleCollapsed={handleToggleLeftSidebar}
+        onArchiveSession={(id) => archiveSession.mutate(id)}
+        onRestoreSession={(id) => restoreSession.mutate(id)}
+        onDeleteSession={(id, title) => {
+          setConfirmModal({
+            title: t('modals.confirm.titles.deleteSession'),
+            message: t('modals.confirm.messages.deleteSession', { title }),
+            onConfirm: async () => {
+              await deleteSession.mutateAsync(id);
+            },
+          });
+        }}
+        onEditSessionTitle={(id) => {
+          setIsSkillsPanelOpen(false);
+          navigate(`/chat/${id}`);
+          setTimeout(() => setIsEditingTitle(true), 100);
+        }}
+        onToggleCleanupMode={(id) => {
+          setIsSkillsPanelOpen(false);
+          navigate(`/chat/${id}`);
+          setTimeout(() => setIsCleanupMode(true), 100);
+        }}
+        isArchiving={archiveSession.isPending || restoreSession.isPending}
+        isDeletingMessages={isDeletingMessages}
       />
 
       {/* Left Sidebar Resize Handle */}
@@ -3336,7 +3373,8 @@ isDeletingMessages={isDeletingMessages}
             'chat-session-workspace-shell flex-1 min-h-0',
             isWorkspacePreviewOpen &&
               workspacePreviewArtifact &&
-              'is-preview-open'
+              'is-preview-open',
+            !isRightSidebarOpen && 'is-sidebar-closed'
           )}
         >
           <div className="chat-session-workspace-chat min-h-0 flex-1 flex flex-col">

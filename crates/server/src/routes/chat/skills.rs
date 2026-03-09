@@ -9,10 +9,9 @@ use serde::Deserialize;
 use services::services::skill_registry::{
     RemoteSkillMeta, RemoteSkillPackage, SkillCategory, SkillRegistryClient, builtin_skills_count,
     filter_builtin_skills_by_agent, filter_builtin_skills_by_category, get_builtin_categories,
-    get_builtin_skill, get_skill_with_fallback, install_builtin_skill,
-    install_skill_files_to_global_directory, install_skill_from_registry,
-    list_categories_with_fallback, list_builtin_skills, list_skills_with_fallback,
-    search_builtin_skills, search_skills_with_fallback,
+    get_skill_with_fallback, install_builtin_skill, install_skill_files_to_global_directory,
+    install_skill_from_registry, list_categories_with_fallback, list_skills_with_fallback,
+    search_skills_with_fallback, sync_discovered_global_skills,
     uninstall_skill_files_from_global_directory,
 };
 use utils::response::ApiResponse;
@@ -25,6 +24,10 @@ use crate::{DeploymentImpl, error::ApiError};
 pub async fn get_skills(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<Vec<ChatSkill>>>, ApiError> {
+    if let Err(err) = sync_discovered_global_skills(&deployment.db().pool).await {
+        tracing::warn!(error = %err, "Failed to sync discovered global skills");
+    }
+
     let skills = ChatSkill::find_all(&deployment.db().pool).await?;
     Ok(ResponseJson(ApiResponse::success(skills)))
 }
@@ -217,7 +220,7 @@ pub async fn install_registry_skill(
         .map_err(|e| ApiError::BadRequest(format!("Failed to fetch skill from registry: {}", e)))?;
 
     let files_count =
-        install_skill_files_to_global_directory(&skill_id, query.registry_url.as_deref())
+        install_skill_files_to_global_directory(&skill_package, query.registry_url.as_deref())
             .await
             .map_err(|e| {
                 ApiError::BadRequest(format!(
