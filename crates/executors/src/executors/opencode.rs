@@ -20,6 +20,7 @@ use crate::{
         StandardCodingAgentExecutor, opencode::types::OpencodeExecutorEvent,
     },
     logs::utils::patch,
+    skill_config::NativeSkillConfigBackend,
     stdout_dup::create_stdout_pipe_writer,
 };
 
@@ -421,6 +422,26 @@ impl StandardCodingAgentExecutor for Opencode {
                 .unwrap_or_else(|| config_dir.join("opencode.jsonc"));
             Some(path)
         }
+    }
+
+    fn default_skill_config_path(&self) -> Option<std::path::PathBuf> {
+        self.default_mcp_config_path()
+    }
+
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        let mut roots = Vec::new();
+
+        if let Some(home) = dirs::home_dir() {
+            roots.push(home.join(".opencode").join("skills"));
+            roots.push(home.join(".claude").join("skills"));
+            roots.push(home.join(".agents").join("skills"));
+        }
+
+        roots
+    }
+
+    fn native_skill_config_backend(&self) -> NativeSkillConfigBackend {
+        NativeSkillConfigBackend::Opencode
     }
 
     fn get_availability_info(&self) -> AvailabilityInfo {

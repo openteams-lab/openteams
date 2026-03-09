@@ -2302,64 +2302,15 @@ const resizeStartRef = useRef<{
     ]
   );
 
-  const syncAgentSkills = useCallback(
-    async (
-      agentId: string,
-      targetSkillIds: string[],
-      options?: { replace?: boolean }
-    ) => {
-      const replace = options?.replace ?? true;
-      const normalizedTargetIds = Array.from(
-        new Set(targetSkillIds.map((skillId) => skillId.trim()).filter(Boolean))
-      );
-      const targetSkillIdSet = new Set(normalizedTargetIds);
-
-      const currentAssignments = await chatApi.listAgentSkills(agentId);
-      const assignmentBySkillId = new Map(
-        currentAssignments.map((assignment) => [
-          assignment.skill_id,
-          assignment,
-        ])
-      );
-
-      const operations: Array<Promise<unknown>> = [];
-
-      for (const skillId of targetSkillIdSet) {
-        if (!assignmentBySkillId.has(skillId)) {
-          operations.push(
-            chatApi.assignSkillToAgent({
-              agent_id: agentId,
-              skill_id: skillId,
-              enabled: true,
-            })
-          );
-        }
-      }
-
-      if (replace) {
-        for (const assignment of currentAssignments) {
-          if (!targetSkillIdSet.has(assignment.skill_id)) {
-            operations.push(
-              chatApi.unassignSkillFromAgent(agentId, assignment.id)
-            );
-          }
-        }
-      }
-
-      if (operations.length > 0) {
-        await Promise.all(operations);
-      }
-    },
-    []
-  );
+  const normalizeAllowedSkillIds = useCallback((skillIds: string[]) => {
+    return Array.from(
+      new Set(skillIds.map((skillId) => skillId.trim()).filter(Boolean))
+    );
+  }, []);
 
   const importMembersFromPlan = useCallback(
     async (plan: MemberPresetImportPlan[]) => {
       if (!activeSessionId) return;
-
-      const attachedAgentIds = new Set(
-        sessionMembers.map((member) => member.agent.id)
-      );
 
       for (const entry of plan) {
         if (entry.action === 'skip') continue;
@@ -2375,33 +2326,19 @@ const resizeStartRef = useRef<{
           agentId = created.id;
         }
 
-        const selectedSkillIds = Array.from(
-          new Set(
-            (entry.selectedSkillIds ?? [])
-              .map((skillId) => skillId.trim())
-              .filter(Boolean)
-          )
+        const selectedSkillIds = normalizeAllowedSkillIds(
+          entry.selectedSkillIds ?? []
         );
 
-        if (agentId) {
-          if (entry.action === 'create') {
-            await syncAgentSkills(agentId, selectedSkillIds, { replace: true });
-          } else if (selectedSkillIds.length > 0) {
-            await syncAgentSkills(agentId, selectedSkillIds, {
-              replace: false,
-            });
-          }
-        }
-
-        if (!agentId || attachedAgentIds.has(agentId)) {
+        if (!agentId) {
           continue;
         }
 
         await chatApi.createSessionAgent(activeSessionId, {
           agent_id: agentId,
           workspace_path: entry.workspacePath,
+          allowed_skill_ids: selectedSkillIds,
         });
-        attachedAgentIds.add(agentId);
       }
 
       await Promise.all([
@@ -2411,7 +2348,7 @@ const resizeStartRef = useRef<{
         }),
       ]);
     },
-    [activeSessionId, queryClient, sessionMembers, syncAgentSkills]
+    [activeSessionId, normalizeAllowedSkillIds, queryClient]
   );
 
   const validateAndPrepareImportPlan = useCallback(
@@ -2515,6 +2452,7 @@ const resizeStartRef = useRef<{
       enabledRunnerTypes,
       sessionMembers,
       showDuplicateMemberNameWarning,
+      t,
     ]
   );
 
@@ -2727,10 +2665,8 @@ const resizeStartRef = useRef<{
     const prompt = newMemberPrompt.trim();
     const workspacePathVal = newMemberWorkspace.trim();
     const selectedVariant = newMemberVariant.trim() || 'DEFAULT';
-    const normalizedSelectedSkillIds = Array.from(
-      new Set(
-        newMemberSkillIds.map((skillId) => skillId.trim()).filter(Boolean)
-      )
+    const normalizedSelectedSkillIds = normalizeAllowedSkillIds(
+      newMemberSkillIds
     );
 
     if (!name) {
@@ -2874,7 +2810,7 @@ if (!isRunnerAvailable(runnerType)) {
           await chatApi.updateAgent(agentId, updatePayload);
         }
 
-        if (workspaceChanged) {
+        if (workspaceChanged || skillsChanged) {
           const sessionIdForUpdate =
             editingMember.sessionAgent.session_id ?? activeSessionId;
           if (!sessionIdForUpdate) {
@@ -2883,14 +2819,11 @@ if (!isRunnerAvailable(runnerType)) {
           await chatApi.updateSessionAgent(
             sessionIdForUpdate,
             editingMember.sessionAgent.id,
-            { workspace_path: workspacePathVal }
+            {
+              workspace_path: workspacePathVal,
+              allowed_skill_ids: normalizedSelectedSkillIds,
+            }
           );
-        }
-
-        if (skillsChanged) {
-          await syncAgentSkills(agentId, normalizedSelectedSkillIds, {
-            replace: true,
-          });
         }
       } else {
         const conflict = sessionMembers.find(
@@ -2914,13 +2847,10 @@ if (!isRunnerAvailable(runnerType)) {
           return;
         }
 
-        await syncAgentSkills(agentId, normalizedSelectedSkillIds, {
-          replace: true,
-        });
-
         await chatApi.createSessionAgent(activeSessionId, {
           agent_id: agentId,
           workspace_path: workspacePathVal,
+          allowed_skill_ids: normalizedSelectedSkillIds,
         });
       }
 
@@ -2985,19 +2915,11 @@ if (!isRunnerAvailable(runnerType)) {
     setPromptFileError(null);
     setPromptFileLoading(false);
     setIsAddMemberOpen(true);
-
-    void chatApi
-      .listAgentSkills(member.agent.id)
-      .then((assignments) => {
-        const assignedSkillIds = Array.from(
-          new Set(assignments.map((assignment) => assignment.skill_id))
-        );
-        setNewMemberSkillIds(assignedSkillIds);
-        setEditingMemberInitialSkillIds(assignedSkillIds);
-      })
-      .catch((error) => {
-        console.warn('Failed to load member skills', error);
-      });
+    const allowedSkillIds = normalizeAllowedSkillIds(
+      member.sessionAgent.allowed_skill_ids ?? []
+    );
+    setNewMemberSkillIds(allowedSkillIds);
+    setEditingMemberInitialSkillIds(allowedSkillIds);
   };
 
   const handleRemoveMember = async (member: SessionMember) => {

@@ -185,4 +185,10 @@ impl StandardCodingAgentExecutor for Amp {
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
         dirs::home_dir().map(|home| home.join(".config").join("amp").join("settings.json"))
     }
+
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".agents").join("skills")])
+            .unwrap_or_default()
+    }
 }

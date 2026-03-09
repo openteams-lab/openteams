@@ -272,6 +272,50 @@
       }
     }
   },
+  "skillLibrary": {
+    "title": "スキル",
+    "description": "インストール済みスキルとマーケットプレイスのスキルを管理します。",
+    "actions": {
+      "refresh": "更新",
+      "refreshing": "更新中...",
+      "newSkill": "新しいスキル",
+      "install": "インストール",
+      "installing": "インストール中...",
+      "create": "作成",
+      "creating": "作成中...",
+      "delete": "削除",
+      "deleting": "削除中...",
+      "enable": "有効化",
+      "disable": "無効化",
+      "updating": "更新中...",
+      "cancel": "キャンセル"
+    },
+    "installed": {
+      "title": "インストール済み",
+      "noRunner": "利用可能な Agent はありません",
+      "toggleUnsupported": "{{runnerType}} は現在ネイティブのスキルディレクトリのみを公開しています。このアプリは読み取れますが、このランナーの有効/無効状態を安全に書き戻すことはまだできません。"
+    },
+    "market": {
+      "title": "マーケットプレイス",
+      "empty": "利用可能なマーケットプレイススキルはありません。",
+      "installAria": "スキルをインストール",
+      "scrollForMore": "さらに読み込むには下にスクロールしてください..."
+    },
+    "create": {
+      "title": "スキルパスを追加",
+      "pathLabel": "スキルパス",
+      "pathPlaceholder": "C:\\skills\\my-skill"
+    },
+    "errors": {
+      "loadInstalled": "インストール済みスキルの読み込みに失敗しました。",
+      "loadMarket": "マーケットプレイススキルの読み込みに失敗しました。",
+      "updateNative": "ネイティブスキルの更新に失敗しました。",
+      "enable": "スキルの有効化に失敗しました。",
+      "delete": "スキルの削除に失敗しました。",
+      "create": "スキルの作成に失敗しました。",
+      "install": "スキルのインストールに失敗しました。"
+    }
+  },
   "cleanup": {
     "selected": "選択済み: {{count}}",
     "cancel": "キャンセル",

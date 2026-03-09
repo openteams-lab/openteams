@@ -272,6 +272,50 @@
       }
     }
   },
+  "skillLibrary": {
+    "title": "Compétences",
+    "description": "Gérez les compétences installées et celles de la place de marché.",
+    "actions": {
+      "refresh": "Actualiser",
+      "refreshing": "Actualisation...",
+      "newSkill": "Nouvelle compétence",
+      "install": "Installer",
+      "installing": "Installation...",
+      "create": "Créer",
+      "creating": "Création...",
+      "delete": "Supprimer",
+      "deleting": "Suppression...",
+      "enable": "Activer",
+      "disable": "Désactiver",
+      "updating": "Mise à jour...",
+      "cancel": "Annuler"
+    },
+    "installed": {
+      "title": "Installées",
+      "noRunner": "Aucun agent",
+      "toggleUnsupported": "{{runnerType}} expose actuellement uniquement un répertoire natif de compétences. L'application peut le lire, mais ne peut pas encore réécrire en toute sécurité l'état activé/désactivé pour cet agent."
+    },
+    "market": {
+      "title": "Place de marché",
+      "empty": "Aucune compétence disponible sur la place de marché.",
+      "installAria": "Installer la compétence",
+      "scrollForMore": "Faites défiler vers le bas pour en charger plus..."
+    },
+    "create": {
+      "title": "Ajouter un chemin de compétence",
+      "pathLabel": "Chemin de la compétence",
+      "pathPlaceholder": "C:\\skills\\my-skill"
+    },
+    "errors": {
+      "loadInstalled": "Échec du chargement des compétences installées.",
+      "loadMarket": "Échec du chargement de la place de marché.",
+      "updateNative": "Échec de la mise à jour de la compétence native.",
+      "enable": "Échec de l'activation de la compétence.",
+      "delete": "Échec de la suppression de la compétence.",
+      "create": "Échec de la création de la compétence.",
+      "install": "Échec de l'installation de la compétence."
+    }
+  },
   "cleanup": {
     "selected": "Sélectionné : {{count}}",
     "cancel": "Annuler",

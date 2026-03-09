@@ -121,6 +121,12 @@ impl StandardCodingAgentExecutor for QwenCode {
         dirs::home_dir().map(|home| home.join(".qwen").join("settings.json"))
     }
 
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".qwen").join("skills")])
+            .unwrap_or_default()
+    }
+
     fn get_availability_info(&self) -> AvailabilityInfo {
         let mcp_config_found = self
             .default_mcp_config_path()

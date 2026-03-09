@@ -96,11 +96,13 @@ pub async fn delete_session(
 pub struct CreateChatSessionAgentRequest {
     pub agent_id: Uuid,
     pub workspace_path: Option<String>,
+    pub allowed_skill_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, TS)]
 pub struct UpdateChatSessionAgentRequest {
     pub workspace_path: Option<String>,
+    pub allowed_skill_ids: Option<Vec<String>>,
 }
 
 #[cfg(windows)]
@@ -232,6 +234,18 @@ async fn normalize_workspace_path(
     Ok(Some(trimmed.to_string()))
 }
 
+fn normalize_allowed_skill_ids(allowed_skill_ids: Option<Vec<String>>) -> Vec<String> {
+    let mut normalized = allowed_skill_ids
+        .unwrap_or_default()
+        .into_iter()
+        .map(|skill_id| skill_id.trim().to_string())
+        .filter(|skill_id| !skill_id.is_empty())
+        .collect::<Vec<_>>();
+    normalized.sort();
+    normalized.dedup();
+    normalized
+}
+
 async fn session_has_duplicate_member_name(
     pool: &sqlx::SqlitePool,
     session_id: Uuid,
@@ -273,6 +287,7 @@ pub async fn create_session_agent(
     }
 
     let workspace_path = normalize_workspace_path(payload.workspace_path).await?;
+    let allowed_skill_ids = normalize_allowed_skill_ids(payload.allowed_skill_ids.clone());
 
     if let Some(existing) = ChatSessionAgent::find_by_session_and_agent(
         &deployment.db().pool,
@@ -281,16 +296,34 @@ pub async fn create_session_agent(
     )
     .await?
     {
+        let mut updated = existing.clone();
+        let mut changed = false;
+
         if workspace_path.is_some() {
-            let updated = ChatSessionAgent::update_workspace_path(
+            updated = ChatSessionAgent::update_workspace_path(
                 &deployment.db().pool,
                 existing.id,
                 workspace_path,
             )
             .await?;
-            return Ok(ResponseJson(ApiResponse::success(updated)));
+            changed = true;
         }
-        return Ok(ResponseJson(ApiResponse::success(existing)));
+
+        if payload.allowed_skill_ids.is_some() {
+            updated = ChatSessionAgent::update_allowed_skill_ids(
+                &deployment.db().pool,
+                existing.id,
+                allowed_skill_ids,
+            )
+            .await?;
+            changed = true;
+        }
+
+        return Ok(ResponseJson(ApiResponse::success(if changed {
+            updated
+        } else {
+            existing
+        })));
     }
 
     let Some(agent) = ChatAgent::find_by_id(&deployment.db().pool, payload.agent_id).await? else {
@@ -324,6 +357,7 @@ pub async fn create_session_agent(
             session_id: session.id,
             agent_id: payload.agent_id,
             workspace_path,
+            allowed_skill_ids,
         },
         Uuid::new_v4(),
     )
@@ -341,8 +375,6 @@ pub async fn update_session_agent(
         return Err(ApiError::Conflict("Chat session is archived".to_string()));
     }
 
-    let workspace_path = normalize_workspace_path(payload.workspace_path).await?;
-
     let Some(existing) =
         ChatSessionAgent::find_by_id(&deployment.db().pool, session_agent_id).await?
     else {
@@ -357,9 +389,37 @@ pub async fn update_session_agent(
         ));
     }
 
-    let updated =
+    let workspace_path = match payload.workspace_path {
+        Some(raw_path) => normalize_workspace_path(Some(raw_path)).await?,
+        None => existing.workspace_path.clone(),
+    };
+
+    let allowed_skill_ids = payload
+        .allowed_skill_ids
+        .map(|skill_ids| normalize_allowed_skill_ids(Some(skill_ids)))
+        .unwrap_or_else(|| existing.allowed_skill_ids.0.clone());
+
+    let workspace_changed = workspace_path != existing.workspace_path;
+    let allowed_skills_changed = allowed_skill_ids != existing.allowed_skill_ids.0;
+
+    let updated = if workspace_changed {
         ChatSessionAgent::update_workspace_path(&deployment.db().pool, existing.id, workspace_path)
-            .await?;
+            .await?
+    } else {
+        existing.clone()
+    };
+
+    let updated = if allowed_skills_changed {
+        ChatSessionAgent::update_allowed_skill_ids(
+            &deployment.db().pool,
+            updated.id,
+            allowed_skill_ids,
+        )
+        .await?
+    } else {
+        updated
+    };
+
     Ok(ResponseJson(ApiResponse::success(updated)))
 }
 
