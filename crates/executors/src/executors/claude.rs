@@ -244,6 +244,12 @@ impl StandardCodingAgentExecutor for ClaudeCode {
         dirs::home_dir().map(|home| home.join(".claude.json"))
     }
 
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".claude").join("skills")])
+            .unwrap_or_default()
+    }
+
     fn get_availability_info(&self) -> AvailabilityInfo {
         let auth_file_path = dirs::home_dir().map(|home| home.join(".claude.json"));
 

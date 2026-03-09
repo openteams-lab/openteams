@@ -54,6 +54,7 @@ use crate::{
         SpawnedChild, StandardCodingAgentExecutor,
     },
     logs::utils::patch,
+    skill_config::NativeSkillConfigBackend,
     stdout_dup::create_stdout_pipe_writer,
 };
 
@@ -228,6 +229,20 @@ impl StandardCodingAgentExecutor for Codex {
 
     fn default_mcp_config_path(&self) -> Option<PathBuf> {
         codex_home().map(|home| home.join("config.toml"))
+    }
+
+    fn default_skill_config_path(&self) -> Option<PathBuf> {
+        self.default_mcp_config_path()
+    }
+
+    fn native_skill_discovery_roots(&self) -> Vec<PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".agents").join("skills")])
+            .unwrap_or_default()
+    }
+
+    fn native_skill_config_backend(&self) -> NativeSkillConfigBackend {
+        NativeSkillConfigBackend::Codex
     }
 
     fn get_availability_info(&self) -> AvailabilityInfo {

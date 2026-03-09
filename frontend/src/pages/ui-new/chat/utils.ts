@@ -43,6 +43,134 @@ export function extractMentions(content: string): Set<string> {
 const sendMessageDirectiveRegex =
   /\[sendMessageTo@@(?:\{([^}\]]+)\}|([^\]\s]+))\]/g;
 
+// Agent response JSON format for structured output
+export interface AgentMemberMessage {
+  target: string;
+  content: string;
+}
+
+export interface AgentResponse {
+  send_to_member?: AgentMemberMessage | null;
+  send_to_user_important?: string | null;
+  record?: string | null;
+  result: string;
+}
+
+/**
+ * Try to parse agent response JSON from message content
+ * Returns null if parsing fails or content is not in expected format
+ */
+export function tryParseAgentResponse(content: string): AgentResponse | null {
+  if (!content || typeof content !== 'string') return null;
+
+  const trimmed = content.trim();
+
+  // Try direct JSON parse first
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (isValidAgentResponse(parsed)) {
+      return parsed;
+    }
+  } catch {
+    // Continue to try other formats
+  }
+
+  // Try to extract from markdown json code block
+  const jsonBlockMatch = trimmed.match(/```json\s*\n?([\s\S]*?)\n?```/);
+  if (jsonBlockMatch) {
+    try {
+      const parsed = JSON.parse(jsonBlockMatch[1].trim());
+      if (isValidAgentResponse(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // Continue to try other formats
+    }
+  }
+
+  // Try plain code block
+  const codeBlockMatch = trimmed.match(/```\s*\n?([\s\S]*?)\n?```/);
+  if (codeBlockMatch) {
+    const blockContent = codeBlockMatch[1].trim();
+    // Skip language identifier if present
+    const lines = blockContent.split('\n');
+    const jsonContent = lines[0].startsWith('{')
+      ? blockContent
+      : lines.slice(1).join('\n').trim();
+
+    if (jsonContent.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(jsonContent);
+        if (isValidAgentResponse(parsed)) {
+          return parsed;
+        }
+      } catch {
+        // Continue to try other formats
+      }
+    }
+  }
+
+  // Try to find raw JSON object
+  const jsonObjMatch = trimmed.match(/\{[\s\S]*\}/);
+  if (jsonObjMatch) {
+    try {
+      const parsed = JSON.parse(jsonObjMatch[0]);
+      if (isValidAgentResponse(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // Parsing failed
+    }
+  }
+
+  return null;
+}
+
+function isValidAgentResponse(obj: unknown): obj is AgentResponse {
+  if (!obj || typeof obj !== 'object') return false;
+  const response = obj as Record<string, unknown>;
+  // result field is required and must be a string
+  return typeof response.result === 'string';
+}
+
+/**
+ * Build display content from agent response
+ * Only shows send_to_member and send_to_user_important fields
+ */
+export function buildAgentDisplayContent(
+  response: AgentResponse,
+  agentName: string
+): string {
+  let content = '';
+
+  // Add send_to_member content with @mention
+  if (response.send_to_member) {
+    const target = response.send_to_member.target.replace(/^@/, '');
+    content += `@${target} ${response.send_to_member.content}\n\n`;
+  }
+
+  // Add send_to_user_important content
+  if (response.send_to_user_important?.trim()) {
+    content += response.send_to_user_important;
+  }
+
+  // If both are empty, show minimal status
+  if (!content.trim()) {
+    content = `[${agentName} completed task]`;
+  }
+
+  return content.trim();
+}
+
+/**
+ * Extract routing target from agent response
+ */
+export function extractAgentResponseTarget(response: AgentResponse): string | null {
+  if (!response.send_to_member) return null;
+  const target = response.send_to_member.target.trim().replace(/^@/, '');
+  return target.length > 0 ? target : null;
+}
+
 function isValidDirectiveTarget(target: string): boolean {
   if (!target) return false;
   return [...target].every((char) => {

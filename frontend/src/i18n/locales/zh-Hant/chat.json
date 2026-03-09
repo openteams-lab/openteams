@@ -272,6 +272,50 @@
       }
     }
   },
+  "skillLibrary": {
+    "title": "技能",
+    "description": "管理已安裝技能與技能市場。",
+    "actions": {
+      "refresh": "重新整理",
+      "refreshing": "重新整理中...",
+      "newSkill": "新技能",
+      "install": "安裝",
+      "installing": "安裝中...",
+      "create": "建立",
+      "creating": "建立中...",
+      "delete": "卸載",
+      "deleting": "卸載中...",
+      "enable": "啟用",
+      "disable": "停用",
+      "updating": "更新中...",
+      "cancel": "取消"
+    },
+    "installed": {
+      "title": "已安裝",
+      "noRunner": "暫無 Agent",
+      "toggleUnsupported": "{{runnerType}} 目前只暴露了技能目錄，沒有公開可安全寫回的單技能啟用設定，因此這裡暫時是唯讀的。"
+    },
+    "market": {
+      "title": "市場",
+      "empty": "暫無可推薦技能。",
+      "installAria": "安裝技能",
+      "scrollForMore": "向下捲動載入更多..."
+    },
+    "create": {
+      "title": "新增技能路徑",
+      "pathLabel": "技能路徑",
+      "pathPlaceholder": "C:\\skills\\my-skill"
+    },
+    "errors": {
+      "loadInstalled": "載入已安裝技能失敗。",
+      "loadMarket": "載入技能市場失敗。",
+      "updateNative": "更新技能啟用狀態失敗。",
+      "enable": "啟用技能失敗。",
+      "delete": "卸載技能失敗。",
+      "create": "建立技能失敗。",
+      "install": "安裝技能失敗。"
+    }
+  },
   "cleanup": {
     "selected": "已選擇: {{count}}",
     "cancel": "取消",

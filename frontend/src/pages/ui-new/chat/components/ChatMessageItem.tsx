@@ -39,6 +39,8 @@ import {
   detectApiError,
   formatBytes,
   renderSendMessageDirectives,
+  tryParseAgentResponse,
+  buildAgentDisplayContent,
 } from '../utils';
 import { formatTokenCount } from '@/utils/string';
 
@@ -136,9 +138,17 @@ export function ChatMessageItem({
     !Array.isArray(message.meta) &&
     (message.meta as { context_compacted?: unknown }).context_compacted ===
       true;
-  const displayContent = isAgent
-    ? renderSendMessageDirectives(message.content)
-    : message.content;
+  // Try to parse new JSON format for agent messages
+  const parsedAgentResponse = isAgent ? tryParseAgentResponse(message.content) : null;
+  const displayContent = (() => {
+    if (!isAgent) return message.content;
+    // If new format is detected, use buildAgentDisplayContent
+    if (parsedAgentResponse) {
+      return buildAgentDisplayContent(parsedAgentResponse, senderLabel);
+    }
+    // Fallback to old format rendering
+    return renderSendMessageDirectives(message.content);
+  })();
 
   const meta = message.meta;
   const tokenUsage =
