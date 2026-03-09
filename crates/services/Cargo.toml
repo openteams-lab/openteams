@@ -40,6 +40,7 @@ futures-util = "0.3"
 json-patch = "2.0"
 backon = "1.5.1"
 base64 = "0.22"
+serde_yaml = "0.9"
 thiserror = { workspace = true }
 futures = "0.3.31"
 tokio-stream = "0.1.17"

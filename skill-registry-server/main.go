@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -36,9 +39,13 @@ type CDNConfig struct {
 
 // Skill metadata from SKILL.md frontmatter
 type SkillFrontmatter struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-	License     string `yaml:"license"`
+	Name             string   `yaml:"name"`
+	Description      string   `yaml:"description"`
+	License          string   `yaml:"license"`
+	Author           string   `yaml:"author"`
+	Category         string   `yaml:"category"`
+	Tags             []string `yaml:"tags"`
+	CompatibleAgents []string `yaml:"compatible_agents"`
 }
 
 // Skill metadata returned by API (detail view)
@@ -55,7 +62,7 @@ type SkillMeta struct {
 	DownloadURL      string   `json:"download_url,omitempty"`
 	Content          string   `json:"content,omitempty"`
 	CompatibleAgents []string `json:"compatible_agents"`
-	DownloadCount    int64    `json:"download_count"` // Number of downloads from skills.sh
+	DownloadCount    int64    `json:"download_count"`
 }
 
 // Skill metadata for list view (no content, files, download_url)
@@ -69,12 +76,19 @@ type SkillListItem struct {
 	Tags             []string `json:"tags"`
 	SourceURL        string   `json:"source_url,omitempty"`
 	CompatibleAgents []string `json:"compatible_agents"`
-	DownloadCount    int64    `json:"download_count"` // Number of downloads from skills.sh
+	DownloadCount    int64    `json:"download_count"`
 }
 
 // Skill detail with full content
 type SkillDetail struct {
 	SkillMeta
+}
+
+type SkillsDataFile struct {
+	GeneratedAt string          `json:"generated_at"`
+	TotalSkills int             `json:"total_skills"`
+	Categories  []string        `json:"categories"`
+	Skills      []SkillListItem `json:"skills"`
 }
 
 // Skill category
@@ -86,24 +100,24 @@ type SkillCategory struct {
 
 // Server state
 type Server struct {
-	skillsDir          string
-	cdnConfig          *CDNConfig
-	skills             []SkillMeta
-	categories         map[string]string
-	downloadCounts     map[string]int64 // skill_id -> download_count from skills.sh
-	skillsShData       *SkillsShData    // cached skills.sh data
-	skillsShDataPath   string           // path to cache file
-	githubSkillsData   *GitHubSkillData // cached GitHub skills data
-	githubDataPath     string           // path to GitHub cache file
-	githubScraper      *GitHubScraper   // GitHub API scraper
+	skillsDir      string
+	skillsDataPath string
+	cdnConfig      *CDNConfig
+	skills         []SkillMeta
+	skillsData     SkillsDataFile
+	skillPaths     map[string]string
+	categories     map[string]string
 }
 
 func main() {
 	// Configuration
 	skillsDir := os.Getenv("SKILLS_DIR")
 	if skillsDir == "" {
-		// Default to the main project directory
-		skillsDir = "../awesome-claude-skills-temp"
+		skillsDir = filepath.Join("data", "skills")
+	}
+	skillsDataPath := os.Getenv("SKILLS_DATA_PATH")
+	if skillsDataPath == "" {
+		skillsDataPath = "skills_data.json"
 	}
 
 	cdnConfig := &CDNConfig{
@@ -137,26 +151,13 @@ func main() {
 	}
 
 	server := &Server{
-		skillsDir:        skillsDir,
-		cdnConfig:        cdnConfig,
-		categories:       make(map[string]string),
-		downloadCounts:   make(map[string]int64),
-		skillsShDataPath: "skills_sh_data.json",
-		githubDataPath:   "github_skills_data.json",
-		githubScraper:    NewGitHubScraper(),
+		skillsDir:      skillsDir,
+		skillsDataPath: skillsDataPath,
+		cdnConfig:      cdnConfig,
+		skillPaths:     make(map[string]string),
+		categories:     make(map[string]string),
 	}
 
-	// Load skills.sh data if available
-	if err := server.loadSkillsShData(); err != nil {
-		fmt.Printf("Warning: failed to load skills.sh data: %v\n", err)
-	}
-
-	// Load GitHub skills data if available
-	if err := server.loadGitHubSkillsData(); err != nil {
-		fmt.Printf("Warning: failed to load GitHub skills data: %v\n", err)
-	}
-
-	// Initialize skills
 	if err := server.loadSkills(); err != nil {
 		fmt.Printf("Error loading skills: %v\n", err)
 		os.Exit(1)
@@ -170,7 +171,7 @@ func main() {
 			fmt.Printf("Warning: invalid SYNC_INTERVAL '%s', using default 6h\n", syncInterval)
 			duration = 6 * time.Hour
 		}
-		server.startPeriodicSync(duration)
+		server.startPeriodicReload(duration)
 	}
 
 	// Setup Gin router
@@ -197,9 +198,8 @@ func main() {
 		api.GET("/download/:id", server.downloadSkill)
 		api.GET("/download/:id/files", server.downloadSkillFiles)
 		api.GET("/download/:id/file/*filepath", server.downloadSkillFile)
-		api.POST("/sync", server.syncSkillsSh)       // Sync from skills.sh
-		api.POST("/sync/github", server.syncGitHub)  // Sync from GitHub
-		api.POST("/sync/all", server.syncAll)        // Sync from all sources
+		api.POST("/sync", server.syncLocalSkills)
+		api.POST("/sync/all", server.syncAll)
 		api.GET("/sync/status", server.getSyncStatus)
 	}
 
@@ -222,22 +222,15 @@ func main() {
 
 // Load skills from the skills directory
 func (s *Server) loadSkills() error {
-	entries, err := os.ReadDir(s.skillsDir)
+	skillDirs, err := discoverSkillDirs(s.skillsDir)
 	if err != nil {
-		return fmt.Errorf("failed to read skills directory: %w", err)
+		return fmt.Errorf("failed to discover skills: %w", err)
 	}
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		// Skip .git directory
-		if entry.Name() == ".git" {
-			continue
-		}
-
-		skillDir := filepath.Join(s.skillsDir, entry.Name())
+	var skills []SkillMeta
+	skillPaths := make(map[string]string)
+	categories := make(map[string]string)
+	for _, skillDir := range skillDirs {
 		skill, err := s.loadSkillFromDir(skillDir)
 		if err != nil {
 			fmt.Printf("Warning: failed to load skill from %s: %v\n", skillDir, err)
@@ -252,26 +245,48 @@ func (s *Server) loadSkills() error {
 			skill.DownloadURL = fmt.Sprintf("/api/download/%s", skill.ID)
 		}
 
-		s.skills = append(s.skills, skill)
+		skills = append(skills, skill)
+		skillPaths[skill.ID] = skillDir
 
 		// Track categories
 		if skill.Category != "" {
-			s.categories[skill.Category] = skill.Category
+			categories[skill.Category] = skill.Category
 		}
 	}
 
+	skillsData := buildSkillsDataFile(skills, categories)
+	if err := s.writeSkillsDataFile(skillsData); err != nil {
+		return fmt.Errorf("failed to write skills data file: %w", err)
+	}
+	loadedSkillsData, err := s.readSkillsDataFile()
+	if err != nil {
+		return fmt.Errorf("failed to read skills data file: %w", err)
+	}
+
+	s.skills = skills
+	s.skillsData = loadedSkillsData
+	s.skillPaths = skillPaths
+	s.categories = categories
 	return nil
 }
 
 // Load a single skill from its directory
 func (s *Server) loadSkillFromDir(dir string) (SkillMeta, error) {
-	skillID := filepath.Base(dir)
-
 	// Read SKILL.md
 	skillMDPath := filepath.Join(dir, "SKILL.md")
+	skillID, err := s.buildSkillID(skillMDPath)
+	if err != nil {
+		return SkillMeta{}, err
+	}
 	skillMeta, content, err := parseSkillMarkdown(skillMDPath)
 	if err != nil {
 		return SkillMeta{}, err
+	}
+	if skillMeta.Name == "" {
+		skillMeta.Name = filepath.Base(dir)
+	}
+	if skillMeta.Description == "" {
+		skillMeta.Description = fmt.Sprintf("Skill: %s", skillMeta.Name)
 	}
 
 	// List all files in the skill directory
@@ -280,19 +295,338 @@ func (s *Server) loadSkillFromDir(dir string) (SkillMeta, error) {
 		return SkillMeta{}, err
 	}
 
+	relDir, err := filepath.Rel(s.skillsDir, dir)
+	if err != nil {
+		return SkillMeta{}, err
+	}
+	relDirSlash := filepath.ToSlash(relDir)
+	category := determineSkillCategory(strings.Split(relDirSlash, "/"), skillMeta.Category)
+	author := extractSkillAuthor(skillMeta.Author)
+	tags := extractSkillTags(skillMeta.Name, category, skillMeta.Tags)
+	compatibleAgents := determineCompatibleAgents(
+		skillMeta.Name,
+		skillMeta.Description,
+		content,
+		category,
+		skillMeta.CompatibleAgents,
+	)
+	sourceURL := buildSourceURL(relDirSlash)
+
 	return SkillMeta{
 		ID:               skillID,
 		Name:             skillMeta.Name,
 		Description:      skillMeta.Description,
-		Category:         getCategoryFromName(skillMeta.Name),
+		Category:         category,
 		Version:          "1.0.0",
-		Author:           "ComposioHQ",
-		Tags:             []string{skillID},
-		SourceURL:        fmt.Sprintf("https://github.com/ComposioHQ/awesome-claude-skills/tree/master/%s", skillID),
+		Author:           author,
+		Tags:             tags,
+		SourceURL:        sourceURL,
 		Files:            files,
 		Content:          content,
-		CompatibleAgents: []string{"claude-code"},
+		CompatibleAgents: compatibleAgents,
+		DownloadCount:    0,
 	}, nil
+}
+
+func discoverSkillDirs(root string) ([]string, error) {
+	var skillDirs []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info.Name() == "SKILL.md" {
+			skillDirs = append(skillDirs, filepath.Dir(path))
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(skillDirs)
+	return skillDirs, nil
+}
+
+func (s *Server) buildSkillID(skillMDPath string) (string, error) {
+	relPath, err := filepath.Rel(s.skillsDir, skillMDPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to build skill id for %s: %w", skillMDPath, err)
+	}
+
+	sum := md5.Sum([]byte(relPath))
+	return hex.EncodeToString(sum[:])[:12], nil
+}
+
+func buildSkillsDataFile(skills []SkillMeta, categories map[string]string) SkillsDataFile {
+	items := make([]SkillListItem, 0, len(skills))
+	for _, skill := range skills {
+		items = append(items, SkillListItem{
+			ID:               skill.ID,
+			Name:             skill.Name,
+			Description:      skill.Description,
+			Category:         skill.Category,
+			Version:          skill.Version,
+			Author:           skill.Author,
+			Tags:             skill.Tags,
+			SourceURL:        skill.SourceURL,
+			CompatibleAgents: skill.CompatibleAgents,
+			DownloadCount:    skill.DownloadCount,
+		})
+	}
+
+	categoryList := make([]string, 0, len(categories))
+	for category := range categories {
+		categoryList = append(categoryList, category)
+	}
+	sort.Strings(categoryList)
+
+	sort.Slice(items, func(i, j int) bool {
+		return strings.ToLower(items[i].Name) < strings.ToLower(items[j].Name)
+	})
+
+	return SkillsDataFile{
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+		TotalSkills: len(items),
+		Categories:  categoryList,
+		Skills:      items,
+	}
+}
+
+func (s *Server) writeSkillsDataFile(data SkillsDataFile) error {
+	encoded, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if dir := filepath.Dir(s.skillsDataPath); dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+
+	return os.WriteFile(s.skillsDataPath, encoded, 0644)
+}
+
+func (s *Server) readSkillsDataFile() (SkillsDataFile, error) {
+	var data SkillsDataFile
+
+	encoded, err := os.ReadFile(s.skillsDataPath)
+	if err != nil {
+		return data, err
+	}
+
+	if err := json.Unmarshal(encoded, &data); err != nil {
+		return data, err
+	}
+
+	return data, nil
+}
+
+func determineSkillCategory(pathParts []string, frontmatterCategory string) string {
+	if frontmatterCategory != "" {
+		return frontmatterCategory
+	}
+
+	categoryMap := map[string]string{
+		"document-skills":             "Document Processing",
+		"composio-skills":             "App Automation",
+		"artifacts-builder":           "Development",
+		"brand-guidelines":            "Design",
+		"canvas-design":               "Creative",
+		"changelog-generator":         "Development",
+		"competitive-ads-extractor":   "Marketing",
+		"connect":                     "Integration",
+		"connect-apps":                "Integration",
+		"connect-apps-plugin":         "Integration",
+		"content-research-writer":     "Writing",
+		"developer-growth-analysis":   "Development",
+		"domain-name-brainstormer":    "Business",
+		"file-organizer":              "Productivity",
+		"image-enhancer":              "Creative",
+		"internal-comms":              "Communication",
+		"invoice-organizer":           "Business",
+		"langsmith-fetch":             "Development",
+		"lead-research-assistant":     "Sales",
+		"mcp-builder":                 "Development",
+		"meeting-insights-analyzer":   "Productivity",
+		"raffle-winner-picker":        "Utility",
+		"skill-creator":               "Development",
+		"skill-share":                 "Collaboration",
+		"slack-gif-creator":           "Creative",
+		"tailored-resume-generator":   "Productivity",
+		"template-skill":              "Development",
+		"theme-factory":               "Design",
+		"twitter-algorithm-optimizer": "Marketing",
+		"video-downloader":            "Utility",
+		"webapp-testing":              "Development",
+	}
+
+	for _, part := range pathParts {
+		if category, ok := categoryMap[part]; ok {
+			return category
+		}
+	}
+
+	if len(pathParts) > 0 && pathParts[0] == "composio-skills" {
+		return "App Automation"
+	}
+
+	return "General"
+}
+
+func extractSkillAuthor(frontmatterAuthor string) string {
+	if frontmatterAuthor != "" {
+		return frontmatterAuthor
+	}
+	return "ComposioHQ"
+}
+
+func extractSkillTags(
+	name string,
+	category string,
+	frontmatterTags []string,
+) []string {
+	if len(frontmatterTags) > 0 {
+		return dedupeStrings(frontmatterTags)
+	}
+
+	categoryTags := map[string][]string{
+		"Document Processing": {"document", "pdf", "processing"},
+		"App Automation":      {"integration", "api", "automation"},
+		"Development":         {"development", "code", "programming"},
+		"Design":              {"creative", "visual", "design"},
+		"Creative":            {"creative", "media", "content"},
+		"Marketing":           {"marketing", "social", "growth"},
+		"Writing":             {"writing", "content", "documentation"},
+		"Business":            {"business", "productivity", "workflow"},
+		"Productivity":        {"productivity", "automation", "efficiency"},
+		"Communication":       {"communication", "messaging", "collaboration"},
+		"Integration":         {"integration", "api", "connection"},
+		"Sales":               {"sales", "leads", "crm"},
+		"Utility":             {"utility", "tools", "helper"},
+		"Collaboration":       {"collaboration", "team", "sharing"},
+		"General":             {"general", "utility"},
+	}
+
+	tags := append([]string{}, categoryTags[category]...)
+	nameLower := strings.ToLower(name)
+
+	if strings.Contains(nameLower, "test") {
+		tags = append(tags, "testing")
+	}
+	if strings.Contains(nameLower, "pdf") {
+		tags = append(tags, "pdf")
+	}
+	if strings.Contains(nameLower, "email") || strings.Contains(nameLower, "mail") {
+		tags = append(tags, "email")
+	}
+	if strings.Contains(nameLower, "git") {
+		tags = append(tags, "git")
+	}
+	if strings.Contains(nameLower, "api") {
+		tags = append(tags, "api")
+	}
+	if strings.Contains(nameLower, "mcp") {
+		tags = append(tags, "mcp")
+	}
+
+	return dedupeStrings(tags)
+}
+
+func determineCompatibleAgents(
+	name string,
+	description string,
+	content string,
+	category string,
+	frontmatterCompatible []string,
+) []string {
+	if len(frontmatterCompatible) > 0 {
+		return dedupeStrings(frontmatterCompatible)
+	}
+
+	text := strings.ToLower(name + " " + description + " " + content)
+	switch category {
+	case "Document Processing":
+		return []string{"claude-code", "cursor", "qwen-code", "codex", "gemini", "copilot"}
+	case "Development", "App Automation", "Integration":
+		return []string{"codex", "opencode", "cursor", "claude-code", "qwen-code"}
+	}
+
+	compatible := []string{"claude-code"}
+	if strings.Contains(text, "cursor") || strings.Contains(text, ".cursor") {
+		compatible = append(compatible, "cursor")
+	}
+	if strings.Contains(text, "qwen") || strings.Contains(text, ".qwen") {
+		compatible = append(compatible, "qwen-code")
+	}
+	if strings.Contains(text, "gemini") || strings.Contains(text, "copilot") {
+		compatible = append(compatible, "gemini", "copilot")
+	}
+	if strings.Contains(text, "agentic") || strings.Contains(text, "agent") {
+		compatible = append(compatible, "codex", "opencode")
+	}
+	if strings.Contains(text, "development") ||
+		strings.Contains(text, "code") ||
+		strings.Contains(text, "git") ||
+		strings.Contains(text, "test") {
+		compatible = append(compatible, "cursor", "qwen-code", "codex", "opencode")
+	}
+
+	return dedupeStrings(compatible)
+}
+
+func buildSourceURL(relDir string) string {
+	if relDir == "" || relDir == "." {
+		return ""
+	}
+
+	return fmt.Sprintf(
+		"https://github.com/ComposioHQ/awesome-claude-skills/tree/master/%s",
+		relDir,
+	)
+}
+
+func dedupeStrings(values []string) []string {
+	seen := make(map[string]bool, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	return result
+}
+
+func describeCategory(category string) string {
+	descriptions := map[string]string{
+		"App Automation":      "Automation skills for third-party apps and services",
+		"Business":            "Business workflows and operational skills",
+		"Collaboration":       "Collaboration and team workflow skills",
+		"Communication":       "Messaging and communication skills",
+		"Creative":            "Creative media and content skills",
+		"Design":              "Design and visual styling skills",
+		"Development":         "Development and coding skills",
+		"Document Processing": "Document creation and processing skills",
+		"General":             "General purpose skills",
+		"Integration":         "Integration and connectivity skills",
+		"Marketing":           "Marketing and growth skills",
+		"Productivity":        "Productivity and organization skills",
+		"Sales":               "Sales and lead generation skills",
+		"Utility":             "Utility and helper skills",
+		"Writing":             "Writing and research skills",
+	}
+
+	if description, ok := descriptions[category]; ok {
+		return description
+	}
+	return ""
 }
 
 // Parse SKILL.md frontmatter
@@ -399,86 +733,34 @@ func (s *Server) listSkills(c *gin.Context) {
 	sortBy := c.Query("sort")      // "downloads", "name", "recent"
 	limitStr := c.Query("limit")   // pagination
 	offsetStr := c.Query("offset") // pagination
-	source := c.Query("source")    // "local", "github", "all" (default: all)
+	_ = c.Query("source")
 
 	var result []SkillListItem
-	seenIDs := make(map[string]bool)
-
-	// Add local skills
-	if source == "" || source == "all" || source == "local" {
-		for _, skill := range s.skills {
-			// Filter by search
-			if search != "" {
-				searchLower := strings.ToLower(search)
-				if !strings.Contains(strings.ToLower(skill.Name), searchLower) &&
-					!strings.Contains(strings.ToLower(skill.Description), searchLower) {
-					continue
-				}
-			}
-
-			// Filter by category
-			if category != "" && skill.Category != category {
+	for _, skill := range s.skillsData.Skills {
+		if search != "" {
+			searchLower := strings.ToLower(search)
+			if !strings.Contains(strings.ToLower(skill.Name), searchLower) &&
+				!strings.Contains(strings.ToLower(skill.Description), searchLower) {
 				continue
 			}
-
-			seenIDs[skill.ID] = true
-
-			// Convert to list item (exclude content, files, download_url)
-			result = append(result, SkillListItem{
-				ID:               skill.ID,
-				Name:             skill.Name,
-				Description:      skill.Description,
-				Category:         skill.Category,
-				Version:          skill.Version,
-				Author:           skill.Author,
-				Tags:             skill.Tags,
-				SourceURL:        skill.SourceURL,
-				CompatibleAgents: skill.CompatibleAgents,
-				DownloadCount:    skill.DownloadCount,
-			})
 		}
-	}
 
-	// Add GitHub skills if available
-	if (source == "" || source == "all" || source == "github") && s.githubSkillsData != nil {
-		for _, skill := range s.githubSkillsData.Skills {
-			// Skip if already seen from local
-			if seenIDs[skill.ID] {
-				continue
-			}
-
-			// Filter by search
-			if search != "" {
-				searchLower := strings.ToLower(search)
-				if !strings.Contains(strings.ToLower(skill.Name), searchLower) &&
-					!strings.Contains(strings.ToLower(skill.Description), searchLower) {
-					continue
-				}
-			}
-
-			// Get category
-			skillCategory := getCategoryFromName(skill.Name)
-
-			// Filter by category
-			if category != "" && skillCategory != category {
-				continue
-			}
-
-			seenIDs[skill.ID] = true
-
-			result = append(result, SkillListItem{
-				ID:               skill.ID,
-				Name:             skill.Name,
-				Description:      skill.Description,
-				Category:         skillCategory,
-				Version:          "1.0.0",
-				Author:           skill.Owner,
-				Tags:             skill.Topics,
-				SourceURL:        skill.SourceURL,
-				CompatibleAgents: []string{"claude-code"},
-				DownloadCount:    skill.DownloadCount,
-			})
+		if category != "" && skill.Category != category {
+			continue
 		}
+
+		result = append(result, SkillListItem{
+			ID:               skill.ID,
+			Name:             skill.Name,
+			Description:      skill.Description,
+			Category:         skill.Category,
+			Version:          skill.Version,
+			Author:           skill.Author,
+			Tags:             skill.Tags,
+			SourceURL:        skill.SourceURL,
+			CompatibleAgents: skill.CompatibleAgents,
+			DownloadCount:    skill.DownloadCount,
+		})
 	}
 
 	// Sort results
@@ -502,10 +784,10 @@ func (s *Server) listSkills(c *gin.Context) {
 			}
 		}
 	default:
-		// Default: sort by downloads
+		// Default: sort by name
 		for i := 0; i < len(result)-1; i++ {
 			for j := i + 1; j < len(result); j++ {
-				if result[j].DownloadCount > result[i].DownloadCount {
+				if strings.ToLower(result[i].Name) > strings.ToLower(result[j].Name) {
 					result[i], result[j] = result[j], result[i]
 				}
 			}
@@ -541,7 +823,6 @@ func (s *Server) getSkill(c *gin.Context) {
 
 	for _, skill := range s.skills {
 		if skill.ID == id {
-			// Return skill without content in list view, but with content in detail view
 			detail := SkillDetail{
 				SkillMeta: skill,
 			}
@@ -555,24 +836,11 @@ func (s *Server) getSkill(c *gin.Context) {
 
 func (s *Server) listCategories(c *gin.Context) {
 	var categories []SkillCategory
-
-	// Add predefined categories
-	catMap := map[string]string{
-		"development":   "Development and coding skills",
-		"design":        "Design and visual skills",
-		"documentation": "Documentation and content skills",
-		"productivity":  "Productivity and organization skills",
-		"media":         "Media and image processing",
-		"content":       "Content creation and research",
-		"business":      "Business and sales skills",
-		"general":       "General purpose skills",
-	}
-
-	for id, desc := range catMap {
+	for _, category := range s.skillsData.Categories {
 		categories = append(categories, SkillCategory{
-			ID:          id,
-			Name:        strings.Title(id),
-			Description: desc,
+			ID:          category,
+			Name:        category,
+			Description: describeCategory(category),
 		})
 	}
 
@@ -582,9 +850,8 @@ func (s *Server) listCategories(c *gin.Context) {
 func (s *Server) downloadSkill(c *gin.Context) {
 	id := c.Param("id")
 
-	// Find the skill
-	skillDir := filepath.Join(s.skillsDir, id)
-	if _, err := os.Stat(skillDir); os.IsNotExist(err) {
+	skillDir, ok := s.getSkillDir(id)
+	if !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Skill not found"})
 		return
 	}
@@ -701,8 +968,12 @@ func (s *Server) downloadSkillFile(c *gin.Context) {
 		return
 	}
 
-	// Build the full file path
-	skillDir := filepath.Join(s.skillsDir, id)
+	skillDir, ok := s.getSkillDir(id)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Skill not found"})
+		return
+	}
+
 	fullPath := filepath.Join(skillDir, decodedPath)
 
 	// Security check: ensure the path is within the skill directory
@@ -742,6 +1013,11 @@ func (s *Server) getSkillFiles(skillID string) []string {
 		}
 	}
 	return nil
+}
+
+func (s *Server) getSkillDir(skillID string) (string, bool) {
+	skillDir, ok := s.skillPaths[skillID]
+	return skillDir, ok
 }
 
 // Create tar.gz from directory
@@ -793,257 +1069,68 @@ func (s *Server) createTarGz(w io.Writer, dir string) error {
 	})
 }
 
-// loadSkillsShData loads cached skills.sh data from file
-func (s *Server) loadSkillsShData() error {
-	data, err := os.ReadFile(s.skillsShDataPath)
-	if err != nil {
-		return err
-	}
-
-	var skillsShData SkillsShData
-	if err := json.Unmarshal(data, &skillsShData); err != nil {
-		return err
-	}
-
-	s.skillsShData = &skillsShData
-
-	// Build download counts map
-	s.downloadCounts = make(map[string]int64)
-	for _, skill := range skillsShData.Skills {
-		// Map skill ID patterns
-		s.downloadCounts[skill.ID] = skill.DownloadCount
-		// Also map by skill name for local matching
-		s.downloadCounts[skill.Name] = skill.DownloadCount
-	}
-
-	fmt.Printf("Loaded %d skills.sh entries\n", len(skillsShData.Skills))
-	return nil
-}
-
-// saveSkillsShData saves skills.sh data to cache file
-func (s *Server) saveSkillsShData() error {
-	if s.skillsShData == nil {
-		return nil
-	}
-
-	data, err := json.MarshalIndent(s.skillsShData, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(s.skillsShDataPath, data, 0644)
-}
-
-// syncSkillsSh syncs skills data from skills.sh
-func (s *Server) syncSkillsSh(c *gin.Context) {
-	fmt.Println("Starting skills.sh sync...")
-
-	data, err := ScrapeSkillsSh()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to scrape skills.sh",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	s.skillsShData = data
-
-	// Build download counts map
-	s.downloadCounts = make(map[string]int64)
-	for _, skill := range data.Skills {
-		s.downloadCounts[skill.ID] = skill.DownloadCount
-		s.downloadCounts[skill.Name] = skill.DownloadCount
-	}
-
-	// Update existing skills with download counts
-	for i := range s.skills {
-		if count, ok := s.downloadCounts[s.skills[i].ID]; ok {
-			s.skills[i].DownloadCount = count
-		} else if count, ok := s.downloadCounts[s.skills[i].Name]; ok {
-			s.skills[i].DownloadCount = count
-		}
-	}
-
-	// Save to cache
-	if err := s.saveSkillsShData(); err != nil {
-		fmt.Printf("Warning: failed to save skills.sh data: %v\n", err)
-	}
-
+// getSyncStatus returns the current sync status
+func (s *Server) getSyncStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"status":         "success",
-		"total_skills":   data.TotalSkills,
-		"total_installs": data.TotalInstalls,
-		"generated_at":   data.GeneratedAt,
+		"mode":             "filesystem",
+		"skills_dir":       s.skillsDir,
+		"skills_data_path": s.skillsDataPath,
+		"generated_at":     s.skillsData.GeneratedAt,
+		"local_skills":     len(s.skills),
 	})
 }
 
-// getSyncStatus returns the current sync status
-func (s *Server) getSyncStatus(c *gin.Context) {
-	status := gin.H{
-		"skills_sh": gin.H{
-			"has_data": s.skillsShData != nil,
-		},
-		"github": gin.H{
-			"has_data": s.githubSkillsData != nil,
-		},
-		"local_skills": len(s.skills),
-	}
-
-	if s.skillsShData != nil {
-		status["skills_sh"] = gin.H{
-			"has_data":       true,
-			"total_skills":   s.skillsShData.TotalSkills,
-			"total_installs": s.skillsShData.TotalInstalls,
-			"generated_at":   s.skillsShData.GeneratedAt,
-		}
-	}
-
-	if s.githubSkillsData != nil {
-		status["github"] = gin.H{
-			"has_data":     true,
-			"total_skills": s.githubSkillsData.TotalSkills,
-			"generated_at": s.githubSkillsData.GeneratedAt,
-		}
-	}
-
-	c.JSON(http.StatusOK, status)
-}
-
-// startPeriodicSync starts a background goroutine to sync data periodically
-func (s *Server) startPeriodicSync(interval time.Duration) {
-	fmt.Printf("Starting periodic sync every %v\n", interval)
+// startPeriodicReload reloads skill metadata from the local filesystem periodically.
+func (s *Server) startPeriodicReload(interval time.Duration) {
+	fmt.Printf("Starting periodic local skill reload every %v\n", interval)
 
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
 		for range ticker.C {
-			fmt.Println("Running scheduled sync (all sources)...")
-			s.doFullSync()
+			fmt.Println("Reloading local skills from disk...")
+			if err := s.loadSkills(); err != nil {
+				fmt.Printf("Warning: local skill reload failed: %v\n", err)
+			}
 		}
 	}()
 }
 
-// doFullSync syncs from all sources: GitHub and skills.sh
-func (s *Server) doFullSync() {
-	ctx := context.Background()
+// syncLocalSkills reloads skill metadata from data/skills.
+func (s *Server) syncLocalSkills(c *gin.Context) {
+	fmt.Println("Reloading local skills from disk...")
 
-	// 1. Sync from skills.sh for download counts
-	fmt.Println("Step 1: Syncing from skills.sh...")
-	shData, err := ScrapeSkillsShWithOptions(true)
-	if err != nil {
-		fmt.Printf("Warning: skills.sh sync failed: %v\n", err)
-	} else {
-		s.skillsShData = shData
-		s.buildDownloadCountsMap()
-		if err := s.saveSkillsShData(); err != nil {
-			fmt.Printf("Warning: failed to save skills.sh data: %v\n", err)
-		}
-		fmt.Printf("  skills.sh: %d skills, %d total installs\n", shData.TotalSkills, shData.TotalInstalls)
-	}
-
-	// 2. Sync from GitHub for full skill discovery
-	fmt.Println("Step 2: Syncing from GitHub...")
-	githubData, err := s.githubScraper.SearchSkills(ctx)
-	if err != nil {
-		fmt.Printf("Warning: GitHub sync failed: %v\n", err)
-	} else {
-		// Merge download counts from skills.sh
-		s.githubScraper.MergeWithSkillsSh(githubData, s.skillsShData)
-		s.githubSkillsData = githubData
-		if err := s.saveGitHubSkillsData(); err != nil {
-			fmt.Printf("Warning: failed to save GitHub data: %v\n", err)
-		}
-		fmt.Printf("  GitHub: %d skills found\n", githubData.TotalSkills)
-	}
-
-	// 3. Update local skills with download counts
-	s.updateSkillsDownloadCounts()
-
-	fmt.Println("Full sync completed")
-}
-
-// buildDownloadCountsMap builds the download counts map from skills.sh data
-func (s *Server) buildDownloadCountsMap() {
-	s.downloadCounts = make(map[string]int64)
-	if s.skillsShData == nil {
-		return
-	}
-	for _, skill := range s.skillsShData.Skills {
-		s.downloadCounts[skill.ID] = skill.DownloadCount
-		s.downloadCounts[skill.Name] = skill.DownloadCount
-	}
-}
-
-// updateSkillsDownloadCounts updates local skills with download counts
-func (s *Server) updateSkillsDownloadCounts() {
-	for i := range s.skills {
-		if count, ok := s.downloadCounts[s.skills[i].ID]; ok {
-			s.skills[i].DownloadCount = count
-		} else if count, ok := s.downloadCounts[s.skills[i].Name]; ok {
-			s.skills[i].DownloadCount = count
-		}
-	}
-}
-
-// loadGitHubSkillsData loads cached GitHub skills data from file
-func (s *Server) loadGitHubSkillsData() error {
-	data, err := ReadGitHubSkillsData(s.githubDataPath)
-	if err != nil {
-		return err
-	}
-	s.githubSkillsData = data
-	fmt.Printf("Loaded %d GitHub skills\n", len(data.Skills))
-	return nil
-}
-
-// saveGitHubSkillsData saves GitHub skills data to cache file
-func (s *Server) saveGitHubSkillsData() error {
-	if s.githubSkillsData == nil {
-		return nil
-	}
-	return WriteGitHubSkillsData(s.githubSkillsData, s.githubDataPath)
-}
-
-// syncGitHub syncs skills data from GitHub
-func (s *Server) syncGitHub(c *gin.Context) {
-	fmt.Println("Starting GitHub sync...")
-	ctx := c.Request.Context()
-
-	data, err := s.githubScraper.SearchSkills(ctx)
-	if err != nil {
+	if err := s.loadSkills(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to search GitHub",
+			"error":   "Failed to reload local skills",
 			"details": err.Error(),
 		})
 		return
 	}
 
-	// Merge with skills.sh download counts
-	s.githubScraper.MergeWithSkillsSh(data, s.skillsShData)
-	s.githubSkillsData = data
-
-	// Save to cache
-	if err := s.saveGitHubSkillsData(); err != nil {
-		fmt.Printf("Warning: failed to save GitHub data: %v\n", err)
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"status":       "success",
-		"total_skills": data.TotalSkills,
-		"generated_at": data.GeneratedAt,
+		"status":           "success",
+		"mode":             "filesystem",
+		"skills_dir":       s.skillsDir,
+		"skills_data_path": s.skillsDataPath,
+		"generated_at":     s.skillsData.GeneratedAt,
+		"total_skills":     len(s.skills),
 	})
 }
 
-// syncAll syncs from all sources
+// syncAll starts a background reload of local skills.
 func (s *Server) syncAll(c *gin.Context) {
-	fmt.Println("Starting full sync (all sources)...")
+	fmt.Println("Starting local skill reload...")
 
-	go s.doFullSync()
+	go func() {
+		if err := s.loadSkills(); err != nil {
+			fmt.Printf("Warning: background local skill reload failed: %v\n", err)
+		}
+	}()
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "started",
-		"message": "Full sync started in background",
+		"message": "Local skill reload started in background",
 	})
 }

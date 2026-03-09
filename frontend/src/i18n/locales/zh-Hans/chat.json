@@ -23,6 +23,13 @@
     "archivedSection": "已归档",
     "settingsInSidebar": "设置"
   },
+  "contextMenu": {
+    "editTitle": "编辑名称",
+    "archive": "归档",
+    "restore": "恢复",
+    "cleanupMessages": "清理消息",
+    "delete": "删除会话"
+  },
   "header": {
     "untitledSession": "未命名会话",
     "editSessionName": "编辑会话名称",

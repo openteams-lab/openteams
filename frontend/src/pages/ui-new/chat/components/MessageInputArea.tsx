@@ -1,7 +1,6 @@
 import type { RefObject, ChangeEvent } from 'react';
 import {
   CaretRightIcon,
-  ChatsTeardropIcon,
   PaperclipIcon,
   PaperPlaneRightIcon,
   XIcon,
@@ -12,7 +11,6 @@ import { useTranslation } from 'react-i18next';
 import type { ChatAgent, ChatMessage } from 'shared/types';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { MultiSelectDropdown } from '@/components/ui-new/primitives/MultiSelectDropdown';
 import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
 import {
   AgentBrandIcon,
@@ -108,7 +106,6 @@ export function MessageInputArea({
   inputRef,
   selectedMentions,
   onSelectedMentionsChange,
-  agentOptions,
   mentionAgentsCount,
   mentionQuery,
   showMentionAllSuggestion,

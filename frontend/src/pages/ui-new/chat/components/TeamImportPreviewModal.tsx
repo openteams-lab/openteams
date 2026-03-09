@@ -236,7 +236,7 @@ export function TeamImportPreviewModal({
     >
       <div
         className={cn(
-          'team-import-preview-modal chat-session-modal-surface flex h-[82vh] max-h-[82vh] w-[min(90vw,820px)] max-w-[820px] flex-col overflow-hidden rounded-[28px] border border-white/60 bg-white/72 shadow-[0_28px_90px_rgba(15,23,42,0.24)] backdrop-blur-[24px]'
+          'team-import-preview-modal chat-session-modal-surface flex h-[88vh] max-h-[88vh] w-[min(86vw,760px)] max-w-[760px] flex-col overflow-hidden rounded-[28px] border border-white/60 bg-white/72 shadow-[0_28px_90px_rgba(15,23,42,0.24)] backdrop-blur-[24px]'
         )}
         onClick={(event) => event.stopPropagation()}
       >
@@ -505,6 +505,7 @@ export function TeamImportPreviewModal({
                               }
                               readOnly={isArchived || isImportingTeam}
                               maxHeightClass="max-h-32"
+                              allowDetailModal={false}
                             />
                           </div>
                         </div>
@@ -526,7 +527,7 @@ export function TeamImportPreviewModal({
             </div>
 
             {importPlan.length > 1 && (
-              <aside className="flex w-[220px] shrink-0 flex-col rounded-[24px] border border-white/70 bg-white/65 p-3 shadow-[0_18px_36px_rgba(148,163,184,0.12)] backdrop-blur-xl">
+              <aside className="flex w-[196px] shrink-0 flex-col rounded-[24px] border border-white/70 bg-white/65 p-3 shadow-[0_18px_36px_rgba(148,163,184,0.12)] backdrop-blur-xl">
                 <div className="border-b border-slate-200/70 px-2 pb-3">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
                     {t('members.importPreview.membersLabel')}

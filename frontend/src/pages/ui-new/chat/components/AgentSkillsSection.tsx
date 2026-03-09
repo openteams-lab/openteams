@@ -27,6 +27,7 @@ interface AgentSkillsSectionProps {
   onSelectedSkillIdsChange?: (skillIds: string[]) => void;
   title?: string;
   maxHeightClass?: string;
+  allowDetailModal?: boolean;
 }
 
 function normalizeSkillIds(skillIds: string[]): string[] {
@@ -48,6 +49,13 @@ function getSkillSearchText(skill: ChatSkill): string {
     .toLowerCase();
 }
 
+function isSkillSelectControlTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    Boolean(target.closest('[data-skill-select-control="true"]'))
+  );
+}
+
 export function AgentSkillsSection({
   agentId,
   runnerType,
@@ -56,6 +64,7 @@ export function AgentSkillsSection({
   onSelectedSkillIdsChange,
   title,
   maxHeightClass,
+  allowDetailModal = true,
 }: AgentSkillsSectionProps) {
   const { t } = useTranslation('chat');
   const [allSkills, setAllSkills] = useState<ChatSkill[]>([]);
@@ -597,12 +606,24 @@ export function AgentSkillsSection({
                   return (
                     <div
                       key={skill.id}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={t('members.skills.detail.viewDetails', {
-                        name: skill.name,
-                      })}
-                      onClick={() => handleOpenSkillDetails(skill)}
+                      role={allowDetailModal ? 'button' : undefined}
+                      tabIndex={allowDetailModal ? 0 : undefined}
+                      aria-label={
+                        allowDetailModal
+                          ? t('members.skills.detail.viewDetails', {
+                              name: skill.name,
+                            })
+                          : undefined
+                      }
+                      onClick={(event) => {
+                        if (isSkillSelectControlTarget(event.target)) {
+                          return;
+                        }
+                        if (!allowDetailModal) {
+                          return;
+                        }
+                        handleOpenSkillDetails(skill);
+                      }}
                       onKeyDown={(event) => {
                         if (event.target !== event.currentTarget) {
                           return;
@@ -610,47 +631,54 @@ export function AgentSkillsSection({
 
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
+                          if (!allowDetailModal) {
+                            return;
+                          }
                           handleOpenSkillDetails(skill);
                         }
                       }}
                       className={cn(
                         'group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
-                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]/30',
-                        'cursor-pointer',
+                        allowDetailModal &&
+                          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]/30 cursor-pointer',
                         isSelected
                           ? 'bg-[rgb(238,242,255)]'
                           : 'hover:bg-[rgb(238,242,255)]',
                         isDetailOpen && !isSelected && 'bg-[rgb(238,242,255)]'
                       )}
                     >
-                      <label
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={isSelected}
+                        data-skill-select-control="true"
                         className={cn(
                           'mt-0.5 inline-flex size-4 shrink-0 items-center justify-center',
                           readOnly || isSyncing
                             ? 'cursor-not-allowed'
                             : 'cursor-pointer'
                         )}
-                        onClick={(event) => event.stopPropagation()}
+                        disabled={readOnly || isSyncing}
+                        onPointerDownCapture={(event) => event.stopPropagation()}
+                        onClickCapture={(event) => event.stopPropagation()}
                         onMouseDown={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        aria-label={
+                          isSelected
+                            ? t('members.skills.unselectAction', {
+                                name: skill.name,
+                              })
+                            : t('members.skills.selectAction', {
+                                name: skill.name,
+                              })
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleToggleSkill(skill.id);
+                        }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          disabled={readOnly || isSyncing}
-                          onChange={() => void handleToggleSkill(skill.id)}
-                          onClick={(event) => event.stopPropagation()}
-                          aria-label={
-                            isSelected
-                              ? t('members.skills.unselectAction', {
-                                  name: skill.name,
-                                })
-                              : t('members.skills.selectAction', {
-                                  name: skill.name,
-                                })
-                          }
-                          className="sr-only"
-                        />
                         <span
+                          data-skill-select-control="true"
                           className={cn(
                             'inline-flex size-4 items-center justify-center rounded-[4px] border transition-colors',
                             isSelected
@@ -664,7 +692,7 @@ export function AgentSkillsSection({
                         >
                           <CheckIcon size={11} weight="bold" />
                         </span>
-                      </label>
+                      </button>
 
                       <div className="min-w-0 flex-1">
                         <div
@@ -686,31 +714,33 @@ export function AgentSkillsSection({
         )}
       </div>
 
-      <SkillDetailModal
-        isOpen={Boolean(detailSkillId)}
-        name={detailSkill?.name ?? ''}
-        description={detailSkill?.description}
-        content={detailSkill?.content}
-        sourceUrl={detailSkill?.source_url}
-        isLoading={isLoadingDetail}
-        error={detailError}
-        onClose={handleCloseSkillDetails}
-        primaryAction={{
-          label:
-            detailSkillId && syncingSkillId === detailSkillId
-              ? t('members.skills.detail.selecting')
-              : t('members.skills.detail.select'),
-          onClick: () => {
-            void handleSelectSkillFromDetails();
-          },
-          disabled:
-            readOnly ||
-            !detailSkillId ||
-            isLoadingDetail ||
-            syncingSkillId === detailSkillId,
-          icon: <CheckIcon size={16} weight="bold" />,
-        }}
-      />
+      {allowDetailModal && (
+        <SkillDetailModal
+          isOpen={Boolean(detailSkillId)}
+          name={detailSkill?.name ?? ''}
+          description={detailSkill?.description}
+          content={detailSkill?.content}
+          sourceUrl={detailSkill?.source_url}
+          isLoading={isLoadingDetail}
+          error={detailError}
+          onClose={handleCloseSkillDetails}
+          primaryAction={{
+            label:
+              detailSkillId && syncingSkillId === detailSkillId
+                ? t('members.skills.detail.selecting')
+                : t('members.skills.detail.select'),
+            onClick: () => {
+              void handleSelectSkillFromDetails();
+            },
+            disabled:
+              readOnly ||
+              !detailSkillId ||
+              isLoadingDetail ||
+              syncingSkillId === detailSkillId,
+            icon: <CheckIcon size={16} weight="bold" />,
+          }}
+        />
+      )}
 
       {error && <div className="text-xs text-error">{error}</div>}
     </div>

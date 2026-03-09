@@ -294,37 +294,6 @@ func parseSkillMarkdownFromContent(content string) (SkillFrontmatter, string, er
 	return fm, content, nil
 }
 
-// DownloadSkillFromGitHub downloads a skill from GitHub
-func DownloadSkillFromGitHub(owner, repo string) ([]byte, error) {
-	client := &http.Client{
-		Timeout: 60 * time.Second,
-	}
-
-	// Download as tarball from GitHub
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/tarball/main", owner, repo)
-	req, err := http.NewRequest("GET", apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add GitHub token if available
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-		req.Header.Set("Authorization", "token "+token)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to download from GitHub: %s", resp.Status)
-	}
-
-	return io.ReadAll(resp.Body)
-}
-
 // WriteSkillsData writes skills data to a JSON file
 func WriteSkillsData(data *SkillsShData, outputPath string) error {
 	jsonData, err := json.MarshalIndent(data, "", "  ")

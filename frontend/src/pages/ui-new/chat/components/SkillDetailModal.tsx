@@ -66,6 +66,7 @@ interface SkillDetailModalProps {
     onClick: () => void;
     disabled?: boolean;
     icon?: ReactNode;
+    className?: string;
   };
 }
 
@@ -209,7 +210,8 @@ export function SkillDetailModal({
                     'inline-flex h-10 min-w-[136px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-black px-6 text-base font-medium text-white',
                     primaryAction.disabled
                       ? 'cursor-not-allowed opacity-60'
-                      : 'hover:bg-black/85'
+                      : 'hover:bg-black/85',
+                    primaryAction.className
                   )}
                 >
                   {primaryAction.icon}
