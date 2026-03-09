@@ -111,6 +111,8 @@ import {
   ChatSkill,
   CreateChatSkill,
   UpdateChatSkill,
+  InstalledNativeSkill,
+  UpdateNativeSkillRequest,
   ChatAgentSkill,
   AssignSkillToAgent,
   UpdateAgentSkill,
@@ -1766,6 +1768,31 @@ export const chatApi = {
   listSkills: async (): Promise<ChatSkill[]> => {
     const response = await makeRequest('/api/chat/skills');
     return handleApiResponse<ChatSkill[]>(response);
+  },
+
+  listNativeSkills: async (
+    runnerType: string
+  ): Promise<InstalledNativeSkill[]> => {
+    const response = await makeRequest(
+      `/api/chat/skills/native/${encodeURIComponent(runnerType)}`
+    );
+    return handleApiResponse<InstalledNativeSkill[]>(response);
+  },
+
+  updateNativeSkill: async (
+    runnerType: string,
+    skillId: string,
+    enabled: boolean
+  ): Promise<InstalledNativeSkill> => {
+    const payload: UpdateNativeSkillRequest = { enabled };
+    const response = await makeRequest(
+      `/api/chat/skills/native/${encodeURIComponent(runnerType)}/${skillId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }
+    );
+    return handleApiResponse<InstalledNativeSkill>(response);
   },
 
   getSkill: async (skillId: string): Promise<ChatSkill> => {

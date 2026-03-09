@@ -87,6 +87,11 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
 
     // Skill CRUD routes
     let skills_router = Router::new()
+        .route("/native/{runner_type}", get(skills::get_native_skills))
+        .route(
+            "/native/{runner_type}/{skill_id}",
+            axum::routing::put(skills::update_native_skill),
+        )
         .route("/", get(skills::get_skills).post(skills::create_skill))
         .route(
             "/{skill_id}",

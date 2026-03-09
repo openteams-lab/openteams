@@ -272,6 +272,50 @@
       }
     }
   },
+  "skillLibrary": {
+    "title": "스킬",
+    "description": "설치된 스킬과 마켓플레이스 스킬을 관리합니다.",
+    "actions": {
+      "refresh": "새로고침",
+      "refreshing": "새로고침 중...",
+      "newSkill": "새 스킬",
+      "install": "설치",
+      "installing": "설치 중...",
+      "create": "생성",
+      "creating": "생성 중...",
+      "delete": "삭제",
+      "deleting": "삭제 중...",
+      "enable": "사용",
+      "disable": "사용 안 함",
+      "updating": "업데이트 중...",
+      "cancel": "취소"
+    },
+    "installed": {
+      "title": "설치됨",
+      "noRunner": "사용 가능한 Agent 없음",
+      "toggleUnsupported": "{{runnerType}}은(는) 현재 네이티브 스킬 디렉터리만 노출합니다. 이 앱에서 읽을 수는 있지만, 이 러너의 사용/비사용 상태를 안전하게 다시 기록할 수는 아직 없습니다."
+    },
+    "market": {
+      "title": "마켓플레이스",
+      "empty": "사용 가능한 마켓플레이스 스킬이 없습니다.",
+      "installAria": "스킬 설치",
+      "scrollForMore": "더 불러오려면 아래로 스크롤하세요..."
+    },
+    "create": {
+      "title": "스킬 경로 추가",
+      "pathLabel": "스킬 경로",
+      "pathPlaceholder": "C:\\skills\\my-skill"
+    },
+    "errors": {
+      "loadInstalled": "설치된 스킬을 불러오지 못했습니다.",
+      "loadMarket": "스킬 마켓플레이스를 불러오지 못했습니다.",
+      "updateNative": "네이티브 스킬을 업데이트하지 못했습니다.",
+      "enable": "스킬을 활성화하지 못했습니다.",
+      "delete": "스킬을 삭제하지 못했습니다.",
+      "create": "스킬을 생성하지 못했습니다.",
+      "install": "스킬을 설치하지 못했습니다."
+    }
+  },
   "cleanup": {
     "selected": "선택됨: {{count}}",
     "cancel": "취소",

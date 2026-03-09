@@ -7,19 +7,17 @@ import {
   PlusIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
+import { useTranslation } from 'react-i18next';
 import { BaseCodingAgent } from 'shared/types';
 import type {
   ChatAgent,
-  ChatAgentSkill,
-  ChatSkill,
+  InstalledNativeSkill,
   RemoteSkillMeta,
   RemoteSkillPackage,
-  UpdateChatSkill,
 } from 'shared/types';
 import { chatApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { SkillDetailModal } from './SkillDetailModal';
-import { filterSkillsByRunner } from '../skillCompatibility';
 
 type MarketSource = 'registry' | 'builtin';
 
@@ -28,7 +26,7 @@ type MarketSkill = RemoteSkillMeta & {
 };
 
 type DetailTarget =
-  | { kind: 'installed'; skill: ChatSkill }
+  | { kind: 'installed'; skill: InstalledNativeSkill }
   | { kind: 'market'; skill: MarketSkill };
 
 type DetailData = {
@@ -38,6 +36,7 @@ type DetailData = {
   sourceUrl: string | null;
   installedSkillId: string | null;
   enabled: boolean | null;
+  canToggle: boolean | null;
 };
 
 type RunnerOption = {
@@ -97,24 +96,6 @@ function toRunnerLabel(runnerType: string): string {
     .split(/[_\s-]+/)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(' ');
-}
-
-function buildSkillEnabledPayload(enabled: boolean): UpdateChatSkill {
-  return {
-    name: null,
-    description: null,
-    content: null,
-    trigger_type: null,
-    trigger_keywords: null,
-    enabled,
-    source: null,
-    source_url: null,
-    version: null,
-    author: null,
-    tags: null,
-    category: null,
-    compatible_agents: null,
-  };
 }
 
 function ToggleSwitch({
@@ -184,11 +165,11 @@ export function SkillsPanel({
   allAgents,
   onClose,
 }: SkillsPanelProps) {
-  const [installedSkills, setInstalledSkills] = useState<ChatSkill[]>([]);
-  const [marketSkills, setMarketSkills] = useState<MarketSkill[]>([]);
-  const [agentAssignments, setAgentAssignments] = useState<ChatAgentSkill[]>(
+  const { t } = useTranslation('chat');
+  const [installedSkills, setInstalledSkills] = useState<InstalledNativeSkill[]>(
     []
   );
+  const [marketSkills, setMarketSkills] = useState<MarketSkill[]>([]);
   const [availableAgents, setAvailableAgents] = useState<ChatAgent[]>([]);
 
   const [selectedRunnerKey, setSelectedRunnerKey] = useState('');
@@ -214,11 +195,7 @@ export function SkillsPanel({
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [customSkillPath, setCustomSkillPath] = useState('');
-  const [customSkillAgentId, setCustomSkillAgentId] = useState('');
   const [isCreatingSkill, setIsCreatingSkill] = useState(false);
-  const [marketInstallTarget, setMarketInstallTarget] =
-    useState<MarketSkill | null>(null);
-  const [marketInstallAgentId, setMarketInstallAgentId] = useState('');
   const [marketVisibleCount, setMarketVisibleCount] = useState(
     marketRenderBatchSize
   );
@@ -252,35 +229,25 @@ export function SkillsPanel({
       runnerOptions.find((option) => option.key === selectedRunnerKey) ?? null,
     [runnerOptions, selectedRunnerKey]
   );
+  const selectedRunnerLabel = selectedRunnerOption?.label ?? '';
 
-  const selectedAgentId = selectedRunnerOption?.representativeAgentId ?? '';
-
-  const assignedSkillIds = useMemo(
-    () => new Set(agentAssignments.map((assignment) => assignment.skill_id)),
-    [agentAssignments]
-  );
-
-  const assignmentBySkillId = useMemo(
-    () =>
-      new Map(
-        agentAssignments.map((assignment) => [assignment.skill_id, assignment])
-      ),
-    [agentAssignments]
-  );
-
-  const loadInstalledSkills = useCallback(async () => {
+  const loadInstalledSkills = useCallback(async (runnerKey: string) => {
     setIsLoadingInstalled(true);
     setInstalledError(null);
     try {
-      const skills = await chatApi.listSkills();
+      if (!runnerKey) {
+        setInstalledSkills([]);
+        return;
+      }
+      const skills = await chatApi.listNativeSkills(runnerKey);
       setInstalledSkills(skills);
     } catch (error) {
       console.error('Failed to load installed skills', error);
-      setInstalledError('加载已安装技能失败。');
+      setInstalledError(t('skillLibrary.errors.loadInstalled'));
     } finally {
       setIsLoadingInstalled(false);
     }
-  }, []);
+  }, [t]);
 
   const loadAgents = useCallback(async () => {
     try {
@@ -312,26 +279,19 @@ export function SkillsPanel({
           registryError,
           builtinError
         );
-        setMarketError('加载技能市场失败。');
+        setMarketError(t('skillLibrary.errors.loadMarket'));
       }
     } finally {
       setIsLoadingMarket(false);
     }
-  }, []);
-
-  const loadAgentAssignments = useCallback(async (agentId: string) => {
-    try {
-      const assignments = await chatApi.listAgentSkills(agentId);
-      setAgentAssignments(assignments);
-    } catch (error) {
-      console.error('Failed to load agent skills', error);
-      setInstalledError('加载 agent 技能分配失败。');
-    }
-  }, []);
+  }, [t]);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([loadInstalledSkills(), loadMarketSkills()]);
-  }, [loadInstalledSkills, loadMarketSkills]);
+    await Promise.all([
+      loadMarketSkills(),
+      selectedRunnerKey ? loadInstalledSkills(selectedRunnerKey) : Promise.resolve(),
+    ]);
+  }, [loadInstalledSkills, loadMarketSkills, selectedRunnerKey]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -353,13 +313,9 @@ export function SkillsPanel({
   }, [isOpen, runnerOptions, selectedRunnerKey]);
 
   useEffect(() => {
-    if (!isOpen) return;
-    if (!selectedAgentId) {
-      setAgentAssignments([]);
-      return;
-    }
-    void loadAgentAssignments(selectedAgentId);
-  }, [isOpen, loadAgentAssignments, selectedAgentId]);
+    if (!isOpen || !selectedRunnerKey) return;
+    void loadInstalledSkills(selectedRunnerKey);
+  }, [isOpen, loadInstalledSkills, selectedRunnerKey]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -385,7 +341,7 @@ export function SkillsPanel({
     () =>
       new Set(
         installedSkills
-          .map((skill) => normalizeSourceUrl(skill.source_url))
+          .map((item) => normalizeSourceUrl(item.skill.source_url))
           .filter(Boolean)
       ),
     [installedSkills]
@@ -393,22 +349,25 @@ export function SkillsPanel({
 
   const installedByName = useMemo(
     () =>
-      new Set(installedSkills.map((skill) => skill.name.trim().toLowerCase())),
+      new Set(
+        installedSkills.map((item) => item.skill.name.trim().toLowerCase())
+      ),
     [installedSkills]
   );
 
   const findInstalledSkillByMeta = useCallback(
-    (meta: MarketSkill): ChatSkill | null => {
+    (meta: MarketSkill): InstalledNativeSkill | null => {
       const normalizedSource = normalizeSourceUrl(meta.source_url);
       return (
         installedSkills.find(
-          (skill) =>
-            normalizeSourceUrl(skill.source_url) === normalizedSource &&
+          (item) =>
+            normalizeSourceUrl(item.skill.source_url) === normalizedSource &&
             normalizedSource.length > 0
         ) ??
         installedSkills.find(
-          (skill) =>
-            skill.name.trim().toLowerCase() === meta.name.trim().toLowerCase()
+          (item) =>
+            item.skill.name.trim().toLowerCase() ===
+            meta.name.trim().toLowerCase()
         ) ??
         null
       );
@@ -427,10 +386,7 @@ export function SkillsPanel({
 
   const searchLower = searchQuery.trim().toLowerCase();
 
-  const displayedInstalledSkills = useMemo(() => {
-    if (!selectedRunnerKey) return installedSkills;
-    return filterSkillsByRunner(installedSkills, selectedRunnerKey);
-  }, [installedSkills, selectedRunnerKey]);
+  const displayedInstalledSkills = installedSkills;
 
   const displayedMarketSkills = useMemo(() => {
     return marketSkills.filter((skill) => {
@@ -474,32 +430,29 @@ export function SkillsPanel({
     [displayedMarketSkills.length, isLoadingMarket]
   );
 
-  const handleToggleAgentSkill = useCallback(
+  const handleToggleInstalledSkill = useCallback(
     async (skillId: string) => {
-      if (!selectedAgentId) return;
-
       setIsSyncingSkillId(skillId);
       setInstalledError(null);
       try {
-        const assignment = assignmentBySkillId.get(skillId);
-        if (assignment) {
-          await chatApi.unassignSkillFromAgent(selectedAgentId, assignment.id);
-        } else {
-          await chatApi.assignSkillToAgent({
-            agent_id: selectedAgentId,
-            skill_id: skillId,
-            enabled: true,
-          });
+        const current = installedSkills.find((item) => item.skill.id === skillId);
+        if (!current || !selectedRunnerKey) {
+          return;
         }
-        await loadAgentAssignments(selectedAgentId);
+        await chatApi.updateNativeSkill(
+          selectedRunnerKey,
+          skillId,
+          !current.enabled
+        );
+        await loadInstalledSkills(selectedRunnerKey);
       } catch (error) {
         console.error('Failed to update agent skill', error);
-        setInstalledError('更新 agent 技能失败。');
+        setInstalledError(t('skillLibrary.errors.updateNative'));
       } finally {
         setIsSyncingSkillId(null);
       }
     },
-    [assignmentBySkillId, loadAgentAssignments, selectedAgentId]
+    [installedSkills, loadInstalledSkills, selectedRunnerKey, t]
   );
 
   const openDetail = useCallback((target: DetailTarget) => {
@@ -517,8 +470,8 @@ export function SkillsPanel({
       try {
         if (detailTarget.kind === 'installed') {
           const detail = await chatApi
-            .getSkill(detailTarget.skill.id)
-            .catch(() => detailTarget.skill);
+            .getSkill(detailTarget.skill.skill.id)
+            .catch(() => detailTarget.skill.skill);
 
           setDetailData({
             name: detail.name,
@@ -526,7 +479,8 @@ export function SkillsPanel({
             content: detail.content,
             sourceUrl: detail.source_url,
             installedSkillId: detail.id,
-            enabled: detail.enabled,
+            enabled: detailTarget.skill.enabled,
+            canToggle: detailTarget.skill.can_toggle,
           });
           return;
         }
@@ -543,19 +497,20 @@ export function SkillsPanel({
           description: pkg.description,
           content: pkg.content,
           sourceUrl: pkg.source_url,
-          installedSkillId: installed?.id ?? null,
+          installedSkillId: installed?.skill.id ?? null,
           enabled: installed?.enabled ?? null,
+          canToggle: installed?.can_toggle ?? null,
         });
       } catch (error) {
         console.error('Failed to load skill detail', error);
-        setDetailError('加载技能详情失败。');
+        setDetailError(t('members.skills.errors.detail'));
       } finally {
         setIsLoadingDetail(false);
       }
     };
 
     void loadDetail();
-  }, [detailTarget, findInstalledSkillByMeta]);
+  }, [detailTarget, findInstalledSkillByMeta, t]);
 
   const closeDetail = useCallback(() => {
     setDetailTarget(null);
@@ -564,108 +519,100 @@ export function SkillsPanel({
   }, []);
 
   const handleEnableSkill = useCallback(async () => {
-    if (!detailData?.installedSkillId) return;
+    if (!detailData?.installedSkillId || !selectedRunnerKey) return;
 
     setIsTryingSkill(true);
     setDetailError(null);
     try {
-      if (selectedAgentId) {
-        if (!assignedSkillIds.has(detailData.installedSkillId)) {
-          await chatApi.assignSkillToAgent({
-            agent_id: selectedAgentId,
-            skill_id: detailData.installedSkillId,
-            enabled: true,
-          });
-          await loadAgentAssignments(selectedAgentId);
-        }
+      if (detailData.enabled === false) {
+        await chatApi.updateNativeSkill(
+          selectedRunnerKey,
+          detailData.installedSkillId,
+          true
+        );
+        await loadInstalledSkills(selectedRunnerKey);
       }
 
       closeDetail();
     } catch (error) {
       console.error('Failed to enable skill', error);
-      setDetailError('启用技能失败。');
+      setDetailError(t('skillLibrary.errors.enable'));
     } finally {
       setIsTryingSkill(false);
     }
   }, [
-    assignedSkillIds,
     closeDetail,
     detailData,
-    loadAgentAssignments,
-    selectedAgentId,
+    loadInstalledSkills,
+    selectedRunnerKey,
+    t,
   ]);
   const handleToggleSkillEnabled = useCallback(async () => {
-    if (!detailData?.installedSkillId || detailData.enabled === null) return;
+    if (
+      !detailData?.installedSkillId ||
+      detailData.enabled === null ||
+      !selectedRunnerKey
+    ) {
+      return;
+    }
 
     setIsTogglingSkill(true);
     setDetailError(null);
     const nextEnabled = !detailData.enabled;
 
     try {
-      await chatApi.updateSkill(
+      await chatApi.updateNativeSkill(
+        selectedRunnerKey,
         detailData.installedSkillId,
-        buildSkillEnabledPayload(nextEnabled)
+        nextEnabled
       );
       setDetailData((prev) =>
         prev ? { ...prev, enabled: nextEnabled } : prev
       );
-      await loadInstalledSkills();
+      await loadInstalledSkills(selectedRunnerKey);
       closeDetail();
     } catch (error) {
       console.error('Failed to toggle skill enabled', error);
-      setDetailError('更新技能状态失败。');
+      setDetailError(t('skillLibrary.errors.updateNative'));
     } finally {
       setIsTogglingSkill(false);
     }
-  }, [closeDetail, detailData, loadInstalledSkills]);
+  }, [closeDetail, detailData, loadInstalledSkills, selectedRunnerKey, t]);
 
   const handleToggleInstalledDetailAssignment = useCallback(async () => {
-    if (!detailData?.installedSkillId || !selectedAgentId) return;
+    if (
+      !detailData?.installedSkillId ||
+      detailData.enabled === null ||
+      !selectedRunnerKey
+    ) {
+      return;
+    }
 
     const skillId = detailData.installedSkillId;
-    const assignment = assignmentBySkillId.get(skillId);
-    const isAssigned = assignedSkillIds.has(skillId);
+    const nextEnabled = !detailData.enabled;
 
     setIsSyncingSkillId(skillId);
     setDetailError(null);
 
     try {
-      if (!isAssigned && detailData.enabled === false) {
-        await chatApi.updateSkill(skillId, buildSkillEnabledPayload(true));
-        setDetailData((prev) => (prev ? { ...prev, enabled: true } : prev));
-        await loadInstalledSkills();
-      }
-
-      if (assignment?.enabled) {
-        await chatApi.unassignSkillFromAgent(selectedAgentId, assignment.id);
-      } else if (assignment) {
-        await chatApi.updateAgentSkill(selectedAgentId, assignment.id, {
-          enabled: true,
-        });
-      } else {
-        await chatApi.assignSkillToAgent({
-          agent_id: selectedAgentId,
-          skill_id: skillId,
-          enabled: true,
-        });
-      }
-
-      await loadAgentAssignments(selectedAgentId);
+      await chatApi.updateNativeSkill(selectedRunnerKey, skillId, nextEnabled);
+      setDetailData((prev) =>
+        prev ? { ...prev, enabled: nextEnabled } : prev
+      );
+      await loadInstalledSkills(selectedRunnerKey);
       closeDetail();
     } catch (error) {
       console.error('Failed to toggle installed skill assignment', error);
-      setDetailError('更新技能启用状态失败。');
+      setDetailError(t('skillLibrary.errors.updateNative'));
     } finally {
       setIsSyncingSkillId(null);
     }
   }, [
-    assignedSkillIds,
-    assignmentBySkillId,
     closeDetail,
     detailData,
-    loadAgentAssignments,
     loadInstalledSkills,
-    selectedAgentId,
+    selectedRunnerKey,
+    t,
   ]);
 
   const handleDeleteSkill = useCallback(async () => {
@@ -676,24 +623,23 @@ export function SkillsPanel({
     try {
       await chatApi.deleteSkill(detailData.installedSkillId);
       await Promise.all([
-        loadInstalledSkills(),
-        selectedAgentId
-          ? loadAgentAssignments(selectedAgentId)
-          : Promise.resolve(),
+        loadMarketSkills(),
+        selectedRunnerKey ? loadInstalledSkills(selectedRunnerKey) : Promise.resolve(),
       ]);
       closeDetail();
     } catch (error) {
       console.error('Failed to delete skill', error);
-      setDetailError('卸载技能失败。');
+      setDetailError(t('skillLibrary.errors.delete'));
     } finally {
       setIsDeletingSkill(false);
     }
   }, [
     closeDetail,
     detailData,
-    loadAgentAssignments,
     loadInstalledSkills,
-    selectedAgentId,
+    loadMarketSkills,
+    selectedRunnerKey,
+    t,
   ]);
 
   const handleCreateSkillFromPath = useCallback(async () => {
@@ -703,7 +649,7 @@ export function SkillsPanel({
     setIsCreatingSkill(true);
     setInstalledError(null);
     try {
-      const createdSkill = await chatApi.createSkill({
+      await chatApi.createSkill({
         name: inferSkillNameFromPath(path),
         description: `Imported from local path: ${path}`,
         content: `Use skill files from path:\n${path}`,
@@ -717,151 +663,105 @@ export function SkillsPanel({
         tags: ['local'],
         category: null,
         compatible_agents: null,
+        download_count: null,
       });
 
-      if (customSkillAgentId) {
-        await chatApi.assignSkillToAgent({
-          agent_id: customSkillAgentId,
-          skill_id: createdSkill.id,
-          enabled: true,
-        });
-      }
-
       await Promise.all([
-        loadInstalledSkills(),
-        customSkillAgentId
-          ? loadAgentAssignments(customSkillAgentId)
-          : Promise.resolve(),
+        loadMarketSkills(),
+        selectedRunnerKey ? loadInstalledSkills(selectedRunnerKey) : Promise.resolve(),
       ]);
 
       setIsCreateModalOpen(false);
       setCustomSkillPath('');
-      setCustomSkillAgentId('');
     } catch (error) {
       console.error('Failed to create skill from path', error);
-      setInstalledError('创建技能失败。');
+      setInstalledError(t('skillLibrary.errors.create'));
     } finally {
       setIsCreatingSkill(false);
     }
   }, [
-    customSkillAgentId,
     customSkillPath,
-    loadAgentAssignments,
     loadInstalledSkills,
+    loadMarketSkills,
+    selectedRunnerKey,
+    t,
   ]);
 
   const handleInstallMarketSkill = useCallback(
-    async (skill: MarketSkill, targetAgentId: string) => {
+    async (skill: MarketSkill) => {
       const marketKey = `${skill.source}:${skill.id}`;
       setIsInstallingMarketSkillKey(marketKey);
       setMarketError(null);
 
       try {
-        let installed = findInstalledSkillByMeta(skill);
-        if (!installed) {
-          installed =
-            skill.source === 'builtin'
-              ? await chatApi.installBuiltinSkill(skill.id)
-              : await chatApi.installRegistrySkill(skill.id);
-        }
-
-        if (targetAgentId) {
-          const existingAssignments =
-            await chatApi.listAgentSkills(targetAgentId);
-          const assignedIds = new Set(
-            existingAssignments.map((item) => item.skill_id)
-          );
-          if (!assignedIds.has(installed.id)) {
-            await chatApi.assignSkillToAgent({
-              agent_id: targetAgentId,
-              skill_id: installed.id,
-              enabled: true,
-            });
+        if (!findInstalledSkillByMeta(skill)) {
+          if (skill.source === 'builtin') {
+            await chatApi.installBuiltinSkill(skill.id);
+          } else {
+            await chatApi.installRegistrySkill(skill.id);
           }
         }
 
         await Promise.all([
-          loadInstalledSkills(),
+          selectedRunnerKey ? loadInstalledSkills(selectedRunnerKey) : Promise.resolve(),
           loadMarketSkills(),
-          selectedAgentId
-            ? loadAgentAssignments(selectedAgentId)
-            : Promise.resolve(),
         ]);
       } catch (error) {
         console.error('Failed to install market skill', error);
-        setMarketError('安装技能失败。');
+        setMarketError(t('skillLibrary.errors.install'));
       } finally {
         setIsInstallingMarketSkillKey(null);
       }
     },
     [
       findInstalledSkillByMeta,
-      loadAgentAssignments,
       loadInstalledSkills,
       loadMarketSkills,
-      selectedAgentId,
+      selectedRunnerKey,
+      t,
     ]
   );
 
-  const openInstallAgentDialog = useCallback(
-    (skill: MarketSkill) => {
-      setMarketInstallTarget(skill);
-      setMarketInstallAgentId(
-        selectedAgentId || runnerOptions[0]?.representativeAgentId || ''
-      );
-    },
-    [runnerOptions, selectedAgentId]
-  );
-
-  const closeInstallAgentDialog = useCallback(() => {
-    setMarketInstallTarget(null);
-    setMarketInstallAgentId('');
-  }, []);
-
-  const handleInstallFromDetail = useCallback(() => {
+  const handleInstallFromDetail = useCallback(async () => {
     if (!detailTarget || detailTarget.kind !== 'market') return;
     const marketSkill = detailTarget.skill;
     closeDetail();
-    openInstallAgentDialog(marketSkill);
-  }, [closeDetail, detailTarget, openInstallAgentDialog]);
+    await handleInstallMarketSkill(marketSkill);
+  }, [closeDetail, detailTarget, handleInstallMarketSkill]);
 
-  const handleConfirmInstallWithAgent = useCallback(async () => {
-    if (!marketInstallTarget || !marketInstallAgentId) return;
-    await handleInstallMarketSkill(marketInstallTarget, marketInstallAgentId);
-    closeInstallAgentDialog();
-  }, [
-    closeInstallAgentDialog,
-    handleInstallMarketSkill,
-    marketInstallAgentId,
-    marketInstallTarget,
-  ]);
-
+  const isInstalledDetail = detailTarget?.kind === 'installed';
   const isDetailInstallAction =
     detailTarget?.kind === 'market' && !detailData?.installedSkillId;
-  const detailPrimaryAction = detailTarget
-    ? {
-        label: isDetailInstallAction
-          ? '安装'
-          : isTryingSkill
-            ? '处理中'
-            : '启用',
-        onClick: () => {
-          if (isDetailInstallAction) {
-            handleInstallFromDetail();
-            return;
+  const detailPrimaryAction =
+    !detailTarget || isInstalledDetail
+      ? null
+      : isDetailInstallAction
+        ? {
+            label: isInstallingMarketSkillKey
+              ? t('skillLibrary.actions.installing')
+              : t('skillLibrary.actions.install'),
+            onClick: () => {
+              void handleInstallFromDetail();
+            },
+            disabled: isLoadingDetail || Boolean(isInstallingMarketSkillKey),
+            icon: <DownloadIcon size={16} weight="bold" />,
           }
-          void handleEnableSkill();
-        },
-        disabled: isLoadingDetail || (!isDetailInstallAction && isTryingSkill),
-        icon: isDetailInstallAction ? (
-          <DownloadIcon size={16} weight="bold" />
-        ) : null,
-      }
-    : null;
-  const isInstalledDetail = detailTarget?.kind === 'installed';
-  const isInstalledDetailAssigned = detailData?.installedSkillId
-    ? assignedSkillIds.has(detailData.installedSkillId)
-    : false;
+        : detailData?.installedSkillId &&
+            detailData.enabled === false &&
+            detailData.canToggle !== false
+          ? {
+              label: isTryingSkill
+                ? t('skillLibrary.actions.updating')
+                : t('skillLibrary.actions.enable'),
+              onClick: () => {
+                void handleEnableSkill();
+              },
+              disabled: isLoadingDetail || isTryingSkill,
+            }
+          : null;
+  const installedToggleUnsupported =
+    displayedInstalledSkills.length > 0 &&
+    displayedInstalledSkills.every((item) => !item.can_toggle);
   const isInstalledDetailSyncing = detailData?.installedSkillId
     ? isSyncingSkillId === detailData.installedSkillId
     : false;
@@ -869,15 +769,17 @@ export function SkillsPanel({
     ? detailData?.installedSkillId && detailData.enabled !== null
       ? {
           label: isInstalledDetailSyncing
-            ? '更新中...'
-            : isInstalledDetailAssigned
-              ? '禁用'
-              : '启用',
+            ? t('skillLibrary.actions.updating')
+            : detailData.enabled
+              ? t('skillLibrary.actions.disable')
+              : t('skillLibrary.actions.enable'),
           onClick: () => {
             void handleToggleInstalledDetailAssignment();
           },
           disabled:
-            isLoadingDetail || isInstalledDetailSyncing || !selectedAgentId,
+            isLoadingDetail ||
+            isInstalledDetailSyncing ||
+            detailData.canToggle === false,
           className: 'min-w-[92px] px-4 text-sm',
         }
       : null
@@ -895,10 +797,10 @@ export function SkillsPanel({
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-[52px] leading-[1.05] font-semibold tracking-tight text-normal">
-                技能
+                {t('skillLibrary.title')}
               </h2>
               <p className="mt-3 text-base text-low">
-                赋予 Agent 更强大的能力。
+                {t('skillLibrary.description')}
               </p>
             </div>
 
@@ -909,41 +811,41 @@ export function SkillsPanel({
                 className="inline-flex h-9 items-center gap-1 rounded-lg px-1 text-sm text-low hover:text-normal"
               >
                 <ArrowClockwiseIcon size={15} />
-                {isLoadingInstalled || isLoadingMarket ? '刷新中' : '刷新'}
+                {isLoadingInstalled || isLoadingMarket
+                  ? t('skillLibrary.actions.refreshing')
+                  : t('skillLibrary.actions.refresh')}
               </button>
 
               <button
                 type="button"
                 onClick={() => {
                   setCustomSkillPath('');
-                  setCustomSkillAgentId(
-                    selectedAgentId ||
-                      runnerOptions[0]?.representativeAgentId ||
-                      ''
-                  );
                   setIsCreateModalOpen(true);
                 }}
                 className="inline-flex h-10 items-center gap-1 rounded-xl bg-black px-4 text-sm font-semibold text-white hover:bg-black/85"
               >
                 <PlusIcon size={14} />
-                新技能
+                {t('skillLibrary.actions.newSkill')}
               </button>
             </div>
           </div>
 
           <section className="mt-10">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-2xl font-semibold text-normal">已安装</h3>
+              <h3 className="text-2xl font-semibold text-normal">
+                {t('skillLibrary.installed.title')}
+              </h3>
               <select
                 value={selectedRunnerKey}
                 onChange={(event) => setSelectedRunnerKey(event.target.value)}
+                title={selectedRunnerLabel}
                 className={cn(
                   'chat-session-member-field min-w-[260px] rounded-xl border bg-panel px-3 py-1.5',
                   'text-xs text-normal focus:outline-none'
                 )}
               >
                 {runnerOptions.length === 0 && (
-                  <option value="">暂无 Agent</option>
+                  <option value="">{t('skillLibrary.installed.noRunner')}</option>
                 )}
                 {runnerOptions.map((option) => (
                   <option key={option.key} value={option.key}>
@@ -953,35 +855,47 @@ export function SkillsPanel({
               </select>
             </div>
 
+            {installedToggleUnsupported && (
+              <div className="mb-4 rounded-2xl border border-border/70 bg-secondary/40 px-4 py-3 text-sm text-low">
+                {t('skillLibrary.installed.toggleUnsupported', {
+                  runnerType: selectedRunnerLabel || selectedRunnerKey,
+                })}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {isLoadingInstalled && (
                 <div className="col-span-full text-sm text-low py-4">
-                  加载中...
+                  {t('members.skills.loading')}
                 </div>
               )}
 
               {!isLoadingInstalled && displayedInstalledSkills.length === 0 && (
                 <div className="col-span-full rounded-2xl border border-border bg-secondary/30 px-4 py-6 text-sm text-low">
-                  没有已安装技能。
+                  {selectedRunnerLabel
+                    ? t('members.skills.noneInstalledForRunner', {
+                        runnerType: selectedRunnerLabel,
+                      })
+                    : t('members.skills.noneInstalled')}
                 </div>
               )}
 
               {!isLoadingInstalled &&
-                displayedInstalledSkills.map((skill) => {
-                  const assigned = assignedSkillIds.has(skill.id);
+                displayedInstalledSkills.map((item) => {
+                  const skill = item.skill;
                   const isSyncing = isSyncingSkillId === skill.id;
-                  const disabled = !selectedAgentId || isSyncing;
+                  const disabled = isSyncing || !item.can_toggle;
 
                   return (
                     <div
                       key={skill.id}
                       role="button"
                       tabIndex={0}
-                      onClick={() => openDetail({ kind: 'installed', skill })}
+                      onClick={() => openDetail({ kind: 'installed', skill: item })}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
-                          openDetail({ kind: 'installed', skill });
+                          openDetail({ kind: 'installed', skill: item });
                         }
                       }}
                       className="rounded-2xl border border-border/80 bg-[var(--chat-session-bg-primary,#ffffff)] px-3 py-2 cursor-pointer"
@@ -993,16 +907,27 @@ export function SkillsPanel({
                             {skill.name}
                           </div>
                           <p className="truncate text-xs text-low">
-                            {skill.description || '暂无描述'}
+                            {skill.description ||
+                              t('members.skills.detail.emptyDescription')}
                           </p>
                         </div>
-                        <div onClick={(event) => event.stopPropagation()}>
+                        <div
+                          onClick={(event) => event.stopPropagation()}
+                          title={
+                            item.can_toggle
+                              ? item.enabled
+                                ? t('skillLibrary.actions.disable')
+                                : t('skillLibrary.actions.enable')
+                              : t('skillLibrary.installed.toggleUnsupported', {
+                                  runnerType:
+                                    selectedRunnerLabel || selectedRunnerKey,
+                                })
+                          }
+                        >
                           <ToggleSwitch
-                            checked={assigned}
+                            checked={item.enabled}
                             disabled={disabled}
-                            onClick={() =>
-                              void handleToggleAgentSkill(skill.id)
-                            }
+                            onClick={() => void handleToggleInstalledSkill(skill.id)}
                           />
                         </div>
                       </div>
@@ -1013,7 +938,9 @@ export function SkillsPanel({
           </section>
           <section className="mt-12 pb-8">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-2xl font-semibold text-normal">市场</h3>
+              <h3 className="text-2xl font-semibold text-normal">
+                {t('skillLibrary.market.title')}
+              </h3>
               <div className="relative">
                 <MagnifyingGlassIcon
                   size={14}
@@ -1022,7 +949,7 @@ export function SkillsPanel({
                 <input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="搜索技能"
+                  placeholder={t('members.skills.searchPlaceholder')}
                   className="h-10 w-[260px] rounded-xl border border-border bg-secondary/40 pl-9 pr-3 text-sm text-normal focus:outline-none"
                 />
               </div>
@@ -1035,13 +962,13 @@ export function SkillsPanel({
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 {isLoadingMarket && (
                   <div className="col-span-full text-sm text-low py-4">
-                    加载中...
+                    {t('members.skills.loading')}
                   </div>
                 )}
 
                 {!isLoadingMarket && displayedMarketSkills.length === 0 && (
                   <div className="col-span-full rounded-2xl border border-border bg-secondary/30 px-4 py-6 text-sm text-low">
-                    暂无可推荐技能。
+                    {t('skillLibrary.market.empty')}
                   </div>
                 )}
 
@@ -1075,19 +1002,20 @@ export function SkillsPanel({
                               {skill.download_count != null && skill.download_count > 0 && (
                                 <span className="shrink-0 text-[10px] text-low flex items-center gap-0.5">
                                   <DownloadIcon size={10} />
-                                  {formatDownloadCount(skill.download_count)}
+                                  {formatDownloadCount(Number(skill.download_count))}
                                 </span>
                               )}
                             </div>
                             <p className="truncate text-xs text-low">
-                              {skill.description || '暂无描述'}
+                              {skill.description ||
+                                t('members.skills.detail.emptyDescription')}
                             </p>
                           </div>
                           <button
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              openInstallAgentDialog(skill);
+                              void handleInstallMarketSkill(skill);
                             }}
                             disabled={isInstalling}
                             className={cn(
@@ -1096,7 +1024,11 @@ export function SkillsPanel({
                                 ? 'opacity-50 cursor-not-allowed'
                                 : 'hover:bg-secondary/70 hover:text-normal'
                             )}
-                            aria-label={isInstalling ? '安装中' : '安装技能'}
+                            aria-label={
+                              isInstalling
+                                ? t('skillLibrary.actions.installing')
+                                : t('skillLibrary.market.installAria')
+                            }
                           >
                             <DownloadIcon size={18} weight="bold" />
                           </button>
@@ -1109,7 +1041,7 @@ export function SkillsPanel({
               {!isLoadingMarket &&
                 displayedMarketSkills.length > visibleMarketSkills.length && (
                   <div className="py-3 text-center text-xs text-low">
-                    向下滚动加载更多...
+                    {t('skillLibrary.market.scrollForMore')}
                   </div>
                 )}
             </div>
@@ -1125,7 +1057,12 @@ export function SkillsPanel({
 
       <SkillDetailModal
         isOpen={Boolean(detailTarget)}
-        name={detailData?.name ?? detailTarget?.skill.name ?? ''}
+        name={
+          detailData?.name ??
+          (detailTarget?.kind === 'installed'
+            ? detailTarget.skill.skill.name
+            : detailTarget?.skill.name ?? '')
+        }
         description={detailData?.description}
         content={detailData?.content}
         sourceUrl={detailData?.sourceUrl}
@@ -1134,7 +1071,14 @@ export function SkillsPanel({
         onClose={closeDetail}
         footerLeading={
           <>
-            {detailData?.installedSkillId && (
+            {detailData?.canToggle === false && (
+              <div className="max-w-[320px] text-sm text-low">
+                {t('skillLibrary.installed.toggleUnsupported', {
+                  runnerType: selectedRunnerLabel || selectedRunnerKey,
+                })}
+              </div>
+            )}
+            {detailTarget?.kind === 'market' && detailData?.installedSkillId && (
               <button
                 type="button"
                 onClick={() => void handleDeleteSkill()}
@@ -1146,12 +1090,34 @@ export function SkillsPanel({
                 style={{ color: '#ff7f50' }}
               >
                 <TrashIcon size={16} />
-                {isDeletingSkill ? '卸载中' : '卸载'}
+                {isDeletingSkill
+                  ? t('skillLibrary.actions.deleting')
+                  : t('skillLibrary.actions.delete')}
+              </button>
+            )}
+
+            {isInstalledDetail && detailData?.installedSkillId && (
+              <button
+                type="button"
+                onClick={() => void handleDeleteSkill()}
+                disabled={isDeletingSkill}
+                className={cn(
+                  'inline-flex h-10 items-center gap-1 rounded-2xl bg-[#fff1eb] px-4 text-sm !text-[#ff7f50]',
+                  isDeletingSkill && 'cursor-not-allowed opacity-60'
+                )}
+                style={{ color: '#ff7f50' }}
+              >
+                <TrashIcon size={16} />
+                {isDeletingSkill
+                  ? t('skillLibrary.actions.deleting')
+                  : t('skillLibrary.actions.delete')}
               </button>
             )}
 
             {detailData?.installedSkillId &&
               detailData.enabled !== null &&
+              detailData.enabled === true &&
+              detailData.canToggle !== false &&
               !isInstalledDetail && (
               <button
                 type="button"
@@ -1163,10 +1129,10 @@ export function SkillsPanel({
                 )}
               >
                 {isTogglingSkill
-                  ? '更新中'
+                  ? t('skillLibrary.actions.updating')
                   : detailData.enabled
-                    ? '禁用'
-                    : '启用'}
+                    ? t('skillLibrary.actions.disable')
+                    : t('skillLibrary.actions.enable')}
               </button>
               )}
           </>
@@ -1174,93 +1140,23 @@ export function SkillsPanel({
         primaryAction={resolvedDetailPrimaryAction ?? undefined}
       />
 
-      {marketInstallTarget && (
-        <div className="absolute inset-0 z-[75] flex items-center justify-center bg-black/30 p-5">
-          <div className="chat-session-modal-surface w-full max-w-md rounded-2xl border border-border bg-panel p-4 space-y-3">
-            <div className="text-lg font-medium text-normal">选择 Agent</div>
-            <p className="text-sm text-low">
-              选择要安装并分配该技能的 Agent：
-              <span className="ml-1 font-medium text-normal">
-                {marketInstallTarget.name}
-              </span>
-            </p>
-
-            <div className="space-y-1">
-              <label className="text-xs text-low">目标 Agent</label>
-              <select
-                value={marketInstallAgentId}
-                onChange={(event) =>
-                  setMarketInstallAgentId(event.target.value)
-                }
-                className="chat-session-member-field w-full rounded-xl border bg-panel px-3 py-2 text-sm text-normal focus:outline-none"
-              >
-                <option value="">请选择 Agent</option>
-                {runnerOptions.map((option) => (
-                  <option key={option.key} value={option.representativeAgentId}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeInstallAgentDialog}
-                disabled={Boolean(isInstallingMarketSkillKey)}
-                className="h-9 rounded-xl border border-border bg-white px-4 text-sm text-low hover:bg-white hover:text-normal disabled:opacity-50"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleConfirmInstallWithAgent()}
-                disabled={
-                  !marketInstallAgentId || Boolean(isInstallingMarketSkillKey)
-                }
-                className={cn(
-                  'inline-flex h-9 items-center gap-1 rounded-xl bg-black px-4 text-sm text-white',
-                  !marketInstallAgentId || Boolean(isInstallingMarketSkillKey)
-                    ? 'opacity-60 cursor-not-allowed'
-                    : 'hover:bg-black/85'
-                )}
-              >
-                {isInstallingMarketSkillKey ? '安装中...' : '安装'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isCreateModalOpen && (
         <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/30 p-5">
           <div className="chat-session-modal-surface w-full max-w-lg rounded-2xl border border-border bg-panel p-4 space-y-3">
-            <div className="text-lg font-medium text-normal">添加技能路径</div>
-
-            <div className="space-y-1">
-              <label className="text-xs text-low">技能路径</label>
-              <input
-                value={customSkillPath}
-                onChange={(event) => setCustomSkillPath(event.target.value)}
-                placeholder="C:\\skills\\my-skill"
-                className="chat-session-member-field w-full rounded-xl border bg-panel px-3 py-2 text-sm text-normal focus:outline-none"
-              />
+            <div className="text-lg font-medium text-normal">
+              {t('skillLibrary.create.title')}
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs text-low">绑定 Agent（可选）</label>
-              <select
-                value={customSkillAgentId}
-                onChange={(event) => setCustomSkillAgentId(event.target.value)}
+              <label className="text-xs text-low">
+                {t('skillLibrary.create.pathLabel')}
+              </label>
+              <input
+                value={customSkillPath}
+                onChange={(event) => setCustomSkillPath(event.target.value)}
+                placeholder={t('skillLibrary.create.pathPlaceholder')}
                 className="chat-session-member-field w-full rounded-xl border bg-panel px-3 py-2 text-sm text-normal focus:outline-none"
-              >
-                <option value="">暂不分配</option>
-                {runnerOptions.map((option) => (
-                  <option key={option.key} value={option.representativeAgentId}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div className="flex items-center justify-end gap-2">
@@ -1269,7 +1165,7 @@ export function SkillsPanel({
                 onClick={() => setIsCreateModalOpen(false)}
                 className="h-9 rounded-xl border border-border bg-panel px-4 text-sm text-low hover:text-normal"
               >
-                取消
+                {t('skillLibrary.actions.cancel')}
               </button>
               <button
                 type="button"
@@ -1285,7 +1181,9 @@ export function SkillsPanel({
                 )}
               >
                 <PlusIcon size={14} />
-                {isCreatingSkill ? '创建中...' : '创建'}
+                {isCreatingSkill
+                  ? t('skillLibrary.actions.creating')
+                  : t('skillLibrary.actions.create')}
               </button>
             </div>
           </div>
