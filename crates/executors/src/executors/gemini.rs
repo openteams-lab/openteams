@@ -15,6 +15,7 @@ use crate::{
     executors::{
         AppendPrompt, AvailabilityInfo, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
     },
+    skill_config::NativeSkillConfigBackend,
 };
 
 #[derive(Derivative, Clone, Serialize, Deserialize, TS, JsonSchema)]
@@ -123,6 +124,20 @@ impl StandardCodingAgentExecutor for Gemini {
 
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
         dirs::home_dir().map(|home| home.join(".gemini").join("settings.json"))
+    }
+
+    fn default_skill_config_path(&self) -> Option<std::path::PathBuf> {
+        self.default_mcp_config_path()
+    }
+
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".gemini").join("skills")])
+            .unwrap_or_default()
+    }
+
+    fn native_skill_config_backend(&self) -> NativeSkillConfigBackend {
+        NativeSkillConfigBackend::Gemini
     }
 
     fn get_availability_info(&self) -> AvailabilityInfo {

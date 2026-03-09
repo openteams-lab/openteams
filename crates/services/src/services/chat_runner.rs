@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     path::{Component, Path, PathBuf},
     str::FromStr,
     sync::{
@@ -44,10 +44,14 @@ use tokio::{
 };
 use tokio_util::io::ReaderStream;
 use ts_rs::TS;
-use utils::{assets::asset_dir, log_msg::LogMsg, msg_store::MsgStore, utf8::Utf8LossyDecoder};
+use utils::{assets::{asset_dir, config_path}, log_msg::LogMsg, msg_store::MsgStore, utf8::Utf8LossyDecoder};
 use uuid::Uuid;
 
-use crate::services::chat::{self, ChatServiceError};
+use crate::services::{
+    chat::{self, ChatServiceError},
+    config::{self, UiLanguage},
+    native_skills::{NativeSkillError, list_native_skills_for_runner},
+};
 
 const UNTRACKED_FILE_LIMIT: u64 = 1024 * 1024;
 const MAX_AGENT_CHAIN_DEPTH: u32 = 5;
@@ -123,6 +127,30 @@ struct SessionAgentSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     system_prompt: Option<String>,
     tools_enabled: serde_json::Value,
+    /// Skills that have been used by this agent
+    skills_used: Vec<String>,
+}
+
+/// Agent response JSON format for structured output
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentResponse {
+    /// Message to forward to another agent (optional)
+    pub send_to_member: Option<AgentMemberMessage>,
+    /// Important message for user - only major conclusions and final results (optional)
+    pub send_to_user_important: Option<String>,
+    /// Content to persist to knowledge file (optional)
+    pub record: Option<String>,
+    /// Complete work status and intermediate outputs (required)
+    pub result: String,
+}
+
+/// Message targeting another agent
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentMemberMessage {
+    /// Target agent name (can use @agent_name format)
+    pub target: String,
+    /// Message content
+    pub content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -193,6 +221,8 @@ pub enum ChatRunnerError {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     ChatService(#[from] ChatServiceError),
+    #[error(transparent)]
+    NativeSkills(#[from] NativeSkillError),
 }
 
 /// Pending message to be processed by an agent
@@ -800,15 +830,14 @@ impl ChatRunner {
                 .await?;
             let session_agents = self.build_session_agent_summaries(session_id).await?;
 
-            // Fetch skills assigned to this agent for prompt injection
-            let agent_skills = ChatSkill::find_by_agent_id(&self.db.pool, agent_id).await?;
+            // Resolve the enabled native skills allowed for this session member.
+            let agent_skills = self
+                .resolve_session_agent_skills(&session_agent, &agent)
+                .await?;
 
-            // Install skills natively for agents that support it (e.g. Claude Code slash commands)
-            if !agent_skills.is_empty() {
-                if let Ok(runner_type) = self.parse_runner_type(&agent) {
-                    Self::install_native_skills(&runner_type, &agent_skills).await;
-                }
-            }
+            // Load UI language setting for agent response language
+            let ui_config = config::load_config_from_file(&config_path()).await;
+            let ui_language = ui_config.language;
 
             let prompt = self.build_prompt(
                 &agent,
@@ -818,6 +847,7 @@ impl ChatRunner {
                 message_attachments.as_ref(),
                 reference_context.as_ref(),
                 &agent_skills,
+                &ui_language,
             );
             fs::write(&input_path, &prompt).await?;
 
@@ -984,6 +1014,35 @@ impl ChatRunner {
         let normalized = raw.replace(['-', ' '], "_").to_ascii_uppercase();
         BaseCodingAgent::from_str(&normalized)
             .map_err(|_| ChatRunnerError::UnknownRunnerType(raw.to_string()))
+    }
+
+    async fn resolve_session_agent_skills(
+        &self,
+        session_agent: &ChatSessionAgent,
+        agent: &ChatAgent,
+    ) -> Result<Vec<ChatSkill>, ChatRunnerError> {
+        let runner_type = self.parse_runner_type(agent)?;
+        let allowed_skill_ids = session_agent
+            .allowed_skill_ids
+            .0
+            .iter()
+            .map(|skill_id| skill_id.trim().to_string())
+            .filter(|skill_id| !skill_id.is_empty())
+            .collect::<HashSet<_>>();
+
+        if allowed_skill_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let skills = list_native_skills_for_runner(&self.db.pool, runner_type)
+            .await?
+            .into_iter()
+            .filter(|item| item.enabled)
+            .filter(|item| allowed_skill_ids.contains(&item.skill.id.to_string()))
+            .map(|item| item.skill)
+            .collect();
+
+        Ok(skills)
     }
 
     fn parse_executor_profile_id(
@@ -1474,6 +1533,15 @@ impl ChatRunner {
             } else {
                 None
             };
+            let agent_skills = self
+                .resolve_session_agent_skills(&session_agent, agent)
+                .await
+                .unwrap_or_default();
+            let skills_used: Vec<String> = agent_skills
+                .iter()
+                .map(|skill| skill.name.clone())
+                .collect();
+
             summaries.push(SessionAgentSummary {
                 session_agent_id: session_agent.id,
                 agent_id: agent.id,
@@ -1487,6 +1555,7 @@ impl ChatRunner {
                     Some(system_prompt.to_string())
                 },
                 tools_enabled: agent.tools_enabled.0.clone(),
+                skills_used,
             });
         }
 
@@ -1494,84 +1563,219 @@ impl ChatRunner {
     }
 
     /// Build the system prompt containing agent role, group members, skills, and critical instructions.
-    /// This is separated from the user message for potential future API-level system prompt support.
+    /// Uses TOML format for structured prompts.
     fn build_system_prompt(
         &self,
         agent: &ChatAgent,
         session_agents: &[SessionAgentSummary],
-        chat_history_path: &Path,
+        context_dir: &Path,
         skills: &[ChatSkill],
         user_message_content: Option<&str>,
+        ui_language: &UiLanguage,
     ) -> String {
-        let mut system = String::new();
+        let mut toml = String::new();
 
-        // 1. Agent role settings
+        // 1. Agent section
+        toml.push_str("[agent]\n");
+        toml.push_str(&format!("name = \"{}\"\n", Self::escape_toml_string(&agent.name)));
         if !agent.system_prompt.trim().is_empty() {
-            system.push_str("[AGENT_ROLE]\n");
-            system.push_str(agent.system_prompt.trim());
-            system.push_str("\n[/AGENT_ROLE]\n\n");
+            toml.push_str(&format!(
+                "role = \"\"\"\n{}\n\"\"\"\n\n",
+                agent.system_prompt.trim()
+            ));
+        } else {
+            toml.push('\n');
         }
 
-        // 2. Skills - local file based; enforce an explicit allow-list for this turn.
+        // 2. Skills section
         let active_skills = Self::filter_active_skills(skills, user_message_content);
-        system.push_str("[SKILL_RESTRICTION]\n");
-        system.push_str("Skills are available as local files in ~/.agents/skills and companion directories (for example ~/.claude/skills, ~/.github/skills).\n");
+        toml.push_str("[skills]\n");
         if active_skills.is_empty() {
-            system.push_str("You have no skills enabled. Do not attempt to use any skill.\n");
+            toml.push_str("restriction = \"You have no skills enabled. Do not attempt to use any skill.\"\n\n");
         } else {
-            system.push_str("You can ONLY use the skills listed below. Do not invent or use unlisted skills.\n\n");
-            system.push_str("[ALLOWED_SKILLS]\n");
+            toml.push_str("restriction = \"\"\"\n");
+            toml.push_str("Skills are available as local files in ~/.agents/skills and companion directories.\n");
+            toml.push_str("You can ONLY use the skills listed below. Do not invent or use unlisted skills.\n");
+            toml.push_str("\"\"\"\n\n");
             for skill in &active_skills {
-                let description = &skill.description;
-                system.push_str(&format!("- {}: {}\n", skill.name, description));
-            }
-            system.push_str("[/ALLOWED_SKILLS]\n");
-        }
-        system.push_str("[/SKILL_RESTRICTION]\n\n");
-
-        // 3. Group members info (separate from AGENT_ROLE)
-        system.push_str("[GROUP_MEMBERS]\n");
-        system.push_str("Current AI members in this group:\n");
-        if session_agents.is_empty() {
-            system.push_str("- No other AI members\n");
-        } else {
-            for member in session_agents {
-                let description = member.description.as_deref().unwrap_or("AI assistant");
-                system.push_str(&format!(
-                    "- {}: {} (state: {:?})\n",
-                    member.name, description, member.state
+                toml.push_str("[[skills.allowed]]\n");
+                toml.push_str(&format!("name = \"{}\"\n", Self::escape_toml_string(&skill.name)));
+                toml.push_str(&format!(
+                    "description = \"{}\"\n\n",
+                    Self::escape_toml_string(&skill.description)
                 ));
             }
         }
-        system.push_str("[/GROUP_MEMBERS]\n\n");
 
-        // 4. Message routing protocol
-        system.push_str("[MESSAGE_ROUTING]\n");
-        system.push_str(
-            "When you want to forward work to another member, include an explicit routing marker in your reply:\n",
-        );
-        system.push_str("[sendMessageTo@@member_name]\n");
-        system.push_str("Rules:\n");
-        system.push_str("- Only this marker triggers forwarding.\n");
-        system.push_str("- Both [sendMessageTo@@member_name] and [sendMessageTo@@{member_name}] are accepted.\n");
-        system.push_str("- Plain @member text is normal content and never triggers forwarding.\n");
-        system.push_str("- member_name must exactly match a name in [GROUP_MEMBERS].\n");
-        system.push_str("- Multiple targets are allowed by adding multiple markers.\n");
-        system.push_str("[/MESSAGE_ROUTING]\n\n");
+        // 3. Group members section
+        toml.push_str("[group]\n");
+        toml.push_str("members_description = \"Current AI members in this group:\"\n\n");
+        if session_agents.is_empty() {
+            toml.push_str("# No other AI members\n\n");
+        } else {
+            for member in session_agents {
+                toml.push_str("[[group.members]]\n");
+                toml.push_str(&format!("name = \"{}\"\n", Self::escape_toml_string(&member.name)));
+                let role = member.description.as_deref().unwrap_or("AI assistant");
+                toml.push_str(&format!("role = \"{}\"\n", Self::escape_toml_string(role)));
+                toml.push_str(&format!("state = \"{:?}\"\n", member.state));
+                // Skills used by this member
+                let skills_str: String = member
+                    .skills_used
+                    .iter()
+                    .map(|s| format!("\"{}\"", Self::escape_toml_string(s)))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                toml.push_str(&format!("skills_used = [{}]\n\n", skills_str));
+            }
+        }
 
-        // 5. Critical instruction to read history file
-        system.push_str("[CRITICAL_INSTRUCTION]\n");
-        system
-            .push_str("Before doing any task, you must first read the group chat history file:\n");
-        system.push_str(&format!(
-            "file_path: {}\n",
-            chat_history_path.to_string_lossy()
+        // 4. Files section
+        toml.push_str("[files]\n");
+        let messages_path = context_dir.join("messages.jsonl");
+        let work_status_path = context_dir.join("agent_work_status.jsonl");
+        let knowledge_path = context_dir.join("knowledge.jsonl");
+        toml.push_str(&format!(
+            "messages_history = \"{}\"\n",
+            Self::escape_toml_path(&messages_path)
         ));
-        system.push_str("format: JSON, containing sender and content fields\n");
-        system.push_str("This is mandatory: understand group context first, then respond.\n");
-        system.push_str("[/CRITICAL_INSTRUCTION]\n");
+        toml.push_str(&format!(
+            "agent_work_status = \"{}\"\n",
+            Self::escape_toml_path(&work_status_path)
+        ));
+        toml.push_str(&format!(
+            "knowledge = \"{}\"\n\n",
+            Self::escape_toml_path(&knowledge_path)
+        ));
 
-        system
+        // 5. Instructions section
+        toml.push_str("[instructions]\n");
+        toml.push_str("history_note = \"\"\"\n");
+        toml.push_str("If you need to understand the current group chat state, you MAY read the messages_history file.\n");
+        toml.push_str("The agent_work_status file contains work outputs (result field) from all agents.\n");
+        toml.push_str("You can search by agent name to find a specific member's work status.\n");
+        toml.push_str("Reading these files is optional - decide based on your task needs.\n");
+        toml.push_str("\"\"\"\n\n");
+
+        // 6. Response format section
+        toml.push_str("[response_format]\n");
+        toml.push_str("required = true\n");
+        toml.push_str("schema = \"\"\"\n");
+        toml.push_str("You MUST respond with valid JSON containing these fields:\n");
+        toml.push_str("{\n");
+        toml.push_str("  \"send_to_member\": { \"target\": \"@agent_name\", \"content\": \"concise request with clear goal\" } | null,\n");
+        toml.push_str("  \"send_to_user_important\": \"Important conclusions and final results only\" | null,\n");
+        toml.push_str("  \"record\": \"Content to persist to knowledge base\" | null,\n");
+        toml.push_str("  \"result\": \"Complete work status and intermediate outputs (REQUIRED)\"\n");
+        toml.push_str("}\n");
+        toml.push_str("\n");
+        toml.push_str("Field rules:\n");
+        toml.push_str("- send_to_member: Route message to another agent. Use concise language with clear goals. Can be null.\n");
+        toml.push_str("- send_to_user_important: Only include important conclusions and final deliverables. Can be null.\n");
+        toml.push_str("- record: Content to persist to knowledge base for future reference. Can be null.\n");
+        toml.push_str("- result: Complete work status and intermediate outputs. REQUIRED, cannot be empty.\n");
+        toml.push_str("\"\"\"\n");
+
+        // Valid target members
+        let member_names: Vec<String> = session_agents
+            .iter()
+            .map(|m| format!("\"{}\"", Self::escape_toml_string(&m.name)))
+            .collect();
+        toml.push_str(&format!("target_members = [{}]\n\n", member_names.join(", ")));
+
+        // 7. Language section
+        let (lang_code, lang_instruction) = Self::get_language_instruction(ui_language);
+        toml.push_str("[language]\n");
+        toml.push_str(&format!("required = \"{}\"\n", lang_code));
+        toml.push_str(&format!("instruction = \"{}\"\n", lang_instruction));
+
+        toml
+    }
+
+    /// Escape special characters for TOML string values
+    fn escape_toml_string(s: &str) -> String {
+        s.replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('\n', "\\n")
+            .replace('\r', "\\r")
+            .replace('\t', "\\t")
+    }
+
+    /// Escape path for TOML (handle Windows backslashes)
+    fn escape_toml_path(path: &Path) -> String {
+        path.to_string_lossy().replace('\\', "\\\\")
+    }
+
+    /// Get language code and instruction based on UiLanguage setting
+    fn get_language_instruction(language: &UiLanguage) -> (&'static str, &'static str) {
+        match language {
+            UiLanguage::Browser => ("en", "You MUST respond in English."),
+            UiLanguage::En => ("en", "You MUST respond in English."),
+            UiLanguage::ZhHans => ("zh-Hans", "You MUST respond in Simplified Chinese (简体中文)."),
+            UiLanguage::ZhHant => ("zh-Hant", "You MUST respond in Traditional Chinese (繁體中文)."),
+            UiLanguage::Ja => ("ja", "You MUST respond in Japanese (日本語)."),
+            UiLanguage::Ko => ("ko", "You MUST respond in Korean (한국어)."),
+            UiLanguage::Fr => ("fr", "You MUST respond in French (Français)."),
+            UiLanguage::Es => ("es", "You MUST respond in Spanish (Español)."),
+        }
+    }
+
+    /// Parse agent response JSON and validate structure
+    pub fn parse_agent_response(content: &str) -> Result<AgentResponse, String> {
+        // Try to extract JSON from content (may be wrapped in markdown code blocks)
+        let json_str = Self::extract_json_from_content(content)?;
+
+        let response: AgentResponse = serde_json::from_str(&json_str)
+            .map_err(|e| format!("JSON parse error: {}. Please respond with valid JSON.", e))?;
+
+        // Validate required field
+        if response.result.trim().is_empty() {
+            return Err("The 'result' field is required and cannot be empty.".to_string());
+        }
+
+        Ok(response)
+    }
+
+    /// Extract JSON from content, handling various formats
+    fn extract_json_from_content(content: &str) -> Result<String, String> {
+        let content = content.trim();
+
+        // Try to find JSON in markdown code block with json tag
+        if let Some(start) = content.find("```json") {
+            let json_start = start + 7;
+            if let Some(end) = content[json_start..].find("```") {
+                return Ok(content[json_start..json_start + end].trim().to_string());
+            }
+        }
+
+        // Try plain code block
+        if let Some(start) = content.find("```") {
+            let block_start = start + 3;
+            if let Some(end) = content[block_start..].find("```") {
+                let block = content[block_start..block_start + end].trim();
+                // Skip language identifier if present on first line
+                if let Some(newline) = block.find('\n') {
+                    let potential_json = block[newline + 1..].trim();
+                    if potential_json.starts_with('{') {
+                        return Ok(potential_json.to_string());
+                    }
+                }
+                if block.starts_with('{') {
+                    return Ok(block.to_string());
+                }
+            }
+        }
+
+        // Try to find raw JSON object
+        if let Some(start) = content.find('{') {
+            if let Some(end) = content.rfind('}') {
+                if end > start {
+                    return Ok(content[start..=end].to_string());
+                }
+            }
+        }
+
+        Err("Could not find valid JSON in response. Please respond with a JSON object.".to_string())
     }
 
     /// Filter skills based on trigger type and message content.
@@ -1613,204 +1817,8 @@ impl ChatRunner {
             .collect()
     }
 
-    /// Install skills natively into global user directories.
-    /// Primary install target: `~/.agents/skills/{skill_name}/SKILL.md`
-    /// Agent-specific targets are under home (for example `~/.claude/skills`, `~/.github/skills`).
-    async fn install_native_skills(runner_type: &BaseCodingAgent, skills: &[ChatSkill]) {
-        // Filter skills by compatible_agents if specified.
-        let filtered_skills: Vec<&ChatSkill> =
-            skills
-                .iter()
-                .filter(|skill| {
-                    if skill.compatible_agents.0.is_empty() {
-                        return true;
-                    }
-                    let agent_name = match runner_type {
-                        BaseCodingAgent::ClaudeCode => "claude",
-                        BaseCodingAgent::Amp => "amp",
-                        BaseCodingAgent::Gemini => "gemini",
-                        BaseCodingAgent::Codex => "codex",
-                        BaseCodingAgent::Opencode => "opencode",
-                        BaseCodingAgent::CursorAgent => "cursor",
-                        BaseCodingAgent::QwenCode => "qwen",
-                        BaseCodingAgent::Copilot => "copilot",
-                        BaseCodingAgent::Droid => "droid",
-                        BaseCodingAgent::KimiCode => "kimi",
-                    };
-                    skill.compatible_agents.0.iter().any(|a| {
-                        a.eq_ignore_ascii_case(agent_name) || a.eq_ignore_ascii_case("all")
-                    })
-                })
-                .collect();
-
-        if filtered_skills.is_empty() {
-            return;
-        }
-
-        let Some(home_dir) = Self::resolve_home_dir() else {
-            tracing::warn!("Failed to resolve user home directory; skip native skill install");
-            return;
-        };
-
-        let primary_dir = home_dir.join(".agents").join("skills");
-        Self::install_skills_to_directory(&primary_dir, &filtered_skills, ".agents/skills").await;
-
-        match runner_type {
-            BaseCodingAgent::ClaudeCode => {
-                let skills_dir = home_dir.join(".claude").join("skills");
-                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".claude/skills")
-                    .await;
-                Self::install_claude_command_files(&home_dir, &filtered_skills).await;
-            }
-            BaseCodingAgent::CursorAgent => {
-                let skills_dir = home_dir.join(".cursor").join("skills");
-                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".cursor/skills")
-                    .await;
-            }
-            BaseCodingAgent::QwenCode => {
-                let skills_dir = home_dir.join(".qwen").join("skills");
-                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".qwen/skills")
-                    .await;
-            }
-            BaseCodingAgent::Opencode => {
-                let skills_dir = home_dir.join(".opencode").join("skills");
-                Self::install_skills_to_directory(
-                    &skills_dir,
-                    &filtered_skills,
-                    ".opencode/skills",
-                )
-                .await;
-            }
-            BaseCodingAgent::Copilot => {
-                let skills_dir = home_dir.join(".github").join("skills");
-                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".github/skills")
-                    .await;
-            }
-            BaseCodingAgent::Gemini => {
-                let skills_dir = home_dir.join(".gemini").join("skills");
-                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".gemini/skills")
-                    .await;
-            }
-            BaseCodingAgent::Droid => {
-                let skills_dir = home_dir.join(".factory").join("skills");
-                Self::install_skills_to_directory(&skills_dir, &filtered_skills, ".factory/skills")
-                    .await;
-            }
-            BaseCodingAgent::Codex | BaseCodingAgent::KimiCode | BaseCodingAgent::Amp => {
-                tracing::info!(
-                    skill_count = filtered_skills.len(),
-                    target_dir = %primary_dir.display(),
-                    "Native skills installed to global primary directory"
-                );
-            }
-        }
-    }
-
-    fn resolve_home_dir() -> Option<PathBuf> {
-        dirs::home_dir()
-            .or_else(|| std::env::var("HOME").ok().map(PathBuf::from))
-            .or_else(|| std::env::var("USERPROFILE").ok().map(PathBuf::from))
-    }
-
-    fn skill_slug(name: &str) -> String {
-        name.to_lowercase().replace(' ', "-")
-    }
-
-    fn render_skill_markdown(skill: &ChatSkill) -> String {
-        let mut content = String::new();
-        content.push_str(&format!("# {}\n\n", skill.name));
-        if !skill.description.is_empty() {
-            content.push_str(&format!("> {}\n\n", skill.description));
-        }
-        content.push_str(skill.content.trim());
-        content.push('\n');
-        content
-    }
-
-    async fn install_skills_to_directory(root: &Path, skills: &[&ChatSkill], label: &str) {
-        if let Err(err) = fs::create_dir_all(root).await {
-            tracing::warn!(
-                dir = %root.display(),
-                error = %err,
-                "Failed to create skill directory"
-            );
-            return;
-        }
-
-        for skill in skills {
-            let skill_dir = root.join(Self::skill_slug(&skill.name));
-            if let Err(err) = fs::create_dir_all(&skill_dir).await {
-                tracing::warn!(
-                    skill_name = %skill.name,
-                    dir = %skill_dir.display(),
-                    error = %err,
-                    "Failed to create skill subdirectory"
-                );
-                continue;
-            }
-
-            let skill_file = skill_dir.join("SKILL.md");
-            let content = Self::render_skill_markdown(skill);
-            if let Err(err) = fs::write(&skill_file, content).await {
-                tracing::warn!(
-                    skill_name = %skill.name,
-                    file_path = %skill_file.display(),
-                    error = %err,
-                    "Failed to write SKILL.md"
-                );
-            } else {
-                tracing::info!(
-                    skill_name = %skill.name,
-                    file_path = %skill_file.display(),
-                    target = label,
-                    "Installed native skill file"
-                );
-            }
-        }
-    }
-
-    async fn install_claude_command_files(home_dir: &Path, skills: &[&ChatSkill]) {
-        let commands_dir = home_dir.join(".claude").join("commands");
-        if let Err(err) = fs::create_dir_all(&commands_dir).await {
-            tracing::warn!(
-                dir = %commands_dir.display(),
-                error = %err,
-                "Failed to create .claude/commands directory"
-            );
-            return;
-        }
-
-        for skill in skills {
-            let file_name = format!("{}.md", Self::skill_slug(&skill.name));
-            let file_path = commands_dir.join(&file_name);
-
-            let mut content = String::new();
-            if !skill.description.is_empty() {
-                content.push_str("---\n");
-                content.push_str(&format!("description: {}\n", skill.description));
-                content.push_str("---\n\n");
-            }
-            content.push_str(skill.content.trim());
-            content.push('\n');
-
-            if let Err(err) = fs::write(&file_path, &content).await {
-                tracing::warn!(
-                    skill_name = %skill.name,
-                    file_path = %file_path.display(),
-                    error = %err,
-                    "Failed to write Claude command skill"
-                );
-            } else {
-                tracing::info!(
-                    skill_name = %skill.name,
-                    file_path = %file_path.display(),
-                    "Installed Claude command skill"
-                );
-            }
-        }
-    }
-
     /// Build the user message prompt (envelope, reference, attachments, message).
+    /// Uses TOML format for structured prompts.
     #[allow(clippy::too_many_arguments)]
     fn build_user_prompt(
         &self,
@@ -1819,75 +1827,105 @@ impl ChatRunner {
         message_attachments: Option<&MessageAttachmentContext>,
         reference: Option<&ReferenceContext>,
     ) -> String {
-        let mut prompt = String::new();
+        let mut toml = String::new();
 
-        // Envelope metadata
-        prompt.push_str("[ENVELOPE]\n");
-        prompt.push_str(&format!("session_id={}\n", message.session_id));
+        // 1. Envelope section
+        toml.push_str("[envelope]\n");
+        toml.push_str(&format!("session_id = \"{}\"\n", message.session_id));
         let sender_handle = self.resolve_reply_handle(message);
-        prompt.push_str(&format!("from=user:{}\n", sender_handle));
-        prompt.push_str(&format!("to=agent:{}\n", agent.name));
-        prompt.push_str(&format!("message_id={}\n", message.id));
-        prompt.push_str(&format!("timestamp={}\n", message.created_at));
-        prompt.push_str("[/ENVELOPE]\n\n");
+        toml.push_str(&format!(
+            "from = \"user:{}\"\n",
+            Self::escape_toml_string(&sender_handle)
+        ));
+        toml.push_str(&format!(
+            "to = \"agent:{}\"\n",
+            Self::escape_toml_string(&agent.name)
+        ));
+        toml.push_str(&format!("message_id = \"{}\"\n", message.id));
+        toml.push_str(&format!("timestamp = \"{}\"\n\n", message.created_at));
 
-        // Reference message (if any)
+        // 2. Reference section (optional)
         if let Some(reference) = reference {
-            prompt.push_str("[REFERENCE_MESSAGE]\n");
-            prompt.push_str(
-                "User referenced the following historical group chat message. Prioritize it.\n",
-            );
-            prompt.push_str(&format!("reference_id={}\n", reference.message_id));
-            prompt.push_str(&format!("reference_sender={}\n", reference.sender_label));
-            prompt.push_str(&format!(
-                "reference_sender_type={:?}\n",
-                reference.sender_type
+            toml.push_str("[reference]\n");
+            toml.push_str("note = \"User referenced the following historical message. Prioritize it.\"\n");
+            toml.push_str(&format!("message_id = \"{}\"\n", reference.message_id));
+            toml.push_str(&format!(
+                "sender = \"{}\"\n",
+                Self::escape_toml_string(&reference.sender_label)
             ));
-            prompt.push_str(&format!("reference_created_at={}\n", reference.created_at));
+            toml.push_str(&format!("sender_type = \"{:?}\"\n", reference.sender_type));
+            toml.push_str(&format!(
+                "created_at = \"{}\"\n",
+                Self::escape_toml_string(&reference.created_at)
+            ));
+            toml.push_str(&format!(
+                "content = \"\"\"\n{}\n\"\"\"\n",
+                reference.content.trim()
+            ));
+
             if !reference.attachments.is_empty() {
-                prompt.push_str("reference_attachments:\n");
                 for attachment in &reference.attachments {
-                    prompt.push_str(&format!(
-                        "- name={} kind={} size_bytes={} mime_type={} local_path={}\n",
-                        attachment.name,
-                        attachment.kind,
-                        attachment.size_bytes,
-                        attachment.mime_type.as_deref().unwrap_or("unknown"),
-                        attachment.local_path
+                    toml.push_str("\n[[reference.attachments]]\n");
+                    toml.push_str(&format!(
+                        "name = \"{}\"\n",
+                        Self::escape_toml_string(&attachment.name)
+                    ));
+                    toml.push_str(&format!(
+                        "kind = \"{}\"\n",
+                        Self::escape_toml_string(&attachment.kind)
+                    ));
+                    toml.push_str(&format!("size_bytes = {}\n", attachment.size_bytes));
+                    toml.push_str(&format!(
+                        "mime_type = \"{}\"\n",
+                        attachment.mime_type.as_deref().unwrap_or("unknown")
+                    ));
+                    toml.push_str(&format!(
+                        "local_path = \"{}\"\n",
+                        Self::escape_toml_string(&attachment.local_path)
                     ));
                 }
             }
-            prompt.push_str("reference_content:\n");
-            prompt.push_str(reference.content.trim());
-            prompt.push_str("\n[/REFERENCE_MESSAGE]\n\n");
+            toml.push('\n');
         }
 
-        // Message attachments (if any)
-        if let Some(message_attachments) = message_attachments
-            && !message_attachments.attachments.is_empty()
+        // 3. Message section
+        toml.push_str("[message]\n");
+        toml.push_str(&format!(
+            "sender = \"{}\"\n",
+            Self::escape_toml_string(&sender_handle)
+        ));
+        toml.push_str(&format!(
+            "content = \"\"\"\n{}\n\"\"\"\n",
+            message.content.trim()
+        ));
+
+        // 4. Message attachments (optional)
+        if let Some(attachments_ctx) = message_attachments
+            && !attachments_ctx.attachments.is_empty()
         {
-            prompt.push_str("[MESSAGE_ATTACHMENTS]\n");
-            prompt.push_str("Attachments included with this message.\n");
-            prompt.push_str(&format!("message_id={}\n", message_attachments.message_id));
-            for attachment in &message_attachments.attachments {
-                prompt.push_str(&format!(
-                    "- name={} kind={} size_bytes={} mime_type={} local_path={}\n",
-                    attachment.name,
-                    attachment.kind,
-                    attachment.size_bytes,
-                    attachment.mime_type.as_deref().unwrap_or("unknown"),
-                    attachment.local_path
+            for attachment in &attachments_ctx.attachments {
+                toml.push_str("\n[[message.attachments]]\n");
+                toml.push_str(&format!(
+                    "name = \"{}\"\n",
+                    Self::escape_toml_string(&attachment.name)
+                ));
+                toml.push_str(&format!(
+                    "kind = \"{}\"\n",
+                    Self::escape_toml_string(&attachment.kind)
+                ));
+                toml.push_str(&format!("size_bytes = {}\n", attachment.size_bytes));
+                toml.push_str(&format!(
+                    "mime_type = \"{}\"\n",
+                    attachment.mime_type.as_deref().unwrap_or("unknown")
+                ));
+                toml.push_str(&format!(
+                    "local_path = \"{}\"\n",
+                    Self::escape_toml_string(&attachment.local_path)
                 ));
             }
-            prompt.push_str("[/MESSAGE_ATTACHMENTS]\n\n");
         }
 
-        // User message (simplified format: sender + content)
-        prompt.push_str("[USER_MESSAGE]\n");
-        prompt.push_str(&format!("{}: {}\n", sender_handle, message.content.trim()));
-        prompt.push_str("[/USER_MESSAGE]\n");
-
-        prompt
+        toml
     }
 
     /// Build the full prompt by combining system prompt and user prompt.
@@ -1902,6 +1940,7 @@ impl ChatRunner {
         message_attachments: Option<&MessageAttachmentContext>,
         reference: Option<&ReferenceContext>,
         skills: &[ChatSkill],
+        ui_language: &UiLanguage,
     ) -> String {
         // Build system prompt with agent role, group members, skills, and history file instruction
         let system_prompt = self.build_system_prompt(
@@ -1910,6 +1949,7 @@ impl ChatRunner {
             context_path,
             skills,
             Some(message.content.as_str()),
+            ui_language,
         );
 
         // Build user prompt with envelope, reference, attachments, and message

@@ -2114,6 +2114,34 @@
     border: 1px solid #c7d2fe;
   }
 
+  /* Inline @mention tag in message content */
+  .new-design .chat-mention-inline {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.06);
+    color: var(--text-normal);
+    font-size: 12px;
+    font-weight: 500;
+    margin: 0 2px;
+    vertical-align: baseline;
+  }
+
+  .new-design .chat-mention-inline:hover {
+    background-color: rgba(0, 0, 0, 0.10);
+  }
+
+  .new-design.dark .chat-mention-inline,
+  .dark .new-design .chat-mention-inline {
+    background-color: rgba(255, 255, 255, 0.10);
+  }
+
+  .new-design.dark .chat-mention-inline:hover,
+  .dark .new-design .chat-mention-inline:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+
   .new-design .chat-session-attachment-card {
     background: #f8fafc;
     border-color: #e2e8f0;

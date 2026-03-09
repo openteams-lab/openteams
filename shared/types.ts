@@ -130,7 +130,7 @@ export type ChatMessage = { id: string, session_id: string, sender_type: ChatSen
 
 export enum ChatSenderType { user = "user", agent = "agent", system = "system" }
 
-export type ChatSessionAgent = { id: string, session_id: string, agent_id: string, state: ChatSessionAgentState, workspace_path: string | null, pty_session_key: string | null, agent_session_id: string | null, agent_message_id: string | null, created_at: string, updated_at: string, };
+export type ChatSessionAgent = { id: string, session_id: string, agent_id: string, state: ChatSessionAgentState, workspace_path: string | null, pty_session_key: string | null, agent_session_id: string | null, agent_message_id: string | null, allowed_skill_ids: string[], created_at: string, updated_at: string, };
 
 export enum ChatSessionAgentState { idle = "idle", running = "running", waitingapproval = "waitingapproval", dead = "dead" }
 
@@ -181,6 +181,8 @@ export type RemoteSkillPackage = { id: string, name: string, description: string
 download_count: bigint | null, };
 
 export type SkillCategory = { id: string, name: string, description: string | null, };
+
+export type InstalledNativeSkill = { skill: ChatSkill, enabled: boolean, can_toggle: boolean, native_path: string, config_path: string | null, };
 
 export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, };
 
@@ -342,9 +344,11 @@ export type CreateFollowUpAttempt = { prompt: string, executor_profile_id: Execu
 
 export type ChatSessionListQuery = { status: ChatSessionStatus | null, };
 
-export type CreateChatSessionAgentRequest = { agent_id: string, workspace_path: string | null, };
+export type CreateChatSessionAgentRequest = { agent_id: string, workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
 
-export type UpdateChatSessionAgentRequest = { workspace_path: string | null, };
+export type UpdateChatSessionAgentRequest = { workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
+
+export type UpdateNativeSkillRequest = { enabled: boolean, };
 
 export type ChatMessageListQuery = { limit: bigint | null, };
 

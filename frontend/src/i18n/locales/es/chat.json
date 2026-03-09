@@ -272,6 +272,50 @@
       }
     }
   },
+  "skillLibrary": {
+    "title": "Habilidades",
+    "description": "Administra las habilidades instaladas y las del marketplace.",
+    "actions": {
+      "refresh": "Actualizar",
+      "refreshing": "Actualizando...",
+      "newSkill": "Nueva habilidad",
+      "install": "Instalar",
+      "installing": "Instalando...",
+      "create": "Crear",
+      "creating": "Creando...",
+      "delete": "Eliminar",
+      "deleting": "Eliminando...",
+      "enable": "Activar",
+      "disable": "Desactivar",
+      "updating": "Actualizando...",
+      "cancel": "Cancelar"
+    },
+    "installed": {
+      "title": "Instaladas",
+      "noRunner": "Sin Agent",
+      "toggleUnsupported": "{{runnerType}} actualmente solo expone un directorio nativo de habilidades. La aplicación puede leerlo, pero todavía no puede escribir de forma segura el estado habilitado/deshabilitado para este runner."
+    },
+    "market": {
+      "title": "Marketplace",
+      "empty": "No hay habilidades disponibles en el marketplace.",
+      "installAria": "Instalar habilidad",
+      "scrollForMore": "Desplázate hacia abajo para cargar más..."
+    },
+    "create": {
+      "title": "Agregar ruta de habilidad",
+      "pathLabel": "Ruta de la habilidad",
+      "pathPlaceholder": "C:\\skills\\my-skill"
+    },
+    "errors": {
+      "loadInstalled": "No se pudieron cargar las habilidades instaladas.",
+      "loadMarket": "No se pudo cargar el marketplace de habilidades.",
+      "updateNative": "No se pudo actualizar la habilidad nativa.",
+      "enable": "No se pudo activar la habilidad.",
+      "delete": "No se pudo eliminar la habilidad.",
+      "create": "No se pudo crear la habilidad.",
+      "install": "No se pudo instalar la habilidad."
+    }
+  },
   "cleanup": {
     "selected": "Seleccionados: {{count}}",
     "cancel": "Cancelar",

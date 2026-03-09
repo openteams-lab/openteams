@@ -218,6 +218,12 @@ impl StandardCodingAgentExecutor for Copilot {
         dirs::home_dir().map(|home| home.join(".copilot").join("mcp-config.json"))
     }
 
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".github").join("skills")])
+            .unwrap_or_default()
+    }
+
     fn get_availability_info(&self) -> AvailabilityInfo {
         let mcp_config_found = self
             .default_mcp_config_path()

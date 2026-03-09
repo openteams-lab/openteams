@@ -272,6 +272,50 @@
       }
     }
   },
+  "skillLibrary": {
+    "title": "Skills",
+    "description": "Manage installed and marketplace skills.",
+    "actions": {
+      "refresh": "Refresh",
+      "refreshing": "Refreshing...",
+      "newSkill": "New Skill",
+      "install": "Install",
+      "installing": "Installing...",
+      "create": "Create",
+      "creating": "Creating...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "enable": "Enable",
+      "disable": "Disable",
+      "updating": "Updating...",
+      "cancel": "Cancel"
+    },
+    "installed": {
+      "title": "Installed",
+      "noRunner": "No Agent",
+      "toggleUnsupported": "{{runnerType}} currently exposes installed skills as a native directory only. This app can read them, but it cannot safely write an enable/disable flag back for this runner yet."
+    },
+    "market": {
+      "title": "Marketplace",
+      "empty": "No marketplace skills available.",
+      "installAria": "Install skill",
+      "scrollForMore": "Scroll down to load more..."
+    },
+    "create": {
+      "title": "Add Skill Path",
+      "pathLabel": "Skill Path",
+      "pathPlaceholder": "C:\\skills\\my-skill"
+    },
+    "errors": {
+      "loadInstalled": "Failed to load installed skills.",
+      "loadMarket": "Failed to load skill marketplace.",
+      "updateNative": "Failed to update native skill.",
+      "enable": "Failed to enable skill.",
+      "delete": "Failed to delete skill.",
+      "create": "Failed to create skill.",
+      "install": "Failed to install skill."
+    }
+  },
   "cleanup": {
     "selected": "Selected: {{count}}",
     "cancel": "Cancel",

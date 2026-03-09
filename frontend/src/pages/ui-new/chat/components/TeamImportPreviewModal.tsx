@@ -236,7 +236,7 @@ export function TeamImportPreviewModal({
     >
       <div
         className={cn(
-          'team-import-preview-modal chat-session-modal-surface flex h-[88vh] max-h-[88vh] w-[min(86vw,760px)] max-w-[760px] flex-col overflow-hidden rounded-[28px] border border-white/60 bg-white/72 shadow-[0_28px_90px_rgba(15,23,42,0.24)] backdrop-blur-[24px]'
+          'team-import-preview-modal chat-session-modal-surface flex h-[88vh] max-h-[88vh] w-[min(82vw,700px)] max-w-[700px] flex-col overflow-hidden rounded-[28px] border border-white/60 bg-white/72 shadow-[0_28px_90px_rgba(15,23,42,0.24)] backdrop-blur-[24px]'
         )}
         onClick={(event) => event.stopPropagation()}
       >
@@ -505,7 +505,6 @@ export function TeamImportPreviewModal({
                               }
                               readOnly={isArchived || isImportingTeam}
                               maxHeightClass="max-h-32"
-                              allowDetailModal={false}
                             />
                           </div>
                         </div>

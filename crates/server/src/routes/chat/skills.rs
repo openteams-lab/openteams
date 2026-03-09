@@ -6,6 +6,8 @@ use db::models::{
 };
 use deployment::Deployment;
 use serde::Deserialize;
+use std::str::FromStr;
+use executors::executors::BaseCodingAgent;
 use services::services::skill_registry::{
     RemoteSkillMeta, RemoteSkillPackage, SkillCategory, SkillRegistryClient, builtin_skills_count,
     filter_builtin_skills_by_agent, filter_builtin_skills_by_category, get_builtin_categories,
@@ -14,10 +16,33 @@ use services::services::skill_registry::{
     search_skills_with_fallback, sync_discovered_global_skills,
     uninstall_skill_files_from_global_directory,
 };
+use services::services::native_skills::{
+    InstalledNativeSkill, NativeSkillError, list_native_skills_for_runner,
+    update_native_skill_enabled_for_runner,
+};
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError};
+
+fn parse_runner_type(runner_type: &str) -> Result<BaseCodingAgent, ApiError> {
+    let normalized = runner_type.trim().replace('-', "_").to_ascii_uppercase();
+    BaseCodingAgent::from_str(&normalized)
+        .map_err(|_| ApiError::BadRequest(format!("Unsupported runner type: {runner_type}")))
+}
+
+fn map_native_skill_error(error: NativeSkillError) -> ApiError {
+    match error {
+        NativeSkillError::Database(error) => ApiError::Database(error),
+        NativeSkillError::Executor(error) => ApiError::BadRequest(error.to_string()),
+        NativeSkillError::SkillRegistry(error) => ApiError::BadRequest(error.to_string()),
+        NativeSkillError::SkillMetadataMissing(message) => ApiError::BadRequest(message),
+        NativeSkillError::SkillNotFound(skill_id) => {
+            ApiError::BadRequest(format!("Native skill not found: {skill_id}"))
+        }
+        NativeSkillError::ToggleUnsupported(message) => ApiError::BadRequest(message),
+    }
+}
 
 // ─── Skill CRUD ───
 
@@ -30,6 +55,41 @@ pub async fn get_skills(
 
     let skills = ChatSkill::find_all(&deployment.db().pool).await?;
     Ok(ResponseJson(ApiResponse::success(skills)))
+}
+
+#[derive(Debug, Deserialize, ts_rs::TS)]
+#[ts(export)]
+pub struct UpdateNativeSkillRequest {
+    pub enabled: bool,
+}
+
+pub async fn get_native_skills(
+    State(deployment): State<DeploymentImpl>,
+    axum::extract::Path(runner_type): axum::extract::Path<String>,
+) -> Result<ResponseJson<ApiResponse<Vec<InstalledNativeSkill>>>, ApiError> {
+    let runner = parse_runner_type(&runner_type)?;
+    let skills = list_native_skills_for_runner(&deployment.db().pool, runner)
+        .await
+        .map_err(map_native_skill_error)?;
+    Ok(ResponseJson(ApiResponse::success(skills)))
+}
+
+pub async fn update_native_skill(
+    State(deployment): State<DeploymentImpl>,
+    axum::extract::Path((runner_type, skill_id)): axum::extract::Path<(String, Uuid)>,
+    Json(payload): Json<UpdateNativeSkillRequest>,
+) -> Result<ResponseJson<ApiResponse<InstalledNativeSkill>>, ApiError> {
+    let runner = parse_runner_type(&runner_type)?;
+    let skill = update_native_skill_enabled_for_runner(
+        &deployment.db().pool,
+        runner,
+        skill_id,
+        payload.enabled,
+    )
+    .await
+    .map_err(map_native_skill_error)?;
+
+    Ok(ResponseJson(ApiResponse::success(skill)))
 }
 
 pub async fn get_skill(

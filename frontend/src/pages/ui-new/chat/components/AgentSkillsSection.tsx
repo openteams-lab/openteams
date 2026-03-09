@@ -13,11 +13,10 @@ import {
   XIcon,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
-import type { ChatAgentSkill, ChatSkill } from 'shared/types';
+import type { ChatSkill } from 'shared/types';
 import { chatApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { SkillDetailModal } from './SkillDetailModal';
-import { filterSkillsByRunner } from '../skillCompatibility';
 
 interface AgentSkillsSectionProps {
   agentId: string | null;
@@ -57,7 +56,6 @@ function isSkillSelectControlTarget(target: EventTarget | null): boolean {
 }
 
 export function AgentSkillsSection({
-  agentId,
   runnerType,
   readOnly = false,
   selectedSkillIds,
@@ -68,16 +66,13 @@ export function AgentSkillsSection({
 }: AgentSkillsSectionProps) {
   const { t } = useTranslation('chat');
   const [allSkills, setAllSkills] = useState<ChatSkill[]>([]);
-  const [agentAssignments, setAgentAssignments] = useState<ChatAgentSkill[]>(
-    []
-  );
   const [internalSelectedSkillIds, setInternalSelectedSkillIds] = useState<
     string[]
   >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [syncingSkillId, setSyncingSkillId] = useState<string | null>(null);
+  const syncingSkillId: string | null = null;
   const [isExpanded, setIsExpanded] = useState(false);
   const [detailSkillId, setDetailSkillId] = useState<string | null>(null);
   const [detailSkillData, setDetailSkillData] = useState<ChatSkill | null>(
@@ -104,14 +99,6 @@ export function AgentSkillsSection({
   const selectedSkillIdSet = useMemo(
     () => new Set(effectiveSelectedSkillIds),
     [effectiveSelectedSkillIds]
-  );
-
-  const assignmentBySkillId = useMemo(
-    () =>
-      new Map(
-        agentAssignments.map((assignment) => [assignment.skill_id, assignment])
-      ),
-    [agentAssignments]
   );
 
   const allSkillsById = useMemo(
@@ -154,50 +141,29 @@ export function AgentSkillsSection({
     setIsLoading(true);
     setError(null);
     try {
-      const skills = await chatApi.listSkills();
-      setAllSkills(skills);
+      if (!runnerType) {
+        setAllSkills([]);
+        return;
+      }
+      const skills = await chatApi.listNativeSkills(runnerType);
+      setAllSkills(
+        skills.filter((skill) => skill.enabled).map((skill) => skill.skill)
+      );
     } catch (loadError) {
       console.error('Failed to load skills', loadError);
       setError(t('members.skills.errors.load'));
     } finally {
       setIsLoading(false);
     }
-  }, [t]);
-
-  const loadAgentAssignments = useCallback(async () => {
-    if (!agentId) {
-      setAgentAssignments([]);
-      if (!isControlled) {
-        setInternalSelectedSkillIds([]);
-      }
-      return;
-    }
-
-    try {
-      const assignments = await chatApi.listAgentSkills(agentId);
-      setAgentAssignments(assignments);
-      if (!isControlled) {
-        setInternalSelectedSkillIds(
-          assignments.map((assignment) => assignment.skill_id)
-        );
-      }
-    } catch (loadError) {
-      console.error('Failed to load agent skill assignments', loadError);
-      setError(t('members.skills.errors.assignedLoad'));
-    }
-  }, [agentId, isControlled, t]);
+  }, [runnerType, t]);
 
   useEffect(() => {
     void loadSkills();
   }, [loadSkills]);
 
-  useEffect(() => {
-    void loadAgentAssignments();
-  }, [loadAgentAssignments]);
-
   const compatibleSkills = useMemo(
-    () => filterSkillsByRunner(allSkills, runnerType),
-    [allSkills, runnerType]
+    () => allSkills,
+    [allSkills]
   );
 
   const filteredSkills = useMemo(() => {
@@ -330,46 +296,10 @@ export function AgentSkillsSection({
         ? [...effectiveSelectedSkillIds, skillId]
         : effectiveSelectedSkillIds.filter((id) => id !== skillId);
 
-      if (isControlled || !agentId) {
-        updateSelectedSkillIds(nextSkillIds);
-        return true;
-      }
-
-      setSyncingSkillId(skillId);
-      setError(null);
-      try {
-        const assignment = assignmentBySkillId.get(skillId);
-        if (assignment) {
-          await chatApi.unassignSkillFromAgent(agentId, assignment.id);
-        } else {
-          await chatApi.assignSkillToAgent({
-            agent_id: agentId,
-            skill_id: skillId,
-            enabled: true,
-          });
-        }
-        updateSelectedSkillIds(nextSkillIds);
-        const refreshedAssignments = await chatApi.listAgentSkills(agentId);
-        setAgentAssignments(refreshedAssignments);
-        return true;
-      } catch (toggleError) {
-        console.error('Failed to update skill assignment', toggleError);
-        setError(t('members.skills.errors.update'));
-        return false;
-      } finally {
-        setSyncingSkillId(null);
-      }
+      updateSelectedSkillIds(nextSkillIds);
+      return true;
     },
-    [
-      agentId,
-      assignmentBySkillId,
-      effectiveSelectedSkillIds,
-      isControlled,
-      readOnly,
-      selectedSkillIdSet,
-      t,
-      updateSelectedSkillIds,
-    ]
+    [effectiveSelectedSkillIds, readOnly, selectedSkillIdSet, updateSelectedSkillIds]
   );
 
   const handleToggleSkill = useCallback(
@@ -659,9 +589,6 @@ export function AgentSkillsSection({
                             : 'cursor-pointer'
                         )}
                         disabled={readOnly || isSyncing}
-                        onPointerDownCapture={(event) => event.stopPropagation()}
-                        onClickCapture={(event) => event.stopPropagation()}
-                        onMouseDown={(event) => event.stopPropagation()}
                         onKeyDown={(event) => event.stopPropagation()}
                         aria-label={
                           isSelected
