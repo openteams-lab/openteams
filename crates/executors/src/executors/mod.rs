@@ -26,7 +26,10 @@ use crate::{
     },
     logs::utils::patch,
     mcp_config::McpConfig,
-    skill_config::{NativeDiscoveredSkill, NativeSkillConfigBackend, list_native_skills, set_native_skill_enabled},
+    skill_config::{
+        NativeDiscoveredSkill, NativeSkillConfigBackend, list_native_skills,
+        set_native_skill_enabled,
+    },
 };
 
 pub mod acp;

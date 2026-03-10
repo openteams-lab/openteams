@@ -29,7 +29,6 @@ export interface RunningAgentPlaceholderProps {
 export function RunningAgentPlaceholder({
   member,
   run,
-  tone,
   stateInfo,
   clock,
   isStopping,

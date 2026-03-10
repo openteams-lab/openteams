@@ -99,7 +99,11 @@ pub async fn update_native_skill_enabled_for_runner(
     let executor_profile = ExecutorProfileId::new(runner);
     let executor = ExecutorConfigs::get_cached().get_coding_agent_or_default(&executor_profile);
     executor
-        .set_native_skill_enabled(&current.skill.name, Path::new(&current.native_path), enabled)
+        .set_native_skill_enabled(
+            &current.skill.name,
+            Path::new(&current.native_path),
+            enabled,
+        )
         .await?;
 
     list_native_skills_for_runner(pool, runner)

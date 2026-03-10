@@ -96,6 +96,20 @@
     "sendToAgent": "Send to agent",
     "open": "Open"
   },
+  "protocolNotice": {
+    "invalidJson": "Agent \"{{agent}}\" returned invalid JSON. Please respond with a JSON array.",
+    "notJsonArray": "Agent \"{{agent}}\" must return a JSON array of messages.",
+    "emptyMessage": "Agent \"{{agent}}\" returned an empty message.",
+    "missingSendTarget": "Agent \"{{agent}}\" returned a send message without a target.",
+    "invalidSendTarget": "Agent \"{{agent}}\" returned an invalid send target \"{{target}}\".",
+    "dismiss": "Dismiss"
+  },
+  "timeline": {
+    "loading": "Loading chat...",
+    "archivedReadonly": "This session is archived. Messages and members are read-only.",
+    "empty": "No messages yet. Start the conversation below.",
+    "noMatches": "No messages match \"{{query}}\"."
+  },
   "members": {
     "title": "AI Member List",
     "countInSession": "{{count}} in session",

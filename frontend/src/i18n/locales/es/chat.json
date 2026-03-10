@@ -96,6 +96,20 @@
     "sendToAgent": "Enviar al agente",
     "open": "Abrir"
   },
+  "protocolNotice": {
+    "invalidJson": "El agente \"{{agent}}\" devolvio un JSON invalido. Responde con un arreglo JSON.",
+    "notJsonArray": "El agente \"{{agent}}\" debe devolver un arreglo JSON de mensajes.",
+    "emptyMessage": "El agente \"{{agent}}\" devolvio un mensaje vacio.",
+    "missingSendTarget": "El agente \"{{agent}}\" devolvio un mensaje send sin destino.",
+    "invalidSendTarget": "El agente \"{{agent}}\" devolvio un destino send invalido \"{{target}}\".",
+    "dismiss": "Cerrar"
+  },
+  "timeline": {
+    "loading": "Cargando chat...",
+    "archivedReadonly": "Esta sesion esta archivada. Los mensajes y miembros son de solo lectura.",
+    "empty": "Todavia no hay mensajes. Inicia la conversacion abajo.",
+    "noMatches": "Ningun mensaje coincide con \"{{query}}\"."
+  },
   "members": {
     "title": "Lista de miembros IA",
     "countInSession": "{{count}} en la sesión",
