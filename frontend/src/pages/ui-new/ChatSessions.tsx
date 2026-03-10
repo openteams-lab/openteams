@@ -1444,6 +1444,8 @@ const resizeStartRef = useRef<{
             return t('protocolNotice.missingSendTarget', values);
           case 'invalid_send_target':
             return t('protocolNotice.invalidSendTarget', values);
+          case 'invalid_send_intent':
+            return t('protocolNotice.invalidSendIntent', values);
           default:
             return t('protocolNotice.invalidJson', values);
         }

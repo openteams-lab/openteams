@@ -102,6 +102,7 @@
     "emptyMessage": "L'agent \"{{agent}}\" a renvoye un message vide.",
     "missingSendTarget": "L'agent \"{{agent}}\" a renvoye un message send sans cible.",
     "invalidSendTarget": "L'agent \"{{agent}}\" a renvoye une cible send invalide \"{{target}}\".",
+    "invalidSendIntent": "L'agent \"{{agent}}\" a renvoye une intention send invalide.",
     "dismiss": "Fermer"
   },
   "timeline": {

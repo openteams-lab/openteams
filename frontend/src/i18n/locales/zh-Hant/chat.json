@@ -97,18 +97,19 @@
     "open": "開啟"
   },
   "protocolNotice": {
-    "invalidJson": "Agent\u300c{{agent}}\u300d\u56de\u50b3\u7684 JSON \u7121\u6548\u3002\u8acb\u4f7f\u7528 JSON \u9663\u5217\u56de\u8986\u3002",
-    "notJsonArray": "Agent\u300c{{agent}}\u300d\u5fc5\u9808\u56de\u50b3\u8a0a\u606f\u7684 JSON \u9663\u5217\u3002",
-    "emptyMessage": "Agent\u300c{{agent}}\u300d\u56de\u50b3\u4e86\u7a7a\u8a0a\u606f\u3002",
-    "missingSendTarget": "Agent\u300c{{agent}}\u300d\u56de\u50b3\u7684 send \u8a0a\u606f\u7f3a\u5c11\u76ee\u6a19\u3002",
-    "invalidSendTarget": "Agent\u300c{{agent}}\u300d\u56de\u50b3\u7684 send \u76ee\u6a19\u300c{{target}}\u300d\u7121\u6548\u3002",
-    "dismiss": "\u95dc\u9589"
+    "invalidJson": "Agent「{{agent}}」回傳的 JSON 無效。請使用 JSON 陣列回覆。",
+    "notJsonArray": "Agent「{{agent}}」必須回傳訊息的 JSON 陣列。",
+    "emptyMessage": "Agent「{{agent}}」回傳了空訊息。",
+    "missingSendTarget": "Agent「{{agent}}」回傳的 send 訊息缺少目標。",
+    "invalidSendTarget": "Agent「{{agent}}」回傳的 send 目標「{{target}}」無效。",
+    "invalidSendIntent": "Agent「{{agent}}」回傳的 send intent 無效。",
+    "dismiss": "關閉"
   },
   "timeline": {
-    "loading": "\u6b63\u5728\u8f09\u5165\u804a\u5929...",
-    "archivedReadonly": "\u76ee\u524d\u6703\u8a71\u5df2\u5c01\u5b58\uff0c\u8a0a\u606f\u8207\u6210\u54e1\u5747\u70ba\u552f\u8b80\u3002",
-    "empty": "\u76ee\u524d\u9084\u6c92\u6709\u8a0a\u606f\uff0c\u53ef\u4ee5\u5728\u4e0b\u65b9\u958b\u59cb\u5c0d\u8a71\u3002",
-    "noMatches": "\u6c92\u6709\u627e\u5230\u8207\u300c{{query}}\u300d\u76f8\u7b26\u7684\u8a0a\u606f\u3002"
+    "loading": "正在載入聊天...",
+    "archivedReadonly": "目前會話已封存，訊息與成員均為唯讀。",
+    "empty": "目前還沒有訊息，可以在下方開始對話。",
+    "noMatches": "沒有找到與「{{query}}」相符的訊息。"
   },
   "members": {
     "title": "AI????",

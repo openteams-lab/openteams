@@ -40,15 +40,32 @@ export function extractMentions(content: string): Set<string> {
   return mentions;
 }
 
+export type AgentProtocolSendIntent =
+  | 'request'
+  | 'reply'
+  | 'notify'
+  | 'blocker'
+  | 'confirm';
+
+const validProtocolSendIntents: AgentProtocolSendIntent[] = [
+  'request',
+  'reply',
+  'notify',
+  'blocker',
+  'confirm',
+];
+
 export interface AgentProtocolMessage {
   type: 'send' | 'record' | 'artifact' | 'conclusion' | 'artiface';
   to?: string;
+  intent?: AgentProtocolSendIntent;
   content: string;
 }
 
 export interface ParsedAgentResponse {
   sendMessages: Array<{
     target: string;
+    intent?: AgentProtocolSendIntent;
     content: string;
   }>;
 }
@@ -144,7 +161,16 @@ function isValidProtocolMessage(obj: unknown): obj is AgentProtocolMessage {
     return false;
   }
   if (message.type === 'send') {
-    return typeof message.to === 'string';
+    if (typeof message.to !== 'string') {
+      return false;
+    }
+    if (message.intent === undefined) {
+      return true;
+    }
+    return (
+      typeof message.intent === 'string' &&
+      validProtocolSendIntents.includes(message.intent as AgentProtocolSendIntent)
+    );
   }
   return true;
 }
@@ -168,6 +194,7 @@ function normalizeAgentResponse(obj: unknown): ParsedAgentResponse | null {
       .filter((item) => item.type === 'send')
       .map((item) => ({
         target: normalizeTarget(item.to ?? ''),
+        intent: item.intent,
         content: item.content.trim(),
       }))
       .filter((item) => item.target.length > 0),

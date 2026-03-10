@@ -79,7 +79,7 @@
     "addAttachment": "添加附件",
     "send": "发送"
   },
-"message": {
+  "message": {
     "quote": "引用",
     "copy": "复制",
     "regenerate": "重新生成",
@@ -104,18 +104,19 @@
     "open": "打开"
   },
   "protocolNotice": {
-    "invalidJson": "Agent\u300c{{agent}}\u300d\u8fd4\u56de\u7684 JSON \u65e0\u6548\u3002\u8bf7\u4f7f\u7528 JSON \u6570\u7ec4\u56de\u590d\u3002",
-    "notJsonArray": "Agent\u300c{{agent}}\u300d\u5fc5\u987b\u8fd4\u56de\u6d88\u606f\u7684 JSON \u6570\u7ec4\u3002",
-    "emptyMessage": "Agent\u300c{{agent}}\u300d\u8fd4\u56de\u4e86\u7a7a\u6d88\u606f\u3002",
-    "missingSendTarget": "Agent\u300c{{agent}}\u300d\u8fd4\u56de\u7684 send \u6d88\u606f\u7f3a\u5c11\u76ee\u6807\u3002",
-    "invalidSendTarget": "Agent\u300c{{agent}}\u300d\u8fd4\u56de\u7684 send \u76ee\u6807\u300c{{target}}\u300d\u65e0\u6548\u3002",
-    "dismiss": "\u5173\u95ed"
+    "invalidJson": "Agent「{{agent}}」返回的 JSON 无效。请使用 JSON 数组回复。",
+    "notJsonArray": "Agent「{{agent}}」必须返回消息的 JSON 数组。",
+    "emptyMessage": "Agent「{{agent}}」返回了空消息。",
+    "missingSendTarget": "Agent「{{agent}}」返回的 send 消息缺少目标。",
+    "invalidSendTarget": "Agent「{{agent}}」返回的 send 目标「{{target}}」无效。",
+    "invalidSendIntent": "Agent「{{agent}}」返回的 send intent 无效。",
+    "dismiss": "关闭"
   },
   "timeline": {
-    "loading": "\u6b63\u5728\u52a0\u8f7d\u804a\u5929...",
-    "archivedReadonly": "\u5f53\u524d\u4f1a\u8bdd\u5df2\u5f52\u6863\uff0c\u6d88\u606f\u548c\u6210\u5458\u5747\u4e3a\u53ea\u8bfb\u3002",
-    "empty": "\u8fd8\u6ca1\u6709\u6d88\u606f\uff0c\u53ef\u4ee5\u5728\u4e0b\u65b9\u5f00\u59cb\u5bf9\u8bdd\u3002",
-    "noMatches": "\u6ca1\u6709\u627e\u5230\u4e0e\u300c{{query}}\u300d\u5339\u914d\u7684\u6d88\u606f\u3002"
+    "loading": "正在加载聊天...",
+    "archivedReadonly": "当前会话已归档，消息和成员均为只读。",
+    "empty": "还没有消息，可以在下方开始对话。",
+    "noMatches": "没有找到与「{{query}}」匹配的消息。"
   },
   "members": {
     "title": "AI成员列表",
