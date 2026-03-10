@@ -69,18 +69,30 @@ const RUN_RECORDS_DIR_NAME: &str = "run_records";
 const SHARED_PROTOCOL_DIR_NAME: &str = "protocol";
 const SHARED_BLACKBOARD_FILE_NAME: &str = "shared_blackboard.jsonl";
 const WORK_RECORDS_FILE_NAME: &str = "work_records.jsonl";
-const MARKDOWN_PROTOCOL_RECORD_RULE: &str =
-    "Write only long-lived shared facts to shared_blackboard.jsonl. Do not write process descriptions, temporary status, or blockers.";
+const MARKDOWN_PROTOCOL_RECORD_RULE: &str = "Write only long-lived shared facts to shared_blackboard.jsonl. Do not write process descriptions, temporary status, or blockers.";
 const MARKDOWN_PROTOCOL_ARTIFACT_RULE: &str =
     "Write only deliverable outputs or their concrete paths to work_records.jsonl.";
-const MARKDOWN_PROTOCOL_CONCLUSION_RULE: &str =
-    "Write only the current-turn work status to work_records.jsonl. Include completed work, blockers, or next steps. Do not write long-lived facts.";
+const MARKDOWN_PROTOCOL_CONCLUSION_RULE: &str = "Write only the current-turn work status to work_records.jsonl. Include completed work, blockers, or next steps. Do not write long-lived facts.";
+const HISTORY_GROUP_MESSAGES_INSTRUCTION: &str = concat!(
+    "If you need to understand the current group chat state, you MAY inspect this file yourself.\n",
+    "Reading history is optional. Do not assume you must read history before acting.\n",
+    "Prioritize reading history when the new message implies continuation or refinement, such as \"continue\", \"继续\", \"接着\", \"基于前文\", \"refine\", or \"update\".\n",
+    "If the current task can be completed independently, you do not need to read history.\n",
+);
+const HISTORY_SHARED_BLACKBOARD_INSTRUCTION: &str = concat!(
+    "You can search by member name to find shared messages published by a specific member.\n",
+    "Before writing a record item, if you are unsure whether the fact was already captured, check this file first.\n",
+);
+const HISTORY_WORK_RECORDS_INSTRUCTION: &str = concat!(
+    "You can search by member name to find a specific member's work outputs and status summaries.\n",
+    "Use this file when you need to review what members have already completed.\n",
+    "Before writing an artifact or conclusion item, if you are unsure whether similar work or status was already recorded, check this file first.\n",
+);
 const RESERVED_USER_HANDLE: &str = "you";
-const PROTOCOL_SEND_INTENT_VALUES: &[&str] =
-    &["request", "reply", "notify", "blocker", "confirm"];
+const PROTOCOL_SEND_INTENT_VALUES: &[&str] = &["request", "reply", "notify", "blocker", "confirm"];
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
 const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
-  {"type": "send", "to": "you", "intent": "request", "content": "Please expose a `GET /chat/sessions` endpoint."},
+  {"type": "send", "to": "you", "intent": "request", "content": "I have finished the front implementation"},
   {"type": "send", "to": "architect", "intent": "confirm", "content": "The UI is ready. Please confirm the API contract before I continue."},
   {"type": "record", "content": "The experiment metrics are `latency_p95_ms`, `success_rate`, and `token_cost_usd`."},
   {"type": "artifact", "content": "Saved the experiment plan to `docs/experiments/chat-metrics-plan.md`."},
@@ -1756,7 +1768,6 @@ impl ChatRunner {
         Ok(summaries)
     }
 
-
     /// Escape special characters for TOML string values
     fn escape_toml_string(s: &str) -> String {
         s.replace('\\', "\\\\")
@@ -1867,10 +1878,7 @@ impl ChatRunner {
         Self::push_markdown_block_field(
             &mut markdown,
             "instruction",
-            concat!(
-                "If you need to understand the current group chat state, you MAY inspect this file yourself.\n",
-                "Reading history is optional. Do not assume you must read history before acting.\n",
-            ),
+            HISTORY_GROUP_MESSAGES_INSTRUCTION,
             "text",
         );
 
@@ -1889,7 +1897,7 @@ impl ChatRunner {
         Self::push_markdown_field(
             &mut markdown,
             "instruction",
-            "You can search by member name to find shared messages published by a specific member.",
+            HISTORY_SHARED_BLACKBOARD_INSTRUCTION,
         );
 
         Self::push_markdown_section(&mut markdown, 2, "history.work_records");
@@ -1903,7 +1911,7 @@ impl ChatRunner {
         Self::push_markdown_field(
             &mut markdown,
             "instruction",
-            "You can search by member name to find a specific member's work outputs and status summaries.",
+            HISTORY_WORK_RECORDS_INSTRUCTION,
         );
 
         Self::push_markdown_section(&mut markdown, 2, "output");
@@ -1961,31 +1969,19 @@ impl ChatRunner {
         Self::push_markdown_field(&mut markdown, "type", "record");
         Self::push_markdown_bool_field(&mut markdown, "required", false);
         Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(
-            &mut markdown,
-            "rules",
-            MARKDOWN_PROTOCOL_RECORD_RULE,
-        );
+        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_RECORD_RULE);
 
         Self::push_markdown_section(&mut markdown, 3, "output.message_types item 3");
         Self::push_markdown_field(&mut markdown, "type", "artifact");
         Self::push_markdown_bool_field(&mut markdown, "required", false);
         Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(
-            &mut markdown,
-            "rules",
-            MARKDOWN_PROTOCOL_ARTIFACT_RULE,
-        );
+        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_ARTIFACT_RULE);
 
         Self::push_markdown_section(&mut markdown, 3, "output.message_types item 4");
         Self::push_markdown_field(&mut markdown, "type", "conclusion");
         Self::push_markdown_bool_field(&mut markdown, "required", false);
         Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(
-            &mut markdown,
-            "rules",
-            MARKDOWN_PROTOCOL_CONCLUSION_RULE,
-        );
+        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_CONCLUSION_RULE);
 
         Self::push_markdown_section(&mut markdown, 2, "output.example");
         Self::push_markdown_block_field(
@@ -2125,8 +2121,7 @@ impl ChatRunner {
         Self::push_markdown_section(&mut markdown, 2, "message");
         Self::push_markdown_field(&mut markdown, "sender", &sender.label);
         Self::push_markdown_content_block_field(&mut markdown, "content", &message.content, "text");
-        if let Some((intent, meaning)) = Self::routed_message_intent_context(message, &agent.name)
-        {
+        if let Some((intent, meaning)) = Self::routed_message_intent_context(message, &agent.name) {
             Self::push_markdown_field(&mut markdown, "intent", &intent);
             Self::push_markdown_field(&mut markdown, "intent_meaning", &meaning);
         }
@@ -2253,31 +2248,19 @@ impl ChatRunner {
         Self::push_markdown_field(&mut markdown, "type", "record");
         Self::push_markdown_bool_field(&mut markdown, "required", false);
         Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(
-            &mut markdown,
-            "rules",
-            MARKDOWN_PROTOCOL_RECORD_RULE,
-        );
+        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_RECORD_RULE);
 
         Self::push_markdown_section(&mut markdown, 3, "output.message_types item 3");
         Self::push_markdown_field(&mut markdown, "type", "artifact");
         Self::push_markdown_bool_field(&mut markdown, "required", false);
         Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(
-            &mut markdown,
-            "rules",
-            MARKDOWN_PROTOCOL_ARTIFACT_RULE,
-        );
+        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_ARTIFACT_RULE);
 
         Self::push_markdown_section(&mut markdown, 3, "output.message_types item 4");
         Self::push_markdown_field(&mut markdown, "type", "conclusion");
         Self::push_markdown_bool_field(&mut markdown, "required", false);
         Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(
-            &mut markdown,
-            "rules",
-            MARKDOWN_PROTOCOL_CONCLUSION_RULE,
-        );
+        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_CONCLUSION_RULE);
 
         Self::set_trailing_newlines(&mut markdown, 2);
         Self::push_markdown_section(&mut markdown, 2, "output.example");
@@ -2368,10 +2351,7 @@ impl ChatRunner {
         Self::push_markdown_block_field(
             &mut markdown,
             "instruction",
-            concat!(
-                "If you need to understand the current group chat state, you MAY inspect this file yourself.\n",
-                "Reading history is optional. Do not assume you must read history before acting.\n",
-            ),
+            HISTORY_GROUP_MESSAGES_INSTRUCTION,
             "text",
         );
 
@@ -2390,7 +2370,7 @@ impl ChatRunner {
         Self::push_markdown_field(
             &mut markdown,
             "instruction",
-            "You can search by member name to find shared messages published by a specific member.",
+            HISTORY_SHARED_BLACKBOARD_INSTRUCTION,
         );
 
         Self::push_markdown_section(&mut markdown, 2, "history.work_records");
@@ -2404,7 +2384,7 @@ impl ChatRunner {
         Self::push_markdown_field(
             &mut markdown,
             "instruction",
-            "You can search by member name to find a specific member's work outputs and status summaries.",
+            HISTORY_WORK_RECORDS_INSTRUCTION,
         );
 
         Self::set_trailing_newlines(&mut markdown, 2);
@@ -2675,12 +2655,10 @@ impl ChatRunner {
     }
 
     fn infer_prompt_language_from_text(text: &str) -> Option<ResolvedPromptLanguage> {
-        const TRADITIONAL_CHINESE_HINT_CHARS: &str =
-            "\u{81fa}\u{7063}\u{7e41}\u{9ad4}\u{9019}\u{500b}\u{55ce}\u{70ba}\u{65bc}\u{8207}\u{5f8c}\u{6703}\u{767c}\u{73fe}\u{9801}";
+        const TRADITIONAL_CHINESE_HINT_CHARS: &str = "\u{81fa}\u{7063}\u{7e41}\u{9ad4}\u{9019}\u{500b}\u{55ce}\u{70ba}\u{65bc}\u{8207}\u{5f8c}\u{6703}\u{767c}\u{73fe}\u{9801}";
         const SPANISH_HINT_CHARS: &str =
             "\u{00bf}\u{00a1}\u{00f1}\u{00e1}\u{00e9}\u{00ed}\u{00f3}\u{00fa}";
-        const FRENCH_HINT_CHARS: &str =
-            "\u{00e0}\u{00e2}\u{00e7}\u{00e9}\u{00e8}\u{00ea}\u{00eb}\u{00ee}\u{00ef}\u{00f4}\u{00f9}\u{00fb}\u{00fc}\u{00ff}\u{0153}\u{00e6}";
+        const FRENCH_HINT_CHARS: &str = "\u{00e0}\u{00e2}\u{00e7}\u{00e9}\u{00e8}\u{00ea}\u{00eb}\u{00ee}\u{00ef}\u{00f4}\u{00f9}\u{00fb}\u{00fc}\u{00ff}\u{0153}\u{00e6}";
 
         let trimmed = text.trim();
         if trimmed.is_empty() {
@@ -2755,12 +2733,6 @@ impl ChatRunner {
         }
     }
 
-
-
-
-
-
-
     fn parse_agent_protocol_messages(
         content: &str,
     ) -> Result<Vec<AgentProtocolMessage>, AgentProtocolError> {
@@ -2819,8 +2791,7 @@ impl ChatRunner {
                     };
                     let intent = match message.intent.as_deref() {
                         Some(raw_intent) if !raw_intent.trim().is_empty() => {
-                            let Some(intent) =
-                                Self::normalize_protocol_send_intent(raw_intent)
+                            let Some(intent) = Self::normalize_protocol_send_intent(raw_intent)
                             else {
                                 return Err(AgentProtocolError {
                                     code: ChatProtocolNoticeCode::InvalidSendIntent,
@@ -4316,9 +4287,9 @@ mod tests {
     use uuid::Uuid;
 
     use super::{
-        AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner, MessageAttachmentContext,
-        PROTOCOL_OUTPUT_EXAMPLE_JSON, ReferenceAttachment, ReferenceContext,
-        ResolvedPromptLanguage, SessionAgentSummary,
+        AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner,
+        MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON, MessageAttachmentContext, ReferenceAttachment,
+        ReferenceContext, ResolvedPromptLanguage, SessionAgentSummary,
     };
     use crate::services::config::UiLanguage;
 
@@ -4473,9 +4444,10 @@ mod tests {
     }
 
     #[test]
-    fn protocol_output_example_json_is_valid() {
+    fn markdown_protocol_output_example_json_is_valid() {
         let messages =
-            ChatRunner::parse_agent_protocol_messages(PROTOCOL_OUTPUT_EXAMPLE_JSON).expect("json");
+            ChatRunner::parse_agent_protocol_messages(MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON)
+                .expect("json");
         assert_eq!(messages.len(), 5);
         assert!(matches!(
             messages.first().map(|message| &message.message_type),
@@ -4638,6 +4610,15 @@ mod tests {
         assert!(prompt.contains("- **PROTOCOL_VERSION**: chatgroup_markdown_v1"));
         assert!(prompt.contains("- **allowed_targets**: [\"architect\",\"you\"]"));
         assert!(prompt.contains("Return ONLY a valid JSON array."));
+        assert!(prompt.contains(
+            "Prioritize reading history when the new message implies continuation or refinement"
+        ));
+        assert!(prompt.contains(
+            "Before writing a record item, if you are unsure whether the fact was already captured, check this file first."
+        ));
+        assert!(prompt.contains(
+            "Use this file when you need to review what members have already completed."
+        ));
         assert!(prompt.contains(
             r"E:\workspace\projectSS\MainPage2\.agents_chatgroup\context\demo\messages.jsonl"
         ));
@@ -4913,6 +4894,8 @@ _No other AI members._
 ~~~text
 If you need to understand the current group chat state, you MAY inspect this file yourself.
 Reading history is optional. Do not assume you must read history before acting.
+Prioritize reading history when the new message implies continuation or refinement, such as "continue", "继续", "接着", "基于前文", "refine", or "update".
+If the current task can be completed independently, you do not need to read history.
 ~~~
 
 ## history.shared_blackboard
@@ -4920,13 +4903,25 @@ Reading history is optional. Do not assume you must read history before acting.
 - **path**: E:\workspace\projectSS\MainPage2\.agents_chatgroup\context\1475cda0-6f11-464e-a61a-7dc81217810e\shared_blackboard.jsonl
 - **format**: jsonl
 - **description**: Persisted shared messages generated from record items.
-- **instruction**: You can search by member name to find shared messages published by a specific member.
+- **instruction**:
+
+~~~text
+You can search by member name to find shared messages published by a specific member.
+Before writing a record item, if you are unsure whether the fact was already captured, check this file first.
+~~~
+
 ## history.work_records
 
 - **path**: E:\workspace\projectSS\MainPage2\.agents_chatgroup\context\1475cda0-6f11-464e-a61a-7dc81217810e\work_records.jsonl
 - **format**: jsonl
 - **description**: Persisted work outputs and summaries generated from artifact/conclusion items.
-- **instruction**: You can search by member name to find a specific member's work outputs and status summaries.
+- **instruction**:
+
+~~~text
+You can search by member name to find a specific member's work outputs and status summaries.
+Use this file when you need to review what members have already completed.
+Before writing an artifact or conclusion item, if you are unsure whether similar work or status was already recorded, check this file first.
+~~~
 
 # envelope
 

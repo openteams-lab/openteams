@@ -102,6 +102,7 @@
     "emptyMessage": "Agent \"{{agent}}\" returned an empty message.",
     "missingSendTarget": "Agent \"{{agent}}\" returned a send message without a target.",
     "invalidSendTarget": "Agent \"{{agent}}\" returned an invalid send target \"{{target}}\".",
+    "invalidSendIntent": "Agent \"{{agent}}\" returned an invalid send intent.",
     "dismiss": "Dismiss"
   },
   "timeline": {

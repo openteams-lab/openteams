@@ -102,6 +102,7 @@
     "emptyMessage": "El agente \"{{agent}}\" devolvio un mensaje vacio.",
     "missingSendTarget": "El agente \"{{agent}}\" devolvio un mensaje send sin destino.",
     "invalidSendTarget": "El agente \"{{agent}}\" devolvio un destino send invalido \"{{target}}\".",
+    "invalidSendIntent": "El agente \"{{agent}}\" devolvio un intent send invalido.",
     "dismiss": "Cerrar"
   },
   "timeline": {

@@ -97,18 +97,19 @@
     "open": "열기"
   },
   "protocolNotice": {
-    "invalidJson": "\uc5d0\uc774\uc804\ud2b8 \"{{agent}}\"\uac00 \uc720\ud6a8\ud558\uc9c0 \uc54a\uc740 JSON\uc744 \ubc18\ud658\ud588\uc2b5\ub2c8\ub2e4. JSON \ubc30\uc5f4\ub85c \uc751\ub2f5\ud574 \uc8fc\uc138\uc694.",
-    "notJsonArray": "\uc5d0\uc774\uc804\ud2b8 \"{{agent}}\"\uc740(\ub294) \uba54\uc2dc\uc9c0 JSON \ubc30\uc5f4\uc744 \ubc18\ud658\ud574\uc57c \ud569\ub2c8\ub2e4.",
-    "emptyMessage": "\uc5d0\uc774\uc804\ud2b8 \"{{agent}}\"\uac00 \ube48 \uba54\uc2dc\uc9c0\ub97c \ubc18\ud658\ud588\uc2b5\ub2c8\ub2e4.",
-    "missingSendTarget": "\uc5d0\uc774\uc804\ud2b8 \"{{agent}}\"\uac00 \ub300\uc0c1\uc774 \uc5c6\ub294 send \uba54\uc2dc\uc9c0\ub97c \ubc18\ud658\ud588\uc2b5\ub2c8\ub2e4.",
-    "invalidSendTarget": "\uc5d0\uc774\uc804\ud2b8 \"{{agent}}\"\uac00 \uc798\ubabb\ub41c send \ub300\uc0c1 \"{{target}}\"\uc744 \ubc18\ud658\ud588\uc2b5\ub2c8\ub2e4.",
-    "dismiss": "\ub2eb\uae30"
+    "invalidJson": "에이전트 \"{{agent}}\"가 유효하지 않은 JSON을 반환했습니다. JSON 배열로 응답해 주세요.",
+    "notJsonArray": "에이전트 \"{{agent}}\"은(는) 메시지 JSON 배열을 반환해야 합니다.",
+    "emptyMessage": "에이전트 \"{{agent}}\"가 빈 메시지를 반환했습니다.",
+    "missingSendTarget": "에이전트 \"{{agent}}\"가 대상이 없는 send 메시지를 반환했습니다.",
+    "invalidSendTarget": "에이전트 \"{{agent}}\"가 잘못된 send 대상 \"{{target}}\"을 반환했습니다.",
+    "invalidSendIntent": "에이전트 \"{{agent}}\"가 잘못된 send intent를 반환했습니다.",
+    "dismiss": "닫기"
   },
   "timeline": {
-    "loading": "\ucc44\ud305\uc744 \ubd88\ub7ec\uc624\ub294 \uc911...",
-    "archivedReadonly": "\uc774 \uc138\uc158\uc740 \ubcf4\uad00\ub418\uc5c8\uc73c\uba70 \uba54\uc2dc\uc9c0\uc640 \uba64\ubc84\ub294 \uc77d\uae30 \uc804\uc6a9\uc785\ub2c8\ub2e4.",
-    "empty": "\uc544\uc9c1 \uba54\uc2dc\uc9c0\uac00 \uc5c6\uc2b5\ub2c8\ub2e4. \uc544\ub798\uc5d0\uc11c \ub300\ud654\ub97c \uc2dc\uc791\ud558\uc138\uc694.",
-    "noMatches": "\"{{query}}\"\uc5d0 \uc77c\uce58\ud558\ub294 \uba54\uc2dc\uc9c0\uac00 \uc5c6\uc2b5\ub2c8\ub2e4."
+    "loading": "채팅을 불러오는 중...",
+    "archivedReadonly": "이 세션은 보관되었으며 메시지와 멤버는 읽기 전용입니다.",
+    "empty": "아직 메시지가 없습니다. 아래에서 대화를 시작하세요.",
+    "noMatches": "\"{{query}}\"에 일치하는 메시지가 없습니다."
   },
   "members": {
     "title": "AI 멤버 목록",

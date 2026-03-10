@@ -188,7 +188,7 @@ export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } |
 
 export type ChatStreamDeltaType = "assistant" | "thinking";
 
-export type ChatProtocolNoticeCode = "invalid_json" | "not_json_array" | "empty_message" | "missing_send_target" | "invalid_send_target";
+export type ChatProtocolNoticeCode = "invalid_json" | "not_json_array" | "empty_message" | "missing_send_target" | "invalid_send_target" | "invalid_send_intent";
 
 export type MentionStatus = "received" | "running" | "completed" | "failed";
 
