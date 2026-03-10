@@ -726,7 +726,9 @@ const renderPresetTab = () => (
         />
       </div>
       <div className="space-y-half">
-        <label className="text-xs text-low">{t('members.workspacePath')}</label>
+        <label className="text-xs text-[#5094FB]">
+          {t('members.workspacePath')}
+        </label>
         <input
           value={newMemberWorkspace}
           onChange={(event) => onWorkspaceChange(event.target.value)}

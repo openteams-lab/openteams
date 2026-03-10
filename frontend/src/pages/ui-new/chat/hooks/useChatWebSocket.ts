@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   type ChatMessage,
@@ -25,6 +25,11 @@ type AgentDeltaPayload = Extract<ChatStreamEvent, { type: 'agent_delta' }> & {
   type: 'agent_delta';
   stream_type?: 'assistant' | 'thinking';
 };
+type ProtocolNoticePayload = Extract<ChatStreamEvent, { type: 'protocol_notice' }>;
+
+export type ChatProtocolNotice = ProtocolNoticePayload & {
+  id: string;
+};
 
 type PersistedStreamRun = StreamRun & {
   updatedAtMs: number;
@@ -44,6 +49,7 @@ const STREAMING_RUN_CACHE_KEY = 'chat_streaming_runs_cache_v1';
 const STREAMING_RUN_CACHE_VERSION = 1;
 const STREAMING_RUN_TTL_MS = 6 * 60 * 60 * 1000;
 const INACTIVE_RUN_PRUNE_GRACE_MS = 15 * 1000;
+const PROTOCOL_NOTICE_TTL_MS = 15 * 1000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -231,6 +237,7 @@ export interface UseChatWebSocketResult {
   agentStateInfos: Record<string, AgentStateInfo>;
   mentionStatuses: Map<string, Map<string, MentionStatus>>;
   compressionWarning: CompressionWarning | null;
+  protocolNotices: ChatProtocolNotice[];
   setAgentStates: React.Dispatch<
     React.SetStateAction<Record<string, ChatSessionAgentState>>
   >;
@@ -246,6 +253,7 @@ export interface UseChatWebSocketResult {
     runningAgentIds: Set<string>
   ) => void;
   clearCompressionWarning: () => void;
+  dismissProtocolNotice: (noticeId: string) => void;
 }
 
 export function useChatWebSocket(
@@ -265,6 +273,12 @@ export function useChatWebSocket(
   >(new Map());
   const [compressionWarning, setCompressionWarning] =
     useState<CompressionWarning | null>(null);
+  const [protocolNotices, setProtocolNotices] = useState<ChatProtocolNotice[]>(
+    []
+  );
+  const protocolNoticeTimeoutsRef = useRef<
+    Map<string, ReturnType<typeof setTimeout>>
+  >(new Map());
   const queryClient = useQueryClient();
 
   const streamingRuns = useMemo<Record<string, StreamRun>>(() => {
@@ -288,6 +302,20 @@ export function useChatWebSocket(
   const clearCompressionWarning = useCallback(() => {
     setCompressionWarning(null);
   }, []);
+
+  const clearProtocolNoticeTimeout = useCallback((noticeId: string) => {
+    const timeoutId = protocolNoticeTimeoutsRef.current.get(noticeId);
+    if (!timeoutId) return;
+    clearTimeout(timeoutId);
+    protocolNoticeTimeoutsRef.current.delete(noticeId);
+  }, []);
+
+  const dismissProtocolNotice = useCallback((noticeId: string) => {
+    clearProtocolNoticeTimeout(noticeId);
+    setProtocolNotices((prev) =>
+      prev.filter((notice) => notice.id !== noticeId)
+    );
+  }, [clearProtocolNoticeTimeout]);
 
   const pruneStreamingRunsForSession = useCallback(
     (
@@ -451,6 +479,22 @@ export function useChatWebSocket(
     []
   );
 
+  const handleProtocolNotice = useCallback((payload: ProtocolNoticePayload) => {
+    if (payload.code === 'empty_message' && payload.output_is_empty === false) {
+      return;
+    }
+
+    const noticeId = `${payload.run_id}-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    const timeoutId = setTimeout(() => {
+      dismissProtocolNotice(noticeId);
+    }, PROTOCOL_NOTICE_TTL_MS);
+
+    protocolNoticeTimeoutsRef.current.set(noticeId, timeoutId);
+    setProtocolNotices((prev) => [...prev, { ...payload, id: noticeId }]);
+  }, [dismissProtocolNotice]);
+
   useEffect(() => {
     setStreamingRunsBySession((prev) => pruneExpiredStreamingRuns(prev));
   }, [activeSessionId]);
@@ -510,6 +554,11 @@ export function useChatWebSocket(
 
           if (payload.type === 'compression_warning') {
             setCompressionWarning(payload.warning);
+            return;
+          }
+
+          if (payload.type === 'protocol_notice') {
+            handleProtocolNotice(payload);
           }
         } catch (error) {
           console.warn('Failed to parse chat stream payload', error);
@@ -540,15 +589,30 @@ export function useChatWebSocket(
     handleAgentDelta,
     handleAgentState,
     handleMentionAcknowledged,
+    handleProtocolNotice,
   ]);
 
   // Reset state when session changes
   useEffect(() => {
+    for (const timeoutId of protocolNoticeTimeoutsRef.current.values()) {
+      clearTimeout(timeoutId);
+    }
+    protocolNoticeTimeoutsRef.current.clear();
     setAgentStates({});
     setAgentStateInfos({});
     setMentionStatuses(new Map());
     setCompressionWarning(null);
+    setProtocolNotices([]);
   }, [activeSessionId]);
+
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of protocolNoticeTimeoutsRef.current.values()) {
+        clearTimeout(timeoutId);
+      }
+      protocolNoticeTimeoutsRef.current.clear();
+    };
+  }, []);
 
   return {
     streamingRuns,
@@ -556,10 +620,12 @@ export function useChatWebSocket(
     agentStateInfos,
     mentionStatuses,
     compressionWarning,
+    protocolNotices,
     setAgentStates,
     setAgentStateInfos,
     setMentionStatuses,
     pruneStreamingRunsForSession,
     clearCompressionWarning,
+    dismissProtocolNotice,
   };
 }

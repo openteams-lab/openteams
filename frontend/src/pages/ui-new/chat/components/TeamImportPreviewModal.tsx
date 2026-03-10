@@ -471,7 +471,7 @@ export function TeamImportPreviewModal({
                       >
                         <div className="space-y-3">
                           <div className="space-y-1">
-                            <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5094FB]">
                               {t('members.workspacePath')}
                             </label>
                             <input
