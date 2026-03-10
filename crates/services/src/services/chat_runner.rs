@@ -92,7 +92,7 @@ const RESERVED_USER_HANDLE: &str = "you";
 const PROTOCOL_SEND_INTENT_VALUES: &[&str] = &["request", "reply", "notify", "blocker", "confirm"];
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
 const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
-  {"type": "send", "to": "you", "intent": "request", "content": "I have finished the front implementation"},
+  {"type": "send", "to": "backend", "intent": "request", "content": "Please expose a `GET /chat/sessions` endpoint."},
   {"type": "send", "to": "architect", "intent": "confirm", "content": "The UI is ready. Please confirm the API contract before I continue."},
   {"type": "record", "content": "The experiment metrics are `latency_p95_ms`, `success_rate`, and `token_cost_usd`."},
   {"type": "artifact", "content": "Saved the experiment plan to `docs/experiments/chat-metrics-plan.md`."},
@@ -128,7 +128,6 @@ struct ReferenceContext {
 }
 
 struct MessageAttachmentContext {
-    message_id: Uuid,
     attachments: Vec<ReferenceAttachment>,
 }
 
@@ -1699,7 +1698,6 @@ impl ChatRunner {
         }
 
         Ok(Some(MessageAttachmentContext {
-            message_id: source_message.id,
             attachments: message_attachments,
         }))
     }
@@ -1776,13 +1774,8 @@ impl ChatRunner {
             .replace('\r', "\\r")
             .replace('\t', "\\t")
     }
-
-    /// Escape path for TOML (handle Windows backslashes)
-    fn escape_toml_path(path: &Path) -> String {
-        path.to_string_lossy().replace('\\', "\\\\")
-    }
-
     /// Build the system prompt using Markdown sections while preserving all protocol fields.
+    #[cfg(test)]
     fn build_system_prompt_markdown(
         agent: &ChatAgent,
         session_agents: &[SessionAgentSummary],
@@ -4655,7 +4648,6 @@ mod tests {
             }],
         };
         let message_attachments = MessageAttachmentContext {
-            message_id: message.id,
             attachments: vec![ReferenceAttachment {
                 name: "ui.png".to_string(),
                 mime_type: Some("image/png".to_string()),
