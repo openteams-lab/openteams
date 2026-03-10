@@ -44,7 +44,12 @@ use tokio::{
 };
 use tokio_util::io::ReaderStream;
 use ts_rs::TS;
-use utils::{assets::{asset_dir, config_path}, log_msg::LogMsg, msg_store::MsgStore, utf8::Utf8LossyDecoder};
+use utils::{
+    assets::{asset_dir, config_path},
+    log_msg::LogMsg,
+    msg_store::MsgStore,
+    utf8::Utf8LossyDecoder,
+};
 use uuid::Uuid;
 
 use crate::services::{
@@ -61,8 +66,18 @@ const RUNS_DIR_NAME: &str = "runs";
 const CONTEXT_DIR_NAME: &str = "context";
 const LEGACY_COMPACTED_CONTEXT_FILE_NAME: &str = "messages_compacted.background.jsonl";
 const RUN_RECORDS_DIR_NAME: &str = "run_records";
+const SHARED_PROTOCOL_DIR_NAME: &str = "protocol";
+const SHARED_BLACKBOARD_FILE_NAME: &str = "shared_blackboard.jsonl";
+const WORK_RECORDS_FILE_NAME: &str = "work_records.jsonl";
 const RESERVED_USER_HANDLE: &str = "you";
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
+const PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
+  {"type": "send", "to": "backend", "content": "Please expose a `GET /chat/sessions` endpoint."},
+  {"type": "send", "to": "architect", "content": "The UI is ready. Please confirm the API contract before I continue."},
+  {"type": "record", "content": "The main chat route is `/chat`."},
+  {"type": "artifact", "content": "Implemented the UI in `frontend/src/pages/ui-new/ChatSessions.tsx`."},
+  {"type": "conclusion", "content": "Work is blocked on the backend response shape."}
+]"#;
 
 struct DiffInfo {
     truncated: bool,
@@ -131,26 +146,67 @@ struct SessionAgentSummary {
     skills_used: Vec<String>,
 }
 
-/// Agent response JSON format for structured output
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentResponse {
-    /// Message to forward to another agent (optional)
-    pub send_to_member: Option<AgentMemberMessage>,
-    /// Important message for user - only major conclusions and final results (optional)
-    pub send_to_user_important: Option<String>,
-    /// Content to persist to knowledge file (optional)
-    pub record: Option<String>,
-    /// Complete work status and intermediate outputs (required)
-    pub result: String,
+#[serde(rename_all = "snake_case")]
+enum AgentProtocolMessageType {
+    Send,
+    Record,
+    #[serde(alias = "artiface", alias = "artefact")]
+    Artifact,
+    Conclusion,
 }
 
-/// Message targeting another agent
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentMemberMessage {
-    /// Target agent name (can use @agent_name format)
-    pub target: String,
-    /// Message content
-    pub content: String,
+struct AgentProtocolMessage {
+    #[serde(rename = "type")]
+    message_type: AgentProtocolMessageType,
+    #[serde(default)]
+    to: Option<String>,
+    #[serde(default)]
+    content: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AgentProtocolError {
+    code: ChatProtocolNoticeCode,
+    target: Option<String>,
+    detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SharedBlackboardEntry {
+    session_id: Uuid,
+    run_id: Uuid,
+    session_agent_id: Uuid,
+    agent_id: Uuid,
+    owner: String,
+    message_type: &'static str,
+    content: String,
+    created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct WorkRecordEntry {
+    session_id: Uuid,
+    run_id: Uuid,
+    session_agent_id: Uuid,
+    agent_id: Uuid,
+    owner: String,
+    message_type: &'static str,
+    content: String,
+    created_at: String,
+}
+
+struct MessageSenderIdentity {
+    label: String,
+    address: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ResolvedPromptLanguage {
+    setting: &'static str,
+    code: &'static str,
+    instruction: &'static str,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -161,6 +217,17 @@ pub enum MentionStatus {
     Running,
     Completed,
     Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ChatProtocolNoticeCode {
+    InvalidJson,
+    NotJsonArray,
+    EmptyMessage,
+    MissingSendTarget,
+    InvalidSendTarget,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -197,6 +264,17 @@ pub enum ChatStreamEvent {
         session_id: Uuid,
         warning: CompressionWarning,
     },
+    ProtocolNotice {
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        run_id: Uuid,
+        agent_name: String,
+        code: ChatProtocolNoticeCode,
+        target: Option<String>,
+        detail: Option<String>,
+        output_is_empty: bool,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -219,6 +297,8 @@ pub enum ChatRunnerError {
     Executor(#[from] ExecutorError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
     #[error(transparent)]
     ChatService(#[from] ChatServiceError),
     #[error(transparent)]
@@ -773,7 +853,6 @@ impl ChatRunner {
         let session_agent_id = session_agent.id;
         let agent_id = agent.id;
 
-        let reply_handle = self.resolve_reply_handle(source_message);
         let chain_depth = self.extract_chain_depth(&source_message.meta);
 
         let result = async {
@@ -838,6 +917,7 @@ impl ChatRunner {
             // Load UI language setting for agent response language
             let ui_config = config::load_config_from_file(&config_path()).await;
             let ui_language = ui_config.language;
+            let prompt_language = Self::resolve_prompt_language(source_message, &ui_language);
 
             let prompt = self.build_prompt(
                 &agent,
@@ -847,7 +927,7 @@ impl ChatRunner {
                 message_attachments.as_ref(),
                 reference_context.as_ref(),
                 &agent_skills,
-                &ui_language,
+                prompt_language,
             );
             fs::write(&input_path, &prompt).await?;
 
@@ -930,7 +1010,6 @@ impl ChatRunner {
                 meta_path,
                 PathBuf::from(&workspace_path),
                 run_dir,
-                Some(reply_handle),
                 failed_flag.clone(),
                 chain_depth,
                 context_snapshot.context_compacted,
@@ -938,6 +1017,7 @@ impl ChatRunner {
                 self.clone(),
                 source_message.id,
                 agent.name.clone(),
+                prompt_language,
             );
 
             self.spawn_exit_watcher(
@@ -1009,6 +1089,67 @@ impl ChatRunner {
         format!("session_agent_{session_agent_id}_run_{run_index:04}")
     }
 
+    fn session_protocol_dir(session_id: Uuid) -> PathBuf {
+        asset_dir()
+            .join("chat")
+            .join(format!("session_{session_id}"))
+            .join(SHARED_PROTOCOL_DIR_NAME)
+    }
+
+    fn session_shared_blackboard_path(session_id: Uuid) -> PathBuf {
+        Self::session_protocol_dir(session_id).join(SHARED_BLACKBOARD_FILE_NAME)
+    }
+
+    fn session_work_records_path(session_id: Uuid) -> PathBuf {
+        Self::session_protocol_dir(session_id).join(WORK_RECORDS_FILE_NAME)
+    }
+
+    async fn sync_protocol_context_files(
+        session_id: Uuid,
+        context_dir: &Path,
+    ) -> Result<(), ChatRunnerError> {
+        let protocol_dir = Self::session_protocol_dir(session_id);
+        fs::create_dir_all(&protocol_dir).await?;
+
+        for (canonical, dest_name) in [
+            (
+                Self::session_shared_blackboard_path(session_id),
+                SHARED_BLACKBOARD_FILE_NAME,
+            ),
+            (
+                Self::session_work_records_path(session_id),
+                WORK_RECORDS_FILE_NAME,
+            ),
+        ] {
+            if fs::metadata(&canonical).await.is_err() {
+                fs::write(&canonical, "").await?;
+            }
+            let contents = fs::read(&canonical).await.unwrap_or_default();
+            fs::write(context_dir.join(dest_name), contents).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn append_jsonl_line<T: Serialize>(
+        path: &Path,
+        value: &T,
+    ) -> Result<(), ChatRunnerError> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .await?;
+        let line = serde_json::to_string(value)?;
+        file.write_all(line.as_bytes()).await?;
+        file.write_all(b"\n").await?;
+        Ok(())
+    }
+
     fn parse_runner_type(&self, agent: &ChatAgent) -> Result<BaseCodingAgent, ChatRunnerError> {
         let raw = agent.runner_type.trim();
         let normalized = raw.replace(['-', ' '], "_").to_ascii_uppercase();
@@ -1069,27 +1210,68 @@ impl ChatRunner {
         Some(canonical_variant_key(variant))
     }
 
-    fn resolve_reply_handle(&self, message: &ChatMessage) -> String {
-        let handle = message
-            .meta
-            .0
-            .get("sender_handle")
-            .and_then(|value| value.as_str())
-            .unwrap_or("you");
-        let sanitized = handle
+    fn sanitize_sender_token(value: &str, fallback: &str) -> String {
+        let sanitized = value
             .chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
             .collect::<String>();
         if sanitized.is_empty() {
-            "you".to_string()
+            fallback.to_string()
         } else {
             sanitized
         }
     }
 
-    fn apply_reply_prefix(content: &str, handle: Option<&str>) -> String {
-        let _ = handle;
-        content.to_string()
+    fn resolve_message_sender_identity(message: &ChatMessage) -> MessageSenderIdentity {
+        let sender_meta = message.meta.0.get("sender");
+        let structured_meta = message.meta.0.get("structured");
+
+        let user_handle = message
+            .meta
+            .0
+            .get("sender_handle")
+            .and_then(|value| value.as_str())
+            .or_else(|| {
+                sender_meta
+                    .and_then(|value| value.get("handle"))
+                    .and_then(|value| value.as_str())
+            })
+            .or_else(|| {
+                structured_meta
+                    .and_then(|value| value.get("sender_handle"))
+                    .and_then(|value| value.as_str())
+            });
+
+        let agent_label = sender_meta
+            .and_then(|value| value.get("name").and_then(|name| name.as_str()))
+            .or_else(|| {
+                sender_meta.and_then(|value| value.get("label").and_then(|label| label.as_str()))
+            })
+            .or_else(|| {
+                structured_meta
+                    .and_then(|value| value.get("sender_label").and_then(|label| label.as_str()))
+            });
+
+        match message.sender_type {
+            ChatSenderType::User => {
+                let label = Self::sanitize_sender_token(user_handle.unwrap_or("you"), "you");
+                MessageSenderIdentity {
+                    address: format!("user:{label}"),
+                    label,
+                }
+            }
+            ChatSenderType::Agent => {
+                let label = Self::sanitize_sender_token(agent_label.unwrap_or("agent"), "agent");
+                MessageSenderIdentity {
+                    address: format!("agent:{label}"),
+                    label,
+                }
+            }
+            ChatSenderType::System => MessageSenderIdentity {
+                address: "system".to_string(),
+                label: "system".to_string(),
+            },
+        }
     }
 
     async fn capture_git_diff(workspace_path: &Path, run_dir: &Path) -> Option<DiffInfo> {
@@ -1269,6 +1451,7 @@ impl ChatRunner {
         let jsonl = full_context.jsonl;
         let context_path = context_dir.join("messages.jsonl");
         fs::write(&context_path, jsonl.as_bytes()).await?;
+        Self::sync_protocol_context_files(session_id, &context_dir).await?;
         tracing::info!(
             session_id = %session_id,
             workspace_path = %workspace_path,
@@ -1571,13 +1754,25 @@ impl ChatRunner {
         context_dir: &Path,
         skills: &[ChatSkill],
         user_message_content: Option<&str>,
-        ui_language: &UiLanguage,
+        prompt_language: ResolvedPromptLanguage,
     ) -> String {
         let mut toml = String::new();
+        let messages_path = context_dir.join("messages.jsonl");
+        let shared_blackboard_path = context_dir.join(SHARED_BLACKBOARD_FILE_NAME);
+        let work_records_path = context_dir.join(WORK_RECORDS_FILE_NAME);
+        let visible_members = session_agents
+            .iter()
+            .filter(|member| member.agent_id != agent.id)
+            .collect::<Vec<_>>();
+
+        toml.push_str("PROTOCOL_VERSION = \"chatgroup_toml_v2\"\n");
 
         // 1. Agent section
-        toml.push_str("[agent]\n");
-        toml.push_str(&format!("name = \"{}\"\n", Self::escape_toml_string(&agent.name)));
+        toml.push_str("[agent.role]\n");
+        toml.push_str(&format!(
+            "name = \"{}\"\n",
+            Self::escape_toml_string(&agent.name)
+        ));
         if !agent.system_prompt.trim().is_empty() {
             toml.push_str(&format!(
                 "role = \"\"\"\n{}\n\"\"\"\n\n",
@@ -1589,17 +1784,24 @@ impl ChatRunner {
 
         // 2. Skills section
         let active_skills = Self::filter_active_skills(skills, user_message_content);
-        toml.push_str("[skills]\n");
+        toml.push_str("[agent.skills]\n");
         if active_skills.is_empty() {
-            toml.push_str("restriction = \"You have no skills enabled. Do not attempt to use any skill.\"\n\n");
+            toml.push_str(
+                "restriction = \"You have no skills enabled. Do not attempt to use any skill.\"\n\n",
+            );
         } else {
             toml.push_str("restriction = \"\"\"\n");
             toml.push_str("Skills are available as local files in ~/.agents/skills and companion directories.\n");
-            toml.push_str("You can ONLY use the skills listed below. Do not invent or use unlisted skills.\n");
+            toml.push_str(
+                "You can ONLY use the skills listed below. Do not invent or use unlisted skills.\n",
+            );
             toml.push_str("\"\"\"\n\n");
             for skill in &active_skills {
-                toml.push_str("[[skills.allowed]]\n");
-                toml.push_str(&format!("name = \"{}\"\n", Self::escape_toml_string(&skill.name)));
+                toml.push_str("[[agent.skills.allowed]]\n");
+                toml.push_str(&format!(
+                    "name = \"{}\"\n",
+                    Self::escape_toml_string(&skill.name)
+                ));
                 toml.push_str(&format!(
                     "description = \"{}\"\n\n",
                     Self::escape_toml_string(&skill.description)
@@ -1609,17 +1811,22 @@ impl ChatRunner {
 
         // 3. Group members section
         toml.push_str("[group]\n");
-        toml.push_str("members_description = \"Current AI members in this group:\"\n\n");
-        if session_agents.is_empty() {
+        toml.push_str("members_description = \"Other AI members currently in this group\"\n\n");
+        if visible_members.is_empty() {
             toml.push_str("# No other AI members\n\n");
         } else {
-            for member in session_agents {
+            for member in visible_members.iter().copied() {
                 toml.push_str("[[group.members]]\n");
-                toml.push_str(&format!("name = \"{}\"\n", Self::escape_toml_string(&member.name)));
-                let role = member.description.as_deref().unwrap_or("AI assistant");
-                toml.push_str(&format!("role = \"{}\"\n", Self::escape_toml_string(role)));
+                toml.push_str(&format!(
+                    "name = \"{}\"\n",
+                    Self::escape_toml_string(&member.name)
+                ));
+                let responsibility = member.description.as_deref().unwrap_or("AI assistant");
+                toml.push_str(&format!(
+                    "responsibility = \"{}\"\n",
+                    Self::escape_toml_string(responsibility)
+                ));
                 toml.push_str(&format!("state = \"{:?}\"\n", member.state));
-                // Skills used by this member
                 let skills_str: String = member
                     .skills_used
                     .iter()
@@ -1630,64 +1837,127 @@ impl ChatRunner {
             }
         }
 
-        // 4. Files section
-        toml.push_str("[files]\n");
-        let messages_path = context_dir.join("messages.jsonl");
-        let work_status_path = context_dir.join("agent_work_status.jsonl");
-        let knowledge_path = context_dir.join("knowledge.jsonl");
+        // 4. History files section
+        toml.push_str("[history.group_messages]\n");
         toml.push_str(&format!(
-            "messages_history = \"{}\"\n",
+            "path = \"{}\"\n",
             Self::escape_toml_path(&messages_path)
         ));
-        toml.push_str(&format!(
-            "agent_work_status = \"{}\"\n",
-            Self::escape_toml_path(&work_status_path)
-        ));
-        toml.push_str(&format!(
-            "knowledge = \"{}\"\n\n",
-            Self::escape_toml_path(&knowledge_path)
-        ));
-
-        // 5. Instructions section
-        toml.push_str("[instructions]\n");
-        toml.push_str("history_note = \"\"\"\n");
-        toml.push_str("If you need to understand the current group chat state, you MAY read the messages_history file.\n");
-        toml.push_str("The agent_work_status file contains work outputs (result field) from all agents.\n");
-        toml.push_str("You can search by agent name to find a specific member's work status.\n");
-        toml.push_str("Reading these files is optional - decide based on your task needs.\n");
+        toml.push_str("format = \"jsonl\"\n");
+        toml.push_str("description = \"Group chat history. Each line is a JSON message record containing sender and content, consistent with messages.jsonl history.\"\n");
+        toml.push_str("optional = true\n");
+        toml.push_str("instruction = \"\"\"\n");
+        toml.push_str("If you need to understand the current group chat state, you MAY inspect this file yourself.\n");
+        toml.push_str(
+            "Reading history is optional. Do not assume you must read history before acting.\n",
+        );
         toml.push_str("\"\"\"\n\n");
 
-        // 6. Response format section
-        toml.push_str("[response_format]\n");
+        toml.push_str("[history.shared_blackboard]\n");
+        toml.push_str(&format!(
+            "path = \"{}\"\n",
+            Self::escape_toml_path(&shared_blackboard_path)
+        ));
+        toml.push_str("format = \"jsonl\"\n");
+        toml.push_str("description = \"Persisted shared messages generated from record items.\"\n");
+        toml.push_str("instruction = \"You can search by member name to find shared messages published by a specific member.\"\n\n");
+
+        toml.push_str("[history.work_records]\n");
+        toml.push_str(&format!(
+            "path = \"{}\"\n",
+            Self::escape_toml_path(&work_records_path)
+        ));
+        toml.push_str("format = \"jsonl\"\n");
+        toml.push_str("description = \"Persisted work outputs and summaries generated from artifact/conclusion items.\"\n");
+        toml.push_str("instruction = \"You can search by member name to find a specific member's work outputs and status summaries.\"\n\n");
+
+        // 5. Response format section
+        toml.push_str("[output]\n");
         toml.push_str("required = true\n");
-        toml.push_str("schema = \"\"\"\n");
-        toml.push_str("You MUST respond with valid JSON containing these fields:\n");
-        toml.push_str("{\n");
-        toml.push_str("  \"send_to_member\": { \"target\": \"@agent_name\", \"content\": \"concise request with clear goal\" } | null,\n");
-        toml.push_str("  \"send_to_user_important\": \"Important conclusions and final results only\" | null,\n");
-        toml.push_str("  \"record\": \"Content to persist to knowledge base\" | null,\n");
-        toml.push_str("  \"result\": \"Complete work status and intermediate outputs (REQUIRED)\"\n");
-        toml.push_str("}\n");
-        toml.push_str("\n");
-        toml.push_str("Field rules:\n");
-        toml.push_str("- send_to_member: Route message to another agent. Use concise language with clear goals. Can be null.\n");
-        toml.push_str("- send_to_user_important: Only include important conclusions and final deliverables. Can be null.\n");
-        toml.push_str("- record: Content to persist to knowledge base for future reference. Can be null.\n");
-        toml.push_str("- result: Complete work status and intermediate outputs. REQUIRED, cannot be empty.\n");
+        toml.push_str("format = \"json\"\n");
+        toml.push_str("container = \"list\"\n");
+        toml.push_str("only_send_items_enter_group_history = true\n");
+        toml.push_str("instruction = \"\"\"\n");
+        toml.push_str("Return ONLY a valid JSON array.\n");
+        toml.push_str("Do not wrap the JSON array in prose or markdown unless your runner forces code fences.\n");
+        toml.push_str("Your final reply MUST be parseable by a standard JSON parser.\n");
+        toml.push_str(
+            "Escape all double quotes, backslashes, and newlines inside JSON string values.\n",
+        );
+        toml.push_str("Before sending, verify that every `content` value is still a valid JSON string after escaping.\n");
+        toml.push_str("Only send items will be turned into visible group chat messages and written into group history.\n");
+        toml.push_str("The current agent is always recorded as the sender automatically. Do not impersonate other senders.\n");
+        toml.push_str("严禁讨论工作以外的事情，回复简洁表达准确，拒绝说废话。 Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.\n");
+        toml.push_str(
+            "Use `to = \\\"you\\\"` when sending a message to the user. Here `you` refers to the human user.\n",
+        );
         toml.push_str("\"\"\"\n");
 
-        // Valid target members
-        let member_names: Vec<String> = session_agents
+        let member_names: Vec<String> = visible_members
             .iter()
             .map(|m| format!("\"{}\"", Self::escape_toml_string(&m.name)))
             .collect();
-        toml.push_str(&format!("target_members = [{}]\n\n", member_names.join(", ")));
+        let mut allowed_targets = member_names;
+        allowed_targets.push(format!("\"{}\"", RESERVED_USER_HANDLE));
+        toml.push_str(&format!(
+            "allowed_targets = [{}]\n\n",
+            allowed_targets.join(", ")
+        ));
 
-        // 7. Language section
-        let (lang_code, lang_instruction) = Self::get_language_instruction(ui_language);
+        toml.push_str("[[output.message_types]]\n");
+        toml.push_str("type = \"send\"\n");
+        toml.push_str("required_fields = [\"type\", \"to\", \"content\"]\n");
+        toml.push_str("rules = \"\"\"\n");
+        toml.push_str("- A send item targets exactly one receiver.\n");
+        toml.push_str("- Use concise language with a clear goal.\n");
+        toml.push_str("- Content may be empty.\n");
+        toml.push_str("- The system will render the final group message as `@receiver content` and route it to that receiver.\n");
+        toml.push_str("\"\"\"\n\n");
+
+        toml.push_str("[[output.message_types]]\n");
+        toml.push_str("type = \"record\"\n");
+        toml.push_str("required = false\n");
+        toml.push_str("required_fields = [\"type\", \"content\"]\n");
+        toml.push_str("rules = \"Persist shared knowledge for all members. Each record item is appended to shared_blackboard.jsonl.\"\n\n");
+
+        toml.push_str("[[output.message_types]]\n");
+        toml.push_str("type = \"artifact\"\n");
+        toml.push_str("required = false\n");
+        toml.push_str("required_fields = [\"type\", \"content\"]\n");
+        toml.push_str("rules = \"Persist concrete work outputs, file paths, and deliverables to work_records.jsonl.\"\n\n");
+
+        toml.push_str("[[output.message_types]]\n");
+        toml.push_str("type = \"conclusion\"\n");
+        toml.push_str("required = false\n");
+        toml.push_str("required_fields = [\"type\", \"content\"]\n");
+        toml.push_str("rules = \"Persist your current work summary, blockers, or conclusions to work_records.jsonl.\"\n\n");
+
+        toml.push_str("[output.example]\n");
+        toml.push_str("json = \"\"\"\n");
+        if false {
+            toml.push_str("[\n");
+            toml.push_str("  {\"type\": \"send\", \"to\": \"backend\", \"content\": \"API接口不正确，重新设计一版\"},\n");
+            toml.push_str("  {\"type\": \"send\", \"to\": \"architect\", \"content\": \"我已经完成前端页面的实现，但是API接口有问题，需要后端配合修改\"},\n");
+            toml.push_str(
+                "  {\"type\": \"record\", \"content\": \"前端界面的路由地址是/chat\"},\n",
+            );
+            toml.push_str(
+                "  {\"type\": \"artifact\", \"content\": \"前端UI组件文件位于 xxxx/a.tsx\"},\n",
+            );
+            toml.push_str("  {\"type\": \"conclusion\", \"content\": \"我已经按照要求实现了登录页面，但是API接口不确定，需要进一步确认后才能继续执行。\"}\n");
+            toml.push_str("]\n");
+        }
+        toml.push_str(PROTOCOL_OUTPUT_EXAMPLE_JSON);
+        toml.push('\n');
+        toml.push_str("\"\"\"\n\n");
+
+        // 6. Language section
         toml.push_str("[language]\n");
-        toml.push_str(&format!("required = \"{}\"\n", lang_code));
-        toml.push_str(&format!("instruction = \"{}\"\n", lang_instruction));
+        toml.push_str(&format!("setting = \"{}\"\n", prompt_language.setting));
+        toml.push_str(&format!(
+            "instruction = \"{}\"\n",
+            prompt_language.instruction
+        ));
 
         toml
     }
@@ -1706,13 +1976,217 @@ impl ChatRunner {
         path.to_string_lossy().replace('\\', "\\\\")
     }
 
+    fn resolve_prompt_language(
+        message: &ChatMessage,
+        configured_language: &UiLanguage,
+    ) -> ResolvedPromptLanguage {
+        let system_locale = sys_locale::get_locale();
+        Self::resolve_prompt_language_with_system_locale(
+            message,
+            configured_language,
+            system_locale.as_deref(),
+        )
+    }
+
+    fn resolve_prompt_language_with_system_locale(
+        message: &ChatMessage,
+        configured_language: &UiLanguage,
+        system_locale: Option<&str>,
+    ) -> ResolvedPromptLanguage {
+        Self::resolve_prompt_language_from_meta(&message.meta)
+            .or_else(|| match configured_language {
+                UiLanguage::Browser => system_locale
+                    .and_then(Self::resolve_prompt_language_from_value)
+                    .or_else(|| Self::infer_prompt_language_from_text(&message.content)),
+                _ => None,
+            })
+            .unwrap_or_else(|| Self::resolve_prompt_language_from_ui_language(configured_language))
+    }
+
+    fn resolve_prompt_language_from_meta(
+        meta: &sqlx::types::Json<serde_json::Value>,
+    ) -> Option<ResolvedPromptLanguage> {
+        meta.get("app_language")
+            .and_then(|value| value.as_str())
+            .and_then(Self::resolve_prompt_language_from_value)
+    }
+
+    fn resolve_prompt_language_from_ui_language(language: &UiLanguage) -> ResolvedPromptLanguage {
+        match language {
+            UiLanguage::Browser | UiLanguage::En => ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            UiLanguage::ZhHans => ResolvedPromptLanguage {
+                setting: "simplified_chinese",
+                code: "zh-Hans",
+                instruction: "You MUST respond in Simplified Chinese.",
+            },
+            UiLanguage::ZhHant => ResolvedPromptLanguage {
+                setting: "traditional_chinese",
+                code: "zh-Hant",
+                instruction: "You MUST respond in Traditional Chinese.",
+            },
+            UiLanguage::Ja => ResolvedPromptLanguage {
+                setting: "japanese",
+                code: "ja",
+                instruction: "You MUST respond in Japanese.",
+            },
+            UiLanguage::Ko => ResolvedPromptLanguage {
+                setting: "korean",
+                code: "ko",
+                instruction: "You MUST respond in Korean.",
+            },
+            UiLanguage::Fr => ResolvedPromptLanguage {
+                setting: "french",
+                code: "fr",
+                instruction: "You MUST respond in French.",
+            },
+            UiLanguage::Es => ResolvedPromptLanguage {
+                setting: "spanish",
+                code: "es",
+                instruction: "You MUST respond in Spanish.",
+            },
+        }
+    }
+
+    fn resolve_prompt_language_from_value(value: &str) -> Option<ResolvedPromptLanguage> {
+        let normalized = value.trim().replace('_', "-").to_ascii_lowercase();
+        if normalized.is_empty() || normalized == "browser" {
+            return None;
+        }
+
+        if normalized == "zh-hant"
+            || normalized.starts_with("zh-hant-")
+            || normalized.starts_with("zh-tw")
+            || normalized.starts_with("zh-hk")
+            || normalized.starts_with("zh-mo")
+            || normalized == "traditional-chinese"
+        {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::ZhHant,
+            ));
+        }
+
+        if normalized == "zh"
+            || normalized == "zh-hans"
+            || normalized.starts_with("zh-hans-")
+            || normalized.starts_with("zh-cn")
+            || normalized.starts_with("zh-sg")
+            || normalized == "simplified-chinese"
+        {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::ZhHans,
+            ));
+        }
+
+        if normalized == "en" || normalized.starts_with("en-") || normalized == "english" {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::En,
+            ));
+        }
+
+        if normalized == "fr" || normalized.starts_with("fr-") || normalized == "french" {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::Fr,
+            ));
+        }
+
+        if normalized == "ja" || normalized.starts_with("ja-") || normalized == "japanese" {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::Ja,
+            ));
+        }
+
+        if normalized == "es" || normalized.starts_with("es-") || normalized == "spanish" {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::Es,
+            ));
+        }
+
+        if normalized == "ko" || normalized.starts_with("ko-") || normalized == "korean" {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::Ko,
+            ));
+        }
+
+        None
+    }
+
+    fn infer_prompt_language_from_text(text: &str) -> Option<ResolvedPromptLanguage> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        if trimmed
+            .chars()
+            .any(|ch| ('\u{3040}'..='\u{30ff}').contains(&ch))
+        {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::Ja,
+            ));
+        }
+
+        if trimmed
+            .chars()
+            .any(|ch| ('\u{ac00}'..='\u{d7af}').contains(&ch))
+        {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::Ko,
+            ));
+        }
+
+        if trimmed
+            .chars()
+            .any(|ch| "臺灣繁體這個嗎為於與後會發現頁".contains(ch))
+        {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::ZhHant,
+            ));
+        }
+
+        if trimmed
+            .chars()
+            .any(|ch| ('\u{4e00}'..='\u{9fff}').contains(&ch))
+        {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::ZhHans,
+            ));
+        }
+
+        if trimmed.chars().any(|ch| "¿¡ñáéíóú".contains(ch)) {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::Es,
+            ));
+        }
+
+        if trimmed.chars().any(|ch| "àâçéèêëîïôùûüÿœæ".contains(ch)) {
+            return Some(Self::resolve_prompt_language_from_ui_language(
+                &UiLanguage::Fr,
+            ));
+        }
+
+        Some(Self::resolve_prompt_language_from_ui_language(
+            &UiLanguage::En,
+        ))
+    }
+
+    #[allow(dead_code)]
     /// Get language code and instruction based on UiLanguage setting
     fn get_language_instruction(language: &UiLanguage) -> (&'static str, &'static str) {
         match language {
             UiLanguage::Browser => ("en", "You MUST respond in English."),
             UiLanguage::En => ("en", "You MUST respond in English."),
-            UiLanguage::ZhHans => ("zh-Hans", "You MUST respond in Simplified Chinese (简体中文)."),
-            UiLanguage::ZhHant => ("zh-Hant", "You MUST respond in Traditional Chinese (繁體中文)."),
+            UiLanguage::ZhHans => (
+                "zh-Hans",
+                "You MUST respond in Simplified Chinese (简体中文).",
+            ),
+            UiLanguage::ZhHant => (
+                "zh-Hant",
+                "You MUST respond in Traditional Chinese (繁體中文).",
+            ),
             UiLanguage::Ja => ("ja", "You MUST respond in Japanese (日本語)."),
             UiLanguage::Ko => ("ko", "You MUST respond in Korean (한국어)."),
             UiLanguage::Fr => ("fr", "You MUST respond in French (Français)."),
@@ -1720,62 +2194,213 @@ impl ChatRunner {
         }
     }
 
-    /// Parse agent response JSON and validate structure
-    pub fn parse_agent_response(content: &str) -> Result<AgentResponse, String> {
-        // Try to extract JSON from content (may be wrapped in markdown code blocks)
+    fn parse_agent_protocol_messages(
+        content: &str,
+    ) -> Result<Vec<AgentProtocolMessage>, AgentProtocolError> {
         let json_str = Self::extract_json_from_content(content)?;
+        let raw: serde_json::Value =
+            serde_json::from_str(&json_str).map_err(Self::invalid_json_error)?;
 
-        let response: AgentResponse = serde_json::from_str(&json_str)
-            .map_err(|e| format!("JSON parse error: {}. Please respond with valid JSON.", e))?;
+        let messages = match &raw {
+            serde_json::Value::Array(_) => {
+                serde_json::from_str::<Vec<AgentProtocolMessage>>(&json_str)
+                    .map_err(Self::invalid_json_error)?
+            }
+            _ => {
+                return Err(AgentProtocolError {
+                    code: ChatProtocolNoticeCode::NotJsonArray,
+                    target: None,
+                    detail: Some(format!(
+                        "Parsed JSON value was {}. Expected a JSON array.",
+                        Self::json_value_kind(&raw)
+                    )),
+                });
+            }
+        };
 
-        // Validate required field
-        if response.result.trim().is_empty() {
-            return Err("The 'result' field is required and cannot be empty.".to_string());
+        Self::validate_agent_protocol_messages(messages)
+    }
+
+    fn validate_agent_protocol_messages(
+        messages: Vec<AgentProtocolMessage>,
+    ) -> Result<Vec<AgentProtocolMessage>, AgentProtocolError> {
+        if messages.is_empty() {
+            return Err(AgentProtocolError {
+                code: ChatProtocolNoticeCode::EmptyMessage,
+                target: None,
+                detail: None,
+            });
         }
 
-        Ok(response)
+        let mut validated = Vec::with_capacity(messages.len());
+        for message in messages {
+            match message.message_type {
+                AgentProtocolMessageType::Send => {
+                    let Some(target) = message.to.as_deref() else {
+                        return Err(AgentProtocolError {
+                            code: ChatProtocolNoticeCode::MissingSendTarget,
+                            target: None,
+                            detail: None,
+                        });
+                    };
+                    let Some(target) = Self::normalize_protocol_target(target) else {
+                        return Err(AgentProtocolError {
+                            code: ChatProtocolNoticeCode::InvalidSendTarget,
+                            target: Some(target.to_string()),
+                            detail: None,
+                        });
+                    };
+                    validated.push(AgentProtocolMessage {
+                        message_type: AgentProtocolMessageType::Send,
+                        to: Some(target),
+                        content: message.content.trim().to_string(),
+                    });
+                }
+                AgentProtocolMessageType::Record
+                | AgentProtocolMessageType::Artifact
+                | AgentProtocolMessageType::Conclusion => {
+                    let content = message.content.trim().to_string();
+                    if content.is_empty() {
+                        return Err(AgentProtocolError {
+                            code: ChatProtocolNoticeCode::EmptyMessage,
+                            target: None,
+                            detail: None,
+                        });
+                    }
+                    validated.push(AgentProtocolMessage {
+                        message_type: message.message_type,
+                        to: None,
+                        content,
+                    });
+                }
+            }
+        }
+
+        Ok(validated)
+    }
+
+    fn normalize_protocol_target(target: &str) -> Option<String> {
+        let normalized = target.trim().trim_start_matches('@').trim();
+        if normalized.is_empty() {
+            return None;
+        }
+
+        let normalized = if normalized.eq_ignore_ascii_case("user") {
+            RESERVED_USER_HANDLE
+        } else {
+            normalized
+        };
+
+        if normalized
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
+            Some(normalized.to_string())
+        } else {
+            None
+        }
+    }
+
+    fn build_send_message_content(target: &str, content: &str) -> String {
+        let content = content.trim();
+        if content.is_empty() {
+            format!("@{target}")
+        } else {
+            format!("@{target} {content}")
+        }
     }
 
     /// Extract JSON from content, handling various formats
-    fn extract_json_from_content(content: &str) -> Result<String, String> {
+    fn extract_json_from_content(content: &str) -> Result<String, AgentProtocolError> {
         let content = content.trim();
 
-        // Try to find JSON in markdown code block with json tag
-        if let Some(start) = content.find("```json") {
-            let json_start = start + 7;
-            if let Some(end) = content[json_start..].find("```") {
-                return Ok(content[json_start..json_start + end].trim().to_string());
+        if let Some(candidate) = Self::extract_json_candidate(content) {
+            return Ok(candidate);
+        }
+
+        if let Some(start) = content.find('[')
+            && let Some(end) = content.rfind(']')
+            && end > start
+        {
+            let candidate = content[start..=end].trim();
+            if let Some(candidate) = Self::extract_json_candidate(candidate) {
+                return Ok(candidate);
             }
         }
 
-        // Try plain code block
-        if let Some(start) = content.find("```") {
+        if let Some(start) = content.find('{')
+            && let Some(end) = content.rfind('}')
+            && end > start
+        {
+            let candidate = content[start..=end].trim();
+            if let Some(candidate) = Self::extract_json_candidate(candidate) {
+                return Ok(candidate);
+            }
+        }
+
+        Err(AgentProtocolError {
+            code: ChatProtocolNoticeCode::InvalidJson,
+            target: None,
+            detail: Some("Could not locate a JSON object or array in the response.".to_string()),
+        })
+    }
+
+    fn extract_json_candidate(content: &str) -> Option<String> {
+        let trimmed = content.trim();
+        if Self::looks_like_json_value(trimmed) {
+            return Some(trimmed.to_string());
+        }
+
+        if let Some(start) = trimmed.find("```json") {
+            let json_start = start + 7;
+            if let Some(end) = trimmed[json_start..].find("```") {
+                let candidate = trimmed[json_start..json_start + end].trim();
+                if Self::looks_like_json_value(candidate) {
+                    return Some(candidate.to_string());
+                }
+            }
+        }
+
+        if let Some(start) = trimmed.find("```") {
             let block_start = start + 3;
-            if let Some(end) = content[block_start..].find("```") {
-                let block = content[block_start..block_start + end].trim();
-                // Skip language identifier if present on first line
+            if let Some(end) = trimmed[block_start..].find("```") {
+                let block = trimmed[block_start..block_start + end].trim();
+                if Self::looks_like_json_value(block) {
+                    return Some(block.to_string());
+                }
                 if let Some(newline) = block.find('\n') {
-                    let potential_json = block[newline + 1..].trim();
-                    if potential_json.starts_with('{') {
-                        return Ok(potential_json.to_string());
+                    let candidate = block[newline + 1..].trim();
+                    if Self::looks_like_json_value(candidate) {
+                        return Some(candidate.to_string());
                     }
                 }
-                if block.starts_with('{') {
-                    return Ok(block.to_string());
-                }
             }
         }
 
-        // Try to find raw JSON object
-        if let Some(start) = content.find('{') {
-            if let Some(end) = content.rfind('}') {
-                if end > start {
-                    return Ok(content[start..=end].to_string());
-                }
-            }
-        }
+        None
+    }
 
-        Err("Could not find valid JSON in response. Please respond with a JSON object.".to_string())
+    fn looks_like_json_value(content: &str) -> bool {
+        matches!(content.trim_start().chars().next(), Some('[' | '{'))
+    }
+
+    fn invalid_json_error(err: serde_json::Error) -> AgentProtocolError {
+        AgentProtocolError {
+            code: ChatProtocolNoticeCode::InvalidJson,
+            target: None,
+            detail: Some(err.to_string()),
+        }
+    }
+
+    fn json_value_kind(value: &serde_json::Value) -> &'static str {
+        match value {
+            serde_json::Value::Null => "null",
+            serde_json::Value::Bool(_) => "a boolean",
+            serde_json::Value::Number(_) => "a number",
+            serde_json::Value::String(_) => "a string",
+            serde_json::Value::Array(_) => "an array",
+            serde_json::Value::Object(_) => "an object",
+        }
     }
 
     /// Filter skills based on trigger type and message content.
@@ -1832,10 +2457,10 @@ impl ChatRunner {
         // 1. Envelope section
         toml.push_str("[envelope]\n");
         toml.push_str(&format!("session_id = \"{}\"\n", message.session_id));
-        let sender_handle = self.resolve_reply_handle(message);
+        let sender = Self::resolve_message_sender_identity(message);
         toml.push_str(&format!(
-            "from = \"user:{}\"\n",
-            Self::escape_toml_string(&sender_handle)
+            "from = \"{}\"\n",
+            Self::escape_toml_string(&sender.address)
         ));
         toml.push_str(&format!(
             "to = \"agent:{}\"\n",
@@ -1844,10 +2469,22 @@ impl ChatRunner {
         toml.push_str(&format!("message_id = \"{}\"\n", message.id));
         toml.push_str(&format!("timestamp = \"{}\"\n\n", message.created_at));
 
-        // 2. Reference section (optional)
+        // 2. Message section
+        toml.push_str("[message]\n");
+        toml.push_str(&format!(
+            "sender = \"{}\"\n",
+            Self::escape_toml_string(&sender.label)
+        ));
+        toml.push_str(&format!(
+            "content = \"\"\"\n{}\n\"\"\"\n",
+            message.content.trim()
+        ));
+
         if let Some(reference) = reference {
-            toml.push_str("[reference]\n");
-            toml.push_str("note = \"User referenced the following historical message. Prioritize it.\"\n");
+            toml.push_str("\n[message.reference]\n");
+            toml.push_str(
+                "note = \"User referenced the following historical message. Prioritize it.\"\n",
+            );
             toml.push_str(&format!("message_id = \"{}\"\n", reference.message_id));
             toml.push_str(&format!(
                 "sender = \"{}\"\n",
@@ -1865,7 +2502,7 @@ impl ChatRunner {
 
             if !reference.attachments.is_empty() {
                 for attachment in &reference.attachments {
-                    toml.push_str("\n[[reference.attachments]]\n");
+                    toml.push_str("\n[[message.reference.attachments]]\n");
                     toml.push_str(&format!(
                         "name = \"{}\"\n",
                         Self::escape_toml_string(&attachment.name)
@@ -1885,21 +2522,9 @@ impl ChatRunner {
                     ));
                 }
             }
-            toml.push('\n');
         }
 
-        // 3. Message section
-        toml.push_str("[message]\n");
-        toml.push_str(&format!(
-            "sender = \"{}\"\n",
-            Self::escape_toml_string(&sender_handle)
-        ));
-        toml.push_str(&format!(
-            "content = \"\"\"\n{}\n\"\"\"\n",
-            message.content.trim()
-        ));
-
-        // 4. Message attachments (optional)
+        // 3. Message attachments (optional)
         if let Some(attachments_ctx) = message_attachments
             && !attachments_ctx.attachments.is_empty()
         {
@@ -1940,16 +2565,18 @@ impl ChatRunner {
         message_attachments: Option<&MessageAttachmentContext>,
         reference: Option<&ReferenceContext>,
         skills: &[ChatSkill],
-        ui_language: &UiLanguage,
+        prompt_language: ResolvedPromptLanguage,
     ) -> String {
+        let context_dir = context_path.parent().unwrap_or(context_path);
+
         // Build system prompt with agent role, group members, skills, and history file instruction
         let system_prompt = self.build_system_prompt(
             agent,
             session_agents,
-            context_path,
+            context_dir,
             skills,
             Some(message.content.as_str()),
-            ui_language,
+            prompt_language,
         );
 
         // Build user prompt with envelope, reference, attachments, and message
@@ -1961,6 +2588,324 @@ impl ChatRunner {
 
         full_prompt.push_str(&user_prompt);
         full_prompt
+    }
+
+    fn emit_protocol_notice(
+        &self,
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        run_id: Uuid,
+        agent_name: &str,
+        error: &AgentProtocolError,
+        output_is_empty: bool,
+    ) {
+        self.emit(
+            session_id,
+            ChatStreamEvent::ProtocolNotice {
+                session_id,
+                session_agent_id,
+                agent_id,
+                run_id,
+                agent_name: agent_name.to_string(),
+                code: error.code.clone(),
+                target: error.target.clone(),
+                detail: error.detail.clone(),
+                output_is_empty,
+            },
+        );
+    }
+
+    fn protocol_notice_log_message(code: &ChatProtocolNoticeCode) -> &'static str {
+        match code {
+            ChatProtocolNoticeCode::InvalidJson => "agent returned invalid message protocol JSON",
+            ChatProtocolNoticeCode::NotJsonArray => {
+                "agent returned a non-array message protocol payload"
+            }
+            ChatProtocolNoticeCode::EmptyMessage => "agent returned an empty protocol message",
+            ChatProtocolNoticeCode::MissingSendTarget => {
+                "agent returned a send message without a target"
+            }
+            ChatProtocolNoticeCode::InvalidSendTarget => {
+                "agent returned a send message with an invalid target"
+            }
+        }
+    }
+
+    fn protocol_notice_reason(error: &AgentProtocolError) -> String {
+        match error.code {
+            ChatProtocolNoticeCode::InvalidJson => match error.detail.as_deref() {
+                Some(detail) => format!(
+                    "Could not parse JSON in response: {}. Please respond with a JSON array.",
+                    detail
+                ),
+                None => "Could not find valid JSON in response. Please respond with a JSON array."
+                    .to_string(),
+            },
+            ChatProtocolNoticeCode::NotJsonArray => match error.detail.as_deref() {
+                Some(detail) => format!(
+                    "Protocol error: response must be a JSON array of messages. {}",
+                    detail
+                ),
+                None => "Protocol error: response must be a JSON array of messages.".to_string(),
+            },
+            ChatProtocolNoticeCode::EmptyMessage => "Protocol error: message is empty.".to_string(),
+            ChatProtocolNoticeCode::MissingSendTarget => {
+                "Protocol error: send messages must include a 'to' field.".to_string()
+            }
+            ChatProtocolNoticeCode::InvalidSendTarget => format!(
+                "Protocol error: invalid send target '{}'.",
+                error.target.as_deref().unwrap_or_default()
+            ),
+        }
+    }
+
+    async fn emit_protocol_error_message(
+        &self,
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        run_id: Uuid,
+        agent_name: &str,
+        source_message_id: Uuid,
+        error: &AgentProtocolError,
+        output_is_empty: bool,
+        raw_output: &str,
+    ) -> Result<(), ChatRunnerError> {
+        let reason = Self::protocol_notice_reason(error);
+        tracing::warn!(
+            session_id = %session_id,
+            session_agent_id = %session_agent_id,
+            agent_id = %agent_id,
+            run_id = %run_id,
+            source_message_id = %source_message_id,
+            agent_name,
+            code = ?error.code,
+            target = error.target.as_deref(),
+            detail = error.detail.as_deref(),
+            reason = %reason,
+            "{}",
+            Self::protocol_notice_log_message(&error.code)
+        );
+
+        self.emit_protocol_notice(
+            session_id,
+            session_agent_id,
+            agent_id,
+            run_id,
+            agent_name,
+            error,
+            output_is_empty,
+        );
+        self.persist_protocol_error_message(
+            session_id,
+            session_agent_id,
+            agent_id,
+            run_id,
+            agent_name,
+            source_message_id,
+            error,
+            output_is_empty,
+            raw_output,
+            &reason,
+        )
+        .await;
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn persist_protocol_error_message(
+        &self,
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        run_id: Uuid,
+        agent_name: &str,
+        source_message_id: Uuid,
+        error: &AgentProtocolError,
+        output_is_empty: bool,
+        raw_output: &str,
+        reason: &str,
+    ) {
+        let mut meta = serde_json::json!({
+            "run_id": run_id,
+            "session_id": session_id,
+            "session_agent_id": session_agent_id,
+            "agent_id": agent_id,
+            "protocol_error": {
+                "code": error.code.clone(),
+                "reason": reason,
+                "target": error.target.clone(),
+                "detail": error.detail.clone(),
+                "agent_name": agent_name,
+                "source_message_id": source_message_id,
+                "output_is_empty": output_is_empty,
+            }
+        });
+
+        if !raw_output.trim().is_empty() {
+            meta["protocol_error"]["raw_output"] = serde_json::json!(raw_output);
+        }
+
+        let content = format!(
+            "Agent \"{}\" returned output that could not be processed by the message protocol.",
+            agent_name
+        );
+
+        match chat::create_message(
+            &self.db.pool,
+            session_id,
+            ChatSenderType::System,
+            None,
+            content,
+            Some(meta),
+        )
+        .await
+        {
+            Ok(message) => self.emit_message_new(session_id, message),
+            Err(err) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    run_id = %run_id,
+                    session_agent_id = %session_agent_id,
+                    agent_id = %agent_id,
+                    error = %err,
+                    "failed to persist protocol error system message"
+                );
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn process_agent_protocol_output(
+        &self,
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        agent_name: &str,
+        run_id: Uuid,
+        source_message_id: Uuid,
+        chain_depth: u32,
+        prompt_language: ResolvedPromptLanguage,
+        latest_assistant: &str,
+    ) -> Result<usize, ChatRunnerError> {
+        let output_is_empty = latest_assistant.trim().is_empty();
+        let protocol_messages = match Self::parse_agent_protocol_messages(latest_assistant) {
+            Ok(messages) => messages,
+            Err(err) => {
+                self.emit_protocol_error_message(
+                    session_id,
+                    session_agent_id,
+                    agent_id,
+                    run_id,
+                    agent_name,
+                    source_message_id,
+                    &err,
+                    output_is_empty,
+                    latest_assistant,
+                )
+                .await?;
+                return Ok(0);
+            }
+        };
+
+        for message in &protocol_messages {
+            let created_at = Utc::now().to_rfc3339();
+            match message.message_type {
+                AgentProtocolMessageType::Record => {
+                    let entry = SharedBlackboardEntry {
+                        session_id,
+                        run_id,
+                        session_agent_id,
+                        agent_id,
+                        owner: agent_name.to_string(),
+                        message_type: "record",
+                        content: message.content.clone(),
+                        created_at,
+                    };
+                    Self::append_jsonl_line(
+                        &Self::session_shared_blackboard_path(session_id),
+                        &entry,
+                    )
+                    .await?;
+                }
+                AgentProtocolMessageType::Artifact => {
+                    let entry = WorkRecordEntry {
+                        session_id,
+                        run_id,
+                        session_agent_id,
+                        agent_id,
+                        owner: agent_name.to_string(),
+                        message_type: "artifact",
+                        content: message.content.clone(),
+                        created_at,
+                    };
+                    Self::append_jsonl_line(&Self::session_work_records_path(session_id), &entry)
+                        .await?;
+                }
+                AgentProtocolMessageType::Conclusion => {
+                    let entry = WorkRecordEntry {
+                        session_id,
+                        run_id,
+                        session_agent_id,
+                        agent_id,
+                        owner: agent_name.to_string(),
+                        message_type: "conclusion",
+                        content: message.content.clone(),
+                        created_at,
+                    };
+                    Self::append_jsonl_line(&Self::session_work_records_path(session_id), &entry)
+                        .await?;
+                }
+                AgentProtocolMessageType::Send => {}
+            }
+        }
+
+        let session = ChatSession::find_by_id(&self.db.pool, session_id).await?;
+        let mut send_count = 0usize;
+
+        for (index, message) in protocol_messages.into_iter().enumerate() {
+            if !matches!(message.message_type, AgentProtocolMessageType::Send) {
+                continue;
+            }
+
+            let Some(target) = message.to.as_deref() else {
+                continue;
+            };
+            let content = Self::build_send_message_content(target, &message.content);
+            let meta = serde_json::json!({
+                "app_language": prompt_language.code,
+                "run_id": run_id,
+                "session_agent_id": session_agent_id,
+                "source_message_id": source_message_id,
+                "chain_depth": chain_depth + 1,
+                "protocol": {
+                    "type": "send",
+                    "to": target,
+                    "index": index,
+                }
+            });
+
+            let routed_message = chat::create_message(
+                &self.db.pool,
+                session_id,
+                ChatSenderType::Agent,
+                Some(agent_id),
+                content,
+                Some(meta),
+            )
+            .await?;
+
+            if let Some(ref session) = session {
+                self.handle_message(session, &routed_message).await;
+            } else {
+                self.emit_message_new(session_id, routed_message);
+            }
+
+            send_count += 1;
+        }
+
+        Ok(send_count)
     }
 
     fn spawn_log_forwarders(
@@ -2210,7 +3155,6 @@ impl ChatRunner {
         meta_path: PathBuf,
         workspace_path: PathBuf,
         run_dir: PathBuf,
-        reply_handle: Option<String>,
         failed_flag: Arc<AtomicBool>,
         chain_depth: u32,
         context_compacted: bool,
@@ -2218,6 +3162,7 @@ impl ChatRunner {
         runner: ChatRunner,
         source_message_id: Uuid,
         agent_name: String,
+        prompt_language: ResolvedPromptLanguage,
     ) {
         let db = self.db.clone();
         let sender = self.sender_for(session_id);
@@ -2391,7 +3336,7 @@ impl ChatRunner {
                             usage.clone()
                         } else {
                             // 璇诲彇input prompt杩涜浼扮畻
-                            let input_path = run_dir.join("input.txt");
+                            let input_path = run_dir.join("input.md");
                             let prompt_content =
                                 fs::read_to_string(&input_path).await.unwrap_or_default();
                             let estimated_input =
@@ -2440,32 +3385,27 @@ impl ChatRunner {
                         let _ = fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap())
                             .await;
 
-                        let final_content = ChatRunner::apply_reply_prefix(
-                            &latest_assistant,
-                            reply_handle.as_deref(),
-                        );
-
-                        if !final_content.trim().is_empty()
-                            && let Ok(message) = crate::services::chat::create_message(
-                                &db.pool,
+                        if let Err(err) = runner
+                            .process_agent_protocol_output(
                                 session_id,
-                                ChatSenderType::Agent,
-                                Some(agent_id),
-                                final_content.clone(),
-                                Some(meta.clone()),
+                                session_agent_id,
+                                agent_id,
+                                &agent_name,
+                                run_id,
+                                source_message_id,
+                                chain_depth,
+                                prompt_language,
+                                &latest_assistant,
                             )
                             .await
                         {
-                            // Call handle_message to process explicit routing directives
-                            // This enables AI-to-AI message forwarding (chain calls)
-                            if let Ok(Some(session)) =
-                                ChatSession::find_by_id(&db.pool, session_id).await
-                            {
-                                runner.handle_message(&session, &message).await;
-                            } else {
-                                // Fallback: emit MessageNew event if session lookup fails
-                                let _ = sender.send(ChatStreamEvent::MessageNew { message });
-                            }
+                            tracing::warn!(
+                                session_id = %session_id,
+                                run_id = %run_id,
+                                agent_id = %agent_id,
+                                error = %err,
+                                "failed to process agent protocol output"
+                            );
                         }
 
                         let _ = sender.send(ChatStreamEvent::AgentDelta {
@@ -2715,7 +3655,38 @@ impl ChatRunner {
 
 #[cfg(test)]
 mod tests {
-    use super::ChatRunner;
+    use chrono::Utc;
+    use db::models::chat_message::{ChatMessage, ChatSenderType};
+    use serde_json::json;
+    use uuid::Uuid;
+
+    use super::{
+        AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner,
+        PROTOCOL_OUTPUT_EXAMPLE_JSON,
+    };
+    use crate::services::config::UiLanguage;
+
+    fn test_message_with_sender(
+        sender_type: ChatSenderType,
+        sender_id: Option<Uuid>,
+        content: &str,
+        meta: serde_json::Value,
+    ) -> ChatMessage {
+        ChatMessage {
+            id: Uuid::new_v4(),
+            session_id: Uuid::new_v4(),
+            sender_type,
+            sender_id,
+            content: content.to_string(),
+            mentions: sqlx::types::Json(Vec::new()),
+            meta: sqlx::types::Json(meta),
+            created_at: Utc::now(),
+        }
+    }
+
+    fn test_message(content: &str, meta: serde_json::Value) -> ChatMessage {
+        test_message_with_sender(ChatSenderType::User, None, content, meta)
+    }
 
     #[test]
     fn parse_token_usage_from_codex_token_count_line() {
@@ -2731,5 +3702,160 @@ mod tests {
         let usage = ChatRunner::parse_token_usage_from_stdout_line(line).expect("usage");
         assert_eq!(usage.total_tokens, 14596);
         assert_eq!(usage.model_context_window, 258400);
+    }
+
+    #[test]
+    fn parse_agent_protocol_messages_supports_json_list() {
+        let content = r#"
+```json
+[
+  {"type":"send","to":"backend","content":"redo api"},
+  {"type":"record","content":"route=/chat"},
+  {"type":"artifact","content":"frontend/src/app.tsx"},
+  {"type":"conclusion","content":"waiting for backend confirmation"}
+]
+```
+"#;
+
+        let messages = ChatRunner::parse_agent_protocol_messages(content).expect("messages");
+        assert_eq!(messages.len(), 4);
+        assert!(matches!(
+            messages[0].message_type,
+            AgentProtocolMessageType::Send
+        ));
+        assert_eq!(messages[0].to.as_deref(), Some("backend"));
+        assert!(matches!(
+            messages[3].message_type,
+            AgentProtocolMessageType::Conclusion
+        ));
+    }
+
+    #[test]
+    fn parse_agent_protocol_messages_rejects_legacy_object() {
+        let content = r#"{
+  "send_to_member": { "target": "@architect", "content": "sync API changes" },
+  "send_to_user_important": "frontend done",
+  "record": "route=/chat",
+  "result": "backend API still pending"
+}"#;
+
+        let err = ChatRunner::parse_agent_protocol_messages(content).expect_err("error");
+        assert_eq!(err.code, ChatProtocolNoticeCode::NotJsonArray);
+    }
+
+    #[test]
+    fn parse_agent_protocol_messages_rejects_missing_send_target() {
+        let content = r#"[{"type":"send","content":"hello"}]"#;
+        let err = ChatRunner::parse_agent_protocol_messages(content).expect_err("error");
+        assert_eq!(err.code, ChatProtocolNoticeCode::MissingSendTarget);
+    }
+
+    #[test]
+    fn parse_agent_protocol_messages_rejects_empty_content() {
+        let content = r#"[{"type":"conclusion","content":"   "}]"#;
+        let err = ChatRunner::parse_agent_protocol_messages(content).expect_err("error");
+        assert_eq!(err.code, ChatProtocolNoticeCode::EmptyMessage);
+    }
+
+    #[test]
+    fn parse_agent_protocol_messages_reports_json_error_detail() {
+        let content = r#"
+```json
+[
+  {"type":"send","to":"backend","content":"bad "quote""}
+]
+```
+"#;
+
+        let err = ChatRunner::parse_agent_protocol_messages(content).expect_err("error");
+        assert_eq!(err.code, ChatProtocolNoticeCode::InvalidJson);
+        let detail = err.detail.expect("detail");
+        assert!(detail.contains("line"));
+        assert!(detail.contains("column"));
+    }
+
+    #[test]
+    fn protocol_output_example_json_is_valid() {
+        let messages =
+            ChatRunner::parse_agent_protocol_messages(PROTOCOL_OUTPUT_EXAMPLE_JSON).expect("json");
+        assert_eq!(messages.len(), 5);
+        assert!(matches!(
+            messages.first().map(|message| &message.message_type),
+            Some(AgentProtocolMessageType::Send)
+        ));
+    }
+
+    #[test]
+    fn resolve_prompt_language_from_value_returns_concrete_language_setting() {
+        let language = ChatRunner::resolve_prompt_language_from_value("zh-Hans").expect("language");
+        assert_eq!(language.setting, "simplified_chinese");
+        assert_eq!(language.code, "zh-Hans");
+        assert_eq!(
+            language.instruction,
+            "You MUST respond in Simplified Chinese."
+        );
+    }
+
+    #[test]
+    fn resolve_prompt_language_from_ui_language_never_returns_browser_setting() {
+        let language = ChatRunner::resolve_prompt_language_from_ui_language(&UiLanguage::Browser);
+        assert_eq!(language.setting, "english");
+        assert_eq!(language.code, "en");
+        assert_eq!(language.instruction, "You MUST respond in English.");
+    }
+
+    #[test]
+    fn resolve_prompt_language_uses_system_locale_when_browser_is_configured() {
+        let message = test_message("Please answer this in English.", serde_json::json!({}));
+        let language = ChatRunner::resolve_prompt_language_with_system_locale(
+            &message,
+            &UiLanguage::Browser,
+            Some("fr-CA"),
+        );
+        assert_eq!(language.setting, "french");
+        assert_eq!(language.code, "fr");
+        assert_eq!(language.instruction, "You MUST respond in French.");
+    }
+
+    #[test]
+    fn resolve_prompt_language_prefers_message_meta_over_system_locale() {
+        let message = test_message(
+            "Please answer this in English.",
+            serde_json::json!({ "app_language": "zh-Hant" }),
+        );
+        let language = ChatRunner::resolve_prompt_language_with_system_locale(
+            &message,
+            &UiLanguage::Browser,
+            Some("fr-CA"),
+        );
+        assert_eq!(language.setting, "traditional_chinese");
+        assert_eq!(language.code, "zh-Hant");
+        assert_eq!(
+            language.instruction,
+            "You MUST respond in Traditional Chinese."
+        );
+    }
+
+    #[test]
+    fn resolve_message_sender_identity_uses_agent_sender_label() {
+        let agent_id = Uuid::new_v4();
+        let message = test_message_with_sender(
+            ChatSenderType::Agent,
+            Some(agent_id),
+            "@product hello",
+            json!({
+                "sender": {
+                    "label": "architect",
+                    "name": "architect"
+                },
+                "structured": {
+                    "sender_label": "architect"
+                }
+            }),
+        );
+
+        let sender = ChatRunner::resolve_message_sender_identity(&message);
+        assert_eq!(sender.label, "architect");
+        assert_eq!(sender.address, "agent:architect");
     }
 }

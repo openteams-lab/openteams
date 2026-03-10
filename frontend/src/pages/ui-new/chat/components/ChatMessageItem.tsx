@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ChatEntryContainer } from '@/components/ui-new/primitives/conversation/ChatEntryContainer';
+import { ChatErrorMessage } from '@/components/ui-new/primitives/conversation/ChatErrorMessage';
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
 import { ChatSystemMessage } from '@/components/ui-new/primitives/conversation/ChatSystemMessage';
 import { chatApi } from '@/lib/api';
@@ -38,9 +39,9 @@ import {
   extractAttachments,
   detectApiError,
   formatBytes,
-  renderSendMessageDirectives,
   tryParseAgentResponse,
   buildAgentDisplayContent,
+  extractProtocolErrorMeta,
 } from '../utils';
 import { formatTokenCount } from '@/utils/string';
 
@@ -101,7 +102,6 @@ export function ChatMessageItem({
   activeSessionId,
   onAddAttachmentAsFile,
   onPreviewAttachment,
-  diffInfo,
   isArchived,
   onReply,
   isCleanupMode,
@@ -118,11 +118,6 @@ export function ChatMessageItem({
     ? getAgentAvatarStyle(agentAvatarSeed)
     : undefined;
 
-  const diffRunId = diffInfo?.runId ?? '';
-  const hasDiffInfo =
-    !!diffInfo &&
-    diffRunId.length > 0 &&
-    (diffInfo.available || diffInfo.untrackedFiles.length > 0);
   const referenceId =
     referenceMessage?.id ??
     (message.meta &&
@@ -142,12 +137,10 @@ export function ChatMessageItem({
   const parsedAgentResponse = isAgent ? tryParseAgentResponse(message.content) : null;
   const displayContent = (() => {
     if (!isAgent) return message.content;
-    // If new format is detected, use buildAgentDisplayContent
     if (parsedAgentResponse) {
       return buildAgentDisplayContent(parsedAgentResponse, senderLabel);
     }
-    // Fallback to old format rendering
-    return renderSendMessageDirectives(message.content);
+    return message.content;
   })();
 
   const meta = message.meta;
@@ -171,9 +164,53 @@ export function ChatMessageItem({
       ? tokenUsage.total_tokens
       : null;
   const isEstimated = tokenUsage?.is_estimated === true;
+  const protocolError = extractProtocolErrorMeta(message.meta);
 
   // System messages
   if (message.sender_type === ChatSenderType.system) {
+    if (protocolError) {
+      const summary = protocolError.reason?.trim() || message.content;
+      const detail = protocolError.detail?.trim() ?? '';
+      const rawOutput = protocolError.rawOutput?.trim() ?? '';
+
+      return (
+        <div className="chat-session-message-row is-system flex items-start gap-base">
+          {isCleanupMode && (
+            <button
+              type="button"
+              className="flex-shrink-0 mt-1"
+              onClick={onToggleSelect}
+            >
+              {isSelected ? (
+                <CheckSquareIcon
+                  className="size-icon text-brand"
+                  weight="fill"
+                />
+              ) : (
+                <SquareIcon className="size-icon text-low" />
+              )}
+            </button>
+          )}
+          <div className="flex-1 rounded-xl border border-[rgba(239,68,68,0.25)] bg-[rgba(239,68,68,0.06)] px-base py-base">
+            <ChatErrorMessage content={summary} expanded />
+            {detail && (
+              <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-border/60 bg-panel px-3 py-2 font-ibm-plex-mono text-xs text-low">
+                {detail}
+              </pre>
+            )}
+            {rawOutput && (
+              <div className="mt-3 rounded-lg border border-border/60 bg-panel px-3 py-3">
+                <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-low">
+                  Raw assistant output
+                </div>
+                <ChatMarkdown content={rawOutput} hideCopyButton />
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="chat-session-message-row is-system flex items-start gap-base">
         {isCleanupMode && (

@@ -61,7 +61,6 @@ class AnalyticsService {
   private flushInterval = 5000; // 5 seconds
   private maxQueueSize = 50;
   private isFlushing = false;
-  private flushTimer?: ReturnType<typeof setInterval>;
 
   constructor() {
     this.deviceId = this.getOrCreateDeviceId();
@@ -357,7 +356,7 @@ class AnalyticsService {
   // Start the flush timer
   private startFlushTimer() {
     if (typeof window !== 'undefined') {
-      this.flushTimer = setInterval(() => {
+      setInterval(() => {
         this.flush();
       }, this.flushInterval);
     }

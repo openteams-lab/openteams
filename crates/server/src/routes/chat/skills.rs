@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use axum::{Json, extract::State, response::Json as ResponseJson};
 use db::models::{
     analytics::{track_skill_assign, track_skill_disable, track_skill_enable, track_skill_install},
@@ -5,20 +7,21 @@ use db::models::{
     chat_skill::{ChatSkill, CreateChatSkill, UpdateChatSkill},
 };
 use deployment::Deployment;
-use serde::Deserialize;
-use std::str::FromStr;
 use executors::executors::BaseCodingAgent;
-use services::services::skill_registry::{
-    RemoteSkillMeta, RemoteSkillPackage, SkillCategory, SkillRegistryClient, builtin_skills_count,
-    filter_builtin_skills_by_agent, filter_builtin_skills_by_category, get_builtin_categories,
-    get_skill_with_fallback, install_builtin_skill, install_skill_files_to_global_directory,
-    install_skill_from_registry, list_categories_with_fallback, list_skills_with_fallback,
-    search_skills_with_fallback, sync_discovered_global_skills,
-    uninstall_skill_files_from_global_directory,
-};
-use services::services::native_skills::{
-    InstalledNativeSkill, NativeSkillError, list_native_skills_for_runner,
-    update_native_skill_enabled_for_runner,
+use serde::Deserialize;
+use services::services::{
+    native_skills::{
+        InstalledNativeSkill, NativeSkillError, list_native_skills_for_runner,
+        update_native_skill_enabled_for_runner,
+    },
+    skill_registry::{
+        RemoteSkillMeta, RemoteSkillPackage, SkillCategory, SkillRegistryClient,
+        builtin_skills_count, filter_builtin_skills_by_agent, filter_builtin_skills_by_category,
+        get_builtin_categories, get_skill_with_fallback, install_builtin_skill,
+        install_skill_files_to_global_directory, install_skill_from_registry,
+        list_categories_with_fallback, list_skills_with_fallback, search_skills_with_fallback,
+        sync_discovered_global_skills, uninstall_skill_files_from_global_directory,
+    },
 };
 use utils::response::ApiResponse;
 use uuid::Uuid;

@@ -183,48 +183,34 @@ pub fn parse_mentions(content: &str) -> Vec<String> {
 pub fn parse_send_message_directives(content: &str) -> Vec<String> {
     const PREFIX: &str = "[sendMessageTo@@";
 
-    let mut mentions = Vec::new();
-    let mut seen = HashSet::new();
+    let mut cleaned = String::with_capacity(content.len());
     let mut cursor = 0usize;
 
     while cursor < content.len() {
         let Some(prefix_rel) = content[cursor..].find(PREFIX) else {
+            cleaned.push_str(&content[cursor..]);
             break;
         };
-        let mut name_start = cursor + prefix_rel + PREFIX.len();
 
-        let (name_end, next_cursor) = if content[name_start..].starts_with('{') {
-            name_start += 1;
-            let Some(suffix_rel) = content[name_start..].find("}]") else {
-                cursor = name_start;
-                continue;
-            };
-            let name_end = name_start + suffix_rel;
-            (name_end, name_end + 2)
+        let prefix_start = cursor + prefix_rel;
+        cleaned.push_str(&content[cursor..prefix_start]);
+
+        let mut directive_start = prefix_start + PREFIX.len();
+        let next_cursor = if content[directive_start..].starts_with('{') {
+            directive_start += 1;
+            content[directive_start..]
+                .find("}]")
+                .map(|suffix_rel| directive_start + suffix_rel + 2)
         } else {
-            let Some(suffix_rel) = content[name_start..].find(']') else {
-                cursor = name_start;
-                continue;
-            };
-            let name_end = name_start + suffix_rel;
-            (name_end, name_end + 1)
+            content[directive_start..]
+                .find(']')
+                .map(|suffix_rel| directive_start + suffix_rel + 1)
         };
 
-        let name = content[name_start..name_end].trim();
-
-        if !name.is_empty()
-            && name
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
-            && seen.insert(name.to_string())
-        {
-            mentions.push(name.to_string());
-        }
-
-        cursor = next_cursor;
+        cursor = next_cursor.unwrap_or(content.len());
     }
 
-    mentions
+    parse_mentions(&cleaned)
 }
 
 pub async fn create_message(
@@ -348,11 +334,24 @@ pub async fn create_message_with_id(
     Ok(message)
 }
 
+pub fn is_protocol_notice_history_message(message: &ChatMessage) -> bool {
+    matches!(message.sender_type, ChatSenderType::System)
+        && message.meta.0.get("protocol_error").is_some()
+}
+
+pub fn should_include_message_in_history(message: &ChatMessage) -> bool {
+    !is_protocol_notice_history_message(message)
+}
+
 pub async fn build_structured_messages(
     pool: &SqlitePool,
     session_id: Uuid,
 ) -> Result<Vec<Value>, ChatServiceError> {
-    let messages = ChatMessage::find_by_session_id(pool, session_id, None).await?;
+    let messages = ChatMessage::find_by_session_id(pool, session_id, None)
+        .await?
+        .into_iter()
+        .filter(should_include_message_in_history)
+        .collect::<Vec<_>>();
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
@@ -460,7 +459,11 @@ pub async fn build_full_context(
     pool: &SqlitePool,
     session_id: Uuid,
 ) -> Result<CompactedContext, ChatServiceError> {
-    let all_messages = ChatMessage::find_by_session_id(pool, session_id, None).await?;
+    let all_messages = ChatMessage::find_by_session_id(pool, session_id, None)
+        .await?
+        .into_iter()
+        .filter(should_include_message_in_history)
+        .collect::<Vec<_>>();
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
@@ -563,7 +566,11 @@ pub async fn build_compacted_context(
     context_dir: Option<&std::path::Path>,
 ) -> Result<CompactedContext, ChatServiceError> {
     // Fetch all messages for the session
-    let all_messages = ChatMessage::find_by_session_id(pool, session_id, None).await?;
+    let all_messages = ChatMessage::find_by_session_id(pool, session_id, None)
+        .await?
+        .into_iter()
+        .filter(should_include_message_in_history)
+        .collect::<Vec<_>>();
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
@@ -665,7 +672,11 @@ pub async fn build_simplified_messages(
     pool: &SqlitePool,
     session_id: Uuid,
 ) -> Result<Vec<SimplifiedMessage>, ChatServiceError> {
-    let messages = ChatMessage::find_by_session_id(pool, session_id, None).await?;
+    let messages = ChatMessage::find_by_session_id(pool, session_id, None)
+        .await?
+        .into_iter()
+        .filter(should_include_message_in_history)
+        .collect::<Vec<_>>();
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
@@ -1768,14 +1779,18 @@ pub async fn compress_messages_if_needed(
 
 #[cfg(test)]
 mod tests {
-    use db::models::chat_session_agent::{ChatSessionAgent, ChatSessionAgentState};
+    use db::models::{
+        chat_message::{ChatMessage, ChatSenderType},
+        chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
+    };
     use sqlx::SqlitePool;
     use uuid::Uuid;
 
     use super::{
         CompressionType, SimplifiedMessage, all_agents_running, compress_messages_if_needed,
-        limit_summary_input_messages, parse_mentions, parse_send_message_directives,
-        prioritize_summary_agents, select_messages_to_compress_by_token,
+        is_protocol_notice_history_message, limit_summary_input_messages, parse_mentions,
+        parse_send_message_directives, prioritize_summary_agents,
+        select_messages_to_compress_by_token, should_include_message_in_history,
     };
 
     #[test]
@@ -1797,44 +1812,17 @@ mod tests {
     }
 
     #[test]
-    fn parses_send_message_directives_and_dedupes_targets() {
-        let mentions = parse_send_message_directives(
-            "notify [sendMessageTo@@{alice}] then [sendMessageTo@@{bob}] and [sendMessageTo@@{alice}]",
-        );
-        assert_eq!(mentions, vec!["alice", "bob"]);
-    }
-
-    #[test]
-    fn parse_send_message_directives_ignores_plain_at_mentions() {
+    fn parse_send_message_directives_supports_plain_at_mentions() {
         let mentions = parse_send_message_directives("@alice please review this");
-        assert!(mentions.is_empty());
+        assert_eq!(mentions, vec!["alice"]);
     }
 
     #[test]
-    fn parse_send_message_directives_ignores_invalid_targets() {
-        let mentions = parse_send_message_directives(
-            "[sendMessageTo@@] [sendMessageTo@@{bad target}] [sendMessageTo@@{ok_agent}]",
-        );
-        assert_eq!(mentions, vec!["ok_agent"]);
-    }
-
-    #[test]
-    fn parse_send_message_directives_supports_non_brace_targets() {
+    fn parse_send_message_directives_ignores_removed_legacy_syntax() {
         let mentions = parse_send_message_directives(
             "[sendMessageTo@@researcher] and [sendMessageTo@@{planner}]",
         );
-        assert_eq!(mentions, vec!["researcher", "planner"]);
-    }
-
-    #[test]
-    fn parse_send_message_directives_supports_unicode_targets() {
-        let mentions = parse_send_message_directives(
-            "[sendMessageTo@@{\u{5C0F}\u{660E}}] and [sendMessageTo@@{\u{30C6}\u{30B9}\u{30C8}-agent}]",
-        );
-        assert_eq!(
-            mentions,
-            vec!["\u{5C0F}\u{660E}", "\u{30C6}\u{30B9}\u{30C8}-agent"]
-        );
+        assert!(mentions.is_empty());
     }
 
     fn make_session_agent(state: ChatSessionAgentState) -> ChatSessionAgent {
@@ -1843,6 +1831,7 @@ mod tests {
             session_id: Uuid::new_v4(),
             agent_id: Uuid::new_v4(),
             state,
+            allowed_skill_ids: sqlx::types::Json(Vec::new()),
             workspace_path: None,
             pty_session_key: None,
             agent_session_id: None,
@@ -1982,6 +1971,39 @@ mod tests {
                 "\u{0645}\u{0637}\u{0648}\u{0631}_1",
             ]
         );
+    }
+
+    fn make_chat_message(sender_type: ChatSenderType, meta: serde_json::Value) -> ChatMessage {
+        ChatMessage {
+            id: Uuid::new_v4(),
+            session_id: Uuid::new_v4(),
+            sender_type,
+            sender_id: None,
+            content: "message".to_string(),
+            mentions: sqlx::types::Json(Vec::new()),
+            meta: sqlx::types::Json(meta),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn protocol_error_system_messages_are_excluded_from_history() {
+        let protocol_error = make_chat_message(
+            ChatSenderType::System,
+            serde_json::json!({
+                "protocol_error": {
+                    "reason": "Protocol error: message is empty."
+                }
+            }),
+        );
+        let normal_system = make_chat_message(ChatSenderType::System, serde_json::json!({}));
+        let agent_message = make_chat_message(ChatSenderType::Agent, serde_json::json!({}));
+
+        assert!(is_protocol_notice_history_message(&protocol_error));
+        assert!(!should_include_message_in_history(&protocol_error));
+        assert!(!is_protocol_notice_history_message(&normal_system));
+        assert!(should_include_message_in_history(&normal_system));
+        assert!(should_include_message_in_history(&agent_message));
     }
 
     #[tokio::test]

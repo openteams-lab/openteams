@@ -23,6 +23,7 @@ import {
   type ChatTeamPreset,
 } from 'shared/types';
 import { ApiError, chatApi, configApi } from '@/lib/api';
+import { resolveAppLanguageCode } from '@/i18n/languages';
 import { cn } from '@/lib/utils';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useTheme } from '@/components/ThemeProvider';
@@ -63,6 +64,7 @@ import {
   extractRunId,
   extractReferenceId,
   extractAttachments,
+  extractProtocolErrorMeta,
   truncateText,
   sanitizeHandle,
 } from './chat';
@@ -89,6 +91,8 @@ import { PromptEditorModal } from './chat/components/PromptEditorModal';
 import { ConfirmModal } from './chat/components/ConfirmModal';
 import { FilePreviewModal } from './chat/components/FilePreviewModal';
 import { SkillsPanel } from './chat/components/SkillsPanel';
+import { ChatSystemMessage } from '@/components/ui-new/primitives/conversation/ChatSystemMessage';
+import type { ChatProtocolNotice } from './chat/hooks/useChatWebSocket';
 
 const mentionStatusPriority: Record<MentionStatus, number> = {
   received: 0,
@@ -143,6 +147,10 @@ const isTextAttachment = (file: File) =>
     '.bash',
     '.svg',
   ].some((ext) => file.name.toLowerCase().endsWith(ext));
+
+const isProtocolErrorMessage = (message: ChatMessage) =>
+  message.sender_type === ChatSenderType.system &&
+  extractProtocolErrorMeta(message.meta) !== null;
 
 const MAX_SESSION_TITLE_LENGTH = 20;
 const COLLAPSED_LEFT_SIDEBAR_WIDTH = 52;
@@ -234,7 +242,7 @@ const getArtifactSpotlightKey = (artifact: ArtifactSpotlight | null) => {
     : `diff:${artifact.runId}`;
 };
 
-function ArtifactSpotlightCard({
+export function ArtifactSpotlightCard({
   artifact,
   title,
   openLabel,
@@ -568,7 +576,7 @@ function WorkspacePreviewPane({
 }
 
 export function ChatSessions() {
-  const { t } = useTranslation('chat');
+  const { t, i18n } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
   const { sessionId } = useParams<{ sessionId?: string }>();
   const navigate = useNavigate();
@@ -576,6 +584,11 @@ export function ChatSessions() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const promptFileInputRef = useRef<HTMLInputElement | null>(null);
   const { config, profiles, loginStatus } = useUserSystem();
+  const appLanguage = resolveAppLanguageCode(
+    config?.language,
+    i18n.resolvedLanguage || i18n.language,
+    i18n.services.languageDetector?.detect()
+  );
   const { theme } = useTheme();
   const actualTheme = getActualTheme(theme);
 
@@ -604,6 +617,7 @@ export function ChatSessions() {
       ? sessionId
       : null
     : (sortedSessions[0]?.id ?? null);
+  const visibleMessagesData = useMemo(() => messagesData, [messagesData]);
   const notificationsRef = useRef(config?.notifications ?? null);
   const sessionTitleByIdRef = useRef<Map<string, string>>(new Map());
   const agentByIdRef = useRef(agentById);
@@ -660,6 +674,7 @@ export function ChatSessions() {
   const handleIncomingMessage = useCallback(
     (message: ChatMessage) => {
       upsertMessage(message);
+      if (isProtocolErrorMessage(message)) return;
 
       const notifications = notificationsRef.current;
       if (!notifications || message.sender_type === ChatSenderType.user) return;
@@ -753,11 +768,13 @@ export function ChatSessions() {
     agentStateInfos,
     mentionStatuses,
     compressionWarning,
+    protocolNotices,
     setAgentStates,
     setAgentStateInfos,
     setMentionStatuses,
     pruneStreamingRunsForSession,
     clearCompressionWarning,
+    dismissProtocolNotice,
   } = useChatWebSocket(activeSessionId, handleIncomingMessage);
 
   // Mutations
@@ -963,18 +980,18 @@ const resizeStartRef = useRef<{
   // Sync messages from query
   useEffect(() => {
     if (activeSessionId) {
-      setMessages(messagesData);
+      setMessages(visibleMessagesData);
     } else {
       setMessages([]);
     }
-  }, [messagesData, activeSessionId]);
+  }, [visibleMessagesData, activeSessionId]);
 
   useEffect(() => {
-    if (messagesData.length === 0) return;
+    if (visibleMessagesData.length === 0) return;
     setMentionStatuses((prev) => {
       let changed = false;
       const next = new Map(prev);
-      for (const message of messagesData) {
+      for (const message of visibleMessagesData) {
         const meta = message.meta;
         if (!meta || typeof meta !== 'object' || Array.isArray(meta)) continue;
         const rawStatuses = (meta as { mention_statuses?: unknown })
@@ -1009,7 +1026,7 @@ const resizeStartRef = useRef<{
       }
       return changed ? next : prev;
     });
-  }, [messagesData, setMentionStatuses]);
+  }, [visibleMessagesData, setMentionStatuses]);
 
   // Reset state on session change
   useEffect(() => {
@@ -1248,6 +1265,7 @@ const resizeStartRef = useRef<{
     }
     return sum;
   }, [messageList]);
+  void totalTokens;
   const runHistory = useRunHistory(messages);
 
   const activeSession = useMemo(
@@ -1408,6 +1426,38 @@ const resizeStartRef = useRef<{
         ),
     [runHistory, workspaceAgentId]
   );
+  const formatProtocolNoticeContent = useCallback(
+    (notice: ChatProtocolNotice) => {
+      const values = {
+        agent: notice.agent_name,
+        target: notice.target ?? '',
+      };
+      const summary = (() => {
+        switch (notice.code) {
+          case 'invalid_json':
+            return t('protocolNotice.invalidJson', values);
+          case 'not_json_array':
+            return t('protocolNotice.notJsonArray', values);
+          case 'empty_message':
+            return t('protocolNotice.emptyMessage', values);
+          case 'missing_send_target':
+            return t('protocolNotice.missingSendTarget', values);
+          case 'invalid_send_target':
+            return t('protocolNotice.invalidSendTarget', values);
+          default:
+            return t('protocolNotice.invalidJson', values);
+        }
+      })();
+
+      const detail =
+        'detail' in notice && typeof notice.detail === 'string'
+          ? notice.detail.trim()
+          : '';
+
+      return detail ? `${summary}\n${detail}` : summary;
+    },
+    [t]
+  );
 
   const canSend =
     !!activeSessionId &&
@@ -1424,7 +1474,7 @@ const resizeStartRef = useRef<{
     if (!activeSessionId) return;
 
     const completedRunIds = new Set<string>();
-    for (const message of messagesData) {
+    for (const message of visibleMessagesData) {
       const runId = extractRunId(message.meta);
       if (runId) {
         completedRunIds.add(runId);
@@ -1447,7 +1497,7 @@ const resizeStartRef = useRef<{
   }, [
     activeSessionId,
     agentStates,
-    messagesData,
+    visibleMessagesData,
     pruneStreamingRunsForSession,
     sessionMembers,
   ]);
@@ -1612,6 +1662,7 @@ const resizeStartRef = useRef<{
     lastMessageId,
     streamingRunCount,
     placeholderAgents.length,
+    protocolNotices.length,
   ]);
 
   useEffect(() => {
@@ -2048,6 +2099,7 @@ const resizeStartRef = useRef<{
   const doSendMessage = async (content: string) => {
     if (!activeSessionId) return;
     const meta: JsonValue = {
+      app_language: appLanguage,
       sender_handle: senderHandle,
       ...(replyToMessage
         ? { reference: { message_id: replyToMessage.id } }
@@ -2098,6 +2150,7 @@ const resizeStartRef = useRef<{
         activeSessionId,
         allowedFiles,
         {
+          appLanguage,
           senderHandle,
           content: options?.content,
           referenceMessageId: options?.referenceMessageId,
@@ -3306,14 +3359,13 @@ isDeletingMessages={isDeletingMessages}
                 ref={messagesContainerRef}
                 className="chat-session-messages flex-1 min-h-0 overflow-y-auto p-base pb-[40px] space-y-base"
               >
-              <div className="chat-session-message-column space-y-base">
+              <div className="chat-session-message-column space-y-double">
                 {isLoading && (
-                  <div className="text-sm text-low">Loading chat...</div>
+                  <div className="text-sm text-low">{t('timeline.loading')}</div>
                 )}
                 {isArchived && !isLoading && (
                   <div className="text-xs text-low border border-border rounded-sm bg-secondary/60 px-base py-half">
-                    This session is archived. Messages and members are
-                    read-only.
+                    {t('timeline.archivedReadonly')}
                   </div>
                 )}
                 {compressionWarning && (
@@ -3339,16 +3391,16 @@ isDeletingMessages={isDeletingMessages}
                   </div>
                 )}
                 {!isLoading && messageList.length === 0 && (
-                  <div className="text-sm text-low">
-                    No messages yet. Start the conversation below.
-                  </div>
+                  <div className="text-sm text-low">{t('timeline.empty')}</div>
                 )}
                 {!isLoading &&
                   messageList.length > 0 &&
                   trimmedMessageSearchQuery &&
                   filteredMessageList.length === 0 && (
                     <div className="text-sm text-low">
-                      No messages match "{messageSearchQuery.trim()}".
+                      {t('timeline.noMatches', {
+                        query: messageSearchQuery.trim(),
+                      })}
                     </div>
                   )}
 
@@ -3441,6 +3493,39 @@ isDeletingMessages={isDeletingMessages}
                         });
                       }}
                     />
+                  );
+                })}
+                {protocolNotices.map((notice) => {
+                  const isEmptyMessageNotice = notice.code === 'empty_message';
+
+                  return (
+                    <div
+                      key={notice.id}
+                      className="chat-session-message-row is-system flex justify-start"
+                    >
+                      <div className="w-[600px] max-w-full rounded-2xl bg-[#F3F4F6] px-base py-half">
+                        <div className="flex items-start justify-between gap-base">
+                          <div className="min-w-0 flex-1">
+                            <ChatSystemMessage
+                              content={formatProtocolNoticeContent(notice)}
+                              expanded
+                              className={
+                                isEmptyMessageNotice
+                                  ? 'text-[#6B7280]'
+                                  : 'text-[#4B5563]'
+                              }
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className="shrink-0 bg-transparent p-0 text-xs text-[#5094FB] hover:text-[#5094FB]/80"
+                            onClick={() => dismissProtocolNotice(notice.id)}
+                          >
+                            {t('protocolNotice.dismiss')}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
 

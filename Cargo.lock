@@ -6331,6 +6331,7 @@ dependencies = [
  "sqlx",
  "strum",
  "strum_macros",
+ "sys-locale",
  "tempfile",
  "thiserror 2.0.18",
  "tiktoken-rs",

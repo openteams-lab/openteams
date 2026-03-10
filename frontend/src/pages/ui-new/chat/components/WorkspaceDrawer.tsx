@@ -64,7 +64,7 @@ export function WorkspaceDrawer({
       >
         <div className="chat-session-workspace-drawer-header px-base py-base border-b border-border shrink-0 flex items-center justify-between">
           <div className="min-w-0">
-            <div className="chat-session-workspace-drawer-eyebrow">
+            <div className="chat-session-workspace-drawer-eyebrow text-[#5094FB]">
               {t('modals.workspaceDrawer.workspaceTrail')}
             </div>
             <div className="text-sm text-normal font-medium truncate">
@@ -91,7 +91,7 @@ export function WorkspaceDrawer({
                 className="chat-session-workspace-path-card"
                 title={workspacePath}
               >
-                <div className="chat-session-workspace-path-label">
+                <div className="chat-session-workspace-path-label text-[#5094FB]">
                   <FolderNotchOpenIcon className="size-icon-xs" />
                   <span>{t('modals.workspaceDrawer.workspaceTrail')}</span>
                 </div>

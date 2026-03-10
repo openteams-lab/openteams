@@ -73,6 +73,7 @@ fn generate_types_content() -> String {
         services::services::native_skills::InstalledNativeSkill::decl(),
         services::services::chat_runner::ChatStreamEvent::decl(),
         services::services::chat_runner::ChatStreamDeltaType::decl(),
+        services::services::chat_runner::ChatProtocolNoticeCode::decl(),
         services::services::chat_runner::MentionStatus::decl(),
         services::services::chat_runner::CompressionWarning::decl(),
         db::models::image::Image::decl(),

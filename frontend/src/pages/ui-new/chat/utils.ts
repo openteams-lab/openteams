@@ -40,36 +40,44 @@ export function extractMentions(content: string): Set<string> {
   return mentions;
 }
 
-const sendMessageDirectiveRegex =
-  /\[sendMessageTo@@(?:\{([^}\]]+)\}|([^\]\s]+))\]/g;
-
-// Agent response JSON format for structured output
-export interface AgentMemberMessage {
-  target: string;
+export interface AgentProtocolMessage {
+  type: 'send' | 'record' | 'artifact' | 'conclusion' | 'artiface';
+  to?: string;
   content: string;
 }
 
-export interface AgentResponse {
-  send_to_member?: AgentMemberMessage | null;
-  send_to_user_important?: string | null;
-  record?: string | null;
-  result: string;
+export interface ParsedAgentResponse {
+  sendMessages: Array<{
+    target: string;
+    content: string;
+  }>;
+}
+
+export interface ChatProtocolErrorMeta {
+  code: string | null;
+  reason: string | null;
+  detail: string | null;
+  target: string | null;
+  agentName: string | null;
+  sourceMessageId: string | null;
+  outputIsEmpty: boolean;
+  rawOutput: string | null;
 }
 
 /**
  * Try to parse agent response JSON from message content
  * Returns null if parsing fails or content is not in expected format
  */
-export function tryParseAgentResponse(content: string): AgentResponse | null {
+export function tryParseAgentResponse(content: string): ParsedAgentResponse | null {
   if (!content || typeof content !== 'string') return null;
 
   const trimmed = content.trim();
 
   // Try direct JSON parse first
   try {
-    const parsed = JSON.parse(trimmed);
-    if (isValidAgentResponse(parsed)) {
-      return parsed;
+    const normalized = normalizeAgentResponse(JSON.parse(trimmed));
+    if (normalized) {
+      return normalized;
     }
   } catch {
     // Continue to try other formats
@@ -79,9 +87,9 @@ export function tryParseAgentResponse(content: string): AgentResponse | null {
   const jsonBlockMatch = trimmed.match(/```json\s*\n?([\s\S]*?)\n?```/);
   if (jsonBlockMatch) {
     try {
-      const parsed = JSON.parse(jsonBlockMatch[1].trim());
-      if (isValidAgentResponse(parsed)) {
-        return parsed;
+      const normalized = normalizeAgentResponse(JSON.parse(jsonBlockMatch[1].trim()));
+      if (normalized) {
+        return normalized;
       }
     } catch {
       // Continue to try other formats
@@ -94,15 +102,15 @@ export function tryParseAgentResponse(content: string): AgentResponse | null {
     const blockContent = codeBlockMatch[1].trim();
     // Skip language identifier if present
     const lines = blockContent.split('\n');
-    const jsonContent = lines[0].startsWith('{')
+    const jsonContent = lines[0].startsWith('[')
       ? blockContent
       : lines.slice(1).join('\n').trim();
 
-    if (jsonContent.startsWith('{')) {
+    if (jsonContent.startsWith('[')) {
       try {
-        const parsed = JSON.parse(jsonContent);
-        if (isValidAgentResponse(parsed)) {
-          return parsed;
+        const normalized = normalizeAgentResponse(JSON.parse(jsonContent));
+        if (normalized) {
+          return normalized;
         }
       } catch {
         // Continue to try other formats
@@ -110,13 +118,13 @@ export function tryParseAgentResponse(content: string): AgentResponse | null {
     }
   }
 
-  // Try to find raw JSON object
-  const jsonObjMatch = trimmed.match(/\{[\s\S]*\}/);
-  if (jsonObjMatch) {
+  // Try to find raw JSON array
+  const jsonArrayMatch = trimmed.match(/\[[\s\S]*\]/);
+  if (jsonArrayMatch) {
     try {
-      const parsed = JSON.parse(jsonObjMatch[0]);
-      if (isValidAgentResponse(parsed)) {
-        return parsed;
+      const normalized = normalizeAgentResponse(JSON.parse(jsonArrayMatch[0]));
+      if (normalized) {
+        return normalized;
       }
     } catch {
       // Parsing failed
@@ -126,35 +134,60 @@ export function tryParseAgentResponse(content: string): AgentResponse | null {
   return null;
 }
 
-function isValidAgentResponse(obj: unknown): obj is AgentResponse {
-  if (!obj || typeof obj !== 'object') return false;
-  const response = obj as Record<string, unknown>;
-  // result field is required and must be a string
-  return typeof response.result === 'string';
+function isValidProtocolMessage(obj: unknown): obj is AgentProtocolMessage {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  const message = obj as Record<string, unknown>;
+  if (typeof message.type !== 'string' || typeof message.content !== 'string') {
+    return false;
+  }
+  if (!['send', 'record', 'artifact', 'conclusion', 'artiface'].includes(message.type)) {
+    return false;
+  }
+  if (message.type === 'send') {
+    return typeof message.to === 'string';
+  }
+  return true;
+}
+
+function normalizeTarget(target: string): string {
+  const normalized = target.trim().replace(/^@/, '');
+  return normalized.toLowerCase() === 'user' ? 'you' : normalized;
+}
+
+function normalizeAgentResponse(obj: unknown): ParsedAgentResponse | null {
+  if (!Array.isArray(obj)) {
+    return null;
+  }
+
+  if (!obj.every((item) => isValidProtocolMessage(item))) {
+    return null;
+  }
+
+  return {
+    sendMessages: obj
+      .filter((item) => item.type === 'send')
+      .map((item) => ({
+        target: normalizeTarget(item.to ?? ''),
+        content: item.content.trim(),
+      }))
+      .filter((item) => item.target.length > 0),
+  };
 }
 
 /**
  * Build display content from agent response
- * Only shows send_to_member and send_to_user_important fields
+ * Only shows routed send items
  */
 export function buildAgentDisplayContent(
-  response: AgentResponse,
+  response: ParsedAgentResponse,
   agentName: string
 ): string {
-  let content = '';
+  let content = response.sendMessages
+    .map(({ target, content: messageContent }) =>
+      messageContent ? `@${target} ${messageContent}` : `@${target}`
+    )
+    .join('\n\n');
 
-  // Add send_to_member content with @mention
-  if (response.send_to_member) {
-    const target = response.send_to_member.target.replace(/^@/, '');
-    content += `@${target} ${response.send_to_member.content}\n\n`;
-  }
-
-  // Add send_to_user_important content
-  if (response.send_to_user_important?.trim()) {
-    content += response.send_to_user_important;
-  }
-
-  // If both are empty, show minimal status
   if (!content.trim()) {
     content = `[${agentName} completed task]`;
   }
@@ -165,38 +198,66 @@ export function buildAgentDisplayContent(
 /**
  * Extract routing target from agent response
  */
-export function extractAgentResponseTarget(response: AgentResponse): string | null {
-  if (!response.send_to_member) return null;
-  const target = response.send_to_member.target.trim().replace(/^@/, '');
+export function extractAgentResponseTarget(
+  response: ParsedAgentResponse
+): string | null {
+  const target = response.sendMessages[0]?.target?.trim() ?? '';
   return target.length > 0 ? target : null;
-}
-
-function isValidDirectiveTarget(target: string): boolean {
-  if (!target) return false;
-  return [...target].every((char) => {
-    if (char === '_' || char === '-') return true;
-    return /[\p{L}\p{N}]/u.test(char);
-  });
-}
-
-export function renderSendMessageDirectives(content: string): string {
-  return content.replace(
-    sendMessageDirectiveRegex,
-    (fullMatch, rawTargetWithBrace: string, rawTargetNoBrace: string) => {
-      const rawTarget = rawTargetWithBrace ?? rawTargetNoBrace ?? '';
-      const target = rawTarget.trim();
-      if (!isValidDirectiveTarget(target)) return fullMatch;
-      // Render as disabled in-app link to get consistent blue styling.
-      const anchor = `#session-agent-${encodeURIComponent(target)}`;
-      return `[${target}](${anchor})`;
-    }
-  );
 }
 
 export function extractRunId(meta: unknown): string | null {
   if (!meta || typeof meta !== 'object') return null;
   const runId = (meta as { run_id?: unknown }).run_id;
   return typeof runId === 'string' ? runId : null;
+}
+
+export function extractProtocolErrorMeta(
+  meta: unknown
+): ChatProtocolErrorMeta | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+
+  const rawProtocolError = (meta as { protocol_error?: unknown }).protocol_error;
+  if (
+    !rawProtocolError ||
+    typeof rawProtocolError !== 'object' ||
+    Array.isArray(rawProtocolError)
+  ) {
+    return null;
+  }
+
+  const protocolError = rawProtocolError as {
+    code?: unknown;
+    reason?: unknown;
+    detail?: unknown;
+    target?: unknown;
+    agent_name?: unknown;
+    source_message_id?: unknown;
+    output_is_empty?: unknown;
+    raw_output?: unknown;
+  };
+
+  return {
+    code: typeof protocolError.code === 'string' ? protocolError.code : null,
+    reason:
+      typeof protocolError.reason === 'string' ? protocolError.reason : null,
+    detail:
+      typeof protocolError.detail === 'string' ? protocolError.detail : null,
+    target:
+      typeof protocolError.target === 'string' ? protocolError.target : null,
+    agentName:
+      typeof protocolError.agent_name === 'string'
+        ? protocolError.agent_name
+        : null,
+    sourceMessageId:
+      typeof protocolError.source_message_id === 'string'
+        ? protocolError.source_message_id
+        : null,
+    outputIsEmpty: protocolError.output_is_empty === true,
+    rawOutput:
+      typeof protocolError.raw_output === 'string'
+        ? protocolError.raw_output
+        : null,
+  };
 }
 
 export function sanitizeHandle(value: string | null | undefined): string {

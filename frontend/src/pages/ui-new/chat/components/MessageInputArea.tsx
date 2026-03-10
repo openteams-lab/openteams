@@ -151,7 +151,7 @@ export function MessageInputArea({
     <div className="chat-session-input-area shrink-0">
       <div className="chat-session-input-shell">
         {replyToMessage && (
-          <div className="chat-session-reply-card border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
+          <div className="chat-session-reply-card border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
             <div className="flex items-center justify-between gap-base">
               <span className="font-medium text-normal">
                 {t('input.replyingTo', {
@@ -160,7 +160,7 @@ export function MessageInputArea({
               </span>
               <button
                 type="button"
-                className="chat-session-reply-cancel text-brand hover:text-brand-hover"
+                className="chat-session-reply-cancel"
                 onClick={onCancelReply}
               >
                 {tCommon('buttons.cancel')}
