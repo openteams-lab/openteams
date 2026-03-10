@@ -48,6 +48,80 @@ export function uiLanguageToI18nCode(uiLang: string): string | undefined {
 }
 
 /**
+ * Normalize the currently resolved app language to a concrete supported code.
+ * This avoids passing symbolic values like `BROWSER` into downstream protocols.
+ */
+export function normalizeAppLanguageCode(
+  langCode: string | undefined | null
+): string {
+  if (!langCode) {
+    return 'en';
+  }
+
+  const normalized = langCode.trim().replaceAll('_', '-').toLowerCase();
+  if (!normalized) {
+    return 'en';
+  }
+
+  if (
+    normalized === 'zh-hant' ||
+    normalized.startsWith('zh-hant-') ||
+    normalized.startsWith('zh-tw') ||
+    normalized.startsWith('zh-hk') ||
+    normalized.startsWith('zh-mo')
+  ) {
+    return 'zh-Hant';
+  }
+
+  if (
+    normalized === 'zh' ||
+    normalized === 'zh-hans' ||
+    normalized.startsWith('zh-hans-') ||
+    normalized.startsWith('zh-cn') ||
+    normalized.startsWith('zh-sg') ||
+    normalized.startsWith('zh-')
+  ) {
+    return 'zh-Hans';
+  }
+
+  if (normalized === 'fr' || normalized.startsWith('fr-')) {
+    return 'fr';
+  }
+
+  if (normalized === 'ja' || normalized.startsWith('ja-')) {
+    return 'ja';
+  }
+
+  if (normalized === 'es' || normalized.startsWith('es-')) {
+    return 'es';
+  }
+
+  if (normalized === 'ko' || normalized.startsWith('ko-')) {
+    return 'ko';
+  }
+
+  return 'en';
+}
+
+export function resolveAppLanguageCode(
+  uiLanguage: string | undefined | null,
+  currentLanguage: string | undefined | null,
+  detectedLanguage?: string | readonly string[] | null
+): string {
+  if (uiLanguage === 'BROWSER') {
+    const detected = Array.isArray(detectedLanguage)
+      ? detectedLanguage[0]
+      : detectedLanguage;
+    return normalizeAppLanguageCode(detected || currentLanguage);
+  }
+
+  const configuredLanguage = uiLanguage
+    ? uiLanguageToI18nCode(uiLanguage)
+    : undefined;
+  return normalizeAppLanguageCode(configuredLanguage || currentLanguage);
+}
+
+/**
  * Get the native name (endonym) of a language using Intl.DisplayNames
  */
 function getEndonym(langCode: string): string {

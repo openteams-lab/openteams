@@ -1523,6 +1523,7 @@ export const chatApi = {
       senderHandle?: string;
       content?: string;
       referenceMessageId?: string;
+      appLanguage?: string;
     }
   ): Promise<ChatMessage> => {
     const form = new FormData();
@@ -1537,6 +1538,9 @@ export const chatApi = {
     }
     if (options?.referenceMessageId) {
       form.append('reference_message_id', options.referenceMessageId);
+    }
+    if (options?.appLanguage) {
+      form.append('app_language', options.appLanguage);
     }
 
     const response = await fetch(

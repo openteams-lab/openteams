@@ -82,6 +82,8 @@ export function SessionListSidebar({
 }: SessionListSidebarProps) {
   const { t } = useTranslation('chat');
   const [contextMenuSession, setContextMenuSession] = useState<ChatSession | null>(null);
+  const hasNoSessions =
+    activeSessions.length === 0 && archivedSessions.length === 0;
   const appVersion = __APP_VERSION__.trim();
   const appVersionLabel = appVersion.startsWith('v')
     ? appVersion
@@ -309,6 +311,7 @@ const handleContextMenu = (e: React.MouseEvent, session: ChatSession) => {
               disabled={isCreating}
               className={cn(
                 'chat-session-function-btn',
+                hasNoSessions && 'chat-session-function-btn-empty-state',
                 isCreating && 'opacity-60 cursor-not-allowed'
               )}
               aria-label={t('sidebar.createNewSession')}

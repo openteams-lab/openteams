@@ -17,7 +17,23 @@ import { chatApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 
-function formatDownloadCount(count: number): string {
+function formatScaledBigInt(
+  count: bigint,
+  divisor: bigint,
+  suffix: string
+): string {
+  const whole = count / divisor;
+  const decimal = (count % divisor) / (divisor / 10n);
+  return `${whole}.${decimal}${suffix}`;
+}
+
+function formatDownloadCount(count: bigint | number): string {
+  if (typeof count === 'bigint') {
+    if (count >= 1000000n) return formatScaledBigInt(count, 1000000n, 'M');
+    if (count >= 1000n) return formatScaledBigInt(count, 1000n, 'K');
+    return count.toString();
+  }
+
   if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
   if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
   return count.toString();
@@ -260,7 +276,7 @@ export function SkillMarketplace({
                             <span className="text-xs text-normal truncate">
                               {skill.name}
                             </span>
-                            {skill.download_count != null && skill.download_count > 0 && (
+                            {skill.download_count != null && skill.download_count > 0n && (
                               <span className="text-[10px] text-low shrink-0 flex items-center gap-0.5">
                                 <DownloadIcon size={10} />
                                 {formatDownloadCount(skill.download_count)}
@@ -330,7 +346,7 @@ export function SkillMarketplace({
                           <span className="text-xs text-normal truncate">
                             {skill.name}
                           </span>
-                          {skill.download_count > 0 && (
+                          {skill.download_count > 0n && (
                             <span className="text-[10px] text-low shrink-0 flex items-center gap-0.5">
                               <DownloadIcon size={10} />
                               {formatDownloadCount(skill.download_count)}

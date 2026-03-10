@@ -110,8 +110,11 @@ pub async fn get_messages(
     State(deployment): State<DeploymentImpl>,
     Query(query): Query<ChatMessageListQuery>,
 ) -> Result<ResponseJson<ApiResponse<Vec<ChatMessage>>>, ApiError> {
-    let messages =
-        ChatMessage::find_by_session_id(&deployment.db().pool, session.id, query.limit).await?;
+    let messages = ChatMessage::find_by_session_id(&deployment.db().pool, session.id, query.limit)
+        .await?
+        .into_iter()
+        .filter(services::services::chat::should_include_message_in_history)
+        .collect();
     Ok(ResponseJson(ApiResponse::success(messages)))
 }
 
@@ -144,6 +147,7 @@ pub async fn upload_message_attachments(
     mut multipart: Multipart,
 ) -> Result<ResponseJson<ApiResponse<ChatMessage>>, ApiError> {
     let message_id = Uuid::new_v4();
+    let mut app_language: Option<String> = None;
     let mut content: Option<String> = None;
     let mut sender_handle: Option<String> = None;
     let mut reference_message_id: Option<Uuid> = None;
@@ -161,6 +165,13 @@ pub async fn upload_message_attachments(
                 let text = field.text().await?;
                 if !text.trim().is_empty() {
                     sender_handle = Some(text);
+                }
+            }
+            Some("app_language") => {
+                let text = field.text().await?;
+                let language = text.trim();
+                if !language.is_empty() {
+                    app_language = Some(language.to_string());
                 }
             }
             Some("reference_message_id") => {
@@ -226,6 +237,9 @@ pub async fn upload_message_attachments(
     let content = content.unwrap_or(fallback_content);
 
     let mut meta = serde_json::json!({ "attachments": attachments });
+    if let Some(language) = app_language {
+        meta["app_language"] = serde_json::json!(language);
+    }
     if let Some(handle) = sender_handle {
         meta["sender_handle"] = serde_json::json!(handle);
     }

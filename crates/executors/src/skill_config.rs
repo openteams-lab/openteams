@@ -115,7 +115,9 @@ async fn write_native_skill_config(
     write_agent_config(config_path, &skill_config_template(is_toml), config).await
 }
 
-async fn discover_skill_files(roots: &[PathBuf]) -> Result<Vec<NativeDiscoveredSkill>, ExecutorError> {
+async fn discover_skill_files(
+    roots: &[PathBuf],
+) -> Result<Vec<NativeDiscoveredSkill>, ExecutorError> {
     let mut discovered = HashMap::<String, NativeDiscoveredSkill>::new();
 
     for root in roots {
@@ -150,14 +152,16 @@ async fn discover_skill_files(roots: &[PathBuf]) -> Result<Vec<NativeDiscoveredS
             let raw = fs::read_to_string(&skill_file).await?;
             let name = parse_skill_name(&dir_name, &raw);
             let slug = slugify_skill_name(&name);
-            discovered.entry(slug.clone()).or_insert(NativeDiscoveredSkill {
-                name,
-                slug,
-                path: skill_file,
-                enabled: true,
-                can_toggle: false,
-                config_path: None,
-            });
+            discovered
+                .entry(slug.clone())
+                .or_insert(NativeDiscoveredSkill {
+                    name,
+                    slug,
+                    path: skill_file,
+                    enabled: true,
+                    can_toggle: false,
+                    config_path: None,
+                });
         }
     }
 
@@ -248,7 +252,12 @@ fn codex_skill_enabled(config: &Value, skill_path: &Path) -> bool {
                     return None;
                 }
 
-                Some(entry.get("enabled").and_then(Value::as_bool).unwrap_or(true))
+                Some(
+                    entry
+                        .get("enabled")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(true),
+                )
             })
         })
         .unwrap_or(true)
