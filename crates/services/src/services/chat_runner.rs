@@ -69,14 +69,22 @@ const RUN_RECORDS_DIR_NAME: &str = "run_records";
 const SHARED_PROTOCOL_DIR_NAME: &str = "protocol";
 const SHARED_BLACKBOARD_FILE_NAME: &str = "shared_blackboard.jsonl";
 const WORK_RECORDS_FILE_NAME: &str = "work_records.jsonl";
+const MARKDOWN_PROTOCOL_RECORD_RULE: &str =
+    "Write only long-lived shared facts to shared_blackboard.jsonl. Do not write process descriptions, temporary status, or blockers.";
+const MARKDOWN_PROTOCOL_ARTIFACT_RULE: &str =
+    "Write only deliverable outputs or their concrete paths to work_records.jsonl.";
+const MARKDOWN_PROTOCOL_CONCLUSION_RULE: &str =
+    "Write only the current-turn work status to work_records.jsonl. Include completed work, blockers, or next steps. Do not write long-lived facts.";
 const RESERVED_USER_HANDLE: &str = "you";
+const PROTOCOL_SEND_INTENT_VALUES: &[&str] =
+    &["request", "reply", "notify", "blocker", "confirm"];
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
-const PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
-  {"type": "send", "to": "backend", "content": "Please expose a `GET /chat/sessions` endpoint."},
-  {"type": "send", "to": "architect", "content": "The UI is ready. Please confirm the API contract before I continue."},
-  {"type": "record", "content": "The main chat route is `/chat`."},
-  {"type": "artifact", "content": "Implemented the UI in `frontend/src/pages/ui-new/ChatSessions.tsx`."},
-  {"type": "conclusion", "content": "Work is blocked on the backend response shape."}
+const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
+  {"type": "send", "to": "you", "intent": "request", "content": "Please expose a `GET /chat/sessions` endpoint."},
+  {"type": "send", "to": "architect", "intent": "confirm", "content": "The UI is ready. Please confirm the API contract before I continue."},
+  {"type": "record", "content": "The experiment metrics are `latency_p95_ms`, `success_rate`, and `token_cost_usd`."},
+  {"type": "artifact", "content": "Saved the experiment plan to `docs/experiments/chat-metrics-plan.md`."},
+  {"type": "conclusion", "content": "This round finished the metric definition. Next step is wiring collection into the runner."}
 ]"#;
 
 struct DiffInfo {
@@ -163,6 +171,8 @@ struct AgentProtocolMessage {
     #[serde(default)]
     to: Option<String>,
     #[serde(default)]
+    intent: Option<String>,
+    #[serde(default)]
     content: String,
 }
 
@@ -228,6 +238,7 @@ pub enum ChatProtocolNoticeCode {
     EmptyMessage,
     MissingSendTarget,
     InvalidSendTarget,
+    InvalidSendIntent,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -1745,222 +1756,6 @@ impl ChatRunner {
         Ok(summaries)
     }
 
-    /// Build the system prompt containing agent role, group members, skills, and critical instructions.
-    /// Uses TOML format for structured prompts.
-    fn build_system_prompt(
-        &self,
-        agent: &ChatAgent,
-        session_agents: &[SessionAgentSummary],
-        context_dir: &Path,
-        skills: &[ChatSkill],
-        user_message_content: Option<&str>,
-        prompt_language: ResolvedPromptLanguage,
-    ) -> String {
-        let mut toml = String::new();
-        let messages_path = context_dir.join("messages.jsonl");
-        let shared_blackboard_path = context_dir.join(SHARED_BLACKBOARD_FILE_NAME);
-        let work_records_path = context_dir.join(WORK_RECORDS_FILE_NAME);
-        let visible_members = session_agents
-            .iter()
-            .filter(|member| member.agent_id != agent.id)
-            .collect::<Vec<_>>();
-
-        toml.push_str("PROTOCOL_VERSION = \"chatgroup_toml_v2\"\n");
-
-        // 1. Agent section
-        toml.push_str("[agent.role]\n");
-        toml.push_str(&format!(
-            "name = \"{}\"\n",
-            Self::escape_toml_string(&agent.name)
-        ));
-        if !agent.system_prompt.trim().is_empty() {
-            toml.push_str(&format!(
-                "role = \"\"\"\n{}\n\"\"\"\n\n",
-                agent.system_prompt.trim()
-            ));
-        } else {
-            toml.push('\n');
-        }
-
-        // 2. Skills section
-        let active_skills = Self::filter_active_skills(skills, user_message_content);
-        toml.push_str("[agent.skills]\n");
-        if active_skills.is_empty() {
-            toml.push_str(
-                "restriction = \"You have no skills enabled. Do not attempt to use any skill.\"\n\n",
-            );
-        } else {
-            toml.push_str("restriction = \"\"\"\n");
-            toml.push_str("Skills are available as local files in ~/.agents/skills and companion directories.\n");
-            toml.push_str(
-                "You can ONLY use the skills listed below. Do not invent or use unlisted skills.\n",
-            );
-            toml.push_str("\"\"\"\n\n");
-            for skill in &active_skills {
-                toml.push_str("[[agent.skills.allowed]]\n");
-                toml.push_str(&format!(
-                    "name = \"{}\"\n",
-                    Self::escape_toml_string(&skill.name)
-                ));
-                toml.push_str(&format!(
-                    "description = \"{}\"\n\n",
-                    Self::escape_toml_string(&skill.description)
-                ));
-            }
-        }
-
-        // 3. Group members section
-        toml.push_str("[group]\n");
-        toml.push_str("members_description = \"Other AI members currently in this group\"\n\n");
-        if visible_members.is_empty() {
-            toml.push_str("# No other AI members\n\n");
-        } else {
-            for member in visible_members.iter().copied() {
-                toml.push_str("[[group.members]]\n");
-                toml.push_str(&format!(
-                    "name = \"{}\"\n",
-                    Self::escape_toml_string(&member.name)
-                ));
-                let responsibility = member.description.as_deref().unwrap_or("AI assistant");
-                toml.push_str(&format!(
-                    "responsibility = \"{}\"\n",
-                    Self::escape_toml_string(responsibility)
-                ));
-                toml.push_str(&format!("state = \"{:?}\"\n", member.state));
-                let skills_str: String = member
-                    .skills_used
-                    .iter()
-                    .map(|s| format!("\"{}\"", Self::escape_toml_string(s)))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                toml.push_str(&format!("skills_used = [{}]\n\n", skills_str));
-            }
-        }
-
-        // 4. History files section
-        toml.push_str("[history.group_messages]\n");
-        toml.push_str(&format!(
-            "path = \"{}\"\n",
-            Self::escape_toml_path(&messages_path)
-        ));
-        toml.push_str("format = \"jsonl\"\n");
-        toml.push_str("description = \"Group chat history. Each line is a JSON message record containing sender and content, consistent with messages.jsonl history.\"\n");
-        toml.push_str("optional = true\n");
-        toml.push_str("instruction = \"\"\"\n");
-        toml.push_str("If you need to understand the current group chat state, you MAY inspect this file yourself.\n");
-        toml.push_str(
-            "Reading history is optional. Do not assume you must read history before acting.\n",
-        );
-        toml.push_str("\"\"\"\n\n");
-
-        toml.push_str("[history.shared_blackboard]\n");
-        toml.push_str(&format!(
-            "path = \"{}\"\n",
-            Self::escape_toml_path(&shared_blackboard_path)
-        ));
-        toml.push_str("format = \"jsonl\"\n");
-        toml.push_str("description = \"Persisted shared messages generated from record items.\"\n");
-        toml.push_str("instruction = \"You can search by member name to find shared messages published by a specific member.\"\n\n");
-
-        toml.push_str("[history.work_records]\n");
-        toml.push_str(&format!(
-            "path = \"{}\"\n",
-            Self::escape_toml_path(&work_records_path)
-        ));
-        toml.push_str("format = \"jsonl\"\n");
-        toml.push_str("description = \"Persisted work outputs and summaries generated from artifact/conclusion items.\"\n");
-        toml.push_str("instruction = \"You can search by member name to find a specific member's work outputs and status summaries.\"\n\n");
-
-        // 5. Response format section
-        toml.push_str("[output]\n");
-        toml.push_str("required = true\n");
-        toml.push_str("format = \"json\"\n");
-        toml.push_str("container = \"list\"\n");
-        toml.push_str("only_send_items_enter_group_history = true\n");
-        toml.push_str("instruction = \"\"\"\n");
-        toml.push_str("Return ONLY a valid JSON array.\n");
-        toml.push_str("Do not wrap the JSON array in prose or markdown unless your runner forces code fences.\n");
-        toml.push_str("Your final reply MUST be parseable by a standard JSON parser.\n");
-        toml.push_str(
-            "Escape all double quotes, backslashes, and newlines inside JSON string values.\n",
-        );
-        toml.push_str("Before sending, verify that every `content` value is still a valid JSON string after escaping.\n");
-        toml.push_str("Only send items will be turned into visible group chat messages and written into group history.\n");
-        toml.push_str("The current agent is always recorded as the sender automatically. Do not impersonate other senders.\n");
-        toml.push_str("严禁讨论工作以外的事情，回复简洁表达准确，拒绝说废话。 Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.\n");
-        toml.push_str(
-            "Use `to = \\\"you\\\"` when sending a message to the user. Here `you` refers to the human user.\n",
-        );
-        toml.push_str("\"\"\"\n");
-
-        let member_names: Vec<String> = visible_members
-            .iter()
-            .map(|m| format!("\"{}\"", Self::escape_toml_string(&m.name)))
-            .collect();
-        let mut allowed_targets = member_names;
-        allowed_targets.push(format!("\"{}\"", RESERVED_USER_HANDLE));
-        toml.push_str(&format!(
-            "allowed_targets = [{}]\n\n",
-            allowed_targets.join(", ")
-        ));
-
-        toml.push_str("[[output.message_types]]\n");
-        toml.push_str("type = \"send\"\n");
-        toml.push_str("required_fields = [\"type\", \"to\", \"content\"]\n");
-        toml.push_str("rules = \"\"\"\n");
-        toml.push_str("- A send item targets exactly one receiver.\n");
-        toml.push_str("- Use concise language with a clear goal.\n");
-        toml.push_str("- Content may be empty.\n");
-        toml.push_str("- The system will render the final group message as `@receiver content` and route it to that receiver.\n");
-        toml.push_str("\"\"\"\n\n");
-
-        toml.push_str("[[output.message_types]]\n");
-        toml.push_str("type = \"record\"\n");
-        toml.push_str("required = false\n");
-        toml.push_str("required_fields = [\"type\", \"content\"]\n");
-        toml.push_str("rules = \"Persist shared knowledge for all members. Each record item is appended to shared_blackboard.jsonl.\"\n\n");
-
-        toml.push_str("[[output.message_types]]\n");
-        toml.push_str("type = \"artifact\"\n");
-        toml.push_str("required = false\n");
-        toml.push_str("required_fields = [\"type\", \"content\"]\n");
-        toml.push_str("rules = \"Persist concrete work outputs, file paths, and deliverables to work_records.jsonl.\"\n\n");
-
-        toml.push_str("[[output.message_types]]\n");
-        toml.push_str("type = \"conclusion\"\n");
-        toml.push_str("required = false\n");
-        toml.push_str("required_fields = [\"type\", \"content\"]\n");
-        toml.push_str("rules = \"Persist your current work summary, blockers, or conclusions to work_records.jsonl.\"\n\n");
-
-        toml.push_str("[output.example]\n");
-        toml.push_str("json = \"\"\"\n");
-        if false {
-            toml.push_str("[\n");
-            toml.push_str("  {\"type\": \"send\", \"to\": \"backend\", \"content\": \"API接口不正确，重新设计一版\"},\n");
-            toml.push_str("  {\"type\": \"send\", \"to\": \"architect\", \"content\": \"我已经完成前端页面的实现，但是API接口有问题，需要后端配合修改\"},\n");
-            toml.push_str(
-                "  {\"type\": \"record\", \"content\": \"前端界面的路由地址是/chat\"},\n",
-            );
-            toml.push_str(
-                "  {\"type\": \"artifact\", \"content\": \"前端UI组件文件位于 xxxx/a.tsx\"},\n",
-            );
-            toml.push_str("  {\"type\": \"conclusion\", \"content\": \"我已经按照要求实现了登录页面，但是API接口不确定，需要进一步确认后才能继续执行。\"}\n");
-            toml.push_str("]\n");
-        }
-        toml.push_str(PROTOCOL_OUTPUT_EXAMPLE_JSON);
-        toml.push('\n');
-        toml.push_str("\"\"\"\n\n");
-
-        // 6. Language section
-        toml.push_str("[language]\n");
-        toml.push_str(&format!("setting = \"{}\"\n", prompt_language.setting));
-        toml.push_str(&format!(
-            "instruction = \"{}\"\n",
-            prompt_language.instruction
-        ));
-
-        toml
-    }
 
     /// Escape special characters for TOML string values
     fn escape_toml_string(s: &str) -> String {
@@ -1974,6 +1769,771 @@ impl ChatRunner {
     /// Escape path for TOML (handle Windows backslashes)
     fn escape_toml_path(path: &Path) -> String {
         path.to_string_lossy().replace('\\', "\\\\")
+    }
+
+    /// Build the system prompt using Markdown sections while preserving all protocol fields.
+    fn build_system_prompt_markdown(
+        agent: &ChatAgent,
+        session_agents: &[SessionAgentSummary],
+        context_dir: &Path,
+        skills: &[ChatSkill],
+        user_message_content: Option<&str>,
+        prompt_language: ResolvedPromptLanguage,
+    ) -> String {
+        let mut markdown = String::new();
+        let messages_path = context_dir.join("messages.jsonl");
+        let shared_blackboard_path = context_dir.join(SHARED_BLACKBOARD_FILE_NAME);
+        let work_records_path = context_dir.join(WORK_RECORDS_FILE_NAME);
+        let visible_members = session_agents
+            .iter()
+            .filter(|member| member.agent_id != agent.id)
+            .collect::<Vec<_>>();
+
+        Self::push_markdown_section(&mut markdown, 1, "ChatGroup Protocol");
+        Self::push_markdown_field(&mut markdown, "PROTOCOL_VERSION", "chatgroup_markdown_v1");
+
+        Self::push_markdown_section(&mut markdown, 2, "agent.role");
+        Self::push_markdown_field(&mut markdown, "name", &agent.name);
+        if !agent.system_prompt.trim().is_empty() {
+            Self::push_markdown_block_field(
+                &mut markdown,
+                "role",
+                agent.system_prompt.trim(),
+                "text",
+            );
+        }
+
+        let active_skills = Self::filter_active_skills(skills, user_message_content);
+        Self::push_markdown_section(&mut markdown, 2, "agent.skills");
+        if active_skills.is_empty() {
+            Self::push_markdown_field(
+                &mut markdown,
+                "restriction",
+                "You have no skills enabled. Do not attempt to use any skill.",
+            );
+        } else {
+            Self::push_markdown_block_field(
+                &mut markdown,
+                "restriction",
+                concat!(
+                    "Skills are available as local files in ~/.agents/skills and companion directories.\n",
+                    "You can ONLY use the skills listed below. Do not invent or use unlisted skills.\n",
+                ),
+                "text",
+            );
+            for (index, skill) in active_skills.iter().enumerate() {
+                Self::push_markdown_section(
+                    &mut markdown,
+                    3,
+                    &format!("agent.skills.allowed item {}", index + 1),
+                );
+                Self::push_markdown_field(&mut markdown, "name", &skill.name);
+                Self::push_markdown_field(&mut markdown, "description", &skill.description);
+            }
+        }
+
+        Self::push_markdown_section(&mut markdown, 2, "group");
+        Self::push_markdown_field(
+            &mut markdown,
+            "members_description",
+            "Other AI members currently in this group",
+        );
+        if visible_members.is_empty() {
+            markdown.push_str("_No other AI members._\n\n");
+        } else {
+            for (index, member) in visible_members.iter().enumerate() {
+                Self::push_markdown_section(
+                    &mut markdown,
+                    3,
+                    &format!("group.members item {}", index + 1),
+                );
+                Self::push_markdown_field(&mut markdown, "name", &member.name);
+                let responsibility = member.description.as_deref().unwrap_or("AI assistant");
+                Self::push_markdown_field(&mut markdown, "responsibility", responsibility);
+                Self::push_markdown_field(&mut markdown, "state", &format!("{:?}", member.state));
+                Self::push_markdown_json_field(&mut markdown, "skills_used", &member.skills_used);
+            }
+        }
+
+        Self::push_markdown_section(&mut markdown, 2, "history.group_messages");
+        Self::push_markdown_field(&mut markdown, "path", &messages_path.to_string_lossy());
+        Self::push_markdown_field(&mut markdown, "format", "jsonl");
+        Self::push_markdown_field(
+            &mut markdown,
+            "description",
+            "Group chat history. Each line is a JSON message record containing sender and content, consistent with messages.jsonl history.",
+        );
+        Self::push_markdown_bool_field(&mut markdown, "optional", true);
+        Self::push_markdown_block_field(
+            &mut markdown,
+            "instruction",
+            concat!(
+                "If you need to understand the current group chat state, you MAY inspect this file yourself.\n",
+                "Reading history is optional. Do not assume you must read history before acting.\n",
+            ),
+            "text",
+        );
+
+        Self::push_markdown_section(&mut markdown, 2, "history.shared_blackboard");
+        Self::push_markdown_field(
+            &mut markdown,
+            "path",
+            &shared_blackboard_path.to_string_lossy(),
+        );
+        Self::push_markdown_field(&mut markdown, "format", "jsonl");
+        Self::push_markdown_field(
+            &mut markdown,
+            "description",
+            "Persisted shared messages generated from record items.",
+        );
+        Self::push_markdown_field(
+            &mut markdown,
+            "instruction",
+            "You can search by member name to find shared messages published by a specific member.",
+        );
+
+        Self::push_markdown_section(&mut markdown, 2, "history.work_records");
+        Self::push_markdown_field(&mut markdown, "path", &work_records_path.to_string_lossy());
+        Self::push_markdown_field(&mut markdown, "format", "jsonl");
+        Self::push_markdown_field(
+            &mut markdown,
+            "description",
+            "Persisted work outputs and summaries generated from artifact/conclusion items.",
+        );
+        Self::push_markdown_field(
+            &mut markdown,
+            "instruction",
+            "You can search by member name to find a specific member's work outputs and status summaries.",
+        );
+
+        Self::push_markdown_section(&mut markdown, 2, "output");
+        Self::push_markdown_bool_field(&mut markdown, "required", true);
+        Self::push_markdown_field(&mut markdown, "format", "json");
+        Self::push_markdown_field(&mut markdown, "container", "list");
+        Self::push_markdown_bool_field(&mut markdown, "only_send_items_enter_group_history", true);
+        Self::push_markdown_block_field(
+            &mut markdown,
+            "instruction",
+            concat!(
+                "Return ONLY a valid JSON array.\n",
+                "Do not wrap the JSON array in prose or markdown unless your runner forces code fences.\n",
+                "Your final reply MUST be parseable by a standard JSON parser.\n",
+                "Escape all double quotes, backslashes, and newlines inside JSON string values.\n",
+                "Before sending, verify that every `content` value is still a valid JSON string after escaping.\n",
+                "Only send items will be turned into visible group chat messages and written into group history.\n",
+                "The current agent is always recorded as the sender automatically. Do not impersonate other senders.\n",
+                "Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.\n",
+                "Use `to = \\\"you\\\"` when sending a message to the user. Here `you` refers to the human user.\n",
+                "For send items, `intent` is optional but recommended when the routing semantics matter.\n",
+            ),
+            "text",
+        );
+        let mut allowed_targets: Vec<&str> = visible_members
+            .iter()
+            .map(|member| member.name.as_str())
+            .collect();
+        allowed_targets.push(RESERVED_USER_HANDLE);
+        Self::push_markdown_json_field(&mut markdown, "allowed_targets", &allowed_targets);
+
+        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 1");
+        Self::push_markdown_field(&mut markdown, "type", "send");
+        Self::push_markdown_json_field(
+            &mut markdown,
+            "required_fields",
+            &["type", "to", "content"],
+        );
+        Self::push_markdown_json_field(&mut markdown, "optional_fields", &["intent"]);
+        Self::push_markdown_block_field(
+            &mut markdown,
+            "rules",
+            concat!(
+                "- A send item targets exactly one receiver.\n",
+                "- Use concise language with a clear goal.\n",
+                "- Content may be empty.\n",
+                "- Prefer setting `intent` for machine-readable routing semantics.\n",
+                "- Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply required; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.\n",
+                "- The system will render the final group message as `@receiver content` and route it to that receiver.\n",
+            ),
+            "text",
+        );
+
+        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 2");
+        Self::push_markdown_field(&mut markdown, "type", "record");
+        Self::push_markdown_bool_field(&mut markdown, "required", false);
+        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
+        Self::push_markdown_field(
+            &mut markdown,
+            "rules",
+            MARKDOWN_PROTOCOL_RECORD_RULE,
+        );
+
+        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 3");
+        Self::push_markdown_field(&mut markdown, "type", "artifact");
+        Self::push_markdown_bool_field(&mut markdown, "required", false);
+        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
+        Self::push_markdown_field(
+            &mut markdown,
+            "rules",
+            MARKDOWN_PROTOCOL_ARTIFACT_RULE,
+        );
+
+        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 4");
+        Self::push_markdown_field(&mut markdown, "type", "conclusion");
+        Self::push_markdown_bool_field(&mut markdown, "required", false);
+        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
+        Self::push_markdown_field(
+            &mut markdown,
+            "rules",
+            MARKDOWN_PROTOCOL_CONCLUSION_RULE,
+        );
+
+        Self::push_markdown_section(&mut markdown, 2, "output.example");
+        Self::push_markdown_block_field(
+            &mut markdown,
+            "json",
+            MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON,
+            "json",
+        );
+
+        Self::push_markdown_section(&mut markdown, 2, "language");
+        Self::push_markdown_field(&mut markdown, "setting", prompt_language.setting);
+        Self::push_markdown_field(&mut markdown, "instruction", prompt_language.instruction);
+
+        markdown
+    }
+
+    /// Build the user message prompt using Markdown sections while preserving all protocol fields.
+    #[allow(dead_code)]
+    #[allow(clippy::too_many_arguments)]
+    fn build_user_prompt_markdown(
+        agent: &ChatAgent,
+        message: &ChatMessage,
+        message_attachments: Option<&MessageAttachmentContext>,
+        reference: Option<&ReferenceContext>,
+    ) -> String {
+        let mut markdown = String::new();
+        let sender = Self::resolve_message_sender_identity(message);
+
+        Self::push_markdown_section(&mut markdown, 2, "envelope");
+        Self::push_markdown_field(&mut markdown, "session_id", &message.session_id.to_string());
+        Self::push_markdown_field(&mut markdown, "from", &sender.address);
+        Self::push_markdown_field(&mut markdown, "to", &format!("agent:{}", agent.name));
+        Self::push_markdown_field(&mut markdown, "message_id", &message.id.to_string());
+        Self::push_markdown_field(&mut markdown, "timestamp", &message.created_at.to_string());
+
+        Self::push_markdown_section(&mut markdown, 2, "message");
+        Self::push_markdown_field(&mut markdown, "sender", &sender.label);
+        Self::push_markdown_block_field(&mut markdown, "content", message.content.trim(), "text");
+
+        if let Some(reference) = reference {
+            Self::push_markdown_section(&mut markdown, 3, "message.reference");
+            Self::push_markdown_field(
+                &mut markdown,
+                "note",
+                "User referenced the following historical message. Prioritize it.",
+            );
+            Self::push_markdown_field(
+                &mut markdown,
+                "message_id",
+                &reference.message_id.to_string(),
+            );
+            Self::push_markdown_field(&mut markdown, "sender", &reference.sender_label);
+            Self::push_markdown_field(
+                &mut markdown,
+                "sender_type",
+                &format!("{:?}", reference.sender_type),
+            );
+            Self::push_markdown_field(&mut markdown, "created_at", &reference.created_at);
+            Self::push_markdown_block_field(
+                &mut markdown,
+                "content",
+                reference.content.trim(),
+                "text",
+            );
+
+            for (index, attachment) in reference.attachments.iter().enumerate() {
+                Self::push_markdown_section(
+                    &mut markdown,
+                    4,
+                    &format!("message.reference.attachments item {}", index + 1),
+                );
+                Self::push_markdown_field(&mut markdown, "name", &attachment.name);
+                Self::push_markdown_field(&mut markdown, "kind", &attachment.kind);
+                Self::push_markdown_number_field(
+                    &mut markdown,
+                    "size_bytes",
+                    attachment.size_bytes,
+                );
+                Self::push_markdown_field(
+                    &mut markdown,
+                    "mime_type",
+                    attachment.mime_type.as_deref().unwrap_or("unknown"),
+                );
+                Self::push_markdown_field(&mut markdown, "local_path", &attachment.local_path);
+            }
+        }
+
+        if let Some(attachments_ctx) = message_attachments {
+            for (index, attachment) in attachments_ctx.attachments.iter().enumerate() {
+                Self::push_markdown_section(
+                    &mut markdown,
+                    3,
+                    &format!("message.attachments item {}", index + 1),
+                );
+                Self::push_markdown_field(&mut markdown, "name", &attachment.name);
+                Self::push_markdown_field(&mut markdown, "kind", &attachment.kind);
+                Self::push_markdown_number_field(
+                    &mut markdown,
+                    "size_bytes",
+                    attachment.size_bytes,
+                );
+                Self::push_markdown_field(
+                    &mut markdown,
+                    "mime_type",
+                    attachment.mime_type.as_deref().unwrap_or("unknown"),
+                );
+                Self::push_markdown_field(&mut markdown, "local_path", &attachment.local_path);
+            }
+        }
+
+        markdown
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build_exact_markdown_prompt(
+        agent: &ChatAgent,
+        message: &ChatMessage,
+        context_dir: &Path,
+        session_agents: &[SessionAgentSummary],
+        message_attachments: Option<&MessageAttachmentContext>,
+        reference: Option<&ReferenceContext>,
+        skills: &[ChatSkill],
+        prompt_language: ResolvedPromptLanguage,
+    ) -> String {
+        let mut markdown = String::new();
+        let sender = Self::resolve_message_sender_identity(message);
+        let messages_path = context_dir.join("messages.jsonl");
+        let shared_blackboard_path = context_dir.join(SHARED_BLACKBOARD_FILE_NAME);
+        let work_records_path = context_dir.join(WORK_RECORDS_FILE_NAME);
+        let visible_members = session_agents
+            .iter()
+            .filter(|member| member.agent_id != agent.id)
+            .collect::<Vec<_>>();
+        let active_skills = Self::filter_active_skills(skills, Some(message.content.as_str()));
+
+        Self::push_markdown_section(&mut markdown, 1, "ChatGroup Message");
+        Self::push_markdown_section(&mut markdown, 2, "message");
+        Self::push_markdown_field(&mut markdown, "sender", &sender.label);
+        Self::push_markdown_content_block_field(&mut markdown, "content", &message.content, "text");
+        if let Some((intent, meaning)) = Self::routed_message_intent_context(message, &agent.name)
+        {
+            Self::push_markdown_field(&mut markdown, "intent", &intent);
+            Self::push_markdown_field(&mut markdown, "intent_meaning", &meaning);
+        }
+
+        if let Some(reference) = reference {
+            Self::push_markdown_section(&mut markdown, 3, "message.reference");
+            Self::push_markdown_field(
+                &mut markdown,
+                "note",
+                "User referenced the following historical message. Prioritize it.",
+            );
+            Self::push_markdown_field(
+                &mut markdown,
+                "message_id",
+                &reference.message_id.to_string(),
+            );
+            Self::push_markdown_field(&mut markdown, "sender", &reference.sender_label);
+            Self::push_markdown_field(
+                &mut markdown,
+                "sender_type",
+                &format!("{:?}", reference.sender_type),
+            );
+            Self::push_markdown_field(&mut markdown, "created_at", &reference.created_at);
+            Self::push_markdown_content_block_field(
+                &mut markdown,
+                "content",
+                &reference.content,
+                "text",
+            );
+
+            for (index, attachment) in reference.attachments.iter().enumerate() {
+                Self::push_markdown_section(
+                    &mut markdown,
+                    4,
+                    &format!("message.reference.attachments item {}", index + 1),
+                );
+                Self::push_markdown_field(&mut markdown, "name", &attachment.name);
+                Self::push_markdown_field(&mut markdown, "kind", &attachment.kind);
+                Self::push_markdown_number_field(
+                    &mut markdown,
+                    "size_bytes",
+                    attachment.size_bytes,
+                );
+                Self::push_markdown_field(
+                    &mut markdown,
+                    "mime_type",
+                    attachment.mime_type.as_deref().unwrap_or("unknown"),
+                );
+                Self::push_markdown_field(&mut markdown, "local_path", &attachment.local_path);
+            }
+        }
+
+        if let Some(attachments_ctx) = message_attachments {
+            for (index, attachment) in attachments_ctx.attachments.iter().enumerate() {
+                Self::push_markdown_section(
+                    &mut markdown,
+                    3,
+                    &format!("message.attachments item {}", index + 1),
+                );
+                Self::push_markdown_field(&mut markdown, "name", &attachment.name);
+                Self::push_markdown_field(&mut markdown, "kind", &attachment.kind);
+                Self::push_markdown_number_field(
+                    &mut markdown,
+                    "size_bytes",
+                    attachment.size_bytes,
+                );
+                Self::push_markdown_field(
+                    &mut markdown,
+                    "mime_type",
+                    attachment.mime_type.as_deref().unwrap_or("unknown"),
+                );
+                Self::push_markdown_field(&mut markdown, "local_path", &attachment.local_path);
+            }
+        }
+
+        Self::set_trailing_newlines(&mut markdown, 2);
+        Self::push_markdown_section(&mut markdown, 1, "Must be obeyed");
+        Self::push_markdown_section(&mut markdown, 2, "output format (important)");
+        Self::push_markdown_bool_field(&mut markdown, "required", true);
+        Self::push_markdown_field(&mut markdown, "format", "json");
+        Self::push_markdown_field(&mut markdown, "container", "list");
+        Self::push_markdown_bool_field(&mut markdown, "only_send_items_enter_group_history", true);
+        Self::push_markdown_block_field(
+            &mut markdown,
+            "instruction",
+            concat!(
+                "- Return ONLY a valid JSON array. Long messages must also be returned in JSON array.\n",
+                "- Your final reply MUST be parseable by a standard JSON parser.\n",
+                "- Escape all double quotes, backslashes, and newlines inside JSON string values.\n",
+                "- Before sending, verify that every `content` value is still a valid JSON string after escaping.\n",
+                "- Only send items will be turned into visible group chat messages and written into group history.\n",
+                "- The current agent is always recorded as the sender automatically. Do not impersonate other senders.\n",
+                "- Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.\n",
+                "- Use `to = \\\"you\\\"` when sending a message to the user. Here `you` refers to the human user.\n",
+                "- For send items, `intent` is optional but recommended when the routing semantics matter.\n",
+            ),
+            "text",
+        );
+
+        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 1");
+        Self::push_markdown_field(&mut markdown, "type", "send");
+        Self::push_markdown_json_field(
+            &mut markdown,
+            "required_fields",
+            &["type", "to", "content"],
+        );
+        Self::push_markdown_json_field(&mut markdown, "optional_fields", &["intent"]);
+        Self::push_markdown_block_field(
+            &mut markdown,
+            "rules",
+            concat!(
+                "- A send item targets exactly one receiver.\n",
+                "- The recipient must be one of the member names listed in group members.\n",
+                "- Use concise language with a clear goal.\n",
+                "- Content may be empty.\n",
+                "- Prefer setting `intent` for machine-readable routing semantics.\n",
+                "- Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply required; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.\n",
+                "- The system will render the final group message as `@receiver content` and route it to that receiver.\n",
+            ),
+            "text",
+        );
+
+        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 2");
+        Self::push_markdown_field(&mut markdown, "type", "record");
+        Self::push_markdown_bool_field(&mut markdown, "required", false);
+        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
+        Self::push_markdown_field(
+            &mut markdown,
+            "rules",
+            MARKDOWN_PROTOCOL_RECORD_RULE,
+        );
+
+        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 3");
+        Self::push_markdown_field(&mut markdown, "type", "artifact");
+        Self::push_markdown_bool_field(&mut markdown, "required", false);
+        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
+        Self::push_markdown_field(
+            &mut markdown,
+            "rules",
+            MARKDOWN_PROTOCOL_ARTIFACT_RULE,
+        );
+
+        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 4");
+        Self::push_markdown_field(&mut markdown, "type", "conclusion");
+        Self::push_markdown_bool_field(&mut markdown, "required", false);
+        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
+        Self::push_markdown_field(
+            &mut markdown,
+            "rules",
+            MARKDOWN_PROTOCOL_CONCLUSION_RULE,
+        );
+
+        Self::set_trailing_newlines(&mut markdown, 2);
+        Self::push_markdown_section(&mut markdown, 2, "output.example");
+        Self::push_markdown_block_field(
+            &mut markdown,
+            "json",
+            MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON,
+            "json",
+        );
+
+        Self::push_markdown_section(&mut markdown, 2, "agent");
+        Self::push_markdown_section(&mut markdown, 3, "role");
+        Self::push_markdown_field(&mut markdown, "name", &agent.name);
+        Self::push_markdown_block_field(&mut markdown, "role", &agent.system_prompt, "text");
+
+        Self::push_markdown_section(&mut markdown, 3, "skills");
+        if active_skills.is_empty() {
+            Self::push_markdown_field(
+                &mut markdown,
+                "restriction",
+                "You have no skills enabled. Do not attempt to use any skill.",
+            );
+        } else {
+            Self::push_markdown_block_field(
+                &mut markdown,
+                "restriction",
+                concat!(
+                    "Skills are available as local files in ~/.agents/skills and companion directories.\n",
+                    "You can ONLY use the skills listed below. Do not invent or use unlisted skills.\n",
+                ),
+                "text",
+            );
+            for (index, skill) in active_skills.iter().enumerate() {
+                Self::push_markdown_section(
+                    &mut markdown,
+                    4,
+                    &format!("agent.skills.allowed item {}", index + 1),
+                );
+                Self::push_markdown_field(&mut markdown, "name", &skill.name);
+                Self::push_markdown_field(&mut markdown, "description", &skill.description);
+            }
+        }
+
+        Self::set_trailing_newlines(&mut markdown, 3);
+        Self::push_markdown_section(&mut markdown, 2, "language");
+        Self::push_markdown_field(&mut markdown, "setting", prompt_language.setting);
+        Self::push_markdown_field(&mut markdown, "instruction", prompt_language.instruction);
+
+        Self::set_trailing_newlines(&mut markdown, 3);
+        Self::push_markdown_section(&mut markdown, 1, "Group Members");
+        Self::push_markdown_field(
+            &mut markdown,
+            "members_description",
+            "Other AI members currently in this group",
+        );
+        if visible_members.is_empty() {
+            markdown.push_str("_No other AI members._\n");
+        } else {
+            markdown.push('\n');
+            for (index, member) in visible_members.iter().enumerate() {
+                Self::push_markdown_section(
+                    &mut markdown,
+                    2,
+                    &format!("group.members item {}", index + 1),
+                );
+                Self::push_markdown_field(&mut markdown, "name", &member.name);
+                Self::push_markdown_field(
+                    &mut markdown,
+                    "responsibility",
+                    member.description.as_deref().unwrap_or("AI assistant"),
+                );
+                Self::push_markdown_field(&mut markdown, "state", &format!("{:?}", member.state));
+                Self::push_markdown_json_field(&mut markdown, "skills_used", &member.skills_used);
+            }
+        }
+
+        Self::set_trailing_newlines(&mut markdown, 2);
+        Self::push_markdown_section(&mut markdown, 1, "History");
+        Self::push_markdown_section(&mut markdown, 2, "history.group_messages");
+        Self::push_markdown_field(&mut markdown, "path", &messages_path.to_string_lossy());
+        Self::push_markdown_field(&mut markdown, "format", "jsonl");
+        Self::push_markdown_field(
+            &mut markdown,
+            "description",
+            "Group chat history. Each line is a JSON message record containing sender and content, consistent with messages.jsonl history.",
+        );
+        Self::push_markdown_bool_field(&mut markdown, "optional", true);
+        Self::push_markdown_block_field(
+            &mut markdown,
+            "instruction",
+            concat!(
+                "If you need to understand the current group chat state, you MAY inspect this file yourself.\n",
+                "Reading history is optional. Do not assume you must read history before acting.\n",
+            ),
+            "text",
+        );
+
+        Self::push_markdown_section(&mut markdown, 2, "history.shared_blackboard");
+        Self::push_markdown_field(
+            &mut markdown,
+            "path",
+            &shared_blackboard_path.to_string_lossy(),
+        );
+        Self::push_markdown_field(&mut markdown, "format", "jsonl");
+        Self::push_markdown_field(
+            &mut markdown,
+            "description",
+            "Persisted shared messages generated from record items.",
+        );
+        Self::push_markdown_field(
+            &mut markdown,
+            "instruction",
+            "You can search by member name to find shared messages published by a specific member.",
+        );
+
+        Self::push_markdown_section(&mut markdown, 2, "history.work_records");
+        Self::push_markdown_field(&mut markdown, "path", &work_records_path.to_string_lossy());
+        Self::push_markdown_field(&mut markdown, "format", "jsonl");
+        Self::push_markdown_field(
+            &mut markdown,
+            "description",
+            "Persisted work outputs and summaries generated from artifact/conclusion items.",
+        );
+        Self::push_markdown_field(
+            &mut markdown,
+            "instruction",
+            "You can search by member name to find a specific member's work outputs and status summaries.",
+        );
+
+        Self::set_trailing_newlines(&mut markdown, 2);
+        Self::push_markdown_section(&mut markdown, 1, "envelope");
+        Self::push_markdown_field(&mut markdown, "session_id", &message.session_id.to_string());
+        Self::push_markdown_field(&mut markdown, "from", &sender.address);
+        Self::push_markdown_field(&mut markdown, "to", &format!("agent:{}", agent.name));
+        Self::push_markdown_field(&mut markdown, "message_id", &message.id.to_string());
+        Self::push_markdown_field(&mut markdown, "timestamp", &message.created_at.to_string());
+        Self::set_trailing_newlines(&mut markdown, 2);
+
+        markdown
+    }
+
+    fn push_markdown_section(markdown: &mut String, level: usize, title: &str) {
+        let heading_level = level.clamp(1, 6);
+        markdown.push_str(&"#".repeat(heading_level));
+        markdown.push(' ');
+        markdown.push_str(title);
+        markdown.push_str("\n\n");
+    }
+
+    fn push_markdown_field(markdown: &mut String, label: &str, value: &str) {
+        if value.contains('\n') {
+            Self::push_markdown_block_field(markdown, label, value, "text");
+            return;
+        }
+        markdown.push_str("- **");
+        markdown.push_str(label);
+        markdown.push_str("**: ");
+        markdown.push_str(value);
+        markdown.push('\n');
+    }
+
+    fn push_markdown_bool_field(markdown: &mut String, label: &str, value: bool) {
+        markdown.push_str("- **");
+        markdown.push_str(label);
+        markdown.push_str("**: ");
+        markdown.push_str(if value { "true" } else { "false" });
+        markdown.push('\n');
+    }
+
+    fn push_markdown_number_field(markdown: &mut String, label: &str, value: i64) {
+        markdown.push_str("- **");
+        markdown.push_str(label);
+        markdown.push_str("**: ");
+        markdown.push_str(&value.to_string());
+        markdown.push('\n');
+    }
+
+    fn push_markdown_json_field<T>(markdown: &mut String, label: &str, value: &T)
+    where
+        T: Serialize + ?Sized,
+    {
+        let json = serde_json::to_string(value).expect("markdown JSON field should serialize");
+        markdown.push_str("- **");
+        markdown.push_str(label);
+        markdown.push_str("**: ");
+        markdown.push_str(&json);
+        markdown.push('\n');
+    }
+
+    fn push_markdown_block_field(markdown: &mut String, label: &str, value: &str, language: &str) {
+        markdown.push_str("- **");
+        markdown.push_str(label);
+        markdown.push_str("**:\n\n");
+
+        let fence = Self::markdown_fence_for_content(value);
+        markdown.push_str(&fence);
+        if !language.is_empty() {
+            markdown.push_str(language);
+        }
+        markdown.push('\n');
+        markdown.push_str(value);
+        if !value.ends_with('\n') {
+            markdown.push('\n');
+        }
+        markdown.push_str(&fence);
+        markdown.push_str("\n\n");
+    }
+
+    fn push_markdown_content_block_field(
+        markdown: &mut String,
+        label: &str,
+        value: &str,
+        language: &str,
+    ) {
+        markdown.push_str("- **");
+        markdown.push_str(label);
+        markdown.push_str("**:\n\n");
+
+        let fence = Self::markdown_fence_for_content(value);
+        markdown.push_str(&fence);
+        if !language.is_empty() {
+            markdown.push_str(language);
+        }
+        markdown.push('\n');
+        markdown.push_str(value);
+        if value.contains('\n') || value.ends_with('\n') {
+            if !value.ends_with('\n') {
+                markdown.push('\n');
+            }
+            markdown.push_str(&fence);
+            markdown.push_str("\n\n");
+            return;
+        }
+        markdown.push_str(&fence);
+        markdown.push_str("\n\n");
+    }
+
+    fn set_trailing_newlines(markdown: &mut String, newline_count: usize) {
+        while markdown.ends_with('\n') {
+            markdown.pop();
+        }
+        markdown.push_str(&"\n".repeat(newline_count));
+    }
+
+    fn markdown_fence_for_content(content: &str) -> String {
+        let mut longest_run = 0usize;
+        let mut current_run = 0usize;
+        for ch in content.chars() {
+            if ch == '~' {
+                current_run += 1;
+                longest_run = longest_run.max(current_run);
+            } else {
+                current_run = 0;
+            }
+        }
+        "~".repeat(longest_run.max(2) + 1)
     }
 
     fn resolve_prompt_language(
@@ -2115,6 +2675,13 @@ impl ChatRunner {
     }
 
     fn infer_prompt_language_from_text(text: &str) -> Option<ResolvedPromptLanguage> {
+        const TRADITIONAL_CHINESE_HINT_CHARS: &str =
+            "\u{81fa}\u{7063}\u{7e41}\u{9ad4}\u{9019}\u{500b}\u{55ce}\u{70ba}\u{65bc}\u{8207}\u{5f8c}\u{6703}\u{767c}\u{73fe}\u{9801}";
+        const SPANISH_HINT_CHARS: &str =
+            "\u{00bf}\u{00a1}\u{00f1}\u{00e1}\u{00e9}\u{00ed}\u{00f3}\u{00fa}";
+        const FRENCH_HINT_CHARS: &str =
+            "\u{00e0}\u{00e2}\u{00e7}\u{00e9}\u{00e8}\u{00ea}\u{00eb}\u{00ee}\u{00ef}\u{00f4}\u{00f9}\u{00fb}\u{00fc}\u{00ff}\u{0153}\u{00e6}";
+
         let trimmed = text.trim();
         if trimmed.is_empty() {
             return None;
@@ -2140,7 +2707,7 @@ impl ChatRunner {
 
         if trimmed
             .chars()
-            .any(|ch| "臺灣繁體這個嗎為於與後會發現頁".contains(ch))
+            .any(|ch| TRADITIONAL_CHINESE_HINT_CHARS.contains(ch))
         {
             return Some(Self::resolve_prompt_language_from_ui_language(
                 &UiLanguage::ZhHant,
@@ -2156,13 +2723,13 @@ impl ChatRunner {
             ));
         }
 
-        if trimmed.chars().any(|ch| "¿¡ñáéíóú".contains(ch)) {
+        if trimmed.chars().any(|ch| SPANISH_HINT_CHARS.contains(ch)) {
             return Some(Self::resolve_prompt_language_from_ui_language(
                 &UiLanguage::Es,
             ));
         }
 
-        if trimmed.chars().any(|ch| "àâçéèêëîïôùûüÿœæ".contains(ch)) {
+        if trimmed.chars().any(|ch| FRENCH_HINT_CHARS.contains(ch)) {
             return Some(Self::resolve_prompt_language_from_ui_language(
                 &UiLanguage::Fr,
             ));
@@ -2179,20 +2746,20 @@ impl ChatRunner {
         match language {
             UiLanguage::Browser => ("en", "You MUST respond in English."),
             UiLanguage::En => ("en", "You MUST respond in English."),
-            UiLanguage::ZhHans => (
-                "zh-Hans",
-                "You MUST respond in Simplified Chinese (简体中文).",
-            ),
-            UiLanguage::ZhHant => (
-                "zh-Hant",
-                "You MUST respond in Traditional Chinese (繁體中文).",
-            ),
-            UiLanguage::Ja => ("ja", "You MUST respond in Japanese (日本語)."),
-            UiLanguage::Ko => ("ko", "You MUST respond in Korean (한국어)."),
-            UiLanguage::Fr => ("fr", "You MUST respond in French (Français)."),
-            UiLanguage::Es => ("es", "You MUST respond in Spanish (Español)."),
+            UiLanguage::ZhHans => ("zh-Hans", "You MUST respond in Simplified Chinese."),
+            UiLanguage::ZhHant => ("zh-Hant", "You MUST respond in Traditional Chinese."),
+            UiLanguage::Ja => ("ja", "You MUST respond in Japanese."),
+            UiLanguage::Ko => ("ko", "You MUST respond in Korean."),
+            UiLanguage::Fr => ("fr", "You MUST respond in French."),
+            UiLanguage::Es => ("es", "You MUST respond in Spanish."),
         }
     }
+
+
+
+
+
+
 
     fn parse_agent_protocol_messages(
         content: &str,
@@ -2250,9 +2817,28 @@ impl ChatRunner {
                             detail: None,
                         });
                     };
+                    let intent = match message.intent.as_deref() {
+                        Some(raw_intent) if !raw_intent.trim().is_empty() => {
+                            let Some(intent) =
+                                Self::normalize_protocol_send_intent(raw_intent)
+                            else {
+                                return Err(AgentProtocolError {
+                                    code: ChatProtocolNoticeCode::InvalidSendIntent,
+                                    target: Some(raw_intent.trim().to_string()),
+                                    detail: Some(format!(
+                                        "Allowed values: {}.",
+                                        PROTOCOL_SEND_INTENT_VALUES.join(", ")
+                                    )),
+                                });
+                            };
+                            Some(intent)
+                        }
+                        _ => None,
+                    };
                     validated.push(AgentProtocolMessage {
                         message_type: AgentProtocolMessageType::Send,
                         to: Some(target),
+                        intent,
                         content: message.content.trim().to_string(),
                     });
                 }
@@ -2270,6 +2856,7 @@ impl ChatRunner {
                     validated.push(AgentProtocolMessage {
                         message_type: message.message_type,
                         to: None,
+                        intent: None,
                         content,
                     });
                 }
@@ -2299,6 +2886,56 @@ impl ChatRunner {
         } else {
             None
         }
+    }
+
+    fn normalize_protocol_send_intent(intent: &str) -> Option<String> {
+        let normalized = intent.trim().to_ascii_lowercase();
+        if PROTOCOL_SEND_INTENT_VALUES.contains(&normalized.as_str()) {
+            Some(normalized)
+        } else {
+            None
+        }
+    }
+
+    fn protocol_send_intent_meaning(intent: &str) -> Option<&'static str> {
+        match intent {
+            "request" => Some("Ask for work or information."),
+            "reply" => Some("The receiver should reply."),
+            "notify" => Some("Informational only. No reply is required."),
+            "blocker" => Some("Report a blocking issue."),
+            "confirm" => Some("Explicit confirmation is required."),
+            _ => None,
+        }
+    }
+
+    fn routed_message_intent_context(
+        message: &ChatMessage,
+        recipient_agent_name: &str,
+    ) -> Option<(String, String)> {
+        let protocol = message.meta.0.get("protocol")?.as_object()?;
+        if protocol.get("type").and_then(serde_json::Value::as_str) != Some("send") {
+            return None;
+        }
+
+        let target = Self::normalize_protocol_target(
+            protocol.get("to").and_then(serde_json::Value::as_str)?,
+        )?;
+        let recipient = Self::normalize_protocol_target(recipient_agent_name)?;
+        if target != recipient {
+            return None;
+        }
+
+        let intent = Self::normalize_protocol_send_intent(
+            protocol.get("intent").and_then(serde_json::Value::as_str)?,
+        )?;
+        let meaning = protocol
+            .get("intent_meaning")
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .map(str::to_string)
+            .or_else(|| Self::protocol_send_intent_meaning(&intent).map(str::to_string))?;
+
+        Some((intent, meaning))
     }
 
     fn build_send_message_content(target: &str, content: &str) -> String {
@@ -2442,8 +3079,8 @@ impl ChatRunner {
             .collect()
     }
 
-    /// Build the user message prompt (envelope, reference, attachments, message).
-    /// Uses TOML format for structured prompts.
+    /// Legacy TOML-based user prompt builder kept for transition safety.
+    #[allow(dead_code)]
     #[allow(clippy::too_many_arguments)]
     fn build_user_prompt(
         &self,
@@ -2569,25 +3206,16 @@ impl ChatRunner {
     ) -> String {
         let context_dir = context_path.parent().unwrap_or(context_path);
 
-        // Build system prompt with agent role, group members, skills, and history file instruction
-        let system_prompt = self.build_system_prompt(
+        Self::build_exact_markdown_prompt(
             agent,
-            session_agents,
+            message,
             context_dir,
+            session_agents,
+            message_attachments,
+            reference,
             skills,
-            Some(message.content.as_str()),
             prompt_language,
-        );
-
-        // Build user prompt with envelope, reference, attachments, and message
-        let user_prompt = self.build_user_prompt(agent, message, message_attachments, reference);
-
-        // Combine system and user prompts
-        let mut full_prompt = system_prompt;
-        full_prompt.push('\n');
-
-        full_prompt.push_str(&user_prompt);
-        full_prompt
+        )
     }
 
     fn emit_protocol_notice(
@@ -2629,6 +3257,9 @@ impl ChatRunner {
             ChatProtocolNoticeCode::InvalidSendTarget => {
                 "agent returned a send message with an invalid target"
             }
+            ChatProtocolNoticeCode::InvalidSendIntent => {
+                "agent returned a send message with an invalid intent"
+            }
         }
     }
 
@@ -2657,6 +3288,17 @@ impl ChatRunner {
                 "Protocol error: invalid send target '{}'.",
                 error.target.as_deref().unwrap_or_default()
             ),
+            ChatProtocolNoticeCode::InvalidSendIntent => match error.detail.as_deref() {
+                Some(detail) => format!(
+                    "Protocol error: invalid send intent '{}'. {}",
+                    error.target.as_deref().unwrap_or_default(),
+                    detail
+                ),
+                None => format!(
+                    "Protocol error: invalid send intent '{}'.",
+                    error.target.as_deref().unwrap_or_default()
+                ),
+            },
         }
     }
 
@@ -2873,17 +3515,24 @@ impl ChatRunner {
                 continue;
             };
             let content = Self::build_send_message_content(target, &message.content);
+            let mut protocol_meta = serde_json::json!({
+                "type": "send",
+                "to": target,
+                "index": index,
+            });
+            if let Some(intent) = message.intent.as_deref() {
+                protocol_meta["intent"] = serde_json::json!(intent);
+                if let Some(meaning) = Self::protocol_send_intent_meaning(intent) {
+                    protocol_meta["intent_meaning"] = serde_json::json!(meaning);
+                }
+            }
             let meta = serde_json::json!({
                 "app_language": prompt_language.code,
                 "run_id": run_id,
                 "session_agent_id": session_agent_id,
                 "source_message_id": source_message_id,
                 "chain_depth": chain_depth + 1,
-                "protocol": {
-                    "type": "send",
-                    "to": target,
-                    "index": index,
-                }
+                "protocol": protocol_meta
             });
 
             let routed_message = chat::create_message(
@@ -3077,14 +3726,13 @@ impl ChatRunner {
         stdout_line_buffer.clear();
     }
 
-    /// 浣跨敤tiktoken浼扮畻鏂囨湰鐨則oken鏁伴噺
+    /// Estimate token count using tiktoken when available.
     fn estimate_tokens_with_tiktoken(text: &str) -> u32 {
         use tiktoken_rs::cl100k_base;
-
         match cl100k_base() {
             Ok(bpe) => bpe.encode_with_special_tokens(text).len() as u32,
             Err(_) => {
-                // fallback: 绾?涓瓧绗︿竴涓猼oken
+                // Fallback heuristic: roughly 4 characters per token.
                 (text.len() / 4) as u32
             }
         }
@@ -3331,11 +3979,11 @@ impl ChatRunner {
                             "chain_depth": chain_depth + 1,
                         });
 
-                        // 濡傛灉娌℃湁token_usage锛屼娇鐢╰iktoken浼扮畻
+                        // If the runner did not emit token usage, estimate it from the prompt and final output.
                         let token_usage = if let Some(ref usage) = last_token_usage {
                             usage.clone()
                         } else {
-                            // 璇诲彇input prompt杩涜浼扮畻
+                            // Read the prompt from input.md to estimate input tokens.
                             let input_path = run_dir.join("input.md");
                             let prompt_content =
                                 fs::read_to_string(&input_path).await.unwrap_or_default();
@@ -3655,14 +4303,22 @@ impl ChatRunner {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use chrono::Utc;
-    use db::models::chat_message::{ChatMessage, ChatSenderType};
+    use db::models::{
+        chat_agent::ChatAgent,
+        chat_message::{ChatMessage, ChatSenderType},
+        chat_session_agent::ChatSessionAgentState,
+        chat_skill::ChatSkill,
+    };
     use serde_json::json;
     use uuid::Uuid;
 
     use super::{
-        AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner,
-        PROTOCOL_OUTPUT_EXAMPLE_JSON,
+        AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner, MessageAttachmentContext,
+        PROTOCOL_OUTPUT_EXAMPLE_JSON, ReferenceAttachment, ReferenceContext,
+        ResolvedPromptLanguage, SessionAgentSummary,
     };
     use crate::services::config::UiLanguage;
 
@@ -3688,6 +4344,40 @@ mod tests {
         test_message_with_sender(ChatSenderType::User, None, content, meta)
     }
 
+    fn test_agent(name: &str, system_prompt: &str) -> ChatAgent {
+        ChatAgent {
+            id: Uuid::new_v4(),
+            name: name.to_string(),
+            runner_type: "codex".to_string(),
+            system_prompt: system_prompt.to_string(),
+            tools_enabled: sqlx::types::Json(json!({})),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn test_skill(name: &str, description: &str, trigger_type: &str) -> ChatSkill {
+        ChatSkill {
+            id: Uuid::new_v4(),
+            name: name.to_string(),
+            description: description.to_string(),
+            content: String::new(),
+            trigger_type: trigger_type.to_string(),
+            trigger_keywords: sqlx::types::Json(Vec::new()),
+            enabled: true,
+            source: "local".to_string(),
+            source_url: None,
+            version: "1.0.0".to_string(),
+            author: None,
+            tags: sqlx::types::Json(Vec::new()),
+            category: None,
+            compatible_agents: sqlx::types::Json(Vec::new()),
+            download_count: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
     #[test]
     fn parse_token_usage_from_codex_token_count_line() {
         let line = r#"{"method":"codex/event/token_count","params":{"msg":{"info":{"last_token_usage":{"total_tokens":53002},"model_context_window":258400}}}}"#;
@@ -3709,7 +4399,7 @@ mod tests {
         let content = r#"
 ```json
 [
-  {"type":"send","to":"backend","content":"redo api"},
+  {"type":"send","to":"backend","intent":"REQUEST","content":"redo api"},
   {"type":"record","content":"route=/chat"},
   {"type":"artifact","content":"frontend/src/app.tsx"},
   {"type":"conclusion","content":"waiting for backend confirmation"}
@@ -3724,6 +4414,7 @@ mod tests {
             AgentProtocolMessageType::Send
         ));
         assert_eq!(messages[0].to.as_deref(), Some("backend"));
+        assert_eq!(messages[0].intent.as_deref(), Some("request"));
         assert!(matches!(
             messages[3].message_type,
             AgentProtocolMessageType::Conclusion
@@ -3748,6 +4439,13 @@ mod tests {
         let content = r#"[{"type":"send","content":"hello"}]"#;
         let err = ChatRunner::parse_agent_protocol_messages(content).expect_err("error");
         assert_eq!(err.code, ChatProtocolNoticeCode::MissingSendTarget);
+    }
+
+    #[test]
+    fn parse_agent_protocol_messages_rejects_invalid_send_intent() {
+        let content = r#"[{"type":"send","to":"backend","intent":"delegate","content":"hello"}]"#;
+        let err = ChatRunner::parse_agent_protocol_messages(content).expect_err("error");
+        assert_eq!(err.code, ChatProtocolNoticeCode::InvalidSendIntent);
     }
 
     #[test]
@@ -3783,6 +4481,8 @@ mod tests {
             messages.first().map(|message| &message.message_type),
             Some(AgentProtocolMessageType::Send)
         ));
+        assert_eq!(messages[0].intent.as_deref(), Some("request"));
+        assert_eq!(messages[1].intent.as_deref(), Some("confirm"));
     }
 
     #[test]
@@ -3837,6 +4537,36 @@ mod tests {
     }
 
     #[test]
+    fn infer_prompt_language_prefers_traditional_chinese_hint_chars() {
+        let language =
+            ChatRunner::infer_prompt_language_from_text("\u{81fa}\u{7063}").expect("language");
+        assert_eq!(language.setting, "traditional_chinese");
+        assert_eq!(language.code, "zh-Hant");
+        assert_eq!(
+            language.instruction,
+            "You MUST respond in Traditional Chinese."
+        );
+    }
+
+    #[test]
+    fn infer_prompt_language_detects_spanish_accented_punctuation() {
+        let language =
+            ChatRunner::infer_prompt_language_from_text("\u{00bf}Como estas?").expect("language");
+        assert_eq!(language.setting, "spanish");
+        assert_eq!(language.code, "es");
+        assert_eq!(language.instruction, "You MUST respond in Spanish.");
+    }
+
+    #[test]
+    fn infer_prompt_language_detects_french_accented_letters() {
+        let language =
+            ChatRunner::infer_prompt_language_from_text("\u{00e9}l\u{00e8}ve").expect("language");
+        assert_eq!(language.setting, "french");
+        assert_eq!(language.code, "fr");
+        assert_eq!(language.instruction, "You MUST respond in French.");
+    }
+
+    #[test]
     fn resolve_message_sender_identity_uses_agent_sender_label() {
         let agent_id = Uuid::new_v4();
         let message = test_message_with_sender(
@@ -3857,5 +4587,357 @@ mod tests {
         let sender = ChatRunner::resolve_message_sender_identity(&message);
         assert_eq!(sender.label, "architect");
         assert_eq!(sender.address, "agent:architect");
+    }
+
+    #[test]
+    fn build_system_prompt_markdown_preserves_protocol_content() {
+        let current_agent = test_agent(
+            "product",
+            "You are the Product Manager.\nKeep scope testable.",
+        );
+        let other_agent_id = Uuid::new_v4();
+        let session_agents = vec![SessionAgentSummary {
+            session_agent_id: Uuid::new_v4(),
+            agent_id: other_agent_id,
+            name: "architect".to_string(),
+            runner_type: "codex".to_string(),
+            state: ChatSessionAgentState::Idle,
+            description: Some("You are the System Architect.".to_string()),
+            system_prompt: None,
+            tools_enabled: json!({}),
+            skills_used: vec!["agent-browser".to_string()],
+        }];
+        let skills = vec![test_skill(
+            "agent-browser",
+            "Browser automation CLI for AI agents.",
+            "always",
+        )];
+
+        let prompt = ChatRunner::build_system_prompt_markdown(
+            &current_agent,
+            &session_agents,
+            Path::new(r"E:\workspace\projectSS\MainPage2\.agents_chatgroup\context\demo"),
+            &skills,
+            Some("Please analyze the page issue"),
+            ResolvedPromptLanguage {
+                setting: "simplified_chinese",
+                code: "zh-Hans",
+                instruction: "You MUST respond in Simplified Chinese.",
+            },
+        );
+
+        assert!(prompt.contains("# ChatGroup Protocol"));
+        assert!(prompt.contains("## agent.role"));
+        assert!(prompt.contains("### agent.skills.allowed item 1"));
+        assert!(prompt.contains("### group.members item 1"));
+        assert!(prompt.contains("## history.group_messages"));
+        assert!(prompt.contains("## output"));
+        assert!(prompt.contains("### output.message_types item 1"));
+        assert!(prompt.contains("## output.example"));
+        assert!(prompt.contains("## language"));
+        assert!(prompt.contains("- **PROTOCOL_VERSION**: chatgroup_markdown_v1"));
+        assert!(prompt.contains("- **allowed_targets**: [\"architect\",\"you\"]"));
+        assert!(prompt.contains("Return ONLY a valid JSON array."));
+        assert!(prompt.contains(
+            r"E:\workspace\projectSS\MainPage2\.agents_chatgroup\context\demo\messages.jsonl"
+        ));
+        assert!(!prompt.contains("[agent.role]"));
+        assert!(!prompt.contains("PROTOCOL_VERSION ="));
+    }
+
+    #[test]
+    fn build_user_prompt_markdown_preserves_reference_and_attachments() {
+        let agent = test_agent("product", "");
+        let message = test_message_with_sender(
+            ChatSenderType::Agent,
+            Some(Uuid::new_v4()),
+            "@product Please confirm the delivery scope",
+            json!({
+                "sender": {
+                    "label": "architect",
+                    "name": "architect"
+                }
+            }),
+        );
+        let reference = ReferenceContext {
+            message_id: Uuid::new_v4(),
+            sender_label: "user".to_string(),
+            sender_type: ChatSenderType::User,
+            created_at: "2026-03-10 08:00:00 UTC".to_string(),
+            content: "Referenced message".to_string(),
+            attachments: vec![ReferenceAttachment {
+                name: "spec.md".to_string(),
+                mime_type: Some("text/markdown".to_string()),
+                size_bytes: 128,
+                kind: "file".to_string(),
+                local_path: r"E:\workspace\projectSS\MainPage2\spec.md".to_string(),
+            }],
+        };
+        let message_attachments = MessageAttachmentContext {
+            message_id: message.id,
+            attachments: vec![ReferenceAttachment {
+                name: "ui.png".to_string(),
+                mime_type: Some("image/png".to_string()),
+                size_bytes: 256,
+                kind: "image".to_string(),
+                local_path: r"E:\workspace\projectSS\MainPage2\ui.png".to_string(),
+            }],
+        };
+
+        let prompt = ChatRunner::build_user_prompt_markdown(
+            &agent,
+            &message,
+            Some(&message_attachments),
+            Some(&reference),
+        );
+
+        assert!(prompt.contains("## envelope"));
+        assert!(prompt.contains("## message"));
+        assert!(prompt.contains("### message.reference"));
+        assert!(prompt.contains("#### message.reference.attachments item 1"));
+        assert!(prompt.contains("### message.attachments item 1"));
+        assert!(prompt.contains("- **from**: agent:architect"));
+        assert!(prompt.contains("- **to**: agent:product"));
+        assert!(prompt.contains("~~~text\n@product Please confirm the delivery scope\n~~~"));
+        assert!(prompt.contains("~~~text\nReferenced message\n~~~"));
+        assert!(prompt.contains(r"- **local_path**: E:\workspace\projectSS\MainPage2\spec.md"));
+        assert!(prompt.contains(r"- **local_path**: E:\workspace\projectSS\MainPage2\ui.png"));
+        assert!(!prompt.contains("[message]"));
+        assert!(!prompt.contains("[message.reference]"));
+    }
+
+    #[test]
+    fn build_exact_markdown_prompt_includes_routed_message_intent_meaning() {
+        let agent = test_agent("product", "");
+        let message = test_message_with_sender(
+            ChatSenderType::Agent,
+            Some(Uuid::new_v4()),
+            "@product Please confirm the delivery scope",
+            json!({
+                "sender": {
+                    "label": "architect",
+                    "name": "architect"
+                },
+                "protocol": {
+                    "type": "send",
+                    "to": "product",
+                    "intent": "confirm"
+                }
+            }),
+        );
+
+        let prompt = ChatRunner::build_exact_markdown_prompt(
+            &agent,
+            &message,
+            Path::new(r"E:\workspace\projectSS\MainPage2\.agents_chatgroup\context\demo"),
+            &[],
+            None,
+            None,
+            &[],
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+        );
+
+        assert!(prompt.contains("- **intent**: confirm"));
+        assert!(prompt.contains("- **intent_meaning**: Explicit confirmation is required."));
+    }
+
+    #[test]
+    fn build_exact_markdown_prompt_matches_expected_input_template() {
+        let session_id = Uuid::parse_str("1475cda0-6f11-464e-a61a-7dc81217810e").expect("uuid");
+        let message_id = Uuid::parse_str("88bd7b05-1ba3-407c-8ca3-a52f14c8aced").expect("uuid");
+        let created_at = chrono::DateTime::parse_from_rfc3339("2026-03-10T06:22:12.973Z")
+            .expect("timestamp")
+            .with_timezone(&Utc);
+        let agent = ChatAgent {
+            id: Uuid::new_v4(),
+            name: "fullstack".to_string(),
+            runner_type: "codex".to_string(),
+            system_prompt: "You are the team \"Full-stack Engineer\". Your goal is to ship complete user-facing capabilities by aligning backend contracts, frontend behavior, and operational reliability.\n\n\n".to_string(),
+            tools_enabled: sqlx::types::Json(json!({})),
+            created_at,
+            updated_at: created_at,
+        };
+        let message = ChatMessage {
+            id: message_id,
+            session_id,
+            sender_type: ChatSenderType::User,
+            sender_id: None,
+            content: "@fullstack ".to_string(),
+            mentions: sqlx::types::Json(vec!["fullstack".to_string()]),
+            meta: sqlx::types::Json(json!({})),
+            created_at,
+        };
+
+        let prompt = ChatRunner::build_exact_markdown_prompt(
+            &agent,
+            &message,
+            Path::new(
+                r"E:\workspace\projectSS\MainPage2\.agents_chatgroup\context\1475cda0-6f11-464e-a61a-7dc81217810e",
+            ),
+            &[],
+            None,
+            None,
+            &[],
+            ResolvedPromptLanguage {
+                setting: "simplified_chinese",
+                code: "zh-Hans",
+                instruction: "You MUST respond in Simplified Chinese.",
+            },
+        );
+
+        let expected = r#"# ChatGroup Message
+
+## message
+
+- **sender**: you
+- **content**:
+
+~~~text
+@fullstack ~~~
+
+# Must be obeyed
+
+## output format (important)
+
+- **required**: true
+- **format**: json
+- **container**: list
+- **only_send_items_enter_group_history**: true
+- **instruction**:
+
+~~~text
+- Return ONLY a valid JSON array. Long messages must also be returned in JSON array.
+- Your final reply MUST be parseable by a standard JSON parser.
+- Escape all double quotes, backslashes, and newlines inside JSON string values.
+- Before sending, verify that every `content` value is still a valid JSON string after escaping.
+- Only send items will be turned into visible group chat messages and written into group history.
+- The current agent is always recorded as the sender automatically. Do not impersonate other senders.
+- Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.
+- Use `to = \"you\"` when sending a message to the user. Here `you` refers to the human user.
+- For send items, `intent` is optional but recommended when the routing semantics matter.
+~~~
+
+### output.message_types item 1
+
+- **type**: send
+- **required_fields**: ["type","to","content"]
+- **optional_fields**: ["intent"]
+- **rules**:
+
+~~~text
+- A send item targets exactly one receiver.
+- The recipient must be one of the member names listed in group members.
+- Use concise language with a clear goal.
+- Content may be empty.
+- Prefer setting `intent` for machine-readable routing semantics.
+- Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply required; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.
+- The system will render the final group message as `@receiver content` and route it to that receiver.
+~~~
+
+### output.message_types item 2
+
+- **type**: record
+- **required**: false
+- **required_fields**: ["type","content"]
+- **rules**: Write only long-lived shared facts to shared_blackboard.jsonl. Do not write process descriptions, temporary status, or blockers.
+### output.message_types item 3
+
+- **type**: artifact
+- **required**: false
+- **required_fields**: ["type","content"]
+- **rules**: Write only deliverable outputs or their concrete paths to work_records.jsonl.
+### output.message_types item 4
+
+- **type**: conclusion
+- **required**: false
+- **required_fields**: ["type","content"]
+- **rules**: Write only the current-turn work status to work_records.jsonl. Include completed work, blockers, or next steps. Do not write long-lived facts.
+
+## output.example
+
+- **json**:
+
+~~~json
+[
+  {"type": "send", "to": "backend", "intent": "request", "content": "Please expose a `GET /chat/sessions` endpoint."},
+  {"type": "send", "to": "architect", "intent": "confirm", "content": "The UI is ready. Please confirm the API contract before I continue."},
+  {"type": "record", "content": "The experiment metrics are `latency_p95_ms`, `success_rate`, and `token_cost_usd`."},
+  {"type": "artifact", "content": "Saved the experiment plan to `docs/experiments/chat-metrics-plan.md`."},
+  {"type": "conclusion", "content": "This round finished the metric definition. Next step is wiring collection into the runner."}
+]
+~~~
+
+## agent
+
+### role
+
+- **name**: fullstack
+- **role**:
+
+~~~text
+You are the team "Full-stack Engineer". Your goal is to ship complete user-facing capabilities by aligning backend contracts, frontend behavior, and operational reliability.
+
+
+~~~
+
+### skills
+
+- **restriction**: You have no skills enabled. Do not attempt to use any skill.
+
+
+## language
+
+- **setting**: simplified_chinese
+- **instruction**: You MUST respond in Simplified Chinese.
+
+
+# Group Members
+
+- **members_description**: Other AI members currently in this group
+_No other AI members._
+
+# History
+
+## history.group_messages
+
+- **path**: E:\workspace\projectSS\MainPage2\.agents_chatgroup\context\1475cda0-6f11-464e-a61a-7dc81217810e\messages.jsonl
+- **format**: jsonl
+- **description**: Group chat history. Each line is a JSON message record containing sender and content, consistent with messages.jsonl history.
+- **optional**: true
+- **instruction**:
+
+~~~text
+If you need to understand the current group chat state, you MAY inspect this file yourself.
+Reading history is optional. Do not assume you must read history before acting.
+~~~
+
+## history.shared_blackboard
+
+- **path**: E:\workspace\projectSS\MainPage2\.agents_chatgroup\context\1475cda0-6f11-464e-a61a-7dc81217810e\shared_blackboard.jsonl
+- **format**: jsonl
+- **description**: Persisted shared messages generated from record items.
+- **instruction**: You can search by member name to find shared messages published by a specific member.
+## history.work_records
+
+- **path**: E:\workspace\projectSS\MainPage2\.agents_chatgroup\context\1475cda0-6f11-464e-a61a-7dc81217810e\work_records.jsonl
+- **format**: jsonl
+- **description**: Persisted work outputs and summaries generated from artifact/conclusion items.
+- **instruction**: You can search by member name to find a specific member's work outputs and status summaries.
+
+# envelope
+
+- **session_id**: 1475cda0-6f11-464e-a61a-7dc81217810e
+- **from**: user:you
+- **to**: agent:fullstack
+- **message_id**: 88bd7b05-1ba3-407c-8ca3-a52f14c8aced
+- **timestamp**: 2026-03-10 06:22:12.973 UTC
+
+"#;
+
+        assert_eq!(prompt, expected);
     }
 }
