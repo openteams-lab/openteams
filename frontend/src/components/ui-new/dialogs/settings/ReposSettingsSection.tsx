@@ -7,6 +7,7 @@ import { useRepoBranches } from '@/hooks/useRepoBranches';
 import { useScriptPlaceholders } from '@/hooks/useScriptPlaceholders';
 import { repoApi } from '@/lib/api';
 import type { Repo, UpdateRepo } from 'shared/types';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import { SearchableDropdownContainer } from '../../containers/SearchableDropdownContainer';
 import {
   DropdownMenu,
@@ -103,14 +104,16 @@ export function ReposSettingsSection() {
 
   // Handle repo selection
   const handleRepoSelect = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (id === selectedRepoId) return;
 
       if (hasUnsavedChanges) {
-        const confirmed = window.confirm(
-          t('settings.repos.save.confirmSwitch')
-        );
-        if (!confirmed) return;
+        const result = await ConfirmDialog.show({
+          title: t('common:buttons.discard'),
+          message: t('settings.repos.save.confirmSwitch'),
+          confirmText: t('common:buttons.discard'),
+        });
+        if (result !== 'confirmed') return;
         setDraft(null);
         setSelectedRepo(null);
         setSuccess(false);

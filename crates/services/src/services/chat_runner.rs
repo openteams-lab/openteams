@@ -92,7 +92,7 @@ const RESERVED_USER_HANDLE: &str = "you";
 const PROTOCOL_SEND_INTENT_VALUES: &[&str] = &["request", "reply", "notify", "blocker", "confirm"];
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
 const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
-  {"type": "send", "to": "backend", "intent": "request", "content": "Please expose a `GET /chat/sessions` endpoint."},
+  {"type": "send", "to": "you", "intent": "request", "content": "I have finished the front implementation"},
   {"type": "send", "to": "architect", "intent": "confirm", "content": "The UI is ready. Please confirm the API contract before I continue."},
   {"type": "record", "content": "The experiment metrics are `latency_p95_ms`, `success_rate`, and `token_cost_usd`."},
   {"type": "artifact", "content": "Saved the experiment plan to `docs/experiments/chat-metrics-plan.md`."},
@@ -128,6 +128,7 @@ struct ReferenceContext {
 }
 
 struct MessageAttachmentContext {
+    message_id: Uuid,
     attachments: Vec<ReferenceAttachment>,
 }
 
@@ -1698,6 +1699,7 @@ impl ChatRunner {
         }
 
         Ok(Some(MessageAttachmentContext {
+            message_id: source_message.id,
             attachments: message_attachments,
         }))
     }
@@ -1775,7 +1777,6 @@ impl ChatRunner {
             .replace('\t', "\\t")
     }
     /// Build the system prompt using Markdown sections while preserving all protocol fields.
-    #[cfg(test)]
     fn build_system_prompt_markdown(
         agent: &ChatAgent,
         session_agents: &[SessionAgentSummary],
@@ -2915,28 +2916,10 @@ impl ChatRunner {
     fn extract_json_from_content(content: &str) -> Result<String, AgentProtocolError> {
         let content = content.trim();
 
-        if let Some(candidate) = Self::extract_json_candidate(content) {
-            return Ok(candidate);
-        }
-
-        if let Some(start) = content.find('[')
-            && let Some(end) = content.rfind(']')
-            && end > start
-        {
-            let candidate = content[start..=end].trim();
-            if let Some(candidate) = Self::extract_json_candidate(candidate) {
-                return Ok(candidate);
-            }
-        }
-
-        if let Some(start) = content.find('{')
-            && let Some(end) = content.rfind('}')
-            && end > start
-        {
-            let candidate = content[start..=end].trim();
-            if let Some(candidate) = Self::extract_json_candidate(candidate) {
-                return Ok(candidate);
-            }
+        match Self::extract_json_candidate(content) {
+            Ok(Some(candidate)) => return Ok(candidate),
+            Ok(None) => {}
+            Err(err) => return Err(Self::invalid_json_error(err)),
         }
 
         Err(AgentProtocolError {
@@ -2946,18 +2929,19 @@ impl ChatRunner {
         })
     }
 
-    fn extract_json_candidate(content: &str) -> Option<String> {
+    fn extract_json_candidate(content: &str) -> Result<Option<String>, serde_json::Error> {
         let trimmed = content.trim();
-        if Self::looks_like_json_value(trimmed) {
-            return Some(trimmed.to_string());
+        if matches!(trimmed.chars().next(), Some('[' | '{')) {
+            return Self::extract_json_prefix(trimmed);
         }
 
         if let Some(start) = trimmed.find("```json") {
             let json_start = start + 7;
             if let Some(end) = trimmed[json_start..].find("```") {
-                let candidate = trimmed[json_start..json_start + end].trim();
-                if Self::looks_like_json_value(candidate) {
-                    return Some(candidate.to_string());
+                let block = &trimmed[json_start..json_start + end];
+                match Self::extract_json_candidate(block)? {
+                    Some(candidate) => return Ok(Some(candidate)),
+                    None => {}
                 }
             }
         }
@@ -2965,24 +2949,43 @@ impl ChatRunner {
         if let Some(start) = trimmed.find("```") {
             let block_start = start + 3;
             if let Some(end) = trimmed[block_start..].find("```") {
-                let block = trimmed[block_start..block_start + end].trim();
-                if Self::looks_like_json_value(block) {
-                    return Some(block.to_string());
-                }
-                if let Some(newline) = block.find('\n') {
-                    let candidate = block[newline + 1..].trim();
-                    if Self::looks_like_json_value(candidate) {
-                        return Some(candidate.to_string());
-                    }
+                let block = &trimmed[block_start..block_start + end];
+                if let Some(candidate) = Self::extract_json_candidate(block)? {
+                    return Ok(Some(candidate));
                 }
             }
         }
 
-        None
+        for (index, ch) in trimmed.char_indices() {
+            if matches!(ch, '[' | '{')
+                && let Ok(Some(candidate)) = Self::extract_json_prefix(&trimmed[index..])
+            {
+                return Ok(Some(candidate));
+            }
+        }
+
+        Ok(None)
     }
 
-    fn looks_like_json_value(content: &str) -> bool {
-        matches!(content.trim_start().chars().next(), Some('[' | '{'))
+    fn extract_json_prefix(content: &str) -> Result<Option<String>, serde_json::Error> {
+        let trimmed = content.trim_start();
+        if !matches!(trimmed.chars().next(), Some('[' | '{')) {
+            return Ok(None);
+        }
+
+        let mut stream = serde_json::Deserializer::from_str(trimmed).into_iter::<serde_json::Value>();
+        let value = match stream.next() {
+            Some(Ok(value)) => value,
+            Some(Err(err)) => return Err(err),
+            None => return Ok(None),
+        };
+
+        if !matches!(value, serde_json::Value::Array(_) | serde_json::Value::Object(_)) {
+            return Ok(None);
+        }
+
+        let offset = stream.byte_offset();
+        Ok(Some(trimmed[..offset].trim_end().to_string()))
     }
 
     fn invalid_json_error(err: serde_json::Error) -> AgentProtocolError {
@@ -4386,6 +4389,22 @@ mod tests {
     }
 
     #[test]
+    fn parse_agent_protocol_messages_supports_json_array_with_tool_call_tail() {
+        let content = r#"[{"type":"send","to":"you","content":"done"}]</parameter>
+</invoke>
+</minimax:tool_call>"#;
+
+        let messages = ChatRunner::parse_agent_protocol_messages(content).expect("messages");
+        assert_eq!(messages.len(), 1);
+        assert!(matches!(
+            messages[0].message_type,
+            AgentProtocolMessageType::Send
+        ));
+        assert_eq!(messages[0].to.as_deref(), Some("you"));
+        assert_eq!(messages[0].content, "done");
+    }
+
+    #[test]
     fn parse_agent_protocol_messages_rejects_legacy_object() {
         let content = r#"{
   "send_to_member": { "target": "@architect", "content": "sync API changes" },
@@ -4648,6 +4667,7 @@ mod tests {
             }],
         };
         let message_attachments = MessageAttachmentContext {
+            message_id: message.id,
             attachments: vec![ReferenceAttachment {
                 name: "ui.png".to_string(),
                 mime_type: Some("image/png".to_string()),

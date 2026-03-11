@@ -1,12 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import {
-  Dialog,
-  DialogHeader,
-  DialogTitle,
-  DialogContent,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
+  ConfirmationDialogChrome,
+  getConfirmationButtonClasses,
+} from '@/components/dialogs/shared/ConfirmationDialogChrome';
 
 export interface ConfirmModalProps {
   isOpen: boolean;
@@ -39,39 +35,46 @@ export function ConfirmModal({
   const resolvedCancelText = cancelText ?? t('modals.confirm.cancel');
 
   return (
-    <Dialog
-      className="chat-session-modal-surface"
+    <ConfirmationDialogChrome
       open={isOpen}
       onOpenChange={(open) => {
         if (!open && !isLoading) {
           onCancel();
         }
       }}
-    >
-      <DialogHeader>
-        <DialogTitle>{title}</DialogTitle>
-      </DialogHeader>
-      <DialogContent>
-        <p className="text-sm text-normal">{message}</p>
-      </DialogContent>
-      <DialogFooter>
-        {!isAlert && (
-          <PrimaryButton
-            variant="tertiary"
-            value={resolvedCancelText}
-            onClick={onCancel}
+      onClose={onCancel}
+      title={title}
+      message={message}
+      tone="destructive"
+      closeLabel={t('common:buttons.close')}
+      footer={
+        <>
+          {!isAlert && (
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isLoading}
+              className={getConfirmationButtonClasses(
+                'destructive',
+                'cancel'
+              )}
+            >
+              {resolvedCancelText}
+            </button>
+          )}
+          <button
+            type="submit"
+            onClick={onConfirm}
             disabled={isLoading}
-            className="!bg-white hover:!bg-white focus-visible:!bg-white active:!bg-white"
-          />
-        )}
-        <PrimaryButton
-          variant="default"
-          value={resolvedConfirmText}
-          onClick={onConfirm}
-          disabled={isLoading}
-          className="!bg-[#EF4444] hover:!bg-[#DC2626] focus-visible:!bg-[#DC2626] active:!bg-[#B91C1C] !text-white"
-        />
-      </DialogFooter>
-    </Dialog>
+            className={getConfirmationButtonClasses(
+              'destructive',
+              'confirm'
+            )}
+          >
+            {resolvedConfirmText}
+          </button>
+        </>
+      }
+    />
   );
 }

@@ -278,6 +278,27 @@
     "joinBeta": "Join Beta",
     "maybeLater": "Maybe Later"
   },
+  "onboardingDialog": {
+    "title": "Welcome to agents-chatgroup",
+    "description": "Let's set up your coding preferences. You can always change these later in Settings.",
+    "agentSectionTitle": "Choose Your Coding Agent",
+    "status": {
+      "checking": "Checking for recent usage and available credentials...",
+      "loginDetected": "Recent usage detected: authentication credentials for this agent were found automatically.",
+      "installationFound": "Previous usage detected: a saved configuration for this agent was found.",
+      "notFound": "No recent credentials were detected yet. You can update this later in Settings."
+    }
+  },
+  "disclaimerDialog": {
+    "title": "Safety Notice",
+    "intro": "agents-chatgroup runs AI coding agents with unrestricted permissions by default.",
+    "body": "This means agents can execute code and run commands on your system with full access. Please proceed carefully.",
+    "importantTitle": "Important note:",
+    "importantBody": "Always review the actions agents are taking and make sure you have backups of important work. This software is experimental, so use it responsibly.",
+    "docsPrefix": "Learn more in the",
+    "docsLinkText": "Safety Guide",
+    "action": "I Understand the Risks, Continue"
+  },
   "workspacesGuide": {
     "welcome": {
       "title": "Welcome",

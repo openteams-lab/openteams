@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { projectsApi } from '@/lib/api';
 import { useProjects } from '@/hooks/useProjects';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import {
   AlertCircle,
   ArrowLeft,
@@ -39,7 +40,13 @@ export function ProjectDetail({ projectId, onBack }: ProjectDetailProps) {
 
   const handleDelete = async () => {
     if (!project) return;
-    if (!window.confirm(t('confirmDelete', { name: project.name }))) return;
+    const result = await ConfirmDialog.show({
+      title: t('common:buttons.delete'),
+      message: t('confirmDelete', { name: project.name }),
+      confirmText: t('common:buttons.delete'),
+      variant: 'destructive',
+    });
+    if (result !== 'confirmed') return;
 
     try {
       await projectsApi.delete(projectId);

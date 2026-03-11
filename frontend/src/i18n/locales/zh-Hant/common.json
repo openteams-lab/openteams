@@ -278,6 +278,27 @@
     "joinBeta": "加入 Beta",
     "maybeLater": "稍後再說"
   },
+  "onboardingDialog": {
+    "title": "歡迎使用 agents-chatgroup",
+    "description": "先設定你的編碼偏好。這些選項之後都可以隨時在「設定」中修改。",
+    "agentSectionTitle": "選擇你的 Coding Agent",
+    "status": {
+      "checking": "正在檢查最近使用記錄與可用憑據...",
+      "loginDetected": "已偵測到最近使用記錄：已自動找到此代理的驗證憑據。",
+      "installationFound": "已偵測到先前的使用記錄：已找到此代理的已儲存設定。",
+      "notFound": "尚未偵測到最近憑據。你之後可以在「設定」中更新。"
+    }
+  },
+  "disclaimerDialog": {
+    "title": "安全提示",
+    "intro": "agents-chatgroup 預設會以不受限制的權限執行 AI 編碼代理。",
+    "body": "這代表代理可以在你的系統中執行程式碼與命令，並擁有完整存取權限。請務必謹慎操作。",
+    "importantTitle": "重要提示：",
+    "importantBody": "請始終檢查代理正在執行的操作，並確保已對重要工作做好備份。本軟體仍處於實驗階段，請負責任地使用。",
+    "docsPrefix": "進一步了解",
+    "docsLinkText": "安全指南",
+    "action": "我已了解風險，繼續"
+  },
   "workspacesGuide": {
     "welcome": {
       "title": "歡迎",

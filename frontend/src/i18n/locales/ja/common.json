@@ -278,6 +278,27 @@
     "joinBeta": "ベータに参加",
     "maybeLater": "後で"
   },
+  "onboardingDialog": {
+    "title": "agents-chatgroup へようこそ",
+    "description": "コーディング設定を行いましょう。これらは後から設定でいつでも変更できます。",
+    "agentSectionTitle": "Coding Agent を選択",
+    "status": {
+      "checking": "最近の利用状況と利用可能な認証情報を確認しています...",
+      "loginDetected": "最近の利用を検出しました。このエージェントの認証情報が自動的に見つかりました。",
+      "installationFound": "以前の利用を検出しました。このエージェントの保存済み設定が見つかりました。",
+      "notFound": "最近の認証情報はまだ見つかっていません。後から設定で更新できます。"
+    }
+  },
+  "disclaimerDialog": {
+    "title": "安全に関する注意",
+    "intro": "agents-chatgroup は既定で制限のない権限で AI コーディングエージェントを実行します。",
+    "body": "これは、エージェントがあなたのシステム上でコードを実行し、コマンドをフルアクセスで実行できることを意味します。十分に注意して進めてください。",
+    "importantTitle": "重要な注意:",
+    "importantBody": "エージェントが実行している操作を常に確認し、重要な作業は必ずバックアップしてください。このソフトウェアは実験段階のため、責任を持って使用してください。",
+    "docsPrefix": "詳しくは",
+    "docsLinkText": "安全ガイド",
+    "action": "リスクを理解しました。続行します"
+  },
   "workspacesGuide": {
     "welcome": {
       "title": "ようこそ",

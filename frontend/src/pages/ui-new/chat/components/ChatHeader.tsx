@@ -20,7 +20,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui-new/primitives/Dropdown';
-import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 
 export interface ChatHeaderProps {
   activeSession: ChatSession | null;
@@ -87,6 +86,7 @@ export function ChatHeader({
   const { t: tCommon } = useTranslation('common');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const searchInputContainerRef = useRef<HTMLDivElement | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!isSearchOpen) return;
@@ -116,6 +116,15 @@ export function ChatHeader({
       document.removeEventListener('mousedown', handlePointerDown);
     };
   }, [isSearchOpen, onCloseSearch]);
+
+  useEffect(() => {
+    if (!isEditingTitle) return;
+    const timer = window.setTimeout(() => {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.select();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [isEditingTitle]);
 
   return (
     <header className="chat-session-header">
@@ -205,41 +214,49 @@ export function ChatHeader({
             </>
           )}
           {isEditingTitle && (
-            <div className="flex items-center gap-half flex-wrap">
-              <input
-                value={titleDraft}
-                onChange={(event) => onTitleDraftChange(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    onSaveTitle();
-                  }
-                  if (event.key === 'Escape') {
-                    event.preventDefault();
-                    onCancelTitleEdit();
-                  }
-                }}
-                placeholder={t('header.sessionNamePlaceholder')}
-                disabled={isSavingTitle}
-                className={cn(
-                  'w-[240px] max-w-full rounded-sm px-base py-half',
-                  'chat-session-header-input',
-                  'text-sm text-normal focus:outline-none'
-                )}
-              />
-              <PrimaryButton
-                value={tCommon('buttons.save')}
-                onClick={onSaveTitle}
-                disabled={isSavingTitle}
-                className="chat-session-header-btn"
-              />
-              <PrimaryButton
-                variant="tertiary"
-                value={tCommon('buttons.cancel')}
-                onClick={onCancelTitleEdit}
-                disabled={isSavingTitle}
-                className="chat-session-header-btn chat-session-header-cancel-btn"
-              />
+            <div className="chat-session-header-edit-group">
+              <div className="chat-session-header-edit-input-wrap">
+                <input
+                  ref={titleInputRef}
+                  value={titleDraft}
+                  onChange={(event) => onTitleDraftChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      onSaveTitle();
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      onCancelTitleEdit();
+                    }
+                  }}
+                  placeholder={t('header.sessionNamePlaceholder')}
+                  disabled={isSavingTitle}
+                  aria-label={t('header.editSessionName')}
+                  className={cn(
+                    'chat-session-header-edit-input',
+                    'text-sm text-normal focus:outline-none'
+                  )}
+                />
+              </div>
+              <div className="chat-session-header-edit-actions">
+                <button
+                  type="button"
+                  onClick={onSaveTitle}
+                  disabled={isSavingTitle}
+                  className="chat-session-header-edit-btn chat-session-header-edit-save-btn"
+                >
+                  {tCommon('buttons.save')}
+                </button>
+                <button
+                  type="button"
+                  onClick={onCancelTitleEdit}
+                  disabled={isSavingTitle}
+                  className="chat-session-header-edit-btn chat-session-header-edit-cancel-btn"
+                >
+                  {tCommon('buttons.cancel')}
+                </button>
+              </div>
             </div>
           )}
           {titleError && <div className="text-xs text-error">{titleError}</div>}

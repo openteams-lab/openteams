@@ -25,6 +25,7 @@ import { useOpenProjectInEditor } from '@/hooks/useOpenProjectInEditor';
 import { useNavigateWithSearch, useProjectRepos } from '@/hooks';
 import { projectsApi } from '@/lib/api';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 
 type Props = {
   project: Project;
@@ -50,7 +51,13 @@ function ProjectCard({ project, isFocused, setError, onEdit }: Props) {
   }, [isFocused]);
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(t('confirmDelete', { name }))) return;
+    const result = await ConfirmDialog.show({
+      title: t('common:buttons.delete'),
+      message: t('confirmDelete', { name }),
+      confirmText: t('common:buttons.delete'),
+      variant: 'destructive',
+    });
+    if (result !== 'confirmed') return;
 
     try {
       await projectsApi.delete(id);

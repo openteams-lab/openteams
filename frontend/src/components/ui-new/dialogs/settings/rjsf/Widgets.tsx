@@ -1,4 +1,5 @@
 import { WidgetProps } from '@rjsf/utils';
+import { CaretDownIcon, CheckIcon } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useMemo } from 'react';
@@ -7,8 +8,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuTriggerButton,
 } from '../../../primitives/Dropdown';
+
+const settingsFieldClassName =
+  'w-full rounded-[10px] border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] py-[10px] text-[14px] text-[#333333] outline-none transition-all duration-200 placeholder:text-[#8C8C8C] focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_3px_rgba(74,144,226,0.08)] disabled:cursor-not-allowed disabled:opacity-50';
 
 // TextWidget - Text input matching settings dialog styling
 export const TextWidget = (props: WidgetProps) => {
@@ -52,8 +55,8 @@ export const TextWidget = (props: WidgetProps) => {
       onBlur={handleBlur}
       onFocus={handleFocus}
       className={cn(
-        'settings-input settings-rjsf-input w-full bg-secondary border border-border rounded-sm px-base py-half text-base text-high',
-        'placeholder:text-low placeholder:opacity-80 focus:outline-none focus:ring-1 focus:ring-brand',
+        'settings-input settings-rjsf-input',
+        settingsFieldClassName,
         (disabled || readonly) && 'opacity-50 cursor-not-allowed'
       )}
     />
@@ -102,18 +105,26 @@ export const SelectWidget = (props: WidgetProps) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <DropdownMenuTriggerButton
+        <button
           id={id}
-          label={selectedOption?.label || placeholder || t('form.selectOption')}
-          className="settings-select-trigger settings-rjsf-select-trigger w-full justify-between"
+          type="button"
+          className={cn(
+            'settings-select-trigger settings-rjsf-select-trigger flex items-center justify-between text-left',
+            settingsFieldClassName
+          )}
           disabled={disabled || readonly}
-        />
+        >
+          <span className="truncate">
+            {selectedOption?.label || placeholder || t('form.selectOption')}
+          </span>
+          <CaretDownIcon className="size-3 text-[#8C8C8C]" weight="fill" />
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="settings-select-dropdown settings-rjsf-select-dropdown w-[var(--radix-dropdown-menu-trigger-width)]">
+      <DropdownMenuContent className="settings-select-dropdown settings-rjsf-select-dropdown w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
         {allOptions.map((option) => (
           <DropdownMenuItem
             key={String(option.value)}
-            className="settings-select-option settings-rjsf-select-option"
+            className="settings-select-option settings-rjsf-select-option mx-0 rounded-[8px] px-3 py-2 text-[14px] text-[#333333] focus:bg-[#F9FBFF]"
             onClick={() => handleChange(String(option.value))}
           >
             {option.label}
@@ -127,26 +138,40 @@ export const SelectWidget = (props: WidgetProps) => {
 // CheckboxWidget - Checkbox matching settings dialog styling
 // Note: Label is shown in the FieldTemplate's left column, not here
 export const CheckboxWidget = (props: WidgetProps) => {
-  const { id, value, disabled, readonly, onChange } = props;
+  const { id, value, disabled, readonly, onChange, onBlur, onFocus } = props;
 
   const handleChange = (checked: boolean) => {
     onChange(checked);
   };
 
   const checked = Boolean(value);
+  const isDisabled = disabled || readonly;
 
   return (
-    <input
-      type="checkbox"
-      id={id}
-      checked={checked}
-      onChange={(e) => handleChange(e.target.checked)}
-      disabled={disabled || readonly}
-      className={cn(
-        'settings-checkbox-input settings-rjsf-checkbox h-4 w-4 rounded border-border bg-secondary text-brand focus:ring-brand focus:ring-offset-0',
-        (disabled || readonly) && 'opacity-50 cursor-not-allowed'
-      )}
-    />
+    <div className="flex items-start">
+      <button
+        id={id}
+        type="button"
+        role="checkbox"
+        aria-checked={checked}
+        disabled={isDisabled}
+        onClick={() => handleChange(!checked)}
+        onBlur={() => onBlur?.(id, checked)}
+        onFocus={() => onFocus?.(id, checked)}
+        className={cn(
+          'settings-rjsf-checkbox flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border-2 text-white transition-colors duration-200 focus:outline-none focus:shadow-[0_0_0_3px_rgba(74,144,226,0.16)]',
+          checked
+            ? 'border-[#4A90E2] bg-[#4A90E2]'
+            : 'border-[#E8EEF5] bg-white text-[#4A90E2]',
+          !isDisabled && 'cursor-pointer',
+          isDisabled && 'cursor-not-allowed opacity-50'
+        )}
+      >
+        {checked ? (
+          <CheckIcon className="h-3 w-3 text-white" weight="bold" />
+        ) : null}
+      </button>
+    </div>
   );
 };
 
@@ -192,8 +217,8 @@ export const TextareaWidget = (props: WidgetProps) => {
       onFocus={handleFocus}
       rows={4}
       className={cn(
-        'settings-textarea settings-rjsf-textarea w-full bg-secondary border border-border rounded-sm px-base py-half text-base text-high',
-        'placeholder:text-low placeholder:opacity-80 focus:outline-none focus:ring-1 focus:ring-brand',
+        'settings-textarea settings-rjsf-textarea resize-y px-3 py-3',
+        settingsFieldClassName,
         'resize-y',
         (disabled || readonly) && 'opacity-50 cursor-not-allowed'
       )}

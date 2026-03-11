@@ -278,6 +278,27 @@
     "joinBeta": "Rejoindre la bêta",
     "maybeLater": "Peut-être plus tard"
   },
+  "onboardingDialog": {
+    "title": "Bienvenue dans agents-chatgroup",
+    "description": "Configurons vos préférences de codage. Vous pourrez toujours les modifier plus tard dans les Paramètres.",
+    "agentSectionTitle": "Choisissez votre agent de code",
+    "status": {
+      "checking": "Vérification des usages récents et des identifiants disponibles...",
+      "loginDetected": "Utilisation récente détectée : des identifiants d'authentification pour cet agent ont été trouvés automatiquement.",
+      "installationFound": "Utilisation précédente détectée : une configuration enregistrée pour cet agent a été trouvée.",
+      "notFound": "Aucun identifiant récent n'a encore été détecté. Vous pourrez mettre cela à jour plus tard dans les Paramètres."
+    }
+  },
+  "disclaimerDialog": {
+    "title": "Avis de sécurité",
+    "intro": "agents-chatgroup exécute par défaut des agents de code IA avec des autorisations non restreintes.",
+    "body": "Cela signifie que les agents peuvent exécuter du code et lancer des commandes sur votre système avec un accès complet. Veuillez agir avec prudence.",
+    "importantTitle": "Note importante :",
+    "importantBody": "Vérifiez toujours les actions effectuées par les agents et assurez-vous d'avoir des sauvegardes de vos travaux importants. Ce logiciel est expérimental ; utilisez-le de manière responsable.",
+    "docsPrefix": "Pour en savoir plus, consultez le",
+    "docsLinkText": "guide de sécurité",
+    "action": "Je comprends les risques, continuer"
+  },
   "workspacesGuide": {
     "welcome": {
       "title": "Bienvenue",

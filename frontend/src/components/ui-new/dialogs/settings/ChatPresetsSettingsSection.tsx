@@ -18,11 +18,13 @@ import { useUserSystem } from '@/components/ConfigProvider';
 import { cn } from '@/lib/utils';
 import { toPrettyCase } from '@/utils/string';
 import { PromptEditorModal } from '@/pages/ui-new/chat/components/PromptEditorModal';
-import { PrimaryButton } from '../../primitives/PrimaryButton';
 import {
   SettingsCard,
   SettingsField,
   SettingsInput,
+  settingsMutedPanelClassName,
+  settingsPanelClassName,
+  settingsSecondaryButtonClassName,
   SettingsSaveBar,
   SettingsSelect,
   SettingsTextarea,
@@ -120,32 +122,39 @@ function PresetListItem({
       type="button"
       onClick={onClick}
       className={cn(
-        'w-full text-left px-base py-half rounded-sm border transition-colors',
+        'w-full rounded-[10px] border border-[#E8EEF5] px-3 py-3 text-left transition-colors duration-200',
         selected
-          ? 'border-brand bg-brand/10'
-          : 'border-border hover:bg-secondary/40',
+          ? 'bg-[rgba(74,144,226,0.06)] text-[#4A90E2]'
+          : 'bg-white text-[#333333] hover:bg-[#F9FBFF]',
         disabled && 'opacity-60'
       )}
     >
-      <div className="flex items-center gap-half">
-        <span className="text-sm font-medium text-normal truncate">
+      <div className="flex items-center gap-2">
+        <span className="truncate text-[13px] font-medium">
           {title}
         </span>
         {isBuiltin && (
-          <span className="text-xs px-half py-[1px] rounded bg-secondary text-low">
+          <span className="rounded-full bg-[#F3F6FA] px-2 py-[2px] text-[11px] text-[#8C8C8C]">
             {t('settings.presets.builtin')}
           </span>
         )}
         {disabled && (
-          <span className="text-xs px-half py-[1px] rounded bg-error/10 text-error">
+          <span className="rounded-full bg-[#fff7f7] px-2 py-[2px] text-[11px] text-[#d14343]">
             {t('settings.presets.disabled')}
           </span>
         )}
       </div>
-      <div className="text-xs text-low truncate">{subtitle}</div>
+      <div className="mt-1 truncate text-[12px] text-[#8C8C8C]">
+        {subtitle || '\u00a0'}
+      </div>
     </button>
   );
 }
+
+const presetToolbarButtonClassName = cn(
+  settingsSecondaryButtonClassName,
+  'px-3 py-[9px] text-[13px]'
+);
 
 export function ChatPresetsSettingsSectionContent() {
   const { t } = useTranslation('settings');
@@ -511,7 +520,7 @@ export function ChatPresetsSettingsSectionContent() {
   if (!config) {
     return (
       <div className="py-8">
-        <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error">
+        <div className="rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
           {t('settings.presets.loadError')}
         </div>
       </div>
@@ -521,12 +530,12 @@ export function ChatPresetsSettingsSectionContent() {
   return (
     <>
       {error && (
-        <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error">
+        <div className="mb-5 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
           {error}
         </div>
       )}
       {success && (
-        <div className="bg-success/10 border border-success/50 rounded-sm p-4 text-success font-medium">
+        <div className="mb-5 rounded-[10px] border border-[#d8ead8] bg-[#f7fcf7] p-4 text-[13px] font-medium text-[#2f7d32]">
           {t('settings.presets.saveSuccess')}
         </div>
       )}
@@ -535,14 +544,14 @@ export function ChatPresetsSettingsSectionContent() {
         title={t('settings.presets.title')}
         description={t('settings.presets.description')}
       >
-        <div className="flex gap-half">
+        <div className="mb-6 flex gap-2">
           <button
             type="button"
             className={cn(
-              'px-base py-half rounded-sm text-sm border',
+              'rounded-[10px] border px-4 py-[10px] text-[14px] font-medium transition-colors duration-200',
               tab === 'members'
-                ? 'border-brand bg-brand/10 text-brand'
-                : 'border-border text-low hover:text-normal'
+                ? 'border-[#E8EEF5] bg-[rgba(74,144,226,0.08)] text-[#4A90E2]'
+                : 'border-[#E8EEF5] bg-white text-[#8C8C8C] hover:bg-[#F9FBFF] hover:text-[#333333]'
             )}
             onClick={() => setTab('members')}
           >
@@ -551,10 +560,10 @@ export function ChatPresetsSettingsSectionContent() {
           <button
             type="button"
             className={cn(
-              'px-base py-half rounded-sm text-sm border',
+              'rounded-[10px] border px-4 py-[10px] text-[14px] font-medium transition-colors duration-200',
               tab === 'teams'
-                ? 'border-brand bg-brand/10 text-brand'
-                : 'border-border text-low hover:text-normal'
+                ? 'border-[#E8EEF5] bg-[rgba(74,144,226,0.08)] text-[#4A90E2]'
+                : 'border-[#E8EEF5] bg-white text-[#8C8C8C] hover:bg-[#F9FBFF] hover:text-[#333333]'
             )}
             onClick={() => setTab('teams')}
           >
@@ -564,20 +573,22 @@ export function ChatPresetsSettingsSectionContent() {
 
         {tab === 'members' ? (
           <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4">
-            <div className="border border-border rounded-sm p-base space-y-half">
-              <div className="flex items-center justify-between mb-half">
-                <div className="text-sm font-medium text-normal">
+            <div className={cn(settingsPanelClassName, 'space-y-3 p-4')}>
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <div className="text-[13px] font-medium text-[#333333]">
                   {t('settings.presets.members.listTitle')}
                 </div>
-                <PrimaryButton
-                  variant="tertiary"
-                  value={t('settings.presets.members.add')}
-                  actionIcon={PlusIcon}
+                <button
+                  type="button"
+                  className={presetToolbarButtonClassName}
                   onClick={handleAddMemberPreset}
-                />
+                >
+                  <PlusIcon className="h-4 w-4" weight="bold" />
+                  {t('settings.presets.members.add')}
+                </button>
               </div>
               {draft.members.length === 0 && (
-                <div className="text-sm text-low py-base">
+                <div className="py-4 text-[12px] text-[#8C8C8C]">
                   {t('settings.presets.members.empty')}
                 </div>
               )}
@@ -593,53 +604,60 @@ export function ChatPresetsSettingsSectionContent() {
                 />
               ))}
             </div>
-            <div className="border border-border rounded-sm p-base">
+            <div className={cn(settingsPanelClassName, 'p-4')}>
               {!selectedMember && (
-                <div className="text-sm text-low">
+                <div className="text-[12px] text-[#8C8C8C]">
                   {t('settings.presets.members.empty')}
                 </div>
               )}
               {selectedMember && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium text-normal">
+                <div className="space-y-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="text-[13px] font-medium text-[#333333]">
                       @{getLocalizedMemberName(selectedMember)}
                     </div>
-                    <div className="flex items-center gap-half">
-                      <PrimaryButton
-                        variant="tertiary"
-                        value={t('settings.presets.actions.copy')}
-                        actionIcon={CopyIcon}
-                        className="text-xs whitespace-nowrap"
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className={presetToolbarButtonClassName}
                         onClick={() => handleCopyMemberPreset(selectedMember)}
-                      />
-                      <PrimaryButton
-                        variant="tertiary"
-                        value={
-                          selectedMember.enabled
-                            ? t('settings.presets.actions.disable')
-                            : t('settings.presets.actions.enable')
-                        }
-                        actionIcon={
-                          selectedMember.enabled ? EyeSlashIcon : EyeIcon
-                        }
-                        className="text-xs whitespace-nowrap"
+                      >
+                        <CopyIcon className="h-4 w-4" weight="bold" />
+                        {t('settings.presets.actions.copy')}
+                      </button>
+                      <button
+                        type="button"
+                        className={presetToolbarButtonClassName}
                         onClick={() =>
                           updateMember(selectedMember.id, (current) => ({
                             ...current,
                             enabled: !current.enabled,
                           }))
                         }
-                      />
+                      >
+                        {selectedMember.enabled ? (
+                          <EyeSlashIcon className="h-4 w-4" weight="bold" />
+                        ) : (
+                          <EyeIcon className="h-4 w-4" weight="bold" />
+                        )}
+                        {selectedMember.enabled
+                          ? t('settings.presets.actions.disable')
+                          : t('settings.presets.actions.enable')}
+                      </button>
                       {!selectedMember.is_builtin && (
-                        <PrimaryButton
-                          variant="tertiary"
-                          value={t('settings.presets.actions.delete')}
-                          actionIcon={TrashIcon}
+                        <button
+                          type="button"
+                          className={cn(
+                            presetToolbarButtonClassName,
+                            'border-[#f3d7d7] bg-[#fff7f7] text-[#d14343] hover:bg-[#fff1f1]'
+                          )}
                           onClick={() =>
                             handleDeleteMemberPreset(selectedMember)
                           }
-                        />
+                        >
+                          <TrashIcon className="h-4 w-4" weight="bold" />
+                          {t('settings.presets.actions.delete')}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -710,7 +728,10 @@ export function ChatPresetsSettingsSectionContent() {
                       <div className="flex items-center justify-end">
                         <button
                           type="button"
-                          className="chat-session-member-expand-btn text-xs"
+                          className={cn(
+                            settingsSecondaryButtonClassName,
+                            'px-3 py-[8px] text-[12px]'
+                          )}
                           onClick={() => setIsMemberPromptEditorOpen(true)}
                         >
                           {tChat('members.expand')}
@@ -772,20 +793,22 @@ export function ChatPresetsSettingsSectionContent() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4">
-            <div className="border border-border rounded-sm p-base space-y-half">
-              <div className="flex items-center justify-between mb-half">
-                <div className="text-sm font-medium text-normal">
+            <div className={cn(settingsPanelClassName, 'space-y-3 p-4')}>
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <div className="text-[13px] font-medium text-[#333333]">
                   {t('settings.presets.teams.listTitle')}
                 </div>
-                <PrimaryButton
-                  variant="tertiary"
-                  value={t('settings.presets.teams.add')}
-                  actionIcon={PlusIcon}
+                <button
+                  type="button"
+                  className={presetToolbarButtonClassName}
                   onClick={handleAddTeamPreset}
-                />
+                >
+                  <PlusIcon className="h-4 w-4" weight="bold" />
+                  {t('settings.presets.teams.add')}
+                </button>
               </div>
               {draft.teams.length === 0 && (
-                <div className="text-sm text-low py-base">
+                <div className="py-4 text-[12px] text-[#8C8C8C]">
                   {t('settings.presets.teams.empty')}
                 </div>
               )}
@@ -801,51 +824,58 @@ export function ChatPresetsSettingsSectionContent() {
                 />
               ))}
             </div>
-            <div className="border border-border rounded-sm p-base">
+            <div className={cn(settingsPanelClassName, 'p-4')}>
               {!selectedTeam && (
-                <div className="text-sm text-low">
+                <div className="text-[12px] text-[#8C8C8C]">
                   {t('settings.presets.teams.empty')}
                 </div>
               )}
               {selectedTeam && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium text-normal">
+                <div className="space-y-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="text-[13px] font-medium text-[#333333]">
                       {getLocalizedTeamName(selectedTeam)}
                     </div>
-                    <div className="flex items-center gap-half">
-                      <PrimaryButton
-                        variant="tertiary"
-                        value={t('settings.presets.actions.copy')}
-                        actionIcon={CopyIcon}
-                        className="text-xs whitespace-nowrap"
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className={presetToolbarButtonClassName}
                         onClick={() => handleCopyTeamPreset(selectedTeam)}
-                      />
-                      <PrimaryButton
-                        variant="tertiary"
-                        value={
-                          selectedTeam.enabled
-                            ? t('settings.presets.actions.disable')
-                            : t('settings.presets.actions.enable')
-                        }
-                        actionIcon={
-                          selectedTeam.enabled ? EyeSlashIcon : EyeIcon
-                        }
-                        className="text-xs whitespace-nowrap"
+                      >
+                        <CopyIcon className="h-4 w-4" weight="bold" />
+                        {t('settings.presets.actions.copy')}
+                      </button>
+                      <button
+                        type="button"
+                        className={presetToolbarButtonClassName}
                         onClick={() =>
                           updateTeam(selectedTeam.id, (current) => ({
                             ...current,
                             enabled: !current.enabled,
                           }))
                         }
-                      />
+                      >
+                        {selectedTeam.enabled ? (
+                          <EyeSlashIcon className="h-4 w-4" weight="bold" />
+                        ) : (
+                          <EyeIcon className="h-4 w-4" weight="bold" />
+                        )}
+                        {selectedTeam.enabled
+                          ? t('settings.presets.actions.disable')
+                          : t('settings.presets.actions.enable')}
+                      </button>
                       {!selectedTeam.is_builtin && (
-                        <PrimaryButton
-                          variant="tertiary"
-                          value={t('settings.presets.actions.delete')}
-                          actionIcon={TrashIcon}
+                        <button
+                          type="button"
+                          className={cn(
+                            presetToolbarButtonClassName,
+                            'border-[#f3d7d7] bg-[#fff7f7] text-[#d14343] hover:bg-[#fff1f1]'
+                          )}
                           onClick={() => handleDeleteTeamPreset(selectedTeam)}
-                        />
+                        >
+                          <TrashIcon className="h-4 w-4" weight="bold" />
+                          {t('settings.presets.actions.delete')}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -895,9 +925,14 @@ export function ChatPresetsSettingsSectionContent() {
                   <SettingsField
                     label={t('settings.presets.teams.fields.members')}
                   >
-                    <div className="border border-border rounded-sm p-half max-h-52 overflow-y-auto space-y-half">
+                    <div
+                      className={cn(
+                        settingsMutedPanelClassName,
+                        'max-h-52 space-y-2 overflow-y-auto p-2'
+                      )}
+                    >
                       {draft.members.length === 0 && (
-                        <div className="text-sm text-low py-half px-half">
+                        <div className="px-2 py-2 text-[12px] text-[#8C8C8C]">
                           {t('settings.presets.teams.noMemberPresets')}
                         </div>
                       )}
@@ -909,10 +944,10 @@ export function ChatPresetsSettingsSectionContent() {
                           <label
                             key={member.id}
                             className={cn(
-                              'flex items-center gap-half px-half py-half rounded-sm text-sm cursor-pointer',
+                              'flex cursor-pointer items-center gap-2 rounded-[8px] px-3 py-2 text-[13px] transition-colors duration-200',
                               checked
-                                ? 'bg-brand/10 text-brand'
-                                : 'hover:bg-secondary/30 text-normal'
+                                ? 'bg-[rgba(74,144,226,0.06)] text-[#4A90E2]'
+                                : 'text-[#333333] hover:bg-white'
                             )}
                           >
                             <input
@@ -932,7 +967,7 @@ export function ChatPresetsSettingsSectionContent() {
                                   };
                                 });
                               }}
-                              className="accent-brand"
+                              className="h-[16px] w-[16px] rounded-[4px] border border-[#E8EEF5] accent-[#4A90E2]"
                             />
                             <span>@{getLocalizedMemberName(member)}</span>
                           </label>

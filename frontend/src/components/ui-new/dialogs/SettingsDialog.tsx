@@ -102,59 +102,64 @@ function SettingsDialogContent({
 
   return (
     <>
-      {/* Overlay */}
       <div
-        className="fixed inset-0 z-[9998] bg-black/50 animate-in fade-in-0 duration-200"
+        className="fixed inset-0 z-[9998] animate-in fade-in-0 duration-200"
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)' }}
         onClick={handleCloseWithConfirmation}
       />
-      {/* Dialog wrapper - handles positioning */}
       <div
         className={cn(
           'fixed z-[9999]',
-          // Mobile: full screen
           'inset-0',
-          // Desktop: centered with fixed size
           'md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2'
         )}
       >
-        {/* Dialog content - handles animation */}
         <div
           className={cn(
-            'settings-dialog-shell chat-settings-theme h-full w-full flex overflow-hidden',
-            'bg-panel/95 backdrop-blur-sm shadow-lg',
+            'settings-dialog-shell chat-settings-theme h-full w-full flex overflow-hidden bg-white',
             'animate-in fade-in-0 slide-in-from-bottom-4 duration-200',
-            // Mobile: full screen, no rounded corners
             'rounded-none border-0',
-            // Desktop: fixed size with rounded corners
-            'md:w-[900px] md:h-[700px] md:rounded-sm md:border md:border-border/50'
+            'md:h-[600px] md:w-[860px] md:rounded-[16px] md:border md:border-[#E8EEF5] md:shadow-[0_20px_60px_rgba(0,0,0,0.1)]'
           )}
+          style={{
+            fontFamily:
+              '-apple-system, "PingFang SC", "Helvetica Neue", sans-serif',
+          }}
         >
-          {/* Sidebar - hidden on mobile when showing content */}
           <div
             className={cn(
-              'settings-dialog-nav bg-secondary/80 border-r border-border flex flex-col',
-              // Mobile: full width, hidden when showing content
+              'settings-dialog-nav flex flex-col border-r border-[#E8EEF5] bg-[#F9FBFF]',
               'w-full',
               mobileShowContent && 'hidden',
-              // Desktop: fixed width sidebar, always visible
-              'md:w-56 md:block'
+              'md:block md:w-[200px]'
             )}
+            style={{ padding: '24px 12px' }}
           >
-            {/* Header */}
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-high">
+            <div className="mb-6 flex items-center justify-between px-3">
+              <h2
+                className="m-0"
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: '#333333',
+                }}
+              >
                 {t('settings.layout.nav.title')}
               </h2>
-              {/* Close button - mobile only */}
               <button
                 onClick={handleCloseWithConfirmation}
-                className="p-1 rounded-sm hover:bg-secondary text-low hover:text-normal md:hidden"
+                className="md:hidden"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#cccccc',
+                  cursor: 'pointer',
+                }}
               >
                 <XIcon className="size-icon-sm" weight="bold" />
               </button>
             </div>
-            {/* Navigation */}
-            <nav className="flex-1 p-2 flex flex-col gap-1 overflow-y-auto">
+            <nav className="flex-1 overflow-y-auto">
               {SETTINGS_SECTIONS.map((section) => {
                 const Icon = section.icon;
                 const isActive = activeSection === section.id;
@@ -162,14 +167,28 @@ function SettingsDialogContent({
                   <button
                     key={section.id}
                     onClick={() => handleSectionSelect(section.id)}
-                    className={cn(
-                      'settings-dialog-nav-item flex items-center gap-3 text-left px-3 py-2 rounded-sm text-sm transition-colors border border-transparent',
-                      isActive
-                        ? 'settings-dialog-nav-item-active font-medium'
-                        : 'settings-dialog-nav-item-inactive'
-                    )}
+                    className="flex w-full items-center gap-[10px] rounded-[10px] border-none px-4 py-[10px] text-left text-[14px] font-medium transition-all duration-200"
+                    style={{
+                      background: isActive
+                        ? 'rgba(74, 144, 226, 0.08)'
+                        : 'transparent',
+                      color: isActive ? '#4A90E2' : '#8C8C8C',
+                    }}
+                    onMouseEnter={(event) => {
+                      if (!isActive) {
+                        event.currentTarget.style.background =
+                          'rgba(0, 0, 0, 0.03)';
+                        event.currentTarget.style.color = '#333333';
+                      }
+                    }}
+                    onMouseLeave={(event) => {
+                      if (!isActive) {
+                        event.currentTarget.style.background = 'transparent';
+                        event.currentTarget.style.color = '#8C8C8C';
+                      }
+                    }}
                   >
-                    <Icon className="size-icon-sm shrink-0" weight="bold" />
+                    <Icon className="size-4 shrink-0" weight="fill" />
                     <span className="truncate">
                       {t(`settings.layout.nav.${section.id}`)}
                     </span>
@@ -178,36 +197,31 @@ function SettingsDialogContent({
               })}
             </nav>
           </div>
-          {/* Content - hidden on mobile when showing nav */}
           <div
             className={cn(
-              'settings-dialog-main flex-1 flex flex-col relative overflow-hidden bg-white',
-              // Mobile: full width, hidden when showing nav
+              'settings-dialog-main relative flex flex-1 flex-col overflow-hidden bg-white',
               !mobileShowContent && 'hidden',
-              // Desktop: always visible
               'md:flex'
             )}
           >
-            {/* Mobile header with back button */}
-            <div className="flex items-center gap-2 p-3 border-b border-border md:hidden">
+            <div className="flex items-center gap-2 border-b border-[#E8EEF5] p-3 md:hidden">
               <button
                 onClick={handleMobileBack}
-                className="p-1 rounded-sm hover:bg-secondary text-low hover:text-normal"
+                className="rounded-[10px] border-none bg-transparent p-1 text-[#8C8C8C]"
               >
                 <CaretLeftIcon className="size-icon-sm" weight="bold" />
               </button>
-              <span className="text-sm font-medium text-high">
+              <span className="text-sm font-medium text-[#333333]">
                 {t(`settings.layout.nav.${activeSection}`)}
               </span>
               <button
                 onClick={handleCloseWithConfirmation}
-                className="ml-auto p-1 rounded-sm hover:bg-secondary text-low hover:text-normal"
+                className="ml-auto rounded-[10px] border-none bg-transparent p-1 text-[#cccccc]"
               >
                 <XIcon className="size-icon-sm" weight="bold" />
               </button>
             </div>
-            {/* Section content */}
-            <div className="settings-dialog-content flex-1 overflow-y-auto bg-white">
+            <div className="settings-dialog-content flex-1 overflow-hidden bg-white">
               <SettingsSection
                 type={activeSection}
                 onClose={handleCloseWithConfirmation}

@@ -418,15 +418,27 @@ export function AiMembersSidebar({
   onConfirmTeamImport,
   onCancelTeamImport,
 }: AiMembersSidebarProps) {
-  const { t } = useTranslation('chat');
+  const { t, i18n } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
   const [activeTab, setActiveTab] = useState<AddMemberTab>('preset');
   const [presetSearchQuery, setPresetSearchQuery] = useState('');
   const [isTeamPresetsExpanded, setIsTeamPresetsExpanded] = useState(true);
+  const [isTeamBulletinExpanded, setIsTeamBulletinExpanded] = useState(false);
   const [importPromptEditorIndex, setImportPromptEditorIndex] = useState<
     number | null
   >(null);
   const workspacePathPlaceholder = getWorkspacePathExample();
+  const isChineseLocale = (
+    i18n.resolvedLanguage ?? i18n.language ?? ''
+  ).toLowerCase().startsWith('zh');
+  const teamBulletinTitle = t('members.teamBulletin.title', {
+    defaultValue: isChineseLocale ? '团队公告板' : 'Team Bulletin',
+  });
+  const teamBulletinContent = t('members.teamBulletin.content', {
+    defaultValue: isChineseLocale
+      ? '团队协作准则'
+      : 'Team collaboration guidelines',
+  });
 
   const hasPresets =
     enabledMemberPresets.length > 0 || enabledTeamPresets.length > 0;
@@ -826,6 +838,60 @@ const renderPresetTab = () => (
           </button>
         </div>
         <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto px-base pb-base pt-half space-y-base">
+          {activeSessionId && (
+            <section className="overflow-hidden rounded-2xl border border-[#e8eef5] bg-white/95 shadow-[0_12px_24px_rgba(148,163,184,0.08)]">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[#f8fbff]"
+                onClick={() =>
+                  setIsTeamBulletinExpanded((expanded) => !expanded)
+                }
+                aria-expanded={isTeamBulletinExpanded}
+                aria-label={
+                  isTeamBulletinExpanded
+                    ? t('members.collapse')
+                    : t('members.expand')
+                }
+                title={
+                  isTeamBulletinExpanded
+                    ? t('members.collapse')
+                    : t('members.expand')
+                }
+              >
+                <span className="flex items-center gap-2">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-[#edf4ff] text-[#4a90e2]">
+                    <MegaphoneIcon className="size-3.5" weight="fill" />
+                  </span>
+                  <span className="text-[13px] font-medium text-normal">
+                    {teamBulletinTitle}
+                  </span>
+                </span>
+                <CaretDownIcon
+                  className={cn(
+                    'size-3.5 text-[#94a3b8] transition-transform duration-200',
+                    isTeamBulletinExpanded && 'rotate-180'
+                  )}
+                  weight="bold"
+                />
+              </button>
+
+              <div
+                className={cn(
+                  'grid transition-all duration-200 ease-out',
+                  isTeamBulletinExpanded
+                    ? 'grid-rows-[1fr] px-4 pb-3 opacity-100'
+                    : 'grid-rows-[0fr] px-4 pb-0 opacity-0'
+                )}
+              >
+                <div className="overflow-hidden">
+                  <p className="m-0 text-xs leading-6 text-low">
+                    {teamBulletinContent}
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
           {!activeSessionId && (
             <SidebarEmptyState
               icon={UsersThreeIcon}

@@ -278,6 +278,27 @@
     "joinBeta": "베타 참여",
     "maybeLater": "나중에"
   },
+  "onboardingDialog": {
+    "title": "agents-chatgroup에 오신 것을 환영합니다",
+    "description": "코딩 환경 설정을 먼저 구성하세요. 나중에 설정에서 언제든지 변경할 수 있습니다.",
+    "agentSectionTitle": "Coding Agent 선택",
+    "status": {
+      "checking": "최근 사용 기록과 사용 가능한 인증 정보를 확인하는 중입니다...",
+      "loginDetected": "최근 사용 기록이 감지되었습니다. 이 에이전트의 인증 정보가 자동으로 발견되었습니다.",
+      "installationFound": "이전 사용 기록이 감지되었습니다. 이 에이전트의 저장된 구성이 발견되었습니다.",
+      "notFound": "최근 인증 정보가 아직 감지되지 않았습니다. 나중에 설정에서 업데이트할 수 있습니다."
+    }
+  },
+  "disclaimerDialog": {
+    "title": "안전 안내",
+    "intro": "agents-chatgroup는 기본적으로 제한 없는 권한으로 AI 코딩 에이전트를 실행합니다.",
+    "body": "즉, 에이전트가 시스템에서 코드를 실행하고 명령을 전체 권한으로 수행할 수 있다는 뜻입니다. 반드시 주의해서 진행하세요.",
+    "importantTitle": "중요 안내:",
+    "importantBody": "에이전트가 수행 중인 작업을 항상 확인하고 중요한 작업은 반드시 백업해 두세요. 이 소프트웨어는 실험 단계이므로 책임 있게 사용해야 합니다.",
+    "docsPrefix": "자세한 내용은",
+    "docsLinkText": "안전 가이드",
+    "action": "위험을 이해했으며 계속 진행합니다"
+  },
   "workspacesGuide": {
     "welcome": {
       "title": "환영합니다",

@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { BaseCodingAgent } from 'shared/types';
 import { settingsRjsfTheme } from './rjsf/theme';
 import { SettingsSaveBar } from './SettingsComponents';
+import { localizeExecutorSchema } from '@/lib/agentConfigLocalization';
 
 interface ExecutorConfigFormProps {
   executor: BaseCodingAgent;
@@ -31,15 +32,16 @@ export function ExecutorConfigForm({
   saving = false,
   isDirty = false,
 }: ExecutorConfigFormProps) {
-  const { t } = useTranslation('settings');
+  const { t, i18n } = useTranslation('settings');
   const [formData, setFormData] = useState<unknown>(value || {});
   const [validationErrors, setValidationErrors] = useState<
     RJSFValidationError[]
   >([]);
 
   const schema = useMemo(() => {
-    return schemas[executor];
-  }, [executor]);
+    const baseSchema = schemas[executor];
+    return baseSchema ? localizeExecutorSchema(baseSchema, i18n.language) : null;
+  }, [executor, i18n.language]);
 
   // Custom handler for env field updates
   const handleEnvChange = useCallback(
@@ -98,7 +100,7 @@ export function ExecutorConfigForm({
 
   if (!schema) {
     return (
-      <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error">
+      <div className="rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
         {t('settings.agents.errors.schemaNotFound', { executor })}
       </div>
     );
@@ -128,7 +130,7 @@ export function ExecutorConfigForm({
       </Form>
 
       {hasValidationErrors && (
-        <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error">
+        <div className="rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
           <ul className="list-disc list-inside space-y-1">
             {validationErrors.map((error, index) => (
               <li key={index}>
@@ -147,6 +149,7 @@ export function ExecutorConfigForm({
           unsavedMessage={t('settings.agents.save.unsavedChanges')}
           onSave={handleSave}
           onDiscard={onDiscard}
+          layout="panel"
         />
       )}
     </div>

@@ -1,49 +1,45 @@
-﻿import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Sparkles, Code, ChevronDown, HandMetal } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Check, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { BaseCodingAgent, EditorType } from 'shared/types';
 import type { EditorConfig, ExecutorProfileId } from 'shared/types';
 import { useUserSystem } from '@/components/ConfigProvider';
-
-import { toPrettyCase } from '@/utils/string';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal, type NoProps } from '@/lib/modals';
-import { useEditorAvailability } from '@/hooks/useEditorAvailability';
-import { EditorAvailabilityIndicator } from '@/components/EditorAvailabilityIndicator';
 import { useAgentAvailability } from '@/hooks/useAgentAvailability';
-import { AgentAvailabilityIndicator } from '@/components/AgentAvailabilityIndicator';
 
 export type OnboardingResult = {
   profile: ExecutorProfileId;
   editor: EditorConfig;
 };
 
+const selectBackgroundStyle = {
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238C8C8C' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E\")",
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'calc(100% - 14px) center',
+} as const;
+
+function sortVariants(variants: string[]) {
+  return [...variants].sort((a, b) => {
+    if (a === 'DEFAULT') return -1;
+    if (b === 'DEFAULT') return 1;
+    return a.localeCompare(b);
+  });
+}
+
 const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
   const modal = useModal();
+  const { t } = useTranslation('common');
   const { profiles, config } = useUserSystem();
+
+  const defaultEditor: EditorConfig = config?.editor ?? {
+    editor_type: EditorType.VS_CODE,
+    custom_command: null,
+    remote_ssh_host: null,
+    remote_ssh_user: null,
+  };
 
   const [profile, setProfile] = useState<ExecutorProfileId>(
     config?.executor_profile || {
@@ -51,194 +47,220 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
       variant: null,
     }
   );
-  const [editorType, setEditorType] = useState<EditorType>(EditorType.VS_CODE);
-  const [customCommand, setCustomCommand] = useState<string>('');
 
-  const editorAvailability = useEditorAvailability(editorType);
   const agentAvailability = useAgentAvailability(profile.executor);
+
+  const agentOptions = useMemo(() => {
+    const availableAgents = profiles
+      ? (Object.keys(profiles) as BaseCodingAgent[]).sort()
+      : [];
+
+    if (availableAgents.length === 0) {
+      return [profile.executor];
+    }
+
+    return availableAgents;
+  }, [profile.executor, profiles]);
+
+  const selectedExecutorProfile = profiles?.[profile.executor];
+  const hasExplicitDefaultVariant = Boolean(
+    selectedExecutorProfile &&
+      Object.prototype.hasOwnProperty.call(selectedExecutorProfile, 'DEFAULT')
+  );
+
+  const variantOptions = useMemo(() => {
+    if (!selectedExecutorProfile) {
+      return ['DEFAULT'];
+    }
+
+    const variants = Object.keys(selectedExecutorProfile);
+    return variants.length > 0 ? sortVariants(variants) : ['DEFAULT'];
+  }, [selectedExecutorProfile]);
+
+  const variantValue =
+    profile.variant && variantOptions.includes(profile.variant)
+      ? profile.variant
+      : (variantOptions[0] ?? 'DEFAULT');
+
+  const resolvedProfile: ExecutorProfileId = {
+    executor: profile.executor,
+    variant:
+      variantValue === 'DEFAULT' && !hasExplicitDefaultVariant
+        ? null
+        : variantValue,
+  };
+
+  const statusMeta = useMemo(() => {
+    if (agentAvailability?.status === 'login_detected') {
+      return {
+        container:
+          'border-[#B7EB8F] bg-[#F6FFED] text-[#389E0D] fill-[#52C41A]',
+        icon: (
+          <Check className="mt-[2px] h-[14px] w-[14px] shrink-0" strokeWidth={3} />
+        ),
+        message: t('onboardingDialog.status.loginDetected'),
+      };
+    }
+
+    if (agentAvailability?.status === 'installation_found') {
+      return {
+        container:
+          'border-[#B7EB8F] bg-[#F6FFED] text-[#389E0D] fill-[#52C41A]',
+        icon: (
+          <Check className="mt-[2px] h-[14px] w-[14px] shrink-0" strokeWidth={3} />
+        ),
+        message: t('onboardingDialog.status.installationFound'),
+      };
+    }
+
+    if (agentAvailability?.status === 'checking') {
+      return {
+        container:
+          'border-[#D9E6F5] bg-[#F9FBFF] text-[#4A90E2] fill-[#4A90E2]',
+        icon: (
+          <Loader2
+            className="mt-[2px] h-[14px] w-[14px] shrink-0 animate-spin"
+            strokeWidth={2.5}
+          />
+        ),
+        message: t('onboardingDialog.status.checking'),
+      };
+    }
+
+    return {
+      container:
+        'border-[#D9E6F5] bg-[#F9FBFF] text-[#8C8C8C] fill-[#8C8C8C]',
+      icon: (
+        <Check
+          className="mt-[2px] h-[14px] w-[14px] shrink-0 opacity-60"
+          strokeWidth={3}
+        />
+      ),
+      message: t('onboardingDialog.status.notFound'),
+    };
+  }, [agentAvailability, t]);
+
+  const handleExecutorChange = (value: string) => {
+    const nextExecutor = value as BaseCodingAgent;
+    const nextProfile = profiles?.[nextExecutor];
+    const nextVariants = nextProfile ? Object.keys(nextProfile) : [];
+    const nextVariant = nextVariants.includes('DEFAULT')
+      ? 'DEFAULT'
+      : (sortVariants(nextVariants)[0] ?? null);
+
+    setProfile({
+      executor: nextExecutor,
+      variant: nextVariant,
+    });
+  };
+
+  const handleVariantChange = (value: string) => {
+    setProfile((current) => ({
+      ...current,
+      variant:
+        value === 'DEFAULT' && !hasExplicitDefaultVariant ? null : value,
+    }));
+  };
 
   const handleComplete = () => {
     modal.resolve({
-      profile,
-      editor: {
-        editor_type: editorType,
-        custom_command:
-          editorType === EditorType.CUSTOM ? customCommand || null : null,
-        remote_ssh_host: null,
-        remote_ssh_user: null,
-      },
+      profile: resolvedProfile,
+      editor: defaultEditor,
     } as OnboardingResult);
   };
 
-  const isValid =
-    editorType !== EditorType.CUSTOM ||
-    (editorType === EditorType.CUSTOM && customCommand.trim() !== '');
-
   return (
-    <Dialog open={modal.visible} uncloseable={true}>
-      <DialogContent className="sm:max-w-[600px] space-y-4">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <HandMetal className="h-6 w-6 text-primary text-primary-foreground" />
-            <DialogTitle>Welcome to agents-chatgroup</DialogTitle>
+    <>
+      <style>{`
+        @keyframes onboarding-welcome-slide-up {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+      <Dialog
+        open={modal.visible}
+        uncloseable
+        hideCloseButton
+        className="!my-0 !w-auto !max-w-none !gap-0 !rounded-none !border-0 !bg-transparent !p-0 !shadow-none"
+        containerClassName="items-center"
+        overlayClassName="!bg-[rgba(240,244,248,0.42)] backdrop-blur-[2px]"
+      >
+        <DialogContent
+          className="!w-[520px] !max-w-[calc(100vw-32px)] self-center !gap-0 !rounded-[20px] !border-0 !bg-white !p-12 !text-center !shadow-[0_10px_40px_rgba(0,0,0,0.05)]"
+          style={{ animation: 'onboarding-welcome-slide-up 0.5s ease-out' }}
+        >
+          <div className="mb-12">
+            <h1 className="m-0 mb-3 text-2xl font-semibold text-[#333333]">
+              {t('onboardingDialog.title')}
+            </h1>
+            <p className="m-0 text-sm leading-[1.5] text-[#8C8C8C]">
+              {t('onboardingDialog.description')}
+            </p>
           </div>
-          <DialogDescription className="text-left pt-2">
-            Let's set up your coding preferences. You can always change these
-            later in Settings.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-2">
-          <h2 className="text-xl flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
-            Choose Your Coding Agent
-          </h2>
-          <div className="space-y-2">
-            <Label htmlFor="profile">Default Agent</Label>
-            <div className="flex gap-2">
-              <Select
+
+          <div className="mb-12 text-left">
+            <div className="mb-5 flex items-center gap-2 text-[15px] font-semibold text-[#333333]">
+              <span className="text-[#52C41A]">{'✓'}</span>
+              <span>{t('onboardingDialog.agentSectionTitle')}</span>
+            </div>
+
+            <div className="mb-4 flex gap-3">
+              <select
                 value={profile.executor}
-                onValueChange={(v) =>
-                  setProfile({ executor: v as BaseCodingAgent, variant: null })
+                onChange={(event) => handleExecutorChange(event.target.value)}
+                className="h-11 min-w-0 flex-[2] appearance-none rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-sm text-[#333333] outline-none transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)]"
+                style={selectBackgroundStyle}
+              >
+                {agentOptions.map((agent) => (
+                  <option key={agent} value={agent}>
+                    {agent}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={variantValue}
+                onChange={(event) => handleVariantChange(event.target.value)}
+                className="h-11 min-w-0 flex-1 appearance-none rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-sm text-[#333333] outline-none transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)] disabled:cursor-not-allowed disabled:opacity-80"
+                style={selectBackgroundStyle}
+                disabled={
+                  variantOptions.length <= 1 && variantOptions[0] === 'DEFAULT'
                 }
               >
-                <SelectTrigger id="profile" className="flex-1">
-                  <SelectValue placeholder="Select your preferred coding agent" />
-                </SelectTrigger>
-                <SelectContent>
-                  {profiles &&
-                    (Object.keys(profiles) as BaseCodingAgent[])
-                      .sort()
-                      .map((agent) => (
-                        <SelectItem key={agent} value={agent}>
-                          {agent}
-                        </SelectItem>
-                      ))}
-                </SelectContent>
-              </Select>
-
-              {/* Show variant selector if selected profile has variants */}
-              {(() => {
-                const selectedProfile = profiles?.[profile.executor];
-                const hasVariants =
-                  selectedProfile && Object.keys(selectedProfile).length > 0;
-
-                if (hasVariants) {
-                  return (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-24 px-2 flex items-center justify-between"
-                        >
-                          <span className="text-xs truncate flex-1 text-left">
-                            {profile.variant || 'DEFAULT'}
-                          </span>
-                          <ChevronDown className="h-3 w-3 ml-1 flex-shrink-0" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        {Object.keys(selectedProfile).map((variant) => (
-                          <DropdownMenuItem
-                            key={variant}
-                            onClick={() =>
-                              setProfile({
-                                ...profile,
-                                variant: variant,
-                              })
-                            }
-                            className={
-                              profile.variant === variant ? 'bg-accent' : ''
-                            }
-                          >
-                            {variant}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  );
-                } else if (selectedProfile) {
-                  // Show disabled button when profile exists but has no variants
-                  return (
-                    <Button
-                      variant="outline"
-                      className="w-24 px-2 flex items-center justify-between"
-                      disabled
-                    >
-                      <span className="text-xs truncate flex-1 text-left">
-                        Default
-                      </span>
-                    </Button>
-                  );
-                }
-                return null;
-              })()}
-            </div>
-            <AgentAvailabilityIndicator availability={agentAvailability} />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <h2 className="text-xl flex items-center gap-2">
-            <Code className="h-4 w-4" />
-            Choose Your Code Editor
-          </h2>
-
-          <div className="space-y-2">
-            <Label htmlFor="editor">Preferred Editor</Label>
-            <Select
-              value={editorType}
-              onValueChange={(value: EditorType) => setEditorType(value)}
-            >
-              <SelectTrigger id="editor">
-                <SelectValue placeholder="Select your preferred editor" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.values(EditorType).map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {toPrettyCase(type)}
-                  </SelectItem>
+                {variantOptions.map((variant) => (
+                  <option key={variant} value={variant}>
+                    {variant}
+                  </option>
                 ))}
-              </SelectContent>
-            </Select>
+              </select>
+            </div>
 
-            {/* Editor availability status indicator */}
-            {editorType !== EditorType.CUSTOM && (
-              <EditorAvailabilityIndicator availability={editorAvailability} />
-            )}
-
-            <p className="text-sm text-muted-foreground">
-              This editor will be used to open task attempts and project files.
-            </p>
-
-            {editorType === EditorType.CUSTOM && (
-              <div className="space-y-2">
-                <Label htmlFor="custom-command">Custom Command</Label>
-                <Input
-                  id="custom-command"
-                  placeholder="e.g., code, subl, vim"
-                  value={customCommand}
-                  onChange={(e) => setCustomCommand(e.target.value)}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Enter the command to run your custom editor. Use spaces for
-                  arguments (e.g., "code --wait").
-                </p>
-              </div>
-            )}
+            <div
+              className={`flex items-start gap-2 rounded-lg border px-3 py-3 ${statusMeta.container}`}
+            >
+              {statusMeta.icon}
+              <span className="text-[13px] leading-[1.4]">
+                {statusMeta.message}
+              </span>
+            </div>
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button
+          <button
+            type="button"
             onClick={handleComplete}
-            disabled={!isValid}
-            className="w-full"
+            className="h-12 w-full rounded-[24px] border-0 bg-[#4A90E2] text-[15px] font-medium text-white shadow-[0_4px_14px_rgba(74,144,226,0.25)] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:-translate-y-px hover:bg-[#357ABD] hover:shadow-[0_6px_20px_rgba(74,144,226,0.35)] active:translate-y-0"
           >
-            Continue
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            {t('buttons.continue')}
+          </button>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 });
 

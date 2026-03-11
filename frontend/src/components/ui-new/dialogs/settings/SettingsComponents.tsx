@@ -1,33 +1,26 @@
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import { CaretDownIcon, CheckIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuTriggerButton,
 } from '../../primitives/Dropdown';
-import { PrimaryButton } from '../../primitives/PrimaryButton';
 
-// ============================================================================
-// Two-Column Picker Components
-// ============================================================================
-
-// TwoColumnPicker - Container for the two-column layout
 interface TwoColumnPickerProps {
   children: ReactNode;
 }
 
 export function TwoColumnPicker({ children }: TwoColumnPickerProps) {
   return (
-    <div className="settings-two-column-picker flex flex-col md:flex-row border border-border rounded-sm overflow-hidden">
+    <div className="mb-6 grid overflow-hidden rounded-[10px] border border-[#E8EEF5] bg-[#E8EEF5] md:grid-cols-2 md:gap-px">
       {children}
     </div>
   );
 }
 
-// TwoColumnPickerColumn - A single column within the picker
 interface TwoColumnPickerColumnProps {
   label: string;
   headerAction?: ReactNode;
@@ -44,24 +37,19 @@ export function TwoColumnPickerColumn({
   return (
     <div
       className={cn(
-        'settings-two-column-column flex-1',
-        isFirst && 'border-b md:border-b-0 md:border-r border-border'
+        'flex-1 bg-white',
+        isFirst && 'border-b border-[#E8EEF5] md:border-b-0'
       )}
     >
-      <div className="settings-two-column-header h-9 px-base border-b border-border bg-secondary/50 flex items-center justify-between">
-        <span className="settings-two-column-label text-sm font-medium text-low tracking-wide">
-          {label}
-        </span>
+      <div className="flex items-center justify-between border-b border-[#E8EEF5] bg-[#fafafa] px-3 py-2">
+        <span className="text-[12px] text-[#8C8C8C]">{label}</span>
         {headerAction}
       </div>
-      <div className="settings-two-column-body max-h-32 md:h-32 overflow-y-auto bg-panel">
-        {children}
-      </div>
+      <div className="h-[180px] overflow-y-auto bg-white">{children}</div>
     </div>
   );
 }
 
-// TwoColumnPickerItem - A selectable row within a column
 interface TwoColumnPickerItemProps {
   selected?: boolean;
   onClick?: () => void;
@@ -78,29 +66,33 @@ export function TwoColumnPickerItem({
   children,
 }: TwoColumnPickerItemProps) {
   return (
-    <div
-      className={cn(
-        'settings-two-column-item group flex items-center gap-half px-base py-half cursor-pointer transition-colors',
-        'hover:bg-secondary',
-        selected && 'settings-two-column-item-selected bg-brand/10 text-brand'
-      )}
+    <button
+      type="button"
+      className="group flex w-full items-center gap-2 border-none bg-transparent px-3 py-2 text-left transition-colors duration-200"
+      style={{
+        background: selected ? 'rgba(74, 144, 226, 0.06)' : 'transparent',
+        color: selected ? '#4A90E2' : '#333333',
+        fontWeight: selected ? 500 : 400,
+      }}
       onClick={onClick}
+      onMouseEnter={(event) => {
+        if (!selected) {
+          event.currentTarget.style.background = '#F9FBFF';
+        }
+      }}
+      onMouseLeave={(event) => {
+        if (!selected) {
+          event.currentTarget.style.background = 'transparent';
+        }
+      }}
     >
       {leading}
-      <span
-        className={cn(
-          'settings-two-column-item-label text-sm truncate flex-1',
-          selected ? 'text-brand font-medium' : 'text-normal'
-        )}
-      >
-        {children}
-      </span>
+      <span className="flex-1 truncate text-[13px]">{children}</span>
       {trailing}
-    </div>
+    </button>
   );
 }
 
-// TwoColumnPickerBadge - A small badge/tag for items
 interface TwoColumnPickerBadgeProps {
   variant?: 'default' | 'brand';
   children: ReactNode;
@@ -112,36 +104,48 @@ export function TwoColumnPickerBadge({
 }: TwoColumnPickerBadgeProps) {
   return (
     <span
-      className={cn(
-        'settings-two-column-badge text-xs px-half rounded font-medium shrink-0',
-        variant === 'brand'
-          ? 'settings-two-column-badge-brand bg-brand/15 text-brand'
-          : 'settings-two-column-badge-default bg-secondary text-low'
-      )}
+      className="shrink-0 rounded-full px-2 py-[2px] text-[11px] font-medium"
+      style={{
+        background:
+          variant === 'brand' ? 'rgba(74, 144, 226, 0.08)' : '#F3F6FA',
+        color: variant === 'brand' ? '#4A90E2' : '#8C8C8C',
+      }}
     >
       {children}
     </span>
   );
 }
 
-// TwoColumnPickerEmpty - Empty state message for a column
 interface TwoColumnPickerEmptyProps {
   children: ReactNode;
 }
 
 export function TwoColumnPickerEmpty({ children }: TwoColumnPickerEmptyProps) {
   return (
-    <div className="settings-two-column-empty px-base py-plusfifty text-sm text-low text-center">
+    <div className="px-3 py-5 text-center text-[13px] text-[#8C8C8C]">
       {children}
     </div>
   );
 }
 
-// ============================================================================
-// Settings Card Components
-// ============================================================================
+export const settingsFieldClassName =
+  'w-full rounded-[10px] border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] py-[10px] text-[14px] text-[#333333] outline-none transition-all duration-200 placeholder:text-[#8C8C8C] focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_3px_rgba(74,144,226,0.08)] disabled:cursor-not-allowed disabled:opacity-50';
 
-// SettingsCard - A card container for a settings subsection
+export const settingsPanelClassName =
+  'rounded-[10px] border border-[#E8EEF5] bg-white';
+
+export const settingsMutedPanelClassName =
+  'rounded-[10px] border border-[#E8EEF5] bg-[#F9FBFF]';
+
+export const settingsSecondaryButtonClassName =
+  'inline-flex items-center justify-center gap-2 rounded-[10px] border border-[#E8EEF5] bg-[#F3F5F8] px-4 py-[10px] text-[14px] text-[#333333] transition-colors duration-200 hover:bg-[#eceff3] disabled:cursor-not-allowed disabled:opacity-50';
+
+export const settingsPrimaryButtonClassName =
+  'inline-flex items-center justify-center gap-2 rounded-[10px] border-none bg-[#4A90E2] px-4 py-[10px] text-[14px] text-white transition-all duration-200 hover:-translate-y-px hover:bg-[#357ABD] disabled:cursor-not-allowed disabled:opacity-50';
+
+export const settingsIconButtonClassName =
+  'inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E8EEF5] bg-[#F3F5F8] text-[#8C8C8C] transition-colors duration-200 hover:bg-[#eceff3] hover:text-[#333333] disabled:cursor-not-allowed disabled:opacity-50';
+
 export function SettingsCard({
   title,
   description,
@@ -150,30 +154,29 @@ export function SettingsCard({
 }: {
   title: string;
   description?: string;
-  children: React.ReactNode;
-  headerAction?: React.ReactNode;
+  children: ReactNode;
+  headerAction?: ReactNode;
 }) {
   return (
-    <div className="settings-card space-y-4 pb-6 border-b border-border last:border-b-0 last:pb-0">
-      <div className="settings-card-header flex items-start justify-between">
+    <section className="mb-8 last:mb-0">
+      <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h3 className="settings-card-title text-base font-medium text-high">
+          <h3 className="m-0 text-[14px] font-semibold text-[#333333]">
             {title}
           </h3>
-          {description && (
-            <p className="settings-card-description text-sm text-low mt-1">
+          {description ? (
+            <p className="mt-2 text-[12px] leading-5 text-[#8C8C8C]">
               {description}
             </p>
-          )}
+          ) : null}
         </div>
         {headerAction}
       </div>
-      <div className="settings-card-body space-y-4">{children}</div>
-    </div>
+      <div>{children}</div>
+    </section>
   );
 }
 
-// SettingsField - A labeled field wrapper
 export function SettingsField({
   label,
   description,
@@ -181,31 +184,27 @@ export function SettingsField({
   children,
 }: {
   label: string;
-  description?: React.ReactNode;
+  description?: ReactNode;
   error?: string | null;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className="settings-field space-y-2">
-      {label && (
-        <label className="settings-field-label text-sm font-medium text-normal">
-          {label}
-        </label>
-      )}
+    <div className="mb-5 last:mb-0">
+      {label ? (
+        <label className="mb-2 block text-[12px] text-[#8C8C8C]">{label}</label>
+      ) : null}
       {children}
-      {error && (
-        <p className="settings-field-error text-sm text-error">{error}</p>
-      )}
-      {description && !error && (
-        <p className="settings-field-description text-sm text-low">
+      {error ? (
+        <p className="mt-2 text-[12px] text-[#d14343]">{error}</p>
+      ) : description ? (
+        <div className="mt-2 text-[12px] leading-5 text-[#8C8C8C]">
           {description}
-        </p>
-      )}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-// SettingsCheckbox - A checkbox with label and optional description
 export function SettingsCheckbox({
   id,
   label,
@@ -222,39 +221,41 @@ export function SettingsCheckbox({
   disabled?: boolean;
 }) {
   return (
-    <div className="settings-checkbox flex items-center gap-3">
-      <input
-        type="checkbox"
-        id={id}
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        disabled={disabled}
-        className={cn(
-          'settings-checkbox-input mt-0.5 h-4 w-4 rounded border-border bg-secondary text-brand focus:ring-brand focus:ring-offset-0',
-          disabled && 'opacity-50 cursor-not-allowed'
-        )}
-      />
-      <div className="settings-checkbox-content space-y-0.5">
-        <label
-          htmlFor={id}
-          className={cn(
-            'settings-checkbox-label text-sm font-medium text-normal cursor-pointer',
-            disabled && 'opacity-50 cursor-not-allowed'
-          )}
-        >
-          {label}
-        </label>
-        {description && (
-          <p className="settings-checkbox-description text-sm text-low">
+    <button
+      id={id}
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        'mb-5 flex w-full items-start gap-[10px] border-none bg-transparent p-0 text-left last:mb-0',
+        disabled && 'cursor-not-allowed opacity-50'
+      )}
+    >
+      <span
+        className="mt-[1px] flex h-[18px] w-[18px] items-center justify-center rounded-[4px] border-2 transition-colors duration-200"
+        style={{
+          borderColor: checked ? '#4A90E2' : '#E8EEF5',
+          background: checked ? '#4A90E2' : '#FFFFFF',
+        }}
+      >
+        {checked ? (
+          <CheckIcon className="h-3 w-3 text-white" weight="bold" />
+        ) : null}
+      </span>
+      <span className="flex flex-col gap-1">
+        <span className="text-[14px] text-[#333333]">{label}</span>
+        {description ? (
+          <span className="text-[12px] leading-5 text-[#8C8C8C]">
             {description}
-          </p>
-        )}
-      </div>
-    </div>
+          </span>
+        ) : null}
+      </span>
+    </button>
   );
 }
 
-// SettingsSelect - A dropdown select component
 export function SettingsSelect<T extends string>({
   value,
   options,
@@ -271,23 +272,30 @@ export function SettingsSelect<T extends string>({
   className?: string;
 }) {
   const selectedOption = options.find((opt) => opt.value === value);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <DropdownMenuTriggerButton
-          label={selectedOption?.label || placeholder}
+        <button
+          type="button"
+          disabled={disabled}
           className={cn(
-            'settings-select-trigger w-full justify-between',
+            settingsFieldClassName,
+            'flex items-center justify-between text-left',
             className
           )}
-          disabled={disabled}
-        />
+        >
+          <span className="truncate">
+            {selectedOption?.label || placeholder || ''}
+          </span>
+          <CaretDownIcon className="size-3 text-[#8C8C8C]" weight="fill" />
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="settings-select-dropdown w-[var(--radix-dropdown-menu-trigger-width)]">
+      <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
         {options.map((option) => (
           <DropdownMenuItem
             key={option.value}
-            className="settings-select-option"
+            className="mx-0 rounded-[8px] px-3 py-2 text-[14px] text-[#333333] focus:bg-[#F9FBFF]"
             onClick={() => onChange(option.value)}
           >
             {option.label}
@@ -298,7 +306,6 @@ export function SettingsSelect<T extends string>({
   );
 }
 
-// SettingsInput - A text input field
 export function SettingsInput({
   value,
   onChange,
@@ -320,16 +327,14 @@ export function SettingsInput({
       placeholder={placeholder}
       disabled={disabled}
       className={cn(
-        'settings-input w-full bg-secondary border rounded-sm px-base py-half text-sm text-high',
-        'placeholder:text-low placeholder:opacity-80 focus:outline-none focus:ring-1 focus:ring-brand',
-        error ? 'border-error' : 'border-border',
-        disabled && 'opacity-50 cursor-not-allowed'
+        settingsFieldClassName,
+        error &&
+          'border-[#d14343] focus:border-[#d14343] focus:shadow-[0_0_0_3px_rgba(209,67,67,0.08)]'
       )}
     />
   );
 }
 
-// SettingsNumberInput - A numeric input field
 export function SettingsNumberInput({
   value,
   onChange,
@@ -360,17 +365,15 @@ export function SettingsNumberInput({
       step={step}
       disabled={disabled}
       className={cn(
-        'settings-number-input w-full bg-secondary border rounded-sm px-base py-half text-sm text-high',
-        'placeholder:text-low placeholder:opacity-80 focus:outline-none focus:ring-1 focus:ring-brand',
-        '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
-        error ? 'border-error' : 'border-border',
-        disabled && 'opacity-50 cursor-not-allowed'
+        settingsFieldClassName,
+        '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
+        error &&
+          'border-[#d14343] focus:border-[#d14343] focus:shadow-[0_0_0_3px_rgba(209,67,67,0.08)]'
       )}
     />
   );
 }
 
-// SettingsTextarea - A multi-line text input
 export function SettingsTextarea({
   value,
   onChange,
@@ -397,23 +400,22 @@ export function SettingsTextarea({
       disabled={disabled}
       rows={rows}
       className={cn(
-        'settings-textarea w-full bg-secondary border border-border rounded-sm px-base py-half text-sm text-high',
-        'placeholder:text-low placeholder:opacity-80 focus:outline-none focus:ring-1 focus:ring-brand',
-        'resize-y',
-        monospace && 'font-mono',
-        disabled && 'opacity-50 cursor-not-allowed'
+        settingsFieldClassName,
+        'resize-y px-3 py-3',
+        monospace && 'font-mono text-[13px]'
       )}
     />
   );
 }
 
-// SettingsSaveBar - A sticky save bar for unsaved changes
 export function SettingsSaveBar({
   show,
   saving,
   saveDisabled,
+  unsavedMessage,
   onSave,
   onDiscard,
+  layout = 'section',
 }: {
   show: boolean;
   saving: boolean;
@@ -421,41 +423,51 @@ export function SettingsSaveBar({
   unsavedMessage?: string;
   onSave: () => void;
   onDiscard?: () => void;
+  layout?: 'section' | 'panel';
 }) {
   const { t } = useTranslation(['settings', 'common']);
 
-  if (!show) {
-    return <div />;
-  }
+  if (!show) return <div />;
+
+  const wrapperClassName =
+    layout === 'panel'
+      ? 'mt-6 -mx-4 border-t border-[#f5f5f5] bg-white px-4 pt-4'
+      : 'mt-8 -mx-8 sticky bottom-0 border-t border-[#f5f5f5] bg-white px-8 py-4';
+  const innerClassName = layout === 'panel' ? 'pb-0' : '';
 
   return (
-    <div className="settings-savebar sticky bottom-0 z-10 bg-panel/80 backdrop-blur-sm border-t border-border/50 py-4 -mx-6 px-6 -mb-6">
+    <div className={wrapperClassName}>
       <div
         className={cn(
           'flex items-center',
-          onDiscard ? 'justify-between' : 'justify-end'
+          onDiscard ? 'justify-between' : 'justify-end',
+          innerClassName
         )}
       >
-        {onDiscard && (
-          <span className="settings-savebar-text text-sm text-low">
-            {t('settings.common.unsavedChanges')}
+        {onDiscard ? (
+          <span className="text-[12px] text-[#8C8C8C]">
+            {unsavedMessage ?? t('settings.common.unsavedChanges')}
           </span>
-        )}
-        <div className="flex gap-2">
-          {onDiscard && (
-            <PrimaryButton
-              variant="tertiary"
-              value={t('common:buttons.discard')}
+        ) : null}
+        <div className="flex items-center gap-3">
+          {onDiscard ? (
+            <button
+              type="button"
               onClick={onDiscard}
               disabled={saving}
-            />
-          )}
-          <PrimaryButton
-            value={t('common:buttons.save')}
+              className={settingsSecondaryButtonClassName}
+            >
+              {t('common:buttons.discard')}
+            </button>
+          ) : null}
+          <button
+            type="button"
             onClick={onSave}
             disabled={saving || saveDisabled}
-            actionIcon={saving ? 'spinner' : undefined}
-          />
+            className={settingsPrimaryButtonClassName}
+          >
+            {saving ? t('common:states.saving') : t('common:buttons.save')}
+          </button>
         </div>
       </div>
     </div>

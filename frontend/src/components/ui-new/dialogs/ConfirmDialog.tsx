@@ -1,21 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
-import {
-  WarningIcon,
-  InfoIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-} from '@phosphor-icons/react';
 import { defineModal, type ConfirmResult } from '@/lib/modals';
+import {
+  ConfirmationDialogChrome,
+  getConfirmationButtonClasses,
+  type ConfirmationDialogTone,
+} from '@/components/dialogs/shared/ConfirmationDialogChrome';
 
 export interface ConfirmDialogProps {
   title: string;
@@ -50,67 +40,50 @@ const ConfirmDialogImpl = NiceModal.create<ConfirmDialogProps>((props) => {
     modal.hide();
   };
 
-  const getIcon = () => {
-    if (!icon) return null;
-
-    const iconClass = 'h-6 w-6';
-
-    switch (variant) {
-      case 'destructive':
-        return <WarningIcon className={`${iconClass} text-destructive`} />;
-      case 'info':
-        return <InfoIcon className={`${iconClass} text-blue-500`} />;
-      case 'success':
-        return <CheckCircleIcon className={`${iconClass} text-green-500`} />;
-      default:
-        return <XCircleIcon className={`${iconClass} text-muted-foreground`} />;
-    }
-  };
-
-  const getConfirmButtonVariant = () => {
-    return variant === 'destructive' ? 'destructive' : 'default';
-  };
+  const tone: ConfirmationDialogTone =
+    variant === 'destructive'
+      ? 'destructive'
+      : variant === 'info'
+        ? 'info'
+        : variant === 'success'
+          ? 'success'
+          : 'default';
 
   return (
-    <Dialog open={modal.visible} onOpenChange={handleCancel}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            {getIcon()}
-            <DialogTitle>{title}</DialogTitle>
-          </div>
-          <DialogDescription className="text-left pt-2">
-            {message}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="gap-2">
+    <ConfirmationDialogChrome
+      open={modal.visible}
+      onOpenChange={(open) => {
+        if (!open) {
+          handleCancel();
+        }
+      }}
+      onClose={handleCancel}
+      title={title}
+      message={message}
+      tone={tone}
+      showIndicator={icon}
+      closeLabel={t('common:buttons.close')}
+      footer={
+        <>
           {showCancelButton && (
-            <Button
-              variant="outline"
+            <button
+              type="button"
               onClick={handleCancel}
-              className={
-                variant === 'destructive'
-                  ? '!bg-white !text-foreground hover:!bg-white hover:!text-foreground focus-visible:!bg-white active:!bg-white'
-                  : undefined
-              }
+              className={getConfirmationButtonClasses(tone, 'cancel')}
             >
               {cancelText}
-            </Button>
+            </button>
           )}
-          <Button
-            variant={getConfirmButtonVariant()}
+          <button
+            type="submit"
             onClick={handleConfirm}
-            className={
-              variant === 'destructive'
-                ? '!bg-[#EF4444] !border-[#EF4444] !text-white hover:!bg-[#DC2626] hover:!border-[#DC2626] hover:!text-white focus-visible:!bg-[#DC2626] focus-visible:!border-[#DC2626] active:!bg-[#B91C1C] active:!border-[#B91C1C]'
-                : undefined
-            }
+            className={getConfirmationButtonClasses(tone, 'confirm')}
           >
             {confirmText}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </button>
+        </>
+      }
+    />
   );
 });
 

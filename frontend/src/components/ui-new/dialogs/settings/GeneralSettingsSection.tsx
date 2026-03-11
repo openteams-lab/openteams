@@ -16,20 +16,14 @@ import { toPrettyCase } from '@/utils/string';
 import { useTheme } from '@/components/ThemeProvider';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { cn } from '@/lib/utils';
-import { PrimaryButton } from '../../primitives/PrimaryButton';
-import { IconButton } from '../../primitives/IconButton';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuTriggerButton,
-} from '../../primitives/Dropdown';
 import {
   SettingsCard,
   SettingsCheckbox,
   SettingsField,
+  settingsFieldClassName,
+  settingsIconButtonClassName,
   SettingsNumberInput,
+  settingsSecondaryButtonClassName,
   SettingsSaveBar,
   SettingsSelect,
 } from './SettingsComponents';
@@ -58,7 +52,10 @@ export function GeneralSettingsSection() {
   const executorOptions = profiles
     ? Object.keys(profiles)
         .sort()
-        .map((key) => ({ value: key, label: toPrettyCase(key) }))
+        .map((key) => ({
+          value: key as BaseCodingAgent,
+          label: toPrettyCase(key),
+        }))
     : [];
 
   const selectedAgentProfile =
@@ -181,7 +178,9 @@ export function GeneralSettingsSection() {
           className="size-icon-lg animate-spin text-brand"
           weight="bold"
         />
-        <span className="text-normal">{t('settings.general.loading')}</span>
+        <span className="text-[14px] text-[#333333]">
+          {t('settings.general.loading')}
+        </span>
       </div>
     );
   }
@@ -189,7 +188,7 @@ export function GeneralSettingsSection() {
   if (!config) {
     return (
       <div className="py-8">
-        <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error">
+        <div className="rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
           {t('settings.general.loadError')}
         </div>
       </div>
@@ -212,13 +211,13 @@ export function GeneralSettingsSection() {
     <>
       {/* Status messages */}
       {error && (
-        <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error">
+        <div className="mb-5 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="bg-success/10 border border-success/50 rounded-sm p-4 text-success font-medium">
+        <div className="mb-5 rounded-[10px] border border-[#d8ead8] bg-[#f7fcf7] p-4 text-[13px] font-medium text-[#2f7d32]">
           {t('settings.general.save.success')}
         </div>
       )}
@@ -265,79 +264,52 @@ export function GeneralSettingsSection() {
           description={t('settings.general.taskExecution.executor.helper')}
         >
           <div className="grid grid-cols-2 gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <DropdownMenuTriggerButton
-                  label={
-                    draft?.executor_profile?.executor
-                      ? toPrettyCase(draft.executor_profile.executor)
-                      : t('settings.agents.selectAgent')
-                  }
-                  className="w-full justify-between"
-                  disabled={!profiles}
-                />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="settings-select-dropdown w-[var(--radix-dropdown-menu-trigger-width)]">
-                {executorOptions.map((option) => (
-                  <DropdownMenuItem
-                    key={option.value}
-                    onClick={() => {
-                      const variants = profiles?.[option.value];
-                      const keepCurrentVariant =
-                        variants &&
-                        draft?.executor_profile?.variant &&
-                        variants[draft.executor_profile.variant];
+            <SettingsSelect
+              value={draft?.executor_profile?.executor}
+              options={executorOptions}
+              onChange={(value: BaseCodingAgent) => {
+                const variants = profiles?.[value];
+                const keepCurrentVariant =
+                  variants &&
+                  draft?.executor_profile?.variant &&
+                  variants[draft.executor_profile.variant];
 
-                      const newProfile: ExecutorProfileId = {
-                        executor: option.value as BaseCodingAgent,
-                        variant: keepCurrentVariant
-                          ? draft!.executor_profile!.variant
-                          : null,
-                      };
-                      updateDraft({ executor_profile: newProfile });
-                    }}
-                  >
-                    {option.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                const newProfile: ExecutorProfileId = {
+                  executor: value,
+                  variant: keepCurrentVariant
+                    ? draft!.executor_profile!.variant
+                    : null,
+                };
+                updateDraft({ executor_profile: newProfile });
+              }}
+              placeholder={t('settings.agents.selectAgent')}
+              disabled={!profiles}
+            />
 
             {hasVariants ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <DropdownMenuTriggerButton
-                    label={
-                      draft?.executor_profile?.variant
-                        ? toPrettyCase(draft.executor_profile.variant)
-                        : t('settings.general.taskExecution.defaultLabel')
-                    }
-                    className="w-full justify-between"
-                  />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="settings-select-dropdown w-[var(--radix-dropdown-menu-trigger-width)]">
-                  {Object.keys(selectedAgentProfile).map((variantLabel) => (
-                    <DropdownMenuItem
-                      key={variantLabel}
-                      onClick={() => {
-                        const newProfile: ExecutorProfileId = {
-                          executor: draft!.executor_profile!.executor,
-                          variant: variantLabel,
-                        };
-                        updateDraft({ executor_profile: newProfile });
-                      }}
-                    >
-                      {toPrettyCase(variantLabel)}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <SettingsSelect
+                value={draft?.executor_profile?.variant ?? undefined}
+                options={Object.keys(selectedAgentProfile).map(
+                  (variantLabel) => ({
+                    value: variantLabel,
+                    label: toPrettyCase(variantLabel),
+                  })
+                )}
+                onChange={(value: string) => {
+                  const newProfile: ExecutorProfileId = {
+                    executor: draft!.executor_profile!.executor,
+                    variant: value,
+                  };
+                  updateDraft({ executor_profile: newProfile });
+                }}
+                placeholder={t('settings.general.taskExecution.defaultLabel')}
+              />
             ) : selectedAgentProfile ? (
               <button
                 disabled
                 className={cn(
-                  'flex items-center justify-between w-full px-base py-half rounded-sm border border-border bg-secondary',
-                  'text-base text-low opacity-50 cursor-not-allowed'
+                  settingsFieldClassName,
+                  'cursor-not-allowed justify-between opacity-50'
                 )}
               >
                 <span className="truncate">
@@ -371,7 +343,7 @@ export function GeneralSettingsSection() {
 
         {draft?.notifications.sound_enabled && (
           <div className="ml-7 space-y-2">
-            <label className="text-sm font-medium text-normal">
+            <label className="text-[12px] text-[#8C8C8C]">
               {t('settings.general.notifications.sound.fileLabel')}
             </label>
             <div className="flex gap-2">
@@ -392,14 +364,17 @@ export function GeneralSettingsSection() {
                   )}
                 />
               </div>
-              <IconButton
-                icon={SpeakerHighIcon}
+              <button
+                type="button"
                 onClick={() => playSound(draft.notifications.sound_file)}
                 aria-label="Preview sound"
                 title="Preview sound"
-              />
+                className={settingsIconButtonClassName}
+              >
+                <SpeakerHighIcon className="h-4 w-4" weight="bold" />
+              </button>
             </div>
-            <p className="text-sm text-low">
+            <p className="text-[12px] leading-5 text-[#8C8C8C]">
               {t('settings.general.notifications.sound.fileHelper')}
             </p>
           </div>
@@ -512,35 +487,47 @@ export function GeneralSettingsSection() {
         title={t('settings.general.safety.title')}
         description={t('settings.general.safety.description')}
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-normal">
-              {t('settings.general.safety.disclaimer.title')}
-            </p>
-            <p className="text-sm text-low">
-              {t('settings.general.safety.disclaimer.description')}
-            </p>
+        <div className="border-t border-[#f5f5f5]">
+          <div className="flex items-center justify-between gap-4 border-b border-[#fafafa] py-3">
+            <div>
+              <p className="text-[13px] font-medium text-[#333333]">
+                {t('settings.general.safety.disclaimer.title')}
+              </p>
+              <p className="mt-1 text-[12px] leading-5 text-[#8C8C8C]">
+                {t('settings.general.safety.disclaimer.description')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={resetDisclaimer}
+              className={cn(
+                settingsSecondaryButtonClassName,
+                'px-3 py-[9px] text-[13px]'
+              )}
+            >
+              {t('settings.general.safety.disclaimer.button')}
+            </button>
           </div>
-          <PrimaryButton
-            variant="tertiary"
-            value={t('settings.general.safety.disclaimer.button')}
-            onClick={resetDisclaimer}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-normal">
-              {t('settings.general.safety.onboarding.title')}
-            </p>
-            <p className="text-sm text-low">
-              {t('settings.general.safety.onboarding.description')}
-            </p>
+          <div className="flex items-center justify-between gap-4 py-3">
+            <div>
+              <p className="text-[13px] font-medium text-[#333333]">
+                {t('settings.general.safety.onboarding.title')}
+              </p>
+              <p className="mt-1 text-[12px] leading-5 text-[#8C8C8C]">
+                {t('settings.general.safety.onboarding.description')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={resetOnboarding}
+              className={cn(
+                settingsSecondaryButtonClassName,
+                'px-3 py-[9px] text-[13px]'
+              )}
+            >
+              {t('settings.general.safety.onboarding.button')}
+            </button>
           </div>
-          <PrimaryButton
-            variant="tertiary"
-            value={t('settings.general.safety.onboarding.button')}
-            onClick={resetOnboarding}
-          />
         </div>
       </SettingsCard>
 

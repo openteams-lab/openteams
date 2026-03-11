@@ -41,24 +41,38 @@ export function SettingsSection({ type, onClose }: SettingsSectionProps) {
 
   return (
     <div className="settings-section flex flex-col h-full">
-      {/* Header - sticky */}
-      <div className="settings-section-header p-4 border-b border-border bg-panel/95 backdrop-blur-sm hidden sm:flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-high">
+      <div
+        className="settings-section-header hidden items-center justify-between sm:flex"
+        style={{ padding: '24px 32px' }}
+      >
+        <h2
+          className="m-0"
+          style={{ fontSize: '16px', fontWeight: 600, color: '#333333' }}
+        >
           {t(`settings.layout.nav.${type}`)}
         </h2>
         {onClose && (
           <button
             onClick={onClose}
-            className="rounded-sm opacity-70 ring-offset-panel transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2"
+            className="border-none bg-transparent p-0 transition-colors duration-200"
+            style={{ cursor: 'pointer', color: '#cccccc' }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.color = '#333333';
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.color = '#cccccc';
+            }}
           >
-            <XIcon className="h-4 w-4 text-normal" weight="bold" />
+            <XIcon className="h-4 w-4" weight="bold" />
             <span className="sr-only">{t('close', { ns: 'common' })}</span>
           </button>
         )}
       </div>
 
-      {/* Content */}
-      <div className="settings-section-body space-y-6 px-6 pt-4 overflow-y-auto">
+      <div
+        className="settings-section-body flex-1 min-h-0 overflow-y-auto"
+        style={{ padding: '0 32px' }}
+      >
         {renderContent()}
       </div>
     </div>

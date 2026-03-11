@@ -22,7 +22,7 @@ import type { BaseCodingAgent, ExecutorConfigs } from 'shared/types';
 import { cn } from '@/lib/utils';
 import { toPrettyCase } from '@/utils/string';
 import {
-  SettingsSaveBar,
+  settingsPanelClassName,
   TwoColumnPicker,
   TwoColumnPickerColumn,
   TwoColumnPickerItem,
@@ -300,26 +300,6 @@ export function AgentsSettingsSection() {
     }
   };
 
-  // Save handler for agent configuration
-  const handleSave = async () => {
-    if (
-      isDirty &&
-      localParsedProfiles &&
-      selectedExecutorType &&
-      selectedConfiguration
-    ) {
-      const executorsMap =
-        localParsedProfiles.executors as unknown as ExecutorsMap;
-      const formData =
-        executorsMap[selectedExecutorType]?.[selectedConfiguration]?.[
-          selectedExecutorType
-        ];
-      if (formData) {
-        await handleExecutorConfigSave(formData);
-      }
-    }
-  };
-
   // Discard handler for agent configuration
   const handleDiscard = () => {
     if (isDirty && serverProfilesContent) {
@@ -340,7 +320,9 @@ export function AgentsSettingsSection() {
           className="size-icon-lg animate-spin text-brand"
           weight="bold"
         />
-        <span className="text-normal">{t('settings.agents.loading')}</span>
+        <span className="text-[14px] text-[#333333]">
+          {t('settings.agents.loading')}
+        </span>
       </div>
     );
   }
@@ -352,7 +334,7 @@ export function AgentsSettingsSection() {
     <>
       {/* Status messages */}
       {!!profilesError && (
-        <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error mb-4">
+        <div className="mb-4 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
           {profilesError instanceof Error
             ? profilesError.message
             : String(profilesError)}
@@ -360,13 +342,13 @@ export function AgentsSettingsSection() {
       )}
 
       {profilesSuccess && (
-        <div className="bg-success/10 border border-success/50 rounded-sm p-4 text-success font-medium mb-4">
+        <div className="mb-4 rounded-[10px] border border-[#d8ead8] bg-[#f7fcf7] p-4 text-[13px] font-medium text-[#2f7d32]">
           {t('settings.agents.save.success')}
         </div>
       )}
 
       {saveError && (
-        <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error mb-4">
+        <div className="mb-4 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
           {saveError}
         </div>
       )}
@@ -426,7 +408,7 @@ export function AgentsSettingsSection() {
               headerAction={
                 selectedExecutorType && (
                   <button
-                    className="p-half rounded-sm hover:bg-secondary text-low hover:text-normal"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] border-none bg-transparent text-[#8C8C8C] transition-colors duration-200 hover:bg-[#F3F6FA] hover:text-[#333333]"
                     onClick={() => handleCreateConfig(selectedExecutorType)}
                     disabled={profilesSaving}
                     title={t('settings.agents.editor.createNew')}
@@ -485,37 +467,34 @@ export function AgentsSettingsSection() {
 
           {/* Config form */}
           {selectedExecutorType && selectedConfiguration && (
-            <div className="settings-inline-panel bg-secondary/50 border border-border rounded-sm p-4">
-              <ExecutorConfigForm
-                key={`${selectedExecutorType}-${selectedConfiguration}`}
-                executor={selectedExecutorType}
-                value={
-                  (executorsMap?.[selectedExecutorType]?.[
-                    selectedConfiguration
-                  ]?.[selectedExecutorType] as Record<string, unknown>) || {}
-                }
-                onChange={(formData) =>
-                  handleExecutorConfigChange(
-                    selectedExecutorType,
-                    selectedConfiguration,
-                    formData
-                  )
-                }
-                disabled={profilesSaving}
-              />
+            <div className="mt-6 border-t border-[#f5f5f5] pt-6">
+              <div className={cn(settingsPanelClassName, 'p-4')}>
+                <ExecutorConfigForm
+                  key={`${selectedExecutorType}-${selectedConfiguration}`}
+                  executor={selectedExecutorType}
+                  value={
+                    (executorsMap?.[selectedExecutorType]?.[
+                      selectedConfiguration
+                    ]?.[selectedExecutorType] as Record<string, unknown>) || {}
+                  }
+                  onChange={(formData) =>
+                    handleExecutorConfigChange(
+                      selectedExecutorType,
+                      selectedConfiguration,
+                      formData
+                    )
+                  }
+                  onSave={handleExecutorConfigSave}
+                  onDiscard={handleDiscard}
+                  disabled={profilesSaving}
+                  saving={profilesSaving}
+                  isDirty={isDirty}
+                />
+              </div>
             </div>
           )}
         </div>
       ) : null}
-
-      <SettingsSaveBar
-        show={isDirty}
-        saving={profilesSaving}
-        saveDisabled={!!profilesError}
-        unsavedMessage={t('settings.agents.save.unsavedChanges')}
-        onSave={handleSave}
-        onDiscard={handleDiscard}
-      />
     </>
   );
 }
@@ -543,7 +522,7 @@ function ConfigActionsDropdown({
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            'p-half rounded-sm hover:bg-panel text-low hover:text-normal',
+            'inline-flex h-7 w-7 items-center justify-center rounded-[8px] border-none bg-transparent text-[#8C8C8C] transition-all duration-200 hover:bg-[#F3F6FA] hover:text-[#333333]',
             'opacity-0 group-hover:opacity-100 transition-opacity'
           )}
           onClick={(e) => e.stopPropagation()}
@@ -551,8 +530,12 @@ function ConfigActionsDropdown({
           <DotsThreeIcon className="size-icon-xs" weight="bold" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="settings-select-dropdown">
+      <DropdownMenuContent
+        align="end"
+        className="rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+      >
         <DropdownMenuItem
+          className="mx-0 rounded-[8px] px-3 py-2 text-[14px] text-[#333333] focus:bg-[#F9FBFF]"
           onClick={(e) => {
             e.stopPropagation();
             onMakeDefault(executorType, configName);
@@ -565,12 +548,12 @@ function ConfigActionsDropdown({
           </div>
         </DropdownMenuItem>
         <DropdownMenuItem
+          className="mx-0 rounded-[8px] px-3 py-2 text-[14px] text-[#d14343] focus:bg-[#fff7f7] focus:text-[#d14343]"
           onClick={(e) => {
             e.stopPropagation();
             onDelete(executorType, configName);
           }}
           disabled={configCount <= 1}
-          className="text-error focus:text-error"
         >
           <div className="flex items-center gap-half w-full">
             <TrashIcon className="size-icon-xs mr-base" />
