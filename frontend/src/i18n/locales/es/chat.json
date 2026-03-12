@@ -185,10 +185,28 @@
     "presetTeamSection": "Equipos",
     "addFromMemberPreset": "Añadir preajuste de miembro",
     "importTeamPreset": "Importar preajuste de equipo",
-    "noEnabledPresets": "No hay preajustes habilitados. Configúralos en Configuración -> Preajustes.",
+    "noEnabledPresets": "No hay preajustes habilitados. Config?ralos en Equipo IA.",
     "presetSearchPlaceholder": "Buscar IA predefinidas o equipos",
     "noPresetSearchResults": "No hay IA predefinidas ni equipos que coincidan.",
     "noPresetSearchResultsHint": "Prueba otra palabra clave o cambia a IA personalizada.",
+    "teamProtocol": {
+      "title": "Protocolo del equipo",
+      "guidelineLabel": "Guía del equipo",
+      "edit": "Editar guía del equipo",
+      "loading": "Cargando protocolo del equipo...",
+      "loadError": "No se pudo cargar el protocolo del equipo.",
+      "saveError": "No se pudo guardar el protocolo del equipo.",
+      "enabled": "Activado",
+      "disabled": "Desactivado",
+      "empty": "La inyección del protocolo del equipo está desactivada.",
+      "modal": {
+        "title": "Editar guía del equipo",
+        "description": "Actualiza las reglas de colaboración que se inyectan en cada miembro de IA.",
+        "placeholder": "Describe cómo debe colaborar el equipo.",
+        "enable": "Inyectar este protocolo en el prompt del sistema de cada miembro de IA",
+        "close": "Cerrar editor del protocolo del equipo"
+      }
+    },
     "importPreview": {
       "title": "Importar equipo: {{teamName}}",
       "description": "Los siguientes miembros se añadirán a esta sesión:",

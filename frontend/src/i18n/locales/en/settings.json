@@ -26,9 +26,7 @@
         "organizations": "Organization Settings",
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "Projects",
-        "remote-projectsDesc": "Manage projects",
-        "presets": "Presets",
-        "presetsDesc": "AI member and team preset templates"
+        "remote-projectsDesc": "Manage projects"
       }
     },
     "general": {

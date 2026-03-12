@@ -38,6 +38,8 @@ import {
   type ChatTeamPreset,
   type JsonValue,
 } from 'shared/types';
+import { useUserSystem } from '@/components/ConfigProvider';
+import { chatApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { getWorkspacePathExample } from '@/utils/platform';
 import {
@@ -61,6 +63,7 @@ import {
   type MemberPresetImportPlan,
 } from '../utils';
 import { AgentSkillsSection } from './AgentSkillsSection';
+import { TeamProtocolEditorModal } from './TeamProtocolEditorModal';
 import { TeamImportPreviewModal } from './TeamImportPreviewModal';
 
 const truncateByChars = (value: string, maxChars: number): string => {
@@ -420,10 +423,23 @@ export function AiMembersSidebar({
 }: AiMembersSidebarProps) {
   const { t, i18n } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
+  const { reloadSystem } = useUserSystem();
   const [activeTab, setActiveTab] = useState<AddMemberTab>('preset');
   const [presetSearchQuery, setPresetSearchQuery] = useState('');
   const [isTeamPresetsExpanded, setIsTeamPresetsExpanded] = useState(true);
   const [isTeamBulletinExpanded, setIsTeamBulletinExpanded] = useState(false);
+  const [isTeamProtocolEditorOpen, setIsTeamProtocolEditorOpen] =
+    useState(false);
+  const [teamProtocolContent, setTeamProtocolContent] = useState('');
+  const [teamProtocolEnabled, setTeamProtocolEnabled] = useState(false);
+  const [isTeamProtocolLoading, setIsTeamProtocolLoading] = useState(false);
+  const [isTeamProtocolSaving, setIsTeamProtocolSaving] = useState(false);
+  const [teamProtocolLoadError, setTeamProtocolLoadError] = useState<
+    string | null
+  >(null);
+  const [teamProtocolSaveError, setTeamProtocolSaveError] = useState<
+    string | null
+  >(null);
   const [importPromptEditorIndex, setImportPromptEditorIndex] = useState<
     number | null
   >(null);
@@ -476,6 +492,39 @@ export function AiMembersSidebar({
     }
   }, [teamImportPlan, importPromptEditorIndex]);
 
+  useEffect(() => {
+    if (!activeSessionId) {
+      setIsTeamProtocolEditorOpen(false);
+      setTeamProtocolLoadError(null);
+      setTeamProtocolSaveError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsTeamProtocolLoading(true);
+    setTeamProtocolLoadError(null);
+
+    void chatApi
+      .getTeamProtocol()
+      .then((protocol) => {
+        if (cancelled) return;
+        setTeamProtocolContent(protocol.content);
+        setTeamProtocolEnabled(protocol.enabled);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTeamProtocolLoadError(t('members.teamProtocol.loadError'));
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsTeamProtocolLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSessionId, t]);
+
   const handleImportPlanVariantChange = useCallback(
     (index: number, variant: string, currentToolsEnabled: JsonValue) => {
       const newToolsEnabled = withExecutorProfileVariant(
@@ -493,7 +542,36 @@ export function AiMembersSidebar({
     []
   );
 
-const renderPresetTab = () => (
+  const handleSaveTeamProtocol = useCallback(
+    async ({
+      content,
+      enabled,
+    }: {
+      content: string;
+      enabled: boolean;
+    }) => {
+      setIsTeamProtocolSaving(true);
+      setTeamProtocolSaveError(null);
+      try {
+        const saved = await chatApi.updateTeamProtocol({
+          content,
+          enabled,
+        });
+        setTeamProtocolContent(saved.content);
+        setTeamProtocolEnabled(saved.enabled);
+        await reloadSystem();
+        return true;
+      } catch {
+        setTeamProtocolSaveError(t('members.teamProtocol.saveError'));
+        return false;
+      } finally {
+        setIsTeamProtocolSaving(false);
+      }
+    },
+    [reloadSystem, t]
+  );
+
+  const renderPresetTab = () => (
     <div className="flex flex-col min-h-0 flex-1">
       {!editingMember && (
         <div className="chat-session-member-search shrink-0">
@@ -794,7 +872,7 @@ const renderPresetTab = () => (
 
   return (
     <>
-<aside
+      <aside
         className="chat-session-members-panel flex flex-col min-h-0 h-full shrink-0"
         style={{ width }}
       >
@@ -884,9 +962,27 @@ const renderPresetTab = () => (
                 )}
               >
                 <div className="overflow-hidden">
-                  <p className="m-0 text-xs leading-6 text-low">
-                    {teamBulletinContent}
-                  </p>
+                  <div className="flex items-center gap-2 text-xs leading-6 text-low">
+                    <span>
+                      {t('members.teamProtocol.guidelineLabel', {
+                        defaultValue: teamBulletinContent,
+                      })}
+                      ：
+                    </span>
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-[#4a90e2] transition-colors hover:text-[#357ABD]"
+                      disabled={isTeamProtocolLoading}
+                      title={teamProtocolLoadError ?? undefined}
+                      aria-busy={isTeamProtocolLoading}
+                      onClick={() => {
+                        setTeamProtocolSaveError(null);
+                        setIsTeamProtocolEditorOpen(true);
+                      }}
+                    >
+                      {t('members.teamProtocol.edit')}
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>
@@ -1073,6 +1169,19 @@ const renderPresetTab = () => (
         }}
         onClose={() => setImportPromptEditorIndex(null)}
         showFileImport={false}
+      />
+      <TeamProtocolEditorModal
+        isOpen={isTeamProtocolEditorOpen}
+        initialValue={teamProtocolContent}
+        initialEnabled={teamProtocolEnabled}
+        isSaving={isTeamProtocolSaving}
+        error={teamProtocolSaveError}
+        onClose={() => {
+          if (isTeamProtocolSaving) return;
+          setIsTeamProtocolEditorOpen(false);
+          setTeamProtocolSaveError(null);
+        }}
+        onSave={handleSaveTeamProtocol}
       />
       <TeamImportPreviewModal
         isOpen={Boolean(teamImportPlan)}

@@ -98,6 +98,7 @@ import {
   ChatSession,
   ChatSessionStatus,
   ChatMessage,
+  TeamProtocolConfig,
   ChatAgent,
   ChatSenderType,
   CreateChatAgent,
@@ -1590,6 +1591,21 @@ export const chatApi = {
       method: 'DELETE',
     });
     return handleApiResponse<void>(response);
+  },
+
+  getTeamProtocol: async (): Promise<TeamProtocolConfig> => {
+    const response = await makeRequest('/api/chat/presets/team-protocol');
+    return handleApiResponse<TeamProtocolConfig>(response);
+  },
+
+  updateTeamProtocol: async (
+    data: TeamProtocolConfig
+  ): Promise<TeamProtocolConfig> => {
+    const response = await makeRequest('/api/chat/presets/team-protocol', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<TeamProtocolConfig>(response);
   },
 
   deleteMessagesBatch: async (

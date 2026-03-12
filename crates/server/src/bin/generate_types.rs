@@ -209,6 +209,7 @@ fn generate_types_content() -> String {
         services::services::config::ChatPresetsConfig::decl(),
         services::services::config::ChatMemberPreset::decl(),
         services::services::config::ChatTeamPreset::decl(),
+        server::routes::chat::presets::TeamProtocolConfig::decl(),
         git::GitBranch::decl(),
         services::services::queued_message::QueuedMessage::decl(),
         services::services::queued_message::QueueStatus::decl(),

@@ -26,9 +26,7 @@
         "organizations": "Paramètres de l'organisation",
         "organizationsDesc": "Gérer les membres et les permissions de l'organisation",
         "remote-projects": "Projets",
-        "remote-projectsDesc": "Gérer les projets",
-        "presets": "Préréglages",
-        "presetsDesc": "Modèles prédéfinis de membres et d'équipes IA"
+        "remote-projectsDesc": "Gérer les projets"
       }
     },
     "general": {
