@@ -10,7 +10,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import { BaseCodingAgent } from 'shared/types';
 import type {
-  ChatAgent,
   InstalledNativeSkill,
   RemoteSkillMeta,
   RemoteSkillPackage,
@@ -42,14 +41,12 @@ type DetailData = {
 type RunnerOption = {
   key: string;
   label: string;
-  representativeAgentId: string;
-  count: number;
 };
 
 interface SkillsPanelProps {
   isOpen: boolean;
   leftOffset: number;
-  allAgents: ChatAgent[];
+  availableRunnerTypes: string[];
   onClose: () => void;
 }
 
@@ -162,7 +159,7 @@ function SkillTileIcon({
 export function SkillsPanel({
   isOpen,
   leftOffset,
-  allAgents,
+  availableRunnerTypes,
   onClose,
 }: SkillsPanelProps) {
   const { t } = useTranslation('chat');
@@ -170,7 +167,6 @@ export function SkillsPanel({
     []
   );
   const [marketSkills, setMarketSkills] = useState<MarketSkill[]>([]);
-  const [availableAgents, setAvailableAgents] = useState<ChatAgent[]>([]);
 
   const [selectedRunnerKey, setSelectedRunnerKey] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -201,28 +197,22 @@ export function SkillsPanel({
   );
 
   const runnerOptions = useMemo<RunnerOption[]>(() => {
-    const map = new Map<string, RunnerOption>();
-    const sourceAgents =
-      availableAgents.length > 0 ? availableAgents : allAgents;
-    for (const agent of sourceAgents) {
-      const key = agent.runner_type.trim().toUpperCase();
-      if (!key || !supportedRunnerTypeSet.has(key)) continue;
-      const existing = map.get(key);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        map.set(key, {
-          key,
-          label: toRunnerLabel(key),
-          representativeAgentId: agent.id,
-          count: 1,
-        });
-      }
-    }
-    return Array.from(map.values()).sort((a, b) =>
-      a.label.localeCompare(b.label)
-    );
-  }, [allAgents, availableAgents]);
+    return Array.from(
+      new Set(
+        availableRunnerTypes
+          .map((runnerType) => runnerType.trim().toUpperCase())
+          .filter(
+            (runnerType) =>
+              runnerType.length > 0 && supportedRunnerTypeSet.has(runnerType)
+          )
+      )
+    )
+      .map((runnerType) => ({
+        key: runnerType,
+        label: toRunnerLabel(runnerType),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [availableRunnerTypes]);
 
   const selectedRunnerOption = useMemo(
     () =>
@@ -248,16 +238,6 @@ export function SkillsPanel({
       setIsLoadingInstalled(false);
     }
   }, [t]);
-
-  const loadAgents = useCallback(async () => {
-    try {
-      const agents = await chatApi.listAgents();
-      setAvailableAgents(agents);
-    } catch (error) {
-      console.error('Failed to load agents for skills panel', error);
-      setAvailableAgents([]);
-    }
-  }, []);
 
   const loadMarketSkills = useCallback(async () => {
     setIsLoadingMarket(true);
@@ -295,8 +275,8 @@ export function SkillsPanel({
 
   useEffect(() => {
     if (!isOpen) return;
-    void Promise.all([refreshAll(), loadAgents()]);
-  }, [isOpen, loadAgents, refreshAll]);
+    void refreshAll();
+  }, [isOpen, refreshAll]);
 
   useEffect(() => {
     if (!isOpen) return;

@@ -2198,35 +2198,6 @@ const resizeStartRef = useRef<{
     setAttachedFiles([]);
   };
 
-  const addAttachmentAsFile = async (
-    messageId: string,
-    attachment: { id: string; name: string; mime_type?: string | null }
-  ) => {
-    if (!activeSessionId || !attachment.id) return;
-
-    try {
-      const attachmentUrl = chatApi.getChatAttachmentUrl(
-        activeSessionId,
-        messageId,
-        attachment.id
-      );
-
-      const response = await fetch(attachmentUrl);
-      if (!response.ok) {
-        throw new Error(
-          `Failed to download attachment: ${response.statusText}`
-        );
-      }
-
-      const blob = await response.blob();
-      const file = new File([blob], attachment.name, { type: blob.type });
-      setAttachedFiles((prev) => [...prev, file]);
-    } catch (error) {
-      console.error('Error downloading attachment:', error);
-      setAttachmentError('Could not download attachment.');
-    }
-  };
-
   const previewAttachedFile = async (file: File) => {
     try {
       if (isTextAttachment(file)) {
@@ -3464,7 +3435,6 @@ isDeletingMessages={isDeletingMessages}
                       agentIdByName={agentIdByName}
                       attachments={attachments}
                       activeSessionId={activeSessionId}
-                      onAddAttachmentAsFile={addAttachmentAsFile}
                       onPreviewAttachment={handlePreviewMessageAttachment}
                       diffInfo={diffInfo}
                       runDiffs={runDiffs}
@@ -3728,7 +3698,7 @@ isDeletingMessages={isDeletingMessages}
       <SkillsPanel
         isOpen={isSkillsPanelOpen}
         leftOffset={skillsPanelLeftOffset}
-        allAgents={agents}
+        availableRunnerTypes={enabledRunnerTypes}
         onClose={() => setIsSkillsPanelOpen(false)}
       />
 
