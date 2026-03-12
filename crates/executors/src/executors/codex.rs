@@ -293,8 +293,10 @@ impl StandardCodingAgentExecutor for Codex {
 }
 
 impl Codex {
+    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.114.0";
+
     pub fn base_command() -> &'static str {
-        "npx -y @openai/codex@latest"
+        Self::BASE_COMMAND
     }
 
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
@@ -336,7 +338,7 @@ impl Codex {
             base_instructions: self.base_instructions.clone(),
             developer_instructions: self.developer_instructions.clone(),
             model_provider: self.model_provider.clone(),
-            experimental_raw_events: false,
+            ..Default::default()
         }
     }
 
@@ -455,7 +457,7 @@ impl Codex {
                     config: overrides.config,
                     base_instructions: overrides.base_instructions,
                     developer_instructions: overrides.developer_instructions,
-                    history: None,
+                    ..Default::default()
                 };
                 let response = client.resume_thread(params).await?;
                 tracing::debug!(

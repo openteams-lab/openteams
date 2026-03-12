@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { toPrettyCase } from '@/utils/string';
 import {
   settingsPanelClassName,
+  SettingsSaveBar,
   TwoColumnPicker,
   TwoColumnPickerColumn,
   TwoColumnPickerItem,
@@ -62,6 +63,7 @@ export function AgentsSettingsSection() {
   const [localParsedProfiles, setLocalParsedProfiles] =
     useState<ExecutorConfigs | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [hasValidationErrors, setHasValidationErrors] = useState(false);
 
   // Initialize selection with default executor when config loads
   useEffect(() => {
@@ -70,6 +72,10 @@ export function AgentsSettingsSection() {
       setSelectedConfiguration(config.executor_profile.variant || 'DEFAULT');
     }
   }, [config?.executor_profile, selectedExecutorType]);
+
+  useEffect(() => {
+    setHasValidationErrors(false);
+  }, [selectedExecutorType, selectedConfiguration]);
 
   // Sync server state to local state when not dirty
   useEffect(() => {
@@ -262,7 +268,7 @@ export function AgentsSettingsSection() {
     markDirty(updatedProfiles);
   };
 
-  const handleExecutorConfigSave = async (formData: unknown) => {
+  const handleExecutorConfigSave = async () => {
     if (
       !localParsedProfiles ||
       !localParsedProfiles.executors ||
@@ -272,24 +278,8 @@ export function AgentsSettingsSection() {
       return;
 
     setSaveError(null);
-
-    const updatedProfiles = {
-      ...localParsedProfiles,
-      executors: {
-        ...localParsedProfiles.executors,
-        [selectedExecutorType]: {
-          ...localParsedProfiles.executors[selectedExecutorType],
-          [selectedConfiguration]: {
-            [selectedExecutorType]: formData,
-          },
-        },
-      },
-    };
-
-    setLocalParsedProfiles(updatedProfiles);
-
     try {
-      await saveProfiles(JSON.stringify(updatedProfiles, null, 2));
+      await saveProfiles(JSON.stringify(localParsedProfiles, null, 2));
       setProfilesSuccess(true);
       setIsDirty(false);
       setTimeout(() => setProfilesSuccess(false), 3000);
@@ -304,6 +294,7 @@ export function AgentsSettingsSection() {
   const handleDiscard = () => {
     if (isDirty && serverProfilesContent) {
       setIsDirty(false);
+      setHasValidationErrors(false);
       try {
         const parsed = JSON.parse(serverProfilesContent);
         setLocalParsedProfiles(parsed);
@@ -331,171 +322,184 @@ export function AgentsSettingsSection() {
     localParsedProfiles?.executors as unknown as ExecutorsMap;
 
   return (
-    <>
-      {/* Status messages */}
-      {!!profilesError && (
-        <div className="mb-4 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
-          {profilesError instanceof Error
-            ? profilesError.message
-            : String(profilesError)}
-        </div>
-      )}
+    <div className="relative flex h-full min-h-0 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-28">
+        {/* Status messages */}
+        {!!profilesError && (
+          <div className="mb-4 shrink-0 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
+            {profilesError instanceof Error
+              ? profilesError.message
+              : String(profilesError)}
+          </div>
+        )}
 
-      {profilesSuccess && (
-        <div className="mb-4 rounded-[10px] border border-[#d8ead8] bg-[#f7fcf7] p-4 text-[13px] font-medium text-[#2f7d32]">
-          {t('settings.agents.save.success')}
-        </div>
-      )}
+        {profilesSuccess && (
+          <div className="mb-4 shrink-0 rounded-[10px] border border-[#d8ead8] bg-[#f7fcf7] p-4 text-[13px] font-medium text-[#2f7d32]">
+            {t('settings.agents.save.success')}
+          </div>
+        )}
 
-      {saveError && (
-        <div className="mb-4 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
-          {saveError}
-        </div>
-      )}
+        {saveError && (
+          <div className="mb-4 shrink-0 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
+            {saveError}
+          </div>
+        )}
 
-      {localParsedProfiles?.executors ? (
-        /* Two-column layout: agents and variants on top, config form below */
-        <div className="space-y-4">
-          {/* Two-column selector - Finder-like style, stacked on mobile */}
-          <TwoColumnPicker>
-            {/* Agents column */}
-            <TwoColumnPickerColumn
-              label={t('settings.agents.editor.agentLabel')}
-              isFirst
-            >
-              {Object.keys(localParsedProfiles.executors).map((executor) => {
-                const isDefault =
-                  config?.executor_profile?.executor === executor;
-                return (
-                  <TwoColumnPickerItem
-                    key={executor}
-                    selected={selectedExecutorType === executor}
-                    onClick={() => {
-                      setSelectedExecutorType(executor as BaseCodingAgent);
-                      // Select first config for this executor
-                      const configs = Object.keys(
-                        localParsedProfiles.executors[
-                          executor as BaseCodingAgent
-                        ] || {}
-                      );
-                      if (configs.length > 0) {
-                        setSelectedConfiguration(configs[0]);
-                      }
-                    }}
-                    leading={
-                      <AgentIcon
-                        agent={executor as BaseCodingAgent}
-                        className="size-icon-sm shrink-0"
-                      />
-                    }
-                    trailing={
-                      isDefault && (
-                        <TwoColumnPickerBadge variant="brand">
-                          {t('settings.agents.editor.isDefault')}
-                        </TwoColumnPickerBadge>
-                      )
-                    }
-                  >
-                    {toPrettyCase(executor)}
-                  </TwoColumnPickerItem>
-                );
-              })}
-            </TwoColumnPickerColumn>
-
-            {/* Variants column */}
-            <TwoColumnPickerColumn
-              label={t('settings.agents.editor.configLabel')}
-              headerAction={
-                selectedExecutorType && (
-                  <button
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] border-none bg-transparent text-[#8C8C8C] transition-colors duration-200 hover:bg-[#F3F6FA] hover:text-[#333333]"
-                    onClick={() => handleCreateConfig(selectedExecutorType)}
-                    disabled={profilesSaving}
-                    title={t('settings.agents.editor.createNew')}
-                  >
-                    <PlusIcon className="size-icon-2xs" weight="bold" />
-                  </button>
-                )
-              }
-            >
-              {selectedExecutorType &&
-              localParsedProfiles.executors[selectedExecutorType] ? (
-                Object.keys(
-                  localParsedProfiles.executors[selectedExecutorType]
-                ).map((configName) => {
+        {localParsedProfiles?.executors ? (
+          /* Two-column layout: agents and variants on top, config form below */
+          <div className="flex flex-col gap-4 pb-4">
+            {/* Two-column selector - Finder-like style, stacked on mobile */}
+            <TwoColumnPicker>
+              {/* Agents column */}
+              <TwoColumnPickerColumn
+                label={t('settings.agents.editor.agentLabel')}
+                isFirst
+              >
+                {Object.keys(localParsedProfiles.executors).map((executor) => {
                   const isDefault =
-                    config?.executor_profile?.executor ===
-                      selectedExecutorType &&
-                    config?.executor_profile?.variant === configName;
-                  const configCount = Object.keys(
-                    localParsedProfiles.executors[selectedExecutorType] || {}
-                  ).length;
+                    config?.executor_profile?.executor === executor;
                   return (
                     <TwoColumnPickerItem
-                      key={configName}
-                      selected={selectedConfiguration === configName}
-                      onClick={() => setSelectedConfiguration(configName)}
+                      key={executor}
+                      selected={selectedExecutorType === executor}
+                      onClick={() => {
+                        setSelectedExecutorType(executor as BaseCodingAgent);
+                        // Select first config for this executor
+                        const configs = Object.keys(
+                          localParsedProfiles.executors[
+                            executor as BaseCodingAgent
+                          ] || {}
+                        );
+                        if (configs.length > 0) {
+                          setSelectedConfiguration(configs[0]);
+                        }
+                      }}
+                      leading={
+                        <AgentIcon
+                          agent={executor as BaseCodingAgent}
+                          className="size-icon-sm shrink-0"
+                        />
+                      }
                       trailing={
-                        <>
-                          {isDefault && (
-                            <TwoColumnPickerBadge variant="brand">
-                              {t('settings.agents.editor.isDefault')}
-                            </TwoColumnPickerBadge>
-                          )}
-                          <ConfigActionsDropdown
-                            executorType={selectedExecutorType}
-                            configName={configName}
-                            isDefault={isDefault}
-                            configCount={configCount}
-                            onMakeDefault={handleMakeDefault}
-                            onDelete={handleDeleteConfig}
-                          />
-                        </>
+                        isDefault && (
+                          <TwoColumnPickerBadge variant="brand">
+                            {t('settings.agents.editor.isDefault')}
+                          </TwoColumnPickerBadge>
+                        )
                       }
                     >
-                      {toPrettyCase(configName)}
+                      {toPrettyCase(executor)}
                     </TwoColumnPickerItem>
                   );
-                })
-              ) : (
-                <TwoColumnPickerEmpty>
-                  {t('settings.agents.selectAgent')}
-                </TwoColumnPickerEmpty>
-              )}
-            </TwoColumnPickerColumn>
-          </TwoColumnPicker>
+                })}
+              </TwoColumnPickerColumn>
 
-          {/* Config form */}
-          {selectedExecutorType && selectedConfiguration && (
-            <div className="mt-6 border-t border-[#f5f5f5] pt-6">
-              <div className={cn(settingsPanelClassName, 'p-4')}>
-                <ExecutorConfigForm
-                  key={`${selectedExecutorType}-${selectedConfiguration}`}
-                  executor={selectedExecutorType}
-                  value={
-                    (executorsMap?.[selectedExecutorType]?.[
-                      selectedConfiguration
-                    ]?.[selectedExecutorType] as Record<string, unknown>) || {}
-                  }
-                  onChange={(formData) =>
-                    handleExecutorConfigChange(
-                      selectedExecutorType,
-                      selectedConfiguration,
-                      formData
-                    )
-                  }
-                  onSave={handleExecutorConfigSave}
-                  onDiscard={handleDiscard}
-                  disabled={profilesSaving}
-                  saving={profilesSaving}
-                  isDirty={isDirty}
-                />
+              {/* Variants column */}
+              <TwoColumnPickerColumn
+                label={t('settings.agents.editor.configLabel')}
+                headerAction={
+                  selectedExecutorType && (
+                    <button
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] border-none bg-transparent text-[#8C8C8C] transition-colors duration-200 hover:bg-[#F3F6FA] hover:text-[#333333]"
+                      onClick={() => handleCreateConfig(selectedExecutorType)}
+                      disabled={profilesSaving}
+                      title={t('settings.agents.editor.createNew')}
+                    >
+                      <PlusIcon className="size-icon-2xs" weight="bold" />
+                    </button>
+                  )
+                }
+              >
+                {selectedExecutorType &&
+                localParsedProfiles.executors[selectedExecutorType] ? (
+                  Object.keys(
+                    localParsedProfiles.executors[selectedExecutorType]
+                  ).map((configName) => {
+                    const isDefault =
+                      config?.executor_profile?.executor ===
+                        selectedExecutorType &&
+                      config?.executor_profile?.variant === configName;
+                    const configCount = Object.keys(
+                      localParsedProfiles.executors[selectedExecutorType] || {}
+                    ).length;
+                    return (
+                      <TwoColumnPickerItem
+                        key={configName}
+                        selected={selectedConfiguration === configName}
+                        onClick={() => setSelectedConfiguration(configName)}
+                        trailing={
+                          <>
+                            {isDefault && (
+                              <TwoColumnPickerBadge variant="brand">
+                                {t('settings.agents.editor.isDefault')}
+                              </TwoColumnPickerBadge>
+                            )}
+                            <ConfigActionsDropdown
+                              executorType={selectedExecutorType}
+                              configName={configName}
+                              isDefault={isDefault}
+                              configCount={configCount}
+                              onMakeDefault={handleMakeDefault}
+                              onDelete={handleDeleteConfig}
+                            />
+                          </>
+                        }
+                      >
+                        {toPrettyCase(configName)}
+                      </TwoColumnPickerItem>
+                    );
+                  })
+                ) : (
+                  <TwoColumnPickerEmpty>
+                    {t('settings.agents.selectAgent')}
+                  </TwoColumnPickerEmpty>
+                )}
+              </TwoColumnPickerColumn>
+            </TwoColumnPicker>
+
+            {/* Config form */}
+            {selectedExecutorType && selectedConfiguration && (
+              <div className="mt-2 border-t border-[#f5f5f5] pt-6">
+                <div className={cn(settingsPanelClassName, 'p-4')}>
+                  <ExecutorConfigForm
+                    key={`${selectedExecutorType}-${selectedConfiguration}`}
+                    executor={selectedExecutorType}
+                    value={
+                      (executorsMap?.[selectedExecutorType]?.[
+                        selectedConfiguration
+                      ]?.[selectedExecutorType] as Record<string, unknown>) || {}
+                    }
+                    onChange={(formData) =>
+                      handleExecutorConfigChange(
+                        selectedExecutorType,
+                        selectedConfiguration,
+                        formData
+                      )
+                    }
+                    onValidationChange={setHasValidationErrors}
+                    disabled={profilesSaving}
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20">
+        <div className="pointer-events-auto px-1">
+          <SettingsSaveBar
+            show={isDirty}
+            saving={profilesSaving}
+            saveDisabled={hasValidationErrors}
+            unsavedMessage={t('settings.agents.save.unsavedChanges')}
+            onSave={handleExecutorConfigSave}
+            onDiscard={handleDiscard}
+            layout="floating-panel"
+          />
         </div>
-      ) : null}
-    </>
+      </div>
+    </div>
   );
 }
 

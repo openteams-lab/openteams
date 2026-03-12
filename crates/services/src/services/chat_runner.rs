@@ -2973,14 +2973,18 @@ impl ChatRunner {
             return Ok(None);
         }
 
-        let mut stream = serde_json::Deserializer::from_str(trimmed).into_iter::<serde_json::Value>();
+        let mut stream =
+            serde_json::Deserializer::from_str(trimmed).into_iter::<serde_json::Value>();
         let value = match stream.next() {
             Some(Ok(value)) => value,
             Some(Err(err)) => return Err(err),
             None => return Ok(None),
         };
 
-        if !matches!(value, serde_json::Value::Array(_) | serde_json::Value::Object(_)) {
+        if !matches!(
+            value,
+            serde_json::Value::Array(_) | serde_json::Value::Object(_)
+        ) {
             return Ok(None);
         }
 
@@ -3269,6 +3273,64 @@ impl ChatRunner {
         }
     }
 
+    fn should_handle_protocol_error_as_raw_output(error: &AgentProtocolError) -> bool {
+        matches!(
+            error.code,
+            ChatProtocolNoticeCode::InvalidJson | ChatProtocolNoticeCode::NotJsonArray
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn persist_raw_agent_message_and_work_record(
+        &self,
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        run_id: Uuid,
+        agent_name: &str,
+        source_message_id: Uuid,
+        chain_depth: u32,
+        prompt_language: ResolvedPromptLanguage,
+        raw_output: &str,
+    ) -> Result<(), ChatRunnerError> {
+        let message = chat::create_message(
+            &self.db.pool,
+            session_id,
+            ChatSenderType::Agent,
+            Some(agent_id),
+            raw_output.to_string(),
+            Some(serde_json::json!({
+                "app_language": prompt_language.code,
+                "run_id": run_id,
+                "session_id": session_id,
+                "session_agent_id": session_agent_id,
+                "source_message_id": source_message_id,
+                "chain_depth": chain_depth + 1,
+                "protocol": {
+                    "type": "message",
+                    "mode": "raw_fallback"
+                }
+            })),
+        )
+        .await?;
+
+        self.emit_message_new(session_id, message.clone());
+
+        let entry = WorkRecordEntry {
+            session_id,
+            run_id,
+            session_agent_id,
+            agent_id,
+            owner: agent_name.to_string(),
+            message_type: "message",
+            content: raw_output.to_string(),
+            created_at: message.created_at.to_rfc3339(),
+        };
+        Self::append_jsonl_line(&Self::session_work_records_path(session_id), &entry).await?;
+
+        Ok(())
+    }
+
     async fn emit_protocol_error_message(
         &self,
         session_id: Uuid,
@@ -3402,6 +3464,46 @@ impl ChatRunner {
         let protocol_messages = match Self::parse_agent_protocol_messages(latest_assistant) {
             Ok(messages) => messages,
             Err(err) => {
+                if Self::should_handle_protocol_error_as_raw_output(&err) {
+                    if output_is_empty {
+                        tracing::info!(
+                            session_id = %session_id,
+                            session_agent_id = %session_agent_id,
+                            agent_id = %agent_id,
+                            run_id = %run_id,
+                            source_message_id = %source_message_id,
+                            agent_name,
+                            code = ?err.code,
+                            "skipping protocol parse error because agent output was empty"
+                        );
+                        return Ok(0);
+                    }
+
+                    tracing::info!(
+                        session_id = %session_id,
+                        session_agent_id = %session_agent_id,
+                        agent_id = %agent_id,
+                        run_id = %run_id,
+                        source_message_id = %source_message_id,
+                        agent_name,
+                        code = ?err.code,
+                        "persisting non-protocol agent output as a plain message"
+                    );
+                    self.persist_raw_agent_message_and_work_record(
+                        session_id,
+                        session_agent_id,
+                        agent_id,
+                        run_id,
+                        agent_name,
+                        source_message_id,
+                        chain_depth,
+                        prompt_language,
+                        latest_assistant,
+                    )
+                    .await?;
+                    return Ok(1);
+                }
+
                 self.emit_protocol_error_message(
                     session_id,
                     session_agent_id,
@@ -4283,7 +4385,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::{
-        AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner,
+        AgentProtocolError, AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner,
         MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON, MessageAttachmentContext, ReferenceAttachment,
         ReferenceContext, ResolvedPromptLanguage, SessionAgentSummary,
     };
@@ -4453,6 +4555,35 @@ mod tests {
         let detail = err.detail.expect("detail");
         assert!(detail.contains("line"));
         assert!(detail.contains("column"));
+    }
+
+    #[test]
+    fn should_handle_protocol_error_as_raw_output_only_for_json_shape_errors() {
+        let invalid_json = AgentProtocolError {
+            code: ChatProtocolNoticeCode::InvalidJson,
+            target: None,
+            detail: None,
+        };
+        let not_json_array = AgentProtocolError {
+            code: ChatProtocolNoticeCode::NotJsonArray,
+            target: None,
+            detail: None,
+        };
+        let missing_target = AgentProtocolError {
+            code: ChatProtocolNoticeCode::MissingSendTarget,
+            target: None,
+            detail: None,
+        };
+
+        assert!(ChatRunner::should_handle_protocol_error_as_raw_output(
+            &invalid_json
+        ));
+        assert!(ChatRunner::should_handle_protocol_error_as_raw_output(
+            &not_json_array
+        ));
+        assert!(!ChatRunner::should_handle_protocol_error_as_raw_output(
+            &missing_target
+        ));
     }
 
     #[test]

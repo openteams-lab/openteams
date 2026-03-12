@@ -64,7 +64,7 @@ pub struct CmdOverrides {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS, JsonSchema)]
 pub struct CommandBuilder {
-    /// Base executable command (e.g., "npx -y @anthropic-ai/claude-code@latest")
+    /// Base executable command (e.g., "npx -y @anthropic-ai/claude-code@2.1.74")
     pub base: String,
     /// Optional parameters to append to the base command
     pub params: Option<Vec<String>>,

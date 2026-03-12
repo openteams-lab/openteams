@@ -105,6 +105,8 @@ type WysiwygProps = {
   saveStatus?: 'idle' | 'saved';
   /** Hide the copy button in read-only mode */
   hideCopyButton?: boolean;
+  /** Preserve the last editor height after the content is cleared */
+  preserveHeightOnClear?: boolean;
 };
 
 /** Ref interface for WYSIWYGEditor, exposing imperative methods */
@@ -154,11 +156,15 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
       showStaticToolbar = false,
       saveStatus,
       hideCopyButton = false,
+      preserveHeightOnClear = false,
     }: WysiwygProps,
     ref: React.ForwardedRef<WYSIWYGEditorRef>
   ) {
     // Ref to capture the Lexical editor instance for imperative methods
     const editorInstanceRef = useRef<LexicalEditor | null>(null);
+    const contentEditableRef = useRef<HTMLDivElement | null>(null);
+    const latestValueRef = useRef(value);
+    const [preservedHeight, setPreservedHeight] = useState<number | null>(null);
 
     // Expose focus method via ref
     useImperativeHandle(ref, () => ({
@@ -166,6 +172,46 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
         editorInstanceRef.current?.focus();
       },
     }));
+
+    useEffect(() => {
+      latestValueRef.current = value;
+    }, [value]);
+
+    useEffect(() => {
+      if (!preserveHeightOnClear) {
+        setPreservedHeight(null);
+        return;
+      }
+
+      const element = contentEditableRef.current;
+      if (!element || typeof ResizeObserver === 'undefined') {
+        return;
+      }
+
+      const updatePreservedHeight = () => {
+        if (latestValueRef.current.trim() === '') {
+          return;
+        }
+
+        const nextHeight = Math.ceil(element.getBoundingClientRect().height);
+        if (nextHeight <= 0) {
+          return;
+        }
+
+        setPreservedHeight((currentHeight) =>
+          currentHeight === nextHeight ? currentHeight : nextHeight
+        );
+      };
+
+      updatePreservedHeight();
+
+      const observer = new ResizeObserver(() => {
+        updatePreservedHeight();
+      });
+      observer.observe(element);
+
+      return () => observer.disconnect();
+    }, [preserveHeightOnClear]);
 
     // Copy button state
     const [copied, setCopied] = useState(false);
@@ -306,7 +352,13 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
                   <RichTextPlugin
                     contentEditable={
                       <ContentEditable
+                        ref={contentEditableRef}
                         className={cn('outline-none', className)}
+                        style={
+                          preserveHeightOnClear && preservedHeight
+                            ? { minHeight: `${preservedHeight}px` }
+                            : undefined
+                        }
                         aria-label={
                           disabled ? 'Markdown content' : 'Markdown editor'
                         }

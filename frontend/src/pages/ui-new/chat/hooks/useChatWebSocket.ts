@@ -279,7 +279,12 @@ export function useChatWebSocket(
   const protocolNoticeTimeoutsRef = useRef<
     Map<string, ReturnType<typeof setTimeout>>
   >(new Map());
+  const onMessageReceivedRef = useRef(onMessageReceived);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    onMessageReceivedRef.current = onMessageReceived;
+  }, [onMessageReceived]);
 
   const streamingRuns = useMemo<Record<string, StreamRun>>(() => {
     if (!activeSessionId) return {};
@@ -368,7 +373,7 @@ export function useChatWebSocket(
       if (metaWarning) {
         setCompressionWarning(metaWarning);
       }
-      onMessageReceived(message);
+      onMessageReceivedRef.current(message);
       const runId = extractRunId(message.meta);
       const sessionId = message.session_id;
       if (!runId || !sessionId) return;
@@ -376,7 +381,7 @@ export function useChatWebSocket(
         removeRunFromSession(prev, sessionId, runId)
       );
     },
-    [onMessageReceived]
+    []
   );
 
   const handleAgentDelta = useCallback((payload: AgentDeltaPayload) => {
