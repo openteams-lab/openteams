@@ -19,9 +19,15 @@
     "generatedSessionTitle": "Started {{date}}",
     "sessionSection": "Sessions",
     "automation": "Automations",
+    "aiTeam": "AI Team",
     "skills": "Skills Library",
     "archivedSection": "Archived",
     "settingsInSidebar": "Settings"
+  },
+  "aiTeamPresets": {
+    "title": "AI Team Presets",
+    "description": "Manage member presets and team presets in one place.",
+    "close": "Close AI Team presets"
   },
   "header": {
     "untitledSession": "Untitled session",
@@ -72,7 +78,7 @@
     "addAttachment": "Add attachment files",
     "send": "Send"
   },
-"message": {
+  "message": {
     "quote": "Quote",
     "copy": "Copy",
     "regenerate": "Regenerate",
@@ -185,10 +191,28 @@
     "presetTeamSection": "Teams",
     "addFromMemberPreset": "Add member preset",
     "importTeamPreset": "Import team preset",
-    "noEnabledPresets": "No enabled presets. Configure them in Settings -> Presets.",
+    "noEnabledPresets": "No enabled presets. Configure them in AI Team.",
     "presetSearchPlaceholder": "Search preset AI or teams",
     "noPresetSearchResults": "No matching preset AI or teams.",
     "noPresetSearchResultsHint": "Try another keyword or switch to Custom AI.",
+    "teamProtocol": {
+      "title": "Team Protocol",
+      "guidelineLabel": "Team Guideline",
+      "edit": "Edit team guideline",
+      "loading": "Loading team protocol...",
+      "loadError": "Failed to load team protocol.",
+      "saveError": "Failed to save team protocol.",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "empty": "Team protocol injection is disabled.",
+      "modal": {
+        "title": "Edit Team Guideline",
+        "description": "Update the collaboration rules injected into every AI member.",
+        "placeholder": "Describe how the team should collaborate.",
+        "enable": "Inject this protocol into every AI member system prompt",
+        "close": "Close team protocol editor"
+      }
+    },
     "importPreview": {
       "title": "Import Team: {{teamName}}",
       "description": "The following members will be added to this session:",

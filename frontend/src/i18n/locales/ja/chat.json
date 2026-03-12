@@ -184,10 +184,28 @@
     "presetTeamSection": "チーム",
     "addFromMemberPreset": "メンバープリセットを追加",
     "importTeamPreset": "チームプリセットをインポート",
-    "noEnabledPresets": "有効なプリセットがありません。設定 -> プリセットで設定してください。",
+    "noEnabledPresets": "???????????????AI ?????????????",
     "presetSearchPlaceholder": "プリセット AI またはチームを検索",
     "noPresetSearchResults": "一致するプリセット AI またはチームがありません。",
     "noPresetSearchResultsHint": "別のキーワードを試すか、カスタム AI に切り替えてください。",
+    "teamProtocol": {
+      "title": "チームプロトコル",
+      "guidelineLabel": "チーム方針",
+      "edit": "チーム方針を編集",
+      "loading": "チームプロトコルを読み込み中...",
+      "loadError": "チームプロトコルの読み込みに失敗しました。",
+      "saveError": "チームプロトコルの保存に失敗しました。",
+      "enabled": "有効",
+      "disabled": "無効",
+      "empty": "チームプロトコルの注入は無効です。",
+      "modal": {
+        "title": "チーム方針を編集",
+        "description": "各 AI メンバーに注入される共同作業ルールを更新します。",
+        "placeholder": "チームの共同作業ルールを入力してください。",
+        "enable": "このプロトコルを各 AI メンバーのシステムプロンプトに注入する",
+        "close": "チームプロトコルエディターを閉じる"
+      }
+    },
     "importPreview": {
       "title": "チームをインポート: {{teamName}}",
       "description": "次のメンバーがこのセッションに追加されます:",

@@ -26,9 +26,7 @@
         "organizations": "Organization Settings",
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "プロジェクト",
-        "remote-projectsDesc": "プロジェクトを管理",
-        "presets": "プリセット",
-        "presetsDesc": "AIメンバーとチームのプリセットテンプレート"
+        "remote-projectsDesc": "プロジェクトを管理"
       }
     },
     "general": {

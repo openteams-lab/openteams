@@ -4,16 +4,14 @@ import { XIcon } from '@phosphor-icons/react';
 import { GeneralSettingsSectionContent } from './GeneralSettingsSection';
 import { AgentsSettingsSectionContent } from './AgentsSettingsSection';
 import { McpSettingsSectionContent } from './McpSettingsSection';
-import { ChatPresetsSettingsSectionContent } from './ChatPresetsSettingsSection';
 
-export type SettingsSectionType = 'general' | 'agents' | 'mcp' | 'presets';
+export type SettingsSectionType = 'general' | 'agents' | 'mcp';
 
 // Section-specific initial state types
 export type SettingsSectionInitialState = {
   general: undefined;
   agents: { executor?: string; variant?: string } | undefined;
   mcp: undefined;
-  presets: undefined;
 };
 
 interface SettingsSectionProps {
@@ -32,8 +30,6 @@ export function SettingsSection({ type, onClose }: SettingsSectionProps) {
         return <AgentsSettingsSectionContent />;
       case 'mcp':
         return <McpSettingsSectionContent />;
-      case 'presets':
-        return <ChatPresetsSettingsSectionContent />;
       default:
         return <GeneralSettingsSectionContent />;
     }

@@ -26,9 +26,7 @@
         "organizations": "组织设置",
         "organizationsDesc": "管理组织成员和权限",
         "remote-projects": "项目",
-        "remote-projectsDesc": "管理项目",
-        "presets": "预设",
-        "presetsDesc": "AI 成员和团队预设模板"
+        "remote-projectsDesc": "管理项目"
       }
     },
     "general": {

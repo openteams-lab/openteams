@@ -26,9 +26,7 @@
         "organizations": "Organization Settings",
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "Proyectos",
-        "remote-projectsDesc": "Gestionar proyectos",
-        "presets": "Preajustes",
-        "presetsDesc": "Plantillas predefinidas de miembros y equipos de IA"
+        "remote-projectsDesc": "Gestionar proyectos"
       }
     },
     "general": {
