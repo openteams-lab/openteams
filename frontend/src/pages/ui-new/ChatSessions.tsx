@@ -91,6 +91,7 @@ import { PromptEditorModal } from './chat/components/PromptEditorModal';
 import { ConfirmModal } from './chat/components/ConfirmModal';
 import { FilePreviewModal } from './chat/components/FilePreviewModal';
 import { SkillsPanel } from './chat/components/SkillsPanel';
+import { AiTeamPresetsModal } from './chat/components/AiTeamPresetsModal';
 import { ChatSystemMessage } from '@/components/ui-new/primitives/conversation/ChatSystemMessage';
 import type { ChatProtocolNotice } from './chat/hooks/useChatWebSocket';
 
@@ -907,6 +908,7 @@ export function ChatSessions() {
   const [clock, setClock] = useState(() => Date.now());
   const [stoppingAgents, setStoppingAgents] = useState<Set<string>>(new Set());
   const [showArchived, setShowArchived] = useState(false);
+  const [isAiTeamPresetsOpen, setIsAiTeamPresetsOpen] = useState(false);
   const [isSkillsPanelOpen, setIsSkillsPanelOpen] = useState(false);
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(
     new Set()
@@ -3144,12 +3146,13 @@ const handleMouseMove = (e: MouseEvent) => {
           navigate(`/chat/${id}`);
         }}
         onCreateSession={() => {
-            setIsSkillsPanelOpen(false);
-            createSession.mutate();
-          }}
+          setIsSkillsPanelOpen(false);
+          createSession.mutate();
+        }}
         isCreating={createSession.isPending}
-        onOpenAutomation={() => {
-          SettingsDialog.show({ initialSection: 'presets' });
+        onOpenAiTeam={() => {
+          setIsSkillsPanelOpen(false);
+          setIsAiTeamPresetsOpen(true);
         }}
         onOpenSkills={() => {
           if (isSkillsPanelOpen) {
@@ -3164,7 +3167,8 @@ const handleMouseMove = (e: MouseEvent) => {
         onOpenSettings={() => {
           SettingsDialog.show();
         }}
-isSkillsActive={isSkillsPanelOpen}
+        isAiTeamActive={isAiTeamPresetsOpen}
+        isSkillsActive={isSkillsPanelOpen}
         width={leftSidebarWidth}
         isCollapsed={isLeftSidebarCollapsed}
         onToggleCollapsed={handleToggleLeftSidebar}
@@ -3700,6 +3704,11 @@ isDeletingMessages={isDeletingMessages}
         leftOffset={skillsPanelLeftOffset}
         availableRunnerTypes={enabledRunnerTypes}
         onClose={() => setIsSkillsPanelOpen(false)}
+      />
+
+      <AiTeamPresetsModal
+        isOpen={isAiTeamPresetsOpen}
+        onClose={() => setIsAiTeamPresetsOpen(false)}
       />
 
       {/* Workspace Drawer */}

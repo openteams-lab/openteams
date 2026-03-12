@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 pub mod editor;
+pub(crate) mod preset_loader;
 mod versions;
 
 pub use editor::EditorOpenError;

@@ -4,7 +4,6 @@ import {
   BoxArrowDownIcon,
   BroomIcon,
   ChatCircleDotsIcon,
-  ClockIcon,
   FileArchiveIcon,
   GearSixIcon,
   ListIcon,
@@ -13,6 +12,7 @@ import {
   SidebarSimpleIcon,
   SquaresFourIcon,
   TrashIcon,
+  UsersThreeIcon,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import type { ChatSession } from 'shared/types';
@@ -39,9 +39,10 @@ export interface SessionListSidebarProps {
   onSelectSession: (sessionId: string) => void;
   onCreateSession: () => void;
   isCreating: boolean;
-  onOpenAutomation: () => void;
+  onOpenAiTeam: () => void;
   onOpenSkills: () => void;
   onOpenSettings: () => void;
+  isAiTeamActive?: boolean;
   isSkillsActive?: boolean;
   width: number;
   isCollapsed: boolean;
@@ -65,9 +66,10 @@ export function SessionListSidebar({
   onSelectSession,
   onCreateSession,
   isCreating,
-  onOpenAutomation,
+  onOpenAiTeam,
   onOpenSkills,
   onOpenSettings,
+  isAiTeamActive = false,
   isSkillsActive = false,
   width,
   isCollapsed,
@@ -322,16 +324,19 @@ const handleContextMenu = (e: React.MouseEvent, session: ChatSession) => {
             </button>
             <button
               type="button"
-              onClick={onOpenAutomation}
-              className="chat-session-function-btn"
-              aria-label={t('sidebar.automation', {
-                defaultValue: 'Automations',
+              onClick={onOpenAiTeam}
+              className={cn(
+                'chat-session-function-btn',
+                isAiTeamActive && 'active'
+              )}
+              aria-label={t('sidebar.aiTeam', {
+                defaultValue: 'AI Team',
               })}
-              title={t('sidebar.automation', { defaultValue: 'Automations' })}
+              title={t('sidebar.aiTeam', { defaultValue: 'AI Team' })}
             >
-              <ClockIcon className="chat-session-function-icon size-icon-sm" />
+              <UsersThreeIcon className="chat-session-function-icon size-icon-sm" />
               <span>
-                {t('sidebar.automation', { defaultValue: 'Automations' })}
+                {t('sidebar.aiTeam', { defaultValue: 'AI Team' })}
               </span>
             </button>
             <button

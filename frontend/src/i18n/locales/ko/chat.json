@@ -184,10 +184,28 @@
     "presetTeamSection": "팀",
     "addFromMemberPreset": "멤버 프리셋 추가",
     "importTeamPreset": "팀 프리셋 가져오기",
-    "noEnabledPresets": "활성화된 프리셋이 없습니다. 설정 -> 프리셋에서 구성하세요.",
+    "noEnabledPresets": "???? ???? ????. AI ??? ?????.",
     "presetSearchPlaceholder": "프리셋 AI 또는 팀 검색",
     "noPresetSearchResults": "일치하는 프리셋 AI 또는 팀이 없습니다.",
     "noPresetSearchResultsHint": "다른 키워드를 시도하거나 사용자 정의 AI로 전환하세요.",
+    "teamProtocol": {
+      "title": "팀 프로토콜",
+      "guidelineLabel": "팀 가이드라인",
+      "edit": "팀 가이드라인 편집",
+      "loading": "팀 프로토콜을 불러오는 중...",
+      "loadError": "팀 프로토콜을 불러오지 못했습니다.",
+      "saveError": "팀 프로토콜을 저장하지 못했습니다.",
+      "enabled": "활성화됨",
+      "disabled": "비활성화됨",
+      "empty": "팀 프로토콜 주입이 비활성화되어 있습니다.",
+      "modal": {
+        "title": "팀 가이드라인 편집",
+        "description": "모든 AI 멤버에 주입되는 협업 규칙을 수정합니다.",
+        "placeholder": "팀이 어떻게 협업해야 하는지 설명하세요.",
+        "enable": "이 프로토콜을 모든 AI 멤버의 시스템 프롬프트에 주입",
+        "close": "팀 프로토콜 편집기 닫기"
+      }
+    },
     "importPreview": {
       "title": "팀 가져오기: {{teamName}}",
       "description": "다음 멤버가 이 세션에 추가됩니다:",
