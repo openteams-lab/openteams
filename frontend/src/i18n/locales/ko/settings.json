@@ -26,9 +26,7 @@
         "organizations": "Organization Settings",
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "프로젝트",
-        "remote-projectsDesc": "프로젝트 관리",
-        "presets": "프리셋",
-        "presetsDesc": "AI 멤버 및 팀 프리셋 템플릿"
+        "remote-projectsDesc": "프로젝트 관리"
       }
     },
     "general": {

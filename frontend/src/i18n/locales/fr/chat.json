@@ -184,10 +184,28 @@
     "presetTeamSection": "Équipes",
     "addFromMemberPreset": "Ajouter un préréglage de membre",
     "importTeamPreset": "Importer un préréglage d'équipe",
-    "noEnabledPresets": "Aucun préréglage activé. Configurez-les dans Paramètres -> Préréglages.",
+    "noEnabledPresets": "Aucun pr?r?glage activ?. Configurez-les dans ?quipe IA.",
     "presetSearchPlaceholder": "Rechercher des IA préréglées ou des équipes",
     "noPresetSearchResults": "Aucune IA préréglée ou équipe correspondante.",
     "noPresetSearchResultsHint": "Essayez un autre mot-clé ou passez à une IA personnalisée.",
+    "teamProtocol": {
+      "title": "Protocole d'équipe",
+      "guidelineLabel": "Règle d'équipe",
+      "edit": "Modifier la règle d'équipe",
+      "loading": "Chargement du protocole d'équipe...",
+      "loadError": "Échec du chargement du protocole d'équipe.",
+      "saveError": "Échec de l'enregistrement du protocole d'équipe.",
+      "enabled": "Activé",
+      "disabled": "Désactivé",
+      "empty": "L'injection du protocole d'équipe est désactivée.",
+      "modal": {
+        "title": "Modifier la règle d'équipe",
+        "description": "Mettez à jour les règles de collaboration injectées dans chaque membre IA.",
+        "placeholder": "Décrivez comment l'équipe doit collaborer.",
+        "enable": "Injecter ce protocole dans le prompt système de chaque membre IA",
+        "close": "Fermer l'éditeur du protocole d'équipe"
+      }
+    },
     "importPreview": {
       "title": "Importer l'équipe : {{teamName}}",
       "description": "Les membres suivants seront ajoutés à cette session :",

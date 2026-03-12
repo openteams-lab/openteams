@@ -556,7 +556,11 @@ members: Array<ChatMemberPreset>,
 /**
  * List of team preset templates
  */
-teams: Array<ChatTeamPreset>, };
+teams: Array<ChatTeamPreset>, 
+/**
+ * Team collaboration protocol content; empty string disables injection
+ */
+team_protocol: string | null, };
 
 export type ChatMemberPreset = { 
 /**
@@ -621,6 +625,8 @@ is_builtin: boolean,
  * Whether this preset is enabled (visible for import)
  */
 enabled: boolean, };
+
+export type TeamProtocolConfig = { content: string, enabled: boolean, };
 
 export type GitBranch = { name: string, is_current: boolean, is_remote: boolean, last_commit_date: Date, };
 

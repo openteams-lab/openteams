@@ -184,10 +184,28 @@
     "presetTeamSection": "團隊",
     "addFromMemberPreset": "新增成員預設",
     "importTeamPreset": "匯入團隊預設",
-    "noEnabledPresets": "沒有已啟用的預設。請在設定 -> 預設中進行設定。",
+    "noEnabledPresets": "??????????? AI ????????",
     "presetSearchPlaceholder": "搜尋預設 AI 或團隊",
     "noPresetSearchResults": "沒有符合的預設 AI 或團隊。",
     "noPresetSearchResultsHint": "試試其他關鍵字，或切換到自訂AI。",
+    "teamProtocol": {
+      "title": "團隊協議",
+      "guidelineLabel": "團隊準則",
+      "edit": "編輯團隊準則",
+      "loading": "正在載入團隊協議...",
+      "loadError": "載入團隊協議失敗。",
+      "saveError": "儲存團隊協議失敗。",
+      "enabled": "已啟用",
+      "disabled": "已停用",
+      "empty": "團隊協議注入目前已停用。",
+      "modal": {
+        "title": "編輯團隊準則",
+        "description": "更新會注入到每個 AI 成員中的協作規則。",
+        "placeholder": "描述團隊應如何協作。",
+        "enable": "將此協議注入到每個 AI 成員的系統提示詞中",
+        "close": "關閉團隊協議編輯器"
+      }
+    },
     "importPreview": {
       "title": "匯入團隊：{{teamName}}",
       "description": "以下成員將加入此會話：",
