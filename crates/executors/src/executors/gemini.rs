@@ -39,8 +39,11 @@ pub struct Gemini {
 }
 
 impl Gemini {
+    const BASE_COMMAND: &'static str = "npx -y @google/gemini-cli@0.33.0";
+    const MAX_RESUME_PROMPT_BYTES: usize = 160 * 1024;
+
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
-        let mut builder = CommandBuilder::new("npx -y @google/gemini-cli@latest");
+        let mut builder = CommandBuilder::new(Self::BASE_COMMAND);
 
         if let Some(model) = &self.model {
             builder = builder.extend_params(["--model", model.as_str()]);
@@ -69,7 +72,8 @@ impl StandardCodingAgentExecutor for Gemini {
         prompt: &str,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let harness = AcpAgentHarness::new();
+        let harness =
+            AcpAgentHarness::new().with_max_resume_prompt_bytes(Self::MAX_RESUME_PROMPT_BYTES);
         let combined_prompt = self.append_prompt.combine_prompt(prompt);
         let gemini_command = self.build_command_builder()?.build_initial()?;
         let approvals = if self.yolo.unwrap_or(false) {
@@ -97,7 +101,8 @@ impl StandardCodingAgentExecutor for Gemini {
         _reset_to_message_id: Option<&str>,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let harness = AcpAgentHarness::new();
+        let harness =
+            AcpAgentHarness::new().with_max_resume_prompt_bytes(Self::MAX_RESUME_PROMPT_BYTES);
         let combined_prompt = self.append_prompt.combine_prompt(prompt);
         let gemini_command = self.build_command_builder()?.build_follow_up(&[])?;
         let approvals = if self.yolo.unwrap_or(false) {
