@@ -268,7 +268,7 @@ export function ChatMessageItem({
             )}
           </button>
         )}
-<div className="relative">
+<div className={cn('relative', !isUser && 'w-full max-w-[680px]')}>
           <ChatEntryContainer
           variant={isUser ? 'user' : 'system'}
           title={isUser ? undefined : senderLabel}
@@ -300,7 +300,7 @@ headerRight={
             'chat-session-message-card max-w-full shadow-sm rounded-3xl',
             isUser
               ? 'w-[600px] chat-session-message-card-self is-user-message ml-auto'
-              : 'w-[600px] chat-session-message-card-agent is-agent-message',
+              : 'chat-session-message-card-agent is-agent-message',
             isCleanupMode && isSelected && 'ring-2 ring-[#EF4444]'
           )}
           headerClassName={cn(
