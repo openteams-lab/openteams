@@ -423,7 +423,7 @@ export function SettingsSaveBar({
   unsavedMessage?: string;
   onSave: () => void;
   onDiscard?: () => void;
-  layout?: 'section' | 'panel';
+  layout?: 'section' | 'panel' | 'floating-panel';
 }) {
   const { t } = useTranslation(['settings', 'common']);
 
@@ -432,8 +432,15 @@ export function SettingsSaveBar({
   const wrapperClassName =
     layout === 'panel'
       ? 'mt-6 -mx-4 border-t border-[#f5f5f5] bg-white px-4 pt-4'
-      : 'mt-8 -mx-8 sticky bottom-0 border-t border-[#f5f5f5] bg-white px-8 py-4';
-  const innerClassName = layout === 'panel' ? 'pb-0' : '';
+      : layout === 'floating-panel'
+        ? 'rounded-[14px] border border-[#E8EEF5] bg-white/95 p-3 shadow-[0_18px_40px_rgba(15,23,42,0.12)] backdrop-blur-sm'
+        : 'mt-8 -mx-8 sticky bottom-0 border-t border-[#f5f5f5] bg-white px-8 py-4';
+  const innerClassName =
+    layout === 'floating-panel'
+      ? 'flex-col gap-3 sm:flex-row sm:items-center'
+      : layout === 'panel'
+        ? 'pb-0'
+        : '';
 
   return (
     <div className={wrapperClassName}>

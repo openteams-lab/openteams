@@ -49,11 +49,14 @@ use crate::{
     stdout_dup::create_stdout_pipe_writer,
 };
 
+const CLAUDE_CODE_ROUTER_BASE_COMMAND: &str = "npx -y @musistudio/claude-code-router@2.0.0 code";
+const CLAUDE_CODE_BASE_COMMAND: &str = "npx -y @anthropic-ai/claude-code@2.1.74";
+
 fn base_command(claude_code_router: bool) -> &'static str {
     if claude_code_router {
-        "npx -y @musistudio/claude-code-router@latest code"
+        CLAUDE_CODE_ROUTER_BASE_COMMAND
     } else {
-        "npx -y @anthropic-ai/claude-code@latest"
+        CLAUDE_CODE_BASE_COMMAND
     }
 }
 

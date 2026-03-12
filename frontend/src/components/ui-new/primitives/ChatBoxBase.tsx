@@ -201,6 +201,7 @@ export function ChatBoxBase({
           onPasteFiles={onPasteFiles}
           localImages={localImages}
           sendShortcut={config?.send_message_shortcut}
+          preserveHeightOnClear
         />
 
         {/* Footer - Controls */}

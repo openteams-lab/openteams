@@ -12,13 +12,17 @@ use async_trait::async_trait;
 use codex_app_server_protocol::{
     ApplyPatchApprovalResponse, ClientInfo, ClientNotification, ClientRequest,
     CommandExecutionApprovalDecision, CommandExecutionRequestApprovalResponse,
-    ExecCommandApprovalResponse, FileChangeApprovalDecision, FileChangeRequestApprovalResponse,
-    GetAuthStatusParams, GetAuthStatusResponse, InitializeParams, InitializeResponse, JSONRPCError,
-    JSONRPCNotification, JSONRPCRequest, JSONRPCResponse, ListMcpServerStatusParams,
-    ListMcpServerStatusResponse, RequestId, ReviewStartParams, ReviewStartResponse, ReviewTarget,
-    ServerNotification, ServerRequest, ThreadItem, ThreadResumeParams, ThreadResumeResponse,
-    ThreadStartParams, ThreadStartResponse, TurnCompletedNotification, TurnStartParams,
-    TurnStartResponse, TurnStatus, UserInput,
+    DynamicToolCallOutputContentItem, DynamicToolCallResponse, ExecCommandApprovalResponse,
+    FileChangeApprovalDecision, FileChangeRequestApprovalResponse, GetAuthStatusParams,
+    GetAuthStatusResponse, GrantedPermissionProfile, InitializeCapabilities, InitializeParams,
+    InitializeResponse, JSONRPCError, JSONRPCErrorError, JSONRPCNotification, JSONRPCRequest,
+    JSONRPCResponse, ListMcpServerStatusParams, ListMcpServerStatusResponse,
+    McpServerElicitationAction, McpServerElicitationRequestResponse, PermissionGrantScope,
+    PermissionsRequestApprovalResponse, RequestId, ReviewStartParams, ReviewStartResponse,
+    ReviewTarget, ServerNotification, ServerRequest, ThreadItem, ThreadResumeParams,
+    ThreadResumeResponse, ThreadStartParams, ThreadStartResponse, ToolRequestUserInputAnswer,
+    ToolRequestUserInputResponse, TurnCompletedNotification, TurnStartParams, TurnStartResponse,
+    TurnStatus, UserInput,
 };
 use codex_protocol::protocol::ReviewDecision;
 use serde::{Serialize, de::DeserializeOwned};
@@ -99,6 +103,10 @@ impl AppServerClient {
                     title: None,
                     version: env!("CARGO_PKG_VERSION").to_string(),
                 },
+                capabilities: Some(InitializeCapabilities {
+                    experimental_api: true,
+                    opt_out_notification_methods: None,
+                }),
             },
         };
 
@@ -142,13 +150,7 @@ impl AppServerClient {
                     text: message,
                     text_elements: Vec::new(),
                 }],
-                cwd: None,
-                approval_policy: None,
-                sandbox_policy: None,
-                model: None,
-                effort: None,
-                summary: None,
-                output_schema: None,
+                ..Default::default()
             },
         };
         self.send_request(request, "turn/start").await
@@ -339,6 +341,58 @@ impl AppServerClient {
                 }
                 Ok(())
             }
+            ServerRequest::ToolRequestUserInput { request_id, params } => {
+                let answers = params
+                    .questions
+                    .into_iter()
+                    .map(|question| {
+                        (
+                            question.id,
+                            ToolRequestUserInputAnswer {
+                                answers: Vec::new(),
+                            },
+                        )
+                    })
+                    .collect();
+                let response = ToolRequestUserInputResponse { answers };
+                send_server_response(peer, request_id, response).await
+            }
+            ServerRequest::McpServerElicitationRequest { request_id, .. } => {
+                let response = McpServerElicitationRequestResponse {
+                    action: McpServerElicitationAction::Decline,
+                    content: None,
+                    meta: None,
+                };
+                send_server_response(peer, request_id, response).await
+            }
+            ServerRequest::PermissionsRequestApproval { request_id, .. } => {
+                let response = PermissionsRequestApprovalResponse {
+                    permissions: GrantedPermissionProfile::default(),
+                    scope: PermissionGrantScope::Turn,
+                };
+                send_server_response(peer, request_id, response).await
+            }
+            ServerRequest::DynamicToolCall { request_id, params } => {
+                let response = DynamicToolCallResponse {
+                    content_items: vec![DynamicToolCallOutputContentItem::InputText {
+                        text: format!(
+                            "Dynamic tool `{}` is not supported by this executor.",
+                            params.tool
+                        ),
+                    }],
+                    success: false,
+                };
+                send_server_response(peer, request_id, response).await
+            }
+            ServerRequest::ChatgptAuthTokensRefresh { request_id, .. } => {
+                send_server_error(
+                    peer,
+                    request_id,
+                    -32000,
+                    "chatgpt auth token refresh is not supported by this executor",
+                )
+                .await
+            }
         }
     }
 
@@ -440,13 +494,7 @@ impl AppServerClient {
                     text: message,
                     text_elements: Vec::new(),
                 }],
-                cwd: None,
-                approval_policy: None,
-                sandbox_policy: None,
-                model: None,
-                effort: None,
-                summary: None,
-                output_schema: None,
+                ..Default::default()
             },
         };
         tokio::spawn(async move {
@@ -589,6 +637,85 @@ impl AppServerClient {
             .await
             .insert(item_id.to_string(), item);
     }
+
+    async fn handle_notification(
+        &self,
+        raw: &str,
+        notification: JSONRPCNotification,
+    ) -> Result<bool, ExecutorError> {
+        let parsed_notification = serde_json::from_str::<ServerNotification>(raw).ok();
+        if let Some(server_notification) = parsed_notification.as_ref() {
+            self.cache_notification_item(server_notification).await;
+        }
+
+        let raw = Cow::Borrowed(raw);
+        self.log_writer.log_raw(&raw).await?;
+
+        if let Some(server_notification) = parsed_notification {
+            if let ServerNotification::TurnCompleted(TurnCompletedNotification {
+                thread_id,
+                turn,
+            }) = server_notification
+            {
+                let has_finished = matches!(
+                    turn.status,
+                    TurnStatus::Completed | TurnStatus::Interrupted | TurnStatus::Failed
+                );
+
+                if has_finished
+                    && matches!(turn.status, TurnStatus::Completed)
+                    && self.commit_reminder
+                    && !self.commit_reminder_sent.swap(true, Ordering::SeqCst)
+                    && let status = self.repo_context.check_uncommitted_changes().await
+                    && !status.is_empty()
+                {
+                    let prompt = format!("{}\n{}", self.commit_reminder_prompt, status);
+                    self.spawn_user_message(thread_id, prompt);
+                    return Ok(false);
+                }
+
+                if self.flush_pending_feedback().await {
+                    return Ok(false);
+                }
+
+                // The app-server emits `turn/completed` before the legacy bridge finishes
+                // flushing `item/completed`, `codex/event/agent_message`, and finally
+                // `codex/event/task_complete`. Stopping here truncates the final answer.
+                return Ok(false);
+            }
+
+            return Ok(false);
+        }
+
+        let method = notification.method.as_str();
+        if !method.starts_with("codex/event") {
+            return Ok(false);
+        }
+
+        if method.ends_with("turn_aborted") {
+            tracing::debug!("codex turn aborted; flushing feedback queue");
+            self.flush_pending_feedback().await;
+            return Ok(false);
+        }
+
+        let has_finished = method
+            .strip_prefix("codex/event/")
+            .is_some_and(|suffix| suffix == "task_complete");
+
+        if has_finished
+            && self.commit_reminder
+            && !self.commit_reminder_sent.swap(true, Ordering::SeqCst)
+            && let status = self.repo_context.check_uncommitted_changes().await
+            && !status.is_empty()
+            && let Some(thread_id) = self.thread_id.lock().await.clone()
+        {
+            let prompt = format!("{}\n{}", self.commit_reminder_prompt, status);
+            self.spawn_user_message(thread_id, prompt);
+            return Ok(false);
+        }
+
+        Ok(has_finished)
+    }
 }
 
 #[async_trait]
@@ -637,87 +764,7 @@ impl JsonRpcCallbacks for AppServerClient {
         raw: &str,
         notification: JSONRPCNotification,
     ) -> Result<bool, ExecutorError> {
-        let parsed_notification = serde_json::from_str::<ServerNotification>(raw).ok();
-        if let Some(server_notification) = parsed_notification.as_ref() {
-            self.cache_notification_item(server_notification).await;
-        }
-
-        let raw = if let Some(mut server_notification) = parsed_notification.clone() {
-            if let ServerNotification::SessionConfigured(session_configured) =
-                &mut server_notification
-            {
-                // history can be large, which might get truncated during transmission, corrupting the JSON line and losing valuable session and model information.
-                session_configured.initial_messages = None;
-                Cow::Owned(serde_json::to_string(&server_notification)?)
-            } else {
-                Cow::Borrowed(raw)
-            }
-        } else {
-            Cow::Borrowed(raw)
-        };
-        self.log_writer.log_raw(&raw).await?;
-
-        if let Some(server_notification) = parsed_notification {
-            if let ServerNotification::TurnCompleted(TurnCompletedNotification {
-                thread_id,
-                turn,
-            }) = server_notification
-            {
-                let has_finished = matches!(
-                    turn.status,
-                    TurnStatus::Completed | TurnStatus::Interrupted | TurnStatus::Failed
-                );
-
-                if has_finished
-                    && matches!(turn.status, TurnStatus::Completed)
-                    && self.commit_reminder
-                    && !self.commit_reminder_sent.swap(true, Ordering::SeqCst)
-                    && let status = self.repo_context.check_uncommitted_changes().await
-                    && !status.is_empty()
-                {
-                    let prompt = format!("{}\n{}", self.commit_reminder_prompt, status);
-                    self.spawn_user_message(thread_id, prompt);
-                    return Ok(false);
-                }
-
-                if self.flush_pending_feedback().await {
-                    return Ok(false);
-                }
-
-                return Ok(has_finished);
-            }
-
-            return Ok(false);
-        }
-
-        let method = notification.method.as_str();
-        if !method.starts_with("codex/event") {
-            return Ok(false);
-        }
-
-        if method.ends_with("turn_aborted") {
-            tracing::debug!("codex turn aborted; flushing feedback queue");
-            self.flush_pending_feedback().await;
-            return Ok(false);
-        }
-
-        let has_finished = method
-            .strip_prefix("codex/event/")
-            .is_some_and(|suffix| suffix == "task_complete");
-
-        if has_finished
-            && self.commit_reminder
-            && !self.commit_reminder_sent.swap(true, Ordering::SeqCst)
-            && let status = self.repo_context.check_uncommitted_changes().await
-            && !status.is_empty()
-            && let Some(thread_id) = self.thread_id.lock().await.clone()
-        {
-            let prompt = format!("{}\n{}", self.commit_reminder_prompt, status);
-            self.spawn_user_message(thread_id, prompt);
-            return Ok(false);
-        }
-
-        Ok(has_finished)
+        self.handle_notification(raw, notification).await
     }
 
     async fn on_non_json(&self, raw: &str) -> Result<(), ExecutorError> {
@@ -764,12 +811,34 @@ fn thread_item_id(item: &ThreadItem) -> Option<&str> {
         | ThreadItem::CommandExecution { id, .. }
         | ThreadItem::FileChange { id, .. }
         | ThreadItem::McpToolCall { id, .. }
+        | ThreadItem::DynamicToolCall { id, .. }
         | ThreadItem::CollabAgentToolCall { id, .. }
         | ThreadItem::WebSearch { id, .. }
         | ThreadItem::ImageView { id, .. }
+        | ThreadItem::ImageGeneration { id, .. }
+        | ThreadItem::Plan { id, .. }
         | ThreadItem::EnteredReviewMode { id, .. }
-        | ThreadItem::ExitedReviewMode { id, .. } => Some(id.as_str()),
+        | ThreadItem::ExitedReviewMode { id, .. }
+        | ThreadItem::ContextCompaction { id, .. } => Some(id.as_str()),
     }
+}
+
+async fn send_server_error(
+    peer: &JsonRpcPeer,
+    request_id: RequestId,
+    code: i64,
+    message: impl Into<String>,
+) -> Result<(), ExecutorError> {
+    let payload = JSONRPCError {
+        id: request_id,
+        error: JSONRPCErrorError {
+            code,
+            data: None,
+            message: message.into(),
+        },
+    };
+
+    peer.send(&payload).await
 }
 
 #[derive(Clone)]
@@ -793,5 +862,80 @@ impl LogWriter {
         guard.write_all(b"\n").await.map_err(ExecutorError::Io)?;
         guard.flush().await.map_err(ExecutorError::Io)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use codex_app_server_protocol::{
+        JSONRPCNotification, ServerNotification, Turn, TurnCompletedNotification, TurnStatus,
+    };
+    use tokio::io::sink;
+    use tokio_util::sync::CancellationToken;
+
+    use super::{AppServerClient, LogWriter};
+    use crate::env::RepoContext;
+
+    fn build_client() -> std::sync::Arc<AppServerClient> {
+        AppServerClient::new(
+            LogWriter::new(sink()),
+            None,
+            true,
+            RepoContext::default(),
+            false,
+            String::new(),
+            CancellationToken::new(),
+        )
+    }
+
+    #[tokio::test]
+    async fn turn_completed_does_not_finish_stream() {
+        let client = build_client();
+        let raw = serde_json::to_string(&ServerNotification::TurnCompleted(
+            TurnCompletedNotification {
+                thread_id: "thread-1".to_string(),
+                turn: Turn {
+                    id: "turn-1".to_string(),
+                    items: Vec::new(),
+                    status: TurnStatus::Completed,
+                    error: None,
+                },
+            },
+        ))
+        .unwrap();
+        let notification: JSONRPCNotification = serde_json::from_str(&raw).unwrap();
+
+        let should_finish = client
+            .handle_notification(&raw, notification)
+            .await
+            .unwrap();
+
+        assert!(!should_finish);
+    }
+
+    #[tokio::test]
+    async fn task_complete_finishes_stream() {
+        let client = build_client();
+        let raw = serde_json::json!({
+            "method": "codex/event/task_complete",
+            "params": {
+                "id": "turn-1",
+                "msg": {
+                    "type": "task_complete",
+                    "turn_id": "turn-1",
+                    "last_agent_message": "final output"
+                },
+                "conversationId": "thread-1"
+            }
+        })
+        .to_string();
+        let notification: JSONRPCNotification = serde_json::from_str(&raw).unwrap();
+
+        let should_finish = client
+            .handle_notification(&raw, notification)
+            .await
+            .unwrap();
+
+        assert!(should_finish);
     }
 }

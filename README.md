@@ -51,10 +51,10 @@ npx agents-chatgroup
 
 | Agent | Install |
 |-------|---------|
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm i -g @anthropic-ai/claude-code` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @google/gemini-cli` |
-| [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex` |
-| [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code@latest` |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm i -g @anthropic-ai/claude-code@2.1.74` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @google/gemini-cli@0.33.0` |
+| [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex@0.114.0` |
+| [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code@0.12.1` |
 
 📚 [Guides for Installing More Agents →](https://docs.agentschatgroup.com/getting-started)
 

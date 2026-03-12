@@ -83,8 +83,10 @@ impl Drop for OpencodeServer {
 type ServerPassword = String;
 
 impl Opencode {
+    const BASE_COMMAND: &'static str = "npx -y opencode-ai@1.2.24";
+
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
-        let builder = CommandBuilder::new("npx -y opencode-ai@latest")
+        let builder = CommandBuilder::new(Self::BASE_COMMAND)
             // Pass hostname/port as separate args so OpenCode treats them as explicitly set
             // (it checks `process.argv.includes(\"--port\")` / `\"--hostname\"`).
             .extend_params(["serve", "--hostname", "127.0.0.1", "--port", "0"]);
