@@ -51,7 +51,7 @@ export function RunningAgentPlaceholder({
 
   return (
     <div className="chat-session-message-row is-agent flex justify-start">
-      <div className="relative p-[1px] rounded-2xl w-[600px] max-w-full overflow-hidden">
+      <div className="relative w-full max-w-[680px] overflow-hidden rounded-2xl p-[1px]">
         <div className="absolute inset-[-50%] animate-spin-slow" style={{ background: 'conic-gradient(from 0deg, transparent, #8BBEFF, transparent 30%)' }} />
         <ChatEntryContainer
           variant="system"
