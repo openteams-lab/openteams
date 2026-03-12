@@ -19,9 +19,15 @@
     "generatedSessionTitle": "开始于 {{date}}",
     "sessionSection": "会话",
     "automation": "自动化",
+    "aiTeam": "AI团队",
     "skills": "技能库",
     "archivedSection": "已归档",
     "settingsInSidebar": "设置"
+  },
+  "aiTeamPresets": {
+    "title": "AI团队预设",
+    "description": "集中管理成员预设和团队预设。",
+    "close": "关闭AI团队预设"
   },
   "contextMenu": {
     "editTitle": "编辑名称",
@@ -191,10 +197,28 @@
     "presetTeamSection": "团队",
     "addFromMemberPreset": "添加成员预设",
     "importTeamPreset": "导入团队预设",
-    "noEnabledPresets": "没有已启用的预设。请在 设置 -> 预设 中配置。",
+    "noEnabledPresets": "??????????? AI?? ????",
     "presetSearchPlaceholder": "搜索预设 AI 或团队",
     "noPresetSearchResults": "没有匹配的预设 AI 或团队。",
     "noPresetSearchResultsHint": "试试其他关键词，或切换到自定义AI。",
+    "teamProtocol": {
+      "title": "团队协议",
+      "guidelineLabel": "团队准则",
+      "edit": "编辑团队准则",
+      "loading": "正在加载团队协议...",
+      "loadError": "加载团队协议失败。",
+      "saveError": "保存团队协议失败。",
+      "enabled": "已启用",
+      "disabled": "已禁用",
+      "empty": "团队协议注入当前已禁用。",
+      "modal": {
+        "title": "编辑团队准则",
+        "description": "更新会注入到每个 AI 成员中的协作规则。",
+        "placeholder": "描述团队应如何协作。",
+        "enable": "将此协议注入到每个 AI 成员的系统提示词中",
+        "close": "关闭团队协议编辑器"
+      }
+    },
     "importPreview": {
       "title": "导入团队：{{teamName}}",
       "description": "以下成员将加入此会话：",

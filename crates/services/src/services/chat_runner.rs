@@ -941,9 +941,14 @@ impl ChatRunner {
             let ui_config = config::load_config_from_file(&config_path()).await;
             let ui_language = ui_config.language;
             let prompt_language = Self::resolve_prompt_language(source_message, &ui_language);
+            let mut prompt_agent = agent.clone();
+            prompt_agent.system_prompt = Self::inject_team_protocol(
+                &agent.system_prompt,
+                ui_config.chat_presets.team_protocol.as_deref(),
+            );
 
             let prompt = self.build_prompt(
-                &agent,
+                &prompt_agent,
                 source_message,
                 &context_snapshot.workspace_path,
                 &session_agents,
@@ -2973,14 +2978,18 @@ impl ChatRunner {
             return Ok(None);
         }
 
-        let mut stream = serde_json::Deserializer::from_str(trimmed).into_iter::<serde_json::Value>();
+        let mut stream =
+            serde_json::Deserializer::from_str(trimmed).into_iter::<serde_json::Value>();
         let value = match stream.next() {
             Some(Ok(value)) => value,
             Some(Err(err)) => return Err(err),
             None => return Ok(None),
         };
 
-        if !matches!(value, serde_json::Value::Array(_) | serde_json::Value::Object(_)) {
+        if !matches!(
+            value,
+            serde_json::Value::Array(_) | serde_json::Value::Object(_)
+        ) {
             return Ok(None);
         }
 
@@ -3159,6 +3168,21 @@ impl ChatRunner {
 
     /// Build the full prompt by combining system prompt and user prompt.
     /// This maintains backwards compatibility while allowing future separation.
+    fn inject_team_protocol(system_prompt: &str, team_protocol: Option<&str>) -> String {
+        let normalized_protocol = team_protocol.map(str::trim).unwrap_or_default();
+        let normalized_prompt = system_prompt.trim();
+
+        if normalized_protocol.is_empty() {
+            return normalized_prompt.to_string();
+        }
+
+        if normalized_prompt.is_empty() {
+            return format!("(Team Protocol)\n{normalized_protocol}");
+        }
+
+        format!("(Team Protocol)\n{normalized_protocol}\n\n{normalized_prompt}")
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn build_prompt(
         &self,
@@ -4946,5 +4970,26 @@ Before writing an artifact or conclusion item, if you are unsure whether similar
 "#;
 
         assert_eq!(prompt, expected);
+    }
+
+    #[test]
+    fn inject_team_protocol_prefixes_system_prompt_when_enabled() {
+        let prompt = ChatRunner::inject_team_protocol(
+            "You are the team \"Backend Engineer\".",
+            Some("Follow the team protocol."),
+        );
+
+        assert_eq!(
+            prompt,
+            "(Team Protocol)\nFollow the team protocol.\n\nYou are the team \"Backend Engineer\"."
+        );
+    }
+
+    #[test]
+    fn inject_team_protocol_skips_empty_protocol() {
+        let prompt =
+            ChatRunner::inject_team_protocol("You are the team \"Backend Engineer\".\n", Some(" "));
+
+        assert_eq!(prompt, "You are the team \"Backend Engineer\".");
     }
 }
