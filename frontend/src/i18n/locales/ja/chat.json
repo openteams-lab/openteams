@@ -342,7 +342,7 @@
     "running": "エージェント実行中",
     "runningElapsed": "エージェント実行中。経過時間 {{seconds}}秒。",
     "processing": "リクエストを処理中...",
-    "thinking": "思考中...",
+    "thinking": "考え中...",
     "idle": "アイドル",
     "completed": "完了",
     "failed": "失敗",
