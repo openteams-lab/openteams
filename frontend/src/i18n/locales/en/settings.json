@@ -526,7 +526,7 @@
         "empty": "No member presets. Add one to get started.",
         "fields": {
           "id": "Preset ID",
-          "name": "Handle (@mention name)",
+          "name": "Name",
           "namePlaceholder": "e.g. backend",
           "description": "Description",
           "descriptionPlaceholder": "What this AI member does",

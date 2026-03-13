@@ -523,18 +523,18 @@ export function TeamImportPreviewModal({
                         )}
                       >
                         <div className="team-import-preview-prompt-shell overflow-hidden rounded-[20px] border">
-                          <div className="flex items-start justify-between gap-4 border-b border-white/10 px-4 py-3">
+                          <div className="flex items-start justify-between gap-4 border-b border-[#d7e1ee] px-4 py-3">
                             <div className="min-w-0">
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-200/75">
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#5094FB]">
                                 {t('members.importPreview.promptBadge')}
                               </div>
-                              <div className="mt-2 text-sm leading-6 text-slate-300">
+                              <div className="mt-2 text-sm leading-6 text-slate-600">
                                 {t('members.importPreview.promptHint')}
                               </div>
                             </div>
                             <button
                               type="button"
-                              className="chat-session-member-expand-btn shrink-0 rounded-full bg-white/8 px-3 py-1.5 text-xs font-medium text-indigo-100 transition-colors hover:bg-white/12 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="chat-session-member-expand-btn shrink-0 rounded-full border border-[#d7e1ee] bg-white/78 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                               onClick={() =>
                                 onExpandPromptEditor(activeCardIndex)
                               }
@@ -544,8 +544,8 @@ export function TeamImportPreviewModal({
                             </button>
                           </div>
 
-                          <div className="flex min-h-[220px]">
-                            <div className="flex w-11 shrink-0 select-none flex-col items-end gap-1 border-r border-white/8 bg-slate-950/30 px-2 py-4 text-[11px] font-medium text-slate-500">
+                          <div className="team-import-preview-prompt-body flex min-h-[220px]">
+                            <div className="flex w-11 shrink-0 select-none flex-col items-end gap-1 border-r border-[#d7e1ee] bg-[#e3eaf4] px-2 py-4 text-[11px] font-medium text-slate-400">
                               <span>01</span>
                               <span>02</span>
                               <span>03</span>
@@ -562,7 +562,7 @@ export function TeamImportPreviewModal({
                               rows={6}
                               placeholder={t('members.systemPromptPlaceholder')}
                               disabled={isImportingTeam}
-                              className="team-import-preview-prompt-field min-h-[220px] flex-1 resize-none bg-transparent px-4 py-4 font-mono text-[13px] leading-7 text-slate-100 placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="team-import-preview-prompt-field min-h-[220px] flex-1 resize-none px-4 py-4 font-mono text-[13px] leading-7 text-slate-700 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                             />
                           </div>
                         </div>

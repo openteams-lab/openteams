@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const promptFieldBackground = '#EEF3F9';
+
 export interface PromptEditorModalProps {
   isOpen: boolean;
   value: string;
@@ -179,7 +181,7 @@ export function PromptEditorModal({
               height: '400px',
               maxHeight: 'calc(100vh - 260px)',
               minHeight: '240px',
-              background: '#F9FBFF',
+              background: promptFieldBackground,
               border: '1px solid #E8EEF5',
               borderRadius: '12px',
               padding: '16px',
@@ -196,12 +198,12 @@ export function PromptEditorModal({
               event.currentTarget.style.borderColor = '#4A90E2';
               event.currentTarget.style.boxShadow =
                 '0 0 0 3px rgba(74, 144, 226, 0.1)';
-              event.currentTarget.style.background = '#FFFFFF';
+              event.currentTarget.style.background = promptFieldBackground;
             }}
             onBlur={(event) => {
               event.currentTarget.style.borderColor = '#E8EEF5';
               event.currentTarget.style.boxShadow = 'none';
-              event.currentTarget.style.background = '#F9FBFF';
+              event.currentTarget.style.background = promptFieldBackground;
             }}
           />
         </div>
