@@ -21,6 +21,10 @@
     "skills": "技能庫",
     "archivedSection": "已歸檔",
     "settingsInSidebar": "設定",
+    "searchSessions": "????",
+    "searchSessionsPlaceholder": "??????...",
+    "clearSessionSearch": "??????",
+    "noSearchResults": "??????{{query}}???????",
     "generatedSessionTitle": "開始於 {{date}}"
   },
   "header": {

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Error;
 use executors::{executors::BaseCodingAgent, profile::ExecutorProfileId};
@@ -38,7 +38,11 @@ pub struct ChatMemberPreset {
     pub system_prompt: String,
     /// Optional default workspace path
     pub default_workspace_path: Option<String>,
+    /// Skills preselected for members created from this preset
+    #[serde(default)]
+    pub selected_skill_ids: Vec<String>,
     /// Tools enabled for this preset
+    #[serde(default)]
     pub tools_enabled: serde_json::Value,
     /// Whether this is a built-in preset (cannot be deleted)
     pub is_builtin: bool,
@@ -125,9 +129,35 @@ fn builtin_team(id: &str, name: &str, description: &str, member_ids: &[&str]) ->
     }
 }
 
+fn normalize_selected_skill_ids(skill_ids: &[String]) -> Vec<String> {
+    let mut normalized = skill_ids
+        .iter()
+        .map(|skill_id| skill_id.trim().to_string())
+        .filter(|skill_id| !skill_id.is_empty())
+        .collect::<Vec<_>>();
+    normalized.sort();
+    normalized.dedup();
+    normalized
+}
+
 fn complete_chat_presets_with_builtins(chat_presets: &mut ChatPresetsConfig) {
     let defaults = default_chat_presets();
     let legacy_default_team_protocol = PresetLoader::load_team_protocol();
+    let default_builtin_workspace_paths: HashMap<String, Option<String>> = defaults
+        .members
+        .iter()
+        .map(|preset| (preset.id.clone(), preset.default_workspace_path.clone()))
+        .collect();
+    let default_builtin_selected_skill_ids: HashMap<String, Vec<String>> = defaults
+        .members
+        .iter()
+        .map(|preset| {
+            (
+                preset.id.clone(),
+                normalize_selected_skill_ids(&preset.selected_skill_ids),
+            )
+        })
+        .collect();
 
     let builtin_member_ids: HashSet<&str> = defaults
         .members
@@ -148,6 +178,21 @@ fn complete_chat_presets_with_builtins(chat_presets: &mut ChatPresetsConfig) {
     chat_presets
         .teams
         .retain(|preset| !preset.is_builtin || builtin_team_ids.contains(preset.id.as_str()));
+
+    for preset in &mut chat_presets.members {
+        preset.selected_skill_ids = normalize_selected_skill_ids(&preset.selected_skill_ids);
+        if preset.is_builtin
+            && let Some(default_workspace_path) = default_builtin_workspace_paths.get(&preset.id)
+        {
+            preset.default_workspace_path = default_workspace_path.clone();
+        }
+        if preset.is_builtin
+            && let Some(default_selected_skill_ids) =
+                default_builtin_selected_skill_ids.get(&preset.id)
+        {
+            preset.selected_skill_ids = default_selected_skill_ids.clone();
+        }
+    }
 
     let mut existing_member_ids: HashSet<String> = chat_presets
         .members
@@ -434,6 +479,8 @@ impl Default for Config {
 
 #[cfg(test)]
 mod tests {
+    use utils::path::home_directory;
+
     use super::*;
 
     #[test]
@@ -444,5 +491,32 @@ mod tests {
         complete_chat_presets_with_builtins(&mut chat_presets);
 
         assert_eq!(chat_presets.team_protocol.as_deref(), Some(""));
+    }
+
+    #[test]
+    fn complete_chat_presets_refreshes_builtin_workspace_path() {
+        let mut chat_presets = default_chat_presets();
+        let expected_workspace = home_directory().to_string_lossy().to_string();
+
+        let builtin = chat_presets
+            .members
+            .iter_mut()
+            .find(|preset| preset.id == "backend_engineer")
+            .expect("backend preset should exist");
+        builtin.default_workspace_path = Some("backend".to_string());
+        builtin.selected_skill_ids = vec![" skill_b ".to_string(), "skill_a".to_string()];
+
+        complete_chat_presets_with_builtins(&mut chat_presets);
+
+        let builtin = chat_presets
+            .members
+            .iter()
+            .find(|preset| preset.id == "backend_engineer")
+            .expect("backend preset should exist");
+        assert_eq!(
+            builtin.default_workspace_path.as_deref(),
+            Some(expected_workspace.as_str())
+        );
+        assert!(builtin.selected_skill_ids.is_empty());
     }
 }

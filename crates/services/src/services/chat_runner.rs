@@ -3313,6 +3313,7 @@ impl ChatRunner {
         prompt_language: ResolvedPromptLanguage,
         raw_output: &str,
     ) -> Result<(), ChatRunnerError> {
+        let output_is_empty = raw_output.trim().is_empty();
         let message = chat::create_message(
             &self.db.pool,
             session_id,
@@ -3328,7 +3329,8 @@ impl ChatRunner {
                 "chain_depth": chain_depth + 1,
                 "protocol": {
                     "type": "message",
-                    "mode": "raw_fallback"
+                    "mode": "raw_fallback",
+                    "output_is_empty": output_is_empty
                 }
             })),
         )
@@ -3484,21 +3486,20 @@ impl ChatRunner {
         let protocol_messages = match Self::parse_agent_protocol_messages(latest_assistant) {
             Ok(messages) => messages,
             Err(err) => {
-                if Self::should_handle_protocol_error_as_raw_output(&err) {
-                    if output_is_empty {
-                        tracing::info!(
-                            session_id = %session_id,
-                            session_agent_id = %session_agent_id,
-                            agent_id = %agent_id,
-                            run_id = %run_id,
-                            source_message_id = %source_message_id,
-                            agent_name,
-                            code = ?err.code,
-                            "skipping protocol parse error because agent output was empty"
-                        );
-                        return Ok(0);
-                    }
+                if err.code == ChatProtocolNoticeCode::EmptyMessage {
+                    tracing::info!(
+                        session_id = %session_id,
+                        session_agent_id = %session_agent_id,
+                        agent_id = %agent_id,
+                        run_id = %run_id,
+                        source_message_id = %source_message_id,
+                        agent_name,
+                        "skipping empty assistant output"
+                    );
+                    return Ok(0);
+                }
 
+                if Self::should_handle_protocol_error_as_raw_output(&err) {
                     tracing::info!(
                         session_id = %session_id,
                         session_agent_id = %session_agent_id,
@@ -3507,7 +3508,8 @@ impl ChatRunner {
                         source_message_id = %source_message_id,
                         agent_name,
                         code = ?err.code,
-                        "persisting non-protocol agent output as a plain message"
+                        output_is_empty = output_is_empty,
+                        "persisting protocol fallback output as a raw assistant message"
                     );
                     self.persist_raw_agent_message_and_work_record(
                         session_id,
@@ -4594,12 +4596,20 @@ mod tests {
             target: None,
             detail: None,
         };
+        let empty_message = AgentProtocolError {
+            code: ChatProtocolNoticeCode::EmptyMessage,
+            target: None,
+            detail: None,
+        };
 
         assert!(ChatRunner::should_handle_protocol_error_as_raw_output(
             &invalid_json
         ));
         assert!(ChatRunner::should_handle_protocol_error_as_raw_output(
             &not_json_array
+        ));
+        assert!(!ChatRunner::should_handle_protocol_error_as_raw_output(
+            &empty_message
         ));
         assert!(!ChatRunner::should_handle_protocol_error_as_raw_output(
             &missing_target

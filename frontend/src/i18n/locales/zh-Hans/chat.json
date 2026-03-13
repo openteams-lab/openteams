@@ -22,7 +22,11 @@
     "aiTeam": "AI团队",
     "skills": "技能库",
     "archivedSection": "已归档",
-    "settingsInSidebar": "设置"
+    "settingsInSidebar": "设置",
+    "searchSessions": "????",
+    "searchSessionsPlaceholder": "?????...",
+    "clearSessionSearch": "??????",
+    "noSearchResults": "??????{{query}}???????"
   },
   "aiTeamPresets": {
     "title": "AI团队预设",

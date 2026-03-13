@@ -536,7 +536,7 @@
           "systemPromptPlaceholder": "描述此 AI 成员的角色设定...",
           "workspacePath": "默认工作区路径（可选）",
           "workspacePathPlaceholder": "例如 backend",
-          "toolsEnabled": "工具（JSON）"
+          "skills": "技能"
         },
         "errors": {
           "toolsJsonInvalid": "工具 JSON 无效。",

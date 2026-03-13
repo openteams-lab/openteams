@@ -47,6 +47,12 @@ import {
 } from '../utils';
 import { formatTokenCount } from '@/utils/string';
 
+const SUPPRESSED_PROTOCOL_ERROR_CODES = new Set([
+  'invalid_json',
+  'not_json_array',
+  'empty_message',
+]);
+
 export interface ChatMessageItemProps {
   message: ChatMessage;
   senderLabel: string;
@@ -172,9 +178,17 @@ export function ChatMessageItem({
       : null;
   const isEstimated = tokenUsage?.is_estimated === true;
   const protocolError = extractProtocolErrorMeta(message.meta);
+  const shouldSuppressProtocolErrorCard =
+    protocolError?.code !== null &&
+    protocolError?.code !== undefined &&
+    SUPPRESSED_PROTOCOL_ERROR_CODES.has(protocolError.code);
 
   // System messages
   if (message.sender_type === ChatSenderType.system) {
+    if (shouldSuppressProtocolErrorCard) {
+      return null;
+    }
+
     if (protocolError) {
       const summary = protocolError.reason?.trim() || message.content;
       const detail = protocolError.detail?.trim() ?? '';
@@ -422,6 +436,18 @@ export function ChatMessageItem({
                   </div>
                 ) : null;
               })()}
+              {isRawFallbackMessage && (
+                <div className="mb-half flex items-center gap-half">
+                  <Badge
+                    variant="secondary"
+                    className="border-[rgba(245,158,11,0.24)] bg-[rgba(245,158,11,0.10)] text-[10px] font-medium uppercase tracking-wide text-[#B45309]"
+                  >
+                    {t('message.rawFallbackBadge', {
+                      defaultValue: 'Raw fallback',
+                    })}
+                  </Badge>
+                </div>
+              )}
               <ChatMarkdown content={displayContent} hideCopyButton />
               {mentionList.length > 0 && (
                 <div className="chat-session-mentions mt-half flex flex-wrap items-center gap-half text-xs text-low">

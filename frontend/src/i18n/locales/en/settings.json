@@ -536,7 +536,7 @@
           "systemPromptPlaceholder": "Describe this AI member's role settings...",
           "workspacePath": "Default Workspace Path (optional)",
           "workspacePathPlaceholder": "e.g. backend",
-          "toolsEnabled": "Tools (JSON)"
+          "skills": "Skills"
         },
         "errors": {
           "toolsJsonInvalid": "Tools JSON is invalid.",

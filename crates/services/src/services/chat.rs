@@ -180,37 +180,43 @@ pub fn parse_mentions(content: &str) -> Vec<String> {
     mentions
 }
 
-pub fn parse_send_message_directives(content: &str) -> Vec<String> {
-    const PREFIX: &str = "[sendMessageTo@@";
-
-    let mut cleaned = String::with_capacity(content.len());
-    let mut cursor = 0usize;
-
-    while cursor < content.len() {
-        let Some(prefix_rel) = content[cursor..].find(PREFIX) else {
-            cleaned.push_str(&content[cursor..]);
-            break;
-        };
-
-        let prefix_start = cursor + prefix_rel;
-        cleaned.push_str(&content[cursor..prefix_start]);
-
-        let mut directive_start = prefix_start + PREFIX.len();
-        let next_cursor = if content[directive_start..].starts_with('{') {
-            directive_start += 1;
-            content[directive_start..]
-                .find("}]")
-                .map(|suffix_rel| directive_start + suffix_rel + 2)
-        } else {
-            content[directive_start..]
-                .find(']')
-                .map(|suffix_rel| directive_start + suffix_rel + 1)
-        };
-
-        cursor = next_cursor.unwrap_or(content.len());
+fn normalize_protocol_send_target(target: &str) -> Option<String> {
+    let normalized = target.trim().trim_start_matches('@').trim();
+    if normalized.is_empty() {
+        return None;
     }
 
-    parse_mentions(&cleaned)
+    let normalized = if normalized.eq_ignore_ascii_case("user") {
+        "you"
+    } else {
+        normalized
+    };
+
+    if normalized
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    {
+        Some(normalized.to_string())
+    } else {
+        None
+    }
+}
+
+pub fn parse_agent_send_mentions(meta: &Value) -> Vec<String> {
+    let Some(protocol) = meta.get("protocol").and_then(Value::as_object) else {
+        return Vec::new();
+    };
+
+    if protocol.get("type").and_then(Value::as_str) != Some("send") {
+        return Vec::new();
+    }
+
+    protocol
+        .get("to")
+        .and_then(Value::as_str)
+        .and_then(normalize_protocol_send_target)
+        .into_iter()
+        .collect()
 }
 
 pub async fn create_message(
@@ -256,14 +262,14 @@ pub async fn create_message_with_id(
         return Err(ChatServiceError::SessionArchived);
     }
 
-    let mentions = match sender_type {
-        ChatSenderType::Agent => parse_send_message_directives(&content),
-        _ => parse_mentions(&content),
-    };
     let mut meta = meta.unwrap_or_else(|| serde_json::json!({}));
     if !meta.is_object() {
         meta = serde_json::json!({ "raw_meta": meta });
     }
+    let mentions = match sender_type {
+        ChatSenderType::Agent => parse_agent_send_mentions(&meta),
+        _ => parse_mentions(&content),
+    };
     if content.trim().is_empty() && !has_attachments(&meta) {
         return Err(ChatServiceError::Validation(
             "content cannot be empty".to_string(),
@@ -1780,7 +1786,9 @@ pub async fn compress_messages_if_needed(
 #[cfg(test)]
 mod tests {
     use db::models::{
+        chat_agent::{ChatAgent, CreateChatAgent},
         chat_message::{ChatMessage, ChatSenderType},
+        chat_session::{ChatSession, CreateChatSession},
         chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
     };
     use sqlx::SqlitePool;
@@ -1788,8 +1796,8 @@ mod tests {
 
     use super::{
         CompressionType, SimplifiedMessage, all_agents_running, compress_messages_if_needed,
-        is_protocol_notice_history_message, limit_summary_input_messages, parse_mentions,
-        parse_send_message_directives, prioritize_summary_agents,
+        create_message, is_protocol_notice_history_message, limit_summary_input_messages,
+        parse_agent_send_mentions, parse_mentions, prioritize_summary_agents,
         select_messages_to_compress_by_token, should_include_message_in_history,
     };
 
@@ -1812,17 +1820,166 @@ mod tests {
     }
 
     #[test]
-    fn parse_send_message_directives_supports_plain_at_mentions() {
-        let mentions = parse_send_message_directives("@alice please review this");
+    fn parse_agent_send_mentions_reads_protocol_target() {
+        let mentions = parse_agent_send_mentions(&serde_json::json!({
+            "protocol": {
+                "type": "send",
+                "to": "@alice"
+            }
+        }));
         assert_eq!(mentions, vec!["alice"]);
     }
 
     #[test]
-    fn parse_send_message_directives_ignores_removed_legacy_syntax() {
-        let mentions = parse_send_message_directives(
-            "[sendMessageTo@@researcher] and [sendMessageTo@@{planner}]",
-        );
+    fn parse_agent_send_mentions_ignores_non_send_protocol_messages() {
+        let mentions = parse_agent_send_mentions(&serde_json::json!({
+            "protocol": {
+                "type": "record",
+                "to": "researcher"
+            }
+        }));
         assert!(mentions.is_empty());
+    }
+
+    async fn setup_chat_message_pool() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("create sqlite memory pool");
+
+        for statement in [
+            "PRAGMA foreign_keys = ON",
+            r#"
+            CREATE TABLE chat_sessions (
+                id BLOB PRIMARY KEY,
+                title TEXT,
+                status TEXT NOT NULL DEFAULT 'active'
+                    CHECK (status IN ('active','archived')),
+                summary_text TEXT,
+                archive_ref TEXT,
+                last_seen_diff_key TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                archived_at TEXT
+            )
+            "#,
+            r#"
+            CREATE TABLE chat_agents (
+                id BLOB PRIMARY KEY,
+                name TEXT NOT NULL,
+                runner_type TEXT NOT NULL,
+                system_prompt TEXT NOT NULL DEFAULT '',
+                tools_enabled TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+            r#"
+            CREATE TABLE chat_messages (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                sender_type TEXT NOT NULL
+                    CHECK (sender_type IN ('user','agent','system')),
+                sender_id BLOB,
+                content TEXT NOT NULL,
+                mentions TEXT NOT NULL DEFAULT '[]',
+                meta TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+            )
+            "#,
+        ] {
+            sqlx::query(statement)
+                .execute(&pool)
+                .await
+                .expect("create minimal chat schema");
+        }
+
+        pool
+    }
+
+    async fn create_active_session(pool: &SqlitePool) -> ChatSession {
+        ChatSession::create(pool, &CreateChatSession { title: None }, Uuid::new_v4())
+            .await
+            .expect("create chat session")
+    }
+
+    async fn create_agent_member(pool: &SqlitePool, name: &str) -> ChatAgent {
+        ChatAgent::create(
+            pool,
+            &CreateChatAgent {
+                name: name.to_string(),
+                runner_type: "codex".to_string(),
+                system_prompt: None,
+                tools_enabled: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create chat agent")
+    }
+
+    #[tokio::test]
+    async fn create_message_keeps_user_mentions_from_plain_at_tokens() {
+        let pool = setup_chat_message_pool().await;
+        let session = create_active_session(&pool).await;
+
+        let message = create_message(
+            &pool,
+            session.id,
+            ChatSenderType::User,
+            None,
+            "@backend please review".to_string(),
+            Some(serde_json::json!({})),
+        )
+        .await
+        .expect("create user message");
+
+        assert_eq!(message.mentions.0, vec!["backend"]);
+    }
+
+    #[tokio::test]
+    async fn create_message_does_not_route_agent_plain_at_content() {
+        let pool = setup_chat_message_pool().await;
+        let session = create_active_session(&pool).await;
+        let sender = create_agent_member(&pool, "planner").await;
+
+        let message = create_message(
+            &pool,
+            session.id,
+            ChatSenderType::Agent,
+            Some(sender.id),
+            "@backend please review".to_string(),
+            Some(serde_json::json!({})),
+        )
+        .await
+        .expect("create agent message");
+
+        assert!(message.mentions.0.is_empty());
+    }
+
+    #[tokio::test]
+    async fn create_message_routes_agent_send_protocol_using_meta_target() {
+        let pool = setup_chat_message_pool().await;
+        let session = create_active_session(&pool).await;
+        let sender = create_agent_member(&pool, "planner").await;
+
+        let message = create_message(
+            &pool,
+            session.id,
+            ChatSenderType::Agent,
+            Some(sender.id),
+            "@backend please review".to_string(),
+            Some(serde_json::json!({
+                "protocol": {
+                    "type": "send",
+                    "to": "backend"
+                }
+            })),
+        )
+        .await
+        .expect("create protocol-routed agent message");
+
+        assert_eq!(message.mentions.0, vec!["backend"]);
     }
 
     fn make_session_agent(state: ChatSessionAgentState) -> ChatSessionAgent {

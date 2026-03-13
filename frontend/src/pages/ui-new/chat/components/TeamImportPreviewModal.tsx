@@ -57,6 +57,10 @@ interface PreviewSectionProps {
   className?: string;
 }
 
+const CARD_SWITCH_WHEEL_STEPS = 2;
+const CARD_SWITCH_WHEEL_RESET_MS = 520;
+const CARD_SWITCH_WHEEL_COOLDOWN_MS = 260;
+
 function PreviewSection({
   step,
   title,
@@ -134,6 +138,8 @@ export function TeamImportPreviewModal({
   const { t } = useTranslation('chat');
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const wheelCooldownRef = useRef<number | null>(null);
+  const wheelIntentResetRef = useRef<number | null>(null);
+  const wheelIntentRef = useRef({ direction: 0, count: 0 });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -163,12 +169,16 @@ export function TeamImportPreviewModal({
       if (wheelCooldownRef.current !== null) {
         window.clearTimeout(wheelCooldownRef.current);
       }
+      if (wheelIntentResetRef.current !== null) {
+        window.clearTimeout(wheelIntentResetRef.current);
+      }
     },
     []
   );
 
   if (!isOpen || !importPlan || importPlan.length === 0) return null;
 
+  const isTeamImport = importPlan.length > 1;
   const activeCardIndex = Math.min(currentCardIndex, importPlan.length - 1);
   const currentPlan = importPlan[activeCardIndex];
   const currentPlanVariant = getPlanVariant(currentPlan.toolsEnabled);
@@ -185,6 +195,14 @@ export function TeamImportPreviewModal({
         ? t('members.importPreview.actionReuse')
         : t('members.importPreview.actionSkip');
   const currentActionTone = getActionTone(currentPlan.action);
+
+  const resetWheelIntent = () => {
+    wheelIntentRef.current = { direction: 0, count: 0 };
+    if (wheelIntentResetRef.current !== null) {
+      window.clearTimeout(wheelIntentResetRef.current);
+      wheelIntentResetRef.current = null;
+    }
+  };
 
   const handleCardWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
     if (importPlan.length <= 1) return;
@@ -206,23 +224,48 @@ export function TeamImportPreviewModal({
     const direction = event.deltaY > 0 ? 1 : -1;
     const canSwitch = (direction > 0 && atBottom) || (direction < 0 && atTop);
 
-    if (!canSwitch) return;
+    if (!canSwitch) {
+      resetWheelIntent();
+      return;
+    }
 
     event.preventDefault();
 
     if (wheelCooldownRef.current !== null) return;
+
+    if (wheelIntentRef.current.direction !== direction) {
+      wheelIntentRef.current = { direction, count: 1 };
+    } else {
+      wheelIntentRef.current = {
+        direction,
+        count: wheelIntentRef.current.count + 1,
+      };
+    }
+
+    if (wheelIntentResetRef.current !== null) {
+      window.clearTimeout(wheelIntentResetRef.current);
+    }
+    wheelIntentResetRef.current = window.setTimeout(() => {
+      resetWheelIntent();
+    }, CARD_SWITCH_WHEEL_RESET_MS);
+
+    if (wheelIntentRef.current.count < CARD_SWITCH_WHEEL_STEPS) return;
 
     const nextIndex = Math.min(
       importPlan.length - 1,
       Math.max(0, activeCardIndex + direction)
     );
 
-    if (nextIndex === activeCardIndex) return;
+    if (nextIndex === activeCardIndex) {
+      resetWheelIntent();
+      return;
+    }
 
     setCurrentCardIndex(nextIndex);
+    resetWheelIntent();
     wheelCooldownRef.current = window.setTimeout(() => {
       wheelCooldownRef.current = null;
-    }, 260);
+    }, CARD_SWITCH_WHEEL_COOLDOWN_MS);
   };
 
   return (
@@ -236,7 +279,10 @@ export function TeamImportPreviewModal({
     >
       <div
         className={cn(
-          'team-import-preview-modal chat-session-modal-surface flex h-[88vh] max-h-[88vh] w-[min(82vw,700px)] max-w-[700px] flex-col overflow-hidden rounded-[28px] border border-white/60 bg-white/72 shadow-[0_28px_90px_rgba(15,23,42,0.24)] backdrop-blur-[24px]'
+          'team-import-preview-modal chat-session-modal-surface flex flex-col overflow-hidden rounded-[28px] border border-white/60 bg-white/72 shadow-[0_28px_90px_rgba(15,23,42,0.24)] backdrop-blur-[24px]',
+          isTeamImport
+            ? 'h-[88vh] max-h-[88vh] w-[min(90vw,980px)] max-w-[980px]'
+            : 'h-[78vh] max-h-[78vh] w-[min(82vw,700px)] max-w-[700px]'
         )}
         onClick={(event) => event.stopPropagation()}
       >
@@ -411,6 +457,54 @@ export function TeamImportPreviewModal({
 
                       <PreviewSection
                         step="02"
+                        title={t('members.importPreview.sections.environment')}
+                        description={t(
+                          'members.importPreview.sections.environmentDescription'
+                        )}
+                      >
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5094FB]">
+                              {t('members.workspacePath')}
+                            </label>
+                            <input
+                              value={currentPlan.workspacePath}
+                              onChange={(event) =>
+                                onUpdatePlanEntry(activeCardIndex, {
+                                  workspacePath: event.target.value,
+                                })
+                              }
+                              placeholder={workspacePathPlaceholder}
+                              disabled={isImportingTeam}
+                              className="team-import-preview-field min-h-11 w-full rounded-2xl px-4 py-2.5 text-[15px] leading-6 text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                            />
+                          </div>
+
+                          <div className="rounded-[18px] border border-white/70 bg-white/72 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
+                            <AgentSkillsSection
+                              agentId={
+                                currentPlan.action === 'reuse'
+                                  ? currentPlan.agentId
+                                  : null
+                              }
+                              runnerType={currentPlan.runnerType || null}
+                              selectedSkillIds={
+                                currentPlan.selectedSkillIds ?? []
+                              }
+                              onSelectedSkillIdsChange={(skillIds) =>
+                                onUpdatePlanEntry(activeCardIndex, {
+                                  selectedSkillIds: skillIds,
+                                })
+                              }
+                              readOnly={isArchived || isImportingTeam}
+                              maxHeightClass="max-h-32"
+                            />
+                          </div>
+                        </div>
+                      </PreviewSection>
+
+                      <PreviewSection
+                        step="03"
                         title={t('members.importPreview.sections.prompt')}
                         description={t(
                           'members.importPreview.sections.promptDescription'
@@ -457,54 +551,6 @@ export function TeamImportPreviewModal({
                               placeholder={t('members.systemPromptPlaceholder')}
                               disabled={isImportingTeam}
                               className="team-import-preview-prompt-field min-h-[220px] flex-1 resize-none bg-transparent px-4 py-4 font-mono text-[13px] leading-7 text-slate-100 placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
-                            />
-                          </div>
-                        </div>
-                      </PreviewSection>
-
-                      <PreviewSection
-                        step="03"
-                        title={t('members.importPreview.sections.environment')}
-                        description={t(
-                          'members.importPreview.sections.environmentDescription'
-                        )}
-                      >
-                        <div className="space-y-3">
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5094FB]">
-                              {t('members.workspacePath')}
-                            </label>
-                            <input
-                              value={currentPlan.workspacePath}
-                              onChange={(event) =>
-                                onUpdatePlanEntry(activeCardIndex, {
-                                  workspacePath: event.target.value,
-                                })
-                              }
-                              placeholder={workspacePathPlaceholder}
-                              disabled={isImportingTeam}
-                              className="team-import-preview-field min-h-11 w-full rounded-2xl px-4 py-2.5 text-[15px] leading-6 text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
-                            />
-                          </div>
-
-                          <div className="rounded-[18px] border border-white/70 bg-white/72 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
-                            <AgentSkillsSection
-                              agentId={
-                                currentPlan.action === 'reuse'
-                                  ? currentPlan.agentId
-                                  : null
-                              }
-                              runnerType={currentPlan.runnerType || null}
-                              selectedSkillIds={
-                                currentPlan.selectedSkillIds ?? []
-                              }
-                              onSelectedSkillIdsChange={(skillIds) =>
-                                onUpdatePlanEntry(activeCardIndex, {
-                                  selectedSkillIds: skillIds,
-                                })
-                              }
-                              readOnly={isArchived || isImportingTeam}
-                              maxHeightClass="max-h-32"
                             />
                           </div>
                         </div>
@@ -598,7 +644,7 @@ export function TeamImportPreviewModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 px-5 pb-5 pt-1">
-{memberError && (
+          {memberError && (
             <div className="flex-1 text-sm text-red-500">{memberError}</div>
           )}
           <PrimaryButton

@@ -5,6 +5,7 @@ import {
   BroomIcon,
   DotsThreeIcon,
   GitDiffIcon,
+  MagnifyingGlassIcon,
   PencilSimpleIcon,
   TrashIcon,
   XIcon,
@@ -27,6 +28,7 @@ export interface ChatHeaderProps {
   isGeneratedTitle: boolean;
   isSearchOpen: boolean;
   searchQuery: string;
+  onOpenSearch: () => void;
   onCloseSearch: () => void;
   onSearchQueryChange: (value: string) => void;
   isArchived: boolean;
@@ -60,6 +62,7 @@ export function ChatHeader({
   isGeneratedTitle,
   isSearchOpen,
   searchQuery,
+  onOpenSearch,
   onCloseSearch,
   onSearchQueryChange,
   isArchived,
@@ -262,6 +265,17 @@ export function ChatHeader({
           {titleError && <div className="text-xs text-error">{titleError}</div>}
         </div>
         <div className="chat-session-header-actions flex items-center gap-base">
+          {activeSession && !isSearchOpen && (
+            <button
+              type="button"
+              onClick={onOpenSearch}
+              className="chat-session-header-icon-btn chat-session-header-op-btn"
+              title={t('header.searchMessages')}
+              aria-label={t('header.searchMessages')}
+            >
+              <MagnifyingGlassIcon className="size-icon-sm" />
+            </button>
+          )}
           {hasChanges && onViewChanges && (
             <button
               type="button"

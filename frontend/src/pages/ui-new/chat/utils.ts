@@ -2,6 +2,7 @@ import { parseDiffStats } from '@/utils/diffStatsParser';
 import type { TFunction } from 'i18next';
 import type { ChatMemberPreset, ChatTeamPreset, JsonValue } from 'shared/types';
 import {
+  isMentionAllAlias,
   mentionTokenRegex,
   messagePalette,
   userMessageTone,
@@ -38,6 +39,15 @@ export function extractMentions(content: string): Set<string> {
     if (name) mentions.add(name);
   }
   return mentions;
+}
+
+export function stripMentionAllAliases(content: string): string {
+  return content
+    .replace(mentionTokenRegex, (match, prefix: string, name: string) =>
+      isMentionAllAlias(name) ? prefix : match
+    )
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
 }
 
 export type AgentProtocolSendIntent =
@@ -85,7 +95,9 @@ export interface ChatProtocolErrorMeta {
  * Try to parse agent response JSON from message content
  * Returns null if parsing fails or content is not in expected format
  */
-export function tryParseAgentResponse(content: string): ParsedAgentResponse | null {
+export function tryParseAgentResponse(
+  content: string
+): ParsedAgentResponse | null {
   if (!content || typeof content !== 'string') return null;
 
   const trimmed = content.trim();
@@ -104,7 +116,9 @@ export function tryParseAgentResponse(content: string): ParsedAgentResponse | nu
   const jsonBlockMatch = trimmed.match(/```json\s*\n?([\s\S]*?)\n?```/);
   if (jsonBlockMatch) {
     try {
-      const normalized = normalizeAgentResponse(JSON.parse(jsonBlockMatch[1].trim()));
+      const normalized = normalizeAgentResponse(
+        JSON.parse(jsonBlockMatch[1].trim())
+      );
       if (normalized) {
         return normalized;
       }
@@ -157,7 +171,11 @@ function isValidProtocolMessage(obj: unknown): obj is AgentProtocolMessage {
   if (typeof message.type !== 'string' || typeof message.content !== 'string') {
     return false;
   }
-  if (!['send', 'record', 'artifact', 'conclusion', 'artiface'].includes(message.type)) {
+  if (
+    !['send', 'record', 'artifact', 'conclusion', 'artiface'].includes(
+      message.type
+    )
+  ) {
     return false;
   }
   if (message.type === 'send') {
@@ -169,7 +187,9 @@ function isValidProtocolMessage(obj: unknown): obj is AgentProtocolMessage {
     }
     return (
       typeof message.intent === 'string' &&
-      validProtocolSendIntents.includes(message.intent as AgentProtocolSendIntent)
+      validProtocolSendIntents.includes(
+        message.intent as AgentProtocolSendIntent
+      )
     );
   }
   return true;
@@ -243,7 +263,8 @@ export function extractProtocolErrorMeta(
 ): ChatProtocolErrorMeta | null {
   if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
 
-  const rawProtocolError = (meta as { protocol_error?: unknown }).protocol_error;
+  const rawProtocolError = (meta as { protocol_error?: unknown })
+    .protocol_error;
   if (
     !rawProtocolError ||
     typeof rawProtocolError !== 'object' ||
@@ -716,6 +737,20 @@ export function normalizePresetToolsEnabled(value: unknown): JsonValue {
   return value as JsonValue;
 }
 
+export function normalizePresetSelectedSkillIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      value
+        .filter((skillId): skillId is string => typeof skillId === 'string')
+        .map((skillId) => skillId.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 export function areToolsEnabledEqual(a: unknown, b: unknown): boolean {
   return (
     stableStringifyJson(normalizePresetToolsEnabled(a)) ===
@@ -781,6 +816,19 @@ export function getSessionWorkspacePath(
   agentName: string
 ): string {
   return `chat/session_${sessionId}/agents/${agentName}`;
+}
+
+function resolvePresetWorkspacePath(
+  explicitWorkspacePath: string | null | undefined,
+  fallbackWorkspacePath: string | null | undefined,
+  sessionId: string,
+  agentName: string
+): string {
+  return (
+    explicitWorkspacePath?.trim() ||
+    fallbackWorkspacePath?.trim() ||
+    getSessionWorkspacePath(sessionId, agentName)
+  );
 }
 
 export function validateWorkspacePath(path: string): string | null {
@@ -944,6 +992,7 @@ export function buildMemberPresetImportPlan({
   preset,
   sessionId,
   sessionMembers,
+  fallbackWorkspacePath,
   defaultRunnerType,
   enabledRunnerTypes,
   availableRunnerTypes,
@@ -952,6 +1001,7 @@ export function buildMemberPresetImportPlan({
   preset: ChatMemberPreset;
   sessionId: string;
   sessionMembers: SessionMember[];
+  fallbackWorkspacePath?: string | null;
   defaultRunnerType: string | null | undefined;
   enabledRunnerTypes: string[];
   availableRunnerTypes: string[];
@@ -985,10 +1035,15 @@ export function buildMemberPresetImportPlan({
       action: 'skip',
       reason: 'duplicate-name-in-session',
       agentId: null,
-      workspacePath:
-        preset.default_workspace_path?.trim() ||
-        getSessionWorkspacePath(sessionId, presetName),
-      selectedSkillIds: [],
+      workspacePath: resolvePresetWorkspacePath(
+        preset.default_workspace_path,
+        fallbackWorkspacePath,
+        sessionId,
+        presetName
+      ),
+      selectedSkillIds: normalizePresetSelectedSkillIds(
+        preset.selected_skill_ids
+      ),
     };
   }
 
@@ -1003,9 +1058,14 @@ export function buildMemberPresetImportPlan({
     action: 'create',
     reason: 'create-new-agent',
     agentId: null,
-    workspacePath:
-      preset.default_workspace_path?.trim() ||
-      getSessionWorkspacePath(sessionId, finalName),
-    selectedSkillIds: [],
+    workspacePath: resolvePresetWorkspacePath(
+      preset.default_workspace_path,
+      fallbackWorkspacePath,
+      sessionId,
+      finalName
+    ),
+    selectedSkillIds: normalizePresetSelectedSkillIds(
+      preset.selected_skill_ids
+    ),
   };
 }

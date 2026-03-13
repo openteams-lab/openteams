@@ -536,7 +536,7 @@
           "systemPromptPlaceholder": "このAIメンバーの役割設定を記述してください...",
           "workspacePath": "既定のワークスペースパス（任意）",
           "workspacePathPlaceholder": "例: backend",
-          "toolsEnabled": "ツール（JSON）"
+          "skills": "スキル"
         },
         "errors": {
           "toolsJsonInvalid": "ツールJSONが無効です。",
