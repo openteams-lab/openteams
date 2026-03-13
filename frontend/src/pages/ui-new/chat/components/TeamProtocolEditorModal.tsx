@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const promptFieldBackground = '#EEF3F9';
+
 interface SavePayload {
   content: string;
   enabled: boolean;
@@ -138,7 +140,10 @@ export function TeamProtocolEditorModal({
         </div>
 
         <div className="space-y-4" style={{ padding: '0 24px 20px 24px' }}>
-          <label className="flex items-center gap-3 rounded-[12px] border border-[#E8EEF5] bg-[#F9FBFF] px-4 py-3 text-[13px] text-[#333333]">
+          <label
+            className="flex items-center gap-3 rounded-[12px] border border-[#E8EEF5] px-4 py-3 text-[13px] text-[#333333]"
+            style={{ background: promptFieldBackground }}
+          >
             <input
               type="checkbox"
               checked={enabled}
@@ -160,7 +165,7 @@ export function TeamProtocolEditorModal({
               height: '360px',
               maxHeight: 'calc(100vh - 320px)',
               minHeight: '220px',
-              background: '#F9FBFF',
+              background: promptFieldBackground,
               border: '1px solid #E8EEF5',
               borderRadius: '12px',
               padding: '16px',

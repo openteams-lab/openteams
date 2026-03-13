@@ -62,6 +62,16 @@
     "settings": "Settings",
     "moreActions": "More actions"
   },
+  "emptyState": {
+    "brand": "Start collaborating",
+    "logoAlt": "Chat empty state logo",
+    "noMembersEyebrow": "Select an AI member to begin",
+    "noMembersDescription": "",
+    "noMembersAction": "Create team now",
+    "emptyEyebrow": "Start a new way to collaborate with AI here",
+    "emptyDescription": "",
+    "emptyAction": "Start typing"
+  },
   "input": {
     "mentionAgents": "Mention agents",
     "mentionAllOption": "All members (@all)",
@@ -80,7 +90,22 @@
     "workbenchHint": "Paste screenshots, drag files, or type @ to route work.",
     "attachmentCount": "{{count}} files ready",
     "addAttachment": "Add attachment files",
-    "send": "Send"
+    "send": "Send",
+    "templates": {
+      "label": "Prompt templates",
+      "optimizeArchitecture": {
+        "label": "Optimize architecture",
+        "value": "Review the current architecture and propose improvements. Cover module boundaries, coupling, maintainability, and the main refactor risks."
+      },
+      "generateDocs": {
+        "label": "Generate technical docs",
+        "value": "Generate a technical documentation draft for the current project. Include module responsibilities, key workflows, interfaces, and open questions that still need confirmation."
+      },
+      "reviewVisualStyle": {
+        "label": "Review visual style",
+        "value": "Review the current UI visual style. Give concrete feedback on typography, color, spacing, hierarchy, and interaction consistency, then suggest the highest-impact improvements."
+      }
+    }
   },
   "message": {
     "quote": "Quote",

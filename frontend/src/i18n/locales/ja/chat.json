@@ -56,7 +56,32 @@
     "closeMembersPanel": "AIメンバー一覧を閉じる",
     "latestArtifact": "最新成果物"
   },
+  "emptyState": {
+    "brand": "協作を始める",
+    "logoAlt": "チャット空状態のロゴ",
+    "noMembersEyebrow": "開始するにはAIメンバーを追加してください",
+    "noMembersDescription": "",
+    "noMembersAction": "今すぐチームを作成",
+    "emptyEyebrow": "ここから新しいAI協業の進め方を始める",
+    "emptyDescription": "",
+    "emptyAction": "入力を始める"
+  },
   "input": {
+    "templates": {
+      "label": "プロンプトテンプレート",
+      "optimizeArchitecture": {
+        "label": "アーキテクチャを最適化",
+        "value": "現在のアーキテクチャをレビューし、改善案を提案してください。モジュール境界、結合度、保守性、主なリファクタリングリスクを含めて整理してください。"
+      },
+      "generateDocs": {
+        "label": "技術文書を生成",
+        "value": "現在のプロジェクトに基づいて技術文書のドラフトを作成してください。モジュールの責務、主要なフロー、インターフェース、まだ確認が必要な論点を含めてください。"
+      },
+      "reviewVisualStyle": {
+        "label": "ビジュアルスタイルを評価",
+        "value": "現在の UI のビジュアルスタイルをレビューしてください。タイポグラフィ、色、余白、階層、インタラクションの一貫性について具体的に指摘し、最も効果の高い改善案を示してください。"
+      }
+    },
     "mentionAgents": "エージェントをメンション",
     "mentionAllOption": "全員（@all）",
     "mentionAllSuggestion": "@全員",

@@ -56,7 +56,32 @@
     "closeMembersPanel": "AI 멤버 목록 닫기",
     "latestArtifact": "최신 아티팩트"
   },
+  "emptyState": {
+    "brand": "협업 시작",
+    "logoAlt": "채팅 빈 상태 로고",
+    "noMembersEyebrow": "시작하려면 AI 멤버를 추가하세요",
+    "noMembersDescription": "",
+    "noMembersAction": "지금 팀 만들기",
+    "emptyEyebrow": "여기에서 새로운 AI 협업 방식을 시작하세요",
+    "emptyDescription": "",
+    "emptyAction": "입력 시작"
+  },
   "input": {
+    "templates": {
+      "label": "프롬프트 템플릿",
+      "optimizeArchitecture": {
+        "label": "아키텍처 최적화",
+        "value": "현재 아키텍처를 검토하고 개선안을 제안하세요. 모듈 경계, 결합도, 유지보수성, 주요 리팩터링 위험을 함께 다뤄 주세요."
+      },
+      "generateDocs": {
+        "label": "기술 문서 생성",
+        "value": "현재 프로젝트를 바탕으로 기술 문서 초안을 작성하세요. 모듈 책임, 핵심 흐름, 인터페이스, 아직 확인이 필요한 쟁점을 포함해 주세요."
+      },
+      "reviewVisualStyle": {
+        "label": "비주얼 스타일 리뷰",
+        "value": "현재 UI의 비주얼 스타일을 검토하세요. 타이포그래피, 색상, 간격, 계층 구조, 상호작용 일관성에 대해 구체적으로 피드백하고 가장 영향력 큰 개선점을 제안해 주세요."
+      }
+    },
     "mentionAgents": "에이전트 멘션",
     "mentionAllOption": "모든 멤버 (@all)",
     "mentionAllSuggestion": "@모든 멤버",

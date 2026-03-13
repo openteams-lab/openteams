@@ -56,7 +56,32 @@
     "closeMembersPanel": "關閉 AI 成員列表",
     "latestArtifact": "最新產物"
   },
+  "emptyState": {
+    "brand": "開始協作",
+    "logoAlt": "聊天空狀態標識",
+    "noMembersEyebrow": "先新增 AI 成員再開始",
+    "noMembersDescription": "",
+    "noMembersAction": "立即建立團隊",
+    "emptyEyebrow": "從這裡開啟全新的AI協作方式",
+    "emptyDescription": "",
+    "emptyAction": "開始輸入"
+  },
   "input": {
+    "templates": {
+      "label": "提示詞模板",
+      "optimizeArchitecture": {
+        "label": "優化當前架構",
+        "value": "請從模組邊界、耦合關係、可維護性和重構風險幾個角度評估當前架構，並給出優化建議。"
+      },
+      "generateDocs": {
+        "label": "生成技術文件",
+        "value": "請基於目前專案內容輸出一份技術文件草稿，包含模組職責、關鍵流程、介面約定，以及仍待確認的問題。"
+      },
+      "reviewVisualStyle": {
+        "label": "視覺風格評審",
+        "value": "請評審目前 UI 的視覺風格，從排版、色彩、間距、層級和互動一致性方面給出具體建議，並指出最值得優先優化的部分。"
+      }
+    },
     "mentionAgents": "提及 Agent",
     "mentionAllOption": "所有成員（@all）",
     "mentionAllSuggestion": "@所有成員",

@@ -70,6 +70,12 @@ const makeUniqueName = (base: string, existingNames: Set<string>): string => {
   return candidate;
 };
 
+const makePresetIdFromName = (
+  name: string,
+  existingIds: Set<string>,
+  fallback: string
+): string => makeUniqueId(slugify(name || fallback), existingIds);
+
 const normalizeToolsEnabled = (value: unknown): JsonValue => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
@@ -202,13 +208,8 @@ const panelFieldClassName = cn(
   'rounded-[14px] border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3 text-[14px] text-[#334155] placeholder:text-[#94A3B8] focus:border-[#3B82F6] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]'
 );
 
-const panelTextareaClassName = cn(
-  panelFieldClassName,
-  'min-h-[96px] resize-y leading-6'
-);
-
 const promptEditorClassName =
-  'min-h-[280px] w-full resize-y rounded-[20px] border border-[#0F172A] bg-[#0F172A] px-5 py-4 font-mono text-[13px] leading-6 text-[#E2E8F0] outline-none transition-all duration-200 placeholder:text-[#64748B] focus:border-[#2563EB] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.18)]';
+  'min-h-[280px] w-full resize-y rounded-[20px] border border-[#D8E2F0] bg-[#EEF3F9] px-5 py-4 font-mono text-[13px] leading-6 text-[#334155] outline-none transition-all duration-200 placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.18)]';
 
 const presetToolbarButtonClassName = cn(
   settingsSecondaryButtonClassName,
@@ -408,9 +409,9 @@ export function ChatPresetsEditorPanel({
       const existingNames = new Set(
         prev.members.map((member) => member.name.toLowerCase())
       );
-      const id = makeUniqueId('custom_member_preset', existingIds);
-      nextId = id;
       const name = makeUniqueName('member', existingNames);
+      const id = makePresetIdFromName(name, existingIds, 'member');
+      nextId = id;
       const nextMember: ChatMemberPreset = {
         id,
         name,
@@ -438,9 +439,9 @@ export function ChatPresetsEditorPanel({
       const existingNames = new Set(
         prev.members.map((item) => item.name.toLowerCase())
       );
-      const id = makeUniqueId(`${slugify(member.id)}_copy`, existingIds);
-      nextId = id;
       const name = makeUniqueName(`${member.name}_copy`, existingNames);
+      const id = makePresetIdFromName(name, existingIds, 'member_copy');
+      nextId = id;
       const copy: ChatMemberPreset = {
         ...cloneDeep(member),
         id,
@@ -474,9 +475,9 @@ export function ChatPresetsEditorPanel({
       const existingNames = new Set(
         prev.teams.map((team) => team.name.toLowerCase())
       );
-      const id = makeUniqueId('custom_team_preset', existingIds);
-      nextId = id;
       const name = makeUniqueName('team', existingNames);
+      const id = makePresetIdFromName(name, existingIds, 'team');
+      nextId = id;
       const nextTeam: ChatTeamPreset = {
         id,
         name,
@@ -501,9 +502,9 @@ export function ChatPresetsEditorPanel({
       const existingNames = new Set(
         prev.teams.map((item) => item.name.toLowerCase())
       );
-      const id = makeUniqueId(`${slugify(team.id)}_copy`, existingIds);
-      nextId = id;
       const name = makeUniqueName(`${team.name} Copy`, existingNames);
+      const id = makePresetIdFromName(name, existingIds, 'team_copy');
+      nextId = id;
       const copy: ChatTeamPreset = {
         ...cloneDeep(team),
         id,
@@ -571,9 +572,11 @@ export function ChatPresetsEditorPanel({
             <h3 className="truncate text-[22px] font-semibold text-[#0F172A]">
               @{getLocalizedMemberName(selectedMember)}
             </h3>
-            <p className="mt-1 truncate text-[13px] text-[#94A3B8]">
-              {selectedMember.description || selectedMember.id}
-            </p>
+            {selectedMember.description ? (
+              <p className="mt-1 truncate text-[13px] text-[#94A3B8]">
+                {selectedMember.description}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -620,15 +623,6 @@ export function ChatPresetsEditorPanel({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-[920px] flex-col gap-6 px-8 py-8">
           <div className="grid gap-6 xl:grid-cols-2">
-            <SettingsField label={t('settings.presets.members.fields.id')}>
-              <input
-                type="text"
-                value={selectedMember.id}
-                readOnly
-                className={panelFieldClassName}
-              />
-            </SettingsField>
-
             <SettingsField label={t('settings.presets.members.fields.name')}>
               <input
                 type="text"
@@ -645,26 +639,26 @@ export function ChatPresetsEditorPanel({
                 )}
               />
             </SettingsField>
-          </div>
 
-          <SettingsField
-            label={t('settings.presets.members.fields.description')}
-          >
-            <input
-              type="text"
-              value={selectedMember.description}
-              onChange={(event) =>
-                updateMember(selectedMember.id, (current) => ({
-                  ...current,
-                  description: event.target.value,
-                }))
-              }
-              className={panelFieldClassName}
-              placeholder={t(
-                'settings.presets.members.fields.descriptionPlaceholder'
-              )}
-            />
-          </SettingsField>
+            <SettingsField
+              label={t('settings.presets.members.fields.description')}
+            >
+              <input
+                type="text"
+                value={selectedMember.description}
+                onChange={(event) =>
+                  updateMember(selectedMember.id, (current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+                className={panelFieldClassName}
+                placeholder={t(
+                  'settings.presets.members.fields.descriptionPlaceholder'
+                )}
+              />
+            </SettingsField>
+          </div>
 
           <SettingsField
             label={t('settings.presets.members.fields.runnerType')}
@@ -767,9 +761,11 @@ export function ChatPresetsEditorPanel({
             <h3 className="truncate text-[22px] font-semibold text-[#0F172A]">
               {getLocalizedTeamName(selectedTeam)}
             </h3>
-            <p className="mt-1 truncate text-[13px] text-[#94A3B8]">
-              {selectedTeam.description || selectedTeam.id}
-            </p>
+            {selectedTeam.description ? (
+              <p className="mt-1 truncate text-[13px] text-[#94A3B8]">
+                {selectedTeam.description}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -816,15 +812,6 @@ export function ChatPresetsEditorPanel({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-[980px] flex-col gap-6 px-8 py-8">
           <div className="grid gap-6 xl:grid-cols-2">
-            <SettingsField label={t('settings.presets.teams.fields.id')}>
-              <input
-                type="text"
-                value={selectedTeam.id}
-                readOnly
-                className={panelFieldClassName}
-              />
-            </SettingsField>
-
             <SettingsField label={t('settings.presets.teams.fields.name')}>
               <input
                 type="text"
@@ -839,24 +826,26 @@ export function ChatPresetsEditorPanel({
                 placeholder={t('settings.presets.teams.fields.namePlaceholder')}
               />
             </SettingsField>
-          </div>
 
-          <SettingsField label={t('settings.presets.teams.fields.description')}>
-            <textarea
-              value={selectedTeam.description}
-              onChange={(event) =>
-                updateTeam(selectedTeam.id, (current) => ({
-                  ...current,
-                  description: event.target.value,
-                }))
-              }
-              rows={4}
-              className={panelTextareaClassName}
-              placeholder={t(
-                'settings.presets.teams.fields.descriptionPlaceholder'
-              )}
-            />
-          </SettingsField>
+            <SettingsField
+              label={t('settings.presets.teams.fields.description')}
+            >
+              <input
+                type="text"
+                value={selectedTeam.description}
+                onChange={(event) =>
+                  updateTeam(selectedTeam.id, (current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+                className={panelFieldClassName}
+                placeholder={t(
+                  'settings.presets.teams.fields.descriptionPlaceholder'
+                )}
+              />
+            </SettingsField>
+          </div>
 
           <SettingsField
             label={
