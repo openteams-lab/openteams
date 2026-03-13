@@ -91,6 +91,9 @@ const normalizeSelectedSkillIds = (value: unknown): string[] => {
   );
 };
 
+const normalizeTeamPresetProtocol = (value: unknown): string =>
+  typeof value === 'string' ? value : '';
+
 const normalizeDraft = (draft: ChatPresetsConfig): ChatPresetsConfig => {
   const members = draft.members.map((member) => ({
     ...member,
@@ -111,6 +114,7 @@ const normalizeDraft = (draft: ChatPresetsConfig): ChatPresetsConfig => {
     name: team.name.trim(),
     description: team.description.trim(),
     member_ids: team.member_ids.filter((id) => validMemberIds.has(id)),
+    team_protocol: normalizeTeamPresetProtocol(team.team_protocol),
   }));
 
   return {
@@ -257,6 +261,8 @@ export function ChatPresetsEditorPanel({
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [isMemberPromptEditorOpen, setIsMemberPromptEditorOpen] =
     useState(false);
+  const [isTeamProtocolEditorOpen, setIsTeamProtocolEditorOpen] =
+    useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -327,6 +333,12 @@ export function ChatPresetsEditorPanel({
       setIsMemberPromptEditorOpen(false);
     }
   }, [selectedMember]);
+
+  useEffect(() => {
+    if (!selectedTeam) {
+      setIsTeamProtocolEditorOpen(false);
+    }
+  }, [selectedTeam]);
 
   const getLocalizedMemberName = useCallback(
     (member: Pick<ChatMemberPreset, 'id' | 'name' | 'is_builtin'>): string => {
@@ -470,6 +482,7 @@ export function ChatPresetsEditorPanel({
         name,
         description: '',
         member_ids: [],
+        team_protocol: '',
         is_builtin: false,
         enabled: true,
       };
@@ -846,6 +859,35 @@ export function ChatPresetsEditorPanel({
           </SettingsField>
 
           <SettingsField
+            label={
+              <div className="flex items-center justify-between gap-3">
+                <span>{tChat('members.teamProtocol.title')}</span>
+                <button
+                  type="button"
+                  className={presetInlineActionButtonClassName}
+                  onClick={() => setIsTeamProtocolEditorOpen(true)}
+                >
+                  {tChat('members.expand')}
+                </button>
+              </div>
+            }
+            description={tChat('members.teamProtocol.modal.description')}
+          >
+            <textarea
+              value={selectedTeam.team_protocol ?? ''}
+              onChange={(event) =>
+                updateTeam(selectedTeam.id, (current) => ({
+                  ...current,
+                  team_protocol: event.target.value,
+                }))
+              }
+              rows={8}
+              className={promptEditorClassName}
+              placeholder={tChat('members.teamProtocol.modal.placeholder')}
+            />
+          </SettingsField>
+
+          <SettingsField
             label={t('settings.presets.teams.fields.members')}
             description={`${selectedTeam.member_ids.length} / ${draft.members.length}`}
           >
@@ -1072,6 +1114,25 @@ export function ChatPresetsEditorPanel({
         }}
         onClose={() => setIsMemberPromptEditorOpen(false)}
         showFileImport={false}
+        size="compact"
+      />
+      <PromptEditorModal
+        isOpen={isTeamProtocolEditorOpen && !!selectedTeam}
+        value={selectedTeam?.team_protocol ?? ''}
+        onChange={(value) => {
+          if (!selectedTeam) return;
+          updateTeam(selectedTeam.id, (current) => ({
+            ...current,
+            team_protocol: value,
+          }));
+        }}
+        onClose={() => setIsTeamProtocolEditorOpen(false)}
+        showFileImport={false}
+        title={tChat('members.teamProtocol.modal.title')}
+        description={tChat('members.teamProtocol.modal.description')}
+        placeholder={tChat('members.teamProtocol.modal.placeholder')}
+        doneText={tCommon('buttons.done')}
+        closeAriaLabel={tChat('members.teamProtocol.modal.close')}
         size="compact"
       />
     </>

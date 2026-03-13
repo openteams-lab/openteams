@@ -940,6 +940,10 @@ export function ChatSessions() {
     MemberPresetImportPlan[] | null
   >(null);
   const [teamImportName, setTeamImportName] = useState<string | null>(null);
+  const [teamImportProtocol, setTeamImportProtocol] = useState<string | null>(
+    null
+  );
+  const [teamProtocolRefreshToken, setTeamProtocolRefreshToken] = useState(0);
   const [isImportingTeam, setIsImportingTeam] = useState(false);
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [isDeletingMessages, setIsDeletingMessages] = useState(false);
@@ -2353,6 +2357,14 @@ export function ChatSessions() {
     ]
   );
 
+  const resolveTeamImportProtocol = useCallback(
+    (protocol: string | null | undefined) => {
+      const raw = protocol ?? '';
+      return raw.trim().length > 0 ? raw : null;
+    },
+    []
+  );
+
   const normalizeAllowedSkillIds = useCallback((skillIds: string[]) => {
     return Array.from(
       new Set(skillIds.map((skillId) => skillId.trim()).filter(Boolean))
@@ -2555,6 +2567,7 @@ export function ChatSessions() {
       }
 
       setTeamImportName(getLocalizedMemberPresetName(preset, t));
+      setTeamImportProtocol(null);
       setTeamImportPlan([plan]);
       setMemberError(null);
     },
@@ -2597,6 +2610,7 @@ export function ChatSessions() {
       }
 
       setTeamImportName(getLocalizedTeamPresetName(teamPreset, t));
+      setTeamImportProtocol(resolveTeamImportProtocol(teamPreset.team_protocol));
       setTeamImportPlan(plan);
       setMemberError(null);
     },
@@ -2604,6 +2618,7 @@ export function ChatSessions() {
       activeSessionId,
       buildTeamImportPlan,
       isArchived,
+      resolveTeamImportProtocol,
       showDuplicateMemberNameWarning,
       t,
     ]
@@ -2670,6 +2685,7 @@ export function ChatSessions() {
       setMemberError(t('members.importPreview.errors.nothingToImport'));
       setTeamImportPlan(null);
       setTeamImportName(null);
+      setTeamImportProtocol(null);
       return;
     }
 
@@ -2693,9 +2709,17 @@ export function ChatSessions() {
     setMemberError(null);
     setTeamImportPlan(preparedPlan);
     try {
+      if (teamImportProtocol) {
+        await chatApi.updateTeamProtocol({
+          content: teamImportProtocol,
+          enabled: true,
+        });
+        setTeamProtocolRefreshToken((current) => current + 1);
+      }
       await importMembersFromPlan(preparedPlan);
       setTeamImportPlan(null);
       setTeamImportName(null);
+      setTeamImportProtocol(null);
       setIsAddMemberOpen(false);
     } catch (error) {
       console.error('Failed to import team preset', error);
@@ -2713,6 +2737,7 @@ export function ChatSessions() {
     importMembersFromPlan,
     setIsAddMemberOpen,
     teamImportPlan,
+    teamImportProtocol,
     t,
     validateAndPrepareImportPlan,
   ]);
@@ -2721,6 +2746,7 @@ export function ChatSessions() {
     if (isImportingTeam) return;
     setTeamImportPlan(null);
     setTeamImportName(null);
+    setTeamImportProtocol(null);
   }, [isImportingTeam]);
 
   const handleAddMember = async () => {
@@ -3751,6 +3777,8 @@ export function ChatSessions() {
             onImportTeamPreset={handleImportTeamPreset}
             teamImportPlan={teamImportPlan}
             teamImportName={teamImportName}
+            teamImportProtocol={teamImportProtocol}
+            teamProtocolRefreshToken={teamProtocolRefreshToken}
             isImportingTeam={isImportingTeam}
             onUpdateTeamImportPlanEntry={handleUpdateTeamImportPlanEntry}
             onConfirmTeamImport={handleConfirmTeamImport}
