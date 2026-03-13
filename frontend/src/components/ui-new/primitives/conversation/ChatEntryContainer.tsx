@@ -48,6 +48,7 @@ const variantConfig: Record<Variant, VariantConfig> = {
 interface ChatEntryContainerProps {
   variant: Variant;
   title?: React.ReactNode;
+  titleClassName?: string;
   icon?: ReactNode;
   headerRight?: React.ReactNode;
   expanded?: boolean;
@@ -68,6 +69,7 @@ interface ChatEntryContainerProps {
 export function ChatEntryContainer({
   variant,
   title,
+  titleClassName,
   icon,
   headerRight,
   expanded = false,
@@ -127,7 +129,14 @@ export function ChatEntryContainer({
           )}
         </span>
         {title && (
-          <span className="flex-1 text-sm text-normal truncate">{title}</span>
+          <span
+            className={cn(
+              'flex-1 text-sm text-normal truncate',
+              titleClassName
+            )}
+          >
+            {title}
+          </span>
         )}
         {headerRight}
         {onToggle && (

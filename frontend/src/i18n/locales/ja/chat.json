@@ -21,11 +21,11 @@
     "skills": "スキルライブラリ",
     "archivedSection": "アーカイブ",
     "settingsInSidebar": "設定",
-    "searchSessions": "????????",
-    "searchSessionsPlaceholder": "?????????...",
-    "clearSessionSearch": "???????????",
-    "noSearchResults": "?{{query}}??????????????????",
-    "generatedSessionTitle": "{{date}} ???"
+    "searchSessions": "セッションを検索",
+    "searchSessionsPlaceholder": "セッション名を検索...",
+    "clearSessionSearch": "セッション検索をクリア",
+    "noSearchResults": "「{{query}}」に一致するセッションはありません。",
+    "generatedSessionTitle": "{{date}} 開始"
   },
   "header": {
     "untitledSession": "無題のセッション",
@@ -45,16 +45,16 @@
     "exitCleanupMode": "クリーンアップモードを終了",
     "settings": "設定",
     "moreActions": "その他の操作",
-    "generatedTitleBadge": "??????",
-    "contextMeter": "????????",
+    "generatedTitleBadge": "自動タイトル",
+    "contextMeter": "コンテキスト負荷",
     "contextUsage": "{{used}} / {{limit}}",
-    "contextUsageUnknown": "{{used}} ??",
-    "contextLoadLow": "????",
-    "contextLoadMedium": "?????",
-    "contextLoadHigh": "????",
+    "contextUsageUnknown": "{{used}} 使用済み",
+    "contextLoadLow": "軽負荷",
+    "contextLoadMedium": "中負荷",
+    "contextLoadHigh": "高負荷",
     "openMembersPanel": "AIメンバー一覧を開く",
     "closeMembersPanel": "AIメンバー一覧を閉じる",
-    "latestArtifact": "??????"
+    "latestArtifact": "最新成果物"
   },
   "input": {
     "mentionAgents": "エージェントをメンション",
@@ -73,8 +73,8 @@
     "sendHint": "Enterで送信、Shift+Enterで改行。",
     "addAttachment": "添付ファイルを追加",
     "send": "送信",
-    "workbenchHint": "??????????????????????????????? @ ????????????",
-    "attachmentCount": "{{count}} ???????????"
+    "workbenchHint": "スクリーンショットの貼り付け、ファイルのドラッグ、または @ で作業を振り分けできます。",
+    "attachmentCount": "{{count}} 件のファイルを準備完了"
   },
   "message": {
     "quote": "引用",
@@ -188,7 +188,7 @@
     "presetTeamSection": "チーム",
     "addFromMemberPreset": "メンバープリセットを追加",
     "importTeamPreset": "チームプリセットをインポート",
-    "noEnabledPresets": "???????????????AI ?????????????",
+    "noEnabledPresets": "有効なプリセットがありません。AI チームで設定してください。",
     "presetSearchPlaceholder": "プリセット AI またはチームを検索",
     "noPresetSearchResults": "一致するプリセット AI またはチームがありません。",
     "noPresetSearchResultsHint": "別のキーワードを試すか、カスタム AI に切り替えてください。",
@@ -435,21 +435,21 @@
       "refresh": "更新",
       "loadingLog": "ログを読み込み中...",
       "logEmpty": "ログは空です。",
-      "workspaceTrail": "??????????"
+      "workspaceTrail": "ワークスペースの階層"
     }
   },
   "workspacePreview": {
-    "title": "????????????",
-    "empty": "????????????????????????????",
-    "files": "????",
-    "added": "??",
-    "removed": "??",
+    "title": "ワークスペースプレビュー",
+    "empty": "成果物またはコード変更を選択すると、ここで内容を確認できます。",
+    "files": "ファイル",
+    "added": "追加",
+    "removed": "削除",
     "html": "HTML",
-    "image": "??",
-    "diff": "??",
-    "liveReport": "?????????",
-    "imagePreview": "???????",
-    "filesChanged": "{{count}} ??????",
-    "runLabel": "?? {{id}}"
+    "image": "画像",
+    "diff": "差分",
+    "liveReport": "ライブレポート",
+    "imagePreview": "画像プレビュー",
+    "filesChanged": "{{count}} 件のファイル",
+    "runLabel": "実行 {{id}}"
   }
 }

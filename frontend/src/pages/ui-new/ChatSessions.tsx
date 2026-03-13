@@ -953,6 +953,7 @@ export function ChatSessions() {
   const [lastSeenArtifactKey, setLastSeenArtifactKey] = useState<string | null>(
     null
   );
+  const hasBootstrappedInitialSessionRef = useRef(false);
   const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
   const resizeStartRef = useRef<{
     startX: number;
@@ -1066,6 +1067,16 @@ export function ChatSessions() {
     setTeamImportPlan(null);
     setTeamImportName(null);
   }, [activeSessionId, resetInput, resetDiffViewer, setReplyToMessage]);
+
+  useEffect(() => {
+    if (isSessionsLoading) return;
+    if (hasBootstrappedInitialSessionRef.current) return;
+
+    hasBootstrappedInitialSessionRef.current = true;
+    if (sortedSessions.length > 0) return;
+
+    createSession.mutate();
+  }, [createSession, isSessionsLoading, sortedSessions.length]);
 
   // Navigate to first session if needed
   useEffect(() => {
@@ -3237,508 +3248,515 @@ export function ChatSessions() {
         />
       )}
 
-      {/* Main Chat Section */}
-      <section className="chat-session-main flex-1 min-w-0 min-h-0 flex flex-col">
-        <ChatHeader
-          activeSession={activeSession ?? null}
-          displayTitle={activeSessionDisplayTitle}
-          isGeneratedTitle={isGeneratedActiveSessionTitle}
-          isSearchOpen={isMessageSearchOpen}
-          searchQuery={messageSearchQuery}
-          onOpenSearch={handleOpenMessageSearch}
-          onCloseSearch={handleCloseMessageSearch}
-          onSearchQueryChange={setMessageSearchQuery}
-          isArchived={isArchived}
-          isEditingTitle={isEditingTitle}
-          titleDraft={titleDraft}
-          titleError={titleError}
-          isSavingTitle={updateSession.isPending}
-          onStartEditTitle={() => {
-            if (isGeneratedActiveSessionTitle) {
-              setTitleDraft(activeSessionEditableSuggestion);
-            }
-            setIsEditingTitle(true);
-            setTitleError(null);
-          }}
-          onTitleDraftChange={(value) => {
-            setTitleDraft(value);
-            if (getSessionTitleLength(value) > MAX_SESSION_TITLE_LENGTH) {
-              setTitleError(
-                `Session name cannot exceed ${MAX_SESSION_TITLE_LENGTH} characters.`
-              );
-            } else {
+      <div className="chat-session-main-shell relative flex flex-1 min-w-0 min-h-0">
+        {/* Main Chat Section */}
+        <section className="chat-session-main flex-1 min-w-0 min-h-0 flex flex-col">
+          <ChatHeader
+            activeSession={activeSession ?? null}
+            displayTitle={activeSessionDisplayTitle}
+            isGeneratedTitle={isGeneratedActiveSessionTitle}
+            isSearchOpen={isMessageSearchOpen}
+            searchQuery={messageSearchQuery}
+            onOpenSearch={handleOpenMessageSearch}
+            onCloseSearch={handleCloseMessageSearch}
+            onSearchQueryChange={setMessageSearchQuery}
+            isArchived={isArchived}
+            isEditingTitle={isEditingTitle}
+            titleDraft={titleDraft}
+            titleError={titleError}
+            isSavingTitle={updateSession.isPending}
+            onStartEditTitle={() => {
+              if (isGeneratedActiveSessionTitle) {
+                setTitleDraft(activeSessionEditableSuggestion);
+              }
+              setIsEditingTitle(true);
               setTitleError(null);
-            }
-          }}
-          onSaveTitle={handleSaveTitle}
-          onCancelTitleEdit={handleCancelTitleEdit}
-          onDeleteSession={() => {
-            if (!activeSession) return;
-            setConfirmModal({
-              title: t('modals.confirm.titles.deleteSession'),
-              message: t('modals.confirm.messages.deleteSession', {
-                title: activeSessionDisplayTitle,
-              }),
-              onConfirm: async () => {
-                await deleteSession.mutateAsync(activeSession.id);
-              },
-            });
-          }}
-          onArchive={() => {
-            if (activeSessionId) archiveSession.mutate(activeSessionId);
-          }}
-          onRestore={() => {
-            if (activeSessionId) restoreSession.mutate(activeSessionId);
-          }}
-          isArchiving={archiveSession.isPending || restoreSession.isPending}
-          isCleanupMode={isCleanupMode}
-          onToggleCleanupMode={() => {
-            if (isCleanupMode) {
-              setIsCleanupMode(false);
-              setSelectedMessageIds(new Set());
-            } else {
-              setIsCleanupMode(true);
-            }
-          }}
-          isDeletingMessages={isDeletingMessages}
-          hasChanges={
-            artifactSpotlight?.kind === 'diff' && artifactSpotlight.hasDiff
-          }
-          hasNewChanges={hasNewChanges}
-          onViewChanges={
-            artifactSpotlight?.kind === 'diff'
-              ? () => handleSelectWorkspacePreview(artifactSpotlight)
-              : undefined
-          }
-        />
-
-        {/* Cleanup mode controls */}
-        {activeSession && isCleanupMode && (
-          <CleanupModeBar
-            selectedCount={selectedMessageIds.size}
-            totalCount={messageList.length}
-            onToggleSelectAll={() => {
-              if (selectedMessageIds.size === messageList.length) {
-                setSelectedMessageIds(new Set());
+            }}
+            onTitleDraftChange={(value) => {
+              setTitleDraft(value);
+              if (getSessionTitleLength(value) > MAX_SESSION_TITLE_LENGTH) {
+                setTitleError(
+                  `Session name cannot exceed ${MAX_SESSION_TITLE_LENGTH} characters.`
+                );
               } else {
-                setSelectedMessageIds(new Set(messageList.map((m) => m.id)));
+                setTitleError(null);
               }
             }}
-            onDeleteSelected={() => {
-              if (!activeSessionId) return;
-              const count = selectedMessageIds.size;
+            onSaveTitle={handleSaveTitle}
+            onCancelTitleEdit={handleCancelTitleEdit}
+            onDeleteSession={() => {
+              if (!activeSession) return;
               setConfirmModal({
-                title: t('modals.confirm.titles.deleteMessages'),
-                message: t('modals.confirm.messages.deleteMessages', {
-                  count,
+                title: t('modals.confirm.titles.deleteSession'),
+                message: t('modals.confirm.messages.deleteSession', {
+                  title: activeSessionDisplayTitle,
                 }),
                 onConfirm: async () => {
-                  setIsDeletingMessages(true);
-                  try {
-                    await deleteMessages.mutateAsync({
-                      sessionId: activeSessionId,
-                      messageIds: Array.from(selectedMessageIds),
-                    });
-                    setSelectedMessageIds(new Set());
-                    setIsCleanupMode(false);
-                  } finally {
-                    setIsDeletingMessages(false);
-                  }
+                  await deleteSession.mutateAsync(activeSession.id);
                 },
               });
             }}
-            isDeletingMessages={isDeletingMessages}
-            onCancel={() => {
-              setSelectedMessageIds(new Set());
-              setIsCleanupMode(false);
+            onArchive={() => {
+              if (activeSessionId) archiveSession.mutate(activeSessionId);
             }}
+            onRestore={() => {
+              if (activeSessionId) restoreSession.mutate(activeSessionId);
+            }}
+            isArchiving={archiveSession.isPending || restoreSession.isPending}
+            isCleanupMode={isCleanupMode}
+            onToggleCleanupMode={() => {
+              if (isCleanupMode) {
+                setIsCleanupMode(false);
+                setSelectedMessageIds(new Set());
+              } else {
+                setIsCleanupMode(true);
+              }
+            }}
+            isDeletingMessages={isDeletingMessages}
+            hasChanges={
+              artifactSpotlight?.kind === 'diff' && artifactSpotlight.hasDiff
+            }
+            hasNewChanges={hasNewChanges}
+            onViewChanges={
+              artifactSpotlight?.kind === 'diff'
+                ? () => handleSelectWorkspacePreview(artifactSpotlight)
+                : undefined
+            }
           />
+
+          {/* Cleanup mode controls */}
+          {activeSession && isCleanupMode && (
+            <CleanupModeBar
+              selectedCount={selectedMessageIds.size}
+              totalCount={messageList.length}
+              onToggleSelectAll={() => {
+                if (selectedMessageIds.size === messageList.length) {
+                  setSelectedMessageIds(new Set());
+                } else {
+                  setSelectedMessageIds(new Set(messageList.map((m) => m.id)));
+                }
+              }}
+              onDeleteSelected={() => {
+                if (!activeSessionId) return;
+                const count = selectedMessageIds.size;
+                setConfirmModal({
+                  title: t('modals.confirm.titles.deleteMessages'),
+                  message: t('modals.confirm.messages.deleteMessages', {
+                    count,
+                  }),
+                  onConfirm: async () => {
+                    setIsDeletingMessages(true);
+                    try {
+                      await deleteMessages.mutateAsync({
+                        sessionId: activeSessionId,
+                        messageIds: Array.from(selectedMessageIds),
+                      });
+                      setSelectedMessageIds(new Set());
+                      setIsCleanupMode(false);
+                    } finally {
+                      setIsDeletingMessages(false);
+                    }
+                  },
+                });
+              }}
+              isDeletingMessages={isDeletingMessages}
+              onCancel={() => {
+                setSelectedMessageIds(new Set());
+                setIsCleanupMode(false);
+              }}
+            />
+          )}
+
+          <div
+            className={cn(
+              'chat-session-workspace-shell flex-1 min-h-0',
+              isWorkspacePreviewOpen &&
+                workspacePreviewArtifact &&
+                'is-preview-open',
+              !isRightSidebarOpen && 'is-sidebar-closed'
+            )}
+          >
+            <div className="chat-session-workspace-chat min-h-0 flex-1 flex flex-col">
+              <div className="chat-session-content-wrapper flex-1 min-h-0 flex flex-col">
+                {/* Messages */}
+                <div
+                  ref={messagesContainerRef}
+                  className="chat-session-messages flex-1 min-h-0 overflow-y-auto p-base pb-[40px] space-y-base"
+                >
+                  <div className="chat-session-message-column space-y-double">
+                    {isLoading && (
+                      <div className="text-sm text-low">
+                        {t('timeline.loading')}
+                      </div>
+                    )}
+                    {isArchived && !isLoading && (
+                      <div className="text-xs text-low border border-border rounded-sm bg-secondary/60 px-base py-half">
+                        {t('timeline.archivedReadonly')}
+                      </div>
+                    )}
+                    {compressionWarning && (
+                      <div className="chat-session-compression-warning text-xs border border-yellow-500/50 rounded-sm bg-yellow-500/10 px-base py-half flex items-center justify-between">
+                        <div className="flex items-center gap-half">
+                          <span className="text-yellow-600 dark:text-yellow-400">
+                            !
+                          </span>
+                          <span className="text-yellow-700 dark:text-yellow-300">
+                            {compressionWarning.message}
+                          </span>
+                          <span className="text-yellow-600/80 dark:text-yellow-400/80 ml-1">
+                            ({compressionWarning.split_file_path})
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200 text-xs"
+                          onClick={clearCompressionWarning}
+                        >
+                          x
+                        </button>
+                      </div>
+                    )}
+                    {!isLoading && messageList.length === 0 && (
+                      <div className="text-sm text-low">
+                        {t('timeline.empty')}
+                      </div>
+                    )}
+                    {!isLoading &&
+                      messageList.length > 0 &&
+                      trimmedMessageSearchQuery &&
+                      filteredMessageList.length === 0 && (
+                        <div className="text-sm text-low">
+                          {t('timeline.noMatches', {
+                            query: messageSearchQuery.trim(),
+                          })}
+                        </div>
+                      )}
+
+                    {filteredMessageList.map((message) => {
+                      const isAgent =
+                        message.sender_type === ChatSenderType.agent;
+                      const agentName =
+                        isAgent && message.sender_id
+                          ? (agentById.get(message.sender_id)?.name ?? 'Agent')
+                          : null;
+                      const diffMeta = isAgent
+                        ? extractDiffMeta(message.meta)
+                        : null;
+                      const diffInfo =
+                        diffMeta && diffMeta.runId ? diffMeta : null;
+                      const attachments = extractAttachments(message.meta);
+                      const mentionList = Array.from(
+                        new Set(
+                          message.mentions.filter(
+                            (mention) => mention.length > 0
+                          )
+                        )
+                      );
+                      const mentionStatusMap = mentionStatuses.get(message.id);
+                      const referenceId = extractReferenceId(message.meta);
+                      const referenceMessage = referenceId
+                        ? messageById.get(referenceId)
+                        : null;
+                      const isUser =
+                        message.sender_type === ChatSenderType.user;
+                      const toneKey = isUser
+                        ? 'user'
+                        : (message.sender_id ?? agentName ?? 'agent');
+                      const tone = getMessageTone(String(toneKey), isUser);
+
+                      const isSelected = selectedMessageIds.has(message.id);
+
+                      return (
+                        <ChatMessageItem
+                          key={message.id}
+                          message={message}
+                          senderLabel={getMessageSenderLabel(message)}
+                          senderRunnerType={
+                            isAgent && message.sender_id
+                              ? (agentById.get(message.sender_id)
+                                  ?.runner_type ?? null)
+                              : null
+                          }
+                          tone={tone}
+                          referenceMessage={referenceMessage ?? null}
+                          referenceSenderLabel={
+                            referenceMessage
+                              ? getMessageSenderLabel(referenceMessage)
+                              : null
+                          }
+                          referencePreview={
+                            referenceMessage
+                              ? getReferencePreview(referenceMessage)
+                              : null
+                          }
+                          mentionList={mentionList}
+                          mentionStatusMap={mentionStatusMap}
+                          agentStates={agentStates}
+                          agentIdByName={agentIdByName}
+                          attachments={attachments}
+                          activeSessionId={activeSessionId}
+                          onPreviewAttachment={handlePreviewMessageAttachment}
+                          diffInfo={diffInfo}
+                          runDiffs={runDiffs}
+                          onOpenDiffViewer={(runId, untrackedFiles, hasDiff) =>
+                            handleSelectWorkspacePreview({
+                              kind: 'diff',
+                              runId,
+                              sourceLabel: getMessageSenderLabel(message),
+                              createdAt: message.created_at,
+                              hasDiff,
+                              untrackedFiles,
+                              previewText: diffInfo?.preview ?? null,
+                            })
+                          }
+                          isArchived={isArchived}
+                          onReply={handleLocalReplySelect}
+                          isCleanupMode={isCleanupMode}
+                          isSelected={isSelected}
+                          onToggleSelect={() => {
+                            setSelectedMessageIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(message.id)) {
+                                next.delete(message.id);
+                              } else {
+                                next.add(message.id);
+                              }
+                              return next;
+                            });
+                          }}
+                        />
+                      );
+                    })}
+                    {protocolNotices.map((notice) => {
+                      const isEmptyMessageNotice =
+                        notice.code === 'empty_message';
+
+                      return (
+                        <div
+                          key={notice.id}
+                          className="chat-session-message-row is-system flex justify-start"
+                        >
+                          <div className="w-[600px] max-w-full rounded-2xl bg-[#F3F4F6] px-base py-half">
+                            <div className="flex items-start justify-between gap-base">
+                              <div className="min-w-0 flex-1">
+                                <ChatSystemMessage
+                                  content={formatProtocolNoticeContent(notice)}
+                                  expanded
+                                  className={
+                                    isEmptyMessageNotice
+                                      ? 'text-[#6B7280]'
+                                      : 'text-[#4B5563]'
+                                  }
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                className="shrink-0 bg-transparent p-0 text-xs text-[#5094FB] hover:text-[#5094FB]/80"
+                                onClick={() => dismissProtocolNotice(notice.id)}
+                              >
+                                {t('protocolNotice.dismiss')}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {placeholderAgents.map((member) => (
+                      <RunningAgentPlaceholder
+                        key={`placeholder-${member.agent.id}`}
+                        member={member}
+                        run={runByAgentId.get(member.agent.id)}
+                        tone={getMessageTone(member.agent.id, false)}
+                        stateInfo={agentStateInfos[member.agent.id]}
+                        clock={clock}
+                        isStopping={stoppingAgents.has(member.agent.id)}
+                        onStop={handleStopAgent}
+                      />
+                    ))}
+
+                    <div ref={bottomRef} />
+                  </div>
+                </div>
+
+                {/* Message Input */}
+                <MessageInputArea
+                  draft={draft}
+                  onDraftChange={handleDraftChange}
+                  inputRef={inputRef}
+                  selectedMentions={selectedMentions}
+                  onSelectedMentionsChange={setSelectedMentions}
+                  agentOptions={agentOptionsWithAll}
+                  mentionAgentsCount={mentionAgents.length}
+                  mentionQuery={mentionQuery}
+                  showMentionAllSuggestion={showMentionAllSuggestion}
+                  visibleMentionSuggestions={visibleMentionSuggestions}
+                  highlightedMentionIndex={highlightedMentionIndex}
+                  onMentionSelect={handleMentionSelect}
+                  onMentionKeyDown={handleMentionKeyDown}
+                  replyToMessage={replyToMessage}
+                  replyToSenderLabel={
+                    replyToMessage
+                      ? getMessageSenderLabel(replyToMessage)
+                      : null
+                  }
+                  replyToPreview={
+                    replyToMessage ? getReferencePreview(replyToMessage) : null
+                  }
+                  onCancelReply={() => setReplyToMessage(null)}
+                  attachedFiles={attachedFiles}
+                  attachmentError={attachmentError}
+                  isUploadingAttachments={isUploadingAttachments}
+                  onAttachmentInputChange={handleAttachmentInputChange}
+                  onRemoveAttachedFile={removeAttachedFile}
+                  onClearAttachedFiles={clearAttachedFiles}
+                  onPreviewFile={previewAttachedFile}
+                  fileInputRef={fileInputRef}
+                  canSend={canSend}
+                  isSending={sendMessage.isPending}
+                  onSend={handleSend}
+                  isArchived={isArchived}
+                  activeSessionId={activeSessionId}
+                />
+              </div>
+            </div>
+
+            {isWorkspacePreviewOpen && workspacePreviewArtifact && (
+              <WorkspacePreviewPane
+                artifact={workspacePreviewArtifact}
+                diffState={
+                  workspacePreviewArtifact.kind === 'diff'
+                    ? runDiffs[workspacePreviewArtifact.runId]
+                    : undefined
+                }
+                title={t('workspacePreview.title')}
+                openLabel={t('message.open')}
+                viewChangesLabel={t('message.viewChanges')}
+                emptyLabel={t('workspacePreview.empty')}
+                closeLabel={tCommon('buttons.close')}
+                loadingLabel={t('message.loadingDiff')}
+                filesLabel={t('workspacePreview.files')}
+                addedLabel={t('workspacePreview.added')}
+                removedLabel={t('workspacePreview.removed')}
+                onClose={() => setIsWorkspacePreviewOpen(false)}
+                onOpenDiffModal={handleOpenDiffViewer}
+              />
+            )}
+          </div>
+        </section>
+
+        {/* Right Sidebar Resize Handle */}
+        {isRightSidebarOpen && (
+          <div
+            className="chat-session-resize-handle w-1 cursor-col-resize transition-colors shrink-0"
+            onMouseDown={(e) => handleResizeStart('right', e)}
+          />
+        )}
+
+        {!isRightSidebarOpen && activeSessionId && (
+          <button
+            type="button"
+            className="chat-session-right-collapsed-toggle"
+            onClick={() => setIsRightSidebarOpen(true)}
+            aria-label={t('header.openMembersPanel')}
+            title={t('header.openMembersPanel')}
+          >
+            <UsersThreeIcon className="size-icon-xs" />
+            <span>
+              {sessionMembers.length} {t('header.aiMembers')}
+            </span>
+          </button>
         )}
 
         <div
           className={cn(
-            'chat-session-workspace-shell flex-1 min-h-0',
-            isWorkspacePreviewOpen &&
-              workspacePreviewArtifact &&
-              'is-preview-open',
-            !isRightSidebarOpen && 'is-sidebar-closed'
+            'chat-session-right-drawer-shell shrink-0 min-h-0 overflow-hidden',
+            isRightSidebarOpen && 'is-open'
           )}
+          style={{ width: isRightSidebarOpen ? rightSidebarWidth : 0 }}
         >
-          <div className="chat-session-workspace-chat min-h-0 flex-1 flex flex-col">
-            <div className="chat-session-content-wrapper flex-1 min-h-0 flex flex-col">
-              {/* Messages */}
-              <div
-                ref={messagesContainerRef}
-                className="chat-session-messages flex-1 min-h-0 overflow-y-auto p-base pb-[40px] space-y-base"
-              >
-                <div className="chat-session-message-column space-y-double">
-                  {isLoading && (
-                    <div className="text-sm text-low">
-                      {t('timeline.loading')}
-                    </div>
-                  )}
-                  {isArchived && !isLoading && (
-                    <div className="text-xs text-low border border-border rounded-sm bg-secondary/60 px-base py-half">
-                      {t('timeline.archivedReadonly')}
-                    </div>
-                  )}
-                  {compressionWarning && (
-                    <div className="chat-session-compression-warning text-xs border border-yellow-500/50 rounded-sm bg-yellow-500/10 px-base py-half flex items-center justify-between">
-                      <div className="flex items-center gap-half">
-                        <span className="text-yellow-600 dark:text-yellow-400">
-                          !
-                        </span>
-                        <span className="text-yellow-700 dark:text-yellow-300">
-                          {compressionWarning.message}
-                        </span>
-                        <span className="text-yellow-600/80 dark:text-yellow-400/80 ml-1">
-                          ({compressionWarning.split_file_path})
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200 text-xs"
-                        onClick={clearCompressionWarning}
-                      >
-                        x
-                      </button>
-                    </div>
-                  )}
-                  {!isLoading && messageList.length === 0 && (
-                    <div className="text-sm text-low">
-                      {t('timeline.empty')}
-                    </div>
-                  )}
-                  {!isLoading &&
-                    messageList.length > 0 &&
-                    trimmedMessageSearchQuery &&
-                    filteredMessageList.length === 0 && (
-                      <div className="text-sm text-low">
-                        {t('timeline.noMatches', {
-                          query: messageSearchQuery.trim(),
-                        })}
-                      </div>
-                    )}
-
-                  {filteredMessageList.map((message) => {
-                    const isAgent =
-                      message.sender_type === ChatSenderType.agent;
-                    const agentName =
-                      isAgent && message.sender_id
-                        ? (agentById.get(message.sender_id)?.name ?? 'Agent')
-                        : null;
-                    const diffMeta = isAgent
-                      ? extractDiffMeta(message.meta)
-                      : null;
-                    const diffInfo =
-                      diffMeta && diffMeta.runId ? diffMeta : null;
-                    const attachments = extractAttachments(message.meta);
-                    const mentionList = Array.from(
-                      new Set(
-                        message.mentions.filter((mention) => mention.length > 0)
-                      )
-                    );
-                    const mentionStatusMap = mentionStatuses.get(message.id);
-                    const referenceId = extractReferenceId(message.meta);
-                    const referenceMessage = referenceId
-                      ? messageById.get(referenceId)
-                      : null;
-                    const isUser = message.sender_type === ChatSenderType.user;
-                    const toneKey = isUser
-                      ? 'user'
-                      : (message.sender_id ?? agentName ?? 'agent');
-                    const tone = getMessageTone(String(toneKey), isUser);
-
-                    const isSelected = selectedMessageIds.has(message.id);
-
-                    return (
-                      <ChatMessageItem
-                        key={message.id}
-                        message={message}
-                        senderLabel={getMessageSenderLabel(message)}
-                        senderRunnerType={
-                          isAgent && message.sender_id
-                            ? (agentById.get(message.sender_id)?.runner_type ??
-                              null)
-                            : null
-                        }
-                        tone={tone}
-                        referenceMessage={referenceMessage ?? null}
-                        referenceSenderLabel={
-                          referenceMessage
-                            ? getMessageSenderLabel(referenceMessage)
-                            : null
-                        }
-                        referencePreview={
-                          referenceMessage
-                            ? getReferencePreview(referenceMessage)
-                            : null
-                        }
-                        mentionList={mentionList}
-                        mentionStatusMap={mentionStatusMap}
-                        agentStates={agentStates}
-                        agentIdByName={agentIdByName}
-                        attachments={attachments}
-                        activeSessionId={activeSessionId}
-                        onPreviewAttachment={handlePreviewMessageAttachment}
-                        diffInfo={diffInfo}
-                        runDiffs={runDiffs}
-                        onOpenDiffViewer={(runId, untrackedFiles, hasDiff) =>
-                          handleSelectWorkspacePreview({
-                            kind: 'diff',
-                            runId,
-                            sourceLabel: getMessageSenderLabel(message),
-                            createdAt: message.created_at,
-                            hasDiff,
-                            untrackedFiles,
-                            previewText: diffInfo?.preview ?? null,
-                          })
-                        }
-                        isArchived={isArchived}
-                        onReply={handleLocalReplySelect}
-                        isCleanupMode={isCleanupMode}
-                        isSelected={isSelected}
-                        onToggleSelect={() => {
-                          setSelectedMessageIds((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(message.id)) {
-                              next.delete(message.id);
-                            } else {
-                              next.add(message.id);
-                            }
-                            return next;
-                          });
-                        }}
-                      />
-                    );
-                  })}
-                  {protocolNotices.map((notice) => {
-                    const isEmptyMessageNotice =
-                      notice.code === 'empty_message';
-
-                    return (
-                      <div
-                        key={notice.id}
-                        className="chat-session-message-row is-system flex justify-start"
-                      >
-                        <div className="w-[600px] max-w-full rounded-2xl bg-[#F3F4F6] px-base py-half">
-                          <div className="flex items-start justify-between gap-base">
-                            <div className="min-w-0 flex-1">
-                              <ChatSystemMessage
-                                content={formatProtocolNoticeContent(notice)}
-                                expanded
-                                className={
-                                  isEmptyMessageNotice
-                                    ? 'text-[#6B7280]'
-                                    : 'text-[#4B5563]'
-                                }
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              className="shrink-0 bg-transparent p-0 text-xs text-[#5094FB] hover:text-[#5094FB]/80"
-                              onClick={() => dismissProtocolNotice(notice.id)}
-                            >
-                              {t('protocolNotice.dismiss')}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {placeholderAgents.map((member) => (
-                    <RunningAgentPlaceholder
-                      key={`placeholder-${member.agent.id}`}
-                      member={member}
-                      run={runByAgentId.get(member.agent.id)}
-                      tone={getMessageTone(member.agent.id, false)}
-                      stateInfo={agentStateInfos[member.agent.id]}
-                      clock={clock}
-                      isStopping={stoppingAgents.has(member.agent.id)}
-                      onStop={handleStopAgent}
-                    />
-                  ))}
-
-                  <div ref={bottomRef} />
-                </div>
-              </div>
-
-              {/* Message Input */}
-              <MessageInputArea
-                draft={draft}
-                onDraftChange={handleDraftChange}
-                inputRef={inputRef}
-                selectedMentions={selectedMentions}
-                onSelectedMentionsChange={setSelectedMentions}
-                agentOptions={agentOptionsWithAll}
-                mentionAgentsCount={mentionAgents.length}
-                mentionQuery={mentionQuery}
-                showMentionAllSuggestion={showMentionAllSuggestion}
-                visibleMentionSuggestions={visibleMentionSuggestions}
-                highlightedMentionIndex={highlightedMentionIndex}
-                onMentionSelect={handleMentionSelect}
-                onMentionKeyDown={handleMentionKeyDown}
-                replyToMessage={replyToMessage}
-                replyToSenderLabel={
-                  replyToMessage ? getMessageSenderLabel(replyToMessage) : null
-                }
-                replyToPreview={
-                  replyToMessage ? getReferencePreview(replyToMessage) : null
-                }
-                onCancelReply={() => setReplyToMessage(null)}
-                attachedFiles={attachedFiles}
-                attachmentError={attachmentError}
-                isUploadingAttachments={isUploadingAttachments}
-                onAttachmentInputChange={handleAttachmentInputChange}
-                onRemoveAttachedFile={removeAttachedFile}
-                onClearAttachedFiles={clearAttachedFiles}
-                onPreviewFile={previewAttachedFile}
-                fileInputRef={fileInputRef}
-                canSend={canSend}
-                isSending={sendMessage.isPending}
-                onSend={handleSend}
-                isArchived={isArchived}
-                activeSessionId={activeSessionId}
-              />
-            </div>
-          </div>
-
-          {isWorkspacePreviewOpen && workspacePreviewArtifact && (
-            <WorkspacePreviewPane
-              artifact={workspacePreviewArtifact}
-              diffState={
-                workspacePreviewArtifact.kind === 'diff'
-                  ? runDiffs[workspacePreviewArtifact.runId]
-                  : undefined
-              }
-              title={t('workspacePreview.title')}
-              openLabel={t('message.open')}
-              viewChangesLabel={t('message.viewChanges')}
-              emptyLabel={t('workspacePreview.empty')}
-              closeLabel={tCommon('buttons.close')}
-              loadingLabel={t('message.loadingDiff')}
-              filesLabel={t('workspacePreview.files')}
-              addedLabel={t('workspacePreview.added')}
-              removedLabel={t('workspacePreview.removed')}
-              onClose={() => setIsWorkspacePreviewOpen(false)}
-              onOpenDiffModal={handleOpenDiffViewer}
-            />
-          )}
+          <AiMembersSidebar
+            sessionMembers={sessionMembers}
+            agentStates={agentStates}
+            activeSessionId={activeSessionId}
+            isArchived={isArchived}
+            width={rightSidebarWidth}
+            isPanelOpen={isRightSidebarOpen}
+            onTogglePanel={() => setIsRightSidebarOpen((prev) => !prev)}
+            isAddMemberOpen={isAddMemberOpen}
+            editingMember={editingMember}
+            newMemberName={newMemberName}
+            newMemberRunnerType={newMemberRunnerType}
+            newMemberVariant={newMemberVariant}
+            newMemberPrompt={newMemberPrompt}
+            newMemberWorkspace={newMemberWorkspace}
+            newMemberSkillIds={newMemberSkillIds}
+            memberNameLengthError={memberNameLengthError}
+            onNameChange={setNewMemberName}
+            onRunnerTypeChange={setNewMemberRunnerType}
+            onVariantChange={setNewMemberVariant}
+            onPromptChange={setNewMemberPrompt}
+            onWorkspaceChange={setNewMemberWorkspace}
+            onMemberSkillIdsChange={setNewMemberSkillIds}
+            memberError={memberError}
+            isSavingMember={isSavingMember}
+            availableRunnerTypes={availableRunnerTypes}
+            enabledRunnerTypes={enabledRunnerTypes}
+            isCheckingAvailability={isCheckingAvailability}
+            isRunnerAvailable={isRunnerAvailable}
+            availabilityLabel={availabilityLabel}
+            memberVariantOptions={memberVariantOptions}
+            getModelName={getModelName}
+            getModelDisplayName={getModelDisplayName}
+            getVariantLabel={getVariantLabel}
+            getVariantOptions={getVariantOptions}
+            onOpenAddMember={() => {
+              setIsRightSidebarOpen(true);
+              setIsAddMemberOpen(true);
+              setMemberError(null);
+              setEditingMember(null);
+              setNewMemberName('');
+              setNewMemberVariant('DEFAULT');
+              setNewMemberPrompt('');
+              setNewMemberWorkspace('');
+              setNewMemberSkillIds([]);
+              setEditingMemberInitialSkillIds([]);
+              setIsPromptEditorOpen(false);
+              setPromptFileError(null);
+            }}
+            onCancelMember={() => {
+              setIsAddMemberOpen(false);
+              setMemberError(null);
+              setEditingMember(null);
+              setNewMemberVariant('DEFAULT');
+              setNewMemberSkillIds([]);
+              setEditingMemberInitialSkillIds([]);
+              setIsPromptEditorOpen(false);
+              setPromptFileError(null);
+            }}
+            onSaveMember={handleAddMember}
+            onEditMember={handleEditMember}
+            onRemoveMember={handleRemoveMember}
+            onOpenWorkspace={(agentId) => {
+              setWorkspaceAgentId(agentId);
+              setWorkspaceDrawerOpen(true);
+            }}
+            onExpandPromptEditor={() => {
+              setIsPromptEditorOpen(true);
+              setPromptFileError(null);
+            }}
+            enabledMemberPresets={enabledMemberPresets}
+            enabledTeamPresets={enabledTeamPresets}
+            onAddMemberPreset={handleAddMemberPreset}
+            onImportTeamPreset={handleImportTeamPreset}
+            teamImportPlan={teamImportPlan}
+            teamImportName={teamImportName}
+            isImportingTeam={isImportingTeam}
+            onUpdateTeamImportPlanEntry={handleUpdateTeamImportPlanEntry}
+            onConfirmTeamImport={handleConfirmTeamImport}
+            onCancelTeamImport={handleCancelTeamImport}
+          />
         </div>
-      </section>
-
-      {/* Right Sidebar Resize Handle */}
-      {isRightSidebarOpen && (
-        <div
-          className="chat-session-resize-handle w-1 cursor-col-resize transition-colors shrink-0"
-          onMouseDown={(e) => handleResizeStart('right', e)}
-        />
-      )}
-
-      {!isRightSidebarOpen && activeSessionId && (
-        <button
-          type="button"
-          className="chat-session-right-collapsed-toggle"
-          onClick={() => setIsRightSidebarOpen(true)}
-          aria-label={t('header.openMembersPanel')}
-          title={t('header.openMembersPanel')}
-        >
-          <UsersThreeIcon className="size-icon-xs" />
-          <span>
-            {sessionMembers.length} {t('header.aiMembers')}
-          </span>
-        </button>
-      )}
-
-      <div
-        className={cn(
-          'chat-session-right-drawer-shell shrink-0 min-h-0 overflow-hidden',
-          isRightSidebarOpen && 'is-open'
-        )}
-        style={{ width: isRightSidebarOpen ? rightSidebarWidth : 0 }}
-      >
-        <AiMembersSidebar
-          sessionMembers={sessionMembers}
-          agentStates={agentStates}
-          activeSessionId={activeSessionId}
-          isArchived={isArchived}
-          width={rightSidebarWidth}
-          isPanelOpen={isRightSidebarOpen}
-          onTogglePanel={() => setIsRightSidebarOpen((prev) => !prev)}
-          isAddMemberOpen={isAddMemberOpen}
-          editingMember={editingMember}
-          newMemberName={newMemberName}
-          newMemberRunnerType={newMemberRunnerType}
-          newMemberVariant={newMemberVariant}
-          newMemberPrompt={newMemberPrompt}
-          newMemberWorkspace={newMemberWorkspace}
-          newMemberSkillIds={newMemberSkillIds}
-          memberNameLengthError={memberNameLengthError}
-          onNameChange={setNewMemberName}
-          onRunnerTypeChange={setNewMemberRunnerType}
-          onVariantChange={setNewMemberVariant}
-          onPromptChange={setNewMemberPrompt}
-          onWorkspaceChange={setNewMemberWorkspace}
-          onMemberSkillIdsChange={setNewMemberSkillIds}
-          memberError={memberError}
-          isSavingMember={isSavingMember}
-          availableRunnerTypes={availableRunnerTypes}
-          enabledRunnerTypes={enabledRunnerTypes}
-          isCheckingAvailability={isCheckingAvailability}
-          isRunnerAvailable={isRunnerAvailable}
-          availabilityLabel={availabilityLabel}
-          memberVariantOptions={memberVariantOptions}
-          getModelName={getModelName}
-          getModelDisplayName={getModelDisplayName}
-          getVariantLabel={getVariantLabel}
-          getVariantOptions={getVariantOptions}
-          onOpenAddMember={() => {
-            setIsRightSidebarOpen(true);
-            setIsAddMemberOpen(true);
-            setMemberError(null);
-            setEditingMember(null);
-            setNewMemberName('');
-            setNewMemberVariant('DEFAULT');
-            setNewMemberPrompt('');
-            setNewMemberWorkspace('');
-            setNewMemberSkillIds([]);
-            setEditingMemberInitialSkillIds([]);
-            setIsPromptEditorOpen(false);
-            setPromptFileError(null);
-          }}
-          onCancelMember={() => {
-            setIsAddMemberOpen(false);
-            setMemberError(null);
-            setEditingMember(null);
-            setNewMemberVariant('DEFAULT');
-            setNewMemberSkillIds([]);
-            setEditingMemberInitialSkillIds([]);
-            setIsPromptEditorOpen(false);
-            setPromptFileError(null);
-          }}
-          onSaveMember={handleAddMember}
-          onEditMember={handleEditMember}
-          onRemoveMember={handleRemoveMember}
-          onOpenWorkspace={(agentId) => {
-            setWorkspaceAgentId(agentId);
-            setWorkspaceDrawerOpen(true);
-          }}
-          onExpandPromptEditor={() => {
-            setIsPromptEditorOpen(true);
-            setPromptFileError(null);
-          }}
-          enabledMemberPresets={enabledMemberPresets}
-          enabledTeamPresets={enabledTeamPresets}
-          onAddMemberPreset={handleAddMemberPreset}
-          onImportTeamPreset={handleImportTeamPreset}
-          teamImportPlan={teamImportPlan}
-          teamImportName={teamImportName}
-          isImportingTeam={isImportingTeam}
-          onUpdateTeamImportPlanEntry={handleUpdateTeamImportPlanEntry}
-          onConfirmTeamImport={handleConfirmTeamImport}
-          onCancelTeamImport={handleCancelTeamImport}
-        />
       </div>
 
       <SkillsPanel
