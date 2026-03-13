@@ -3634,10 +3634,10 @@
     border: 1px solid #e4ebf5;
     background: linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.96) 0%,
-      #f8fafc 100%
+      rgba(255, 255, 255, 0.86) 0%,
+      var(--chat-agent-avatar-bg, #eef3f9) 100%
     );
-    border-radius: 16px;
+    border-radius: 24px;
     padding: 14px;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.82),
@@ -3661,6 +3661,12 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     line-height: 1.3;
+    max-width: 21ch;
+  }
+
+  .new-design .chat-session-member-card:hover .chat-session-member-name,
+  .new-design .chat-session-member-card:focus-within .chat-session-member-name {
+    max-width: none;
   }
 
   .new-design .chat-session-member-header {
@@ -3698,6 +3704,26 @@
   .new-design .chat-session-member-model {
     color: var(--chat-session-text-tertiary);
     margin-left: 42px;
+    max-height: 0;
+    margin-top: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition:
+      max-height 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+      margin-top 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.18s ease,
+      transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .new-design .chat-session-member-card:hover .chat-session-member-model,
+  .new-design .chat-session-member-card:focus-within .chat-session-member-model {
+    max-height: 24px;
+    margin-top: 4px;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
   }
 
   .new-design .chat-session-member-model-full {
@@ -3725,11 +3751,35 @@
   }
 
   .new-design .chat-session-member-workspace-row {
-    margin-top: 10px;
-    padding: 8px 10px;
+    display: block;
+    max-height: 0;
+    margin-top: 0;
+    padding: 0 10px;
     border-top: 0;
     border-radius: 12px;
     background: #eef3f9;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition:
+      max-height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      margin-top 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      padding 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.18s ease,
+      transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .new-design .chat-session-member-card:hover .chat-session-member-workspace-row,
+  .new-design
+    .chat-session-member-card:focus-within
+    .chat-session-member-workspace-row {
+    max-height: 44px;
+    margin-top: 10px;
+    padding: 8px 10px;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
   }
 
   .new-design .chat-session-member-workspace-icon {
@@ -3777,11 +3827,17 @@
     padding: 3px 8px;
     border-radius: 999px;
     border: 1px solid transparent;
+    overflow: hidden;
     font-size: 10px;
     font-weight: 600;
     line-height: 1.2;
+    white-space: nowrap;
     transition:
+      max-width 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+      padding 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+      border-width 0.22s cubic-bezier(0.22, 1, 0.36, 1),
       opacity 0.15s ease,
+      transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
       background-color 0.15s ease,
       border-color 0.15s ease,
       color 0.15s ease;
@@ -3789,11 +3845,28 @@
 
   .new-design .chat-session-member-action.workspace,
   .new-design .chat-session-member-action.edit {
+    max-width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-width: 0;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
+    transform: translateX(6px) scale(0.96);
   }
 
+  .new-design
+    .chat-session-member-card:hover
+    .chat-session-member-action.workspace,
+  .new-design
+    .chat-session-member-card:hover
+    .chat-session-member-action.edit,
+  .new-design
+    .chat-session-member-card:focus-within
+    .chat-session-member-action.workspace,
+  .new-design
+    .chat-session-member-card:focus-within
+    .chat-session-member-action.edit,
   .new-design
     .chat-session-member-actions:hover
     .chat-session-member-action.workspace,
@@ -3806,9 +3879,14 @@
   .new-design
     .chat-session-member-actions:focus-within
     .chat-session-member-action.edit {
+    max-width: 88px;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-width: 1px;
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
+    transform: translateX(0) scale(1);
   }
 
   .new-design

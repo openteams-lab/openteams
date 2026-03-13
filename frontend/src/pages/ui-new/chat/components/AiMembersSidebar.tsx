@@ -917,7 +917,7 @@ export function AiMembersSidebar({
         </div>
         <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto px-base pb-base pt-half space-y-base">
           {activeSessionId && (
-            <section className="overflow-hidden rounded-2xl border border-[#e8eef5] bg-white/95 shadow-[0_12px_24px_rgba(148,163,184,0.08)]">
+            <section className="mb-3 overflow-hidden rounded-2xl border border-[#e8eef5] bg-white/95 shadow-[0_12px_24px_rgba(148,163,184,0.08)]">
               <button
                 type="button"
                 className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[#f8fbff]"
@@ -1022,7 +1022,8 @@ export function AiMembersSidebar({
             return (
               <div
                 key={sessionAgent.id}
-                className="chat-session-member-card rounded-sm px-base py-half space-y-half"
+                className="chat-session-member-card px-base py-half space-y-half"
+                style={getAgentAvatarStyle(avatarSeed)}
               >
                 <div className="chat-session-member-header">
                   <div className="chat-session-member-primary flex items-center gap-half min-w-0">
@@ -1036,7 +1037,6 @@ export function AiMembersSidebar({
                     />
                     <span
                       className="chat-session-member-avatar"
-                      style={getAgentAvatarStyle(avatarSeed)}
                     >
                       <AgentBrandIcon
                         runnerType={agent.runner_type}
