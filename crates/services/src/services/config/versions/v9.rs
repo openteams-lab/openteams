@@ -4,6 +4,7 @@ use anyhow::Error;
 use executors::{executors::BaseCodingAgent, profile::ExecutorProfileId};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
+use utils::path::home_directory;
 pub use v8::{
     EditorConfig, EditorType, GitHubConfig, NotificationConfig, SendMessageShortcut, ShowcaseState,
     SoundFile, ThemeMode, UiLanguage,
@@ -62,6 +63,9 @@ pub struct ChatTeamPreset {
     pub description: String,
     /// List of member preset IDs to include in this team
     pub member_ids: Vec<String>,
+    /// Optional team protocol injected when importing this team preset
+    #[serde(default)]
+    pub team_protocol: String,
     /// Whether this is a built-in preset (cannot be deleted)
     pub is_builtin: bool,
     /// Whether this preset is enabled (visible for import)
@@ -124,6 +128,7 @@ fn builtin_team(id: &str, name: &str, description: &str, member_ids: &[&str]) ->
         name: name.to_string(),
         description: description.to_string(),
         member_ids: member_ids.iter().map(|member| member.to_string()).collect(),
+        team_protocol: String::new(),
         is_builtin: true,
         enabled: true,
     }
@@ -143,11 +148,7 @@ fn normalize_selected_skill_ids(skill_ids: &[String]) -> Vec<String> {
 fn complete_chat_presets_with_builtins(chat_presets: &mut ChatPresetsConfig) {
     let defaults = default_chat_presets();
     let legacy_default_team_protocol = PresetLoader::load_team_protocol();
-    let default_builtin_workspace_paths: HashMap<String, Option<String>> = defaults
-        .members
-        .iter()
-        .map(|preset| (preset.id.clone(), preset.default_workspace_path.clone()))
-        .collect();
+    let default_workspace_path = Some(home_directory().to_string_lossy().to_string());
     let default_builtin_selected_skill_ids: HashMap<String, Vec<String>> = defaults
         .members
         .iter()
@@ -181,11 +182,7 @@ fn complete_chat_presets_with_builtins(chat_presets: &mut ChatPresetsConfig) {
 
     for preset in &mut chat_presets.members {
         preset.selected_skill_ids = normalize_selected_skill_ids(&preset.selected_skill_ids);
-        if preset.is_builtin
-            && let Some(default_workspace_path) = default_builtin_workspace_paths.get(&preset.id)
-        {
-            preset.default_workspace_path = default_workspace_path.clone();
-        }
+        preset.default_workspace_path = default_workspace_path.clone();
         if preset.is_builtin
             && let Some(default_selected_skill_ids) =
                 default_builtin_selected_skill_ids.get(&preset.id)
@@ -479,6 +476,7 @@ impl Default for Config {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
     use utils::path::home_directory;
 
     use super::*;
@@ -518,5 +516,51 @@ mod tests {
             Some(expected_workspace.as_str())
         );
         assert!(builtin.selected_skill_ids.is_empty());
+    }
+
+    #[test]
+    fn complete_chat_presets_refreshes_custom_workspace_path() {
+        let mut chat_presets = default_chat_presets();
+        let expected_workspace = home_directory().to_string_lossy().to_string();
+
+        chat_presets.members.push(ChatMemberPreset {
+            id: "custom_member".to_string(),
+            name: "custom_member".to_string(),
+            description: "Custom member".to_string(),
+            runner_type: None,
+            system_prompt: "Prompt".to_string(),
+            default_workspace_path: Some("E:/workspace/custom".to_string()),
+            selected_skill_ids: vec![],
+            tools_enabled: serde_json::json!({}),
+            is_builtin: false,
+            enabled: true,
+        });
+
+        complete_chat_presets_with_builtins(&mut chat_presets);
+
+        let custom = chat_presets
+            .members
+            .iter()
+            .find(|preset| preset.id == "custom_member")
+            .expect("custom preset should exist");
+        assert_eq!(
+            custom.default_workspace_path.as_deref(),
+            Some(expected_workspace.as_str())
+        );
+    }
+
+    #[test]
+    fn team_preset_deserializes_missing_team_protocol() {
+        let preset: ChatTeamPreset = serde_json::from_value(json!({
+            "id": "custom_team",
+            "name": "Custom Team",
+            "description": "Custom description",
+            "member_ids": ["backend_engineer"],
+            "is_builtin": false,
+            "enabled": true
+        }))
+        .expect("team preset should deserialize");
+
+        assert_eq!(preset.team_protocol, "");
     }
 }

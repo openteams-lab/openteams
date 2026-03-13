@@ -16,6 +16,7 @@ interface TeamImportPreviewModalProps {
   isOpen: boolean;
   importName: string | null;
   importPlan: MemberPresetImportPlan[] | null;
+  teamImportProtocol: string | null;
   isArchived: boolean;
   isImportingTeam: boolean;
   isCheckingAvailability: boolean;
@@ -117,6 +118,7 @@ export function TeamImportPreviewModal({
   isOpen,
   importName,
   importPlan,
+  teamImportProtocol,
   isArchived,
   isImportingTeam,
   isCheckingAvailability,
@@ -297,6 +299,16 @@ export function TeamImportPreviewModal({
             <div className="mt-3 max-w-[560px] text-sm leading-6 text-slate-500">
               {t('members.importPreview.description')}
             </div>
+            {teamImportProtocol ? (
+              <div className="mt-4 max-w-[560px] rounded-[18px] border border-[#dbe7f5] bg-[#f8fbff] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#5094FB]">
+                  {t('members.teamProtocol.title')}
+                </div>
+                <div className="mt-2 max-h-[96px] overflow-hidden whitespace-pre-line text-sm leading-6 text-slate-600">
+                  {teamImportProtocol}
+                </div>
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
