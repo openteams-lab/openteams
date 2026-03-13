@@ -352,6 +352,8 @@ export interface AiMembersSidebarProps {
   onImportTeamPreset: (team: ChatTeamPreset) => void;
   teamImportPlan: MemberPresetImportPlan[] | null;
   teamImportName: string | null;
+  teamImportProtocol: string | null;
+  teamProtocolRefreshToken: number;
   isImportingTeam: boolean;
   onUpdateTeamImportPlanEntry: (
     index: number,
@@ -416,6 +418,8 @@ export function AiMembersSidebar({
   onImportTeamPreset,
   teamImportPlan,
   teamImportName,
+  teamImportProtocol,
+  teamProtocolRefreshToken,
   isImportingTeam,
   onUpdateTeamImportPlanEntry,
   onConfirmTeamImport,
@@ -523,7 +527,7 @@ export function AiMembersSidebar({
     return () => {
       cancelled = true;
     };
-  }, [activeSessionId, t]);
+  }, [activeSessionId, t, teamProtocolRefreshToken]);
 
   const handleImportPlanVariantChange = useCallback(
     (index: number, variant: string, currentToolsEnabled: JsonValue) => {
@@ -1187,6 +1191,7 @@ export function AiMembersSidebar({
         isOpen={Boolean(teamImportPlan)}
         importName={teamImportName}
         importPlan={teamImportPlan}
+        teamImportProtocol={teamImportProtocol}
         isArchived={isArchived}
         isImportingTeam={isImportingTeam}
         isCheckingAvailability={isCheckingAvailability}

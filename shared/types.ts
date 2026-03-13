@@ -622,6 +622,10 @@ description: string,
  */
 member_ids: Array<string>, 
 /**
+ * Optional team protocol injected when importing this team preset
+ */
+team_protocol: string, 
+/**
  * Whether this is a built-in preset (cannot be deleted)
  */
 is_builtin: boolean, 
