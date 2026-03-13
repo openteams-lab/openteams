@@ -125,6 +125,25 @@ pub fn get_agent_chatgroup_temp_dir() -> std::path::PathBuf {
     }
 }
 
+/// Resolve the current user's home directory with platform-specific fallbacks.
+pub fn home_directory() -> std::path::PathBuf {
+    dirs::home_dir()
+        .or_else(|| {
+            if cfg!(windows) {
+                std::env::var_os("USERPROFILE").map(PathBuf::from)
+            } else {
+                std::env::var_os("HOME").map(PathBuf::from)
+            }
+        })
+        .unwrap_or_else(|| {
+            if cfg!(windows) {
+                PathBuf::from(r"C:\")
+            } else {
+                PathBuf::from("/")
+            }
+        })
+}
+
 /// Expand leading ~ to user's home directory.
 pub fn expand_tilde(path_str: &str) -> std::path::PathBuf {
     shellexpand::tilde(path_str).as_ref().into()

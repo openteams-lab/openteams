@@ -18,6 +18,7 @@ import type {
 import { useUserSystem } from '@/components/ConfigProvider';
 import { cn } from '@/lib/utils';
 import { PromptEditorModal } from '@/pages/ui-new/chat/components/PromptEditorModal';
+import { AgentSkillsSection } from '@/pages/ui-new/chat/components/AgentSkillsSection';
 import { toPrettyCase } from '@/utils/string';
 import {
   SettingsField,
@@ -76,6 +77,20 @@ const normalizeToolsEnabled = (value: unknown): JsonValue => {
   return value as JsonValue;
 };
 
+const normalizeSelectedSkillIds = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      value
+        .filter((skillId): skillId is string => typeof skillId === 'string')
+        .map((skillId) => skillId.trim())
+        .filter(Boolean)
+    )
+  );
+};
+
 const normalizeDraft = (draft: ChatPresetsConfig): ChatPresetsConfig => {
   const members = draft.members.map((member) => ({
     ...member,
@@ -85,6 +100,7 @@ const normalizeDraft = (draft: ChatPresetsConfig): ChatPresetsConfig => {
     runner_type: member.runner_type?.trim() || null,
     system_prompt: member.system_prompt,
     default_workspace_path: member.default_workspace_path?.trim() || null,
+    selected_skill_ids: normalizeSelectedSkillIds(member.selected_skill_ids),
     tools_enabled: normalizeToolsEnabled(member.tools_enabled),
   }));
 
@@ -195,6 +211,11 @@ const presetToolbarButtonClassName = cn(
   'rounded-[12px] border-[#E2E8F0] bg-white px-4 py-[9px] text-[13px] font-medium text-[#475569] hover:bg-[#F8FAFC]'
 );
 
+const presetInlineActionButtonClassName = cn(
+  settingsSecondaryButtonClassName,
+  'rounded-[10px] border-[#E2E8F0] bg-white px-3 py-[5px] text-[11px] font-medium text-[#64748B] hover:bg-[#F8FAFC]'
+);
+
 const presetDestructiveButtonClassName = cn(
   presetToolbarButtonClassName,
   'border-[#FECACA] bg-[#FFF5F5] text-[#EF4444] hover:bg-[#FEF2F2]'
@@ -219,7 +240,8 @@ export function ChatPresetsEditorPanel({
   const { t } = useTranslation('settings');
   const { t: tChat } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
-  const { config, profiles, updateAndSaveConfig } = useUserSystem();
+  const { config, profiles, updateAndSaveConfig, homeDirectory } =
+    useUserSystem();
   const { setDirty: setContextDirty } = useSettingsDirty();
 
   const sourcePresets = useMemo(
@@ -233,10 +255,8 @@ export function ChatPresetsEditorPanel({
   );
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [toolsDraft, setToolsDraft] = useState('{}');
   const [isMemberPromptEditorOpen, setIsMemberPromptEditorOpen] =
     useState(false);
-  const [toolsError, setToolsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -328,22 +348,6 @@ export function ChatPresetsEditorPanel({
     [tChat]
   );
 
-  useEffect(() => {
-    if (!selectedMember) {
-      setToolsDraft('{}');
-      setToolsError(null);
-      return;
-    }
-    setToolsDraft(
-      JSON.stringify(
-        normalizeToolsEnabled(selectedMember.tools_enabled),
-        null,
-        2
-      )
-    );
-    setToolsError(null);
-  }, [selectedMember]);
-
   const runnerOptions = useMemo(() => {
     const allRunners = Object.keys(profiles ?? {}).sort();
     return [
@@ -385,21 +389,6 @@ export function ChatPresetsEditorPanel({
     []
   );
 
-  const parseToolsDraft = useCallback((): JsonValue | null => {
-    try {
-      const parsed = JSON.parse(toolsDraft);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        setToolsError(t('settings.presets.members.errors.toolsJsonObject'));
-        return null;
-      }
-      setToolsError(null);
-      return parsed as JsonValue;
-    } catch {
-      setToolsError(t('settings.presets.members.errors.toolsJsonInvalid'));
-      return null;
-    }
-  }, [t, toolsDraft]);
-
   const handleAddMemberPreset = useCallback(() => {
     let nextId = '';
     setDraft((prev) => {
@@ -416,7 +405,8 @@ export function ChatPresetsEditorPanel({
         description: '',
         runner_type: null,
         system_prompt: '',
-        default_workspace_path: null,
+        default_workspace_path: homeDirectory,
+        selected_skill_ids: [],
         tools_enabled: {},
         is_builtin: false,
         enabled: true,
@@ -427,7 +417,7 @@ export function ChatPresetsEditorPanel({
       };
     });
     setSelectedMemberId(nextId);
-  }, []);
+  }, [homeDirectory]);
 
   const handleCopyMemberPreset = useCallback((member: ChatMemberPreset) => {
     let nextId = '';
@@ -523,41 +513,14 @@ export function ChatPresetsEditorPanel({
     }));
   }, []);
 
-  const applyToolsDraft = useCallback(() => {
-    if (!selectedMember) return true;
-    const parsed = parseToolsDraft();
-    if (!parsed) {
-      return false;
-    }
-    updateMember(selectedMember.id, (current) => ({
-      ...current,
-      tools_enabled: parsed,
-    }));
-    return true;
-  }, [parseToolsDraft, selectedMember, updateMember]);
-
   const handleSave = async () => {
     if (!config) return;
-
-    let nextDraft = draft;
-    if (selectedMember) {
-      const parsed = parseToolsDraft();
-      if (!parsed) return;
-      nextDraft = {
-        ...draft,
-        members: draft.members.map((member) =>
-          member.id === selectedMember.id
-            ? { ...member, tools_enabled: parsed }
-            : member
-        ),
-      };
-    }
 
     setSaving(true);
     setError(null);
     setSuccess(false);
     try {
-      const next = normalizeDraft(nextDraft);
+      const next = normalizeDraft(draft);
       const ok = await updateAndSaveConfig({ chat_presets: next });
       if (!ok) {
         setError(t('settings.presets.saveError'));
@@ -575,7 +538,6 @@ export function ChatPresetsEditorPanel({
     setDraft(cloneDeep(sourcePresets));
     setError(null);
     setSuccess(false);
-    setToolsError(null);
   };
 
   if (!config) {
@@ -708,18 +670,59 @@ export function ChatPresetsEditorPanel({
           </SettingsField>
 
           <SettingsField
-            label={t('settings.presets.members.fields.systemPrompt')}
+            label={t('settings.presets.members.fields.workspacePath')}
           >
-            <div className="space-y-3">
-              <div className="flex items-center justify-end">
+            <input
+              type="text"
+              value={selectedMember.default_workspace_path ?? ''}
+              onChange={(event) =>
+                updateMember(selectedMember.id, (current) => ({
+                  ...current,
+                  default_workspace_path:
+                    event.target.value.length > 0 ? event.target.value : null,
+                }))
+              }
+              className={panelFieldClassName}
+              placeholder={t(
+                'settings.presets.members.fields.workspacePathPlaceholder'
+              )}
+            />
+          </SettingsField>
+
+          <SettingsField label={t('settings.presets.members.fields.skills')}>
+            <div className="rounded-[18px] border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+              <AgentSkillsSection
+                agentId={null}
+                runnerType={
+                  selectedMember.runner_type ?? config.executor_profile.executor
+                }
+                selectedSkillIds={selectedMember.selected_skill_ids ?? []}
+                onSelectedSkillIdsChange={(skillIds) =>
+                  updateMember(selectedMember.id, (current) => ({
+                    ...current,
+                    selected_skill_ids: skillIds,
+                  }))
+                }
+                maxHeightClass="max-h-40"
+              />
+            </div>
+          </SettingsField>
+
+          <SettingsField
+            label={
+              <div className="flex items-center justify-between gap-3">
+                <span>{t('settings.presets.members.fields.systemPrompt')}</span>
                 <button
                   type="button"
-                  className={presetToolbarButtonClassName}
+                  className={presetInlineActionButtonClassName}
                   onClick={() => setIsMemberPromptEditorOpen(true)}
                 >
                   {tChat('members.expand')}
                 </button>
               </div>
+            }
+          >
+            <div className="space-y-3">
               <textarea
                 value={selectedMember.system_prompt}
                 onChange={(event) =>
@@ -735,45 +738,6 @@ export function ChatPresetsEditorPanel({
                 )}
               />
             </div>
-          </SettingsField>
-
-          <SettingsField
-            label={t('settings.presets.members.fields.workspacePath')}
-          >
-            <input
-              type="text"
-              value={selectedMember.default_workspace_path ?? ''}
-              onChange={(event) =>
-                updateMember(selectedMember.id, (current) => ({
-                  ...current,
-                  default_workspace_path:
-                    event.target.value.length > 0
-                      ? event.target.value
-                      : null,
-                }))
-              }
-              className={panelFieldClassName}
-              placeholder={t(
-                'settings.presets.members.fields.workspacePathPlaceholder'
-              )}
-            />
-          </SettingsField>
-
-          <SettingsField
-            label={t('settings.presets.members.fields.toolsEnabled')}
-            error={toolsError}
-          >
-            <textarea
-              value={toolsDraft}
-              onChange={(event) => {
-                setToolsDraft(event.target.value);
-                if (toolsError) setToolsError(null);
-              }}
-              onBlur={applyToolsDraft}
-              rows={7}
-              className={cn(panelTextareaClassName, 'font-mono text-[13px]')}
-              placeholder="{ }"
-            />
           </SettingsField>
         </div>
       </div>
@@ -864,9 +828,7 @@ export function ChatPresetsEditorPanel({
             </SettingsField>
           </div>
 
-          <SettingsField
-            label={t('settings.presets.teams.fields.description')}
-          >
+          <SettingsField label={t('settings.presets.teams.fields.description')}>
             <textarea
               value={selectedTeam.description}
               onChange={(event) =>
@@ -902,7 +864,9 @@ export function ChatPresetsEditorPanel({
                       onClick={() =>
                         updateTeam(selectedTeam.id, (current) => {
                           const nextIds = checked
-                            ? current.member_ids.filter((id) => id !== member.id)
+                            ? current.member_ids.filter(
+                                (id) => id !== member.id
+                              )
                             : [...current.member_ids, member.id];
                           return {
                             ...current,
@@ -952,6 +916,30 @@ export function ChatPresetsEditorPanel({
   ) : (
     <EmptyDetailState message={t('settings.presets.teams.empty')} />
   );
+
+  const detailActions = hasUnsavedChanges ? (
+    <div className="shrink-0 border-t border-[#E2E8F0] bg-[#F8FAFC]/80 px-6 py-4 backdrop-blur-sm">
+      <div className="mx-auto flex w-full max-w-[980px] items-center justify-end gap-3">
+        <button
+          type="button"
+          className={modalFooterSecondaryButtonClassName}
+          onClick={onCancel ?? handleDiscard}
+        >
+          {onCancel ? tCommon('buttons.cancel') : tCommon('buttons.discard')}
+        </button>
+        <button
+          type="button"
+          className={modalFooterPrimaryButtonClassName}
+          onClick={() => {
+            void handleSave();
+          }}
+          disabled={saving}
+        >
+          {saving ? tCommon('states.saving') : tCommon('buttons.save')}
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
@@ -1067,29 +1055,8 @@ export function ChatPresetsEditorPanel({
 
           <section className="flex min-w-0 flex-1 flex-col bg-white">
             {tab === 'members' ? memberDetail : teamDetail}
+            {detailActions}
           </section>
-        </div>
-
-        <div className="mt-4 flex items-center justify-end gap-3 rounded-[20px] border border-[#E2E8F0] bg-[#F8FAFC]/80 px-6 py-4">
-          <button
-            type="button"
-            className={modalFooterSecondaryButtonClassName}
-            onClick={onCancel ?? handleDiscard}
-          >
-            {onCancel
-              ? tCommon('buttons.cancel')
-              : tCommon('buttons.discard')}
-          </button>
-          <button
-            type="button"
-            className={modalFooterPrimaryButtonClassName}
-            onClick={() => {
-              void handleSave();
-            }}
-            disabled={!hasUnsavedChanges || !!toolsError || saving}
-          >
-            {saving ? tCommon('states.saving') : tCommon('buttons.save')}
-          </button>
         </div>
       </div>
 

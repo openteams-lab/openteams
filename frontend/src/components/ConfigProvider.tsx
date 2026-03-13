@@ -25,6 +25,7 @@ interface UserSystemState {
   capabilities: Record<string, BaseAgentCapability[]> | null;
   analyticsUserId: string | null;
   loginStatus: LoginStatus | null;
+  homeDirectory: string | null;
 }
 
 interface UserSystemContextType {
@@ -43,6 +44,7 @@ interface UserSystemContextType {
   capabilities: Record<string, BaseAgentCapability[]> | null;
   analyticsUserId: string | null;
   loginStatus: LoginStatus | null;
+  homeDirectory: string | null;
   setEnvironment: (env: Environment | null) => void;
   setProfiles: (profiles: Record<string, ExecutorConfig> | null) => void;
   setCapabilities: (caps: Record<string, BaseAgentCapability[]> | null) => void;
@@ -75,6 +77,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
   const environment = userSystemInfo?.environment || null;
   const analyticsUserId = userSystemInfo?.analytics_user_id || null;
   const loginStatus = userSystemInfo?.login_status || null;
+  const homeDirectory = userSystemInfo?.home_directory || null;
   const profiles =
     (userSystemInfo?.executors as Record<string, ExecutorConfig> | null) ||
     null;
@@ -188,6 +191,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
         capabilities,
         analyticsUserId,
         loginStatus,
+        homeDirectory,
       },
       config,
       environment,
@@ -195,6 +199,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
       capabilities,
       analyticsUserId,
       loginStatus,
+      homeDirectory,
       updateConfig,
       saveConfig,
       updateAndSaveConfig,
@@ -211,6 +216,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
       capabilities,
       analyticsUserId,
       loginStatus,
+      homeDirectory,
       updateConfig,
       saveConfig,
       updateAndSaveConfig,

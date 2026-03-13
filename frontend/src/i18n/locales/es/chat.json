@@ -21,6 +21,10 @@
     "skills": "Biblioteca de habilidades",
     "archivedSection": "Archivadas",
     "settingsInSidebar": "Configuración",
+    "searchSessions": "Buscar sesiones",
+    "searchSessionsPlaceholder": "Buscar nombres de sesiones...",
+    "clearSessionSearch": "Borrar b?squeda de sesiones",
+    "noSearchResults": "Ninguna sesi?n coincide con \"{{query}}\".",
     "generatedSessionTitle": "Iniciada {{date}}"
   },
   "header": {

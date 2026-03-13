@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowCounterClockwiseIcon,
   BoxArrowDownIcon,
@@ -7,12 +7,14 @@ import {
   FileArchiveIcon,
   GearSixIcon,
   ListIcon,
+  MagnifyingGlassIcon,
   PencilSimpleIcon,
   PlusIcon,
   SidebarSimpleIcon,
   SquaresFourIcon,
   TrashIcon,
   UsersThreeIcon,
+  XIcon,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import type { ChatSession } from 'shared/types';
@@ -83,7 +85,12 @@ export function SessionListSidebar({
   isDeletingMessages,
 }: SessionListSidebarProps) {
   const { t } = useTranslation('chat');
-  const [contextMenuSession, setContextMenuSession] = useState<ChatSession | null>(null);
+  const [contextMenuSession, setContextMenuSession] =
+    useState<ChatSession | null>(null);
+  const [isSessionSearchOpen, setIsSessionSearchOpen] = useState(false);
+  const [sessionSearchQuery, setSessionSearchQuery] = useState('');
+  const sessionSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const sessionSearchContainerRef = useRef<HTMLDivElement | null>(null);
   const hasNoSessions =
     activeSessions.length === 0 && archivedSessions.length === 0;
   const appVersion = __APP_VERSION__.trim();
@@ -93,9 +100,86 @@ export function SessionListSidebar({
   const collapseActionLabel = isCollapsed
     ? t('sidebar.expandSidebar')
     : t('sidebar.collapseSidebar');
+  const trimmedSessionSearchQuery = sessionSearchQuery.trim();
+  const normalizedSessionSearchQuery =
+    trimmedSessionSearchQuery.toLocaleLowerCase();
+  const hasSessionSearchQuery = normalizedSessionSearchQuery.length > 0;
+
+  const closeSessionSearch = useCallback(() => {
+    setIsSessionSearchOpen(false);
+    setSessionSearchQuery('');
+  }, []);
+
+  useEffect(() => {
+    if (!isSessionSearchOpen) return;
+    const timer = window.setTimeout(() => {
+      sessionSearchInputRef.current?.focus();
+      sessionSearchInputRef.current?.select();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [isSessionSearchOpen]);
+
+  useEffect(() => {
+    if (!isSessionSearchOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (sessionSearchContainerRef.current?.contains(target)) {
+        return;
+      }
+      closeSessionSearch();
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [closeSessionSearch, isSessionSearchOpen]);
+
+  const getSessionSearchTitle = useCallback(
+    (session: ChatSession) =>
+      session.title?.trim() || t('sidebar.untitledSession'),
+    [t]
+  );
+
+  const filteredActiveSessions = useMemo(() => {
+    if (!hasSessionSearchQuery) return activeSessions;
+    return activeSessions.filter((session) =>
+      getSessionSearchTitle(session)
+        .toLocaleLowerCase()
+        .includes(normalizedSessionSearchQuery)
+    );
+  }, [
+    activeSessions,
+    getSessionSearchTitle,
+    hasSessionSearchQuery,
+    normalizedSessionSearchQuery,
+  ]);
+
+  const filteredArchivedSessions = useMemo(() => {
+    if (!hasSessionSearchQuery) return archivedSessions;
+    return archivedSessions.filter((session) =>
+      getSessionSearchTitle(session)
+        .toLocaleLowerCase()
+        .includes(normalizedSessionSearchQuery)
+    );
+  }, [
+    archivedSessions,
+    getSessionSearchTitle,
+    hasSessionSearchQuery,
+    normalizedSessionSearchQuery,
+  ]);
+
+  const shouldShowArchivedSection = showArchived || hasSessionSearchQuery;
+  const shouldRenderArchivedBlock =
+    shouldShowArchivedSection &&
+    (filteredArchivedSessions.length > 0 || !hasSessionSearchQuery);
+  const hasSessionMatches =
+    filteredActiveSessions.length > 0 || filteredArchivedSessions.length > 0;
 
   const getDisplaySessionTitle = (session: ChatSession) => {
-    const fallbackTitle = session.title?.trim() || t('sidebar.untitledSession');
+    const fallbackTitle = getSessionSearchTitle(session);
     const fullTitle = fallbackTitle;
     if (fullTitle.length <= MAX_SESSION_TITLE_LENGTH) {
       return { fullTitle, displayTitle: fullTitle };
@@ -106,7 +190,7 @@ export function SessionListSidebar({
     };
   };
 
-const handleContextMenu = (e: React.MouseEvent, session: ChatSession) => {
+  const handleContextMenu = (e: React.MouseEvent, session: ChatSession) => {
     e.preventDefault();
     e.stopPropagation();
     setContextMenuSession(session);
@@ -144,38 +228,44 @@ const handleContextMenu = (e: React.MouseEvent, session: ChatSession) => {
             )}
             title={fullTitle}
           >
-        <div className="chat-session-item-inner flex items-center gap-half">
-          {isActive ? (
-            <span className="chat-session-item-active-dot" aria-hidden="true" />
-          ) : hasUnread ? (
-            <span className="chat-session-item-unread-dot" aria-hidden="true" />
-          ) : isArchived ? (
-            <FileArchiveIcon className="chat-session-item-icon size-icon-xs" />
-          ) : (
-            <ChatCircleDotsIcon className="chat-session-item-icon size-icon-xs" />
-          )}
-          {!isCollapsed && (
-            <div className="chat-session-item-content min-w-0 flex-1">
-              <div className="chat-session-item-title-row flex items-center gap-half">
-                <div
-                  className="chat-session-item-title truncate"
-                  title={fullTitle}
-                >
-                  {displayTitle}
-                </div>
-                <span className="chat-session-item-time">{timeLabel}</span>
-              </div>
-              {summaryPreview.length > 0 && (
-                <div
-                  className="chat-session-item-summary truncate"
-                  title={summaryPreview}
-                >
-                  {summaryPreview}
+            <div className="chat-session-item-inner flex items-center gap-half">
+              {isActive ? (
+                <span
+                  className="chat-session-item-active-dot"
+                  aria-hidden="true"
+                />
+              ) : hasUnread ? (
+                <span
+                  className="chat-session-item-unread-dot"
+                  aria-hidden="true"
+                />
+              ) : isArchived ? (
+                <FileArchiveIcon className="chat-session-item-icon size-icon-xs" />
+              ) : (
+                <ChatCircleDotsIcon className="chat-session-item-icon size-icon-xs" />
+              )}
+              {!isCollapsed && (
+                <div className="chat-session-item-content min-w-0 flex-1">
+                  <div className="chat-session-item-title-row flex items-center gap-half">
+                    <div
+                      className="chat-session-item-title truncate"
+                      title={fullTitle}
+                    >
+                      {displayTitle}
+                    </div>
+                    <span className="chat-session-item-time">{timeLabel}</span>
+                  </div>
+                  {summaryPreview.length > 0 && (
+                    <div
+                      className="chat-session-item-summary truncate"
+                      title={summaryPreview}
+                    >
+                      {summaryPreview}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -335,9 +425,7 @@ const handleContextMenu = (e: React.MouseEvent, session: ChatSession) => {
               title={t('sidebar.aiTeam', { defaultValue: 'AI Team' })}
             >
               <UsersThreeIcon className="chat-session-function-icon size-icon-sm" />
-              <span>
-                {t('sidebar.aiTeam', { defaultValue: 'AI Team' })}
-              </span>
+              <span>{t('sidebar.aiTeam', { defaultValue: 'AI Team' })}</span>
             </button>
             <button
               type="button"
@@ -360,6 +448,51 @@ const handleContextMenu = (e: React.MouseEvent, session: ChatSession) => {
                 {t('sidebar.sessionSection', { defaultValue: 'Sessions' })}
               </div>
               <div className="chat-session-conversation-actions">
+                {isSessionSearchOpen ? (
+                  <div
+                    ref={sessionSearchContainerRef}
+                    className="chat-session-conversation-search"
+                  >
+                    <div className="chat-session-conversation-search-input-wrap">
+                      <MagnifyingGlassIcon className="chat-session-conversation-search-icon size-icon-xs" />
+                      <input
+                        ref={sessionSearchInputRef}
+                        value={sessionSearchQuery}
+                        onChange={(event) =>
+                          setSessionSearchQuery(event.target.value)
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape') {
+                            event.preventDefault();
+                            closeSessionSearch();
+                          }
+                        }}
+                        placeholder={t('sidebar.searchSessionsPlaceholder')}
+                        aria-label={t('sidebar.searchSessions')}
+                        className="chat-session-conversation-search-input"
+                      />
+                      <button
+                        type="button"
+                        onClick={closeSessionSearch}
+                        className="chat-session-conversation-search-clear-btn"
+                        aria-label={t('sidebar.clearSessionSearch')}
+                        title={t('sidebar.clearSessionSearch')}
+                      >
+                        <XIcon className="size-icon-2xs" weight="bold" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsSessionSearchOpen(true)}
+                    className="chat-session-conversation-action-btn"
+                    aria-label={t('sidebar.searchSessions')}
+                    title={t('sidebar.searchSessions')}
+                  >
+                    <MagnifyingGlassIcon className="size-icon-xs" />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onToggleArchived}
@@ -368,7 +501,9 @@ const handleContextMenu = (e: React.MouseEvent, session: ChatSession) => {
                     'chat-session-conversation-action-btn',
                     archivedSessions.length === 0 &&
                       'opacity-50 cursor-not-allowed',
-                    showArchived && archivedSessions.length > 0 && 'active'
+                    shouldShowArchivedSection &&
+                      archivedSessions.length > 0 &&
+                      'active'
                   )}
                   aria-label={
                     showArchived
@@ -387,28 +522,43 @@ const handleContextMenu = (e: React.MouseEvent, session: ChatSession) => {
             </div>
 
             <div className="chat-session-conversation-list min-h-0 overflow-y-auto p-base space-y-half">
-              {activeSessions.length === 0 ? (
+              {hasSessionSearchQuery && !hasSessionMatches ? (
                 <div className="chat-session-list-empty text-sm text-low">
-                  {t('sidebar.noActiveSessions')}
+                  {t('sidebar.noSearchResults', {
+                    query: trimmedSessionSearchQuery,
+                  })}
                 </div>
               ) : (
-                activeSessions.map((session) => renderSessionItem(session))
-              )}
-
-              {showArchived && (
                 <>
-                  <div className="chat-session-archived-separator" />
-                  <div className="chat-session-archived-label px-base pt-half">
-                    {t('sidebar.archivedSection', { defaultValue: 'Archived' })}
-                  </div>
-                  {archivedSessions.length === 0 ? (
+                  {filteredActiveSessions.length === 0 &&
+                  !hasSessionSearchQuery ? (
                     <div className="chat-session-list-empty text-sm text-low">
-                      {t('sidebar.noArchivedSessions')}
+                      {t('sidebar.noActiveSessions')}
                     </div>
                   ) : (
-                    archivedSessions.map((session) =>
+                    filteredActiveSessions.map((session) =>
                       renderSessionItem(session)
                     )
+                  )}
+
+                  {shouldRenderArchivedBlock && (
+                    <>
+                      <div className="chat-session-archived-separator" />
+                      <div className="chat-session-archived-label px-base pt-half">
+                        {t('sidebar.archivedSection', {
+                          defaultValue: 'Archived',
+                        })}
+                      </div>
+                      {filteredArchivedSessions.length === 0 ? (
+                        <div className="chat-session-list-empty text-sm text-low">
+                          {t('sidebar.noArchivedSessions')}
+                        </div>
+                      ) : (
+                        filteredArchivedSessions.map((session) =>
+                          renderSessionItem(session)
+                        )
+                      )}
+                    </>
                   )}
                 </>
               )}

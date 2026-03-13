@@ -183,7 +183,7 @@ export function SettingsField({
   error,
   children,
 }: {
-  label: string;
+  label: ReactNode;
   description?: ReactNode;
   error?: string | null;
   children: ReactNode;
@@ -191,7 +191,7 @@ export function SettingsField({
   return (
     <div className="mb-5 last:mb-0">
       {label ? (
-        <label className="mb-2 block text-[12px] text-[#8C8C8C]">{label}</label>
+        <div className="mb-2 text-[12px] text-[#8C8C8C]">{label}</div>
       ) : null}
       {children}
       {error ? (

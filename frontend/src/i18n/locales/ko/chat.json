@@ -21,6 +21,10 @@
     "skills": "스킬 라이브러리",
     "archivedSection": "보관됨",
     "settingsInSidebar": "설정",
+    "searchSessions": "?? ??",
+    "searchSessionsPlaceholder": "?? ?? ??...",
+    "clearSessionSearch": "?? ?? ???",
+    "noSearchResults": "\"{{query}}\"? ???? ??? ????.",
     "generatedSessionTitle": "{{date}} ??"
   },
   "header": {

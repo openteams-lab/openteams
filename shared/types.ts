@@ -320,7 +320,7 @@ export type TagSearchParams = { search: string | null, };
 
 export type TokenResponse = { access_token: string, expires_at: string | null, };
 
-export type UserSystemInfo = { config: Config, analytics_user_id: string, login_status: LoginStatus, environment: Environment, 
+export type UserSystemInfo = { config: Config, analytics_user_id: string, login_status: LoginStatus, home_directory: string, environment: Environment, 
 /**
  * Capabilities supported per executor (e.g., { "CLAUDE_CODE": ["SESSION_FORK"] })
  */
@@ -587,6 +587,10 @@ system_prompt: string,
  * Optional default workspace path
  */
 default_workspace_path: string | null, 
+/**
+ * Skills preselected for members created from this preset
+ */
+selected_skill_ids: Array<string>, 
 /**
  * Tools enabled for this preset
  */

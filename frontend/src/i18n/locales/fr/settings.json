@@ -536,7 +536,7 @@
           "systemPromptPlaceholder": "Décrivez les paramètres du rôle de ce membre IA...",
           "workspacePath": "Chemin de workspace par défaut (optionnel)",
           "workspacePathPlaceholder": "ex. backend",
-          "toolsEnabled": "Outils (JSON)"
+          "skills": "Compétences"
         },
         "errors": {
           "toolsJsonInvalid": "Le JSON des outils n'est pas valide.",

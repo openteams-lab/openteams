@@ -50,6 +50,11 @@ const STREAMING_RUN_CACHE_VERSION = 1;
 const STREAMING_RUN_TTL_MS = 6 * 60 * 60 * 1000;
 const INACTIVE_RUN_PRUNE_GRACE_MS = 15 * 1000;
 const PROTOCOL_NOTICE_TTL_MS = 15 * 1000;
+const SUPPRESSED_PROTOCOL_NOTICE_CODES = new Set([
+  'invalid_json',
+  'not_json_array',
+  'empty_message',
+]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -485,7 +490,7 @@ export function useChatWebSocket(
   );
 
   const handleProtocolNotice = useCallback((payload: ProtocolNoticePayload) => {
-    if (payload.code === 'empty_message' && payload.output_is_empty === false) {
+    if (SUPPRESSED_PROTOCOL_NOTICE_CODES.has(payload.code)) {
       return;
     }
 

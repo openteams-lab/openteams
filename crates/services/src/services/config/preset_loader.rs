@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, anyhow, bail};
 use serde::Deserialize;
+use utils::path::home_directory;
 
 use crate::services::config::versions::v9::{ChatMemberPreset, ChatPresetsConfig};
 
@@ -129,6 +130,8 @@ struct RolePresetFrontmatter {
     description: String,
     #[serde(default, alias = "default_workspace_path")]
     default_workspace: Option<String>,
+    #[serde(default, alias = "allowed_skill_ids")]
+    selected_skill_ids: Vec<String>,
     #[serde(default)]
     runner_type: Option<String>,
     #[serde(default)]
@@ -145,6 +148,7 @@ struct RolePresetMd {
     role_focus: Vec<String>,
     definition_of_done: String,
     default_workspace_path: Option<String>,
+    selected_skill_ids: Vec<String>,
     runner_type: Option<String>,
     tools_enabled: serde_json::Value,
 }
@@ -154,9 +158,12 @@ pub struct PresetLoader;
 impl PresetLoader {
     pub fn load_builtin_presets() -> ChatPresetsConfig {
         let team_protocol = Self::load_team_protocol();
+        let default_workspace_path = home_directory().to_string_lossy().to_string();
         let members = ROLE_PRESET_MARKDOWN
             .iter()
-            .map(|(path, raw)| Self::parse_chat_member_preset(path, raw, &team_protocol))
+            .map(|(path, raw)| {
+                Self::parse_chat_member_preset(path, raw, &team_protocol, &default_workspace_path)
+            })
             .collect::<Result<Vec<_>>>()
             .expect("built-in role preset markdown should be valid");
 
@@ -187,6 +194,7 @@ impl PresetLoader {
         path: &str,
         raw: &str,
         team_protocol: &str,
+        default_workspace_path: &str,
     ) -> Result<ChatMemberPreset> {
         let preset = Self::parse_role_preset_markdown(path, raw)?;
         Ok(ChatMemberPreset {
@@ -201,7 +209,8 @@ impl PresetLoader {
                 &preset.definition_of_done,
                 team_protocol,
             ),
-            default_workspace_path: preset.default_workspace_path,
+            default_workspace_path: Some(default_workspace_path.to_string()),
+            selected_skill_ids: preset.selected_skill_ids,
             tools_enabled: preset.tools_enabled,
             is_builtin: true,
             enabled: true,
@@ -246,10 +255,22 @@ impl PresetLoader {
             role_focus,
             definition_of_done,
             default_workspace_path: frontmatter.default_workspace,
+            selected_skill_ids: normalize_selected_skill_ids(frontmatter.selected_skill_ids),
             runner_type: frontmatter.runner_type,
             tools_enabled,
         })
     }
+}
+
+fn normalize_selected_skill_ids(skill_ids: Vec<String>) -> Vec<String> {
+    let mut normalized = skill_ids
+        .into_iter()
+        .map(|skill_id| skill_id.trim().to_string())
+        .filter(|skill_id| !skill_id.is_empty())
+        .collect::<Vec<_>>();
+    normalized.sort();
+    normalized.dedup();
+    normalized
 }
 
 fn normalize_newlines(content: &str) -> String {
@@ -332,7 +353,7 @@ fn build_role_prompt(
     team_protocol: &str,
 ) -> String {
     format!(
-        "You are the team \"{role}\". {goal}\n\n\
+        "You are the \"{role}\". {goal}\n\n\
 (Embedded: Team Collaboration Protocol)\n\
 {team_protocol}\n\n\
 Inputs:\n\
@@ -382,6 +403,8 @@ fn format_steps(items: &[&str]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use utils::path::home_directory;
+
     use super::PresetLoader;
 
     #[test]
@@ -397,10 +420,12 @@ mod tests {
             .find(|preset| preset.id == "fullstack_engineer")
             .expect("fullstack preset should exist");
         assert_eq!(fullstack.name, "fullstack");
+        let expected_workspace = home_directory().to_string_lossy().to_string();
         assert_eq!(
             fullstack.default_workspace_path.as_deref(),
-            Some("fullstack")
+            Some(expected_workspace.as_str())
         );
+        assert!(fullstack.selected_skill_ids.is_empty());
         assert!(
             fullstack
                 .system_prompt
@@ -428,6 +453,10 @@ id: sample_role
 name: sample
 description: Sample role
 default_workspace: samples
+selected_skill_ids:
+  - skill_b
+  - skill_a
+  - skill_b
 runner_type: codex
 tools_enabled:
   shell: true
@@ -462,6 +491,10 @@ The sample is shippable.
         );
         assert_eq!(parsed.definition_of_done, "The sample is shippable.");
         assert_eq!(parsed.default_workspace_path.as_deref(), Some("samples"));
+        assert_eq!(
+            parsed.selected_skill_ids,
+            vec!["skill_a".to_string(), "skill_b".to_string()]
+        );
         assert_eq!(parsed.runner_type.as_deref(), Some("codex"));
         assert_eq!(parsed.tools_enabled, serde_json::json!({ "shell": true }));
     }

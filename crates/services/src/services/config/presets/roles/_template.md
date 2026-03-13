@@ -3,6 +3,7 @@ id: role_id
 name: role_handle
 description: Role description
 default_workspace: workspace_path
+selected_skill_ids: []
 ---
 
 # Role: Role Name

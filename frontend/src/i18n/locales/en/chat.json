@@ -22,7 +22,11 @@
     "aiTeam": "AI Team",
     "skills": "Skills Library",
     "archivedSection": "Archived",
-    "settingsInSidebar": "Settings"
+    "settingsInSidebar": "Settings",
+    "searchSessions": "Search sessions",
+    "searchSessionsPlaceholder": "Search session names...",
+    "clearSessionSearch": "Clear session search",
+    "noSearchResults": "No sessions match \"{{query}}\"."
   },
   "aiTeamPresets": {
     "title": "AI Team Presets",
