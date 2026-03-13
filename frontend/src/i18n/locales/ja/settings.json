@@ -526,7 +526,7 @@
         "empty": "メンバープリセットがありません。追加して開始してください。",
         "fields": {
           "id": "プリセットID",
-          "name": "ハンドル（@メンション名）",
+          "name": "名前",
           "namePlaceholder": "例: backend",
           "description": "説明",
           "descriptionPlaceholder": "このAIメンバーの役割",

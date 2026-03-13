@@ -85,6 +85,7 @@ import { CleanupModeBar } from './chat/components/CleanupModeBar';
 import { ChatMessageItem } from './chat/components/ChatMessageItem';
 import { RunningAgentPlaceholder } from './chat/components/RunningAgentPlaceholder';
 import { MessageInputArea } from './chat/components/MessageInputArea';
+import { ChatEmptyStateIndicator } from './chat/components/ChatEmptyStateIndicator';
 import { AiMembersSidebar } from './chat/components/AiMembersSidebar';
 import { WorkspaceDrawer } from './chat/components/WorkspaceDrawer';
 import { DiffViewerModal } from './chat/components/DiffViewerModal';
@@ -1490,6 +1491,45 @@ export function ChatSessions() {
     !isUploadingAttachments;
 
   const diffViewerRun = diffViewerRunId ? runDiffs[diffViewerRunId] : null;
+  const showEmptyTimelineIndicator =
+    !isLoading &&
+    !!activeSessionId &&
+    messageList.length === 0 &&
+    protocolNotices.length === 0 &&
+    placeholderAgents.length === 0;
+  const emptyTimelineVariant =
+    sessionMembers.length === 0 ? 'no-members' : 'empty-messages';
+
+  const handleSelectPromptTemplate = useCallback(
+    (templateValue: string) => {
+      handleDraftChange(templateValue);
+      requestAnimationFrame(() => {
+        const textarea = inputRef.current;
+        if (!textarea) return;
+        textarea.style.height = 'auto';
+        const nextHeight = Math.min(textarea.scrollHeight, 200);
+        textarea.style.height = `${Math.max(44, nextHeight)}px`;
+        textarea.focus();
+        textarea.setSelectionRange(templateValue.length, templateValue.length);
+      });
+    },
+    [handleDraftChange, inputRef]
+  );
+
+  const handleOpenAddMemberPanel = useCallback(() => {
+    setIsRightSidebarOpen(true);
+    setIsAddMemberOpen(true);
+    setMemberError(null);
+    setEditingMember(null);
+    setNewMemberName('');
+    setNewMemberVariant('DEFAULT');
+    setNewMemberPrompt('');
+    setNewMemberWorkspace('');
+    setNewMemberSkillIds([]);
+    setEditingMemberInitialSkillIds([]);
+    setIsPromptEditorOpen(false);
+    setPromptFileError(null);
+  }, []);
 
   useEffect(() => {
     if (!activeSessionId) return;
@@ -3442,10 +3482,17 @@ export function ChatSessions() {
                         </button>
                       </div>
                     )}
-                    {!isLoading && messageList.length === 0 && (
-                      <div className="text-sm text-low">
-                        {t('timeline.empty')}
-                      </div>
+                    {showEmptyTimelineIndicator && (
+                      <ChatEmptyStateIndicator
+                        variant={emptyTimelineVariant}
+                        onAction={handleOpenAddMemberPanel}
+                        onTemplateSelect={
+                          emptyTimelineVariant === 'empty-messages'
+                            ? handleSelectPromptTemplate
+                            : undefined
+                        }
+                        disabled={isArchived}
+                      />
                     )}
                     {!isLoading &&
                       messageList.length > 0 &&
@@ -3736,20 +3783,7 @@ export function ChatSessions() {
             getModelDisplayName={getModelDisplayName}
             getVariantLabel={getVariantLabel}
             getVariantOptions={getVariantOptions}
-            onOpenAddMember={() => {
-              setIsRightSidebarOpen(true);
-              setIsAddMemberOpen(true);
-              setMemberError(null);
-              setEditingMember(null);
-              setNewMemberName('');
-              setNewMemberVariant('DEFAULT');
-              setNewMemberPrompt('');
-              setNewMemberWorkspace('');
-              setNewMemberSkillIds([]);
-              setEditingMemberInitialSkillIds([]);
-              setIsPromptEditorOpen(false);
-              setPromptFileError(null);
-            }}
+            onOpenAddMember={handleOpenAddMemberPanel}
             onCancelMember={() => {
               setIsAddMemberOpen(false);
               setMemberError(null);
