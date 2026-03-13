@@ -21,10 +21,10 @@
     "skills": "技能庫",
     "archivedSection": "已歸檔",
     "settingsInSidebar": "設定",
-    "searchSessions": "????",
-    "searchSessionsPlaceholder": "??????...",
-    "clearSessionSearch": "??????",
-    "noSearchResults": "??????{{query}}???????",
+    "searchSessions": "搜尋會話",
+    "searchSessionsPlaceholder": "搜尋會話名稱...",
+    "clearSessionSearch": "清除會話搜尋",
+    "noSearchResults": "沒有會話符合「{{query}}」。",
     "generatedSessionTitle": "開始於 {{date}}"
   },
   "header": {
@@ -35,7 +35,7 @@
     "created": "建立於",
     "totalMessages": "訊息總數",
     "tokenUsage": "消耗token: {{value}}",
-    "aiMembers": "AI??",
+    "aiMembers": "AI 成員",
     "searchMessages": "搜尋訊息...",
     "clearSearch": "清除搜尋",
     "archived": "已歸檔",
@@ -52,8 +52,8 @@
     "contextLoadLow": "負載較輕",
     "contextLoadMedium": "負載活躍",
     "contextLoadHigh": "負載較高",
-    "openMembersPanel": "??AI????",
-    "closeMembersPanel": "??AI????",
+    "openMembersPanel": "開啟 AI 成員列表",
+    "closeMembersPanel": "關閉 AI 成員列表",
     "latestArtifact": "最新產物"
   },
   "input": {
@@ -116,7 +116,7 @@
     "noMatches": "沒有找到與「{{query}}」相符的訊息。"
   },
   "members": {
-    "title": "AI????",
+    "title": "AI 成員列表",
     "countInSession": "會話中有 {{count}} 個成員",
     "selectSessionToManage": "選擇一個會話來管理 AI 成員。",
     "noMembersYet": "暫無 AI 成員",
@@ -188,7 +188,7 @@
     "presetTeamSection": "團隊",
     "addFromMemberPreset": "新增成員預設",
     "importTeamPreset": "匯入團隊預設",
-    "noEnabledPresets": "??????????? AI ????????",
+    "noEnabledPresets": "沒有啟用的預設。請在 AI 團隊中設定。",
     "presetSearchPlaceholder": "搜尋預設 AI 或團隊",
     "noPresetSearchResults": "沒有符合的預設 AI 或團隊。",
     "noPresetSearchResultsHint": "試試其他關鍵字，或切換到自訂AI。",

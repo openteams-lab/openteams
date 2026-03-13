@@ -21,11 +21,11 @@
     "skills": "스킬 라이브러리",
     "archivedSection": "보관됨",
     "settingsInSidebar": "설정",
-    "searchSessions": "?? ??",
-    "searchSessionsPlaceholder": "?? ?? ??...",
-    "clearSessionSearch": "?? ?? ???",
-    "noSearchResults": "\"{{query}}\"? ???? ??? ????.",
-    "generatedSessionTitle": "{{date}} ??"
+    "searchSessions": "세션 검색",
+    "searchSessionsPlaceholder": "세션 이름 검색...",
+    "clearSessionSearch": "세션 검색 지우기",
+    "noSearchResults": "\"{{query}}\"와 일치하는 세션이 없습니다.",
+    "generatedSessionTitle": "{{date}} 시작"
   },
   "header": {
     "untitledSession": "제목 없는 세션",
@@ -45,16 +45,16 @@
     "exitCleanupMode": "정리 모드 종료",
     "settings": "설정",
     "moreActions": "추가 작업",
-    "generatedTitleBadge": "?? ??",
-    "contextMeter": "???? ???",
+    "generatedTitleBadge": "자동 제목",
+    "contextMeter": "컨텍스트 부하",
     "contextUsage": "{{used}} / {{limit}}",
-    "contextUsageUnknown": "{{used}} ?? ?",
-    "contextLoadLow": "??? ???",
-    "contextLoadMedium": "??? ???",
-    "contextLoadHigh": "?? ???",
+    "contextUsageUnknown": "{{used}} 사용됨",
+    "contextLoadLow": "낮은 부하",
+    "contextLoadMedium": "보통 부하",
+    "contextLoadHigh": "높은 부하",
     "openMembersPanel": "AI 멤버 목록 열기",
     "closeMembersPanel": "AI 멤버 목록 닫기",
-    "latestArtifact": "?? ????"
+    "latestArtifact": "최신 아티팩트"
   },
   "input": {
     "mentionAgents": "에이전트 멘션",
@@ -73,8 +73,8 @@
     "sendHint": "Enter로 전송, Shift+Enter로 줄바꿈.",
     "addAttachment": "첨부 파일 추가",
     "send": "전송",
-    "workbenchHint": "????? ????, ??? ?????, @? ??? ?? ??? ?????.",
-    "attachmentCount": "{{count}}? ?? ???"
+    "workbenchHint": "스크린샷을 붙여넣거나, 파일을 끌어오거나, @로 작업을 라우팅하세요.",
+    "attachmentCount": "{{count}}개 파일 준비됨"
   },
   "message": {
     "quote": "인용",
@@ -188,7 +188,7 @@
     "presetTeamSection": "팀",
     "addFromMemberPreset": "멤버 프리셋 추가",
     "importTeamPreset": "팀 프리셋 가져오기",
-    "noEnabledPresets": "???? ???? ????. AI ??? ?????.",
+    "noEnabledPresets": "활성화된 프리셋이 없습니다. AI 팀에서 설정하세요.",
     "presetSearchPlaceholder": "프리셋 AI 또는 팀 검색",
     "noPresetSearchResults": "일치하는 프리셋 AI 또는 팀이 없습니다.",
     "noPresetSearchResultsHint": "다른 키워드를 시도하거나 사용자 정의 AI로 전환하세요.",
@@ -435,21 +435,21 @@
       "refresh": "새로고침",
       "loadingLog": "로그 로드 중...",
       "logEmpty": "로그가 비어 있습니다.",
-      "workspaceTrail": "?????? ??"
+      "workspaceTrail": "워크스페이스 경로"
     }
   },
   "workspacePreview": {
-    "title": "?????? ????",
-    "empty": "???? ?? ?? ??? ???? ???? ??? ? ????.",
-    "files": "??",
-    "added": "??",
-    "removed": "??",
+    "title": "워크스페이스 미리보기",
+    "empty": "아티팩트나 코드 변경을 선택하면 여기에서 확인할 수 있습니다.",
+    "files": "파일",
+    "added": "추가",
+    "removed": "삭제",
     "html": "HTML",
-    "image": "???",
+    "image": "이미지",
     "diff": "Diff",
-    "liveReport": "??? ????",
-    "imagePreview": "??? ????",
-    "filesChanged": "?? {{count}}?",
-    "runLabel": "?? {{id}}"
+    "liveReport": "라이브 리포트",
+    "imagePreview": "이미지 미리보기",
+    "filesChanged": "{{count}}개 파일",
+    "runLabel": "실행 {{id}}"
   }
 }

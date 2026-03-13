@@ -23,10 +23,10 @@
     "skills": "技能库",
     "archivedSection": "已归档",
     "settingsInSidebar": "设置",
-    "searchSessions": "????",
-    "searchSessionsPlaceholder": "?????...",
-    "clearSessionSearch": "??????",
-    "noSearchResults": "??????{{query}}???????"
+    "searchSessions": "搜索会话",
+    "searchSessionsPlaceholder": "搜索会话名称...",
+    "clearSessionSearch": "清除会话搜索",
+    "noSearchResults": "没有会话匹配“{{query}}”。"
   },
   "aiTeamPresets": {
     "title": "AI团队预设",
@@ -201,7 +201,7 @@
     "presetTeamSection": "团队",
     "addFromMemberPreset": "添加成员预设",
     "importTeamPreset": "导入团队预设",
-    "noEnabledPresets": "??????????? AI?? ????",
+    "noEnabledPresets": "没有启用的预设。请在 AI 团队中配置。",
     "presetSearchPlaceholder": "搜索预设 AI 或团队",
     "noPresetSearchResults": "没有匹配的预设 AI 或团队。",
     "noPresetSearchResultsHint": "试试其他关键词，或切换到自定义AI。",

@@ -324,28 +324,25 @@ export function ChatMessageItem({
                 : 'chat-session-message-card-agent is-agent-message max-w-full',
               isCleanupMode && isSelected && 'ring-2 ring-[#EF4444]'
             )}
+            titleClassName={!isUser ? 'chat-session-message-title' : undefined}
             headerClassName={cn(
               'chat-session-message-header',
               isUser && 'hidden'
             )}
             bodyClassName="chat-session-message-body"
-            style={{
-              backgroundColor: isUser
-                ? 'var(--chat-session-message-self-bg)'
-                : 'var(--chat-session-glass-bg)',
-              borderColor:
-                isCleanupMode && isSelected
-                  ? '#EF4444'
-                  : isUser
-                    ? 'var(--chat-session-message-self-border)'
-                    : 'var(--chat-session-glass-border)',
-              ...(isUser
+            style={
+              isUser
                 ? {
+                    backgroundColor: 'var(--chat-session-message-self-bg)',
+                    borderColor:
+                      isCleanupMode && isSelected
+                        ? '#EF4444'
+                        : 'var(--chat-session-message-self-border)',
                     width: 'fit-content',
                     maxWidth: 'min(600px, 100%)',
                   }
-                : {}),
-            }}
+                : undefined
+            }
           >
             <div>
               {referenceId && (
@@ -528,7 +525,10 @@ export function ChatMessageItem({
                                     onPreviewAttachment(message, attachment)
                                   }
                                 >
-                                  <span className="min-w-0 truncate" title={attachmentName}>
+                                  <span
+                                    className="min-w-0 truncate"
+                                    title={attachmentName}
+                                  >
                                     {attachmentName}
                                   </span>
                                   {attachment.size_bytes ? (
@@ -539,7 +539,10 @@ export function ChatMessageItem({
                                 </button>
                               ) : (
                                 <div className="chat-session-message-attachment-name">
-                                  <span className="min-w-0 truncate" title={attachmentName}>
+                                  <span
+                                    className="min-w-0 truncate"
+                                    title={attachmentName}
+                                  >
                                     {attachmentName}
                                   </span>
                                   {attachment.size_bytes ? (
@@ -556,7 +559,9 @@ export function ChatMessageItem({
                               <button
                                 type="button"
                                 className="chat-session-message-attachment-action"
-                                onClick={() => onPreviewAttachment(message, attachment)}
+                                onClick={() =>
+                                  onPreviewAttachment(message, attachment)
+                                }
                                 title={t('message.view')}
                                 aria-label={t('message.view')}
                               >
@@ -617,7 +622,7 @@ export function ChatMessageItem({
             <div
               className={cn(
                 'chat-session-message-actions absolute opacity-0 group-hover:opacity-100 flex items-center gap-2 -bottom-8 transition-opacity duration-200',
-                isAgent ? 'left-0' : 'right-0'
+                'right-0'
               )}
             >
               <button
