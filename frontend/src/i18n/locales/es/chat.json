@@ -56,7 +56,32 @@
     "closeMembersPanel": "Cerrar la lista de miembros de IA",
     "latestArtifact": "?ltimo artefacto"
   },
+  "emptyState": {
+    "brand": "Empezar a colaborar",
+    "logoAlt": "Logotipo del estado vacío del chat",
+    "noMembersEyebrow": "Selecciona un miembro de IA para empezar",
+    "noMembersDescription": "",
+    "noMembersAction": "Crear equipo ahora",
+    "emptyEyebrow": "Desde aquí comienza una nueva forma de colaborar con IA",
+    "emptyDescription": "",
+    "emptyAction": "Empezar a escribir"
+  },
   "input": {
+    "templates": {
+      "label": "Plantillas de prompts",
+      "optimizeArchitecture": {
+        "label": "Optimizar arquitectura",
+        "value": "Revisa la arquitectura actual y propone mejoras. Cubre los limites entre modulos, el acoplamiento, la mantenibilidad y los principales riesgos de refactorizacion."
+      },
+      "generateDocs": {
+        "label": "Generar documentacion tecnica",
+        "value": "Genera un borrador de documentacion tecnica para el proyecto actual. Incluye responsabilidades de modulos, flujos clave, interfaces y las preguntas abiertas que aun requieren confirmacion."
+      },
+      "reviewVisualStyle": {
+        "label": "Revisar estilo visual",
+        "value": "Revisa el estilo visual actual de la interfaz. Da comentarios concretos sobre tipografia, color, espaciado, jerarquia y consistencia de interaccion, y sugiere las mejoras de mayor impacto."
+      }
+    },
     "mentionAgents": "Mencionar agentes",
     "mentionAllOption": "Todos los miembros (@all)",
     "mentionAllSuggestion": "@Todos los miembros",

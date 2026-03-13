@@ -220,15 +220,22 @@ function SidebarEmptyState({
   icon: Icon,
   title,
   description,
+  variant = 'default',
 }: {
   icon: Icon;
   title: string;
   description?: string;
+  variant?: 'default' | 'subtle';
 }) {
   return (
-    <div className="chat-session-members-empty-state">
+    <div
+      className={cn(
+        'chat-session-members-empty-state',
+        variant === 'subtle' && 'is-subtle'
+      )}
+    >
       <div className="chat-session-members-empty-state-icon">
-        <Icon className="size-5" weight="duotone" />
+        <Icon className={variant === 'subtle' ? 'size-4' : 'size-5'} weight="duotone" />
       </div>
       <div className="chat-session-members-empty-state-title">{title}</div>
       {description ? (
@@ -1002,6 +1009,7 @@ export function AiMembersSidebar({
             <SidebarEmptyState
               icon={UserPlusIcon}
               title={t('members.noMembersYet')}
+              variant="subtle"
             />
           )}
 

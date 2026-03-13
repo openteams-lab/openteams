@@ -59,6 +59,12 @@ const isTextAttachment = (file: File) =>
 
 const isImageAttachment = (file: File) => file.type.startsWith('image/');
 
+const resizeTextarea = (textarea: HTMLTextAreaElement) => {
+  textarea.style.height = 'auto';
+  const newHeight = Math.min(textarea.scrollHeight, 200);
+  textarea.style.height = `${Math.max(44, newHeight)}px`;
+};
+
 export const isAllowedAttachment = (file: File) =>
   isTextAttachment(file) || isImageAttachment(file);
 
@@ -153,7 +159,6 @@ export function MessageInputArea({
       agent,
     })),
   ];
-
   return (
     <div className="chat-session-input-area shrink-0">
       <div className="chat-session-input-shell">
@@ -230,10 +235,7 @@ export function MessageInputArea({
             value={draft}
             onChange={(event) => {
               onDraftChange(event.target.value);
-              const textarea = event.target;
-              textarea.style.height = 'auto';
-              const newHeight = Math.min(textarea.scrollHeight, 200);
-              textarea.style.height = `${Math.max(44, newHeight)}px`;
+              resizeTextarea(event.target);
             }}
             onKeyDown={(event) => {
               if (onMentionKeyDown(event)) {

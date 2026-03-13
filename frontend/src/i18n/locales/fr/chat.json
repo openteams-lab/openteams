@@ -56,7 +56,32 @@
     "closeMembersPanel": "Fermer la liste des membres IA",
     "latestArtifact": "Dernier artefact"
   },
+  "emptyState": {
+    "brand": "Commencer à collaborer",
+    "logoAlt": "Logo de l'état vide du chat",
+    "noMembersEyebrow": "Sélectionnez un membre IA pour commencer",
+    "noMembersDescription": "",
+    "noMembersAction": "Creer l'equipe maintenant",
+    "emptyEyebrow": "Commencez ici une nouvelle façon de collaborer avec l'IA",
+    "emptyDescription": "",
+    "emptyAction": "Commencer a ecrire"
+  },
   "input": {
+    "templates": {
+      "label": "Modeles de prompts",
+      "optimizeArchitecture": {
+        "label": "Optimiser l'architecture",
+        "value": "Examinez l'architecture actuelle et proposez des ameliorations. Couvrez les frontieres entre modules, le couplage, la maintenabilite et les principaux risques de refactorisation."
+      },
+      "generateDocs": {
+        "label": "Generer la doc technique",
+        "value": "Generez un brouillon de documentation technique pour le projet actuel. Incluez les responsabilites des modules, les flux cles, les interfaces et les questions encore a confirmer."
+      },
+      "reviewVisualStyle": {
+        "label": "Evaluer le style visuel",
+        "value": "Evaluez le style visuel actuel de l'interface. Donnez des retours concrets sur la typographie, la couleur, l'espacement, la hierarchie et la coherence des interactions, puis proposez les ameliorations les plus impactantes."
+      }
+    },
     "mentionAgents": "Mentionner des agents",
     "mentionAllOption": "Tous les membres (@all)",
     "mentionAllSuggestion": "@Tous les membres",

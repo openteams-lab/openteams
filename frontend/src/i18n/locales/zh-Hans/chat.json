@@ -69,6 +69,16 @@
     "settings": "设置",
     "moreActions": "更多操作"
   },
+  "emptyState": {
+    "brand": "开始协作",
+    "logoAlt": "聊天空状态标识",
+    "noMembersEyebrow": "先添加 AI 成员再开始",
+    "noMembersDescription": "",
+    "noMembersAction": "立即创建团队",
+    "emptyEyebrow": "从这里开启全新的AI协作方式",
+    "emptyDescription": "",
+    "emptyAction": "开始输入"
+  },
   "input": {
     "mentionAgents": "提及 Agent",
     "mentionAllOption": "所有成员（@all）",
@@ -87,7 +97,22 @@
     "workbenchHint": "可粘贴截图、拖入文件，或输入 @ 指派 Agent。",
     "attachmentCount": "已就绪 {{count}} 个文件",
     "addAttachment": "添加附件",
-    "send": "发送"
+    "send": "发送",
+    "templates": {
+      "label": "提示词模板",
+      "optimizeArchitecture": {
+        "label": "优化当前架构",
+        "value": "请从模块边界、耦合关系、可维护性和重构风险几个角度评估当前架构，并给出优化建议。"
+      },
+      "generateDocs": {
+        "label": "生成技术文档",
+        "value": "请基于当前项目内容输出一份技术文档草稿，包含模块职责、关键流程、接口约定，以及仍待确认的问题。"
+      },
+      "reviewVisualStyle": {
+        "label": "视觉风格评审",
+        "value": "请评审当前 UI 的视觉风格，从排版、色彩、间距、层级和交互一致性方面给出具体建议，并指出最值得优先优化的部分。"
+      }
+    }
   },
   "message": {
     "quote": "引用",

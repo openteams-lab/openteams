@@ -526,7 +526,7 @@
         "empty": "尚無成員預設，請先新增。",
         "fields": {
           "id": "預設 ID",
-          "name": "名稱（@提及名稱）",
+          "name": "名稱",
           "namePlaceholder": "例如 backend",
           "description": "描述",
           "descriptionPlaceholder": "此 AI 成員的角色",

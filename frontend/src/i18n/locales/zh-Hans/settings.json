@@ -526,7 +526,7 @@
         "empty": "暂无成员预设。添加一个开始使用。",
         "fields": {
           "id": "预设 ID",
-          "name": "句柄（@提及名称）",
+          "name": "名称",
           "namePlaceholder": "例如 backend",
           "description": "描述",
           "descriptionPlaceholder": "该 AI 成员负责什么",
