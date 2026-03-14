@@ -167,6 +167,18 @@ const getStatusIndicator = (entryType: NormalizedEntryType) => {
  * Helper definitions *
  **********************/
 
+const stripTargetPrefix = (content: string): string => {
+  const trimmed = content.trimStart();
+  if (!trimmed.startsWith('@')) {
+    return content;
+  }
+  const spaceIndex = trimmed.indexOf(' ');
+  if (spaceIndex === -1) {
+    return content;
+  }
+  return trimmed.slice(spaceIndex + 1);
+};
+
 const shouldRenderMarkdown = (entryType: NormalizedEntryType) =>
   entryType.type === 'assistant_message' ||
   entryType.type === 'system_message' ||
@@ -964,7 +976,13 @@ function DisplayConversationEntry({
       <div className={getContentClassName(entryType)}>
         {shouldRenderMarkdown(entryType) ? (
           <WYSIWYGEditor
-            value={isNormalizedEntry(entry) ? entry.content : ''}
+            value={
+              isNormalizedEntry(entry)
+                ? entryType.type === 'assistant_message'
+                  ? stripTargetPrefix(entry.content)
+                  : entry.content
+                : ''
+            }
             disabled
             className="whitespace-pre-wrap break-words flex flex-col gap-1 font-light"
             taskAttemptId={taskAttempt?.id}

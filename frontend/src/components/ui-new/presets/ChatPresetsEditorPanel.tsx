@@ -22,6 +22,7 @@ import { useUserSystem } from '@/components/ConfigProvider';
 import { cn } from '@/lib/utils';
 import { PromptEditorModal } from '@/pages/ui-new/chat/components/PromptEditorModal';
 import { AgentSkillsSection } from '@/pages/ui-new/chat/components/AgentSkillsSection';
+import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
 import {
   formatExecutorModelLabel,
   getVariantModelName,
@@ -704,14 +705,16 @@ export function ChatPresetsEditorPanel({
     <>
       <div className="border-b border-[#F1F5F9] px-8 py-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
+          <div className="min-w-0 max-w-[calc(100%-240px)] flex-1">
             <h3 className="truncate text-[22px] font-semibold text-[#0F172A]">
               @{getLocalizedMemberName(selectedMember)}
             </h3>
             {selectedMember.description ? (
-              <p className="mt-1 truncate text-[13px] text-[#94A3B8]">
-                {selectedMember.description}
-              </p>
+              <Tooltip content={selectedMember.description} side="bottom">
+                <p className="mt-1 truncate text-[13px] text-[#94A3B8]">
+                  {selectedMember.description}
+                </p>
+              </Tooltip>
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -925,14 +928,16 @@ export function ChatPresetsEditorPanel({
     <>
       <div className="border-b border-[#F1F5F9] px-8 py-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
+          <div className="min-w-0 max-w-[calc(100%-240px)] flex-1">
             <h3 className="truncate text-[22px] font-semibold text-[#0F172A]">
               {getLocalizedTeamName(selectedTeam)}
             </h3>
             {selectedTeam.description ? (
-              <p className="mt-1 truncate text-[13px] text-[#94A3B8]">
-                {selectedTeam.description}
-              </p>
+              <Tooltip content={selectedTeam.description} side="bottom">
+                <p className="mt-1 truncate text-[13px] text-[#94A3B8]">
+                  {selectedTeam.description}
+                </p>
+              </Tooltip>
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
