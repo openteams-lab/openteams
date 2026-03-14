@@ -1,4 +1,4 @@
-﻿// vite.config.ts
+// vite.config.ts
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { createLogger, defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react";
@@ -99,7 +99,7 @@ export default defineConfig({
         ],
       },
     }),
-    sentryVitePlugin({ org: 'starterra.ai-ai', project: 'agents-chatgroup' }),
+    sentryVitePlugin({ org: 'starterra.ai-ai', project: 'openteams' }),
     executorSchemasPlugin(),
   ],
   resolve: {

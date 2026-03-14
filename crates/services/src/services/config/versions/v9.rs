@@ -35,6 +35,9 @@ pub struct ChatMemberPreset {
     pub description: String,
     /// Optional runner type (null means use default)
     pub runner_type: Option<String>,
+    /// Optional recommended model identifier for the selected runner
+    #[serde(default)]
+    pub recommended_model: Option<String>,
     /// System prompt defining the agent's behavior
     pub system_prompt: String,
     /// Optional default workspace path
@@ -120,18 +123,6 @@ fn default_chat_compression() -> ChatCompressionConfig {
 
 fn default_true() -> bool {
     true
-}
-
-fn builtin_team(id: &str, name: &str, description: &str, member_ids: &[&str]) -> ChatTeamPreset {
-    ChatTeamPreset {
-        id: id.to_string(),
-        name: name.to_string(),
-        description: description.to_string(),
-        member_ids: member_ids.iter().map(|member| member.to_string()).collect(),
-        team_protocol: String::new(),
-        is_builtin: true,
-        enabled: true,
-    }
 }
 
 fn normalize_selected_skill_ids(skill_ids: &[String]) -> Vec<String> {
@@ -223,117 +214,8 @@ fn complete_chat_presets_with_builtins(chat_presets: &mut ChatPresetsConfig) {
     }
 }
 
-fn default_builtin_teams() -> Vec<ChatTeamPreset> {
-    vec![
-        builtin_team(
-            "fullstack_delivery_team",
-            "Full-stack Delivery Team",
-            "End-to-end product delivery across product, architecture, engineering, QA, and operations.",
-            &[
-                "coordinator_pmo",
-                "product_manager",
-                "system_architect",
-                "backend_engineer",
-                "frontend_engineer",
-                "qa_tester",
-                "code_reviewer",
-                "devops_engineer",
-                "safety_policy_officer",
-            ],
-        ),
-        builtin_team(
-            "ai_prompt_quality_team",
-            "AI Prompt Quality Team",
-            "Prompt design, adversarial testing, and policy hardening for AI role execution.",
-            &[
-                "coordinator_pmo",
-                "prompt_engineer",
-                "qa_tester",
-                "backend_engineer",
-                "safety_policy_officer",
-            ],
-        ),
-        builtin_team(
-            "architecture_governance_team",
-            "Architecture Governance Team",
-            "Architecture review, implementation feasibility, security, and operational readiness.",
-            &[
-                "system_architect",
-                "backend_engineer",
-                "frontend_engineer",
-                "code_reviewer",
-                "devops_engineer",
-                "safety_policy_officer",
-            ],
-        ),
-        builtin_team(
-            "product_discovery_team",
-            "Product Discovery Team",
-            "User problem discovery, experience design, instrumentation, and market validation.",
-            &[
-                "product_manager",
-                "ux_ui_designer",
-                "product_analyst",
-                "data_analyst",
-                "market_analyst",
-            ],
-        ),
-        builtin_team(
-            "content_studio_team",
-            "Content Studio Team",
-            "Research, writing, editing, and packaging of launch-ready content assets.",
-            &[
-                "solution_manager",
-                "content_researcher",
-                "technical_writer",
-                "content_editor",
-                "marketing_specialist",
-                "video_editor",
-            ],
-        ),
-        builtin_team(
-            "growth_marketing_team",
-            "Growth Marketing Team",
-            "Positioning, campaign execution, and funnel optimization with analytics feedback.",
-            &[
-                "product_manager",
-                "marketing_specialist",
-                "market_analyst",
-                "product_analyst",
-                "data_analyst",
-            ],
-        ),
-        builtin_team(
-            "research_innovation_team",
-            "Research Innovation Team",
-            "Frontier exploration and rapid validation of new capabilities and model strategies.",
-            &[
-                "coordinator_pmo",
-                "frontier_researcher",
-                "system_architect",
-                "prompt_engineer",
-                "product_manager",
-                "data_analyst",
-            ],
-        ),
-        builtin_team(
-            "rapid_bugfix_team",
-            "Rapid Bugfix Team",
-            "Fast incident response across implementation, testing, and review.",
-            &[
-                "coordinator_pmo",
-                "backend_engineer",
-                "frontend_engineer",
-                "qa_tester",
-                "code_reviewer",
-            ],
-        ),
-    ]
-}
-
 fn default_chat_presets() -> ChatPresetsConfig {
     let mut chat_presets = PresetLoader::load_builtin_presets();
-    chat_presets.teams = default_builtin_teams();
     chat_presets.team_protocol = Some(String::new());
     chat_presets
 }
@@ -528,6 +410,7 @@ mod tests {
             name: "custom_member".to_string(),
             description: "Custom member".to_string(),
             runner_type: None,
+            recommended_model: None,
             system_prompt: "Prompt".to_string(),
             default_workspace_path: Some("E:/workspace/custom".to_string()),
             selected_skill_ids: vec![],
@@ -562,5 +445,70 @@ mod tests {
         .expect("team preset should deserialize");
 
         assert_eq!(preset.team_protocol, "");
+    }
+
+    #[test]
+    fn default_chat_presets_loads_builtin_team_metadata_from_markdown() {
+        let chat_presets = default_chat_presets();
+
+        let planner = chat_presets
+            .members
+            .iter()
+            .find(|preset| preset.id == "coordinator_pmo")
+            .expect("planner preset should exist");
+        assert_eq!(planner.runner_type.as_deref(), Some("CLAUDE_CODE"));
+        assert_eq!(
+            planner.recommended_model.as_deref(),
+            Some("claude-sonnet-4-6")
+        );
+
+        let fullstack = chat_presets
+            .teams
+            .iter()
+            .find(|preset| preset.id == "fullstack_delivery_team")
+            .expect("fullstack team should exist");
+
+        assert_eq!(fullstack.name, "Full-stack Delivery Team");
+        assert_eq!(
+            fullstack.description,
+            "Planner-led web delivery across design, frontend, backend, QA, and review."
+        );
+        assert_eq!(
+            fullstack.member_ids,
+            vec![
+                "coordinator_pmo".to_string(),
+                "ux_ui_designer".to_string(),
+                "backend_engineer".to_string(),
+                "frontend_engineer".to_string(),
+                "qa_tester".to_string(),
+                "code_reviewer".to_string(),
+            ]
+        );
+        assert!(!fullstack.team_protocol.trim().is_empty());
+        assert!(
+            fullstack
+                .team_protocol
+                .contains("Only the Planner (Coordinator / PMO) and the UI Designer (UX/UI Designer) may directly `@` the user.")
+        );
+    }
+
+    #[test]
+    fn complete_chat_presets_preserves_customized_builtin_team_protocol() {
+        let mut chat_presets = default_chat_presets();
+        let team = chat_presets
+            .teams
+            .iter_mut()
+            .find(|preset| preset.id == "rapid_bugfix_team")
+            .expect("rapid bugfix team should exist");
+        team.team_protocol = "Custom rapid response protocol".to_string();
+
+        complete_chat_presets_with_builtins(&mut chat_presets);
+
+        let team = chat_presets
+            .teams
+            .iter()
+            .find(|preset| preset.id == "rapid_bugfix_team")
+            .expect("rapid bugfix team should exist");
+        assert_eq!(team.team_protocol, "Custom rapid response protocol");
     }
 }

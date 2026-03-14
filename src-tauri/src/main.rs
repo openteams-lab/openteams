@@ -13,7 +13,7 @@ struct BackendState {
 /// Delete all user data (database, config, cache, workspaces)
 #[tauri::command]
 fn delete_all_user_data() -> Result<String, String> {
-    let proj = ProjectDirs::from("ai", "starterra.ai", "agents-chatgroup")
+    let proj = ProjectDirs::from("ai", "starterra.ai", "openteams")
         .ok_or("Could not determine data directories")?;
 
     let mut deleted_paths = Vec::new();
@@ -39,9 +39,9 @@ fn delete_all_user_data() -> Result<String, String> {
 
     // Delete temp workspaces
     let temp_dir = if cfg!(target_os = "macos") || cfg!(target_os = "linux") {
-        std::path::PathBuf::from("/var/tmp/agents-chatgroup")
+        std::path::PathBuf::from("/var/tmp/openteams")
     } else {
-        std::env::temp_dir().join("agents-chatgroup")
+        std::env::temp_dir().join("openteams")
     };
     if temp_dir.exists() {
         match std::fs::remove_dir_all(&temp_dir) {
@@ -60,7 +60,7 @@ fn delete_all_user_data() -> Result<String, String> {
 /// Delete only cache and temp data (keep core data like db.sqlite, config.json)
 #[tauri::command]
 fn delete_cache_data() -> Result<String, String> {
-    let proj = ProjectDirs::from("ai", "starterra.ai", "agents-chatgroup")
+    let proj = ProjectDirs::from("ai", "starterra.ai", "openteams")
         .ok_or("Could not determine data directories")?;
 
     let mut deleted_paths = Vec::new();
@@ -77,9 +77,9 @@ fn delete_cache_data() -> Result<String, String> {
 
     // Delete temp workspaces
     let temp_dir = if cfg!(target_os = "macos") || cfg!(target_os = "linux") {
-        std::path::PathBuf::from("/var/tmp/agents-chatgroup")
+        std::path::PathBuf::from("/var/tmp/openteams")
     } else {
-        std::env::temp_dir().join("agents-chatgroup")
+        std::env::temp_dir().join("openteams")
     };
     if temp_dir.exists() {
         match std::fs::remove_dir_all(&temp_dir) {

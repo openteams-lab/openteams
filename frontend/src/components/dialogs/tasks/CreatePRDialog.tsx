@@ -1,4 +1,4 @@
-﻿import {
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -81,7 +81,7 @@ const CreatePRDialogImpl = NiceModal.create<CreatePRDialogProps>(
         return;
       }
 
-      setPrTitle(`${task.title} (agents-chatgroup)`);
+      setPrTitle(`${task.title} (openteams)`);
       setPrBody(task.description || '');
       setError(null);
       setGhCliHelp(null);

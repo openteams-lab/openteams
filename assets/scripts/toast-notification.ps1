@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory=$true)]
     [string]$Title,
     
@@ -6,7 +6,7 @@
     [string]$Message,
     
     [Parameter(Mandatory=$false)]
-    [string]$AppName = "agents-chatgroup"
+    [string]$AppName = "openteams"
 )
 
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null

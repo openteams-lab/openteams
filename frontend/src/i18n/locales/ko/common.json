@@ -112,7 +112,7 @@
     "banner": "개발 모드 - 개발 빌드입니다"
   },
   "oauth": {
-    "title": "agents-chatgroup 로그인",
+    "title": "openteams 로그인",
     "description": "로그인하여 조직에 참여하고 팀과 작업을 공유하세요",
     "continueWithGitHub": "GitHub로 계속",
     "continueWithGoogle": "Google로 계속",
@@ -260,7 +260,7 @@
   },
   "betaWorkspaces": {
     "title": "새로운 UI 사용해보기",
-    "intro": "agents-chatgroup의 UI를 처음부터 다시 구축했으며, 체험에 초대되었습니다.",
+    "intro": "openteams의 UI를 처음부터 다시 구축했으며, 체험에 초대되었습니다.",
     "newUiDescription": "새로운 UI는 일상 업무에 최적화되어 있습니다: 에이전트 관리, 변경 사항 미리보기, 코드 검토. 또한 기존 UI에서는 사용할 수 없는 기능도 제공합니다:",
     "newFeatures": {
       "multiRepo": "여러 저장소를 동시에 편집",
@@ -279,7 +279,7 @@
     "maybeLater": "나중에"
   },
   "onboardingDialog": {
-    "title": "agents-chatgroup에 오신 것을 환영합니다",
+    "title": "openteams에 오신 것을 환영합니다",
     "description": "코딩 환경 설정을 먼저 구성하세요. 나중에 설정에서 언제든지 변경할 수 있습니다.",
     "agentSectionTitle": "Coding Agent 선택",
     "status": {
@@ -291,7 +291,7 @@
   },
   "disclaimerDialog": {
     "title": "안전 안내",
-    "intro": "agents-chatgroup는 기본적으로 제한 없는 권한으로 AI 코딩 에이전트를 실행합니다.",
+    "intro": "openteams는 기본적으로 제한 없는 권한으로 AI 코딩 에이전트를 실행합니다.",
     "body": "즉, 에이전트가 시스템에서 코드를 실행하고 명령을 전체 권한으로 수행할 수 있다는 뜻입니다. 반드시 주의해서 진행하세요.",
     "importantTitle": "중요 안내:",
     "importantBody": "에이전트가 수행 중인 작업을 항상 확인하고 중요한 작업은 반드시 백업해 두세요. 이 소프트웨어는 실험 단계이므로 책임 있게 사용해야 합니다.",
@@ -302,7 +302,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "환영합니다",
-      "content": "agents-chatgroup의 새롭게 디자인된 UI인 Workspaces에 오신 것을 환영합니다. 초기 피드백을 위해 일부 사용자에게 먼저 공개하고 있습니다. 네비게이션 바의 피드백 아이콘을 통해 언제든지 의견을 공유해 주세요."
+      "content": "openteams의 새롭게 디자인된 UI인 Workspaces에 오신 것을 환영합니다. 초기 피드백을 위해 일부 사용자에게 먼저 공개하고 있습니다. 네비게이션 바의 피드백 아이콘을 통해 언제든지 의견을 공유해 주세요."
     },
     "commandBar": {
       "title": "명령 바",

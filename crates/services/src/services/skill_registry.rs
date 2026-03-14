@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 /// Default skill registry URL (can be configured)
 /// Use local server for development: http://127.0.0.1:3101
-/// Production: https://skills.agentschatgroup.com
+/// Production: https://skills.openteams.com
 pub const DEFAULT_REGISTRY_URL: &str = "http://127.0.0.1:3101";
 const GLOBAL_SKILLS_DIR: &str = ".agents";
 

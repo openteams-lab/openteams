@@ -1,6 +1,16 @@
 import { parseDiffStats } from '@/utils/diffStatsParser';
 import type { TFunction } from 'i18next';
-import type { ChatMemberPreset, ChatTeamPreset, JsonValue } from 'shared/types';
+import type {
+  BaseCodingAgent,
+  ChatMemberPreset,
+  ChatTeamPreset,
+  ExecutorConfigs,
+  JsonValue,
+} from 'shared/types';
+import {
+  findVariantByModel,
+  withExecutorProfileVariant,
+} from '@/utils/executor';
 import {
   isMentionAllAlias,
   mentionTokenRegex,
@@ -758,6 +768,14 @@ export function areToolsEnabledEqual(a: unknown, b: unknown): boolean {
   );
 }
 
+function normalizeRunnerTypeValue(
+  value: string | null | undefined
+): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return trimmed.replace(/-/g, '_').toUpperCase();
+}
+
 export function resolvePresetRunnerType({
   presetRunnerType,
   defaultRunnerType,
@@ -769,21 +787,44 @@ export function resolvePresetRunnerType({
   enabledRunnerTypes: string[];
   availableRunnerTypes: string[];
 }): string | null {
-  const trimmedPresetRunner = presetRunnerType?.trim();
-  if (
-    trimmedPresetRunner &&
-    (enabledRunnerTypes.includes(trimmedPresetRunner) ||
-      availableRunnerTypes.includes(trimmedPresetRunner))
-  ) {
-    return trimmedPresetRunner;
+  const enabledRunnerTypeMap = new Map(
+    enabledRunnerTypes.map((runnerType) => [
+      normalizeRunnerTypeValue(runnerType),
+      runnerType,
+    ])
+  );
+  const availableRunnerTypeMap = new Map(
+    availableRunnerTypes.map((runnerType) => [
+      normalizeRunnerTypeValue(runnerType),
+      runnerType,
+    ])
+  );
+
+  const normalizedPresetRunner = normalizeRunnerTypeValue(presetRunnerType);
+  if (normalizedPresetRunner) {
+    const matchedEnabledRunner = enabledRunnerTypeMap.get(
+      normalizedPresetRunner
+    );
+    if (matchedEnabledRunner) {
+      return matchedEnabledRunner;
+    }
+
+    const matchedAvailableRunner = availableRunnerTypeMap.get(
+      normalizedPresetRunner
+    );
+    if (matchedAvailableRunner) {
+      return matchedAvailableRunner;
+    }
   }
 
-  const trimmedDefaultRunner = defaultRunnerType?.trim();
-  if (
-    trimmedDefaultRunner &&
-    enabledRunnerTypes.includes(trimmedDefaultRunner)
-  ) {
-    return trimmedDefaultRunner;
+  const normalizedDefaultRunner = normalizeRunnerTypeValue(defaultRunnerType);
+  if (normalizedDefaultRunner) {
+    const matchedDefaultRunner = enabledRunnerTypeMap.get(
+      normalizedDefaultRunner
+    );
+    if (matchedDefaultRunner) {
+      return matchedDefaultRunner;
+    }
   }
 
   if (enabledRunnerTypes.length > 0) {
@@ -997,6 +1038,7 @@ export function buildMemberPresetImportPlan({
   enabledRunnerTypes,
   availableRunnerTypes,
   takenNamesLowercase,
+  profiles,
 }: {
   preset: ChatMemberPreset;
   sessionId: string;
@@ -1006,6 +1048,7 @@ export function buildMemberPresetImportPlan({
   enabledRunnerTypes: string[];
   availableRunnerTypes: string[];
   takenNamesLowercase: Set<string>;
+  profiles: ExecutorConfigs['executors'] | null | undefined;
 }): MemberPresetImportPlan | null {
   const runnerType = resolvePresetRunnerType({
     presetRunnerType: preset.runner_type,
@@ -1020,7 +1063,15 @@ export function buildMemberPresetImportPlan({
   const presetName =
     preset.name.trim().length > 0 ? preset.name.trim() : preset.id;
   const systemPrompt = preset.system_prompt?.trim() ?? '';
-  const toolsEnabled = normalizePresetToolsEnabled(preset.tools_enabled);
+  const baseToolsEnabled = normalizePresetToolsEnabled(preset.tools_enabled);
+  const recommendedVariant = findVariantByModel(
+    runnerType as BaseCodingAgent,
+    preset.recommended_model,
+    profiles
+  );
+  const toolsEnabled = recommendedVariant
+    ? withExecutorProfileVariant(baseToolsEnabled, recommendedVariant)
+    : baseToolsEnabled;
   const hasSameNameInSession = sessionMembers.some(
     (member) => member.agent.name.toLowerCase() === presetName.toLowerCase()
   );

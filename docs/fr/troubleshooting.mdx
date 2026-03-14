@@ -1,6 +1,6 @@
 ---
 title: "Dépannage"
-description: "Problèmes courants et solutions lors de l'utilisation d'agents-chatgroup"
+description: "Problèmes courants et solutions lors de l'utilisation d'openteams"
 ---
 
 ## L'Agent Signale une Base de Code Vide
@@ -24,14 +24,14 @@ Si vous avez besoin de journaux plus détaillés pour aider à déboguer un prob
 **Utilisation :**
 
 ```bash
-RUST_LOG=debug npx agents-chatgroup
+RUST_LOG=debug npx openteams
 ```
 
 Cela fournira une sortie de journalisation détaillée qui peut aider à identifier la cause racine des problèmes.
 
 ## DANGER : Effacement de Votre Base de Données
 
-Si vous rencontrez des erreurs irrécupérables et devez effacer complètement votre base de données agents-chatgroup, vous pouvez supprimer le répertoire de données de l'application pour votre système d'exploitation.
+Si vous rencontrez des erreurs irrécupérables et devez effacer complètement votre base de données openteams, vous pouvez supprimer le répertoire de données de l'application pour votre système d'exploitation.
 
 <Warning>
 Cette action est irréversible et entraînera la perte de TOUTES vos tâches et paramètres. Assurez-vous de sauvegarder toute information importante avant de continuer.
@@ -42,23 +42,23 @@ Cette action est irréversible et entraînera la perte de TOUTES vos tâches et 
 <Tabs>
 <Tab title="macOS">
 ```bash
-~/Library/Application Support/ai.starterra.ai.agents-chatgroup/
+~/Library/Application Support/ai.starterra.ai.openteams/
 ```
 </Tab>
 
 <Tab title="Linux">
 ```bash
-~/.local/share/agents-chatgroup/
+~/.local/share/openteams/
 ```
 </Tab>
 
 <Tab title="Windows">
 ```
-%APPDATA%\starterra.ai\agents-chatgroup\
+%APPDATA%\starterra.ai\openteams\
 ```
 
-Typiquement : `C:\Users\<nom d'utilisateur>\AppData\Roaming\starterra.ai\agents-chatgroup\`
+Typiquement : `C:\Users\<nom d'utilisateur>\AppData\Roaming\starterra.ai\openteams\`
 </Tab>
 </Tabs>
 
-Après avoir supprimé le répertoire de données de l'application, redémarrez agents-chatgroup pour réinitialiser avec une base de données vide et les paramètres par défaut.
+Après avoir supprimé le répertoire de données de l'application, redémarrez openteams pour réinitialiser avec une base de données vide et les paramètres par défaut.

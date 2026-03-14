@@ -106,7 +106,7 @@ export function NavbarContainer() {
   );
 
   // Using consistent application title instead of dynamic navbar titles
-  const navbarTitle = 'AgentsChatGroup'; // Fixed title as per branding requirements
+  const navbarTitle = 'OpenTeams'; // Fixed title as per branding requirements
 
   return (
     <Navbar

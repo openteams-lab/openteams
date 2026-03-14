@@ -6,13 +6,13 @@
 
     <SetProperty
       Id="INSTALLDIR"
-      Value="[INSTALLDIR]agents_chatgroup\"
+      Value="[INSTALLDIR]openteams\"
       Before="CostFinalize"
     >
       NOT Installed
       AND NOT REMOVE
-      AND NOT (INSTALLDIR ~&gt;&lt; "agents_chatgroup")
-      AND NOT (INSTALLDIR ~&gt;&lt; "agents-chatgroup")
+      AND NOT (INSTALLDIR ~&gt;&lt; "openteams")
+      AND NOT (INSTALLDIR ~&gt;&lt; "openteams")
     </SetProperty>
   </Fragment>
 
@@ -61,7 +61,7 @@
       Directory="INSTALLDIR"
       Execute="deferred"
       Impersonate="yes"
-      ExeCommand="powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command &quot;$ErrorActionPreference = 'SilentlyContinue'; $workspaceRoot = $null; $configPaths = @((Join-Path $env:APPDATA 'agents-chatgroup\config.json'), (Join-Path $env:APPDATA 'ai\agents-chatgroup\config.json')); foreach ($configPath in $configPaths) { if (Test-Path -LiteralPath $configPath) { try { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json; if ($config.workspace_dir) { $workspaceRoot = Join-Path $config.workspace_dir '.agents-chatgroup-workspaces'; break } } catch {} } }; $paths = @((Join-Path $env:LOCALAPPDATA 'utils'), (Join-Path $env:LOCALAPPDATA 'ai\utils'), (Join-Path $env:LOCALAPPDATA 'agents-chatgroup'), (Join-Path $env:LOCALAPPDATA 'ai\agents-chatgroup'), (Join-Path $env:TEMP 'agents-chatgroup'), (Join-Path $env:TEMP 'agents-chatgroup-dev')); if ($workspaceRoot) { $paths += $workspaceRoot }; foreach ($path in $paths) { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue } }&quot;"
+      ExeCommand="powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command &quot;$ErrorActionPreference = 'SilentlyContinue'; $workspaceRoot = $null; $configPaths = @((Join-Path $env:APPDATA 'openteams\config.json'), (Join-Path $env:APPDATA 'ai\openteams\config.json')); foreach ($configPath in $configPaths) { if (Test-Path -LiteralPath $configPath) { try { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json; if ($config.workspace_dir) { $workspaceRoot = Join-Path $config.workspace_dir '.openteams-workspaces'; break } } catch {} } }; $paths = @((Join-Path $env:LOCALAPPDATA 'utils'), (Join-Path $env:LOCALAPPDATA 'ai\utils'), (Join-Path $env:LOCALAPPDATA 'openteams'), (Join-Path $env:LOCALAPPDATA 'ai\openteams'), (Join-Path $env:TEMP 'openteams'), (Join-Path $env:TEMP 'openteams-dev')); if ($workspaceRoot) { $paths += $workspaceRoot }; foreach ($path in $paths) { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue } }&quot;"
       Return="ignore"
     />
 
@@ -71,7 +71,7 @@
       Directory="INSTALLDIR"
       Execute="deferred"
       Impersonate="yes"
-      ExeCommand="powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command &quot;$ErrorActionPreference = 'SilentlyContinue'; $workspaceRoot = $null; $configPaths = @((Join-Path $env:APPDATA 'agents-chatgroup\config.json'), (Join-Path $env:APPDATA 'ai\agents-chatgroup\config.json')); foreach ($configPath in $configPaths) { if (Test-Path -LiteralPath $configPath) { try { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json; if ($config.workspace_dir) { $workspaceRoot = Join-Path $config.workspace_dir '.agents-chatgroup-workspaces'; break } } catch {} } }; $paths = @((Join-Path $env:APPDATA 'agents-chatgroup'), (Join-Path $env:APPDATA 'ai\agents-chatgroup'), (Join-Path $env:LOCALAPPDATA 'utils'), (Join-Path $env:LOCALAPPDATA 'ai\utils'), (Join-Path $env:LOCALAPPDATA 'agents-chatgroup'), (Join-Path $env:LOCALAPPDATA 'ai\agents-chatgroup'), (Join-Path $env:TEMP 'agents-chatgroup'), (Join-Path $env:TEMP 'agents-chatgroup-dev')); if ($workspaceRoot) { $paths += $workspaceRoot }; foreach ($path in $paths) { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue } }&quot;"
+      ExeCommand="powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command &quot;$ErrorActionPreference = 'SilentlyContinue'; $workspaceRoot = $null; $configPaths = @((Join-Path $env:APPDATA 'openteams\config.json'), (Join-Path $env:APPDATA 'ai\openteams\config.json')); foreach ($configPath in $configPaths) { if (Test-Path -LiteralPath $configPath) { try { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json; if ($config.workspace_dir) { $workspaceRoot = Join-Path $config.workspace_dir '.openteams-workspaces'; break } } catch {} } }; $paths = @((Join-Path $env:APPDATA 'openteams'), (Join-Path $env:APPDATA 'ai\openteams'), (Join-Path $env:LOCALAPPDATA 'utils'), (Join-Path $env:LOCALAPPDATA 'ai\utils'), (Join-Path $env:LOCALAPPDATA 'openteams'), (Join-Path $env:LOCALAPPDATA 'ai\openteams'), (Join-Path $env:TEMP 'openteams'), (Join-Path $env:TEMP 'openteams-dev')); if ($workspaceRoot) { $paths += $workspaceRoot }; foreach ($path in $paths) { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue } }&quot;"
       Return="ignore"
     />
 

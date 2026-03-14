@@ -10,21 +10,21 @@ const DEFAULT_R2_BASE_URL = "__R2_PUBLIC_URL__";
 const DEFAULT_BINARY_TAG = "__BINARY_TAG__";
 
 const OSS_BASE_URL = normalizeBaseUrl(
-  process.env.AGENTS_CHATGROUP_OSS_BASE_URL || DEFAULT_OSS_BASE_URL,
+  process.env.OPENTEAMS_OSS_BASE_URL || DEFAULT_OSS_BASE_URL,
 );
 const R2_BASE_URL = normalizeBaseUrl(
-  process.env.AGENTS_CHATGROUP_R2_BASE_URL || DEFAULT_R2_BASE_URL,
+  process.env.OPENTEAMS_R2_BASE_URL || DEFAULT_R2_BASE_URL,
 );
 const BINARY_TAG =
-  process.env.AGENTS_CHATGROUP_BINARY_TAG || DEFAULT_BINARY_TAG;
+  process.env.OPENTEAMS_BINARY_TAG || DEFAULT_BINARY_TAG;
 
-const INSTALL_DIR = path.join(os.homedir(), ".agents-chatgroup");
+const INSTALL_DIR = path.join(os.homedir(), ".openteams");
 const CACHE_DIR = path.join(INSTALL_DIR, "cache");
 
-// Local development mode: use binaries from agents-chatgroup-npx/dist/
+// Local development mode: use binaries from openteams-npx/dist/
 const LOCAL_DIST_DIR = path.join(__dirname, "..", "dist");
 const LOCAL_DEV_MODE =
-  fs.existsSync(LOCAL_DIST_DIR) || process.env.AGENTS_CHATGROUP_LOCAL === "1";
+  fs.existsSync(LOCAL_DIST_DIR) || process.env.OPENTEAMS_LOCAL === "1";
 
 function normalizeBaseUrl(url) {
   if (!url) return "";
@@ -64,7 +64,7 @@ function ensureRemoteConfig() {
   const source = resolveRemoteSource();
   if (!source) {
     throw new Error(
-      "Binary source URL is not configured. Set AGENTS_CHATGROUP_OSS_BASE_URL or AGENTS_CHATGROUP_R2_BASE_URL, or publish npm package with URL injection.",
+      "Binary source URL is not configured. Set OPENTEAMS_OSS_BASE_URL or OPENTEAMS_R2_BASE_URL, or publish npm package with URL injection.",
     );
   }
 

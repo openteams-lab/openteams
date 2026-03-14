@@ -51,9 +51,9 @@ case "$1" in
         fi
 
         # Data directories
-        DATA_DIR="$REAL_HOME/.local/share/ai.starterra.ai/agents-chatgroup"
-        CACHE_DIR="$REAL_HOME/.cache/ai.starterra.ai/agents-chatgroup"
-        TEMP_DIR="/var/tmp/agents-chatgroup"
+        DATA_DIR="$REAL_HOME/.local/share/ai.starterra.ai/openteams"
+        CACHE_DIR="$REAL_HOME/.cache/ai.starterra.ai/openteams"
+        TEMP_DIR="/var/tmp/openteams"
 
         # Always delete cache and temp
         if [ -d "$CACHE_DIR" ]; then
@@ -69,7 +69,7 @@ case "$1" in
             if [ -f "$CONFIG_FILE" ]; then
                 WORKSPACE_DIR=$(grep -o '"workspace_dir"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" 2>/dev/null | sed 's/.*: *"\([^"]*\)".*/\1/' || true)
                 if [ -n "$WORKSPACE_DIR" ]; then
-                    WORKSPACE_ROOT="$WORKSPACE_DIR/.agents-chatgroup-workspaces"
+                    WORKSPACE_ROOT="$WORKSPACE_DIR/.openteams-workspaces"
                     if [ -d "$WORKSPACE_ROOT" ]; then
                         rm -rf "$WORKSPACE_ROOT" 2>/dev/null || true
                     fi

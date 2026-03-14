@@ -1,9 +1,9 @@
 {
-  "name": "agents-chatgroup",
+  "name": "openteams",
   "version": "0.2.10",
   "private": true,
   "bin": {
-    "agents-chatgroup": "npx-cli/bin/cli.js"
+    "openteams": "npx-cli/bin/cli.js"
   },
   "files": [
     "npx-cli/bin/cli.js",
