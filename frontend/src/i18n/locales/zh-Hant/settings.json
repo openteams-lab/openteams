@@ -510,9 +510,13 @@
       "saveError": "儲存預設失敗。",
       "builtin": "內建",
       "disabled": "已停用",
+      "search": "搜尋",
+      "searchPlaceholder": "搜尋成員...",
+      "searchMembersPlaceholder": "搜尋團隊成員...",
+      "noSearchResults": "未找到結果",
       "tabs": {
-        "members": "成員範本",
-        "teams": "團隊範本"
+        "members": "AI員工",
+        "teams": "AI團隊"
       },
       "actions": {
         "copy": "複製",
@@ -610,8 +614,8 @@
         "delete": "刪除"
       },
       "tabs": {
-        "members": "成員範本",
-        "teams": "團隊範本"
+        "members": "AI員工",
+        "teams": "AI團隊"
       },
       "members": {
         "title": "成員範本",

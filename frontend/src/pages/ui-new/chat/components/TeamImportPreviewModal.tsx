@@ -17,7 +17,6 @@ interface TeamImportPreviewModalProps {
   importName: string | null;
   importPlan: MemberPresetImportPlan[] | null;
   teamImportProtocol: string | null;
-  isArchived: boolean;
   isImportingTeam: boolean;
   isCheckingAvailability: boolean;
   enabledRunnerTypes: string[];
@@ -119,7 +118,6 @@ export function TeamImportPreviewModal({
   importName,
   importPlan,
   teamImportProtocol,
-  isArchived,
   isImportingTeam,
   isCheckingAvailability,
   enabledRunnerTypes,
@@ -508,7 +506,7 @@ export function TeamImportPreviewModal({
                                   selectedSkillIds: skillIds,
                                 })
                               }
-                              readOnly={isArchived || isImportingTeam}
+                              readOnly={isImportingTeam}
                               maxHeightClass="max-h-32"
                             />
                           </div>
@@ -674,7 +672,7 @@ export function TeamImportPreviewModal({
             }
             onClick={onConfirm}
             actionIcon={isImportingTeam ? 'spinner' : undefined}
-            disabled={isImportingTeam || isArchived}
+            disabled={isImportingTeam}
             className="chat-session-member-btn chat-session-member-btn-primary"
           />
         </div>

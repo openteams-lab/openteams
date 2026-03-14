@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  CaretRightIcon,
+  CaretDownIcon,
   FolderNotchOpenIcon,
+  WarningCircleIcon,
+  XCircleIcon,
   XIcon,
 } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
-import type { ChatAgent } from 'shared/types';
+import type { ChatAgent, ChatMessage } from 'shared/types';
 import RawLogText from '@/components/common/RawLogText';
 import { formatDateShortWithTime } from '@/utils/date';
 import {
@@ -16,6 +18,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { RunHistoryItem } from '../types';
+import { detectApiError, extractProtocolErrorMeta } from '../utils';
+
+export interface FailedMessageInfo {
+  message: ChatMessage;
+  errorType: 'protocol' | 'api';
+  errorSummary: string;
+  errorDetail?: string;
+}
 
 export interface WorkspaceDrawerProps {
   isOpen: boolean;
@@ -23,6 +33,7 @@ export interface WorkspaceDrawerProps {
   agent: ChatAgent | null;
   workspacePath: string | null;
   runs: RunHistoryItem[];
+  messages: ChatMessage[];
   logRunId: string | null;
   logContent: string;
   logLoading: boolean;
@@ -36,6 +47,7 @@ export function WorkspaceDrawer({
   agent,
   workspacePath,
   runs,
+  messages,
   logRunId,
   logContent,
   logLoading,
@@ -44,16 +56,64 @@ export function WorkspaceDrawer({
 }: WorkspaceDrawerProps) {
   const { t } = useTranslation('chat');
   const [expandedRun, setExpandedRun] = useState<RunHistoryItem | null>(null);
-  const workspaceSegments = workspacePath
-    ? workspacePath
-        .split(/[\\/]+/)
-        .map((segment) => segment.trim())
-        .filter((segment) => segment.length > 0)
-    : [];
-  const condensedSegments =
-    workspaceSegments.length > 5
-      ? ['...', ...workspaceSegments.slice(-4)]
-      : workspaceSegments;
+  const [expandedError, setExpandedError] = useState<FailedMessageInfo | null>(
+    null
+  );
+  const [isFailedMessagesExpanded, setIsFailedMessagesExpanded] =
+    useState(true);
+
+  // Filter and extract failed messages for this agent
+  const failedMessages = useMemo<FailedMessageInfo[]>(() => {
+    if (!agent) return [];
+    const failed: FailedMessageInfo[] = [];
+
+    for (const message of messages) {
+      // Check if message is from this agent or is a system message about this agent
+      const isFromAgent =
+        message.sender_type === 'agent' && message.sender_id === agent.id;
+      const isSystemAboutAgent =
+        message.sender_type === 'system' &&
+        extractProtocolErrorMeta(message.meta)?.agentName === agent.name;
+
+      if (!isFromAgent && !isSystemAboutAgent) continue;
+
+      // Check for protocol errors in system messages
+      if (message.sender_type === 'system') {
+        const protocolError = extractProtocolErrorMeta(message.meta);
+        if (protocolError && protocolError.code) {
+          failed.push({
+            message,
+            errorType: 'protocol',
+            errorSummary:
+              protocolError.reason || `Protocol error: ${protocolError.code}`,
+            errorDetail: protocolError.detail || protocolError.rawOutput || undefined,
+          });
+        }
+        continue;
+      }
+
+      // Check for API errors in agent messages
+      const apiError = detectApiError(message.content);
+      if (apiError) {
+        failed.push({
+          message,
+          errorType: 'api',
+          errorSummary: apiError.message,
+          errorDetail: apiError.provider
+            ? `Provider: ${apiError.provider}`
+            : undefined,
+        });
+      }
+    }
+
+    // Sort by created_at descending (most recent first)
+    return failed.sort(
+      (a, b) =>
+        new Date(b.message.created_at).getTime() -
+        new Date(a.message.created_at).getTime()
+    );
+  }, [messages, agent]);
+
   return (
     <>
       <div
@@ -93,20 +153,7 @@ export function WorkspaceDrawer({
               >
                 <div className="chat-session-workspace-path-label text-[#5094FB]">
                   <FolderNotchOpenIcon className="size-icon-xs" />
-                  <span>{t('modals.workspaceDrawer.workspaceTrail')}</span>
-                </div>
-                <div className="chat-session-workspace-breadcrumbs">
-                  {condensedSegments.map((segment, index) => (
-                    <div
-                      key={`${segment}-${index}`}
-                      className="chat-session-workspace-breadcrumb-segment"
-                    >
-                      {index > 0 && (
-                        <CaretRightIcon className="chat-session-workspace-breadcrumb-separator" />
-                      )}
-                      <span>{segment}</span>
-                    </div>
-                  ))}
+                  <span>{t('modals.workspaceDrawer.workspacePath')}</span>
                 </div>
                 <div className="chat-session-workspace-path-raw">
                   {workspacePath}
@@ -114,6 +161,84 @@ export function WorkspaceDrawer({
               </div>
             )}
           </div>
+
+          {/* Failed Messages Section */}
+          {failedMessages.length > 0 && (
+            <div className="space-y-half">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between text-sm font-medium text-normal hover:text-[#4084EB] transition-colors"
+                onClick={() =>
+                  setIsFailedMessagesExpanded((expanded) => !expanded)
+                }
+                aria-expanded={isFailedMessagesExpanded}
+              >
+                <span className="flex items-center gap-1.5">
+                  <WarningCircleIcon
+                    className="size-icon-sm text-[#EF4444]"
+                    weight="fill"
+                  />
+                  <span>
+                    {t('modals.workspaceDrawer.failedMessages', {
+                      defaultValue: 'Failed Messages',
+                    })}
+                  </span>
+                  <span className="text-xs text-[#EF4444] font-normal">
+                    ({failedMessages.length})
+                  </span>
+                </span>
+                <CaretDownIcon
+                  className={cn(
+                    'size-3.5 text-low transition-transform duration-200',
+                    isFailedMessagesExpanded && 'rotate-180'
+                  )}
+                  weight="bold"
+                />
+              </button>
+              {isFailedMessagesExpanded && (
+                <div className="space-y-2 max-h-[280px] overflow-y-auto">
+                  {failedMessages.map((failedMsg) => (
+                    <div
+                      key={failedMsg.message.id}
+                      className="rounded-sm p-base space-y-half bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)]"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <XCircleIcon
+                            className="size-icon-xs text-[#EF4444] flex-shrink-0"
+                            weight="fill"
+                          />
+                          <span className="text-xs text-[#EF4444] font-medium truncate">
+                            {failedMsg.errorSummary}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-low flex-shrink-0">
+                          {formatDateShortWithTime(failedMsg.message.created_at)}
+                        </span>
+                      </div>
+                      {failedMsg.errorDetail && (
+                        <div className="text-xs text-low font-mono bg-[rgba(239,68,68,0.04)] rounded px-2 py-1 break-all max-h-[60px] overflow-y-auto">
+                          {failedMsg.errorDetail.slice(0, 200)}
+                          {failedMsg.errorDetail.length > 200 && '...'}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-xs">
+                        <button
+                          type="button"
+                          className="text-[#5094FB] hover:text-[#4084EB]"
+                          onClick={() => setExpandedError(failedMsg)}
+                        >
+                          {t('modals.workspaceDrawer.viewDetails', {
+                            defaultValue: 'View Details',
+                          })}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-half">
             <div className="text-sm text-normal font-medium">
@@ -233,6 +358,73 @@ export function WorkspaceDrawer({
           <div className="max-h-[70vh] overflow-y-auto rounded-sm bg-[#ecedf1] p-base">
             <div className="text-xs text-normal font-mono whitespace-pre-wrap break-all">
               {expandedRun?.content ?? ''}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Failed Message Details Dialog */}
+      <Dialog
+        className="chat-session-modal-surface max-w-3xl"
+        open={!!expandedError}
+        onOpenChange={(open) => {
+          if (!open) {
+            setExpandedError(null);
+          }
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <XCircleIcon className="size-5 text-[#EF4444]" weight="fill" />
+            <span>
+              {t('modals.workspaceDrawer.errorDetails', {
+                defaultValue: 'Error Details',
+              })}
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+        <DialogContent>
+          <div className="space-y-4">
+            {/* Error Summary */}
+            <div className="rounded-sm bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] p-base">
+              <div className="text-xs text-low mb-1">
+                {t('modals.workspaceDrawer.errorSummary', {
+                  defaultValue: 'Error Summary',
+                })}
+              </div>
+              <div className="text-sm text-[#EF4444] font-medium">
+                {expandedError?.errorSummary}
+              </div>
+              {expandedError?.errorDetail && (
+                <div className="mt-2 text-xs text-low">
+                  {expandedError.errorDetail}
+                </div>
+              )}
+            </div>
+
+            {/* Timestamp */}
+            <div className="text-xs text-low">
+              {t('modals.workspaceDrawer.occurredAt', {
+                defaultValue: 'Occurred at',
+              })}
+              :{' '}
+              {expandedError?.message?.created_at
+                ? formatDateShortWithTime(expandedError.message.created_at)
+                : '—'}
+            </div>
+
+            {/* Full Message Content */}
+            <div>
+              <div className="text-xs text-low mb-1">
+                {t('modals.workspaceDrawer.messageContent', {
+                  defaultValue: 'Message Content',
+                })}
+              </div>
+              <div className="max-h-[50vh] overflow-y-auto rounded-sm bg-[#ecedf1] p-base">
+                <div className="text-xs text-normal font-mono whitespace-pre-wrap break-all">
+                  {expandedError?.message?.content ?? ''}
+                </div>
+              </div>
             </div>
           </div>
         </DialogContent>

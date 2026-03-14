@@ -537,7 +537,7 @@
       "toggleUnsupported": "{{runnerType}} 当前只暴露了技能目录，没有公开可安全写回的单技能启用配置，因此这里暂时是只读的。"
     },
     "market": {
-      "title": "??",
+      "title": "市场",
       "empty": "暂无可推荐技能。",
       "installAria": "安装技能",
       "scrollForMore": "向下滚动加载更多..."
@@ -628,8 +628,15 @@
     "workspaceDrawer": {
       "agentWorkspace": "Agent 工作区",
       "close": "关闭",
-      "workspaceTrail": "工作区路径",
+      "workspaceTrail": "工作区",
+      "workspacePath": "工作区路径",
       "workspacePathCreatedOnFirstRun": "工作区路径将在首次运行时创建。",
+      "failedMessages": "失败消息",
+      "viewDetails": "查看详情",
+      "errorDetails": "错误详情",
+      "errorSummary": "错误摘要",
+      "occurredAt": "发生时间",
+      "messageContent": "消息内容",
       "runHistory": "运行历史",
       "noRunsYet": "此 Agent 暂无运行记录。",
       "run": "运行",
@@ -654,6 +661,6 @@
     "liveReport": "报表预览",
     "imagePreview": "图片预览",
     "filesChanged": "{{count}} 个文件",
-    "runLabel": "?? {{id}}"
+    "runLabel": "运行 {{id}}"
   }
 }

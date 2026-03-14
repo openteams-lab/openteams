@@ -510,9 +510,13 @@
       "saveError": "Échec de l'enregistrement des préréglages.",
       "builtin": "intégré",
       "disabled": "désactivé",
+      "search": "Rechercher",
+      "searchPlaceholder": "Rechercher des membres...",
+      "searchMembersPlaceholder": "Rechercher des membres d'équipe...",
+      "noSearchResults": "Aucun résultat trouvé",
       "tabs": {
-        "members": "Modèles de membres",
-        "teams": "Modèles d'équipes"
+        "members": "Employés IA",
+        "teams": "Équipes IA"
       },
       "actions": {
         "copy": "Dupliquer",
@@ -610,8 +614,8 @@
         "delete": "Supprimer"
       },
       "tabs": {
-        "members": "Modèles de membres",
-        "teams": "Modèles d'équipes"
+        "members": "Employés IA",
+        "teams": "Équipes IA"
       },
       "members": {
         "title": "Modèles de membres",

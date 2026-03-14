@@ -1370,7 +1370,6 @@ export function AiMembersSidebar({
         importName={teamImportName}
         importPlan={teamImportPlan}
         teamImportProtocol={teamImportProtocol}
-        isArchived={isArchived}
         isImportingTeam={isImportingTeam}
         isCheckingAvailability={isCheckingAvailability}
         enabledRunnerTypes={enabledRunnerTypes}

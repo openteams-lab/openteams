@@ -510,9 +510,13 @@
       "saveError": "No se pudieron guardar los preajustes.",
       "builtin": "integrado",
       "disabled": "deshabilitado",
+      "search": "Buscar",
+      "searchPlaceholder": "Buscar miembros...",
+      "searchMembersPlaceholder": "Buscar miembros del equipo...",
+      "noSearchResults": "No se encontraron resultados",
       "tabs": {
-        "members": "Plantillas de miembros",
-        "teams": "Plantillas de equipos"
+        "members": "Empleados IA",
+        "teams": "Equipos IA"
       },
       "actions": {
         "copy": "Duplicar",
@@ -610,8 +614,8 @@
         "delete": "Eliminar"
       },
       "tabs": {
-        "members": "Plantillas de miembros",
-        "teams": "Plantillas de equipos"
+        "members": "Empleados IA",
+        "teams": "Equipos IA"
       },
       "members": {
         "title": "Plantillas de miembros",

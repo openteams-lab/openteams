@@ -525,7 +525,7 @@
       "toggleUnsupported": "{{runnerType}} 目前只暴露了技能目錄，沒有公開可安全寫回的單技能啟用設定，因此這裡暫時是唯讀的。"
     },
     "market": {
-      "title": "??",
+      "title": "市場",
       "empty": "暫無可推薦技能。",
       "installAria": "安裝技能",
       "scrollForMore": "向下捲動載入更多..."
@@ -617,6 +617,12 @@
       "agentWorkspace": "Agent 工作區",
       "close": "關閉",
       "workspacePathCreatedOnFirstRun": "工作區路徑將在首次執行時建立。",
+      "failedMessages": "失敗訊息",
+      "viewDetails": "查看詳情",
+      "errorDetails": "錯誤詳情",
+      "errorSummary": "錯誤摘要",
+      "occurredAt": "發生時間",
+      "messageContent": "訊息內容",
       "runHistory": "執行歷史",
       "noRunsYet": "此 Agent 暫無執行記錄。",
       "run": "執行",
@@ -627,7 +633,8 @@
       "refresh": "重新整理",
       "loadingLog": "正在載入日誌...",
       "logEmpty": "日誌為空。",
-      "workspaceTrail": "工作區路徑"
+      "workspaceTrail": "工作區",
+      "workspacePath": "工作區路徑"
     }
   },
   "workspacePreview": {
@@ -642,7 +649,7 @@
     "liveReport": "報表預覽",
     "imagePreview": "圖片預覽",
     "filesChanged": "{{count}} 個檔案",
-    "runLabel": "?? {{id}}"
+    "runLabel": "運行 {{id}}"
   },
   "aiTeamPresets": {
     "title": "AI 團隊預設",

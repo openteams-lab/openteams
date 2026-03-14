@@ -2462,11 +2462,7 @@ export function ChatSessions() {
 
   const buildTeamImportPlan = useCallback(
     (teamPreset: ChatTeamPreset): MemberPresetImportPlan[] => {
-      if (!activeSessionId) return [];
-
-      const takenNamesLowercase = new Set(
-        sessionMembers.map((member) => member.agent.name.toLowerCase())
-      );
+      const importSessionId = activeSessionId ?? 'preview';
       const plans: MemberPresetImportPlan[] = [];
 
       for (const memberPresetId of teamPreset.member_ids) {
@@ -2507,13 +2503,11 @@ export function ChatSessions() {
 
         const plan = buildMemberPresetImportPlan({
           preset,
-          sessionId: activeSessionId,
-          sessionMembers,
+          sessionId: importSessionId,
           fallbackWorkspacePath: homeDirectory,
           defaultRunnerType: config?.executor_profile?.executor ?? null,
           enabledRunnerTypes,
           availableRunnerTypes,
-          takenNamesLowercase,
           profiles,
         });
 
@@ -2547,7 +2541,6 @@ export function ChatSessions() {
       homeDirectory,
       memberPresetById,
       profiles,
-      sessionMembers,
     ]
   );
 
@@ -2725,39 +2718,17 @@ export function ChatSessions() {
 
   const handleAddMemberPreset = useCallback(
     (preset: ChatMemberPreset) => {
-      if (!activeSessionId) {
-        setMemberError(t('members.importPreview.errors.selectSessionFirst'));
-        return;
-      }
-      if (isArchived) {
-        setMemberError(t('members.importPreview.errors.sessionArchived'));
-        return;
-      }
-
-      const takenNamesLowercase = new Set(
-        sessionMembers.map((member) => member.agent.name.toLowerCase())
-      );
       const plan = buildMemberPresetImportPlan({
         preset,
-        sessionId: activeSessionId,
-        sessionMembers,
+        sessionId: activeSessionId ?? 'preview',
         fallbackWorkspacePath: homeDirectory,
         defaultRunnerType: config?.executor_profile?.executor ?? null,
         enabledRunnerTypes,
         availableRunnerTypes,
-        takenNamesLowercase,
         profiles,
       });
 
       if (!plan) {
-        setMemberError(
-          t('members.importPreview.errors.noAvailableCodingAgent')
-        );
-        return;
-      }
-
-      if (plan.action === 'skip') {
-        showDuplicateMemberNameWarning(plan.finalName);
         return;
       }
 
@@ -2772,36 +2743,16 @@ export function ChatSessions() {
       config?.executor_profile?.executor,
       enabledRunnerTypes,
       homeDirectory,
-      isArchived,
       profiles,
-      sessionMembers,
-      showDuplicateMemberNameWarning,
       t,
     ]
   );
 
   const handleImportTeamPreset = useCallback(
     (teamPreset: ChatTeamPreset) => {
-      if (!activeSessionId) {
-        setMemberError(t('members.importPreview.errors.selectSessionFirst'));
-        return;
-      }
-      if (isArchived) {
-        setMemberError(t('members.importPreview.errors.sessionArchived'));
-        return;
-      }
-
       const plan = buildTeamImportPlan(teamPreset);
       if (plan.length === 0) {
         setMemberError(t('members.importPreview.errors.nothingToImport'));
-        return;
-      }
-
-      const duplicateEntry = plan.find(
-        (entry) => entry.reason === 'duplicate-name-in-session'
-      );
-      if (duplicateEntry) {
-        showDuplicateMemberNameWarning(duplicateEntry.finalName);
         return;
       }
 
@@ -2813,11 +2764,8 @@ export function ChatSessions() {
       setMemberError(null);
     },
     [
-      activeSessionId,
       buildTeamImportPlan,
-      isArchived,
       resolveTeamImportProtocol,
-      showDuplicateMemberNameWarning,
       t,
     ]
   );
@@ -2889,6 +2837,14 @@ export function ChatSessions() {
 
   const handleConfirmTeamImport = useCallback(async () => {
     if (!teamImportPlan || teamImportPlan.length === 0) return;
+    if (!activeSessionId) {
+      setMemberError(t('members.importPreview.errors.selectSessionFirst'));
+      return;
+    }
+    if (isArchived) {
+      setMemberError(t('members.importPreview.errors.sessionArchived'));
+      return;
+    }
 
     const preparedPlan = validateAndPrepareImportPlan(teamImportPlan);
     if (!preparedPlan) return;
@@ -2950,6 +2906,8 @@ export function ChatSessions() {
     }
   }, [
     importMembersFromPlan,
+    activeSessionId,
+    isArchived,
     setIsAddMemberOpen,
     teamImportPlan,
     teamImportProtocol,
@@ -4029,6 +3987,7 @@ export function ChatSessions() {
         agent={activeWorkspaceAgent ?? null}
         workspacePath={workspacePath}
         runs={activeWorkspaceRuns}
+        messages={messagesData}
         logRunId={logRunId}
         logContent={logContent}
         logLoading={logLoading}

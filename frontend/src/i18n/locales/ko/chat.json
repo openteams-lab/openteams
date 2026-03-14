@@ -525,7 +525,7 @@
       "toggleUnsupported": "{{runnerType}}은(는) 현재 네이티브 스킬 디렉터리만 노출합니다. 이 앱에서 읽을 수는 있지만, 이 러너의 사용/비사용 상태를 안전하게 다시 기록할 수는 아직 없습니다."
     },
     "market": {
-      "title": "??????",
+      "title": "시장",
       "empty": "사용 가능한 마켓플레이스 스킬이 없습니다.",
       "installAria": "스킬 설치",
       "scrollForMore": "더 불러오려면 아래로 스크롤하세요..."
@@ -617,6 +617,12 @@
       "agentWorkspace": "에이전트 워크스페이스",
       "close": "닫기",
       "workspacePathCreatedOnFirstRun": "워크스페이스 경로는 첫 실행 시 생성됩니다.",
+      "failedMessages": "실패 메시지",
+      "viewDetails": "상세 보기",
+      "errorDetails": "오류 상세",
+      "errorSummary": "오류 요약",
+      "occurredAt": "발생 시간",
+      "messageContent": "메시지 내용",
       "runHistory": "실행 기록",
       "noRunsYet": "이 에이전트의 실행 기록이 아직 없습니다.",
       "run": "실행",
@@ -627,7 +633,8 @@
       "refresh": "새로고침",
       "loadingLog": "로그 로드 중...",
       "logEmpty": "로그가 비어 있습니다.",
-      "workspaceTrail": "워크스페이스 경로"
+      "workspaceTrail": "워크스페이스",
+      "workspacePath": "워크스페이스 경로"
     }
   },
   "workspacePreview": {
@@ -642,7 +649,7 @@
     "liveReport": "라이브 리포트",
     "imagePreview": "이미지 미리보기",
     "filesChanged": "{{count}}개 파일",
-    "runLabel": "?? {{id}}"
+    "runLabel": "운행 {{id}}"
   },
   "aiTeamPresets": {
     "title": "AI 팀 프리셋",
