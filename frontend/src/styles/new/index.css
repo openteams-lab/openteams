@@ -4233,8 +4233,8 @@
   .new-design .chat-session-member-card {
     border: 1px solid #e4ebf5;
     background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.86) 0%,
+      135deg,
+      #ffffff 0%,
       var(--chat-agent-avatar-bg, #eef3f9) 100%
     );
     border-radius: 24px;

@@ -617,6 +617,12 @@
       "agentWorkspace": "Espace de travail de l'agent",
       "close": "Fermer",
       "workspacePathCreatedOnFirstRun": "Le chemin de l'espace de travail est créé lors de la première exécution.",
+      "failedMessages": "Messages Échoués",
+      "viewDetails": "Voir les Détails",
+      "errorDetails": "Détails de l'Erreur",
+      "errorSummary": "Résumé de l'Erreur",
+      "occurredAt": "Survenu à",
+      "messageContent": "Contenu du Message",
       "runHistory": "Historique des exécutions",
       "noRunsYet": "Aucune exécution pour cet agent.",
       "run": "Exécution",
@@ -627,7 +633,8 @@
       "refresh": "Actualiser",
       "loadingLog": "Chargement du journal...",
       "logEmpty": "Le journal est vide.",
-      "workspaceTrail": "Chemin de l'espace de travail"
+      "workspaceTrail": "Espace de travail",
+      "workspacePath": "Chemin de l'espace de travail"
     }
   },
   "workspacePreview": {

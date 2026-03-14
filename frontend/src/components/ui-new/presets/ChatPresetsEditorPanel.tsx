@@ -6,8 +6,10 @@ import {
   CopyIcon,
   EyeIcon,
   EyeSlashIcon,
+  MagnifyingGlassIcon,
   PlusIcon,
   TrashIcon,
+  XIcon,
 } from '@phosphor-icons/react';
 import type {
   BaseCodingAgent,
@@ -279,7 +281,7 @@ export function ChatPresetsEditorPanel({
     [config?.chat_presets]
   );
 
-  const [tab, setTab] = useState<PresetsTab>('members');
+  const [tab, setTab] = useState<PresetsTab>('teams');
   const [draft, setDraft] = useState<ChatPresetsConfig>(() =>
     cloneDeep(sourcePresets)
   );
@@ -292,6 +294,9 @@ export function ChatPresetsEditorPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [teamMemberSearch, setTeamMemberSearch] = useState('');
+  const [showMemberSearch, setShowMemberSearch] = useState(false);
 
   const hasUnsavedChanges = useMemo(
     () => !isEqual(draft, sourcePresets),
@@ -375,6 +380,42 @@ export function ChatPresetsEditorPanel({
     },
     [tChat]
   );
+
+  // Filtered members for sidebar list
+  const filteredSidebarMembers = useMemo(() => {
+    if (!memberSearch.trim()) return draft.members;
+    const searchLower = memberSearch.toLowerCase().trim();
+    return draft.members.filter((member) => {
+      const localizedName = member.is_builtin
+        ? tChat(`members.presetDisplay.members.${member.id}`, {
+            defaultValue: member.name,
+          })
+        : member.name;
+      return (
+        localizedName.toLowerCase().includes(searchLower) ||
+        member.id.toLowerCase().includes(searchLower) ||
+        member.description.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [draft.members, memberSearch, tChat]);
+
+  // Filtered members for team member selection
+  const filteredTeamMembers = useMemo(() => {
+    if (!teamMemberSearch.trim()) return draft.members;
+    const searchLower = teamMemberSearch.toLowerCase().trim();
+    return draft.members.filter((member) => {
+      const localizedName = member.is_builtin
+        ? tChat(`members.presetDisplay.members.${member.id}`, {
+            defaultValue: member.name,
+          })
+        : member.name;
+      return (
+        localizedName.toLowerCase().includes(searchLower) ||
+        member.id.toLowerCase().includes(searchLower) ||
+        member.description.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [draft.members, teamMemberSearch, tChat]);
 
   const getLocalizedTeamName = useCallback(
     (team: Pick<ChatTeamPreset, 'id' | 'name' | 'is_builtin'>): string => {
@@ -1004,67 +1045,102 @@ export function ChatPresetsEditorPanel({
           </SettingsField>
 
           <SettingsField
-            label={t('settings.presets.teams.fields.members')}
-            description={`${selectedTeam.member_ids.length} / ${draft.members.length}`}
+            label={
+              <div className="flex items-center justify-between gap-3">
+                <span>{t('settings.presets.teams.fields.members')}</span>
+                <span className="text-[12px] font-normal text-[#94A3B8]">
+                  {selectedTeam.member_ids.length} / {draft.members.length}
+                </span>
+              </div>
+            }
           >
             {draft.members.length === 0 ? (
               <div className="rounded-[20px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-5 py-6 text-[13px] text-[#94A3B8]">
                 {t('settings.presets.teams.noMemberPresets')}
               </div>
             ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                {draft.members.map((member) => {
-                  const checked = selectedTeam.member_ids.includes(member.id);
-                  return (
+              <div className="space-y-3">
+                {/* Search input for team members */}
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                  <input
+                    type="text"
+                    value={teamMemberSearch}
+                    onChange={(e) => setTeamMemberSearch(e.target.value)}
+                    placeholder={t('settings.presets.searchMembersPlaceholder')}
+                    className="w-full rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] py-2.5 pl-10 pr-8 text-[13px] text-[#334155] placeholder:text-[#94A3B8] focus:border-[#3B82F6] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#3B82F6]"
+                  />
+                  {teamMemberSearch && (
                     <button
-                      key={member.id}
                       type="button"
-                      onClick={() =>
-                        updateTeam(selectedTeam.id, (current) => {
-                          const nextIds = checked
-                            ? current.member_ids.filter(
-                                (id) => id !== member.id
-                              )
-                            : [...current.member_ids, member.id];
-                          return {
-                            ...current,
-                            member_ids: Array.from(new Set(nextIds)),
-                          };
-                        })
-                      }
-                      className={cn(
-                        'group flex items-start gap-3 rounded-[18px] border px-4 py-3 text-left transition-all duration-200',
-                        checked
-                          ? 'border-[#3B82F6] bg-[#F0F7FF] shadow-[0_8px_20px_rgba(59,130,246,0.08)]'
-                          : 'border-[#E2E8F0] bg-white hover:border-[#CBD5E1] hover:bg-[#F8FAFC]'
-                      )}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#94A3B8] hover:bg-[#E2E8F0] hover:text-[#64748B]"
+                      onClick={() => setTeamMemberSearch('')}
                     >
-                      <span
-                        className={cn(
-                          'mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-2 transition-all duration-200',
-                          checked
-                            ? 'border-[#3B82F6] bg-[#3B82F6] text-white'
-                            : 'border-[#CBD5E1] bg-white text-transparent group-hover:border-[#94A3B8]'
-                        )}
-                      >
-                        <CheckIcon className="h-3 w-3" weight="bold" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span
+                      <XIcon className="h-3.5 w-3.5" weight="bold" />
+                    </button>
+                  )}
+                </div>
+                {/* Members grid */}
+                {filteredTeamMembers.length === 0 ? (
+                  <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-5 py-6 text-center text-[13px] text-[#94A3B8]">
+                    {t('settings.presets.noSearchResults')}
+                  </div>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {filteredTeamMembers.map((member) => {
+                      const checked = selectedTeam.member_ids.includes(member.id);
+                      return (
+                        <button
+                          key={member.id}
+                          type="button"
+                          onClick={() =>
+                            updateTeam(selectedTeam.id, (current) => {
+                              const nextIds = checked
+                                ? current.member_ids.filter(
+                                    (id) => id !== member.id
+                                  )
+                                : [...current.member_ids, member.id];
+                              return {
+                                ...current,
+                                member_ids: Array.from(new Set(nextIds)),
+                              };
+                            })
+                          }
                           className={cn(
-                            'block truncate text-[14px] font-medium',
-                            checked ? 'text-[#0F172A]' : 'text-[#475569]'
+                            'group flex items-start gap-3 rounded-[18px] border px-4 py-3 text-left transition-all duration-200',
+                            checked
+                              ? 'border-[#3B82F6] bg-[#F0F7FF] shadow-[0_8px_20px_rgba(59,130,246,0.08)]'
+                              : 'border-[#E2E8F0] bg-white hover:border-[#CBD5E1] hover:bg-[#F8FAFC]'
                           )}
                         >
-                          @{getLocalizedMemberName(member)}
-                        </span>
-                        <span className="mt-1 block truncate text-[12px] text-[#94A3B8]">
-                          {member.description || member.id}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
+                          <span
+                            className={cn(
+                              'mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-2 transition-all duration-200',
+                              checked
+                                ? 'border-[#3B82F6] bg-[#3B82F6] text-white'
+                                : 'border-[#CBD5E1] bg-white text-transparent group-hover:border-[#94A3B8]'
+                            )}
+                          >
+                            <CheckIcon className="h-3 w-3" weight="bold" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={cn(
+                                'block truncate text-[14px] font-medium',
+                                checked ? 'text-[#0F172A]' : 'text-[#475569]'
+                              )}
+                            >
+                              @{getLocalizedMemberName(member)}
+                            </span>
+                            <span className="mt-1 block truncate text-[12px] text-[#94A3B8]">
+                              {member.description || member.id}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </SettingsField>
@@ -1121,18 +1197,6 @@ export function ChatPresetsEditorPanel({
                   type="button"
                   className={cn(
                     sidebarTabButtonClassName,
-                    tab === 'members'
-                      ? 'border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm'
-                      : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70'
-                  )}
-                  onClick={() => setTab('members')}
-                >
-                  {t('settings.presets.tabs.members')}
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    sidebarTabButtonClassName,
                     tab === 'teams'
                       ? 'border-[#E2E8F0] bg-white text-[#2563EB] shadow-sm'
                       : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70'
@@ -1141,32 +1205,90 @@ export function ChatPresetsEditorPanel({
                 >
                   {t('settings.presets.tabs.teams')}
                 </button>
+                <button
+                  type="button"
+                  className={cn(
+                    sidebarTabButtonClassName,
+                    tab === 'members'
+                      ? 'border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm'
+                      : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70'
+                  )}
+                  onClick={() => setTab('members')}
+                >
+                  {t('settings.presets.tabs.members')}
+                </button>
               </div>
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex items-center justify-between px-5 py-4">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94A3B8]">
-                  {tab === 'members'
-                    ? t('settings.presets.members.listTitle')
-                    : t('settings.presets.teams.listTitle')}
-                </span>
-                <button
-                  type="button"
-                  className="text-[12px] font-semibold text-[#2563EB] transition-colors duration-200 hover:text-[#1D4ED8]"
-                  onClick={
-                    tab === 'members'
-                      ? handleAddMemberPreset
-                      : handleAddTeamPreset
-                  }
-                >
-                  <span className="inline-flex items-center gap-1">
-                    <PlusIcon className="h-3.5 w-3.5" weight="bold" />
+              <div className="flex flex-col gap-2 px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94A3B8]">
                     {tab === 'members'
-                      ? t('settings.presets.members.add')
-                      : t('settings.presets.teams.add')}
+                      ? t('settings.presets.members.listTitle')
+                      : t('settings.presets.teams.listTitle')}
                   </span>
-                </button>
+                  <div className="flex items-center gap-2">
+                    {tab === 'members' && (
+                      <button
+                        type="button"
+                        className={cn(
+                          'flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-200',
+                          showMemberSearch
+                            ? 'bg-[#2563EB] text-white'
+                            : 'text-[#64748B] hover:bg-[#E2E8F0] hover:text-[#475569]'
+                        )}
+                        onClick={() => {
+                          setShowMemberSearch(!showMemberSearch);
+                          if (showMemberSearch) {
+                            setMemberSearch('');
+                          }
+                        }}
+                        title={t('settings.presets.search')}
+                      >
+                        <MagnifyingGlassIcon className="h-3.5 w-3.5" weight="bold" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="text-[12px] font-semibold text-[#2563EB] transition-colors duration-200 hover:text-[#1D4ED8]"
+                      onClick={
+                        tab === 'members'
+                          ? handleAddMemberPreset
+                          : handleAddTeamPreset
+                      }
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <PlusIcon className="h-3.5 w-3.5" weight="bold" />
+                        {tab === 'members'
+                          ? t('settings.presets.members.add')
+                          : t('settings.presets.teams.add')}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+                {tab === 'members' && showMemberSearch && (
+                  <div className="relative">
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                    <input
+                      type="text"
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      placeholder={t('settings.presets.searchPlaceholder')}
+                      className="w-full rounded-[10px] border border-[#E2E8F0] bg-white py-2 pl-9 pr-8 text-[13px] text-[#334155] placeholder:text-[#94A3B8] focus:border-[#3B82F6] focus:outline-none focus:ring-1 focus:ring-[#3B82F6]"
+                      autoFocus
+                    />
+                    {memberSearch && (
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#94A3B8] hover:bg-[#F1F5F9] hover:text-[#64748B]"
+                        onClick={() => setMemberSearch('')}
+                      >
+                        <XIcon className="h-3.5 w-3.5" weight="bold" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
@@ -1176,8 +1298,12 @@ export function ChatPresetsEditorPanel({
                       <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-white px-4 py-6 text-[13px] text-[#94A3B8]">
                         {t('settings.presets.members.empty')}
                       </div>
+                    ) : filteredSidebarMembers.length === 0 ? (
+                      <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-white px-4 py-6 text-center text-[13px] text-[#94A3B8]">
+                        {t('settings.presets.noSearchResults')}
+                      </div>
                     ) : (
-                      draft.members.map((member) => (
+                      filteredSidebarMembers.map((member) => (
                         <PresetListItem
                           key={member.id}
                           title={`@${getLocalizedMemberName(member)}`}

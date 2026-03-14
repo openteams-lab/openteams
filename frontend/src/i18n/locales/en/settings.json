@@ -510,9 +510,13 @@
       "saveError": "Failed to save presets.",
       "builtin": "built-in",
       "disabled": "disabled",
+      "search": "Search",
+      "searchPlaceholder": "Search members...",
+      "searchMembersPlaceholder": "Search team members...",
+      "noSearchResults": "No results found",
       "tabs": {
-        "members": "Member Templates",
-        "teams": "Team Templates"
+        "members": "AI Employees",
+        "teams": "AI Teams"
       },
       "actions": {
         "copy": "Duplicate",
@@ -612,8 +616,8 @@
         "delete": "Delete"
       },
       "tabs": {
-        "members": "Member Templates",
-        "teams": "Team Templates"
+        "members": "AI Employees",
+        "teams": "AI Teams"
       },
       "members": {
         "title": "Member Templates",
