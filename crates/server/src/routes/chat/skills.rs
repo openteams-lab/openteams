@@ -15,12 +15,12 @@ use services::services::{
         update_native_skill_enabled_for_runner,
     },
     skill_registry::{
-        RemoteSkillMeta, RemoteSkillPackage, SkillCategory, SkillRegistryClient,
+        RemoteSkillMeta, RemoteSkillPackage, SkillCategory,
         builtin_skills_count, filter_builtin_skills_by_agent, filter_builtin_skills_by_category,
         get_builtin_categories, get_skill_with_fallback, install_builtin_skill,
-        install_skill_files_to_global_directory, install_skill_from_registry,
-        list_categories_with_fallback, list_skills_with_fallback, search_skills_with_fallback,
-        sync_discovered_global_skills, uninstall_skill_files_from_global_directory,
+        install_skill_with_fallback, list_categories_with_fallback, list_skills_with_fallback,
+        search_skills_with_fallback, sync_discovered_global_skills,
+        uninstall_skill_files_from_global_directory,
     },
 };
 use utils::response::ApiResponse;
@@ -234,29 +234,24 @@ pub struct RegistryQuery {
     pub registry_url: Option<String>,
 }
 
-/// List available skills from the remote registry
+/// List available skills from the remote registry with fallback to built-in skills
 pub async fn list_registry_skills(
     State(_deployment): State<DeploymentImpl>,
     axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
 ) -> Result<ResponseJson<ApiResponse<Vec<RemoteSkillMeta>>>, ApiError> {
-    let client = SkillRegistryClient::new(query.registry_url);
-    let skills = client.list_skills().await.map_err(|e| {
-        ApiError::BadRequest(format!("Failed to fetch skills from registry: {}", e))
-    })?;
+    let skills = list_skills_with_fallback(query.registry_url).await;
     Ok(ResponseJson(ApiResponse::success(skills)))
 }
 
-/// Get a specific skill from the registry
+/// Get a specific skill from the registry with fallback to built-in skills
 pub async fn get_registry_skill(
     State(_deployment): State<DeploymentImpl>,
     axum::extract::Path(skill_id): axum::extract::Path<String>,
     axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
 ) -> Result<ResponseJson<ApiResponse<RemoteSkillPackage>>, ApiError> {
-    let client = SkillRegistryClient::new(query.registry_url);
-    let skill = client
-        .get_skill(&skill_id)
+    let skill = get_skill_with_fallback(query.registry_url, &skill_id)
         .await
-        .map_err(|e| ApiError::BadRequest(format!("Failed to fetch skill from registry: {}", e)))?;
+        .ok_or_else(|| ApiError::BadRequest(format!("Skill not found: {}", skill_id)))?;
     Ok(ResponseJson(ApiResponse::success(skill)))
 }
 
@@ -271,34 +266,15 @@ pub async fn list_registry_categories(
 
 /// Install a skill from the registry to the local database
 /// and download full skill files to global user skill directories.
+///
+/// Fallback: If remote registry is unavailable, uses built-in skills.
+/// Only returns error if skill is not found anywhere.
 pub async fn install_registry_skill(
     State(deployment): State<DeploymentImpl>,
     axum::extract::Path(skill_id): axum::extract::Path<String>,
     axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
 ) -> Result<ResponseJson<ApiResponse<ChatSkill>>, ApiError> {
-    let client = SkillRegistryClient::new(query.registry_url.clone());
-    let skill_package = client
-        .get_skill(&skill_id)
-        .await
-        .map_err(|e| ApiError::BadRequest(format!("Failed to fetch skill from registry: {}", e)))?;
-
-    let files_count =
-        install_skill_files_to_global_directory(&skill_package, query.registry_url.as_deref())
-            .await
-            .map_err(|e| {
-                ApiError::BadRequest(format!(
-                    "Failed to install skill files to global directories: {}",
-                    e
-                ))
-            })?;
-
-    tracing::info!(
-        skill_id = %skill_id,
-        files_count = files_count,
-        "Installed registry skill files to global user directories"
-    );
-
-    let installed = install_skill_from_registry(&deployment.db().pool, &skill_package)
+    let installed = install_skill_with_fallback(&deployment.db().pool, &skill_id, query.registry_url.as_deref())
         .await
         .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
 
