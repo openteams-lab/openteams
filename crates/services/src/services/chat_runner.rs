@@ -19,6 +19,7 @@ use db::{
         chat_session::ChatSession,
         chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
         chat_skill::ChatSkill,
+        chat_work_item::{ChatWorkItem, ChatWorkItemType, CreateChatWorkItem},
     },
 };
 use executors::{
@@ -260,6 +261,9 @@ pub enum ChatStreamEvent {
     MessageNew {
         message: ChatMessage,
     },
+    WorkItemNew {
+        work_item: ChatWorkItem,
+    },
     AgentDelta {
         session_id: Uuid,
         session_agent_id: Uuid,
@@ -368,6 +372,10 @@ impl ChatRunner {
 
     pub fn emit_message_new(&self, session_id: Uuid, message: ChatMessage) {
         self.emit(session_id, ChatStreamEvent::MessageNew { message });
+    }
+
+    pub fn emit_work_item_new(&self, session_id: Uuid, work_item: ChatWorkItem) {
+        self.emit(session_id, ChatStreamEvent::WorkItemNew { work_item });
     }
 
     /// Update the mention_statuses field in a message's meta
@@ -3404,6 +3412,65 @@ impl ChatRunner {
         Ok(())
     }
 
+    fn protocol_work_item_type(
+        message_type: &AgentProtocolMessageType,
+    ) -> Option<ChatWorkItemType> {
+        match message_type {
+            AgentProtocolMessageType::Artifact => Some(ChatWorkItemType::Artifact),
+            AgentProtocolMessageType::Conclusion => Some(ChatWorkItemType::Conclusion),
+            AgentProtocolMessageType::Send | AgentProtocolMessageType::Record => None,
+        }
+    }
+
+    fn work_item_type_label(item_type: &ChatWorkItemType) -> &'static str {
+        match item_type {
+            ChatWorkItemType::Artifact => "artifact",
+            ChatWorkItemType::Conclusion => "conclusion",
+        }
+    }
+
+    async fn persist_work_item(
+        &self,
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        run_id: Uuid,
+        agent_name: &str,
+        item_type: ChatWorkItemType,
+        content: String,
+    ) -> Result<ChatWorkItem, ChatRunnerError> {
+        let work_item = ChatWorkItem::create(
+            &self.db.pool,
+            &CreateChatWorkItem {
+                session_id,
+                run_id,
+                session_agent_id,
+                agent_id,
+                item_type: item_type.clone(),
+                content: content.clone(),
+            },
+            Uuid::new_v4(),
+        )
+        .await?;
+
+        ChatSession::touch(&self.db.pool, session_id).await?;
+        self.emit_work_item_new(session_id, work_item.clone());
+
+        let entry = WorkRecordEntry {
+            session_id,
+            run_id,
+            session_agent_id,
+            agent_id,
+            owner: agent_name.to_string(),
+            message_type: Self::work_item_type_label(&item_type),
+            content,
+            created_at: work_item.created_at.to_rfc3339(),
+        };
+        Self::append_jsonl_line(&Self::session_work_records_path(session_id), &entry).await?;
+
+        Ok(work_item)
+    }
+
     async fn emit_protocol_error_message(
         &self,
         session_id: Uuid,
@@ -3594,9 +3661,9 @@ impl ChatRunner {
         };
 
         for message in &protocol_messages {
-            let created_at = Utc::now().to_rfc3339();
-            match message.message_type {
+            match &message.message_type {
                 AgentProtocolMessageType::Record => {
+                    let created_at = Utc::now().to_rfc3339();
                     let entry = SharedBlackboardEntry {
                         session_id,
                         run_id,
@@ -3613,33 +3680,21 @@ impl ChatRunner {
                     )
                     .await?;
                 }
-                AgentProtocolMessageType::Artifact => {
-                    let entry = WorkRecordEntry {
+                AgentProtocolMessageType::Artifact | AgentProtocolMessageType::Conclusion => {
+                    let Some(item_type) = Self::protocol_work_item_type(&message.message_type)
+                    else {
+                        continue;
+                    };
+                    self.persist_work_item(
                         session_id,
-                        run_id,
                         session_agent_id,
                         agent_id,
-                        owner: agent_name.to_string(),
-                        message_type: "artifact",
-                        content: message.content.clone(),
-                        created_at,
-                    };
-                    Self::append_jsonl_line(&Self::session_work_records_path(session_id), &entry)
-                        .await?;
-                }
-                AgentProtocolMessageType::Conclusion => {
-                    let entry = WorkRecordEntry {
-                        session_id,
                         run_id,
-                        session_agent_id,
-                        agent_id,
-                        owner: agent_name.to_string(),
-                        message_type: "conclusion",
-                        content: message.content.clone(),
-                        created_at,
-                    };
-                    Self::append_jsonl_line(&Self::session_work_records_path(session_id), &entry)
-                        .await?;
+                        agent_name,
+                        item_type,
+                        message.content.clone(),
+                    )
+                    .await?;
                 }
                 AgentProtocolMessageType::Send => {}
             }

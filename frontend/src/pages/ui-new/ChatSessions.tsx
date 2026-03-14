@@ -16,6 +16,8 @@ import {
   ChatSession,
   ChatSessionStatus,
   ChatSessionAgentState,
+  ChatWorkItem,
+  ChatWorkItemType,
   BaseCodingAgent,
   type AvailabilityInfo,
   type JsonValue,
@@ -44,6 +46,7 @@ import {
   type RunHistoryItem,
   type MentionStatus,
   type ChatAttachment,
+  type ChatWorkItemGroup,
   type RunDiffState,
   type StreamRun,
   useChatData,
@@ -83,6 +86,7 @@ import { SessionListSidebar } from './chat/components/SessionListSidebar';
 import { ChatHeader } from './chat/components/ChatHeader';
 import { CleanupModeBar } from './chat/components/CleanupModeBar';
 import { ChatMessageItem } from './chat/components/ChatMessageItem';
+import { ChatWorkItemCard } from './chat/components/ChatWorkItemCard';
 import { RunningAgentPlaceholder } from './chat/components/RunningAgentPlaceholder';
 import { MessageInputArea } from './chat/components/MessageInputArea';
 import { ChatEmptyStateIndicator } from './chat/components/ChatEmptyStateIndicator';
@@ -210,6 +214,20 @@ type ArtifactSpotlight =
       hasDiff: boolean;
       untrackedFiles: string[];
       previewText: string | null;
+    };
+
+type TimelineEntry =
+  | {
+      kind: 'message';
+      key: string;
+      createdAtMs: number;
+      message: ChatMessage;
+    }
+  | {
+      kind: 'work_item';
+      key: string;
+      createdAtMs: number;
+      group: ChatWorkItemGroup;
     };
 
 const normalizeSessionTitle = (value: string | null | undefined) => {
@@ -606,6 +624,7 @@ export function ChatSessions() {
     agents,
     sessionAgents,
     messagesData,
+    workItemsData,
     agentById,
     sessionMembers,
     mentionAgents,
@@ -624,6 +643,7 @@ export function ChatSessions() {
       : null
     : (sortedSessions[0]?.id ?? null);
   const visibleMessagesData = useMemo(() => messagesData, [messagesData]);
+  const visibleWorkItemsData = useMemo(() => workItemsData, [workItemsData]);
   const notificationsRef = useRef(config?.notifications ?? null);
   const sessionTitleByIdRef = useRef<Map<string, string>>(new Map());
   const agentByIdRef = useRef(agentById);
@@ -644,6 +664,7 @@ export function ChatSessions() {
 
   // Messages state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [workItems, setWorkItems] = useState<ChatWorkItem[]>([]);
 
   const upsertMessage = useCallback(
     (message: ChatMessage) => {
@@ -671,6 +692,35 @@ export function ChatSessions() {
             return next;
           }
           return [...prev, message];
+        }
+      );
+    },
+    [queryClient]
+  );
+
+  const upsertWorkItem = useCallback(
+    (workItem: ChatWorkItem) => {
+      setWorkItems((prev) => {
+        const existingIndex = prev.findIndex((item) => item.id === workItem.id);
+        if (existingIndex >= 0) {
+          const next = [...prev];
+          next[existingIndex] = workItem;
+          return next;
+        }
+        return [...prev, workItem];
+      });
+
+      queryClient.setQueryData<ChatWorkItem[]>(
+        ['chatWorkItems', workItem.session_id],
+        (prev) => {
+          if (!prev) return [workItem];
+          const existingIndex = prev.findIndex((item) => item.id === workItem.id);
+          if (existingIndex >= 0) {
+            const next = [...prev];
+            next[existingIndex] = workItem;
+            return next;
+          }
+          return [...prev, workItem];
         }
       );
     },
@@ -767,6 +817,13 @@ export function ChatSessions() {
     [t, upsertMessage]
   );
 
+  const handleIncomingWorkItem = useCallback(
+    (workItem: ChatWorkItem) => {
+      upsertWorkItem(workItem);
+    },
+    [upsertWorkItem]
+  );
+
   // WebSocket connection
   const {
     streamingRuns,
@@ -781,7 +838,11 @@ export function ChatSessions() {
     pruneStreamingRunsForSession,
     clearCompressionWarning,
     dismissProtocolNotice,
-  } = useChatWebSocket(activeSessionId, handleIncomingMessage);
+  } = useChatWebSocket(
+    activeSessionId,
+    handleIncomingMessage,
+    handleIncomingWorkItem
+  );
 
   // Mutations
   const {
@@ -991,10 +1052,12 @@ export function ChatSessions() {
   useEffect(() => {
     if (activeSessionId) {
       setMessages(visibleMessagesData);
+      setWorkItems(visibleWorkItemsData);
     } else {
       setMessages([]);
+      setWorkItems([]);
     }
-  }, [visibleMessagesData, activeSessionId]);
+  }, [visibleMessagesData, visibleWorkItemsData, activeSessionId]);
 
   useEffect(() => {
     if (visibleMessagesData.length === 0) return;
@@ -1258,8 +1321,68 @@ export function ChatSessions() {
       ),
     [messages]
   );
-  const lastMessageId =
-    messageList.length > 0 ? messageList[messageList.length - 1].id : null;
+  const workItemGroups = useMemo<ChatWorkItemGroup[]>(() => {
+    const sorted = [...workItems].sort(
+      (a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    const groups = new Map<string, ChatWorkItemGroup>();
+
+    for (const item of sorted) {
+      const existing = groups.get(item.run_id);
+      if (existing) {
+        if (item.item_type === ChatWorkItemType.artifact) {
+          existing.artifacts.push(item);
+        } else {
+          existing.conclusions.push(item);
+        }
+
+        if (
+          new Date(item.created_at).getTime() >
+          new Date(existing.createdAt).getTime()
+        ) {
+          existing.createdAt = item.created_at;
+        }
+        continue;
+      }
+
+      groups.set(item.run_id, {
+        runId: item.run_id,
+        sessionAgentId: item.session_agent_id,
+        agentId: item.agent_id,
+        createdAt: item.created_at,
+        artifacts: item.item_type === ChatWorkItemType.artifact ? [item] : [],
+        conclusions:
+          item.item_type === ChatWorkItemType.conclusion ? [item] : [],
+      });
+    }
+
+    return [...groups.values()].sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+  }, [workItems]);
+
+  const timelineEntries = useMemo<TimelineEntry[]>(
+    () =>
+      [...messageList.map((message) => ({
+        kind: 'message' as const,
+        key: `message:${message.id}`,
+        createdAtMs: new Date(message.created_at).getTime(),
+        message,
+      })),
+      ...workItemGroups.map((group) => ({
+        kind: 'work_item' as const,
+        key: `work-item:${group.runId}`,
+        createdAtMs: new Date(group.createdAt).getTime(),
+        group,
+      }))].sort((a, b) => a.createdAtMs - b.createdAtMs),
+    [messageList, workItemGroups]
+  );
+  const lastTimelineEntryKey =
+    timelineEntries.length > 0
+      ? timelineEntries[timelineEntries.length - 1].key
+      : null;
 
   const messageById = useMemo(
     () => new Map(messageList.map((message) => [message.id, message])),
@@ -1494,7 +1617,7 @@ export function ChatSessions() {
   const showEmptyTimelineIndicator =
     !isLoading &&
     !!activeSessionId &&
-    messageList.length === 0 &&
+    timelineEntries.length === 0 &&
     protocolNotices.length === 0 &&
     placeholderAgents.length === 0;
   const emptyTimelineVariant =
@@ -1541,6 +1664,9 @@ export function ChatSessions() {
         completedRunIds.add(runId);
       }
     }
+    for (const workItem of visibleWorkItemsData) {
+      completedRunIds.add(workItem.run_id);
+    }
 
     const runningAgentIds = new Set<string>();
     for (const member of sessionMembers) {
@@ -1559,6 +1685,7 @@ export function ChatSessions() {
     activeSessionId,
     agentStates,
     visibleMessagesData,
+    visibleWorkItemsData,
     pruneStreamingRunsForSession,
     sessionMembers,
   ]);
@@ -1720,7 +1847,7 @@ export function ChatSessions() {
     return () => cancelAnimationFrame(animationFrame);
   }, [
     activeSessionId,
-    lastMessageId,
+    lastTimelineEntryKey,
     streamingRunCount,
     placeholderAgents.length,
     protocolNotices.length,
@@ -1754,6 +1881,12 @@ export function ChatSessions() {
       }
       return 'System';
     },
+    [agentById]
+  );
+
+  const getWorkItemSenderLabel = useCallback(
+    (group: ChatWorkItemGroup) =>
+      agentById.get(group.agentId)?.name ?? 'Agent',
     [agentById]
   );
 
@@ -1944,24 +2077,43 @@ export function ChatSessions() {
     return new RegExp(escapedMessageSearchQuery, 'giu');
   }, [escapedMessageSearchQuery]);
 
-  const filteredMessageList = useMemo(() => {
-    if (!messageSearchRegExp) return messageList;
+  const filteredTimelineEntries = useMemo(() => {
+    if (!messageSearchRegExp) return timelineEntries;
 
-    return messageList.filter((message) => {
-      if (messageSearchRegExp.test(message.content)) {
+    return timelineEntries.filter((entry) => {
+      if (entry.kind === 'message') {
+        const { message } = entry;
+        if (messageSearchRegExp.test(message.content)) {
+          return true;
+        }
+
+        if (messageSearchRegExp.test(getMessageSenderLabel(message))) {
+          return true;
+        }
+
+        const attachments = extractAttachments(message.meta);
+        return attachments.some((attachment) =>
+          messageSearchRegExp.test(attachment.name ?? '')
+        );
+      }
+
+      if (messageSearchRegExp.test(getWorkItemSenderLabel(entry.group))) {
         return true;
       }
 
-      if (messageSearchRegExp.test(getMessageSenderLabel(message))) {
-        return true;
-      }
-
-      const attachments = extractAttachments(message.meta);
-      return attachments.some((attachment) =>
-        messageSearchRegExp.test(attachment.name ?? '')
+      return (
+        entry.group.artifacts.some((item) => messageSearchRegExp.test(item.content)) ||
+        entry.group.conclusions.some((item) =>
+          messageSearchRegExp.test(item.content)
+        )
       );
     });
-  }, [getMessageSenderLabel, messageList, messageSearchRegExp]);
+  }, [
+    getMessageSenderLabel,
+    getWorkItemSenderLabel,
+    messageSearchRegExp,
+    timelineEntries,
+  ]);
 
   const handleCloseMessageSearch = useCallback(() => {
     setIsMessageSearchOpen(false);
@@ -2021,7 +2173,7 @@ export function ChatSessions() {
     }
 
     const roots = container.querySelectorAll<HTMLElement>(
-      '.chat-session-message-body, .chat-session-message-row.is-system'
+      '.chat-session-message-body, .chat-session-message-row.is-system, .chat-session-work-item-card'
     );
     const ranges: Range[] = [];
 
@@ -2084,7 +2236,7 @@ export function ChatSessions() {
     return () => {
       cssHighlights.delete(MESSAGE_SEARCH_HIGHLIGHT_NAME);
     };
-  }, [filteredMessageList, messageSearchHighlightRegExp]);
+  }, [filteredTimelineEntries, messageSearchHighlightRegExp]);
 
   const getReferencePreview = useCallback((message: ChatMessage) => {
     const attachments = extractAttachments(message.meta);
@@ -3518,9 +3670,9 @@ export function ChatSessions() {
                       />
                     )}
                     {!isLoading &&
-                      messageList.length > 0 &&
+                      timelineEntries.length > 0 &&
                       trimmedMessageSearchQuery &&
-                      filteredMessageList.length === 0 && (
+                      filteredTimelineEntries.length === 0 && (
                         <div className="text-sm text-low">
                           {t('timeline.noMatches', {
                             query: messageSearchQuery.trim(),
@@ -3528,7 +3680,22 @@ export function ChatSessions() {
                         </div>
                       )}
 
-                    {filteredMessageList.map((message) => {
+                    {filteredTimelineEntries.map((entry) => {
+                      if (entry.kind === 'work_item') {
+                        return (
+                          <ChatWorkItemCard
+                            key={entry.key}
+                            group={entry.group}
+                            senderLabel={getWorkItemSenderLabel(entry.group)}
+                            senderRunnerType={
+                              agentById.get(entry.group.agentId)?.runner_type ??
+                              null
+                            }
+                          />
+                        );
+                      }
+
+                      const { message } = entry;
                       const isAgent =
                         message.sender_type === ChatSenderType.agent;
                       const agentName =
@@ -3559,7 +3726,6 @@ export function ChatSessions() {
                         ? 'user'
                         : (message.sender_id ?? agentName ?? 'agent');
                       const tone = getMessageTone(String(toneKey), isUser);
-
                       const isSelected = selectedMessageIds.has(message.id);
 
                       return (

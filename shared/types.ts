@@ -142,6 +142,10 @@ export type ChatArtifact = { id: string, session_id: string, name: string, path:
 
 export type ChatRun = { id: string, session_id: string, session_agent_id: string, run_index: bigint, run_dir: string, input_path: string | null, output_path: string | null, raw_log_path: string | null, meta_path: string | null, created_at: string, };
 
+export type ChatWorkItem = { id: string, session_id: string, run_id: string, session_agent_id: string, agent_id: string, item_type: ChatWorkItemType, content: string, created_at: string, };
+
+export enum ChatWorkItemType { artifact = "artifact", conclusion = "conclusion" }
+
 export type ChatSkill = { id: string, name: string, description: string, content: string, trigger_type: string, trigger_keywords: string[], enabled: boolean, source: string, source_url: string | null, version: string, author: string | null, tags: string[], category: string | null, compatible_agents: string[], 
 /**
  * Download count from skills.sh registry
@@ -184,7 +188,7 @@ export type SkillCategory = { id: string, name: string, description: string | nu
 
 export type InstalledNativeSkill = { skill: ChatSkill, enabled: boolean, can_toggle: boolean, native_path: string, config_path: string | null, };
 
-export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, } | { "type": "protocol_notice", session_id: string, session_agent_id: string, agent_id: string, run_id: string, agent_name: string, code: ChatProtocolNoticeCode, target: string | null, detail: string | null, output_is_empty: boolean, };
+export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "work_item_new", work_item: ChatWorkItem, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, } | { "type": "protocol_notice", session_id: string, session_agent_id: string, agent_id: string, run_id: string, agent_name: string, code: ChatProtocolNoticeCode, target: string | null, detail: string | null, output_is_empty: boolean, };
 
 export type ChatStreamDeltaType = "assistant" | "thinking";
 
@@ -353,6 +357,8 @@ export type UpdateChatSessionAgentRequest = { workspace_path: string | null, all
 export type UpdateNativeSkillRequest = { enabled: boolean, };
 
 export type ChatMessageListQuery = { limit: bigint | null, };
+
+export type ChatWorkItemListQuery = { limit: bigint | null, };
 
 export type CreateChatMessageRequest = { sender_type: ChatSenderType, sender_id: string | null, content: string, meta: JsonValue | null, };
 
