@@ -2,6 +2,7 @@
 //!
 //! Provides functionality to fetch and install skills from a remote registry.
 //! Also provides built-in skills from the awesome-claude-skills repository.
+//! Supports fallback to embedded local skill files when remote server is unavailable.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -11,23 +12,37 @@ use std::{
 use db::models::chat_skill::{ChatSkill, CreateChatSkill};
 use once_cell::sync::Lazy;
 use reqwest::Client;
+use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use thiserror::Error;
 use ts_rs::TS;
 use uuid::Uuid;
 
-/// Default skill registry URL (can be configured)
+/// Default skill registry URL (can be configured via SKILL_REGISTRY_URL env var)
 /// Use local server for development: http://127.0.0.1:3101
 /// Production: https://skills.openteams.com
-pub const DEFAULT_REGISTRY_URL: &str = "http://127.0.0.1:3101";
+pub fn default_registry_url() -> &'static str {
+    static DEFAULT_URL: Lazy<String> = Lazy::new(|| {
+        std::env::var("SKILL_REGISTRY_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:3101".to_string())
+    });
+    DEFAULT_URL.as_str()
+}
+
 const GLOBAL_SKILLS_DIR: &str = ".agents";
+
+/// Embedded skill files from assets/skills directory
+/// This allows installing skills without network access
+#[derive(RustEmbed)]
+#[folder = "../../assets/skills/"]
+struct EmbeddedSkillFiles;
 
 /// Built-in skills data loaded from JSON
 static BUILTIN_SKILLS: Lazy<BuiltInSkillsData> = Lazy::new(|| {
     let json_data = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../skill-registry-server/seed/skills_registry.json"
+        "/../../assets/skills/skills_registry.json"
     ));
     match serde_json::from_str(json_data) {
         Ok(data) => data,
@@ -350,7 +365,7 @@ impl SkillRegistryClient {
     pub fn new(base_url: Option<String>) -> Self {
         Self {
             client: Client::new(),
-            base_url: base_url.unwrap_or_else(|| DEFAULT_REGISTRY_URL.to_string()),
+            base_url: base_url.unwrap_or_else(|| default_registry_url().to_string()),
         }
     }
 
@@ -675,56 +690,75 @@ async fn load_discovered_skill(
 /// - ~/.factory/skills/{skill_name}
 ///
 /// Returns the number of downloaded source files.
+///
+/// Fallback: If remote registry is unavailable, attempts to install from embedded assets.
 pub async fn install_skill_files_to_global_directory(
     skill: &RemoteSkillPackage,
     registry_url: Option<&str>,
 ) -> Result<usize, SkillInstallError> {
     let client = SkillRegistryClient::new(registry_url.map(String::from));
 
-    // Get file list from registry
-    let download_response = client
-        .get_skill_files(&skill.id)
-        .await
-        .map_err(|e| SkillInstallError::DownloadFailed(e.to_string()))?;
-    if download_response.files.is_empty() {
-        return Err(SkillInstallError::DownloadFailed(format!(
-            "Registry returned zero files for skill: {}",
-            skill.id
-        )));
-    }
-
-    let home_dir = resolve_home_dir()?;
-    let target_roots = global_skill_roots(&home_dir, &skill.name);
-
-    for root in &target_roots {
-        tokio::fs::create_dir_all(root).await?;
-    }
-
-    let mut files_downloaded = 0;
-    // Download each file
-    for file_info in &download_response.files {
-        let relative_path = sanitize_skill_relative_path(&file_info.path)?;
-
-        // Download the file
-        let content = client
-            .download_file(&file_info.download_url)
-            .await
-            .map_err(|e| SkillInstallError::DownloadFailed(e.to_string()))?;
-
-        for root in &target_roots {
-            let file_path = root.join(&relative_path);
-            if let Some(parent) = file_path.parent() {
-                tokio::fs::create_dir_all(parent).await?;
+    // Try to get file list from registry
+    match client.get_skill_files(&skill.id).await {
+        Ok(download_response) => {
+            if download_response.files.is_empty() {
+                return Err(SkillInstallError::DownloadFailed(format!(
+                    "Registry returned zero files for skill: {}",
+                    skill.id
+                )));
             }
-            tokio::fs::write(&file_path, &content)
-                .await
-                .map_err(|e| SkillInstallError::SaveFailed(e.to_string()))?;
+
+            let home_dir = resolve_home_dir()?;
+            let target_roots = global_skill_roots(&home_dir, &skill.name);
+
+            for root in &target_roots {
+                tokio::fs::create_dir_all(root).await?;
+            }
+
+            let mut files_downloaded = 0;
+            // Download each file
+            for file_info in &download_response.files {
+                let relative_path = sanitize_skill_relative_path(&file_info.path)?;
+
+                // Download the file
+                let content = client
+                    .download_file(&file_info.download_url)
+                    .await
+                    .map_err(|e| SkillInstallError::DownloadFailed(e.to_string()))?;
+
+                for root in &target_roots {
+                    let file_path = root.join(&relative_path);
+                    if let Some(parent) = file_path.parent() {
+                        tokio::fs::create_dir_all(parent).await?;
+                    }
+                    tokio::fs::write(&file_path, &content)
+                        .await
+                        .map_err(|e| SkillInstallError::SaveFailed(e.to_string()))?;
+                }
+
+                files_downloaded += 1;
+            }
+
+            Ok(files_downloaded)
         }
+        Err(e) => {
+            // Remote registry failed, try embedded assets as fallback
+            tracing::warn!(
+                skill_id = %skill.id,
+                error = %e,
+                "Remote registry unavailable, falling back to embedded skill files"
+            );
 
-        files_downloaded += 1;
+            if has_embedded_skill_files(&skill.name) {
+                install_skill_files_from_embedded(skill).await
+            } else {
+                Err(SkillInstallError::DownloadFailed(format!(
+                    "Remote registry failed and no embedded files available for skill: {}",
+                    skill.name
+                )))
+            }
+        }
     }
-
-    Ok(files_downloaded)
 }
 
 /// Remove installed skill files from global user directories.
@@ -1112,6 +1146,35 @@ Open the page and inspect it carefully.
         assert_eq!(skill.name, "Browser Automation");
         assert!(skill.compatible_agents.contains("claude"));
     }
+
+    #[test]
+    fn embedded_skill_files_are_available() {
+        use super::{get_embedded_skill_files, has_embedded_skill_files};
+
+        // Check that artifacts-builder has embedded files
+        assert!(has_embedded_skill_files("artifacts-builder"));
+
+        let files = get_embedded_skill_files("artifacts-builder");
+        assert!(!files.is_empty());
+
+        // Should have SKILL.md
+        let skill_md = files.iter().find(|(path, _)| path.contains("SKILL.md"));
+        assert!(skill_md.is_some(), "Should have SKILL.md file");
+
+        // Content should not be empty
+        if let Some((_, content)) = skill_md {
+            assert!(!content.is_empty(), "SKILL.md content should not be empty");
+        }
+    }
+
+    #[test]
+    fn embedded_files_count_is_reasonable() {
+        use super::EmbeddedSkillFiles;
+
+        let count = EmbeddedSkillFiles::iter().count();
+        // Should have at least some files embedded
+        assert!(count > 100, "Expected at least 100 embedded files, got {}", count);
+    }
 }
 
 /// Check if a skill from registry is already installed locally
@@ -1286,6 +1349,7 @@ pub fn get_builtin_categories() -> Vec<String> {
 }
 
 /// Install a built-in skill by ID to the local database
+/// Also installs skill files from embedded assets if available
 pub async fn install_builtin_skill(
     pool: &SqlitePool,
     skill_id: &str,
@@ -1293,5 +1357,139 @@ pub async fn install_builtin_skill(
     let skill = get_builtin_skill(skill_id)
         .ok_or_else(|| SkillRegistryError::SkillNotFound(skill_id.to_string()))?;
 
+    // Try to install skill files from embedded assets
+    if has_embedded_skill_files(&skill.name) {
+        match install_skill_files_from_embedded(&skill).await {
+            Ok(count) => {
+                tracing::info!(
+                    skill_name = %skill.name,
+                    files_count = count,
+                    "Installed builtin skill files from embedded assets"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    skill_name = %skill.name,
+                    error = %e,
+                    "Failed to install builtin skill files from embedded assets"
+                );
+            }
+        }
+    }
+
     install_skill_from_registry(pool, &skill).await
+}
+
+/// Install a skill with full fallback logic:
+/// 1. Try remote registry first
+/// 2. If remote fails, try builtin skill
+/// 3. Install files (remote or embedded)
+/// Only returns error if skill not found anywhere
+pub async fn install_skill_with_fallback(
+    pool: &SqlitePool,
+    skill_id: &str,
+    registry_url: Option<&str>,
+) -> Result<ChatSkill, SkillRegistryError> {
+    let skill_package = get_skill_with_fallback(registry_url.map(String::from), skill_id)
+        .await
+        .ok_or_else(|| SkillRegistryError::SkillNotFound(skill_id.to_string()))?;
+
+    // Try to install files with fallback
+    match install_skill_files_to_global_directory(&skill_package, registry_url).await {
+        Ok(count) => {
+            tracing::info!(
+                skill_id = %skill_id,
+                files_count = count,
+                "Installed skill files"
+            );
+        }
+        Err(e) => {
+            tracing::warn!(
+                skill_id = %skill_id,
+                error = %e,
+                "Failed to install skill files, continuing with database install"
+            );
+        }
+    }
+
+    install_skill_from_registry(pool, &skill_package).await
+}
+
+// ============================================================
+// Embedded Skill Files Functions
+// ============================================================
+
+/// Get list of embedded skill files for a given skill name
+/// Returns a list of (relative_path, content) pairs
+fn get_embedded_skill_files(skill_name: &str) -> Vec<(String, Vec<u8>)> {
+    let slug = slugify_skill_name(skill_name);
+    let prefix = format!("{}/", slug);
+
+    EmbeddedSkillFiles::iter()
+        .filter(|path| path.starts_with(&prefix))
+        .filter_map(|path| {
+            let file = EmbeddedSkillFiles::get(&path)?;
+            Some((path.to_string(), file.data.to_vec()))
+        })
+        .collect()
+}
+
+/// Check if embedded skill files exist for a given skill name
+pub fn has_embedded_skill_files(skill_name: &str) -> bool {
+    let slug = slugify_skill_name(skill_name);
+    let prefix = format!("{}/", slug);
+    EmbeddedSkillFiles::iter().any(|path| path.starts_with(&prefix))
+}
+
+/// Install skill files from embedded assets to global user directories.
+/// This is used as a fallback when the remote registry is unavailable.
+pub async fn install_skill_files_from_embedded(
+    skill: &RemoteSkillPackage,
+) -> Result<usize, SkillInstallError> {
+    let files = get_embedded_skill_files(&skill.name);
+
+    if files.is_empty() {
+        return Err(SkillInstallError::DownloadFailed(format!(
+            "No embedded files found for skill: {}",
+            skill.name
+        )));
+    }
+
+    let home_dir = resolve_home_dir()?;
+    let target_roots = global_skill_roots(&home_dir, &skill.name);
+
+    for root in &target_roots {
+        tokio::fs::create_dir_all(root).await?;
+    }
+
+    let mut files_written = 0;
+    for (relative_path, content) in &files {
+        let sanitized = sanitize_skill_relative_path(
+            &relative_path
+                .split('/')
+                .skip(1)
+                .collect::<Vec<_>>()
+                .join("/"),
+        )?;
+
+        for root in &target_roots {
+            let file_path = root.join(&sanitized);
+            if let Some(parent) = file_path.parent() {
+                tokio::fs::create_dir_all(parent).await?;
+            }
+            tokio::fs::write(&file_path, content)
+                .await
+                .map_err(|e| SkillInstallError::SaveFailed(e.to_string()))?;
+        }
+
+        files_written += 1;
+    }
+
+    tracing::info!(
+        skill_name = %skill.name,
+        files_count = files_written,
+        "Installed skill files from embedded assets"
+    );
+
+    Ok(files_written)
 }
