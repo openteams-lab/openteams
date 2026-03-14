@@ -510,9 +510,13 @@
       "saveError": "保存预设失败。",
       "builtin": "内置",
       "disabled": "已禁用",
+      "search": "搜索",
+      "searchPlaceholder": "搜索成员...",
+      "searchMembersPlaceholder": "搜索团队成员...",
+      "noSearchResults": "未找到结果",
       "tabs": {
-        "members": "成员模板",
-        "teams": "团队模板"
+        "members": "AI员工",
+        "teams": "AI团队"
       },
       "actions": {
         "copy": "复制",
@@ -612,8 +616,8 @@
         "delete": "删除"
       },
       "tabs": {
-        "members": "成员模板",
-        "teams": "团队模板"
+        "members": "AI员工",
+        "teams": "AI团队"
       },
       "members": {
         "title": "成员模板",

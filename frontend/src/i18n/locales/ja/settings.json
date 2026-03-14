@@ -510,9 +510,13 @@
       "saveError": "プリセットの保存に失敗しました。",
       "builtin": "組み込み",
       "disabled": "無効",
+      "search": "検索",
+      "searchPlaceholder": "メンバーを検索...",
+      "searchMembersPlaceholder": "チームメンバーを検索...",
+      "noSearchResults": "結果が見つかりません",
       "tabs": {
-        "members": "メンバーテンプレート",
-        "teams": "チームテンプレート"
+        "members": "AI社員",
+        "teams": "AIチーム"
       },
       "actions": {
         "copy": "複製",
@@ -610,8 +614,8 @@
         "delete": "削除"
       },
       "tabs": {
-        "members": "メンバーテンプレート",
-        "teams": "チームテンプレート"
+        "members": "AI社員",
+        "teams": "AIチーム"
       },
       "members": {
         "title": "メンバーテンプレート",

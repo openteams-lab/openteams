@@ -617,6 +617,12 @@
       "agentWorkspace": "エージェントワークスペース",
       "close": "閉じる",
       "workspacePathCreatedOnFirstRun": "ワークスペースパスは初回実行時に作成されます。",
+      "failedMessages": "失敗メッセージ",
+      "viewDetails": "詳細を表示",
+      "errorDetails": "エラー詳細",
+      "errorSummary": "エラー概要",
+      "occurredAt": "発生時刻",
+      "messageContent": "メッセージ内容",
       "runHistory": "実行履歴",
       "noRunsYet": "このエージェントの実行履歴はまだありません。",
       "run": "実行",
@@ -627,7 +633,8 @@
       "refresh": "更新",
       "loadingLog": "ログを読み込み中...",
       "logEmpty": "ログは空です。",
-      "workspaceTrail": "ワークスペースの階層"
+      "workspaceTrail": "ワークスペース",
+      "workspacePath": "ワークスペースパス"
     }
   },
   "workspacePreview": {

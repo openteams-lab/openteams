@@ -22,7 +22,6 @@ import type {
   DiffFileEntry,
   DiffMeta,
   MessageTone,
-  SessionMember,
 } from './types';
 
 export function hashKey(value: string): number {
@@ -1032,24 +1031,24 @@ export function getLocalizedMemberPresetNameById(
 export function buildMemberPresetImportPlan({
   preset,
   sessionId,
-  sessionMembers,
   fallbackWorkspacePath,
   defaultRunnerType,
   enabledRunnerTypes,
   availableRunnerTypes,
-  takenNamesLowercase,
   profiles,
 }: {
   preset: ChatMemberPreset;
   sessionId: string;
-  sessionMembers: SessionMember[];
   fallbackWorkspacePath?: string | null;
   defaultRunnerType: string | null | undefined;
   enabledRunnerTypes: string[];
   availableRunnerTypes: string[];
-  takenNamesLowercase: Set<string>;
   profiles: ExecutorConfigs['executors'] | null | undefined;
 }): MemberPresetImportPlan | null {
+  const presetName =
+    preset.name.trim().length > 0 ? preset.name.trim() : preset.id;
+  const systemPrompt = preset.system_prompt?.trim() ?? '';
+  const baseToolsEnabled = normalizePresetToolsEnabled(preset.tools_enabled);
   const runnerType = resolvePresetRunnerType({
     presetRunnerType: preset.runner_type,
     defaultRunnerType,
@@ -1057,34 +1056,15 @@ export function buildMemberPresetImportPlan({
     availableRunnerTypes,
   });
   if (!runnerType) {
-    return null;
-  }
-
-  const presetName =
-    preset.name.trim().length > 0 ? preset.name.trim() : preset.id;
-  const systemPrompt = preset.system_prompt?.trim() ?? '';
-  const baseToolsEnabled = normalizePresetToolsEnabled(preset.tools_enabled);
-  const recommendedVariant = findVariantByModel(
-    runnerType as BaseCodingAgent,
-    preset.recommended_model,
-    profiles
-  );
-  const toolsEnabled = recommendedVariant
-    ? withExecutorProfileVariant(baseToolsEnabled, recommendedVariant)
-    : baseToolsEnabled;
-  const hasSameNameInSession = sessionMembers.some(
-    (member) => member.agent.name.toLowerCase() === presetName.toLowerCase()
-  );
-  if (hasSameNameInSession) {
     return {
       presetId: preset.id,
       presetName: preset.name,
-      runnerType,
+      runnerType: '',
       finalName: presetName,
       systemPrompt,
-      toolsEnabled,
-      action: 'skip',
-      reason: 'duplicate-name-in-session',
+      toolsEnabled: baseToolsEnabled,
+      action: 'create',
+      reason: 'runner-not-available',
       agentId: null,
       workspacePath: resolvePresetWorkspacePath(
         preset.default_workspace_path,
@@ -1098,12 +1078,19 @@ export function buildMemberPresetImportPlan({
     };
   }
 
-  const finalName = resolveUniqueAgentName(presetName, takenNamesLowercase);
+  const recommendedVariant = findVariantByModel(
+    runnerType as BaseCodingAgent,
+    preset.recommended_model,
+    profiles
+  );
+  const toolsEnabled = recommendedVariant
+    ? withExecutorProfileVariant(baseToolsEnabled, recommendedVariant)
+    : baseToolsEnabled;
   return {
     presetId: preset.id,
     presetName: preset.name,
     runnerType,
-    finalName,
+    finalName: presetName,
     systemPrompt,
     toolsEnabled,
     action: 'create',
@@ -1113,7 +1100,7 @@ export function buildMemberPresetImportPlan({
       preset.default_workspace_path,
       fallbackWorkspacePath,
       sessionId,
-      finalName
+      presetName
     ),
     selectedSkillIds: normalizePresetSelectedSkillIds(
       preset.selected_skill_ids

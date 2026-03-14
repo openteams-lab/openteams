@@ -510,9 +510,13 @@
       "saveError": "프리셋 저장에 실패했습니다.",
       "builtin": "기본 제공",
       "disabled": "비활성화됨",
+      "search": "검색",
+      "searchPlaceholder": "멤버 검색...",
+      "searchMembersPlaceholder": "팀 멤버 검색...",
+      "noSearchResults": "결과를 찾을 수 없습니다",
       "tabs": {
-        "members": "멤버 템플릿",
-        "teams": "팀 템플릿"
+        "members": "AI 직원",
+        "teams": "AI 팀"
       },
       "actions": {
         "copy": "복제",
@@ -610,8 +614,8 @@
         "delete": "삭제"
       },
       "tabs": {
-        "members": "멤버 템플릿",
-        "teams": "팀 템플릿"
+        "members": "AI 직원",
+        "teams": "AI 팀"
       },
       "members": {
         "title": "멤버 템플릿",
