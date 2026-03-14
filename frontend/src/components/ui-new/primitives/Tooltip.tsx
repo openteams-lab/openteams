@@ -30,7 +30,7 @@ export function Tooltip({
             side={side}
             sideOffset={4}
             className={cn(
-              'z-[10000] flex items-center rounded-sm border border-white bg-white px-base py-half text-xs text-normal shadow-md',
+              'z-[10000] flex items-center rounded-sm border border-white bg-white px-base py-half text-sm text-normal shadow-md',
               'animate-in fade-in-0 zoom-in-95',
               className
             )}
@@ -41,7 +41,7 @@ export function Tooltip({
                 className={cn(
                   'ml-2 inline-flex items-center gap-0.5 px-2 py-0.5',
                   'rounded-sm border border-border bg-secondary',
-                  'font-ibm-plex-mono text-xs text-high'
+                  'font-ibm-plex-mono text-sm text-high'
                 )}
               >
                 {formattedShortcut}
