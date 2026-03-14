@@ -18,7 +18,9 @@ export function ChatThinkingMessage({
       className={cn('flex items-start gap-base text-sm text-low', className)}
     >
       <ChatDotsIcon className="shrink-0 size-icon-base mt-0.5" />
-      <ChatMarkdown content={content} workspaceId={taskAttemptId} />
+      <div className="max-h-[150px] overflow-y-auto">
+        <ChatMarkdown content={content} workspaceId={taskAttemptId} />
+      </div>
     </div>
   );
 }

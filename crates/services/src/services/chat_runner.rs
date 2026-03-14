@@ -2976,27 +2976,26 @@ impl ChatRunner {
     fn extract_json_candidate(content: &str) -> Result<Option<String>, serde_json::Error> {
         let trimmed = content.trim();
         if matches!(trimmed.chars().next(), Some('[' | '{')) {
-            return Self::extract_json_prefix(trimmed);
+            if let Ok(Some(candidate)) = Self::extract_json_prefix(trimmed) {
+                return Ok(Some(candidate));
+            }
         }
 
         if let Some(start) = trimmed.find("```json") {
             let json_start = start + 7;
-            if let Some(end) = trimmed[json_start..].find("```") {
-                let block = &trimmed[json_start..json_start + end];
-                match Self::extract_json_candidate(block)? {
-                    Some(candidate) => return Ok(Some(candidate)),
-                    None => {}
-                }
+            let remaining = &trimmed[json_start..];
+            match Self::extract_json_prefix(remaining) {
+                Ok(Some(candidate)) => return Ok(Some(candidate)),
+                Ok(None) => {}
+                Err(err) => return Err(err),
             }
         }
 
         if let Some(start) = trimmed.find("```") {
             let block_start = start + 3;
-            if let Some(end) = trimmed[block_start..].find("```") {
-                let block = &trimmed[block_start..block_start + end];
-                if let Some(candidate) = Self::extract_json_candidate(block)? {
-                    return Ok(Some(candidate));
-                }
+            let remaining = &trimmed[block_start..];
+            if let Ok(Some(candidate)) = Self::extract_json_prefix(remaining) {
+                return Ok(Some(candidate));
             }
         }
 
@@ -4632,6 +4631,27 @@ mod tests {
         ));
         assert_eq!(messages[0].to.as_deref(), Some("you"));
         assert_eq!(messages[0].content, "done");
+    }
+
+    #[test]
+    fn parse_agent_protocol_messages_json_with_embedded_backticks() {
+        let backticks = "\u{0060}\u{0060}\u{0060}";
+        let content = format!(
+            "[Pasted ~5 lines] {backticks}json\n\
+[\n\
+  {{\"type\": \"send\", \"to\": \"you\", \"content\": \"## Heading\\n\\n{backticks}\\ncode block inside json\\n{backticks}\\n\\nMore text\"}}\n\
+]\n\
+{backticks}"
+        );
+
+        let messages = ChatRunner::parse_agent_protocol_messages(&content).expect("messages");
+        assert_eq!(messages.len(), 1);
+        assert!(matches!(
+            messages[0].message_type,
+            AgentProtocolMessageType::Send
+        ));
+        assert_eq!(messages[0].to.as_deref(), Some("you"));
+        assert!(messages[0].content.contains("code block inside json"));
     }
 
     #[test]
