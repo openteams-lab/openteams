@@ -1,4 +1,4 @@
-import type { ChatAgent, ChatSessionAgent } from 'shared/types';
+import type { ChatAgent, ChatSessionAgent, ChatWorkItem } from 'shared/types';
 
 export type StreamRun = {
   agentId: string;
@@ -26,6 +26,15 @@ export type RunHistoryItem = {
 export type SessionMember = {
   agent: ChatAgent;
   sessionAgent: ChatSessionAgent;
+};
+
+export type ChatWorkItemGroup = {
+  runId: string;
+  sessionAgentId: string;
+  agentId: string;
+  createdAt: string;
+  artifacts: ChatWorkItem[];
+  conclusions: ChatWorkItem[];
 };
 
 export type DiffMeta = {

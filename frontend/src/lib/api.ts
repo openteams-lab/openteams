@@ -101,6 +101,7 @@ import {
   TeamProtocolConfig,
   ChatAgent,
   ChatSenderType,
+  ChatWorkItem,
   CreateChatAgent,
   CreateChatSession,
   UpdateChatSession,
@@ -1570,6 +1571,17 @@ export const chatApi = {
       `/api/chat/sessions/${sessionId}/messages${queryParam}`
     );
     return handleApiResponse<ChatMessage[]>(response);
+  },
+
+  listWorkItems: async (
+    sessionId: string,
+    limit?: number
+  ): Promise<ChatWorkItem[]> => {
+    const queryParam = limit ? `?limit=${limit}` : '';
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/work-items${queryParam}`
+    );
+    return handleApiResponse<ChatWorkItem[]>(response);
   },
 
   createMessage: async (
