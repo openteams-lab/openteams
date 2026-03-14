@@ -263,6 +263,9 @@ export function SettingsSelect<T extends string>({
   placeholder,
   disabled,
   className,
+  contentClassName,
+  itemClassName,
+  selectedItemClassName,
 }: {
   value: T | undefined;
   options: { value: T; label: string }[];
@@ -270,6 +273,9 @@ export function SettingsSelect<T extends string>({
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  contentClassName?: string;
+  itemClassName?: string;
+  selectedItemClassName?: string;
 }) {
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -291,16 +297,30 @@ export function SettingsSelect<T extends string>({
           <CaretDownIcon className="size-3 text-[#8C8C8C]" weight="fill" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
-        {options.map((option) => (
-          <DropdownMenuItem
-            key={option.value}
-            className="mx-0 rounded-[8px] px-3 py-2 text-[14px] text-[#333333] focus:bg-[#F9FBFF]"
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
-          </DropdownMenuItem>
-        ))}
+      <DropdownMenuContent
+        className={cn(
+          'w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)]',
+          contentClassName
+        )}
+      >
+        {options.map((option) => {
+          const isSelected = option.value === value;
+
+          return (
+            <DropdownMenuItem
+              key={option.value}
+              data-selected={isSelected ? 'true' : undefined}
+              className={cn(
+                'mx-0 rounded-[8px] px-3 py-2 text-[14px] text-[#333333] focus:bg-[#F9FBFF]',
+                itemClassName,
+                isSelected && selectedItemClassName
+              )}
+              onClick={() => onChange(option.value)}
+            >
+              {option.label}
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

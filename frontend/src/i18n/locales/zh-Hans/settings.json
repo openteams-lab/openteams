@@ -81,7 +81,7 @@
           "host": {
             "label": "远程 SSH 主机（可选）",
             "placeholder": "例如：主机名或 IP 地址",
-            "helper": "如果 agents-chatgroup 在远程服务器上运行，请设置此项。设置后，点击在编辑器中打开将生成 URL 以通过 SSH 打开编辑器，而不是执行本地命令。"
+            "helper": "如果 openteams 在远程服务器上运行，请设置此项。设置后，点击在编辑器中打开将生成 URL 以通过 SSH 打开编辑器，而不是执行本地命令。"
           },
           "user": {
             "label": "远程 SSH 用户（可选）",
@@ -207,7 +207,7 @@
       },
       "privacy": {
         "title": "隐私",
-        "description": "通过共享匿名使用数据帮助改进 agents-chatgroup。",
+        "description": "通过共享匿名使用数据帮助改进 openteams。",
         "telemetry": {
           "label": "启用遥测",
           "helper": "启用匿名使用事件跟踪以帮助改进应用程序。不会收集提示或项目信息。"
@@ -532,6 +532,8 @@
           "descriptionPlaceholder": "该 AI 成员负责什么",
           "runnerType": "运行器类型（可选）",
           "runnerTypePlaceholder": "留空则使用会话默认值",
+          "recommendedModel": "推荐模型（可选）",
+          "recommendedModelPlaceholder": "留空则使用执行器默认模型",
           "systemPrompt": "角色设定（必填）",
           "systemPromptPlaceholder": "描述此 AI 成员的角色设定...",
           "workspacePath": "默认工作区路径（可选）",

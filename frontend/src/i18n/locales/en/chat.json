@@ -305,7 +305,7 @@
     },
     "presetDisplay": {
       "members": {
-        "coordinator_pmo": "Coordinator",
+        "coordinator_pmo": "Project Manager",
         "product_manager": "Product Manager",
         "system_architect": "System Architect",
         "prompt_engineer": "Prompt Engineer",

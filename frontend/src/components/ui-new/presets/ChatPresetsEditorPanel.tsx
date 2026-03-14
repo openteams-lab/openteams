@@ -10,6 +10,7 @@ import {
   TrashIcon,
 } from '@phosphor-icons/react';
 import type {
+  BaseCodingAgent,
   ChatMemberPreset,
   ChatPresetsConfig,
   ChatTeamPreset,
@@ -19,6 +20,11 @@ import { useUserSystem } from '@/components/ConfigProvider';
 import { cn } from '@/lib/utils';
 import { PromptEditorModal } from '@/pages/ui-new/chat/components/PromptEditorModal';
 import { AgentSkillsSection } from '@/pages/ui-new/chat/components/AgentSkillsSection';
+import {
+  formatExecutorModelLabel,
+  getVariantModelName,
+  getVariantOptions as getExecutorVariantOptions,
+} from '@/utils/executor';
 import { toPrettyCase } from '@/utils/string';
 import {
   SettingsField,
@@ -97,6 +103,14 @@ const normalizeSelectedSkillIds = (value: unknown): string[] => {
   );
 };
 
+const normalizeRecommendedModel = (value: unknown): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 const normalizeTeamPresetProtocol = (value: unknown): string =>
   typeof value === 'string' ? value : '';
 
@@ -107,6 +121,7 @@ const normalizeDraft = (draft: ChatPresetsConfig): ChatPresetsConfig => {
     name: member.name.trim(),
     description: member.description.trim(),
     runner_type: member.runner_type?.trim() || null,
+    recommended_model: normalizeRecommendedModel(member.recommended_model),
     system_prompt: member.system_prompt,
     default_workspace_path: member.default_workspace_path?.trim() || null,
     selected_skill_ids: normalizeSelectedSkillIds(member.selected_skill_ids),
@@ -225,6 +240,16 @@ const presetDestructiveButtonClassName = cn(
   presetToolbarButtonClassName,
   'border-[#FECACA] bg-[#FFF5F5] text-[#EF4444] hover:bg-[#FEF2F2]'
 );
+
+const presetMemberSelectTriggerClassName =
+  'preset-member-select-trigger rounded-[14px] border-[#D1D5DB] bg-[#F8FAFC] px-4 py-3 text-[#334155] focus:border-[#3B82F6] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]';
+
+const presetMemberSelectContentClassName = 'preset-member-select-content';
+
+const presetMemberSelectItemClassName = 'preset-member-select-item';
+
+const presetMemberSelectItemSelectedClassName =
+  'preset-member-select-item-selected';
 
 const modalFooterButtonClassName =
   'inline-flex items-center justify-center rounded-[14px] px-6 py-[10px] text-[14px] font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50';
@@ -375,6 +400,75 @@ export function ChatPresetsEditorPanel({
     ];
   }, [profiles, t]);
 
+  const getRecommendedModelOptions = useCallback(
+    (runnerType: string | null | undefined) => {
+      const normalizedRunnerType = runnerType?.trim();
+      if (!normalizedRunnerType) {
+        return [] as { value: string; label: string }[];
+      }
+
+      const uniqueOptions = new Map<string, { value: string; label: string }>();
+      const variants = getExecutorVariantOptions(
+        normalizedRunnerType as BaseCodingAgent,
+        profiles
+      );
+
+      for (const variant of variants) {
+        const model = getVariantModelName(
+          normalizedRunnerType as BaseCodingAgent,
+          variant,
+          profiles
+        )?.trim();
+        if (!model) continue;
+
+        const normalizedModel = model.toLowerCase();
+        if (uniqueOptions.has(normalizedModel)) continue;
+
+        uniqueOptions.set(normalizedModel, {
+          value: model,
+          label:
+            formatExecutorModelLabel(
+              normalizedRunnerType as BaseCodingAgent,
+              model
+            ) ?? model,
+        });
+      }
+
+      return Array.from(uniqueOptions.values()).sort((a, b) =>
+        a.label.localeCompare(b.label)
+      );
+    },
+    [profiles]
+  );
+
+  const recommendedModelOptions = useMemo(() => {
+    if (!selectedMember) {
+      return [] as { value: string; label: string }[];
+    }
+
+    const options = getRecommendedModelOptions(selectedMember.runner_type);
+    const currentModel = selectedMember.recommended_model?.trim();
+    if (
+      currentModel &&
+      !options.some(
+        (option) => option.value.toLowerCase() === currentModel.toLowerCase()
+      )
+    ) {
+      options.push({
+        value: currentModel,
+        label: currentModel,
+      });
+    }
+
+    return [
+      {
+        value: '',
+        label: t('settings.presets.members.fields.recommendedModelPlaceholder'),
+      },
+      ...options,
+    ];
+  }, [getRecommendedModelOptions, selectedMember, t]);
+
   const updateMember = useCallback(
     (
       memberId: string,
@@ -417,6 +511,7 @@ export function ChatPresetsEditorPanel({
         name,
         description: '',
         runner_type: null,
+        recommended_model: null,
         system_prompt: '',
         default_workspace_path: homeDirectory,
         selected_skill_ids: [],
@@ -670,9 +765,41 @@ export function ChatPresetsEditorPanel({
                 updateMember(selectedMember.id, (current) => ({
                   ...current,
                   runner_type: value.length > 0 ? value : null,
+                  recommended_model:
+                    value.length > 0 &&
+                    getRecommendedModelOptions(value).some(
+                      (option) =>
+                        option.value.toLowerCase() ===
+                        (current.recommended_model ?? '').toLowerCase()
+                    )
+                      ? current.recommended_model
+                      : null,
                 }))
               }
-              className="rounded-[14px] border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3 text-[#334155] focus:border-[#3B82F6] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]"
+              className={presetMemberSelectTriggerClassName}
+              contentClassName={presetMemberSelectContentClassName}
+              itemClassName={presetMemberSelectItemClassName}
+              selectedItemClassName={presetMemberSelectItemSelectedClassName}
+            />
+          </SettingsField>
+
+          <SettingsField
+            label={t('settings.presets.members.fields.recommendedModel')}
+          >
+            <SettingsSelect
+              value={selectedMember.recommended_model ?? ''}
+              options={recommendedModelOptions}
+              onChange={(value) =>
+                updateMember(selectedMember.id, (current) => ({
+                  ...current,
+                  recommended_model: value.length > 0 ? value : null,
+                }))
+              }
+              disabled={!selectedMember.runner_type}
+              className={presetMemberSelectTriggerClassName}
+              contentClassName={presetMemberSelectContentClassName}
+              itemClassName={presetMemberSelectItemClassName}
+              selectedItemClassName={presetMemberSelectItemSelectedClassName}
             />
           </SettingsField>
 

@@ -250,8 +250,8 @@ def main():
 
 if __name__ == '__main__':
     # Configuration
-    SKILLS_DIR = Path(r'E:\workspace\projectSS\agents-chatgroup\awesome-claude-skills-temp')
-    OUTPUT_FILE = r'E:\workspace\projectSS\agents-chatgroup\crates\db\seed\skills_registry.json'
+    SKILLS_DIR = Path(r'E:\workspace\projectSS\openteams\awesome-claude-skills-temp')
+    OUTPUT_FILE = r'E:\workspace\projectSS\openteams\crates\db\seed\skills_registry.json'
     
     # Ensure output directory exists
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)

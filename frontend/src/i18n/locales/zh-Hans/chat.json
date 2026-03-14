@@ -312,7 +312,7 @@
     "roleSettingsRequired": "角色设定为必填项。",
     "presetDisplay": {
       "members": {
-        "coordinator_pmo": "协调官",
+        "coordinator_pmo": "项目经理",
         "product_manager": "产品经理",
         "system_architect": "系统架构师",
         "prompt_engineer": "提示词工程师",

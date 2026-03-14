@@ -20,7 +20,7 @@ use utils::{
 };
 
 #[derive(Debug, Error)]
-pub enum AgentChatgroupError {
+pub enum OpenTeamsError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -36,7 +36,7 @@ fn is_desktop_mode() -> bool {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), AgentChatgroupError> {
+async fn main() -> Result<(), OpenTeamsError> {
     // Install rustls crypto provider before any TLS operations
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()

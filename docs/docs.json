@@ -1,9 +1,9 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "agents-chatgroup",
+  "name": "openteams",
   "basePath": "/docs",
-  "description": "AgentsChatGroup - Make multiple AI Agents work together like a real team.",
+  "description": "OpenTeams - Make multiple AI Agents work together like a real team.",
   "appearance": {
     "default": "light"
   },
@@ -313,13 +313,13 @@
     "links": [
       {
         "label": "GitHub",
-        "href": "https://github.com/StarterraAI/AgentsChatGroup"
+        "href": "https://github.com/StarterraAI/OpenTeams"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Get Started",
-      "href": "https://docs.agentschatgroup.com/getting-started"
+      "href": "https://docs.openteams.com/getting-started"
     }
   },
   "contextual": {
@@ -342,8 +342,8 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/StarterraAI/AgentsChatGroup",
-      "x": "https://x.com/agents-chatgroup"
+      "github": "https://github.com/StarterraAI/OpenTeams",
+      "x": "https://x.com/openteams"
     }
   }
 }

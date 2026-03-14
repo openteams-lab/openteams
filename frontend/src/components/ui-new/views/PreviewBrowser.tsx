@@ -1,4 +1,4 @@
-﻿import type { RefObject } from 'react';
+import type { RefObject } from 'react';
 import {
   PlayIcon,
   SpinnerIcon,
@@ -414,7 +414,7 @@ export function PreviewBrowser({
                     />
                   </div>
                   <a
-                    href="https://www.agents-chatgroup.com/docs/core-features/testing-your-application"
+                    href="https://www.openteams.com/docs/core-features/testing-your-application"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-brand hover:text-brand-hover underline"

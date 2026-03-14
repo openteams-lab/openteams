@@ -299,7 +299,7 @@
     "roleSettingsRequired": "役割設定は必須です。",
     "presetDisplay": {
       "members": {
-        "coordinator_pmo": "コーディネーター",
+        "coordinator_pmo": "プロジェクトマネージャー",
         "product_manager": "プロダクトマネージャー",
         "system_architect": "システムアーキテクト",
         "prompt_engineer": "プロンプトエンジニア",

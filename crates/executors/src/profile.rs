@@ -482,3 +482,34 @@ pub fn to_default_variant(id: &ExecutorProfileId) -> ExecutorProfileId {
         variant: None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::executors::codex::Codex;
+
+    #[test]
+    fn default_profiles_use_gpt_5_4_for_codex() {
+        let profiles = ExecutorConfigs::from_defaults();
+
+        let default_codex = profiles
+            .get_coding_agent(&ExecutorProfileId::new(BaseCodingAgent::Codex))
+            .expect("codex default profile should exist");
+        let gpt_5_4_codex = profiles
+            .get_coding_agent(&ExecutorProfileId::with_variant(
+                BaseCodingAgent::Codex,
+                "GPT_5_4".to_string(),
+            ))
+            .expect("codex GPT_5_4 profile should exist");
+
+        let assert_model = |agent: CodingAgent| match agent {
+            CodingAgent::Codex(Codex { model, .. }) => {
+                assert_eq!(model.as_deref(), Some("gpt-5.4"));
+            }
+            other => panic!("expected codex profile, got {other:?}"),
+        };
+
+        assert_model(default_codex);
+        assert_model(gpt_5_4_codex);
+    }
+}

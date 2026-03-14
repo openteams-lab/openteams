@@ -928,10 +928,10 @@ export function AiMembersSidebar({
         </div>
         <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto px-base pb-base pt-half space-y-base">
           {activeSessionId && (
-            <section className="mb-3 overflow-hidden rounded-2xl border border-[#e8eef5] bg-white/95 shadow-[0_12px_24px_rgba(148,163,184,0.08)]">
+            <section className="mb-5 overflow-hidden rounded-[12px] border border-[#dce6f2] bg-[#fbfdff] shadow-[0_8px_18px_rgba(148,163,184,0.08)]">
               <button
                 type="button"
-                className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[#f8fbff]"
+                className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[#f3f8ff]"
                 onClick={() =>
                   setIsTeamBulletinExpanded((expanded) => !expanded)
                 }
@@ -948,7 +948,7 @@ export function AiMembersSidebar({
                 }
               >
                 <span className="flex items-center gap-2">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-[#edf4ff] text-[#4a90e2]">
+                  <span className="flex size-6 items-center justify-center rounded-[8px] bg-[#edf4ff] text-[#4a90e2]">
                     <MegaphoneIcon className="size-3.5" weight="fill" />
                   </span>
                   <span className="text-[13px] font-medium text-normal">
@@ -1005,14 +1005,6 @@ export function AiMembersSidebar({
               title={t('members.selectSessionToManage')}
             />
           )}
-          {activeSessionId && sessionMembers.length === 0 && (
-            <SidebarEmptyState
-              icon={UserPlusIcon}
-              title={t('members.noMembersYet')}
-              variant="subtle"
-            />
-          )}
-
           {sessionMembers.map(({ agent, sessionAgent }) => {
             const state = agentStates[agent.id] ?? ChatSessionAgentState.idle;
             const memberVariant =

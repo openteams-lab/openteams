@@ -112,7 +112,7 @@
     "banner": "開発モード - これは開発ビルドです"
   },
   "oauth": {
-    "title": "agents-chatgroupにサインイン",
+    "title": "openteamsにサインイン",
     "description": "サインインして組織に参加し、チームとタスクを共有します",
     "continueWithGitHub": "GitHubで続行",
     "continueWithGoogle": "Googleで続行",
@@ -260,7 +260,7 @@
   },
   "betaWorkspaces": {
     "title": "新しいUIを試す",
-    "intro": "agents-chatgroupのUIをゼロから再構築しました。あなたは試用に招待されています。",
+    "intro": "openteamsのUIをゼロから再構築しました。あなたは試用に招待されています。",
     "newUiDescription": "新しいUIは日常業務に最適化されています：エージェントの管理、変更のプレビュー、コードのレビュー。また、旧UIでは利用できない機能も利用可能になります：",
     "newFeatures": {
       "multiRepo": "複数のリポジトリを同時に編集",
@@ -279,7 +279,7 @@
     "maybeLater": "後で"
   },
   "onboardingDialog": {
-    "title": "agents-chatgroup へようこそ",
+    "title": "openteams へようこそ",
     "description": "コーディング設定を行いましょう。これらは後から設定でいつでも変更できます。",
     "agentSectionTitle": "Coding Agent を選択",
     "status": {
@@ -291,7 +291,7 @@
   },
   "disclaimerDialog": {
     "title": "安全に関する注意",
-    "intro": "agents-chatgroup は既定で制限のない権限で AI コーディングエージェントを実行します。",
+    "intro": "openteams は既定で制限のない権限で AI コーディングエージェントを実行します。",
     "body": "これは、エージェントがあなたのシステム上でコードを実行し、コマンドをフルアクセスで実行できることを意味します。十分に注意して進めてください。",
     "importantTitle": "重要な注意:",
     "importantBody": "エージェントが実行している操作を常に確認し、重要な作業は必ずバックアップしてください。このソフトウェアは実験段階のため、責任を持って使用してください。",
@@ -302,7 +302,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "ようこそ",
-      "content": "agents-chatgroupの新しいUIであるWorkspacesへようこそ。早期フィードバックのために一部のユーザーに先行公開しています。ナビバーのフィードバックアイコンからいつでもご意見をお聞かせください。"
+      "content": "openteamsの新しいUIであるWorkspacesへようこそ。早期フィードバックのために一部のユーザーに先行公開しています。ナビバーのフィードバックアイコンからいつでもご意見をお聞かせください。"
     },
     "commandBar": {
       "title": "コマンドバー",

@@ -299,7 +299,7 @@
     "roleSettingsRequired": "Les paramètres du rôle sont obligatoires.",
     "presetDisplay": {
       "members": {
-        "coordinator_pmo": "Coordinateur",
+        "coordinator_pmo": "Chef de projet",
         "product_manager": "Chef de Produit",
         "system_architect": "Architecte Syst?me",
         "prompt_engineer": "Ing?nieur Prompt",

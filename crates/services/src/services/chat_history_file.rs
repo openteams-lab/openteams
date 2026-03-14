@@ -64,10 +64,10 @@ pub enum ChatHistoryFileError {
 }
 
 /// Get the chat history directory path.
-/// Returns `{UserDir}/.agents-chatgroup/chat_history/`
+/// Returns `{UserDir}/.openteams/chat_history/`
 pub fn chat_history_dir() -> Result<PathBuf, ChatHistoryFileError> {
     let data_dir = dirs::data_dir().ok_or(ChatHistoryFileError::NoDataDir)?;
-    Ok(data_dir.join(".agents-chatgroup").join("chat_history"))
+    Ok(data_dir.join(".openteams").join("chat_history"))
 }
 
 /// Get the path to the main chat history file for a session.

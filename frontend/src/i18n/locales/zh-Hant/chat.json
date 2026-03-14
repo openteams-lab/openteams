@@ -299,7 +299,7 @@
     "roleSettingsRequired": "角色設定為必填欄位。",
     "presetDisplay": {
       "members": {
-        "coordinator_pmo": "協調官",
+        "coordinator_pmo": "專案經理",
         "product_manager": "產品經理",
         "system_architect": "系統架構師",
         "prompt_engineer": "提示詞工程師",

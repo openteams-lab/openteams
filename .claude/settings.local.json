@@ -14,8 +14,8 @@
       "Bash(pnpm run desktop:build:*)",
       "Bash(dir:*)",
       "Bash(findstr /i \"\\\\.rs$\")",
-      "Bash(powershell -Command \"\\(Get-Content ''E:\\\\workspace\\\\projectSS\\\\agents-chatgroup\\\\raw.log'' | Measure-Object -Line\\).Lines\")",
-      "Bash(powershell -Command \"Get-Content ''E:\\\\workspace\\\\projectSS\\\\agents-chatgroup\\\\raw.log'' -Tail 5\")"
+      "Bash(powershell -Command \"\\(Get-Content ''.\\\\raw.log'' | Measure-Object -Line\\).Lines\")",
+      "Bash(powershell -Command \"Get-Content ''.\\\\raw.log'' -Tail 5\")"
     ]
   }
 }

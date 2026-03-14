@@ -1,5 +1,5 @@
 [package]
-name = "agents-chatgroup-desktop"
+name = "openteams-desktop"
 version = "0.2.10"
 description = "Agents Chatgroup Desktop"
 authors = ["StarTerra AI"]

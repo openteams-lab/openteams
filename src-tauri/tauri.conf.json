@@ -6,7 +6,7 @@
     "distDir": "../frontend/dist"
   },
   "package": {
-    "productName": "agents-chatgroup",
+    "productName": "openteams",
     "version": "0.2.10"
   },
   "tauri": {
@@ -21,7 +21,7 @@
         "appimage",
         "deb"
       ],
-      "identifier": "com.agents-chatgroup.desktop",
+      "identifier": "com.openteams.desktop",
       "icon": [
         "icons/icon-square.png",
         "icons/icon.icns",
@@ -30,7 +30,7 @@
       "windows": {
         "wix": {
           "fragmentPaths": [
-            "wix/fragments/agents-chatgroup-directory.wxs"
+            "wix/fragments/openteams-directory.wxs"
           ]
         }
       },
@@ -47,13 +47,13 @@
       "active": true,
       "dialog": true,
       "endpoints": [
-        "https://updates.agents-chatgroup.com/{{target}}/{{current_version}}"
+        "https://updates.openteams.com/{{target}}/{{current_version}}"
       ],
       "pubkey": ""
     },
     "windows": [
       {
-        "title": "agents-chatgroup",
+        "title": "openteams",
         "width": 1920,
         "height": 1080,
         "minWidth": 1024,
