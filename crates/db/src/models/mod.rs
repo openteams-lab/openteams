@@ -8,6 +8,7 @@ pub mod chat_run;
 pub mod chat_session;
 pub mod chat_session_agent;
 pub mod chat_skill;
+pub mod chat_work_item;
 pub mod coding_agent_turn;
 pub mod execution_process;
 pub mod execution_process_logs;

@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -48,6 +49,13 @@ import {
 } from '@/utils/executor';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toPrettyCase } from '@/utils/string';
 import type { SessionMember } from '../types';
 import { agentStateLabels, agentStateDotClass } from '../constants';
@@ -109,8 +117,96 @@ const teamRoleIcons: Record<string, Icon> = {
   rapid_bugfix_team: BugBeetleIcon,
 };
 
-function getPresetIcon(presetId: string) {
-  return presetRoleIcons[presetId] ?? UserIcon;
+/* Category-based default icons */
+const CATEGORY_DEFAULT_ICONS: Record<string, Icon> = {
+  'Development': CodeIcon,
+  'Product & Design': PaintBrushIcon,
+  'Sales & Business': ChartBarIcon,
+  'Content & Marketing': MegaphoneIcon,
+  'Compliance & Security': ShieldCheckIcon,
+  'Data & Analytics': ChartBarIcon,
+  'Game Development': CodeIcon,
+  'Operations & Support': GearIcon,
+};
+
+const PRESET_CATEGORY_FILTER_ALL_VALUE = '__all__';
+
+const PRESET_CATEGORY_OPTIONS = [
+  {
+    value: 'Development',
+    translationKey: 'development',
+  },
+  {
+    value: 'Product & Design',
+    translationKey: 'productDesign',
+  },
+  {
+    value: 'Sales & Business',
+    translationKey: 'salesBusiness',
+  },
+  {
+    value: 'Content & Marketing',
+    translationKey: 'contentMarketing',
+  },
+  {
+    value: 'Compliance & Security',
+    translationKey: 'complianceSecurity',
+  },
+  {
+    value: 'Data & Analytics',
+    translationKey: 'dataAnalytics',
+  },
+  {
+    value: 'Game Development',
+    translationKey: 'gameDevelopment',
+  },
+  {
+    value: 'Operations & Support',
+    translationKey: 'operationsSupport',
+  },
+] as const;
+
+const presetCategorySelectTriggerClassName = cn(
+  'h-auto min-h-[26px] rounded-full border border-[#A8C9FF] bg-transparent px-1.5 py-0.5 text-left text-[10px] font-bold leading-3.5 tracking-[0.12em] text-[#64748B] shadow-none transition-all duration-200 [&>span]:truncate',
+  'hover:border-[#A8C9FF] hover:bg-[rgba(168,201,255,0.12)] hover:text-[#4084EB]',
+  'focus:border-[#A8C9FF] focus:bg-[rgba(168,201,255,0.12)] focus:text-[#4084EB] focus:ring-0 focus:ring-offset-0 focus:shadow-none',
+  'data-[state=open]:border-[#A8C9FF] data-[state=open]:bg-[rgba(168,201,255,0.12)] data-[state=open]:text-[#4084EB]',
+  'data-[placeholder]:text-[#64748B]'
+);
+
+const presetCategorySelectContentClassName =
+  'rounded-[14px] border border-[#A8C9FF] bg-white p-1';
+
+const presetCategorySelectItemClassName =
+  'rounded-[10px] border border-transparent px-3 py-1.5 text-[10px] font-semibold tracking-[0.04em] text-[#64748B] focus:border-[#A8C9FF] focus:bg-[rgba(168,201,255,0.18)] focus:text-[#0F172A] data-[highlighted]:border-[#A8C9FF] data-[highlighted]:bg-[rgba(168,201,255,0.18)] data-[highlighted]:text-[#0F172A] data-[state=checked]:border-[#A8C9FF] data-[state=checked]:bg-[rgba(168,201,255,0.22)] data-[state=checked]:text-[#0F172A]';
+
+function getPresetCategory(preset: ChatMemberPreset) {
+  const metadata = preset.tools_enabled as
+    | {
+        metadata?: {
+          category?: string;
+        };
+      }
+    | null
+    | undefined;
+
+  return metadata?.metadata?.category ?? null;
+}
+
+function getPresetIcon(preset: ChatMemberPreset) {
+  // 1. Check explicit mapping
+  if (presetRoleIcons[preset.id]) {
+    return presetRoleIcons[preset.id];
+  }
+
+  // 2. Check category default
+  const category = getPresetCategory(preset);
+  if (category && CATEGORY_DEFAULT_ICONS[category]) {
+    return CATEGORY_DEFAULT_ICONS[category];
+  }
+
+  // 3. Fallback
+  return UserIcon;
 }
 
 function getTeamIcon(teamId: string) {
@@ -437,6 +533,8 @@ export function AiMembersSidebar({
   const { reloadSystem } = useUserSystem();
   const [activeTab, setActiveTab] = useState<AddMemberTab>('preset');
   const [presetSearchQuery, setPresetSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const presetCategoryTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [isTeamPresetsExpanded, setIsTeamPresetsExpanded] = useState(true);
   const [isTeamBulletinExpanded, setIsTeamBulletinExpanded] = useState(false);
   const [isTeamProtocolEditorOpen, setIsTeamProtocolEditorOpen] =
@@ -469,12 +567,38 @@ export function AiMembersSidebar({
 
   const hasPresets =
     enabledMemberPresets.length > 0 || enabledTeamPresets.length > 0;
-  const normalizedPresetSearch = presetSearchQuery.trim().toLowerCase();
-  const filteredMemberPresets = enabledMemberPresets.filter((preset) =>
-    getLocalizedMemberPresetName(preset, t)
-      .toLowerCase()
-      .includes(normalizedPresetSearch)
+  const presetCategoryOptions = useMemo(
+    () => [
+      {
+        value: PRESET_CATEGORY_FILTER_ALL_VALUE,
+        label: t('members.categoryFilter.all', {
+          defaultValue: 'All Categories',
+        }),
+      },
+      ...PRESET_CATEGORY_OPTIONS.map((option) => ({
+        value: option.value,
+        label: t(`members.categoryFilter.options.${option.translationKey}`, {
+          defaultValue: option.value,
+        }),
+      })),
+    ],
+    [t]
   );
+  const normalizedPresetSearch = presetSearchQuery.trim().toLowerCase();
+  const filteredMemberPresets = enabledMemberPresets.filter((preset) => {
+    // Category filter
+    if (selectedCategory) {
+      const presetCategory = getPresetCategory(preset);
+      if (presetCategory !== selectedCategory) {
+        return false;
+      }
+    }
+
+    // Search filter
+    return getLocalizedMemberPresetName(preset, t)
+      .toLowerCase()
+      .includes(normalizedPresetSearch);
+  });
   const filteredTeamPresets = enabledTeamPresets.filter((team) =>
     getLocalizedTeamPresetName(team, t)
       .toLowerCase()
@@ -582,18 +706,29 @@ export function AiMembersSidebar({
     [reloadSystem, t]
   );
 
+  const handlePresetCategoryOpenChange = useCallback((open: boolean) => {
+    if (open) return;
+
+    requestAnimationFrame(() => {
+      presetCategoryTriggerRef.current?.blur();
+    });
+  }, []);
+
   const renderPresetTab = () => (
     <div className="flex flex-col min-h-0 flex-1">
       {!editingMember && (
-        <div className="chat-session-member-search shrink-0">
-          <MagnifyingGlassIcon className="chat-session-member-search-icon" />
-          <input
-            value={presetSearchQuery}
-            onChange={(event) => setPresetSearchQuery(event.target.value)}
-            placeholder={t('members.presetSearchPlaceholder')}
-            className="chat-session-member-search-input"
-          />
-        </div>
+        <>
+          {/* Search Input */}
+          <div className="chat-session-member-search shrink-0">
+            <MagnifyingGlassIcon className="chat-session-member-search-icon" />
+            <input
+              value={presetSearchQuery}
+              onChange={(event) => setPresetSearchQuery(event.target.value)}
+              placeholder={t('members.presetSearchPlaceholder')}
+              className="chat-session-member-search-input"
+            />
+          </div>
+        </>
       )}
 
       <div className="space-y-3 pt-3">
@@ -652,34 +787,77 @@ export function AiMembersSidebar({
           </div>
         )}
 
-        {filteredMemberPresets.length > 0 && (
+        {enabledMemberPresets.length > 0 && (
           <div>
-            <div className="chat-session-member-preset-group-title">
-              <UserPlusIcon className="size-3.5" />
-              <span>{t('members.presetMemberSection')}</span>
-            </div>
-            <div className="max-h-[280px] overflow-y-auto pr-1 -mr-1">
-              <div className="space-y-1.5">
-                {filteredMemberPresets.map((preset) => {
-                  const RoleIcon = getPresetIcon(preset.id);
-                  return (
-                    <PresetOptionCard
-                      key={preset.id}
-                      icon={RoleIcon}
-                      title={getLocalizedMemberPresetName(preset, t)}
-                      subtitle=""
-                      seed={getAgentAvatarSeed(
-                        preset.id,
-                        'PRESET_MEMBER',
-                        preset.name
-                      )}
-                      onClick={() => onAddMemberPreset(preset)}
-                      type="member"
-                    />
-                  );
-                })}
+            <div className="chat-session-member-preset-group-row mb-2">
+              <div className="chat-session-member-preset-group-title mb-0">
+                <UserPlusIcon className="size-3.5" />
+                <span>{t('members.presetMemberSection')}</span>
               </div>
+              {!editingMember && (
+                <div className="w-[min(190px,50%)] shrink-0">
+                  <Select
+                    value={selectedCategory ?? PRESET_CATEGORY_FILTER_ALL_VALUE}
+                    onOpenChange={handlePresetCategoryOpenChange}
+                    onValueChange={(value) =>
+                      setSelectedCategory(
+                        value === PRESET_CATEGORY_FILTER_ALL_VALUE
+                          ? null
+                          : value
+                      )
+                    }
+                  >
+                    <SelectTrigger
+                      ref={presetCategoryTriggerRef}
+                      disableFocusRing
+                      aria-label={t('members.categoryFilter.label', {
+                        defaultValue: 'Category',
+                      })}
+                      className={presetCategorySelectTriggerClassName}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent
+                      className={presetCategorySelectContentClassName}
+                    >
+                      {presetCategoryOptions.map((option) => (
+                        <SelectItem
+                          key={option.value}
+                          value={option.value}
+                          className={presetCategorySelectItemClassName}
+                        >
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
+            {filteredMemberPresets.length > 0 && (
+              <div className="max-h-[280px] overflow-y-auto pr-1 -mr-1">
+                <div className="space-y-1.5">
+                  {filteredMemberPresets.map((preset) => {
+                    const RoleIcon = getPresetIcon(preset);
+                    return (
+                      <PresetOptionCard
+                        key={preset.id}
+                        icon={RoleIcon}
+                        title={getLocalizedMemberPresetName(preset, t)}
+                        subtitle=""
+                        seed={getAgentAvatarSeed(
+                          preset.id,
+                          'PRESET_MEMBER',
+                          preset.name
+                        )}
+                        onClick={() => onAddMemberPreset(preset)}
+                        type="member"
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
