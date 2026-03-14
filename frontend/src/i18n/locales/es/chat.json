@@ -299,7 +299,7 @@
     },
     "presetDisplay": {
       "members": {
-        "coordinator_pmo": "Coordinador",
+        "coordinator_pmo": "Gerente de proyecto",
         "product_manager": "Gerente de Producto",
         "system_architect": "Arquitecto de Sistemas",
         "prompt_engineer": "Ingeniero de Prompts",

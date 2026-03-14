@@ -1,6 +1,6 @@
 ---
 title: "故障排除"
-description: "使用 agents-chatgroup 时的常见问题和解决方案"
+description: "使用 openteams 时的常见问题和解决方案"
 ---
 
 ## 代理报告代码库为空
@@ -24,14 +24,14 @@ git sparse-checkout disable
 **用法：**
 
 ```bash
-RUST_LOG=debug npx agents-chatgroup
+RUST_LOG=debug npx openteams
 ```
 
 这将提供详细的日志输出，有助于识别问题的根本原因。
 
 ## 危险：清除数据库
 
-如果您遇到不可恢复的错误并需要完全清除 agents-chatgroup 数据库，可以删除操作系统对应的应用数据目录。
+如果您遇到不可恢复的错误并需要完全清除 openteams 数据库，可以删除操作系统对应的应用数据目录。
 
 <Warning>
 此操作不可逆，将导致所有任务和设置丢失。在继续之前，请确保备份所有重要信息。
@@ -42,23 +42,23 @@ RUST_LOG=debug npx agents-chatgroup
 <Tabs>
 <Tab title="macOS">
 ```bash
-~/Library/Application Support/ai.starterra.ai.agents-chatgroup/
+~/Library/Application Support/ai.starterra.ai.openteams/
 ```
 </Tab>
 
 <Tab title="Linux">
 ```bash
-~/.local/share/agents-chatgroup/
+~/.local/share/openteams/
 ```
 </Tab>
 
 <Tab title="Windows">
 ```
-%APPDATA%\starterra.ai\agents-chatgroup\
+%APPDATA%\starterra.ai\openteams\
 ```
 
-通常为：`C:\Users\<用户名>\AppData\Roaming\starterra.ai\agents-chatgroup\`
+通常为：`C:\Users\<用户名>\AppData\Roaming\starterra.ai\openteams\`
 </Tab>
 </Tabs>
 
-删除应用数据目录后，重启 agents-chatgroup 即可使用空数据库和默认设置重置。
+删除应用数据目录后，重启 openteams 即可使用空数据库和默认设置重置。

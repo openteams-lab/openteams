@@ -1,4 +1,4 @@
-﻿# Rust
+# Rust
 target/
 **/*.rs.bk
 src-tauri/target/
@@ -75,8 +75,8 @@ remote-frontend/dist
 build-npm-package-codesign.sh
 
 npx-cli/dist
-npx-cli/agents-chatgroup-*
-agents-chatgroup-*.tgz
+npx-cli/openteams-*
+openteams-*.tgz
 
 # Development ports file
 .dev-ports.json
@@ -85,7 +85,7 @@ dev_assets
 /frontend/.env.sentry-build-plugin
 .ssh
 
-agents-chatgroup-cloud/
+openteams-cloud/
 
 .jj
 .sisyphus/
@@ -95,6 +95,6 @@ agents-chatgroup-cloud/
 .context/
 runs/
 context/
-.agents_chatgroup/
-**/.agents-chatgroup/
+.openteams/
+**/.openteams/
 .main_page/

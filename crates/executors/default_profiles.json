@@ -108,13 +108,26 @@
     "CODEX": {
       "DEFAULT": {
         "CODEX": {
-          "model": "gpt-5.3-codex",
+          "model": "gpt-5.4",
           "sandbox": "danger-full-access"
         }
       },
       "HIGH": {
         "CODEX": {
-          "model": "gpt-5.3-codex",
+          "model": "gpt-5.4",
+          "sandbox": "danger-full-access",
+          "model_reasoning_effort": "high"
+        }
+      },
+      "GPT_5_4": {
+        "CODEX": {
+          "model": "gpt-5.4",
+          "sandbox": "danger-full-access"
+        }
+      },
+      "GPT_5_4_HIGH": {
+        "CODEX": {
+          "model": "gpt-5.4",
           "sandbox": "danger-full-access",
           "model_reasoning_effort": "high"
         }
@@ -134,7 +147,7 @@
       },
       "APPROVALS": {
         "CODEX": {
-          "model": "gpt-5.3-codex",
+          "model": "gpt-5.4",
           "sandbox": "workspace-write",
           "ask_for_approval": "unless-trusted"
         }

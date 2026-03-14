@@ -1,4 +1,4 @@
-﻿name: Building
+name: Building
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ on:
           - major
           - prerelease
       publish_to_npm:
-        description: "Publish agents-chatgroup-npx package to npm"
+        description: "Publish openteams-npx package to npm"
         required: true
         default: false
         type: boolean
@@ -82,7 +82,7 @@ jobs:
         id: version
         run: |
           # Get the latest version from npm registry
-          latest_npm_version=$(npm view agents-chatgroup version 2>/dev/null || echo "0.0.0")
+          latest_npm_version=$(npm view openteams version 2>/dev/null || echo "0.0.0")
           echo "Latest npm version: $latest_npm_version"
 
           # Get current repo version
@@ -146,8 +146,8 @@ jobs:
             desktop_version="${new_version%%-*}"
           fi
 
-          # Update agents-chatgroup-npx package.json to match
-          cd agents-chatgroup-npx
+          # Update openteams-npx package.json to match
+          cd openteams-npx
           npm version $new_version --no-git-tag-version --allow-same-version
           cd ..
 
@@ -200,7 +200,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add package.json pnpm-lock.yaml agents-chatgroup-npx/package.json frontend/package.json src-tauri/tauri.conf.json Cargo.lock
+          git add package.json pnpm-lock.yaml openteams-npx/package.json frontend/package.json src-tauri/tauri.conf.json Cargo.lock
           git add $(find . -name Cargo.toml)
           [ -f crates/remote/Cargo.lock ] && git add crates/remote/Cargo.lock || true
           git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
@@ -430,13 +430,13 @@ jobs:
         run: |
           mkdir -p dist
           if [[ "${{ matrix.name }}" == *"windows"* ]]; then
-            cp target/${{ matrix.target }}/release/server.exe dist/agents-chatgroup-${{ matrix.name }}.exe
-            cp target/${{ matrix.target }}/release/mcp_task_server.exe dist/agents-chatgroup-mcp-${{ matrix.name }}.exe
-            cp target/${{ matrix.target }}/release/review.exe dist/agents-chatgroup-review-${{ matrix.name }}.exe
+            cp target/${{ matrix.target }}/release/server.exe dist/openteams-${{ matrix.name }}.exe
+            cp target/${{ matrix.target }}/release/mcp_task_server.exe dist/openteams-mcp-${{ matrix.name }}.exe
+            cp target/${{ matrix.target }}/release/review.exe dist/openteams-review-${{ matrix.name }}.exe
           else
-            cp target/${{ matrix.target }}/release/server dist/agents-chatgroup-${{ matrix.name }}
-            cp target/${{ matrix.target }}/release/mcp_task_server dist/agents-chatgroup-mcp-${{ matrix.name }}
-            cp target/${{ matrix.target }}/release/review dist/agents-chatgroup-review-${{ matrix.name }}
+            cp target/${{ matrix.target }}/release/server dist/openteams-${{ matrix.name }}
+            cp target/${{ matrix.target }}/release/mcp_task_server dist/openteams-mcp-${{ matrix.name }}
+            cp target/${{ matrix.target }}/release/review dist/openteams-review-${{ matrix.name }}
           fi
 
       # Code signing for macOS only
@@ -491,7 +491,7 @@ jobs:
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: target/${{ matrix.target }}/release/server
-          output_path: agents-chatgroup
+          output_path: openteams
           p12_file: certificate.p12
           p12_password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           sign: true
@@ -499,14 +499,14 @@ jobs:
 
       - name: Package main binary (macOS)
         if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
-        run: zip agents-chatgroup.zip agents-chatgroup
+        run: zip openteams.zip openteams
 
       - name: Sign MCP binary (macOS)
         if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: target/${{ matrix.target }}/release/mcp_task_server
-          output_path: agents-chatgroup-mcp
+          output_path: openteams-mcp
           p12_file: certificate.p12
           p12_password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           sign: true
@@ -514,14 +514,14 @@ jobs:
 
       - name: Package MCP binary (macOS)
         if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
-        run: zip agents-chatgroup-mcp.zip agents-chatgroup-mcp
+        run: zip openteams-mcp.zip openteams-mcp
 
       - name: Sign Review binary (macOS)
         if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: target/${{ matrix.target }}/release/review
-          output_path: agents-chatgroup-review
+          output_path: openteams-review
           p12_file: certificate.p12
           p12_password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           sign: true
@@ -529,18 +529,18 @@ jobs:
 
       - name: Package Review binary (macOS)
         if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
-        run: zip agents-chatgroup-review.zip agents-chatgroup-review
+        run: zip openteams-review.zip openteams-review
 
       - name: Package unsigned binaries (macOS)
         if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled != 'true'
         run: |
-          cp target/${{ matrix.target }}/release/server agents-chatgroup
-          cp target/${{ matrix.target }}/release/mcp_task_server agents-chatgroup-mcp
-          cp target/${{ matrix.target }}/release/review agents-chatgroup-review
-          chmod +x agents-chatgroup agents-chatgroup-mcp agents-chatgroup-review
-          zip agents-chatgroup.zip agents-chatgroup
-          zip agents-chatgroup-mcp.zip agents-chatgroup-mcp
-          zip agents-chatgroup-review.zip agents-chatgroup-review
+          cp target/${{ matrix.target }}/release/server openteams
+          cp target/${{ matrix.target }}/release/mcp_task_server openteams-mcp
+          cp target/${{ matrix.target }}/release/review openteams-review
+          chmod +x openteams openteams-mcp openteams-review
+          zip openteams.zip openteams
+          zip openteams-mcp.zip openteams-mcp
+          zip openteams-review.zip openteams-review
 
       - name: Notarize signed binaries (macOS)
         if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.notarize_enabled == 'true'
@@ -548,9 +548,9 @@ jobs:
         continue-on-error: true
         with:
           input_path: |
-            agents-chatgroup.zip
-            agents-chatgroup-mcp.zip
-            agents-chatgroup-review.zip
+            openteams.zip
+            openteams-mcp.zip
+            openteams-review.zip
           sign: false
           notarize: true
           app_store_connect_api_key_json_file: app_store_key.json
@@ -559,9 +559,9 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           mkdir -p dist
-          cp agents-chatgroup.zip dist/agents-chatgroup-${{ matrix.name }}.zip
-          cp agents-chatgroup-mcp.zip dist/agents-chatgroup-mcp-${{ matrix.name }}.zip
-          cp agents-chatgroup-review.zip dist/agents-chatgroup-review-${{ matrix.name }}.zip
+          cp openteams.zip dist/openteams-${{ matrix.name }}.zip
+          cp openteams-mcp.zip dist/openteams-mcp-${{ matrix.name }}.zip
+          cp openteams-review.zip dist/openteams-review-${{ matrix.name }}.zip
 
       - name: Clean up certificates (macOS)
         if: runner.os == 'macOS'
@@ -594,29 +594,29 @@ jobs:
         include:
           - target: x86_64-unknown-linux-musl
             name: linux-x64
-            binary: agents-chatgroup
-            mcp_binary: agents-chatgroup-mcp
-            review_binary: agents-chatgroup-review
+            binary: openteams
+            mcp_binary: openteams-mcp
+            review_binary: openteams-review
           - target: x86_64-pc-windows-msvc
             name: windows-x64
-            binary: agents-chatgroup.exe
-            mcp_binary: agents-chatgroup-mcp.exe
-            review_binary: agents-chatgroup-review.exe
+            binary: openteams.exe
+            mcp_binary: openteams-mcp.exe
+            review_binary: openteams-review.exe
           - target: x86_64-apple-darwin
             name: macos-x64
-            binary: agents-chatgroup
-            mcp_binary: agents-chatgroup-mcp
-            review_binary: agents-chatgroup-review
+            binary: openteams
+            mcp_binary: openteams-mcp
+            review_binary: openteams-review
           - target: aarch64-apple-darwin
             name: macos-arm64
-            binary: agents-chatgroup
-            mcp_binary: agents-chatgroup-mcp
-            review_binary: agents-chatgroup-review
+            binary: openteams
+            mcp_binary: openteams-mcp
+            review_binary: openteams-review
           - target: aarch64-unknown-linux-musl
             name: linux-arm64
-            binary: agents-chatgroup
-            mcp_binary: agents-chatgroup-mcp
-            review_binary: agents-chatgroup-review
+            binary: openteams
+            mcp_binary: openteams-mcp
+            review_binary: openteams-review
     steps:
       - uses: actions/checkout@v6
         with:
@@ -642,33 +642,33 @@ jobs:
       - name: Create platform package
         if: matrix.name != 'macos-arm64' && matrix.name != 'macos-x64'
         run: |
-          mkdir -p agents-chatgroup-npx/dist/${{ matrix.name }}
-          mkdir agents-chatgroup-${{ matrix.name }}
-          mkdir agents-chatgroup-mcp-${{ matrix.name }}
-          mkdir agents-chatgroup-review-${{ matrix.name }}
+          mkdir -p openteams-npx/dist/${{ matrix.name }}
+          mkdir openteams-${{ matrix.name }}
+          mkdir openteams-mcp-${{ matrix.name }}
+          mkdir openteams-review-${{ matrix.name }}
 
-          cp dist/agents-chatgroup-${{ matrix.name }}* agents-chatgroup-${{ matrix.name }}/${{ matrix.binary }}
-          cp dist/agents-chatgroup-mcp-${{ matrix.name }}* agents-chatgroup-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
-          cp dist/agents-chatgroup-review-${{ matrix.name }}* agents-chatgroup-review-${{ matrix.name }}/${{ matrix.review_binary }}
+          cp dist/openteams-${{ matrix.name }}* openteams-${{ matrix.name }}/${{ matrix.binary }}
+          cp dist/openteams-mcp-${{ matrix.name }}* openteams-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
+          cp dist/openteams-review-${{ matrix.name }}* openteams-review-${{ matrix.name }}/${{ matrix.review_binary }}
 
-          zip -j agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup.zip agents-chatgroup-${{ matrix.name }}/${{ matrix.binary }}
-          zip -j agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup-mcp.zip agents-chatgroup-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
-          zip -j agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup-review.zip agents-chatgroup-review-${{ matrix.name }}/${{ matrix.review_binary }}
+          zip -j openteams-npx/dist/${{ matrix.name }}/openteams.zip openteams-${{ matrix.name }}/${{ matrix.binary }}
+          zip -j openteams-npx/dist/${{ matrix.name }}/openteams-mcp.zip openteams-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
+          zip -j openteams-npx/dist/${{ matrix.name }}/openteams-review.zip openteams-review-${{ matrix.name }}/${{ matrix.review_binary }}
 
       - name: Create platform package (macOS)
         if: matrix.name == 'macos-arm64' || matrix.name == 'macos-x64'
         run: |
-          mkdir -p agents-chatgroup-npx/dist/${{ matrix.name }}
-          mkdir agents-chatgroup-${{ matrix.name }}
-          cp dist/agents-chatgroup-${{ matrix.name }}* agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup.zip
-          cp dist/agents-chatgroup-mcp-${{ matrix.name }}* agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup-mcp.zip
-          cp dist/agents-chatgroup-review-${{ matrix.name }}* agents-chatgroup-npx/dist/${{ matrix.name }}/agents-chatgroup-review.zip
+          mkdir -p openteams-npx/dist/${{ matrix.name }}
+          mkdir openteams-${{ matrix.name }}
+          cp dist/openteams-${{ matrix.name }}* openteams-npx/dist/${{ matrix.name }}/openteams.zip
+          cp dist/openteams-mcp-${{ matrix.name }}* openteams-npx/dist/${{ matrix.name }}/openteams-mcp.zip
+          cp dist/openteams-review-${{ matrix.name }}* openteams-npx/dist/${{ matrix.name }}/openteams-review.zip
 
       - name: Upload platform package artifact
         uses: actions/upload-artifact@v6
         with:
           name: npx-platform-${{ matrix.name }}
-          path: agents-chatgroup-npx/dist/
+          path: openteams-npx/dist/
           retention-days: 1
 
   upload-to-r2:
@@ -802,7 +802,7 @@ jobs:
             const crypto = require('crypto');
             const manifest = { version: '$TAG', platforms: {} };
             const platforms = ['linux-x64', 'linux-arm64', 'windows-x64', 'macos-x64', 'macos-arm64'];
-            const binaries = ['agents-chatgroup', 'agents-chatgroup-mcp', 'agents-chatgroup-review'];
+            const binaries = ['openteams', 'openteams-mcp', 'openteams-review'];
 
             for (const platform of platforms) {
               manifest.platforms[platform] = {};
@@ -824,7 +824,7 @@ jobs:
 
           # Upload binaries (use full tag for path, allows multiple pre-releases to coexist)
           for platform in linux-x64 linux-arm64 windows-x64 macos-x64 macos-arm64; do
-            for binary in agents-chatgroup agents-chatgroup-mcp agents-chatgroup-review; do
+            for binary in openteams openteams-mcp openteams-review; do
               if [ -f "binaries/$platform/$binary.zip" ]; then
                 echo "Uploading binaries/$platform/$binary.zip..."
                 aws s3 cp "binaries/$platform/$binary.zip" \
@@ -1068,7 +1068,7 @@ jobs:
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: ${{ steps.macos_bundle.outputs.app_path }}
-          output_path: signed/agents-chatgroup.app
+          output_path: signed/openteams.app
           p12_file: certificate.p12
           p12_password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           sign: true
@@ -1080,9 +1080,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          signed_dmg='src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg'
+          signed_dmg='src-tauri/target/release/bundle/dmg/openteams-signed.dmg'
           rm -f "$signed_dmg"
-          hdiutil create -volname 'agents-chatgroup' -srcfolder 'signed/agents-chatgroup.app' -ov -format UDZO "$signed_dmg"
+          hdiutil create -volname 'openteams' -srcfolder 'signed/openteams.app' -ov -format UDZO "$signed_dmg"
           echo "signed_dmg=$signed_dmg" >> "$GITHUB_OUTPUT"
 
       - name: Notarize signed DMG (macOS)
@@ -1149,7 +1149,7 @@ jobs:
           mkdir -p gh-package/files
 
           if [[ "${{ matrix.platform }}" == "macos" && "${{ steps.macos_signing.outputs.enabled }}" == "true" ]]; then
-            cp src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg gh-package/files/
+            cp src-tauri/target/release/bundle/dmg/openteams-signed.dmg gh-package/files/
           elif [[ "${{ matrix.platform }}" == "linux" ]]; then
             cp src-tauri/target/release/bundle/appimage/*.AppImage gh-package/files/
             cp src-tauri/target/release/bundle/deb/*.deb gh-package/files/
@@ -1164,7 +1164,7 @@ jobs:
             exit 1
           fi
 
-          bundle_name="agents-chatgroup-desktop-${{ matrix.platform }}-${{ github.sha }}.tar.gz"
+          bundle_name="openteams-desktop-${{ matrix.platform }}-${{ github.sha }}.tar.gz"
           (cd gh-package/files && tar -czf "../${bundle_name}" .)
           (cd gh-package && sha256sum "${bundle_name}" > "${bundle_name}.sha256")
 
@@ -1193,7 +1193,7 @@ jobs:
           cd gh-package
           echo "Pushing package: ${package_ref}"
           oras push "$package_ref" \
-            --artifact-type application/vnd.agentschatgroup.desktop.bundle.v1+tar \
+            --artifact-type application/vnd.openteams.desktop.bundle.v1+tar \
             --annotation "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
             --annotation "org.opencontainers.image.revision=${{ github.sha }}" \
             "${{ steps.package_bundle.outputs.bundle_name }}:application/gzip" \
@@ -1241,9 +1241,9 @@ jobs:
 
       - name: Zip frontend
         run: |
-          mkdir agents-chatgroup-${{ needs.bump-version.outputs.new_tag }}
-          mv frontend/dist agents-chatgroup-${{ needs.bump-version.outputs.new_tag }}
-          zip -r agents-chatgroup-${{ needs.bump-version.outputs.new_tag }}.zip agents-chatgroup-${{ needs.bump-version.outputs.new_tag }}
+          mkdir openteams-${{ needs.bump-version.outputs.new_tag }}
+          mv frontend/dist openteams-${{ needs.bump-version.outputs.new_tag }}
+          zip -r openteams-${{ needs.bump-version.outputs.new_tag }}.zip openteams-${{ needs.bump-version.outputs.new_tag }}
 
       - name: Setup Node for npm pack
         uses: ./.github/actions/setup-node
@@ -1321,7 +1321,7 @@ jobs:
             const fs = require("fs");
             const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
             const requiredPlatforms = ["linux-x64", "linux-arm64", "windows-x64", "macos-x64", "macos-arm64"];
-            const requiredBinaries = ["agents-chatgroup", "agents-chatgroup-mcp", "agents-chatgroup-review"];
+            const requiredBinaries = ["openteams", "openteams-mcp", "openteams-review"];
 
             for (const platform of requiredPlatforms) {
               if (!manifest.platforms?.[platform]) {
@@ -1338,7 +1338,7 @@ jobs:
           '
 
           for platform in linux-x64 linux-arm64 windows-x64 macos-x64 macos-arm64; do
-            for binary in agents-chatgroup agents-chatgroup-mcp agents-chatgroup-review; do
+            for binary in openteams openteams-mcp openteams-review; do
               url="$BASE/binaries/$TAG/$platform/$binary.zip"
               echo "Checking $url"
               curl -fsI "$url" >/dev/null
@@ -1352,7 +1352,7 @@ jobs:
           STORAGE_PUBLIC_URL: ${{ env.STORAGE_PUBLIC_URL_RESOLVED }}
         run: |
           set -euo pipefail
-          cd agents-chatgroup-npx
+          cd openteams-npx
           if [ -f bin/download.js ]; then
             if [ -n "${STORAGE_PUBLIC_URL:-}" ] && [ "${STORAGE_PROVIDER}" = "oss" ]; then
               echo "Injecting OSS URL into bin/download.js"
@@ -1394,8 +1394,8 @@ jobs:
             exit 1
           fi
 
-          cd agents-chatgroup-npx
-          tarball=$(ls -1t agents-chatgroup-*.tgz | head -n 1)
+          cd openteams-npx
+          tarball=$(ls -1t openteams-*.tgz | head -n 1)
           if [ -z "${tarball:-}" ]; then
             echo "::error::No npm tarball found to publish"
             exit 1
@@ -1545,8 +1545,8 @@ jobs:
           generate_release_notes: false
           body: ${{ steps.changelog.outputs.body }}
           files: |
-            agents-chatgroup-${{ needs.bump-version.outputs.new_tag }}.zip
-            agents-chatgroup-npx/agents-chatgroup-*.tgz
+            openteams-${{ needs.bump-version.outputs.new_tag }}.zip
+            openteams-npx/openteams-*.tgz
             release-assets/desktop/**/*.msi
             release-assets/desktop/**/*.dmg
             release-assets/desktop/**/*.AppImage

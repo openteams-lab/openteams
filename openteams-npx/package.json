@@ -1,16 +1,16 @@
 {
-  "name": "agents-chatgroup",
+  "name": "openteams",
   "version": "0.2.10",
   "description": "AI Coding Agents Chatgroup - Cross-platform installer and runner",
   "author": "starterra.ai",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/StarterraAI/AgentsChatGroup"
+    "url": "https://github.com/StarterraAI/OpenTeams"
   },
-  "homepage": "https://github.com/StarterraAI/AgentsChatGroup",
+  "homepage": "https://github.com/StarterraAI/OpenTeams",
   "bugs": {
-    "url": "https://github.com/StarterraAI/AgentsChatGroup/issues"
+    "url": "https://github.com/StarterraAI/OpenTeams/issues"
   },
   "keywords": [
     "ai",
@@ -23,7 +23,7 @@
     "cross-platform"
   ],
   "bin": {
-    "agents-chatgroup": "bin/cli.js"
+    "openteams": "bin/cli.js"
   },
   "main": "bin/cli.js",
   "files": [

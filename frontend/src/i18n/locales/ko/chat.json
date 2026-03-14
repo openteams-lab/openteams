@@ -299,7 +299,7 @@
     "roleSettingsRequired": "역할 설정은 필수입니다.",
     "presetDisplay": {
       "members": {
-        "coordinator_pmo": "코디네이터",
+        "coordinator_pmo": "프로젝트 매니저",
         "product_manager": "프로덕트 매니저",
         "system_architect": "시스템 아키텍트",
         "prompt_engineer": "프롬프트 엔지니어",

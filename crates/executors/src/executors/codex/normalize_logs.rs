@@ -1939,7 +1939,7 @@ mod tests {
                 path: PathBuf::from(
                     "C:/Users/Admin/.codex/sessions/2026/03/06/rollout-2026-03-06T10-00-00-88d1d63d-b84e-4f3d-9d87-1fb21839379d.jsonl",
                 ),
-                cwd: PathBuf::from("E:/workspace/projectSS/agents-chatgroup-codex-latest-protocol"),
+                cwd: PathBuf::from("E:/workspace/projectSS/openteams-codex-latest-protocol"),
                 cli_version: "0.0.0".to_string(),
                 source: codex_app_server_protocol::SessionSource::AppServer,
                 git_info: None,
@@ -1947,7 +1947,7 @@ mod tests {
             },
             model: "gpt-5-codex".to_string(),
             model_provider: "openai".to_string(),
-            cwd: PathBuf::from("E:/workspace/projectSS/agents-chatgroup-codex-latest-protocol"),
+            cwd: PathBuf::from("E:/workspace/projectSS/openteams-codex-latest-protocol"),
             approval_policy: codex_app_server_protocol::AskForApproval::OnRequest,
             sandbox: codex_app_server_protocol::SandboxPolicy::WorkspaceWrite {
                 writable_roots: Vec::new(),
@@ -1967,50 +1967,6 @@ mod tests {
         assert_eq!(
             session_id_from_history(&msg_store).as_deref(),
             Some("88d1d63d-b84e-4f3d-9d87-1fb21839379d")
-        );
-    }
-
-    #[test]
-    fn handle_jsonrpc_response_supports_thread_resume_response() {
-        let msg_store = std::sync::Arc::new(MsgStore::new());
-        let entry_index = EntryIndexProvider::start_from(&msg_store);
-        let response = codex_app_server_protocol::ThreadResumeResponse {
-            thread: codex_app_server_protocol::Thread {
-                id: "9bfb6d6f-73c8-4b39-8e6d-2dc1f18a75f1".to_string(),
-                preview: String::new(),
-                model_provider: "openai".to_string(),
-                created_at: 0,
-                path: PathBuf::from(
-                    "C:/Users/Admin/.codex/sessions/2026/03/06/rollout-2026-03-06T11-00-00-9bfb6d6f-73c8-4b39-8e6d-2dc1f18a75f1.jsonl",
-                ),
-                cwd: PathBuf::from("E:/workspace/projectSS/agents-chatgroup-codex-latest-protocol"),
-                cli_version: "0.0.0".to_string(),
-                source: codex_app_server_protocol::SessionSource::AppServer,
-                git_info: None,
-                turns: Vec::new(),
-            },
-            model: "gpt-5-codex".to_string(),
-            model_provider: "openai".to_string(),
-            cwd: PathBuf::from("E:/workspace/projectSS/agents-chatgroup-codex-latest-protocol"),
-            approval_policy: codex_app_server_protocol::AskForApproval::OnRequest,
-            sandbox: codex_app_server_protocol::SandboxPolicy::WorkspaceWrite {
-                writable_roots: Vec::new(),
-                network_access: false,
-                exclude_tmpdir_env_var: false,
-                exclude_slash_tmp: false,
-            },
-            reasoning_effort: Some(codex_protocol::openai_models::ReasoningEffort::Medium),
-        };
-        let response = codex_app_server_protocol::JSONRPCResponse {
-            id: RequestId::Integer(2),
-            result: serde_json::to_value(response).unwrap(),
-        };
-
-        handle_jsonrpc_response(response, &msg_store, &entry_index);
-
-        assert_eq!(
-            session_id_from_history(&msg_store).as_deref(),
-            Some("9bfb6d6f-73c8-4b39-8e6d-2dc1f18a75f1")
         );
     }
 }

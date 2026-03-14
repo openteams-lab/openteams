@@ -5,7 +5,7 @@ import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal, type NoProps } from '@/lib/modals';
 
 const SAFETY_DOCS_URL =
-  'https://www.agents-chatgroup.com/docs/getting-started#safety-notice';
+  'https://www.openteams.com/docs/getting-started#safety-notice';
 
 const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
   const modal = useModal();

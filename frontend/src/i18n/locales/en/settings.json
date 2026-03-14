@@ -81,7 +81,7 @@
           "host": {
             "label": "Remote SSH Host (Optional)",
             "placeholder": "e.g., hostname or IP address",
-            "helper": "Set this if agents-chatgroup is running on a remote server. When set, clicking \"Open in Editor\" will generate a URL to open your editor via SSH instead of spawning a local command."
+            "helper": "Set this if openteams is running on a remote server. When set, clicking \"Open in Editor\" will generate a URL to open your editor via SSH instead of spawning a local command."
           },
           "user": {
             "label": "Remote SSH User (Optional)",
@@ -207,7 +207,7 @@
       },
       "privacy": {
         "title": "Privacy",
-        "description": "Help improve agents-chatgroup by sharing anonymous usage data.",
+        "description": "Help improve openteams by sharing anonymous usage data.",
         "telemetry": {
           "label": "Enable Telemetry",
           "helper": "Enables anonymous usage events tracking to help improve the application. No prompts or project information are collected."
@@ -532,6 +532,8 @@
           "descriptionPlaceholder": "What this AI member does",
           "runnerType": "Runner Type (optional)",
           "runnerTypePlaceholder": "Leave empty to use session default",
+          "recommendedModel": "Recommended Model (optional)",
+          "recommendedModelPlaceholder": "Leave empty to use executor default",
           "systemPrompt": "Role settings (required)",
           "systemPromptPlaceholder": "Describe this AI member's role settings...",
           "workspacePath": "Default Workspace Path (optional)",

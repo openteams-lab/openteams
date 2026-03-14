@@ -18,10 +18,10 @@ const {
 
 const CLI_VERSION = require("../package.json").version;
 
-const APP_NAME = "agents-chatgroup";
-const APP_BINARY_BASE = "agents-chatgroup";
+const APP_NAME = "openteams";
+const APP_BINARY_BASE = "openteams";
 
-const INSTALL_DIR = path.join(os.homedir(), ".agents-chatgroup");
+const INSTALL_DIR = path.join(os.homedir(), ".openteams");
 const BIN_DIR = path.join(INSTALL_DIR, "bin");
 const METADATA_PATH = path.join(INSTALL_DIR, "install.json");
 
@@ -190,7 +190,7 @@ function appendLineIfMissing(filePath, line) {
 }
 
 function persistPathOnUnix() {
-  const exportLine = 'export PATH="$HOME/.agents-chatgroup/bin:$PATH"';
+  const exportLine = 'export PATH="$HOME/.openteams/bin:$PATH"';
   const home = os.homedir();
   const files = [
     path.join(home, ".zshrc"),
@@ -436,24 +436,24 @@ function launchBinary(binaryPath, args) {
 
 function showHelp() {
   console.log(`
-Usage: npx agents-chatgroup [command] [args]
+Usage: npx openteams [command] [args]
 
 Commands:
   install       Download and install prebuilt binary only
   start         Install if needed, then run binary
   update        Force re-download and reinstall current binary tag
   status        Show installation and binary source status
-  uninstall     Remove local installation under ~/.agents-chatgroup
+  uninstall     Remove local installation under ~/.openteams
   --help, -h    Show help
   --version     Show CLI version
 
 Default behavior:
-  npx agents-chatgroup
+  npx openteams
   -> install (if needed) + run binary
 
 Pass-through args:
-  npx agents-chatgroup -- --port 54321
-  npx agents-chatgroup start --port 54321
+  npx openteams -- --port 54321
+  npx openteams start --port 54321
 `);
 }
 
@@ -490,7 +490,7 @@ async function showStatus() {
       );
     } else {
       printWarning(
-        "Source mode: unconfigured (set AGENTS_CHATGROUP_OSS_BASE_URL or AGENTS_CHATGROUP_R2_BASE_URL).",
+        "Source mode: unconfigured (set OPENTEAMS_OSS_BASE_URL or OPENTEAMS_R2_BASE_URL).",
       );
     }
   }
@@ -516,7 +516,7 @@ function uninstall() {
   if (fs.existsSync(INSTALL_DIR)) {
     fs.rmSync(INSTALL_DIR, { recursive: true, force: true });
     printSuccess("Uninstalled successfully.");
-    printWarning("If PATH was persisted, remove ~/.agents-chatgroup/bin manually from shell profile if needed.");
+    printWarning("If PATH was persisted, remove ~/.openteams/bin manually from shell profile if needed.");
   } else {
     printWarning("Nothing to uninstall. Installation directory does not exist.");
   }
@@ -564,7 +564,7 @@ async function main() {
     printBanner();
     await installBinary();
     console.log("");
-    printInfo("Run `npx agents-chatgroup start` to launch.");
+    printInfo("Run `npx openteams start` to launch.");
     console.log("");
     return;
   }
@@ -594,7 +594,7 @@ async function main() {
 
 main().catch((err) => {
   printError(err.message || String(err));
-  if (process.env.AGENTS_CHATGROUP_DEBUG === "1") {
+  if (process.env.OPENTEAMS_DEBUG === "1") {
     console.error(err.stack || err);
   }
   process.exit(1);

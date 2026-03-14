@@ -112,7 +112,7 @@
     "banner": "开发模式 - 这是开发版本"
   },
   "oauth": {
-    "title": "登录 agents-chatgroup",
+    "title": "登录 openteams",
     "description": "登录以加入组织并与团队共享任务",
     "continueWithGitHub": "使用 GitHub 继续",
     "continueWithGoogle": "使用 Google 继续",
@@ -260,7 +260,7 @@
   },
   "betaWorkspaces": {
     "title": "试用新界面",
-    "intro": "我们从头重建了 agents-chatgroup 的界面，您已被邀请试用。",
+    "intro": "我们从头重建了 openteams 的界面，您已被邀请试用。",
     "newUiDescription": "新界面针对日常工作进行了优化：管理代理、预览更改和审查代码。它还解锁了旧界面中不可用的功能：",
     "newFeatures": {
       "multiRepo": "同时编辑多个仓库",
@@ -279,7 +279,7 @@
     "maybeLater": "稍后再说"
   },
   "onboardingDialog": {
-    "title": "欢迎使用 agents-chatgroup",
+    "title": "欢迎使用 openteams",
     "description": "先设置你的编码偏好。这些选项之后都可以随时在“设置”中修改。",
     "agentSectionTitle": "选择你的 Coding Agent",
     "status": {
@@ -291,7 +291,7 @@
   },
   "disclaimerDialog": {
     "title": "安全提示",
-    "intro": "agents-chatgroup 默认会以不受限制的权限运行 AI 编码代理。",
+    "intro": "openteams 默认会以不受限制的权限运行 AI 编码代理。",
     "body": "这意味着代理可以在你的系统中执行代码和运行命令，并拥有完整访问权限。请务必谨慎操作。",
     "importantTitle": "重要提示：",
     "importantBody": "请始终检查代理正在执行的操作，并确保已对重要工作进行了备份。本软件仍处于实验阶段，请负责任地使用。",
@@ -302,7 +302,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "欢迎",
-      "content": "欢迎使用 Workspaces，这是 agents-chatgroup 的全新设计界面。我们正在向部分用户推出以获取早期反馈。您可以随时通过导航栏中的反馈图标分享您的想法。"
+      "content": "欢迎使用 Workspaces，这是 openteams 的全新设计界面。我们正在向部分用户推出以获取早期反馈。您可以随时通过导航栏中的反馈图标分享您的想法。"
     },
     "commandBar": {
       "title": "命令栏",

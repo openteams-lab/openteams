@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, X, Wrench } from 'lucide-react';
@@ -249,7 +249,7 @@ export function PreviewPanel() {
                   <li>
                     {t('preview.troubleAlert.item3')}{' '}
                     <a
-                      href="https://github.com/StarterraAI/AgentsChatGroup"
+                      href="https://github.com/StarterraAI/OpenTeams"
                       target="_blank"
                       className="underline font-bold"
                     >

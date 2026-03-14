@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 
 set -e  # Exit on any error
 
@@ -43,8 +43,8 @@ echo "📍 Detected platform: $PLATFORM"
 echo "📂 Using target directory: $CARGO_TARGET_DIR"
 
 echo "🧹 Cleaning previous builds..."
-rm -rf agents-chatgroup-npx/dist
-mkdir -p agents-chatgroup-npx/dist/$PLATFORM
+rm -rf openteams-npx/dist
+mkdir -p openteams-npx/dist/$PLATFORM
 
 echo "🏗️ Building frontend..."
 (cd frontend && npm run build)
@@ -56,30 +56,30 @@ cargo build --release --bin mcp_task_server --manifest-path Cargo.toml
 echo "📦 Creating distribution package..."
 
 # Copy the main binary
-cp ${CARGO_TARGET_DIR}/release/server agents-chatgroup
-zip -q agents-chatgroup.zip agents-chatgroup
-rm -f agents-chatgroup 
-mv agents-chatgroup.zip agents-chatgroup-npx/dist/$PLATFORM/agents-chatgroup.zip
+cp ${CARGO_TARGET_DIR}/release/server openteams
+zip -q openteams.zip openteams
+rm -f openteams 
+mv openteams.zip openteams-npx/dist/$PLATFORM/openteams.zip
 
 # Copy the MCP binary
-cp ${CARGO_TARGET_DIR}/release/mcp_task_server agents-chatgroup-mcp
-zip -q agents-chatgroup-mcp.zip agents-chatgroup-mcp
-rm -f agents-chatgroup-mcp
-mv agents-chatgroup-mcp.zip agents-chatgroup-npx/dist/$PLATFORM/agents-chatgroup-mcp.zip
+cp ${CARGO_TARGET_DIR}/release/mcp_task_server openteams-mcp
+zip -q openteams-mcp.zip openteams-mcp
+rm -f openteams-mcp
+mv openteams-mcp.zip openteams-npx/dist/$PLATFORM/openteams-mcp.zip
 
 # Copy the Review CLI binary
-cp ${CARGO_TARGET_DIR}/release/review agents-chatgroup-review
-zip -q agents-chatgroup-review.zip agents-chatgroup-review
-rm -f agents-chatgroup-review
-mv agents-chatgroup-review.zip agents-chatgroup-npx/dist/$PLATFORM/agents-chatgroup-review.zip
+cp ${CARGO_TARGET_DIR}/release/review openteams-review
+zip -q openteams-review.zip openteams-review
+rm -f openteams-review
+mv openteams-review.zip openteams-npx/dist/$PLATFORM/openteams-review.zip
 
 echo "✅ Build complete!"
 echo "📋 Files created:"
-echo "   - agents-chatgroup-npx/dist/$PLATFORM/agents-chatgroup.zip"
-echo "   - agents-chatgroup-npx/dist/$PLATFORM/agents-chatgroup-mcp.zip"
-echo "   - agents-chatgroup-npx/dist/$PLATFORM/agents-chatgroup-review.zip"
+echo "   - openteams-npx/dist/$PLATFORM/openteams.zip"
+echo "   - openteams-npx/dist/$PLATFORM/openteams-mcp.zip"
+echo "   - openteams-npx/dist/$PLATFORM/openteams-review.zip"
 echo ""
 echo "🚀 To test locally, run:"
-echo "   cd agents-chatgroup-npx && node bin/cli.js"
+echo "   cd openteams-npx && node bin/cli.js"
 
 

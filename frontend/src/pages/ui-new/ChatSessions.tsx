@@ -2362,6 +2362,7 @@ export function ChatSessions() {
           enabledRunnerTypes,
           availableRunnerTypes,
           takenNamesLowercase,
+          profiles,
         });
 
         if (!plan) {
@@ -2393,6 +2394,7 @@ export function ChatSessions() {
       enabledRunnerTypes,
       homeDirectory,
       memberPresetById,
+      profiles,
       sessionMembers,
     ]
   );
@@ -2592,6 +2594,7 @@ export function ChatSessions() {
         enabledRunnerTypes,
         availableRunnerTypes,
         takenNamesLowercase,
+        profiles,
       });
 
       if (!plan) {
@@ -2618,6 +2621,7 @@ export function ChatSessions() {
       enabledRunnerTypes,
       homeDirectory,
       isArchived,
+      profiles,
       sessionMembers,
       showDuplicateMemberNameWarning,
       t,
@@ -2650,7 +2654,9 @@ export function ChatSessions() {
       }
 
       setTeamImportName(getLocalizedTeamPresetName(teamPreset, t));
-      setTeamImportProtocol(resolveTeamImportProtocol(teamPreset.team_protocol));
+      setTeamImportProtocol(
+        resolveTeamImportProtocol(teamPreset.team_protocol)
+      );
       setTeamImportPlan(plan);
       setMemberError(null);
     },
@@ -2695,8 +2701,25 @@ export function ChatSessions() {
           patch.finalName = updates.finalName;
         if (updates.workspacePath !== undefined)
           patch.workspacePath = updates.workspacePath;
-        if (updates.runnerType !== undefined)
+        if (updates.runnerType !== undefined) {
           patch.runnerType = updates.runnerType;
+          if (updates.toolsEnabled === undefined) {
+            const currentToolsEnabled = next[index].toolsEnabled;
+            const currentVariant =
+              extractExecutorProfileVariant(currentToolsEnabled);
+            const nextVariantOptions = getVariantOptions(updates.runnerType);
+            const nextVariant =
+              currentVariant && nextVariantOptions.includes(currentVariant)
+                ? currentVariant
+                : nextVariantOptions.includes('DEFAULT')
+                  ? null
+                  : (nextVariantOptions[0] ?? null);
+            patch.toolsEnabled = withExecutorProfileVariant(
+              currentToolsEnabled,
+              nextVariant
+            );
+          }
+        }
         if (updates.systemPrompt !== undefined)
           patch.systemPrompt = updates.systemPrompt;
         if (updates.toolsEnabled !== undefined)
@@ -2709,7 +2732,7 @@ export function ChatSessions() {
         return next;
       });
     },
-    []
+    [getVariantOptions]
   );
 
   const handleConfirmTeamImport = useCallback(async () => {

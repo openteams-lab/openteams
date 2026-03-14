@@ -1,4 +1,4 @@
-﻿use std::net::IpAddr;
+use std::net::IpAddr;
 
 use axum::{
     Json, Router,
@@ -455,7 +455,7 @@ pub async fn review_failed(
         // Post PR comment instead of sending email
         if let Some(github_app) = state.github_app() {
             let comment = format!(
-                "## agents-chatgroup Review Failed\n\n\
+                "## openteams Review Failed\n\n\
                 Unfortunately, the code review could not be completed.\n\n\
                 Review ID: `{}`",
                 review_id

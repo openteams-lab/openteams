@@ -1,6 +1,6 @@
-﻿{
-  "name": "agents-chatgroup",
-  "short_name": "agents-chatgroup",
+{
+  "name": "openteams",
+  "short_name": "openteams",
   "icons": [
     {
       "src": "/favionc-chatgroups.svg",
@@ -9,7 +9,7 @@
       "type": "image/svg+xml"
     },
     {
-      "src": "/favicon-agents-chatgroup-light-maskable.svg",
+      "src": "/favicon-openteams-light-maskable.svg",
       "sizes": "any",
       "purpose": "maskable",
       "type": "image/svg+xml"
