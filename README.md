@@ -7,7 +7,7 @@
 
   <p>
     <a href="https://www.npmjs.com/package/openteams"><img alt="npm" src="https://img.shields.io/npm/v/openteams?style=flat-square" /></a>
-    <a href="https://github.com/StarterraAI/OpenTeams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/StarterraAI/OpenTeams/actions/workflows/pre-release.yml/badge.svg" /></a>
+    <a href="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml/badge.svg" /></a>
     <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
     <a href="https://discord.gg/MbgNFJeWDc"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
     <a href="https://docs.openteams.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
@@ -29,6 +29,8 @@
 
 ![OpenTeams Demo](docs/images/demo.gif)
 
+替换主页面展示demo，10s，内容：主页面->创建团队->导入->say hi
+
 ---
 
 
@@ -43,10 +45,11 @@ npx openteams
 
 ### Option B: Download Desktop App
 
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/StarterraAI/OpenTeams/releases/latest)
-[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/StarterraAI/OpenTeams/releases/latest)
-[![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/StarterraAI/OpenTeams/releases/latest)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/openteams-lab/openteams/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/openteams-lab/openteams/releases/latest)
+[![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest)
 
+### Dependency
 **You'll need at least one AI agent installed:**
 
 | Agent | Install |
@@ -58,47 +61,34 @@ npx openteams
 
 📚 [Guides for Installing More Agents →](https://docs.openteams.com/getting-started)
 
-## Why develop this app?
-
-You might be using Claude Code, Gemini CLI, and Codex every day. Have you run into the following issues?
-
-- **you are the middleman.** you copy outputs from one agent and paste them into another, manually.
-- **No parallelism.** Tasks queue up. One agent finishes, then the next one starts.
-- **Lost context.** Every new agent conversation starts from zero.
-- **Context switching kills flow.** Jumping between multiple chat windows is exhausting.
-
-**AI is getting more powerful, but we developers are getting more exhausted.**
-
-## The Solution
-
-OpenTeams puts all your AI agents into **one chat group**. They share context, `@mention` each other to hand off tasks, and work in parallel like a real team.
+## Features
+`画个表，内容有：支持多少种code agent、群聊上下文共享、并行执行、自主协作、预设成员和预设团队、完全本地运行`
 
 
-```
-╭─────────────────────────────────────────────────────────────╮
-│                    OpenTeams 🧩                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  👤 You                                                     │
-│  │  @coder Build a user login feature                       │
-│                                                             │
-│  🤖 Coder                                    [parallel ⚡] │
-│  │  Writing the login module...                             │
-│  │  └─ @reviewer Done! Please review this.                  │
-│                                                             │
-│  🤖 Reviewer                                 [parallel ⚡] │
-│  │  Found 2 security issues:                                │
-│  │  1. Passwords need hashing                               │
-│  │  2. Add rate limiting                                    │
-│  │  └─ @coder Please fix these.                             │
-│                                                             │
-│  🤖 Coder                                                   │
-│  │  Fixed. Pushing now...                                   │
-│                                                             │
-╰─────────────────────────────────────────────────────────────╯
-```
+### Agent并行执行任务
+`demo展示内容: 多个agent同时工作的场景 5s`
 
-You assign the task once. The agents figure out the rest.
+同一个上下文环境下可同时指挥多个Agent并行执行任务
+
+### Agent自主协作
+`demo展示内容: agent A @ agent B干活的场景 5s`
+
+支持多个Agent之间能互相发送消息，不受任何约束。你可以让一个Agent指挥全局，你也可以让所有Agent畅所欲言，这完全取决于你的使用场景。
+
+### Agent技能库
+`demo展示内容：滚动的技能市场页面 + 内置技能数量 + 安装和使用操作`
+
+内置1000+个技能，可以任意配置组合，赋能给不同的AI成员，打造你的专属AI团队。支持你在软件中创建你自己的技能，直接应用到你的AI成员上。我们也将持续更新技能库
+
+### 预设AI成员
+`demo展示内容: 预设成员列表展示 + 使用预设成员操作 + 添加成员模板演示`
+
+内置160+ AI成员，涵盖开发、营销、写作、内容生产等不同领域，你可以将他们自由组合成不同的AI团队，为你提供独一无二的服务。我们也将持续更新成员列表
+
+### 预设AI团队
+`demo展示内容: 预设AI团队 + 团队协议介绍 + 添加团队演示`
+
+内置8类 常见AI团队，开箱即用。
 
 ## How It's Different
 
@@ -110,45 +100,8 @@ You assign the task once. The agents figure out the rest.
 | Agent handoff | ❌ No | ❌ No (you orchestrate) | ⚠️ Partial (delegated inside Claude) | ✅ Yes (@mention) |
 | Your effort | 🔺 High | 🔺 Very high | ◼️ Medium | 🔹 Low |
 
-## Features
-
-| Category | Details |
-|----------|---------|
-| **Agent Support** | Claude Code, Gemini CLI, Codex, Amp, QWen Coder, and other popular agents |
-| **Collaboration** | Group chat, shared context, @mention handoff, task tracking, session archive |
-| **Team Presets** | 22 built-in member presets, 8 built-in team presets, one-click team import, custom presets with full CRUD |
-| **Config** | Unified MCP config, flexible environment variables |
-| **Platform** | Desktop app (Windows / macOS / Linux), web app (npx) |
-| **Coming Soon** | Compact context optimization, more agent integrations |
-
-
-## AI Team Presets
-
-Stop configuring the same agents over and over. OpenTeams includes **22 built-in member presets** and **8 built-in team presets** you can import in one click.
-
-![OpenTeams_AddTeam](docs/images/add_team_en.png)
-
-You can also build and save your own custom presets. When importing a team, a preview shows exactly which members will be created, reused, or renamed - so there are no surprises.
-
-📚 [Team Presets documentation](https://docs.openteams.com/core-features/ai-team-presets)
 
 ---
-
-### Use Cases
-
-**Full-stack Development Team**
-> Architect designs the schema -> Coder implements -> Reviewer checks security -> Tester writes coverage. All in one chat, in parallel.
-
-**Content Production Team**
-> Researcher gathers sources -> Writer drafts -> Editor polishes. No copy-pasting between chats.
-
-**Codebase Audit**
-> Multiple agents scan different modules simultaneously. Get a full report in a fraction of the time.
-
-**Data Pipeline**
-> Cleaner preps data -> Analyst runs queries -> Visualizer builds charts. Each agent picks up where the last left off.
-
-Assemble more AI teams. The future is yours to build.
 
 
 ## Tech Stack

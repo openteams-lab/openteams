@@ -175,8 +175,12 @@
     "workspacePath": "Chemin de l'espace de travail",
     "workspacePathPlaceholder": "Chemin d'accès absolu pour le travail des membres IA",
     "workspacePathCannotBeModified": "Le chemin de l'espace de travail ne peut pas être modifié",
-    "add": "Ajouter",
+"add": "Ajouter",
     "save": "Enregistrer",
+    "teamBulletin": {
+      "title": "Tableau d'équipe",
+      "content": "Directives de collaboration d'équipe"
+    },
     "skills": {
       "label": "Compétences",
       "selected": "Compétences sélectionnées",
@@ -530,10 +534,16 @@
       "installAria": "Installer la compétence",
       "scrollForMore": "Faites défiler vers le bas pour en charger plus..."
     },
-    "create": {
+"create": {
       "title": "Ajouter un chemin de compétence",
       "pathLabel": "Chemin de la compétence",
       "pathPlaceholder": "C:\\skills\\my-skill"
+    },
+    "installDialog": {
+      "title": "Installer la compétence",
+      "selectAgents": "Installer sur：",
+      "install": "Installer",
+      "installing": "Installation..."
     },
     "errors": {
       "loadInstalled": "Échec du chargement des compétences installées.",

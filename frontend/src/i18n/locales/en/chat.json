@@ -154,7 +154,7 @@
       "statusCount_other": "{{count}} status updates"
     }
   },
-  "members": {
+"members": {
     "title": "AI Member List",
     "countInSession": "{{count}} in session",
     "selectSessionToManage": "Select a session to manage AI members.",
@@ -183,6 +183,10 @@
     "workspacePathCannotBeModified": "Workspace path cannot be modified",
     "add": "Add",
     "save": "Save",
+    "teamBulletin": {
+      "title": "Team Bulletin",
+      "content": "Team collaboration guidelines"
+    },
     "skills": {
       "label": "Skills",
       "selected": "Selected skills",
@@ -506,7 +510,7 @@
       }
     }
   },
-  "skillLibrary": {
+"skillLibrary": {
     "title": "Skills",
     "description": "Manage installed and marketplace skills.",
     "actions": {
@@ -539,6 +543,12 @@
       "title": "Add Skill Path",
       "pathLabel": "Skill Path",
       "pathPlaceholder": "C:\\skills\\my-skill"
+    },
+    "installDialog": {
+      "title": "Install Skill",
+      "selectAgents": "Install to:",
+      "install": "Install",
+      "installing": "Installing..."
     },
     "errors": {
       "loadInstalled": "Failed to load installed skills.",

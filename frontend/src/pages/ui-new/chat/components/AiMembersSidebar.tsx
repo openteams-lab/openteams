@@ -528,7 +528,7 @@ export function AiMembersSidebar({
   onConfirmTeamImport,
   onCancelTeamImport,
 }: AiMembersSidebarProps) {
-  const { t, i18n } = useTranslation('chat');
+  const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
   const { reloadSystem } = useUserSystem();
   const [activeTab, setActiveTab] = useState<AddMemberTab>('preset');
@@ -553,17 +553,8 @@ export function AiMembersSidebar({
     number | null
   >(null);
   const workspacePathPlaceholder = getWorkspacePathExample();
-  const isChineseLocale = (
-    i18n.resolvedLanguage ?? i18n.language ?? ''
-  ).toLowerCase().startsWith('zh');
-  const teamBulletinTitle = t('members.teamBulletin.title', {
-    defaultValue: isChineseLocale ? '团队公告板' : 'Team Bulletin',
-  });
-  const teamBulletinContent = t('members.teamBulletin.content', {
-    defaultValue: isChineseLocale
-      ? '团队协作准则'
-      : 'Team collaboration guidelines',
-  });
+  const teamBulletinTitle = t('members.teamBulletin.title');
+  const teamBulletinContent = t('members.teamBulletin.content');
 
   const hasPresets =
     enabledMemberPresets.length > 0 || enabledTeamPresets.length > 0;

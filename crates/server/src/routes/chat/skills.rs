@@ -15,11 +15,11 @@ use services::services::{
         update_native_skill_enabled_for_runner,
     },
     skill_registry::{
-        RemoteSkillMeta, RemoteSkillPackage, SkillCategory,
+        AgentInfo, RemoteSkillMeta, RemoteSkillPackage, SkillCategory,
         builtin_skills_count, filter_builtin_skills_by_agent, filter_builtin_skills_by_category,
         get_builtin_categories, get_skill_with_fallback, install_builtin_skill,
         install_skill_with_fallback, list_categories_with_fallback, list_skills_with_fallback,
-        search_skills_with_fallback, sync_discovered_global_skills,
+        list_supported_agents, search_skills_with_fallback, sync_discovered_global_skills,
         uninstall_skill_files_from_global_directory,
     },
 };
@@ -269,14 +269,25 @@ pub async fn list_registry_categories(
 ///
 /// Fallback: If remote registry is unavailable, uses built-in skills.
 /// Only returns error if skill is not found anywhere.
+#[derive(Debug, Deserialize)]
+pub struct InstallSkillRequest {
+    pub agents: Option<Vec<String>>,
+}
+
 pub async fn install_registry_skill(
     State(deployment): State<DeploymentImpl>,
     axum::extract::Path(skill_id): axum::extract::Path<String>,
     axum::extract::Query(query): axum::extract::Query<RegistryQuery>,
+    Json(payload): Json<InstallSkillRequest>,
 ) -> Result<ResponseJson<ApiResponse<ChatSkill>>, ApiError> {
-    let installed = install_skill_with_fallback(&deployment.db().pool, &skill_id, query.registry_url.as_deref())
-        .await
-        .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
+    let installed = install_skill_with_fallback(
+        &deployment.db().pool,
+        &skill_id,
+        query.registry_url.as_deref(),
+        payload.agents.as_deref(),
+    )
+    .await
+    .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
 
     // Track analytics: skill_install
     let _ = track_skill_install(
@@ -361,8 +372,9 @@ pub async fn get_builtin_skill_api(
 pub async fn install_builtin_skill_api(
     State(deployment): State<DeploymentImpl>,
     axum::extract::Path(skill_id): axum::extract::Path<String>,
+    Json(payload): Json<InstallSkillRequest>,
 ) -> Result<ResponseJson<ApiResponse<ChatSkill>>, ApiError> {
-    let installed = install_builtin_skill(&deployment.db().pool, &skill_id)
+    let installed = install_builtin_skill(&deployment.db().pool, &skill_id, payload.agents.as_deref())
         .await
         .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
 
@@ -377,4 +389,14 @@ pub async fn install_builtin_skill_api(
     .await;
 
     Ok(ResponseJson(ApiResponse::success(installed)))
+}
+
+// ─── Supported Agents ───
+
+/// List supported agents for skill installation
+pub async fn list_supported_agents_api(
+    State(_deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<Vec<AgentInfo>>>, ApiError> {
+    let agents = list_supported_agents();
+    Ok(ResponseJson(ApiResponse::success(agents)))
 }
