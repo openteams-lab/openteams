@@ -175,8 +175,12 @@
     "workspacePath": "ワークスペースパス",
     "workspacePathPlaceholder": "AIメンバーの作業用絶対パス",
     "workspacePathCannotBeModified": "ワークスペースパスは変更できません",
-    "add": "追加",
+"add": "追加",
     "save": "保存",
+    "teamBulletin": {
+      "title": "チーム掲示板",
+      "content": "チームコラボレーションガイドライン"
+    },
     "skills": {
       "label": "スキル",
       "selected": "選択済みスキル",
@@ -530,10 +534,16 @@
       "installAria": "スキルをインストール",
       "scrollForMore": "さらに読み込むには下にスクロールしてください..."
     },
-    "create": {
+"create": {
       "title": "スキルパスを追加",
       "pathLabel": "スキルパス",
       "pathPlaceholder": "C:\\skills\\my-skill"
+    },
+    "installDialog": {
+      "title": "スキルをインストール",
+      "selectAgents": "インストール先：",
+      "install": "インストール",
+      "installing": "インストール中..."
     },
     "errors": {
       "loadInstalled": "インストール済みスキルの読み込みに失敗しました。",

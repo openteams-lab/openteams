@@ -2859,37 +2859,28 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 24px;
-    padding: clamp(36px, 7vh, 84px) 24px 12px;
+    justify-content: flex-start;
+    padding-top: 28vh;
+    padding-bottom: 24px;
+    padding-left: 24px;
+    padding-right: 24px;
     text-align: center;
+    position: relative;
   }
 
   .new-design .chat-session-empty-state-logo {
-    width: 160px;
-    height: 160px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 48px;
-    border: 1px solid rgba(255, 255, 255, 0.82);
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.82));
-    box-shadow:
-      0 12px 32px rgba(15, 23, 42, 0.05),
-      inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    flex-shrink: 0;
   }
 
   .new-design .chat-session-empty-state-logo-image {
-    width: 72px;
-    height: 72px;
+    max-width: 396px;
+    max-height: 90px;
+    width: auto;
+    height: auto;
     object-fit: contain;
-    filter:
-      drop-shadow(0 14px 28px rgba(80, 148, 251, 0.18))
-      drop-shadow(0 6px 14px rgba(109, 88, 255, 0.12));
-    animation: chat-empty-state-logo-breathe 4.6s ease-in-out infinite;
-    transform-origin: center;
-    will-change: transform, filter;
   }
 
   .new-design .chat-session-empty-state-logo-placeholder {
@@ -2938,6 +2929,7 @@
     align-items: center;
     gap: 10px;
     max-width: 480px;
+    margin-top: 48px;
   }
 
   .new-design .chat-session-empty-state-copy.is-no-members {
@@ -2946,10 +2938,16 @@
 
   .new-design .chat-session-empty-state-title {
     font-size: clamp(28px, 4vw, 34px);
-    line-height: 1.15;
-    letter-spacing: -0.04em;
+    line-height: 1.2;
+    letter-spacing: 0.12em;
     font-weight: 300;
-    color: #111827;
+    font-family: sans-serif;
+    color: #33302E;
+    background: linear-gradient(135deg, #3d3935 0%, #4a4640 50%, #3a3632 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
   }
 
   .new-design .chat-session-empty-state-eyebrow {
@@ -3051,7 +3049,7 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: 12px;
-    margin-top: 4px;
+    margin-top: 48px;
   }
 
   .new-design .chat-session-empty-state-template-card {
@@ -3529,16 +3527,6 @@
     color: #9ca3af;
   }
 
-  .new-design.dark .chat-session-empty-state-logo,
-  .dark .new-design .chat-session-empty-state-logo {
-    border-color: rgba(148, 163, 184, 0.16);
-    background:
-      linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.72));
-    box-shadow:
-      0 16px 30px rgba(2, 6, 23, 0.24),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  }
-
   .new-design.dark .chat-session-empty-state-logo-placeholder,
   .dark .new-design .chat-session-empty-state-logo-placeholder {
     background:
@@ -3560,9 +3548,7 @@
 
   .new-design.dark .chat-session-empty-state-logo-image,
   .dark .new-design .chat-session-empty-state-logo-image {
-    filter:
-      drop-shadow(0 16px 30px rgba(96, 165, 250, 0.24))
-      drop-shadow(0 8px 16px rgba(129, 140, 248, 0.18));
+    filter: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -3577,7 +3563,11 @@
 
   .new-design.dark .chat-session-empty-state-title,
   .dark .new-design .chat-session-empty-state-title {
-    color: #f8fafc;
+    color: #f5f0eb;
+    background: linear-gradient(135deg, #f5f0eb 0%, #e8e0d8 50%, #f0ebe4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .new-design.dark .chat-session-empty-state-eyebrow,

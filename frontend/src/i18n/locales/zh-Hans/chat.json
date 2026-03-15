@@ -187,8 +187,12 @@
     "workspacePath": "工作区路径",
     "workspacePathPlaceholder": "AI成员工作的绝对路径",
     "workspacePathCannotBeModified": "工作区路径无法修改",
-    "add": "添加",
+"add": "添加",
     "save": "保存",
+    "teamBulletin": {
+      "title": "团队公告板",
+      "content": "团队协作准则"
+    },
     "skills": {
       "label": "技能",
       "selected": "已选技能",
@@ -542,10 +546,16 @@
       "installAria": "安装技能",
       "scrollForMore": "向下滚动加载更多..."
     },
-    "create": {
+"create": {
       "title": "添加技能路径",
       "pathLabel": "技能路径",
       "pathPlaceholder": "C:\\skills\\my-skill"
+    },
+    "installDialog": {
+      "title": "安装技能",
+      "selectAgents": "安装到：",
+      "install": "安装",
+      "installing": "安装中..."
     },
     "errors": {
       "loadInstalled": "加载已安装技能失败。",

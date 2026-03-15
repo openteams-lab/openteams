@@ -216,7 +216,7 @@ struct DiscoveryRoot {
     agent_hint: Option<&'static str>,
 }
 
-const DISCOVERY_ROOTS: [DiscoveryRoot; 8] = [
+const DISCOVERY_ROOTS: [DiscoveryRoot; 9] = [
     DiscoveryRoot {
         folder: GLOBAL_SKILLS_DIR,
         agent_hint: None,
@@ -246,10 +246,47 @@ const DISCOVERY_ROOTS: [DiscoveryRoot; 8] = [
         agent_hint: Some("gemini"),
     },
     DiscoveryRoot {
+        folder: ".kimi",
+        agent_hint: Some("kimi"),
+    },
+    DiscoveryRoot {
         folder: ".factory",
         agent_hint: Some("droid"),
     },
 ];
+
+/// Supported agent directories for skill installation
+/// Each tuple contains (agent_id, display_name)
+pub const SUPPORTED_AGENT_DIRS: &[(&str, &str)] = &[
+    ("agents", "All Agents"),
+    ("claude", "Claude Code"),
+    ("copilot", "GitHub Copilot"),
+    ("cursor", "Cursor"),
+    ("qwen", "Qwen Code"),
+    ("opencode", "Opencode"),
+    ("gemini", "Gemini CLI"),
+    ("kimi", "Kimi Code"),
+    ("droid", "Droid"),
+];
+
+/// Agent info for API response
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AgentInfo {
+    pub id: String,
+    pub name: String,
+}
+
+/// Get list of supported agents for skill installation
+pub fn list_supported_agents() -> Vec<AgentInfo> {
+    SUPPORTED_AGENT_DIRS
+        .iter()
+        .map(|(id, name)| AgentInfo {
+            id: id.to_string(),
+            name: name.to_string(),
+        })
+        .collect()
+}
 
 #[derive(Debug, Default)]
 struct ParsedSkillFrontmatter {
@@ -692,9 +729,15 @@ async fn load_discovered_skill(
 /// Returns the number of downloaded source files.
 ///
 /// Fallback: If remote registry is unavailable, attempts to install from embedded assets.
+///
+/// # Arguments
+/// * `skill` - The skill package to install
+/// * `registry_url` - Optional registry URL override
+/// * `target_agents` - Optional list of target agent IDs. If None or empty, installs to all agents.
 pub async fn install_skill_files_to_global_directory(
     skill: &RemoteSkillPackage,
     registry_url: Option<&str>,
+    target_agents: Option<&[String]>,
 ) -> Result<usize, SkillInstallError> {
     let client = SkillRegistryClient::new(registry_url.map(String::from));
 
@@ -709,7 +752,7 @@ pub async fn install_skill_files_to_global_directory(
             }
 
             let home_dir = resolve_home_dir()?;
-            let target_roots = global_skill_roots(&home_dir, &skill.name);
+            let target_roots = filter_skill_roots_by_agents(&home_dir, &skill.name, target_agents);
 
             for root in &target_roots {
                 tokio::fs::create_dir_all(root).await?;
@@ -750,7 +793,7 @@ pub async fn install_skill_files_to_global_directory(
             );
 
             if has_embedded_skill_files(&skill.name) {
-                install_skill_files_from_embedded(skill).await
+                install_skill_files_from_embedded(skill, target_agents).await
             } else {
                 Err(SkillInstallError::DownloadFailed(format!(
                     "Remote registry failed and no embedded files available for skill: {}",
@@ -832,6 +875,69 @@ fn global_skill_base_roots(home_dir: &Path) -> Vec<PathBuf> {
 
 fn slugify_skill_name(name: &str) -> String {
     name.to_lowercase().replace(' ', "-")
+}
+
+/// Map agent id to discovery root folder name
+fn agent_id_to_folder(agent_id: &str) -> Option<&'static str> {
+    match agent_id {
+        "agents" => Some(GLOBAL_SKILLS_DIR),
+        "claude" => Some(".claude"),
+        "copilot" => Some(".github"),
+        "cursor" => Some(".cursor"),
+        "qwen" => Some(".qwen"),
+        "opencode" => Some(".opencode"),
+        "gemini" => Some(".gemini"),
+        "kimi" => Some(".kimi"),
+        "droid" => Some(".factory"),
+        _ => None,
+    }
+}
+
+/// Filter skill installation roots by selected agents
+/// If target_agents is None or empty, installs to all agents
+/// If target_agents contains "agents", installs to universal .agents directory only
+fn filter_skill_roots_by_agents(
+    home_dir: &Path,
+    skill_name: &str,
+    target_agents: Option<&[String]>,
+) -> Vec<PathBuf> {
+    let install_dir_name = slugify_skill_name(skill_name);
+
+    // If no agents specified or empty, install to all
+    let agents: &[String] = match target_agents {
+        Some(agents) if !agents.is_empty() => agents,
+        _ => {
+            // Install to all agent directories
+            return global_skill_roots(home_dir, skill_name);
+        }
+    };
+
+    // Check if "agents" (universal) is selected
+    let has_universal = agents.iter().any(|a| a == "agents");
+
+    let mut roots = Vec::new();
+
+    // Add universal .agents directory if selected
+    if has_universal {
+        roots.push(home_dir.join(GLOBAL_SKILLS_DIR).join("skills").join(&install_dir_name));
+    }
+
+    // Add specific agent directories
+    for agent_id in agents {
+        if agent_id == "agents" {
+            continue; // Already handled above
+        }
+        if let Some(folder) = agent_id_to_folder(agent_id) {
+            roots.push(home_dir.join(folder).join("skills").join(&install_dir_name));
+        }
+    }
+
+    // If no valid agents found, fall back to universal
+    if roots.is_empty() {
+        roots.push(home_dir.join(GLOBAL_SKILLS_DIR).join("skills").join(&install_dir_name));
+    }
+
+    roots
 }
 
 struct DiscoveryRootPath {
@@ -1350,16 +1456,22 @@ pub fn get_builtin_categories() -> Vec<String> {
 
 /// Install a built-in skill by ID to the local database
 /// Also installs skill files from embedded assets if available
+///
+/// # Arguments
+/// * `pool` - Database connection pool
+/// * `skill_id` - The skill ID to install
+/// * `target_agents` - Optional list of target agent IDs. If None or empty, installs to all agents.
 pub async fn install_builtin_skill(
     pool: &SqlitePool,
     skill_id: &str,
+    target_agents: Option<&[String]>,
 ) -> Result<ChatSkill, SkillRegistryError> {
     let skill = get_builtin_skill(skill_id)
         .ok_or_else(|| SkillRegistryError::SkillNotFound(skill_id.to_string()))?;
 
     // Try to install skill files from embedded assets
     if has_embedded_skill_files(&skill.name) {
-        match install_skill_files_from_embedded(&skill).await {
+        match install_skill_files_from_embedded(&skill, target_agents).await {
             Ok(count) => {
                 tracing::info!(
                     skill_name = %skill.name,
@@ -1385,17 +1497,24 @@ pub async fn install_builtin_skill(
 /// 2. If remote fails, try builtin skill
 /// 3. Install files (remote or embedded)
 /// Only returns error if skill not found anywhere
+///
+/// # Arguments
+/// * `pool` - Database connection pool
+/// * `skill_id` - The skill ID to install
+/// * `registry_url` - Optional registry URL override
+/// * `target_agents` - Optional list of target agent IDs. If None or empty, installs to all agents.
 pub async fn install_skill_with_fallback(
     pool: &SqlitePool,
     skill_id: &str,
     registry_url: Option<&str>,
+    target_agents: Option<&[String]>,
 ) -> Result<ChatSkill, SkillRegistryError> {
     let skill_package = get_skill_with_fallback(registry_url.map(String::from), skill_id)
         .await
         .ok_or_else(|| SkillRegistryError::SkillNotFound(skill_id.to_string()))?;
 
     // Try to install files with fallback
-    match install_skill_files_to_global_directory(&skill_package, registry_url).await {
+    match install_skill_files_to_global_directory(&skill_package, registry_url, target_agents).await {
         Ok(count) => {
             tracing::info!(
                 skill_id = %skill_id,
@@ -1443,8 +1562,13 @@ pub fn has_embedded_skill_files(skill_name: &str) -> bool {
 
 /// Install skill files from embedded assets to global user directories.
 /// This is used as a fallback when the remote registry is unavailable.
+///
+/// # Arguments
+/// * `skill` - The skill package to install
+/// * `target_agents` - Optional list of target agent IDs. If None or empty, installs to all agents.
 pub async fn install_skill_files_from_embedded(
     skill: &RemoteSkillPackage,
+    target_agents: Option<&[String]>,
 ) -> Result<usize, SkillInstallError> {
     let files = get_embedded_skill_files(&skill.name);
 
@@ -1456,7 +1580,7 @@ pub async fn install_skill_files_from_embedded(
     }
 
     let home_dir = resolve_home_dir()?;
-    let target_roots = global_skill_roots(&home_dir, &skill.name);
+    let target_roots = filter_skill_roots_by_agents(&home_dir, &skill.name, target_agents);
 
     for root in &target_roots {
         tokio::fs::create_dir_all(root).await?;
