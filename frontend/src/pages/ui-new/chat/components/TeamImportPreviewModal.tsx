@@ -4,6 +4,7 @@ import { XIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import type { JsonValue } from 'shared/types';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
+import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
 import { cn } from '@/lib/utils';
 import { toPrettyCase } from '@/utils/string';
 import {
@@ -287,7 +288,7 @@ export function TeamImportPreviewModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-6 px-6 pb-3 pt-5">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[#5094FB]">
               {t('members.importPreview.previewEyebrow')}
             </div>
@@ -297,16 +298,6 @@ export function TeamImportPreviewModal({
             <div className="mt-3 max-w-[560px] text-sm leading-6 text-slate-500">
               {t('members.importPreview.description')}
             </div>
-            {teamImportProtocol ? (
-              <div className="mt-4 max-w-[560px] rounded-[18px] border border-[#dbe7f5] bg-[#f8fbff] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#5094FB]">
-                  {t('members.teamProtocol.title')}
-                </div>
-                <div className="mt-2 max-h-[96px] overflow-hidden whitespace-pre-line text-sm leading-6 text-slate-600">
-                  {teamImportProtocol}
-                </div>
-              </div>
-            ) : null}
           </div>
           <button
             type="button"
@@ -321,6 +312,18 @@ export function TeamImportPreviewModal({
             <XIcon size={18} />
           </button>
         </div>
+        {teamImportProtocol ? (
+          <div className="mx-6 mb-4 rounded-[18px] border border-[#dbe7f5] bg-[#f8fbff] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#5094FB]">
+              {t('members.teamProtocol.title')}
+            </div>
+            <Tooltip content={teamImportProtocol} side="bottom">
+              <div className="mt-2 truncate text-sm leading-6 text-slate-600">
+                {teamImportProtocol}
+              </div>
+            </Tooltip>
+          </div>
+        ) : null}
 
         <div className="min-h-0 flex-1 overflow-hidden px-5 pb-4">
           <div className="flex h-full min-h-0 gap-5">

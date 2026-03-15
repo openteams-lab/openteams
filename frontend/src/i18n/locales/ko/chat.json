@@ -227,7 +227,7 @@
     "addFromMemberPreset": "멤버 프리셋 추가",
     "importTeamPreset": "팀 프리셋 가져오기",
     "noEnabledPresets": "활성화된 프리셋이 없습니다. AI 팀에서 설정하세요.",
-    "presetSearchPlaceholder": "프리셋 AI 또는 팀 검색",
+    "presetSearchPlaceholder": "팀 또는 멤버 검색",
     "noPresetSearchResults": "일치하는 프리셋 AI 또는 팀이 없습니다.",
     "noPresetSearchResultsHint": "다른 키워드를 시도하거나 사용자 정의 AI로 전환하세요.",
     "categoryFilter": {

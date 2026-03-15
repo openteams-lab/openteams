@@ -228,7 +228,7 @@
     "addFromMemberPreset": "Añadir preajuste de miembro",
     "importTeamPreset": "Importar preajuste de equipo",
     "noEnabledPresets": "No hay preajustes habilitados. Config?ralos en Equipo IA.",
-    "presetSearchPlaceholder": "Buscar IA predefinidas o equipos",
+    "presetSearchPlaceholder": "Buscar equipos o miembros",
     "noPresetSearchResults": "No hay IA predefinidas ni equipos que coincidan.",
     "noPresetSearchResultsHint": "Prueba otra palabra clave o cambia a IA personalizada.",
     "categoryFilter": {

@@ -227,7 +227,7 @@
     "addFromMemberPreset": "新增成員預設",
     "importTeamPreset": "匯入團隊預設",
     "noEnabledPresets": "沒有啟用的預設。請在 AI 團隊中設定。",
-    "presetSearchPlaceholder": "搜尋預設 AI 或團隊",
+    "presetSearchPlaceholder": "搜尋團隊或成員",
     "noPresetSearchResults": "沒有符合的預設 AI 或團隊。",
     "noPresetSearchResultsHint": "試試其他關鍵字，或切換到自訂AI。",
     "categoryFilter": {

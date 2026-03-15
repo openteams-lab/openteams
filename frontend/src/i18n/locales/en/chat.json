@@ -233,7 +233,7 @@
     "addFromMemberPreset": "Add member preset",
     "importTeamPreset": "Import team preset",
     "noEnabledPresets": "No enabled presets. Configure them in AI Team.",
-    "presetSearchPlaceholder": "Search preset AI or teams",
+    "presetSearchPlaceholder": "Search teams or members",
     "noPresetSearchResults": "No matching preset AI or teams.",
     "noPresetSearchResultsHint": "Try another keyword or switch to Custom AI.",
     "categoryFilter": {

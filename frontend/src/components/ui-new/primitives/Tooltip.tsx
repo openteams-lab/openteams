@@ -9,6 +9,7 @@ interface TooltipProps {
   shortcut?: string;
   side?: 'top' | 'bottom' | 'left' | 'right';
   className?: string;
+  maxWidth?: number | string;
 }
 
 export function Tooltip({
@@ -17,6 +18,7 @@ export function Tooltip({
   shortcut,
   side = 'bottom',
   className,
+  maxWidth = 320,
 }: TooltipProps) {
   const container = usePortalContainer();
   const formattedShortcut = shortcut?.replace('{mod}', getModifierKey());
@@ -29,17 +31,18 @@ export function Tooltip({
           <TooltipPrimitive.Content
             side={side}
             sideOffset={4}
+            style={{ maxWidth }}
             className={cn(
-              'z-[10000] flex items-center rounded-sm border border-white bg-white px-base py-half text-sm text-normal shadow-md',
+              'z-[10000] flex items-start rounded-sm border border-white bg-white px-base py-half text-sm text-normal shadow-md',
               'animate-in fade-in-0 zoom-in-95',
               className
             )}
           >
-            <span>{content}</span>
+            <span className="whitespace-pre-wrap break-words">{content}</span>
             {formattedShortcut && (
               <kbd
                 className={cn(
-                  'ml-2 inline-flex items-center gap-0.5 px-2 py-0.5',
+                  'ml-2 inline-flex items-center gap-0.5 px-2 py-0.5 shrink-0',
                   'rounded-sm border border-border bg-secondary',
                   'font-ibm-plex-mono text-sm text-high'
                 )}

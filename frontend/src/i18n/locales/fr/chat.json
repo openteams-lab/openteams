@@ -227,7 +227,7 @@
     "addFromMemberPreset": "Ajouter un préréglage de membre",
     "importTeamPreset": "Importer un préréglage d'équipe",
     "noEnabledPresets": "Aucun pr?r?glage activ?. Configurez-les dans ?quipe IA.",
-    "presetSearchPlaceholder": "Rechercher des IA préréglées ou des équipes",
+    "presetSearchPlaceholder": "Rechercher des équipes ou des membres",
     "noPresetSearchResults": "Aucune IA préréglée ou équipe correspondante.",
     "noPresetSearchResultsHint": "Essayez un autre mot-clé ou passez à une IA personnalisée.",
     "categoryFilter": {
