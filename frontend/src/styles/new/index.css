@@ -4766,10 +4766,10 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    height: 42px;
+    height: 36px;
     padding: 0 12px;
     border-radius: 14px;
-    border: 1px solid #dde6f2;
+    border: 1px solid #5094fb;
     background: #ffffff;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.88),
@@ -4777,10 +4777,10 @@
   }
 
   .new-design .chat-session-member-search:focus-within {
-    border-color: #818cf8;
+    border-color: #5094fb;
     box-shadow:
-      0 0 0 3px rgba(99, 102, 241, 0.12),
-      0 14px 28px rgba(99, 102, 241, 0.12);
+      0 0 0 3px rgba(80, 148, 251, 0.12),
+      0 14px 28px rgba(80, 148, 251, 0.12);
   }
 
   .new-design .chat-session-member-search-icon {

@@ -239,7 +239,7 @@
     "addFromMemberPreset": "添加成员预设",
     "importTeamPreset": "导入团队预设",
     "noEnabledPresets": "没有启用的预设。请在 AI 团队中配置。",
-    "presetSearchPlaceholder": "搜索预设 AI 或团队",
+    "presetSearchPlaceholder": "搜索团队或成员",
     "noPresetSearchResults": "没有匹配的预设 AI 或团队。",
     "noPresetSearchResultsHint": "试试其他关键词，或切换到自定义AI。",
     "categoryFilter": {
