@@ -14,8 +14,9 @@ import type {
   RemoteSkillMeta,
   RemoteSkillPackage,
 } from 'shared/types';
-import { chatApi } from '@/lib/api';
+import { AgentInfo, chatApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { InstallSkillDialog } from './InstallSkillDialog';
 import { SkillDetailModal } from './SkillDetailModal';
 
 type MarketSource = 'registry' | 'builtin';
@@ -93,6 +94,18 @@ function toRunnerLabel(runnerType: string): string {
     .split(/[_\s-]+/)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(' ');
+}
+
+function runnerKeyToAgentId(runnerKey: string): string {
+  const normalized = runnerKey.toLowerCase().replace(/_/g, '-');
+  const mapping: Record<string, string> = {
+    'claude-code': 'claude',
+    'github-copilot': 'copilot',
+    'copilot': 'copilot',
+    'qwen-code': 'qwen',
+    'kimi-code': 'kimi',
+  };
+  return mapping[normalized] ?? normalized;
 }
 
 function ToggleSwitch({
@@ -196,6 +209,12 @@ export function SkillsPanel({
     marketRenderBatchSize
   );
 
+  const [availableAgents, setAvailableAgents] = useState<AgentInfo[]>([]);
+  const [installDialog, setInstallDialog] = useState<{
+    isOpen: boolean;
+    skill: MarketSkill | null;
+  }>({ isOpen: false, skill: null });
+
   const runnerOptions = useMemo<RunnerOption[]>(() => {
     return Array.from(
       new Set(
@@ -296,6 +315,11 @@ export function SkillsPanel({
     if (!isOpen || !selectedRunnerKey) return;
     void loadInstalledSkills(selectedRunnerKey);
   }, [isOpen, loadInstalledSkills, selectedRunnerKey]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    chatApi.listSupportedAgents().then(setAvailableAgents).catch(console.error);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -667,18 +691,26 @@ export function SkillsPanel({
     t,
   ]);
 
-  const handleInstallMarketSkill = useCallback(
-    async (skill: MarketSkill) => {
+  const handleOpenInstallDialog = useCallback((skill: MarketSkill) => {
+    setInstallDialog({ isOpen: true, skill });
+  }, []);
+
+  const handleConfirmInstall = useCallback(
+    async (agents: string[]) => {
+      const skill = installDialog.skill;
+      if (!skill) return;
+
       const marketKey = `${skill.source}:${skill.id}`;
       setIsInstallingMarketSkillKey(marketKey);
       setMarketError(null);
+      setInstallDialog({ isOpen: false, skill: null });
 
       try {
         if (!findInstalledSkillByMeta(skill)) {
           if (skill.source === 'builtin') {
-            await chatApi.installBuiltinSkill(skill.id);
+            await chatApi.installBuiltinSkill(skill.id, agents);
           } else {
-            await chatApi.installRegistrySkill(skill.id);
+            await chatApi.installRegistrySkill(skill.id, undefined, agents);
           }
         }
 
@@ -695,11 +727,23 @@ export function SkillsPanel({
     },
     [
       findInstalledSkillByMeta,
+      installDialog.skill,
       loadInstalledSkills,
       loadMarketSkills,
       selectedRunnerKey,
       t,
     ]
+  );
+
+  const handleCancelInstall = useCallback(() => {
+    setInstallDialog({ isOpen: false, skill: null });
+  }, []);
+
+  const handleInstallMarketSkill = useCallback(
+    async (skill: MarketSkill) => {
+      handleOpenInstallDialog(skill);
+    },
+    [handleOpenInstallDialog]
   );
 
   const handleInstallFromDetail = useCallback(async () => {
@@ -1169,6 +1213,17 @@ export function SkillsPanel({
           </div>
         </div>
       )}
+
+      <InstallSkillDialog
+        isOpen={installDialog.isOpen}
+        skillName={installDialog.skill?.name ?? ''}
+        skillDescription={installDialog.skill?.description}
+        defaultAgent={runnerKeyToAgentId(selectedRunnerKey)}
+        availableAgents={availableAgents}
+        isLoading={isInstallingMarketSkillKey !== null}
+        onConfirm={handleConfirmInstall}
+        onCancel={handleCancelInstall}
+      />
     </div>
   );
 }

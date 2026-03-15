@@ -90,6 +90,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
 
     // Skill CRUD routes
     let skills_router = Router::new()
+        .route("/agents", get(skills::list_supported_agents_api))
         .route("/native/{runner_type}", get(skills::get_native_skills))
         .route(
             "/native/{runner_type}/{skill_id}",

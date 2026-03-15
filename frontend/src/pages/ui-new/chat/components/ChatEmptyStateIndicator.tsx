@@ -7,7 +7,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
-const CHAT_EMPTY_STATE_LOGO_PATH: string | null = null;
+const CHAT_EMPTY_STATE_LOGO_PATH: string | null = '/openteams-brand-logo.png';
 // Set this to a public asset path such as '/branding/chat-empty-logo.svg'
 // to replace the built-in placeholder mark.
 

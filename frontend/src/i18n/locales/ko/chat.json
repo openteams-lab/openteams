@@ -175,8 +175,12 @@
     "workspacePath": "워크스페이스 경로",
     "workspacePathPlaceholder": "AI 구성원 작업 절대 경로",
     "workspacePathCannotBeModified": "워크스페이스 경로는 수정할 수 없습니다",
-    "add": "추가",
+"add": "추가",
     "save": "저장",
+    "teamBulletin": {
+      "title": "팀 게시판",
+      "content": "팀 협업 가이드라인"
+    },
     "skills": {
       "label": "스킬",
       "selected": "선택된 스킬",
@@ -530,10 +534,16 @@
       "installAria": "스킬 설치",
       "scrollForMore": "더 불러오려면 아래로 스크롤하세요..."
     },
-    "create": {
+"create": {
       "title": "스킬 경로 추가",
       "pathLabel": "스킬 경로",
       "pathPlaceholder": "C:\\skills\\my-skill"
+    },
+    "installDialog": {
+      "title": "스킬 설치",
+      "selectAgents": "설치 대상：",
+      "install": "설치",
+      "installing": "설치 중..."
     },
     "errors": {
       "loadInstalled": "설치된 스킬을 불러오지 못했습니다.",

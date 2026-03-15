@@ -196,6 +196,11 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
           style={{ animation: 'onboarding-welcome-slide-up 0.5s ease-out' }}
         >
           <div className="mb-12">
+            <img
+              src="/openteams-brand-logo.png"
+              alt="OpenTeams"
+              className="mx-auto mb-6 h-10 w-auto"
+            />
             <h1 className="m-0 mb-3 text-2xl font-semibold text-[#333333]">
               {t('onboardingDialog.title')}
             </h1>

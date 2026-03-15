@@ -125,6 +125,11 @@ import {
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { createWorkspaceWithSession } from '@/types/attempt';
 
+export interface AgentInfo {
+  id: string;
+  name: string;
+}
+
 export class ApiError<E = unknown> extends Error {
   public status?: number;
   public error_data?: E;
@@ -1943,7 +1948,8 @@ export const chatApi = {
 
   installRegistrySkill: async (
     skillId: string,
-    registryUrl?: string
+    registryUrl?: string,
+    agents?: string[]
   ): Promise<ChatSkill> => {
     const params = new URLSearchParams();
     if (registryUrl) {
@@ -1951,7 +1957,10 @@ export const chatApi = {
     }
     const paramStr = params.toString();
     const url = `/api/chat/registry/skills/${skillId}/install${paramStr ? '?' + paramStr : ''}`;
-    const response = await makeRequest(url, { method: 'POST' });
+    const response = await makeRequest(url, {
+      method: 'POST',
+      body: JSON.stringify({ agents }),
+    });
     return handleApiResponse<ChatSkill>(response);
   },
 
@@ -1975,9 +1984,10 @@ export const chatApi = {
     return handleApiResponse<RemoteSkillPackage>(response);
   },
 
-  installBuiltinSkill: async (skillId: string): Promise<ChatSkill> => {
+  installBuiltinSkill: async (skillId: string, agents?: string[]): Promise<ChatSkill> => {
     const response = await makeRequest(`/api/chat/builtin/skills/${skillId}/install`, {
       method: 'POST',
+      body: JSON.stringify({ agents }),
     });
     return handleApiResponse<ChatSkill>(response);
   },
@@ -1985,6 +1995,11 @@ export const chatApi = {
   getBuiltinSkillsStats: async (): Promise<BuiltinSkillsStats> => {
     const response = await makeRequest('/api/chat/builtin/skills/stats');
     return handleApiResponse<BuiltinSkillsStats>(response);
+  },
+
+  listSupportedAgents: async (): Promise<AgentInfo[]> => {
+    const response = await makeRequest('/api/chat/skills/agents');
+    return handleApiResponse<AgentInfo[]>(response);
   },
 
   validateWorkspacePath: async (
