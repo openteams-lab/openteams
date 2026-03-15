@@ -554,7 +554,6 @@ export function AiMembersSidebar({
   >(null);
   const workspacePathPlaceholder = getWorkspacePathExample();
   const teamBulletinTitle = t('members.teamBulletin.title');
-  const teamBulletinContent = t('members.teamBulletin.content');
 
   const hasPresets =
     enabledMemberPresets.length > 0 || enabledTeamPresets.length > 0;
@@ -1143,12 +1142,7 @@ export function AiMembersSidebar({
               >
                 <div className="overflow-hidden">
                   <div className="flex items-center gap-2 text-xs leading-6 text-low">
-                    <span>
-                      {t('members.teamProtocol.guidelineLabel', {
-                        defaultValue: teamBulletinContent,
-                      })}
-                      ：
-                    </span>
+                    <span>{t('members.teamProtocol.guidelineLabel')}</span>
                     <button
                       type="button"
                       className="text-xs font-medium text-[#4a90e2] transition-colors hover:text-[#357ABD]"

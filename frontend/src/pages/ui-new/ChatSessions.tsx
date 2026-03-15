@@ -1011,7 +1011,7 @@ export function ChatSessions() {
   const [isDeletingMessages, setIsDeletingMessages] = useState(false);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(340);
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
-  const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(280);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
   const [isWorkspacePreviewOpen, setIsWorkspacePreviewOpen] = useState(false);
   const [workspacePreviewArtifact, setWorkspacePreviewArtifact] =

@@ -227,7 +227,7 @@
     "addFromMemberPreset": "メンバープリセットを追加",
     "importTeamPreset": "チームプリセットをインポート",
     "noEnabledPresets": "有効なプリセットがありません。AI チームで設定してください。",
-    "presetSearchPlaceholder": "プリセット AI またはチームを検索",
+    "presetSearchPlaceholder": "チームまたはメンバーを検索",
     "noPresetSearchResults": "一致するプリセット AI またはチームがありません。",
     "noPresetSearchResultsHint": "別のキーワードを試すか、カスタム AI に切り替えてください。",
     "categoryFilter": {
