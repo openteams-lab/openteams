@@ -302,6 +302,13 @@ pub enum ChatStreamEvent {
         detail: Option<String>,
         output_is_empty: bool,
     },
+    MentionError {
+        session_id: Uuid,
+        message_id: Uuid,
+        agent_name: String,
+        agent_id: Option<Uuid>,
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -465,7 +472,7 @@ impl ChatRunner {
         let compact_reason = if compact_reason.is_empty() {
             "Unknown error".to_string()
         } else {
-            compact_reason
+            compact_reason.clone()
         };
 
         self.set_mention_status(
@@ -476,6 +483,31 @@ impl ChatRunner {
             MentionStatus::Failed,
         )
         .await;
+
+        if let Ok(Some(msg)) = ChatMessage::find_by_id(&self.db.pool, message_id).await {
+            let mut meta = msg.meta.0.clone();
+            let mention_errors = meta
+                .entry("mention_errors")
+                .or_insert_with(|| serde_json::json!({}));
+            if let Some(errors) = mention_errors.as_object_mut() {
+                let mut error_info = serde_json::json!({
+                    "reason": compact_reason.clone(),
+                });
+                if let Some(aid) = agent_id {
+                    error_info["agent_id"] = serde_json::json!(aid);
+                }
+                errors.insert(agent_name.to_string(), error_info);
+            }
+            let _ = ChatMessage::update_meta(&self.db.pool, message_id, meta).await;
+        }
+
+        self.emit(session_id, ChatStreamEvent::MentionError {
+            session_id,
+            message_id,
+            agent_name: agent_name.to_string(),
+            agent_id,
+            reason: compact_reason.clone(),
+        });
 
         let mut failure_meta = serde_json::json!({
             "mention_failure": {

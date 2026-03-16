@@ -16,6 +16,12 @@ export type AgentStateInfo = {
 
 export type MentionStatus = 'received' | 'running' | 'completed' | 'failed';
 
+export type MentionError = {
+  agentName: string;
+  agentId: string | null;
+  reason: string;
+};
+
 export type RunHistoryItem = {
   runId: string;
   agentId: string;
