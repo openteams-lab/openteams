@@ -226,11 +226,12 @@ pnpm dev -- --port $env:FRONTEND_PORT --host
 
 ### 路线图
 
-- [ ] 开发针对openteams场景优化的Code Agent后端
+- [ ] 开发针对OpenTeams场景优化的Code Agent后端
 - [ ] 建立高效的团队协作框架
-- [ ] 更多 Agent 集成（kilo code、OpenClaw 等）
+- [ ] 更多 Agent 集成（Kilo Code, OpenClaw, 等）
 - [ ] 添加更强大的开箱即用AI团队
 - [ ] 添加更强大的技能
+- [ ] 开发多种前端配色方案
 - [ ] 提供高度优化的定制版本
 
 

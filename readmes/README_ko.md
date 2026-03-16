@@ -228,9 +228,10 @@ pnpm dev -- --port $env:FRONTEND_PORT --host
 
 - [ ] OpenTeams 사용 사례에 최적화된 Code Agent 백엔드
 - [ ] 고효율 팀 협업 프레임워크 구축
-- [ ] 더 많은 에이전트 통합 (Cursor, Windsurf 등)
+- [ ] 더 많은 에이전트 통합 (Kilo Code, OpenClaw 등)
 - [ ] 더 강력한 바로 사용 가능한 AI 팀 추가
 - [ ] 더 강력한 스킬 추가
+- [ ] 다양한 프론트엔드 색상 테마 개발
 - [ ] 고도로 최적화된 맞춤 버전 제공
 
 
