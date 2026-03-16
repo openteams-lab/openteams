@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320">
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 15px; margin-bottom: 15px;">
 
   <p><strong>以团队方式运行 Agent，让效率在 AI 时代成倍提升。</strong></p>
 
