@@ -1,18 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal } from '@/lib/modals';
+import {
+  ConfirmationDialogChrome,
+  getConfirmationButtonClasses,
+} from '@/components/dialogs/shared/ConfirmationDialogChrome';
 
 export interface DeleteConfigurationDialogProps {
   configName: string;
@@ -55,48 +49,58 @@ const DeleteConfigurationDialogImpl =
         }
       };
 
+      const message = t(
+        'settings:settings.agents.deleteConfigDialog.description',
+        {
+          configName,
+          executorType,
+        }
+      );
+
       return (
-        <Dialog open={modal.visible} onOpenChange={handleOpenChange}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {t('settings:settings.agents.deleteConfigDialog.title')}
-              </DialogTitle>
-              <DialogDescription>
-                {t('settings:settings.agents.deleteConfigDialog.description', {
-                  configName,
-                  executorType,
-                })}
-              </DialogDescription>
-            </DialogHeader>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <DialogFooter>
-              <Button
-                variant="outline"
+        <ConfirmationDialogChrome
+          open={modal.visible}
+          onOpenChange={handleOpenChange}
+          onClose={handleCancel}
+          title={t('settings:settings.agents.deleteConfigDialog.title')}
+          message={message}
+          tone="destructive"
+          closeLabel={t('common:buttons.close')}
+          bodyExtra={
+            error ? (
+              <div className="rounded-[10px] border border-[#F7D9D9] bg-[#FFF5F5] px-4 py-3 text-sm text-[#F56C6C]">
+                {error}
+              </div>
+            ) : null
+          }
+          footer={
+            <>
+              <button
+                type="button"
                 onClick={handleCancel}
                 disabled={isDeleting}
+                className={getConfirmationButtonClasses(
+                  'destructive',
+                  'cancel'
+                )}
               >
                 {t('common:buttons.cancel')}
-              </Button>
-              <Button
-                variant="destructive"
+              </button>
+              <button
+                type="submit"
                 onClick={handleDelete}
                 disabled={isDeleting}
-              >
-                {isDeleting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                className={getConfirmationButtonClasses(
+                  'destructive',
+                  'confirm'
                 )}
+              >
+                {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
                 {t('common:buttons.delete')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              </button>
+            </>
+          }
+        />
       );
     }
   );

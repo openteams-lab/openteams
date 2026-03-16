@@ -1,4 +1,4 @@
-﻿import {
+import {
   createContext,
   useContext,
   ReactNode,
@@ -49,9 +49,9 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   // Centralized page title management
   useEffect(() => {
     if (project) {
-      document.title = `${project.name} | agents-chatgroup`;
+      document.title = `${project.name} | openteams`;
     } else {
-      document.title = 'agents-chatgroup';
+      document.title = 'openteams';
     }
   }, [project]);
 

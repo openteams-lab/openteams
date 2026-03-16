@@ -9,12 +9,16 @@ use axum::{
     response::{IntoResponse, Json as ResponseJson},
 };
 use db::models::{
+    analytics::{
+        AnalyticsSessionStats, track_session_archive, track_session_create, track_session_delete,
+        track_session_restore,
+    },
     chat_agent::ChatAgent,
     chat_session::{ChatSession, ChatSessionStatus, CreateChatSession, UpdateChatSession},
     chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
 };
 use deployment::Deployment;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utils::{assets::asset_dir, response::ApiResponse};
 use uuid::Uuid;
@@ -45,6 +49,14 @@ pub async fn create_session(
     Json(payload): Json<CreateChatSession>,
 ) -> Result<ResponseJson<ApiResponse<ChatSession>>, ApiError> {
     let session = ChatSession::create(&deployment.db().pool, &payload, Uuid::new_v4()).await?;
+
+    // Track analytics: session_create
+    let title_length = payload.title.as_ref().map(|t| t.len()).unwrap_or(0);
+    let _ = track_session_create(&deployment.db().pool, session.id, None, title_length).await;
+
+    // Initialize session stats
+    let _ = AnalyticsSessionStats::upsert(&deployment.db().pool, session.id, None).await;
+
     Ok(ResponseJson(ApiResponse::success(session)))
 }
 
@@ -61,23 +73,36 @@ pub async fn delete_session(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    // Check if session had messages before deletion
+    let had_messages = AnalyticsSessionStats::find_by_id(&deployment.db().pool, session.id)
+        .await
+        .ok()
+        .flatten()
+        .map(|stats| stats.message_count > 0)
+        .unwrap_or(false);
+
     let rows_affected = ChatSession::delete(&deployment.db().pool, session.id).await?;
     if rows_affected == 0 {
-        Err(ApiError::Database(sqlx::Error::RowNotFound))
-    } else {
-        Ok(ResponseJson(ApiResponse::success(())))
+        return Err(ApiError::Database(sqlx::Error::RowNotFound));
     }
+
+    // Track analytics: session_delete
+    let _ = track_session_delete(&deployment.db().pool, session.id, None, had_messages).await;
+
+    Ok(ResponseJson(ApiResponse::success(())))
 }
 
 #[derive(Debug, Deserialize, TS)]
 pub struct CreateChatSessionAgentRequest {
     pub agent_id: Uuid,
     pub workspace_path: Option<String>,
+    pub allowed_skill_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, TS)]
 pub struct UpdateChatSessionAgentRequest {
     pub workspace_path: Option<String>,
+    pub allowed_skill_ids: Option<Vec<String>>,
 }
 
 #[cfg(windows)]
@@ -111,6 +136,30 @@ fn is_windows_reserved_name(name: &str) -> bool {
 }
 
 fn validate_workspace_path_legality(trimmed: &str) -> Result<PathBuf, ApiError> {
+    let is_absolute = {
+        #[cfg(windows)]
+        {
+            // Windows: C:\, D:\, etc., or UNC paths \\server\share
+            // Also allow ~ for home directory (will be expanded later)
+            (trimmed.len() >= 2
+                && trimmed.chars().nth(1) == Some(':')
+                && matches!(trimmed.chars().next(), Some('a'..='z' | 'A'..='Z')))
+                || trimmed.starts_with(r"\\")
+                || trimmed.starts_with('~')
+        }
+        #[cfg(not(windows))]
+        {
+            // Unix/macOS: /path or ~/path
+            trimmed.starts_with('/') || trimmed.starts_with('~')
+        }
+    };
+
+    if !is_absolute {
+        return Err(ApiError::BadRequest(
+            "Workspace path must be an absolute path.".to_string(),
+        ));
+    }
+
     if trimmed.chars().any(|ch| ch == '\0' || ch.is_control()) {
         return Err(ApiError::BadRequest(
             "Workspace path contains invalid characters.".to_string(),
@@ -185,6 +234,18 @@ async fn normalize_workspace_path(
     Ok(Some(trimmed.to_string()))
 }
 
+fn normalize_allowed_skill_ids(allowed_skill_ids: Option<Vec<String>>) -> Vec<String> {
+    let mut normalized = allowed_skill_ids
+        .unwrap_or_default()
+        .into_iter()
+        .map(|skill_id| skill_id.trim().to_string())
+        .filter(|skill_id| !skill_id.is_empty())
+        .collect::<Vec<_>>();
+    normalized.sort();
+    normalized.dedup();
+    normalized
+}
+
 async fn session_has_duplicate_member_name(
     pool: &sqlx::SqlitePool,
     session_id: Uuid,
@@ -226,6 +287,7 @@ pub async fn create_session_agent(
     }
 
     let workspace_path = normalize_workspace_path(payload.workspace_path).await?;
+    let allowed_skill_ids = normalize_allowed_skill_ids(payload.allowed_skill_ids.clone());
 
     if let Some(existing) = ChatSessionAgent::find_by_session_and_agent(
         &deployment.db().pool,
@@ -234,16 +296,34 @@ pub async fn create_session_agent(
     )
     .await?
     {
+        let mut updated = existing.clone();
+        let mut changed = false;
+
         if workspace_path.is_some() {
-            let updated = ChatSessionAgent::update_workspace_path(
+            updated = ChatSessionAgent::update_workspace_path(
                 &deployment.db().pool,
                 existing.id,
                 workspace_path,
             )
             .await?;
-            return Ok(ResponseJson(ApiResponse::success(updated)));
+            changed = true;
         }
-        return Ok(ResponseJson(ApiResponse::success(existing)));
+
+        if payload.allowed_skill_ids.is_some() {
+            updated = ChatSessionAgent::update_allowed_skill_ids(
+                &deployment.db().pool,
+                existing.id,
+                allowed_skill_ids,
+            )
+            .await?;
+            changed = true;
+        }
+
+        return Ok(ResponseJson(ApiResponse::success(if changed {
+            updated
+        } else {
+            existing
+        })));
     }
 
     let Some(agent) = ChatAgent::find_by_id(&deployment.db().pool, payload.agent_id).await? else {
@@ -277,6 +357,7 @@ pub async fn create_session_agent(
             session_id: session.id,
             agent_id: payload.agent_id,
             workspace_path,
+            allowed_skill_ids,
         },
         Uuid::new_v4(),
     )
@@ -294,8 +375,6 @@ pub async fn update_session_agent(
         return Err(ApiError::Conflict("Chat session is archived".to_string()));
     }
 
-    let workspace_path = normalize_workspace_path(payload.workspace_path).await?;
-
     let Some(existing) =
         ChatSessionAgent::find_by_id(&deployment.db().pool, session_agent_id).await?
     else {
@@ -310,9 +389,37 @@ pub async fn update_session_agent(
         ));
     }
 
-    let updated =
+    let workspace_path = match payload.workspace_path {
+        Some(raw_path) => normalize_workspace_path(Some(raw_path)).await?,
+        None => existing.workspace_path.clone(),
+    };
+
+    let allowed_skill_ids = payload
+        .allowed_skill_ids
+        .map(|skill_ids| normalize_allowed_skill_ids(Some(skill_ids)))
+        .unwrap_or_else(|| existing.allowed_skill_ids.0.clone());
+
+    let workspace_changed = workspace_path != existing.workspace_path;
+    let allowed_skills_changed = allowed_skill_ids != existing.allowed_skill_ids.0;
+
+    let updated = if workspace_changed {
         ChatSessionAgent::update_workspace_path(&deployment.db().pool, existing.id, workspace_path)
-            .await?;
+            .await?
+    } else {
+        existing.clone()
+    };
+
+    let updated = if allowed_skills_changed {
+        ChatSessionAgent::update_allowed_skill_ids(
+            &deployment.db().pool,
+            updated.id,
+            allowed_skill_ids,
+        )
+        .await?
+    } else {
+        updated
+    };
+
     Ok(ResponseJson(ApiResponse::success(updated)))
 }
 
@@ -353,6 +460,12 @@ pub async fn archive_session(
         return Ok(ResponseJson(ApiResponse::success(session)));
     }
 
+    // Get session stats for analytics
+    let session_stats = AnalyticsSessionStats::find_by_id(&deployment.db().pool, session.id)
+        .await
+        .ok()
+        .flatten();
+
     let archive_dir = asset_dir()
         .join("chat")
         .join(format!("session_{}", session.id))
@@ -372,9 +485,26 @@ pub async fn archive_session(
             status: Some(ChatSessionStatus::Archived),
             summary_text: None,
             archive_ref: Some(archive_ref),
+            last_seen_diff_key: None,
+            team_protocol: None,
+            team_protocol_enabled: None,
         },
     )
     .await?;
+
+    // Track analytics: session_archive
+    if let Some(stats) = session_stats {
+        let duration_seconds = (chrono::Utc::now() - session.created_at).num_seconds();
+        let _ = track_session_archive(
+            &deployment.db().pool,
+            session.id,
+            None,
+            duration_seconds,
+            stats.message_count,
+            stats.agent_count,
+        )
+        .await;
+    }
 
     Ok(ResponseJson(ApiResponse::success(updated)))
 }
@@ -395,9 +525,15 @@ pub async fn restore_session(
             status: Some(ChatSessionStatus::Active),
             summary_text: None,
             archive_ref: None,
+            last_seen_diff_key: None,
+            team_protocol: None,
+            team_protocol_enabled: None,
         },
     )
     .await?;
+
+    // Track analytics: session_restore
+    let _ = track_session_restore(&deployment.db().pool, session.id, None).await;
 
     Ok(ResponseJson(ApiResponse::success(updated)))
 }
@@ -469,4 +605,72 @@ pub async fn stop_session_agent(
         .await?;
 
     Ok(ResponseJson(ApiResponse::success(())))
+}
+
+#[derive(Debug, Deserialize, TS)]
+pub struct ValidateWorkspacePathRequest {
+    pub workspace_path: String,
+}
+
+#[derive(Debug, Serialize, TS)]
+pub struct ValidateWorkspacePathResponse {
+    pub valid: bool,
+    pub error: Option<String>,
+}
+
+pub async fn validate_workspace_path_endpoint(
+    Json(payload): Json<ValidateWorkspacePathRequest>,
+) -> Result<ResponseJson<ApiResponse<ValidateWorkspacePathResponse>>, ApiError> {
+    let trimmed = payload.workspace_path.trim();
+
+    if trimmed.is_empty() {
+        return Ok(ResponseJson(ApiResponse::success(
+            ValidateWorkspacePathResponse {
+                valid: false,
+                error: Some("Workspace path is required.".to_string()),
+            },
+        )));
+    }
+
+    if let Err(e) = validate_workspace_path_legality(trimmed) {
+        return Ok(ResponseJson(ApiResponse::success(
+            ValidateWorkspacePathResponse {
+                valid: false,
+                error: Some(e.to_string()),
+            },
+        )));
+    }
+
+    let parsed_path = PathBuf::from(trimmed);
+    match tokio::fs::metadata(&parsed_path).await {
+        Ok(metadata) => {
+            if metadata.is_dir() {
+                Ok(ResponseJson(ApiResponse::success(
+                    ValidateWorkspacePathResponse {
+                        valid: true,
+                        error: None,
+                    },
+                )))
+            } else {
+                Ok(ResponseJson(ApiResponse::success(
+                    ValidateWorkspacePathResponse {
+                        valid: false,
+                        error: Some("Workspace path must be an existing directory.".to_string()),
+                    },
+                )))
+            }
+        }
+        Err(err) => {
+            let error_msg = match err.kind() {
+                std::io::ErrorKind::NotFound => "Workspace path does not exist.".to_string(),
+                _ => format!("Workspace path is not accessible: {err}"),
+            };
+            Ok(ResponseJson(ApiResponse::success(
+                ValidateWorkspacePathResponse {
+                    valid: false,
+                    error: Some(error_msg),
+                },
+            )))
+        }
+    }
 }

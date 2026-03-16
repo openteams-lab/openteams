@@ -412,7 +412,7 @@
       "prMerged": "PR #{{number}} is already merged",
       "loginRequired": {
         "title": "Sign in to manage git actions",
-        "description": "Sign in to agents-chatgroup so you can push branches, merge changes, or open pull requests for this task.",
+        "description": "Sign in to openteams so you can push branches, merge changes, or open pull requests for this task.",
         "action": "Sign in"
       },
       "cannotMerge": {
@@ -589,12 +589,12 @@
   "showcases": {
     "taskPanel": {
       "companion": {
-        "title": "agents-chatgroup Companion Point-and-Click",
+        "title": "openteams Companion Point-and-Click",
         "description": "Click any UI component in the preview window to select it precisely. The coding agent receives exact DOM selectors and component hierarchy, eliminating ambiguous feedback."
       },
       "installation": {
         "title": "Dev Server & Companion Installation",
-        "description": "Set a dev server command for previews, with a setup script configurable in settings. Use a coding agent to automatically install the agents-chatgroup web companion."
+        "description": "Set a dev server command for previews, with a setup script configurable in settings. Use a coding agent to automatically install the openteams web companion."
       },
       "codeReview": {
         "title": "Built-in Code Review",

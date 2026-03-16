@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**AgentsChatGroup** is a multi-agent conversation platform where multiple AI agents (Claude Code, Gemini CLI, Codex, QWen Coder, etc.) can collaborate in shared chat sessions like a real team. Key features:
+**OpenTeams** is a multi-agent conversation platform where multiple AI agents (Claude Code, Gemini CLI, Codex, QWen Coder, etc.) can collaborate in shared chat sessions like a real team. Key features:
 - **Multi-agent chat sessions** with real-time streaming
 - **Context synchronization** across agents
 - **Agent execution tracking** with diffs and logs
@@ -47,7 +47,7 @@
     - `legacy/index.css` + `tailwind.legacy.config.js` (scoped to `.legacy-design`)
 - `remote-frontend/`: Lightweight remote deployment frontend
 - `shared/`: Generated TypeScript types from Rust (`shared/types.ts` - auto-generated, do not edit)
-- `agents-chatgroup-npx/`: NPM CLI package (`agents-chatgroup`) for cross-platform installer and runner
+- `openteams-npx/`: NPM CLI package (`openteams`) for cross-platform installer and runner
 - `scripts/`: Development helpers (port management, DB preparation, desktop packaging)
 - `docs/`: Documentation (Mintlify setup)
 - `src-tauri/`: Tauri desktop application configuration
@@ -103,12 +103,12 @@ The chat system uses 7 core entities:
 ### Runtime Storage (Workspace-Scoped)
 - Agents are restricted to their configured workspace path for file access.
 - Chat context file path:
-  - `<workspace>/.agents_chatgroup/context/<session_id>/messages.jsonl`
+  - `<workspace>/.openteams/context/<session_id>/messages.jsonl`
 - Chat run records path:
-  - `<workspace>/.agents_chatgroup/runs/<session_id>/run_records/...`
+  - `<workspace>/.openteams/runs/<session_id>/run_records/...`
 - Per-run context snapshot path:
   - `<run_dir>/context.jsonl`
-- Internal `.agents_chatgroup/` files should be treated as runtime artifacts, not user source files.
+- Internal `.openteams/` files should be treated as runtime artifacts, not user source files.
 
 ## Design System Status
 
@@ -144,7 +144,7 @@ Do not manually edit shared/types.ts, instead edit crates/server/src/bin/generat
 - Generate TS types from Rust: `pnpm run generate-types` (or `generate-types:check` in CI)
 - Prepare SQLx (offline): `pnpm run prepare-db`
 - Prepare SQLx (remote package, postgres): `pnpm run remote:prepare-db`
-- Local NPX build: `pnpm run build:npx` then `pnpm pack` in `agents-chatgroup-npx/`
+- Local NPX build: `pnpm run build:npx` then `pnpm pack` in `openteams-npx/`
 
 ## Coding Style & Naming Conventions
 - Rust: `rustfmt` enforced (`rustfmt.toml`); group imports by crate; snake_case modules, PascalCase types.

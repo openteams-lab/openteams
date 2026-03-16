@@ -563,6 +563,23 @@ function UserMessageEntry({
 }
 
 /**
+ * Strip @target prefix from message content.
+ * Agent messages are formatted as "@target content" in the backend,
+ * but we only want to render the actual content as markdown.
+ */
+function stripTargetPrefix(content: string): string {
+  const trimmed = content.trimStart();
+  if (!trimmed.startsWith('@')) {
+    return content;
+  }
+  const spaceIndex = trimmed.indexOf(' ');
+  if (spaceIndex === -1) {
+    return content;
+  }
+  return trimmed.slice(spaceIndex + 1);
+}
+
+/**
  * Assistant message entry with expandable content
  */
 function AssistantMessageEntry({
@@ -572,7 +589,10 @@ function AssistantMessageEntry({
   content: string;
   workspaceId: string | undefined;
 }) {
-  return <ChatAssistantMessage content={content} workspaceId={workspaceId} />;
+  const displayContent = stripTargetPrefix(content);
+  return (
+    <ChatAssistantMessage content={displayContent} workspaceId={workspaceId} />
+  );
 }
 
 /**

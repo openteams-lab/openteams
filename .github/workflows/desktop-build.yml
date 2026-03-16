@@ -212,7 +212,7 @@ jobs:
         uses: BloopAI/apple-code-sign-action@v1
         with:
           input_path: ${{ steps.macos_bundle.outputs.app_path }}
-          output_path: signed/agents-chatgroup.app
+          output_path: signed/openteams.app
           p12_file: certificate.p12
           p12_password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           sign: true
@@ -224,9 +224,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          signed_dmg='src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg'
+          signed_dmg='src-tauri/target/release/bundle/dmg/openteams-signed.dmg'
           rm -f "$signed_dmg"
-          hdiutil create -volname 'agents-chatgroup' -srcfolder 'signed/agents-chatgroup.app' -ov -format UDZO "$signed_dmg"
+          hdiutil create -volname 'openteams' -srcfolder 'signed/openteams.app' -ov -format UDZO "$signed_dmg"
           echo "signed_dmg=$signed_dmg" >> "$GITHUB_OUTPUT"
 
       - name: Notarize signed DMG (macOS)
@@ -251,7 +251,7 @@ jobs:
         with:
           name: ${{ steps.artifact_meta.outputs.name }}
           path: |
-            src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg
+            src-tauri/target/release/bundle/dmg/openteams-signed.dmg
           if-no-files-found: error
           retention-days: 7
 
@@ -294,7 +294,7 @@ jobs:
           mkdir -p gh-package/files
 
           if [[ "${{ matrix.platform }}" == "macos" && "${{ inputs.macos_sign_and_notarize }}" == "true" ]]; then
-            cp src-tauri/target/release/bundle/dmg/agents-chatgroup-signed.dmg gh-package/files/
+            cp src-tauri/target/release/bundle/dmg/openteams-signed.dmg gh-package/files/
           elif [[ "${{ matrix.platform }}" == "linux" ]]; then
             cp src-tauri/target/release/bundle/appimage/*.AppImage gh-package/files/
             cp src-tauri/target/release/bundle/deb/*.deb gh-package/files/
@@ -309,7 +309,7 @@ jobs:
             exit 1
           fi
 
-          bundle_name="agents-chatgroup-desktop-${{ matrix.platform }}-${{ github.sha }}.tar.gz"
+          bundle_name="openteams-desktop-${{ matrix.platform }}-${{ github.sha }}.tar.gz"
           (cd gh-package/files && tar -czf "../${bundle_name}" .)
           (cd gh-package && sha256sum "${bundle_name}" > "${bundle_name}.sha256")
 

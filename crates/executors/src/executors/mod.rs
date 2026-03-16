@@ -26,6 +26,10 @@ use crate::{
     },
     logs::utils::patch,
     mcp_config::McpConfig,
+    skill_config::{
+        NativeDiscoveredSkill, NativeSkillConfigBackend, list_native_skills,
+        set_native_skill_enabled,
+    },
 };
 
 pub mod acp;
@@ -270,6 +274,43 @@ pub trait StandardCodingAgentExecutor {
 
     // MCP configuration methods
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf>;
+
+    fn default_skill_config_path(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        Vec::new()
+    }
+
+    fn native_skill_config_backend(&self) -> NativeSkillConfigBackend {
+        NativeSkillConfigBackend::Unsupported
+    }
+
+    async fn list_native_skills(&self) -> Result<Vec<NativeDiscoveredSkill>, ExecutorError> {
+        list_native_skills(
+            self.native_skill_config_backend(),
+            self.default_skill_config_path(),
+            self.native_skill_discovery_roots(),
+        )
+        .await
+    }
+
+    async fn set_native_skill_enabled(
+        &self,
+        skill_name: &str,
+        skill_path: &Path,
+        enabled: bool,
+    ) -> Result<(), ExecutorError> {
+        set_native_skill_enabled(
+            self.native_skill_config_backend(),
+            self.default_skill_config_path(),
+            skill_name,
+            skill_path,
+            enabled,
+        )
+        .await
+    }
 
     async fn get_setup_helper_action(&self) -> Result<ExecutorAction, ExecutorError> {
         Err(ExecutorError::SetupHelperNotSupported)

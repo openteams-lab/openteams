@@ -54,6 +54,7 @@ use crate::{
         SpawnedChild, StandardCodingAgentExecutor,
     },
     logs::utils::patch,
+    skill_config::NativeSkillConfigBackend,
     stdout_dup::create_stdout_pipe_writer,
 };
 
@@ -230,6 +231,20 @@ impl StandardCodingAgentExecutor for Codex {
         codex_home().map(|home| home.join("config.toml"))
     }
 
+    fn default_skill_config_path(&self) -> Option<PathBuf> {
+        self.default_mcp_config_path()
+    }
+
+    fn native_skill_discovery_roots(&self) -> Vec<PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".agents").join("skills")])
+            .unwrap_or_default()
+    }
+
+    fn native_skill_config_backend(&self) -> NativeSkillConfigBackend {
+        NativeSkillConfigBackend::Codex
+    }
+
     fn get_availability_info(&self) -> AvailabilityInfo {
         if let Some(timestamp) = codex_home()
             .and_then(|home| std::fs::metadata(home.join("auth.json")).ok())
@@ -278,8 +293,10 @@ impl StandardCodingAgentExecutor for Codex {
 }
 
 impl Codex {
+    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.114.0";
+
     pub fn base_command() -> &'static str {
-        "npx -y @openai/codex@latest"
+        Self::BASE_COMMAND
     }
 
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
@@ -321,7 +338,7 @@ impl Codex {
             base_instructions: self.base_instructions.clone(),
             developer_instructions: self.developer_instructions.clone(),
             model_provider: self.model_provider.clone(),
-            experimental_raw_events: false,
+            ..Default::default()
         }
     }
 
@@ -440,7 +457,7 @@ impl Codex {
                     config: overrides.config,
                     base_instructions: overrides.base_instructions,
                     developer_instructions: overrides.developer_instructions,
-                    history: None,
+                    ..Default::default()
                 };
                 let response = client.resume_thread(params).await?;
                 tracing::debug!(

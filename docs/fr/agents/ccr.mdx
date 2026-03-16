@@ -20,7 +20,7 @@ npx -y @musistudio/claude-code-router ui
 Cela lance l'interface locale CCR où vous configurez les fournisseurs et les modèles.
 
 ## Authentification
-Authentifiez et configurez CCR en dehors d'agents-chatgroup. Suivez les instructions sur le repo GitHub CCR :
+Authentifiez et configurez CCR en dehors d'openteams. Suivez les instructions sur le repo GitHub CCR :
 
 - GitHub : https://github.com/musistudio/claude-code-router
 
@@ -63,9 +63,9 @@ CCR peut aussi être configuré via son fichier de configuration JSON. Référez
 <img src="/images/ccr-config-example.png" alt="Exemple de configuration de modèles CCR" />
 </Frame>
 
-## Configurer agents-chatgroup
+## Configurer openteams
 
-agents-chatgroup ne fournit pas de configuration par défaut pour CCR. Ajoutez des configurations à l'agent Claude Code existant :
+openteams ne fournit pas de configuration par défaut pour CCR. Ajoutez des configurations à l'agent Claude Code existant :
 
 1) Ouvrez la page "Configurations d'Agents de Codage".
 2) Ajoutez une nouvelle configuration pour l'agent Claude Code (ou éditez une existante).
@@ -86,13 +86,13 @@ Conseils :
 - Créez plusieurs configurations si vous voulez facilement basculer entre différents modèles.
 - Laissez la chaîne de modèle vide si vous voulez que CCR utilise son propre routage basé sur votre configuration d'interface CCR (ex: ses mappings `default`/`longContext`/etc.).
 
-### Exemple : Configuration d'agent Claude Code dans agents-chatgroup
+### Exemple : Configuration d'agent Claude Code dans openteams
 
 <Frame>
-<img src="/images/ccr-agent-config.png" alt="Configuration d'agent Claude Code dans agents-chatgroup" />
+<img src="/images/ccr-agent-config.png" alt="Configuration d'agent Claude Code dans openteams" />
 </Frame>
 
-## Utiliser CCR dans agents-chatgroup
+## Utiliser CCR dans openteams
 
 Lors de la création d'une Tentative de Tâche, sélectionnez l'agent de codage et la configuration : choisissez l'agent Claude Code, puis choisissez une de vos configurations activées CCR.
 

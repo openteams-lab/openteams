@@ -493,6 +493,12 @@ impl StandardCodingAgentExecutor for CursorAgent {
         dirs::home_dir().map(|home| home.join(".cursor").join("mcp.json"))
     }
 
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".cursor").join("skills")])
+            .unwrap_or_default()
+    }
+
     fn get_availability_info(&self) -> AvailabilityInfo {
         let binary_found = resolve_executable_path_blocking(Self::base_command()).is_some();
         if !binary_found {

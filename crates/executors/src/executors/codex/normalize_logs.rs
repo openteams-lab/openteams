@@ -10,7 +10,6 @@ use codex_app_server_protocol::{
     PatchChangeKind, ServerNotification, ServerRequest, ThreadItem, ThreadResumeResponse,
     ThreadStartResponse, TurnPlanStepStatus,
 };
-use codex_mcp_types::ContentBlock;
 use codex_protocol::{
     openai_models::ReasoningEffort,
     plan_tool::{StepStatus, UpdatePlanArgs},
@@ -30,7 +29,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use workspace_utils::{
     approvals::ApprovalStatus, diff::normalize_unified_diff, msg_store::MsgStore,
-    path::make_path_relative,
+    path::make_path_relative, utf8::Utf8LossyDecoder,
 };
 
 use crate::{
@@ -75,6 +74,8 @@ struct CommandState {
     command: String,
     stdout: String,
     stderr: String,
+    stdout_decoder: Utf8LossyDecoder,
+    stderr_decoder: Utf8LossyDecoder,
     formatted_output: Option<String>,
     status: ToolStatus,
     exit_code: Option<i32>,
@@ -110,6 +111,49 @@ impl ToNormalizedEntry for CommandState {
                 tool_call_id: self.call_id.clone(),
             })
             .ok(),
+        }
+    }
+}
+
+impl CommandState {
+    fn new(command: String, call_id: String) -> Self {
+        Self {
+            index: None,
+            command,
+            stdout: String::new(),
+            stderr: String::new(),
+            stdout_decoder: Utf8LossyDecoder::new(),
+            stderr_decoder: Utf8LossyDecoder::new(),
+            formatted_output: None,
+            status: ToolStatus::Created,
+            exit_code: None,
+            awaiting_approval: false,
+            call_id,
+        }
+    }
+
+    fn append_output_chunk(&mut self, stream: ExecOutputStream, chunk: &[u8]) {
+        let decoded = match stream {
+            ExecOutputStream::Stdout => self.stdout_decoder.decode_chunk(chunk),
+            ExecOutputStream::Stderr => self.stderr_decoder.decode_chunk(chunk),
+        };
+        if decoded.is_empty() {
+            return;
+        }
+        match stream {
+            ExecOutputStream::Stdout => self.stdout.push_str(&decoded),
+            ExecOutputStream::Stderr => self.stderr.push_str(&decoded),
+        }
+    }
+
+    fn finalize_output_decoding(&mut self) {
+        let stdout_tail = self.stdout_decoder.finish();
+        if !stdout_tail.is_empty() {
+            self.stdout.push_str(&stdout_tail);
+        }
+        let stderr_tail = self.stderr_decoder.finish();
+        if !stderr_tail.is_empty() {
+            self.stderr.push_str(&stderr_tail);
         }
     }
 }
@@ -496,7 +540,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     let (entry, index, is_new) = state.thinking_append(delta);
                     upsert_normalized_entry(&msg_store, index, entry, is_new);
                 }
-                EventMsg::AgentMessage(AgentMessageEvent { message }) => {
+                EventMsg::AgentMessage(AgentMessageEvent { message, .. }) => {
                     state.thinking = None;
                     let (entry, index, is_new) = state.assistant_message(message);
                     upsert_normalized_entry(&msg_store, index, entry, is_new);
@@ -523,6 +567,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     reason,
                     parsed_cmd: _,
                     proposed_execpolicy_amendment: _,
+                    ..
                 }) => {
                     state.assistant = None;
                     state.thinking = None;
@@ -640,17 +685,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     }
                     state.commands.insert(
                         call_id.clone(),
-                        CommandState {
-                            index: None,
-                            command: command_text,
-                            stdout: String::new(),
-                            stderr: String::new(),
-                            formatted_output: None,
-                            status: ToolStatus::Created,
-                            exit_code: None,
-                            awaiting_approval: false,
-                            call_id: call_id.clone(),
-                        },
+                        CommandState::new(command_text, call_id.clone()),
                     );
                     let command_state = state.commands.get_mut(&call_id).unwrap();
                     let index = add_normalized_entry(
@@ -666,14 +701,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     chunk,
                 }) => {
                     if let Some(command_state) = state.commands.get_mut(&call_id) {
-                        let chunk = String::from_utf8_lossy(&chunk);
-                        if chunk.is_empty() {
-                            continue;
-                        }
-                        match stream {
-                            ExecOutputStream::Stdout => command_state.stdout.push_str(&chunk),
-                            ExecOutputStream::Stderr => command_state.stderr.push_str(&chunk),
-                        }
+                        command_state.append_output_chunk(stream, &chunk);
                         let Some(index) = command_state.index else {
                             tracing::error!("missing entry index for existing command state");
                             continue;
@@ -700,8 +728,10 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     duration: _,
                     formatted_output,
                     process_id: _,
+                    ..
                 }) => {
                     if let Some(mut command_state) = state.commands.remove(&call_id) {
+                        command_state.finalize_output_decoding();
                         command_state.formatted_output = Some(formatted_output);
                         command_state.exit_code = Some(exit_code);
                         command_state.awaiting_approval = false;
@@ -785,29 +815,10 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                                 } else {
                                     ToolStatus::Success
                                 };
-                                if value
-                                    .content
-                                    .iter()
-                                    .all(|block| matches!(block, ContentBlock::TextContent(_)))
-                                {
+                                if let Some(text) = mcp_text_blocks_joined(&value.content, "\n") {
                                     mcp_tool_state.result = Some(ToolResult {
                                         r#type: ToolResultValueType::Markdown,
-                                        value: Value::String(
-                                            value
-                                                .content
-                                                .iter()
-                                                .map(|block| {
-                                                    if let ContentBlock::TextContent(content) =
-                                                        block
-                                                    {
-                                                        content.text.clone()
-                                                    } else {
-                                                        unreachable!()
-                                                    }
-                                                })
-                                                .collect::<Vec<String>>()
-                                                .join("\n"),
-                                        ),
+                                        value: Value::String(text),
                                     });
                                 } else {
                                     mcp_tool_state.result = Some(ToolResult {
@@ -944,7 +955,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     let index = add_normalized_entry(&msg_store, &entry_index, normalized_entry);
                     web_search_state.index = Some(index);
                 }
-                EventMsg::WebSearchEnd(WebSearchEndEvent { call_id, query }) => {
+                EventMsg::WebSearchEnd(WebSearchEndEvent { call_id, query, .. }) => {
                     state.assistant = None;
                     state.thinking = None;
                     if let Some(mut entry) = state.web_searches.remove(&call_id) {
@@ -1137,7 +1148,8 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 | EventMsg::CollabWaitingBegin(..)
                 | EventMsg::CollabWaitingEnd(..)
                 | EventMsg::CollabCloseBegin(..)
-                | EventMsg::CollabCloseEnd(..) => {}
+                | EventMsg::CollabCloseEnd(..)
+                | _ => {}
             }
         }
     });
@@ -1159,19 +1171,14 @@ fn handle_jsonrpc_request(
             let command_state = state
                 .commands
                 .entry(params.item_id.clone())
-                .or_insert_with(|| CommandState {
-                    index: None,
-                    command: params
-                        .reason
-                        .clone()
-                        .unwrap_or_else(|| "command execution".to_string()),
-                    stdout: String::new(),
-                    stderr: String::new(),
-                    formatted_output: None,
-                    status: ToolStatus::Created,
-                    exit_code: None,
-                    awaiting_approval: false,
-                    call_id: params.item_id.clone(),
+                .or_insert_with(|| {
+                    CommandState::new(
+                        params
+                            .reason
+                            .clone()
+                            .unwrap_or_else(|| "command execution".to_string()),
+                        params.item_id.clone(),
+                    )
                 });
             command_state.awaiting_approval = true;
             if let Some(index) = command_state.index {
@@ -1195,7 +1202,13 @@ fn handle_jsonrpc_request(
                 }
             }
         }
-        ServerRequest::ExecCommandApproval { .. } | ServerRequest::ApplyPatchApproval { .. } => {}
+        ServerRequest::ExecCommandApproval { .. }
+        | ServerRequest::ApplyPatchApproval { .. }
+        | ServerRequest::ToolRequestUserInput { .. }
+        | ServerRequest::McpServerElicitationRequest { .. }
+        | ServerRequest::PermissionsRequestApproval { .. }
+        | ServerRequest::DynamicToolCall { .. }
+        | ServerRequest::ChatgptAuthTokensRefresh { .. } => {}
     }
 }
 
@@ -1207,23 +1220,15 @@ fn handle_server_notification(
     worktree_path: &str,
 ) {
     match server_notification {
-        ServerNotification::SessionConfigured(session_configured) => {
-            msg_store.push_session_id(session_configured.session_id.to_string());
-            handle_model_params(
-                session_configured.model,
-                session_configured.reasoning_effort,
-                msg_store,
-                entry_index,
-            );
-        }
         ServerNotification::ThreadStarted(payload) => {
-            if let Ok(session_id) =
-                SessionHandler::extract_session_id_from_rollout_path(payload.thread.path.clone())
-            {
-                msg_store.push_session_id(session_id);
-            } else {
-                msg_store.push_session_id(payload.thread.id);
+            if let Some(path) = payload.thread.path.clone() {
+                if let Ok(session_id) = SessionHandler::extract_session_id_from_rollout_path(path) {
+                    msg_store.push_session_id(session_id);
+                    return;
+                }
             }
+
+            msg_store.push_session_id(payload.thread.id);
         }
         ServerNotification::ItemStarted(payload) => {
             handle_v2_item_started(payload.item, state, msg_store, entry_index, worktree_path);
@@ -1361,22 +1366,7 @@ fn handle_server_notification(
                 },
             );
         }
-        ServerNotification::TurnStarted(_)
-        | ServerNotification::TurnCompleted(_)
-        | ServerNotification::TurnDiffUpdated(_)
-        | ServerNotification::RawResponseItemCompleted(_)
-        | ServerNotification::TerminalInteraction(_)
-        | ServerNotification::FileChangeOutputDelta(_)
-        | ServerNotification::McpToolCallProgress(_)
-        | ServerNotification::McpServerOauthLoginCompleted(_)
-        | ServerNotification::AccountUpdated(_)
-        | ServerNotification::AccountRateLimitsUpdated(_)
-        | ServerNotification::DeprecationNotice(_)
-        | ServerNotification::ConfigWarning(_)
-        | ServerNotification::WindowsWorldWritableWarning(_)
-        | ServerNotification::AccountLoginCompleted(_)
-        | ServerNotification::AuthStatusChange(_)
-        | ServerNotification::LoginChatGptComplete(_) => {}
+        _ => {}
     }
 }
 
@@ -1397,17 +1387,10 @@ fn handle_v2_item_started(
         } => {
             state.assistant = None;
             state.thinking = None;
-            let command_state = state.commands.entry(id.clone()).or_insert(CommandState {
-                index: None,
-                command: command.clone(),
-                stdout: String::new(),
-                stderr: String::new(),
-                formatted_output: aggregated_output.clone(),
-                status: ToolStatus::Created,
-                exit_code,
-                awaiting_approval: false,
-                call_id: id.clone(),
-            });
+            let command_state = state
+                .commands
+                .entry(id.clone())
+                .or_insert_with(|| CommandState::new(command.clone(), id.clone()));
             command_state.command = command;
             command_state.formatted_output = aggregated_output;
             command_state.exit_code = exit_code;
@@ -1471,7 +1454,7 @@ fn handle_v2_item_started(
                 tool_state.index = Some(index);
             }
         }
-        ThreadItem::WebSearch { id, query } => {
+        ThreadItem::WebSearch { id, query, .. } => {
             state.assistant = None;
             state.thinking = None;
             let web_search_state = state
@@ -1641,7 +1624,7 @@ fn handle_v2_item_completed(
                 }
             }
         }
-        ThreadItem::WebSearch { id, query } => {
+        ThreadItem::WebSearch { id, query, .. } => {
             if let Some(mut entry) = state.web_searches.remove(&id) {
                 entry.status = ToolStatus::Success;
                 entry.query = Some(query);
@@ -1655,23 +1638,10 @@ fn handle_v2_item_completed(
 }
 
 fn tool_result_from_v2_mcp_result(result: McpToolCallResult) -> ToolResult {
-    if result
-        .content
-        .iter()
-        .all(|block| matches!(block, ContentBlock::TextContent(_)))
-    {
+    if let Some(text) = mcp_text_blocks_joined(&result.content, "") {
         ToolResult {
             r#type: ToolResultValueType::Markdown,
-            value: Value::String(
-                result
-                    .content
-                    .into_iter()
-                    .filter_map(|block| match block {
-                        ContentBlock::TextContent(text) => Some(text.text),
-                        _ => None,
-                    })
-                    .collect::<String>(),
-            ),
+            value: Value::String(text),
         }
     } else if let Some(structured_content) = result.structured_content {
         ToolResult {
@@ -1686,6 +1656,29 @@ fn tool_result_from_v2_mcp_result(result: McpToolCallResult) -> ToolResult {
     }
 }
 
+fn mcp_text_blocks_joined(blocks: &[Value], separator: &str) -> Option<String> {
+    let texts = blocks
+        .iter()
+        .map(mcp_text_block_text)
+        .collect::<Option<Vec<_>>>()?;
+    Some(texts.join(separator))
+}
+
+fn mcp_text_block_text(block: &Value) -> Option<String> {
+    let Value::Object(content) = block else {
+        return None;
+    };
+
+    if content.get("type").and_then(Value::as_str) != Some("text") {
+        return None;
+    }
+
+    content
+        .get("text")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned)
+}
+
 fn handle_jsonrpc_response(
     response: JSONRPCResponse,
     msg_store: &Arc<MsgStore>,
@@ -1698,9 +1691,11 @@ fn handle_jsonrpc_response(
             reasoning_effort,
             ..
         } = response;
-        match SessionHandler::extract_session_id_from_rollout_path(thread.path) {
-            Ok(session_id) => msg_store.push_session_id(session_id),
-            Err(err) => tracing::error!("failed to extract session id: {err}"),
+        if let Some(path) = thread.path {
+            match SessionHandler::extract_session_id_from_rollout_path(path) {
+                Ok(session_id) => msg_store.push_session_id(session_id),
+                Err(err) => tracing::error!("failed to extract session id: {err}"),
+            }
         }
 
         handle_model_params(model, reasoning_effort, msg_store, entry_index);
@@ -1714,9 +1709,11 @@ fn handle_jsonrpc_response(
             reasoning_effort,
             ..
         } = response;
-        match SessionHandler::extract_session_id_from_rollout_path(thread.path) {
-            Ok(session_id) => msg_store.push_session_id(session_id),
-            Err(err) => tracing::error!("failed to extract session id: {err}"),
+        if let Some(path) = thread.path {
+            match SessionHandler::extract_session_id_from_rollout_path(path) {
+                Ok(session_id) => msg_store.push_session_id(session_id),
+                Err(err) => tracing::error!("failed to extract session id: {err}"),
+            }
         }
 
         handle_model_params(model, reasoning_effort, msg_store, entry_index);
@@ -1937,23 +1934,31 @@ mod tests {
             thread: codex_app_server_protocol::Thread {
                 id: "88d1d63d-b84e-4f3d-9d87-1fb21839379d".to_string(),
                 preview: String::new(),
+                ephemeral: false,
                 model_provider: "openai".to_string(),
                 created_at: 0,
-                path: PathBuf::from(
+                updated_at: 0,
+                status: codex_app_server_protocol::ThreadStatus::Idle,
+                path: Some(PathBuf::from(
                     "C:/Users/Admin/.codex/sessions/2026/03/06/rollout-2026-03-06T10-00-00-88d1d63d-b84e-4f3d-9d87-1fb21839379d.jsonl",
-                ),
-                cwd: PathBuf::from("E:/workspace/projectSS/agents-chatgroup-codex-latest-protocol"),
+                )),
+                cwd: PathBuf::from("E:/workspace/projectSS/openteams-codex-latest-protocol"),
                 cli_version: "0.0.0".to_string(),
                 source: codex_app_server_protocol::SessionSource::AppServer,
+                agent_nickname: None,
+                agent_role: None,
                 git_info: None,
+                name: None,
                 turns: Vec::new(),
             },
             model: "gpt-5-codex".to_string(),
             model_provider: "openai".to_string(),
-            cwd: PathBuf::from("E:/workspace/projectSS/agents-chatgroup-codex-latest-protocol"),
+            service_tier: None,
+            cwd: PathBuf::from("E:/workspace/projectSS/openteams-codex-latest-protocol"),
             approval_policy: codex_app_server_protocol::AskForApproval::OnRequest,
             sandbox: codex_app_server_protocol::SandboxPolicy::WorkspaceWrite {
                 writable_roots: Vec::new(),
+                read_only_access: Default::default(),
                 network_access: false,
                 exclude_tmpdir_env_var: false,
                 exclude_slash_tmp: false,
@@ -1970,50 +1975,6 @@ mod tests {
         assert_eq!(
             session_id_from_history(&msg_store).as_deref(),
             Some("88d1d63d-b84e-4f3d-9d87-1fb21839379d")
-        );
-    }
-
-    #[test]
-    fn handle_jsonrpc_response_supports_thread_resume_response() {
-        let msg_store = std::sync::Arc::new(MsgStore::new());
-        let entry_index = EntryIndexProvider::start_from(&msg_store);
-        let response = codex_app_server_protocol::ThreadResumeResponse {
-            thread: codex_app_server_protocol::Thread {
-                id: "9bfb6d6f-73c8-4b39-8e6d-2dc1f18a75f1".to_string(),
-                preview: String::new(),
-                model_provider: "openai".to_string(),
-                created_at: 0,
-                path: PathBuf::from(
-                    "C:/Users/Admin/.codex/sessions/2026/03/06/rollout-2026-03-06T11-00-00-9bfb6d6f-73c8-4b39-8e6d-2dc1f18a75f1.jsonl",
-                ),
-                cwd: PathBuf::from("E:/workspace/projectSS/agents-chatgroup-codex-latest-protocol"),
-                cli_version: "0.0.0".to_string(),
-                source: codex_app_server_protocol::SessionSource::AppServer,
-                git_info: None,
-                turns: Vec::new(),
-            },
-            model: "gpt-5-codex".to_string(),
-            model_provider: "openai".to_string(),
-            cwd: PathBuf::from("E:/workspace/projectSS/agents-chatgroup-codex-latest-protocol"),
-            approval_policy: codex_app_server_protocol::AskForApproval::OnRequest,
-            sandbox: codex_app_server_protocol::SandboxPolicy::WorkspaceWrite {
-                writable_roots: Vec::new(),
-                network_access: false,
-                exclude_tmpdir_env_var: false,
-                exclude_slash_tmp: false,
-            },
-            reasoning_effort: Some(codex_protocol::openai_models::ReasoningEffort::Medium),
-        };
-        let response = codex_app_server_protocol::JSONRPCResponse {
-            id: RequestId::Integer(2),
-            result: serde_json::to_value(response).unwrap(),
-        };
-
-        handle_jsonrpc_response(response, &msg_store, &entry_index);
-
-        assert_eq!(
-            session_id_from_history(&msg_store).as_deref(),
-            Some("9bfb6d6f-73c8-4b39-8e6d-2dc1f18a75f1")
         );
     }
 }

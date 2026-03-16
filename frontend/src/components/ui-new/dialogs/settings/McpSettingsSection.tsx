@@ -9,16 +9,12 @@ import { McpConfigStrategyGeneral } from '@/lib/mcpStrategies';
 import { cn } from '@/lib/utils';
 import { toPrettyCase } from '@/utils/string';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuTriggerButton,
-} from '../../primitives/Dropdown';
-import {
   SettingsCard,
   SettingsField,
+  settingsMutedPanelClassName,
+  settingsPanelClassName,
   SettingsSaveBar,
+  SettingsSelect,
   SettingsTextarea,
 } from './SettingsComponents';
 import { useSettingsDirty } from './SettingsDirtyContext';
@@ -238,7 +234,7 @@ export function McpSettingsSection() {
   if (!config) {
     return (
       <div className="py-8">
-        <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error">
+        <div className="rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
           {t('settings.mcp.errors.loadFailed')}
         </div>
       </div>
@@ -249,13 +245,13 @@ export function McpSettingsSection() {
     <>
       {/* Status messages */}
       {mcpError && !mcpError.includes('does not support MCP') && (
-        <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error">
+        <div className="mb-5 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
           {t('settings.mcp.errors.mcpError', { error: mcpError })}
         </div>
       )}
 
       {success && (
-        <div className="bg-success/10 border border-success/50 rounded-sm p-4 text-success font-medium">
+        <div className="mb-5 rounded-[10px] border border-[#d8ead8] bg-[#f7fcf7] p-4 text-[13px] font-medium text-[#2f7d32]">
           {t('settings.mcp.save.successMessage')}
         </div>
       )}
@@ -269,39 +265,23 @@ export function McpSettingsSection() {
           label={t('settings.mcp.labels.agent')}
           description={t('settings.mcp.labels.agentHelper')}
         >
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <DropdownMenuTriggerButton
-                label={
-                  selectedProfileKey
-                    ? toPrettyCase(selectedProfileKey)
-                    : t('settings.mcp.labels.agentPlaceholder')
-                }
-                className="w-full justify-between"
-              />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="settings-select-dropdown w-[var(--radix-dropdown-menu-trigger-width)]">
-              {profileOptions.map((option) => (
-                <DropdownMenuItem
-                  key={option.value}
-                  onClick={() => {
-                    const profile = profiles?.[option.value];
-                    if (profile) setSelectedProfile(profile);
-                  }}
-                >
-                  {option.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <SettingsSelect
+            value={selectedProfileKey || undefined}
+            options={profileOptions}
+            onChange={(value) => {
+              const profile = profiles?.[value];
+              if (profile) setSelectedProfile(profile);
+            }}
+            placeholder={t('settings.mcp.labels.agentPlaceholder')}
+          />
         </SettingsField>
 
         {mcpError && mcpError.includes('does not support MCP') ? (
-          <div className="rounded-sm border border-warning/50 bg-warning/10 p-4">
-            <h3 className="text-sm font-medium text-warning">
+          <div className="rounded-[10px] border border-[#f2d9a6] bg-[#fffaf0] p-4">
+            <h3 className="text-[13px] font-medium text-[#9a6700]">
               {t('settings.mcp.errors.notSupported')}
             </h3>
-            <div className="mt-2 text-sm text-low">
+            <div className="mt-2 text-[12px] leading-5 text-[#8C8C8C]">
               <p>{mcpError}</p>
               <p className="mt-1">{t('settings.mcp.errors.supportMessage')}</p>
             </div>
@@ -341,10 +321,10 @@ export function McpSettingsSection() {
               typeof mcpConfig.preconfigured === 'object' &&
               Object.keys(servers).length > 0 && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-normal">
+                  <label className="text-[12px] text-[#8C8C8C]">
                     {t('settings.mcp.labels.popularServers')}
                   </label>
-                  <p className="text-sm text-low">
+                  <p className="text-[12px] leading-5 text-[#8C8C8C]">
                     {t('settings.mcp.labels.serverHelper')}
                   </p>
 
@@ -366,11 +346,16 @@ export function McpSettingsSection() {
                           type="button"
                           onClick={() => addServer(key)}
                           className={cn(
-                            'flex items-start gap-3 p-3 rounded-sm border border-border/50 bg-secondary/30',
-                            'hover:bg-secondary hover:border-border transition-colors text-left'
+                            settingsPanelClassName,
+                            'flex items-start gap-3 p-3 text-left transition-colors duration-200 hover:bg-[#F9FBFF]'
                           )}
                         >
-                          <div className="w-6 h-6 rounded-sm border border-border bg-secondary flex items-center justify-center overflow-hidden shrink-0">
+                          <div
+                            className={cn(
+                              settingsMutedPanelClassName,
+                              'flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden'
+                            )}
+                          >
                             {icon ? (
                               <img
                                 src={icon}
@@ -378,21 +363,21 @@ export function McpSettingsSection() {
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span className="text-xs font-semibold text-normal">
+                              <span className="text-xs font-semibold text-[#333333]">
                                 {name.slice(0, 1).toUpperCase()}
                               </span>
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm font-medium text-normal truncate">
+                            <div className="truncate text-[13px] font-medium text-[#333333]">
                               {name}
                             </div>
-                            <div className="text-xs text-low line-clamp-2">
+                            <div className="line-clamp-2 text-[12px] leading-5 text-[#8C8C8C]">
                               {description}
                             </div>
                           </div>
                           <PlusIcon
-                            className="size-icon-xs text-low shrink-0"
+                            className="size-icon-xs shrink-0 text-[#8C8C8C]"
                             weight="bold"
                           />
                         </button>

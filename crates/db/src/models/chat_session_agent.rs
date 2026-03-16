@@ -1,8 +1,23 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, SqlitePool, Type};
+use sqlx::{FromRow, SqlitePool, Type, types::Json};
 use ts_rs::TS;
 use uuid::Uuid;
+
+const CHAT_SESSION_AGENT_SELECT: &str = r#"
+    SELECT id,
+           session_id,
+           agent_id,
+           state,
+           workspace_path,
+           pty_session_key,
+           agent_session_id,
+           agent_message_id,
+           allowed_skill_ids,
+           created_at,
+           updated_at
+    FROM chat_session_agents
+"#;
 
 #[derive(Debug, Clone, Type, Serialize, Deserialize, PartialEq, TS)]
 #[sqlx(type_name = "chat_session_agent_state", rename_all = "lowercase")]
@@ -25,6 +40,8 @@ pub struct ChatSessionAgent {
     pub pty_session_key: Option<String>,
     pub agent_session_id: Option<String>,
     pub agent_message_id: Option<String>,
+    #[ts(type = "string[]")]
+    pub allowed_skill_ids: Json<Vec<String>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -34,26 +51,15 @@ pub struct CreateChatSessionAgent {
     pub session_id: Uuid,
     pub agent_id: Uuid,
     pub workspace_path: Option<String>,
+    pub allowed_skill_ids: Vec<String>,
 }
 
 impl ChatSessionAgent {
     pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            ChatSessionAgent,
-            r#"SELECT id as "id!: Uuid",
-                      session_id as "session_id!: Uuid",
-                      agent_id as "agent_id!: Uuid",
-                      state as "state!: ChatSessionAgentState",
-                      workspace_path,
-                      pty_session_key,
-                      agent_session_id,
-                      agent_message_id,
-                      created_at as "created_at!: DateTime<Utc>",
-                      updated_at as "updated_at!: DateTime<Utc>"
-               FROM chat_session_agents
-               WHERE id = $1"#,
-            id
-        )
+        sqlx::query_as::<_, ChatSessionAgent>(&format!(
+            "{CHAT_SESSION_AGENT_SELECT}\nWHERE id = ?1"
+        ))
+        .bind(id)
         .fetch_optional(pool)
         .await
     }
@@ -63,23 +69,11 @@ impl ChatSessionAgent {
         session_id: Uuid,
         agent_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            ChatSessionAgent,
-            r#"SELECT id as "id!: Uuid",
-                      session_id as "session_id!: Uuid",
-                      agent_id as "agent_id!: Uuid",
-                      state as "state!: ChatSessionAgentState",
-                      workspace_path,
-                      pty_session_key,
-                      agent_session_id,
-                      agent_message_id,
-                      created_at as "created_at!: DateTime<Utc>",
-                      updated_at as "updated_at!: DateTime<Utc>"
-               FROM chat_session_agents
-               WHERE session_id = $1 AND agent_id = $2"#,
-            session_id,
-            agent_id
-        )
+        sqlx::query_as::<_, ChatSessionAgent>(&format!(
+            "{CHAT_SESSION_AGENT_SELECT}\nWHERE session_id = ?1 AND agent_id = ?2"
+        ))
+        .bind(session_id)
+        .bind(agent_id)
         .fetch_optional(pool)
         .await
     }
@@ -88,23 +82,10 @@ impl ChatSessionAgent {
         pool: &SqlitePool,
         session_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            ChatSessionAgent,
-            r#"SELECT id as "id!: Uuid",
-                      session_id as "session_id!: Uuid",
-                      agent_id as "agent_id!: Uuid",
-                      state as "state!: ChatSessionAgentState",
-                      workspace_path,
-                      pty_session_key,
-                      agent_session_id,
-                      agent_message_id,
-                      created_at as "created_at!: DateTime<Utc>",
-                      updated_at as "updated_at!: DateTime<Utc>"
-               FROM chat_session_agents
-               WHERE session_id = $1
-               ORDER BY created_at ASC"#,
-            session_id
-        )
+        sqlx::query_as::<_, ChatSessionAgent>(&format!(
+            "{CHAT_SESSION_AGENT_SELECT}\nWHERE session_id = ?1\nORDER BY created_at ASC"
+        ))
+        .bind(session_id)
         .fetch_all(pool)
         .await
     }
@@ -114,25 +95,35 @@ impl ChatSessionAgent {
         data: &CreateChatSessionAgent,
         id: Uuid,
     ) -> Result<Self, sqlx::Error> {
-        sqlx::query_as!(
-            ChatSessionAgent,
-            r#"INSERT INTO chat_session_agents (id, session_id, agent_id, workspace_path, state)
-               VALUES ($1, $2, $3, $4, 'idle')
-               RETURNING id as "id!: Uuid",
-                         session_id as "session_id!: Uuid",
-                         agent_id as "agent_id!: Uuid",
-                         state as "state!: ChatSessionAgentState",
-                         workspace_path,
-                         pty_session_key,
-                         agent_session_id,
-                         agent_message_id,
-                         created_at as "created_at!: DateTime<Utc>",
-                         updated_at as "updated_at!: DateTime<Utc>""#,
-            id,
-            data.session_id,
-            data.agent_id,
-            data.workspace_path
+        sqlx::query_as::<_, ChatSessionAgent>(
+            r#"
+            INSERT INTO chat_session_agents (
+                id,
+                session_id,
+                agent_id,
+                workspace_path,
+                allowed_skill_ids,
+                state
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, 'idle')
+            RETURNING id,
+                      session_id,
+                      agent_id,
+                      state,
+                      workspace_path,
+                      pty_session_key,
+                      agent_session_id,
+                      agent_message_id,
+                      allowed_skill_ids,
+                      created_at,
+                      updated_at
+            "#,
         )
+        .bind(id)
+        .bind(data.session_id)
+        .bind(data.agent_id)
+        .bind(data.workspace_path.clone())
+        .bind(Json(data.allowed_skill_ids.clone()))
         .fetch_one(pool)
         .await
     }
@@ -142,25 +133,27 @@ impl ChatSessionAgent {
         id: Uuid,
         state: ChatSessionAgentState,
     ) -> Result<Self, sqlx::Error> {
-        sqlx::query_as!(
-            ChatSessionAgent,
-            r#"UPDATE chat_session_agents
-               SET state = $2,
-                   updated_at = datetime('now', 'subsec')
-               WHERE id = $1
-               RETURNING id as "id!: Uuid",
-                         session_id as "session_id!: Uuid",
-                         agent_id as "agent_id!: Uuid",
-                         state as "state!: ChatSessionAgentState",
-                         workspace_path,
-                         pty_session_key,
-                         agent_session_id,
-                         agent_message_id,
-                         created_at as "created_at!: DateTime<Utc>",
-                         updated_at as "updated_at!: DateTime<Utc>""#,
-            id,
-            state
+        sqlx::query_as::<_, ChatSessionAgent>(
+            r#"
+            UPDATE chat_session_agents
+            SET state = ?2,
+                updated_at = datetime('now', 'subsec')
+            WHERE id = ?1
+            RETURNING id,
+                      session_id,
+                      agent_id,
+                      state,
+                      workspace_path,
+                      pty_session_key,
+                      agent_session_id,
+                      agent_message_id,
+                      allowed_skill_ids,
+                      created_at,
+                      updated_at
+            "#,
         )
+        .bind(id)
+        .bind(state)
         .fetch_one(pool)
         .await
     }
@@ -170,25 +163,57 @@ impl ChatSessionAgent {
         id: Uuid,
         workspace_path: Option<String>,
     ) -> Result<Self, sqlx::Error> {
-        sqlx::query_as!(
-            ChatSessionAgent,
-            r#"UPDATE chat_session_agents
-               SET workspace_path = $2,
-                   updated_at = datetime('now', 'subsec')
-               WHERE id = $1
-               RETURNING id as "id!: Uuid",
-                         session_id as "session_id!: Uuid",
-                         agent_id as "agent_id!: Uuid",
-                         state as "state!: ChatSessionAgentState",
-                         workspace_path,
-                         pty_session_key,
-                         agent_session_id,
-                         agent_message_id,
-                         created_at as "created_at!: DateTime<Utc>",
-                         updated_at as "updated_at!: DateTime<Utc>""#,
-            id,
-            workspace_path
+        sqlx::query_as::<_, ChatSessionAgent>(
+            r#"
+            UPDATE chat_session_agents
+            SET workspace_path = ?2,
+                updated_at = datetime('now', 'subsec')
+            WHERE id = ?1
+            RETURNING id,
+                      session_id,
+                      agent_id,
+                      state,
+                      workspace_path,
+                      pty_session_key,
+                      agent_session_id,
+                      agent_message_id,
+                      allowed_skill_ids,
+                      created_at,
+                      updated_at
+            "#,
         )
+        .bind(id)
+        .bind(workspace_path)
+        .fetch_one(pool)
+        .await
+    }
+
+    pub async fn update_allowed_skill_ids(
+        pool: &SqlitePool,
+        id: Uuid,
+        allowed_skill_ids: Vec<String>,
+    ) -> Result<Self, sqlx::Error> {
+        sqlx::query_as::<_, ChatSessionAgent>(
+            r#"
+            UPDATE chat_session_agents
+            SET allowed_skill_ids = ?2,
+                updated_at = datetime('now', 'subsec')
+            WHERE id = ?1
+            RETURNING id,
+                      session_id,
+                      agent_id,
+                      state,
+                      workspace_path,
+                      pty_session_key,
+                      agent_session_id,
+                      agent_message_id,
+                      allowed_skill_ids,
+                      created_at,
+                      updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(Json(allowed_skill_ids))
         .fetch_one(pool)
         .await
     }
@@ -198,25 +223,27 @@ impl ChatSessionAgent {
         id: Uuid,
         agent_session_id: Option<String>,
     ) -> Result<Self, sqlx::Error> {
-        sqlx::query_as!(
-            ChatSessionAgent,
-            r#"UPDATE chat_session_agents
-               SET agent_session_id = $2,
-                   updated_at = datetime('now', 'subsec')
-               WHERE id = $1
-               RETURNING id as "id!: Uuid",
-                         session_id as "session_id!: Uuid",
-                         agent_id as "agent_id!: Uuid",
-                         state as "state!: ChatSessionAgentState",
-                         workspace_path,
-                         pty_session_key,
-                         agent_session_id,
-                         agent_message_id,
-                         created_at as "created_at!: DateTime<Utc>",
-                         updated_at as "updated_at!: DateTime<Utc>""#,
-            id,
-            agent_session_id
+        sqlx::query_as::<_, ChatSessionAgent>(
+            r#"
+            UPDATE chat_session_agents
+            SET agent_session_id = ?2,
+                updated_at = datetime('now', 'subsec')
+            WHERE id = ?1
+            RETURNING id,
+                      session_id,
+                      agent_id,
+                      state,
+                      workspace_path,
+                      pty_session_key,
+                      agent_session_id,
+                      agent_message_id,
+                      allowed_skill_ids,
+                      created_at,
+                      updated_at
+            "#,
         )
+        .bind(id)
+        .bind(agent_session_id)
         .fetch_one(pool)
         .await
     }
@@ -226,31 +253,34 @@ impl ChatSessionAgent {
         id: Uuid,
         agent_message_id: Option<String>,
     ) -> Result<Self, sqlx::Error> {
-        sqlx::query_as!(
-            ChatSessionAgent,
-            r#"UPDATE chat_session_agents
-               SET agent_message_id = $2,
-                   updated_at = datetime('now', 'subsec')
-               WHERE id = $1
-               RETURNING id as "id!: Uuid",
-                         session_id as "session_id!: Uuid",
-                         agent_id as "agent_id!: Uuid",
-                         state as "state!: ChatSessionAgentState",
-                         workspace_path,
-                         pty_session_key,
-                         agent_session_id,
-                         agent_message_id,
-                         created_at as "created_at!: DateTime<Utc>",
-                         updated_at as "updated_at!: DateTime<Utc>""#,
-            id,
-            agent_message_id
+        sqlx::query_as::<_, ChatSessionAgent>(
+            r#"
+            UPDATE chat_session_agents
+            SET agent_message_id = ?2,
+                updated_at = datetime('now', 'subsec')
+            WHERE id = ?1
+            RETURNING id,
+                      session_id,
+                      agent_id,
+                      state,
+                      workspace_path,
+                      pty_session_key,
+                      agent_session_id,
+                      agent_message_id,
+                      allowed_skill_ids,
+                      created_at,
+                      updated_at
+            "#,
         )
+        .bind(id)
+        .bind(agent_message_id)
         .fetch_one(pool)
         .await
     }
 
     pub async fn delete(pool: &SqlitePool, id: Uuid) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query!(r#"DELETE FROM chat_session_agents WHERE id = $1"#, id)
+        let result = sqlx::query(r#"DELETE FROM chat_session_agents WHERE id = ?1"#)
+            .bind(id)
             .execute(pool)
             .await?;
         Ok(result.rows_affected())
@@ -263,15 +293,17 @@ impl ChatSessionAgent {
         pool: &SqlitePool,
         agent_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query!(
-            r#"UPDATE chat_session_agents
-               SET agent_session_id = NULL,
-                   agent_message_id = NULL,
-                   updated_at = datetime('now', 'subsec')
-               WHERE agent_id = $1
-                 AND (agent_session_id IS NOT NULL OR agent_message_id IS NOT NULL)"#,
-            agent_id
+        let result = sqlx::query(
+            r#"
+            UPDATE chat_session_agents
+            SET agent_session_id = NULL,
+                agent_message_id = NULL,
+                updated_at = datetime('now', 'subsec')
+            WHERE agent_id = ?1
+              AND (agent_session_id IS NOT NULL OR agent_message_id IS NOT NULL)
+            "#,
         )
+        .bind(agent_id)
         .execute(pool)
         .await?;
         Ok(result.rows_affected())

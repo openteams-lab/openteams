@@ -29,6 +29,7 @@ import type { MemberRole } from 'shared/types';
 import { MemberRole as MemberRoleEnum } from 'shared/types';
 import { cn } from '@/lib/utils';
 import { REMOTE_API_URL } from '@/lib/remoteApi';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import { PrimaryButton } from '../../primitives/PrimaryButton';
 import {
   DropdownMenu,
@@ -174,8 +175,13 @@ export function OrganizationsSettingsSection() {
   const handleRemoveMember = async (userId: string) => {
     if (!selectedOrgId) return;
 
-    const confirmed = window.confirm(t('confirmRemoveMember'));
-    if (!confirmed) return;
+    const result = await ConfirmDialog.show({
+      title: t('common:confirm.defaultConfirm'),
+      message: t('confirmRemoveMember'),
+      confirmText: t('common:buttons.delete'),
+      variant: 'destructive',
+    });
+    if (result !== 'confirmed') return;
 
     setError(null);
     removeMember.mutate({ orgId: selectedOrgId, userId });
@@ -190,10 +196,13 @@ export function OrganizationsSettingsSection() {
   const handleDeleteOrganization = async () => {
     if (!selectedOrgId || !selectedOrg) return;
 
-    const confirmed = window.confirm(
-      t('settings.confirmDelete', { orgName: selectedOrg.name })
-    );
-    if (!confirmed) return;
+    const result = await ConfirmDialog.show({
+      title: t('common:buttons.delete'),
+      message: t('settings.confirmDelete', { orgName: selectedOrg.name }),
+      confirmText: t('common:buttons.delete'),
+      variant: 'destructive',
+    });
+    if (result !== 'confirmed') return;
 
     setError(null);
     deleteOrganization.mutate(selectedOrgId);
