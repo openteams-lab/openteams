@@ -1,8 +1,8 @@
 [package]
 name = "openteams-desktop"
-version = "0.2.10"
-description = "Agents Chatgroup Desktop"
-authors = ["StarTerra AI"]
+version = "0.2.11"
+description = "OpenTeams Desktop"
+authors = ["openteams-lab"]
 edition = "2021"
 
 [build-dependencies]

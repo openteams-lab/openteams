@@ -1,7 +1,7 @@
 {
   "name": "@openteams-lab/openteams-web",
-  "version": "0.2.10",
-  "description": "AI Coding Agents Chatgroup - Cross-platform installer and runner",
+  "version": "0.2.11",
+  "description": "OpenTeams - Run agents as one team, multiply your efficiency in the AI era.",
   "author": "openteams-lab",
   "license": "MIT",
   "repository": {
