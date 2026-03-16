@@ -51,13 +51,14 @@ const CreateConfigurationDialogImpl =
         const handleKeyDown = (event: KeyboardEvent) => {
           if (event.key === 'Escape') {
             event.preventDefault();
-            handleCancel();
+            modal.resolve({ action: 'canceled' } as CreateConfigurationResult);
+            modal.hide();
           }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-      }, [modal.visible]);
+      }, [modal]);
 
       const validateConfigName = (name: string): string | null => {
         const trimmedName = name.trim();
