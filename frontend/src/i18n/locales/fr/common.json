@@ -15,7 +15,8 @@
     "replay": "Rejouer",
     "discard": "Abandonner",
     "addItem": "Ajouter un élément",
-    "reply": "Répondre"
+    "reply": "Répondre",
+    "done": "Terminé"
   },
   "form": {
     "notSpecified": "Non spécifié",

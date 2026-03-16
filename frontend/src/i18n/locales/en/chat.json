@@ -25,8 +25,15 @@
     "settingsInSidebar": "Settings",
     "searchSessions": "Search sessions",
     "searchSessionsPlaceholder": "Search session names...",
-    "clearSessionSearch": "Clear session search",
+"clearSessionSearch": "Clear session search",
     "noSearchResults": "No sessions match \"{{query}}\"."
+  },
+  "contextMenu": {
+    "editTitle": "Edit name",
+    "archive": "Archive",
+    "restore": "Restore",
+    "cleanupMessages": "Cleanup messages",
+    "delete": "Delete session"
   },
   "aiTeamPresets": {
     "title": "AI Team Presets",

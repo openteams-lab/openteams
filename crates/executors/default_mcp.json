@@ -1,12 +1,4 @@
 {
-  "agent_chatgroup": {
-    "command": "npx",
-    "args": [
-      "-y",
-      "openteams@latest",
-      "--mcp"
-    ]
-  },
   "context7": {
     "type": "http",
     "url": "https://mcp.context7.com/mcp",
@@ -45,12 +37,6 @@
     ]
   },
   "meta": {
-    "agent_chatgroup": {
-      "name": "openteams",
-      "description": "Create, update and delete openteams tasks",
-      "url": "https://www.openteams.com/docs/integrations/openteams-mcp-server",
-      "icon": "favicon-openteams-light.svg"
-    },
     "context7": {
       "name": "Context7",
       "description": "Fetch up-to-date documentation and code examples",

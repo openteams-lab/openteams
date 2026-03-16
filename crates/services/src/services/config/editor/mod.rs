@@ -150,7 +150,7 @@ impl EditorConfig {
 
         let vscode_dir = path.join(".vscode");
         let extensions_file = vscode_dir.join("extensions.json");
-        const EXTENSION_ID: &str = "starterra.ai.openteams";
+        const EXTENSION_ID: &str = "openteams-lab.openteams";
 
         let mut json: serde_json::Value = if extensions_file.exists() {
             match std::fs::read_to_string(&extensions_file) {

@@ -329,7 +329,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             config_version: "v9".to_string(),
-            theme: ThemeMode::System,
+            theme: ThemeMode::Light,
             executor_profile: ExecutorProfileId::new(BaseCodingAgent::ClaudeCode),
             disclaimer_acknowledged: false,
             onboarding_acknowledged: false,

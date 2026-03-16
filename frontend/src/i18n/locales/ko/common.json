@@ -37,7 +37,8 @@
     "save": "저장",
     "send": "보내기",
     "addItem": "항목 추가",
-    "reply": "답장"
+    "reply": "답장",
+    "done": "완료"
   },
   "form": {
     "notSpecified": "지정되지 않음",

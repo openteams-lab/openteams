@@ -25,8 +25,15 @@
     "searchSessionsPlaceholder": "搜尋會話名稱...",
     "clearSessionSearch": "清除會話搜尋",
     "noSearchResults": "沒有會話符合「{{query}}」。",
-    "generatedSessionTitle": "開始於 {{date}}",
+"generatedSessionTitle": "開始於 {{date}}",
     "aiTeam": "AI 團隊"
+  },
+  "contextMenu": {
+    "editTitle": "編輯名稱",
+    "archive": "歸檔",
+    "restore": "恢復",
+    "cleanupMessages": "清理訊息",
+    "delete": "刪除會話"
   },
   "header": {
     "untitledSession": "未命名會話",

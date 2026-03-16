@@ -15,7 +15,8 @@
     "replay": "重播",
     "discard": "放棄",
     "addItem": "新增項目",
-    "reply": "回覆"
+    "reply": "回覆",
+    "done": "完成"
   },
   "form": {
     "notSpecified": "未指定",

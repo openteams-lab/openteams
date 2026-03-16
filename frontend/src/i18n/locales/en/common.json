@@ -15,7 +15,8 @@
     "replay": "Replay",
     "discard": "Discard",
     "addItem": "Add Item",
-    "reply": "Reply"
+    "reply": "Reply",
+    "done": "Done"
   },
   "form": {
     "notSpecified": "Not specified",

@@ -195,12 +195,7 @@ export function GeneralSettingsSection() {
     );
   }
 
-  const themeOptions = Object.values(ThemeMode)
-    .filter((theme) => theme !== ThemeMode.DARK)
-    .map((theme) => ({
-      value: theme,
-      label: toPrettyCase(theme),
-    }));
+  const themeOptions = [{ value: ThemeMode.LIGHT, label: toPrettyCase(ThemeMode.LIGHT) }];
 
   const soundOptions = Object.values(SoundFile).map((sound) => ({
     value: sound,
@@ -232,11 +227,9 @@ export function GeneralSettingsSection() {
           description={t('settings.general.appearance.theme.helper')}
         >
           <SettingsSelect
-            value={
-              draft?.theme === ThemeMode.DARK ? ThemeMode.LIGHT : draft?.theme
-            }
+            value={ThemeMode.LIGHT}
             options={themeOptions}
-            onChange={(value) => updateDraft({ theme: value })}
+            onChange={() => updateDraft({ theme: ThemeMode.LIGHT })}
             placeholder={t('settings.general.appearance.theme.placeholder')}
           />
         </SettingsField>

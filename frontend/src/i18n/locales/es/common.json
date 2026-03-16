@@ -37,7 +37,8 @@
     "save": "Guardar",
     "send": "Enviar",
     "addItem": "Añadir elemento",
-    "reply": "Responder"
+    "reply": "Responder",
+    "done": "Hecho"
   },
   "form": {
     "notSpecified": "No especificado",

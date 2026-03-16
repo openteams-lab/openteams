@@ -270,14 +270,7 @@ export function TeamImportPreviewModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-5 backdrop-blur-sm"
-      onClick={() => {
-        if (!isImportingTeam) {
-          onCancel();
-        }
-      }}
-    >
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-5 backdrop-blur-sm">
       <div
         className={cn(
           'team-import-preview-modal chat-session-modal-surface flex flex-col overflow-hidden rounded-[28px] border border-white/60 bg-white/72 shadow-[0_28px_90px_rgba(15,23,42,0.24)] backdrop-blur-[24px]',
@@ -285,7 +278,6 @@ export function TeamImportPreviewModal({
             ? 'h-[88vh] max-h-[88vh] w-[min(90vw,980px)] max-w-[980px]'
             : 'h-[78vh] max-h-[78vh] w-[min(82vw,700px)] max-w-[700px]'
         )}
-        onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-6 px-6 pb-3 pt-5">
           <div className="min-w-0 flex-1">

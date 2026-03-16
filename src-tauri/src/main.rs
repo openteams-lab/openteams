@@ -13,7 +13,7 @@ struct BackendState {
 /// Delete all user data (database, config, cache, workspaces)
 #[tauri::command]
 fn delete_all_user_data() -> Result<String, String> {
-    let proj = ProjectDirs::from("ai", "starterra.ai", "openteams")
+    let proj = ProjectDirs::from("ai", "openteams-lab", "openteams")
         .ok_or("Could not determine data directories")?;
 
     let mut deleted_paths = Vec::new();
@@ -60,7 +60,7 @@ fn delete_all_user_data() -> Result<String, String> {
 /// Delete only cache and temp data (keep core data like db.sqlite, config.json)
 #[tauri::command]
 fn delete_cache_data() -> Result<String, String> {
-    let proj = ProjectDirs::from("ai", "starterra.ai", "openteams")
+    let proj = ProjectDirs::from("ai", "openteams-lab", "openteams")
         .ok_or("Could not determine data directories")?;
 
     let mut deleted_paths = Vec::new();

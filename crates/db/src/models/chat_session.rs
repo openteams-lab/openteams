@@ -21,6 +21,8 @@ pub struct ChatSession {
     pub summary_text: Option<String>,
     pub archive_ref: Option<String>,
     pub last_seen_diff_key: Option<String>,
+    pub team_protocol: Option<String>,
+    pub team_protocol_enabled: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub archived_at: Option<DateTime<Utc>>,
@@ -38,6 +40,8 @@ pub struct UpdateChatSession {
     pub summary_text: Option<String>,
     pub archive_ref: Option<String>,
     pub last_seen_diff_key: Option<String>,
+    pub team_protocol: Option<String>,
+    pub team_protocol_enabled: Option<bool>,
 }
 
 impl ChatSession {
@@ -54,6 +58,8 @@ impl ChatSession {
                           summary_text,
                           archive_ref,
                           last_seen_diff_key,
+                          team_protocol,
+                          team_protocol_enabled as "team_protocol_enabled!: bool",
                           created_at as "created_at!: DateTime<Utc>",
                           updated_at as "updated_at!: DateTime<Utc>",
                           archived_at as "archived_at: DateTime<Utc>"
@@ -73,6 +79,8 @@ impl ChatSession {
                           summary_text,
                           archive_ref,
                           last_seen_diff_key,
+                          team_protocol,
+                          team_protocol_enabled as "team_protocol_enabled!: bool",
                           created_at as "created_at!: DateTime<Utc>",
                           updated_at as "updated_at!: DateTime<Utc>",
                           archived_at as "archived_at: DateTime<Utc>"
@@ -95,6 +103,8 @@ impl ChatSession {
                       summary_text,
                       archive_ref,
                       last_seen_diff_key,
+                      team_protocol,
+                      team_protocol_enabled as "team_protocol_enabled!: bool",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>",
                       archived_at as "archived_at: DateTime<Utc>"
@@ -121,6 +131,8 @@ impl ChatSession {
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
+                         team_protocol,
+                         team_protocol_enabled as "team_protocol_enabled!: bool",
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>",
                          archived_at as "archived_at: DateTime<Utc>""#,
@@ -149,6 +161,10 @@ impl ChatSession {
             .last_seen_diff_key
             .clone()
             .or(existing.last_seen_diff_key);
+        let team_protocol = data.team_protocol.clone().or(existing.team_protocol);
+        let team_protocol_enabled = data
+            .team_protocol_enabled
+            .unwrap_or(existing.team_protocol_enabled);
 
         let archived_at = if status == ChatSessionStatus::Archived {
             existing.archived_at.or(Some(Utc::now()))
@@ -164,7 +180,9 @@ impl ChatSession {
                    summary_text = $4,
                    archive_ref = $5,
                    last_seen_diff_key = $6,
-                   archived_at = $7,
+                   team_protocol = $7,
+                   team_protocol_enabled = $8,
+                   archived_at = $9,
                    updated_at = datetime('now', 'subsec')
                WHERE id = $1
                RETURNING id as "id!: Uuid",
@@ -173,6 +191,8 @@ impl ChatSession {
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
+                         team_protocol,
+                         team_protocol_enabled as "team_protocol_enabled!: bool",
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>",
                          archived_at as "archived_at: DateTime<Utc>""#,
@@ -182,6 +202,8 @@ impl ChatSession {
             summary_text,
             archive_ref,
             last_seen_diff_key,
+            team_protocol,
+            team_protocol_enabled,
             archived_at
         )
         .fetch_one(pool)

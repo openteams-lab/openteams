@@ -12,10 +12,12 @@ type ThemeProviderState = {
 };
 
 const normalizeThemeMode = (theme: ThemeMode): ThemeMode =>
-  theme === ThemeMode.DARK ? ThemeMode.LIGHT : theme;
+  theme === ThemeMode.DARK || theme === ThemeMode.SYSTEM
+    ? ThemeMode.LIGHT
+    : theme;
 
 const initialState: ThemeProviderState = {
-  theme: ThemeMode.SYSTEM,
+  theme: ThemeMode.LIGHT,
   setTheme: () => null,
 };
 
@@ -23,14 +25,13 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 export function ThemeProvider({
   children,
-  initialTheme = ThemeMode.SYSTEM,
+  initialTheme = ThemeMode.LIGHT,
   ...props
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<ThemeMode>(
     normalizeThemeMode(initialTheme)
   );
 
-  // Update theme when initialTheme changes
   useEffect(() => {
     setThemeState(normalizeThemeMode(initialTheme));
   }, [initialTheme]);
@@ -39,18 +40,7 @@ export function ThemeProvider({
     const root = window.document.documentElement;
 
     root.classList.remove('light', 'dark');
-
-    if (theme === ThemeMode.SYSTEM) {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
-        .matches
-        ? 'dark'
-        : 'light';
-
-      root.classList.add(systemTheme);
-      return;
-    }
-
-    root.classList.add(theme.toLowerCase());
+    root.classList.add('light');
   }, [theme]);
 
   const setTheme = (newTheme: ThemeMode) => {

@@ -1,8 +1,9 @@
-use axum::{Json, extract::State, response::Json as ResponseJson};
+use axum::{Extension, Json, extract::State, response::Json as ResponseJson};
+use db::models::chat_session::{ChatSession, UpdateChatSession};
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
-use utils::{assets::config_path, response::ApiResponse};
+use utils::response::ApiResponse;
 
 use crate::{DeploymentImpl, error::ApiError};
 
@@ -13,29 +14,24 @@ pub struct TeamProtocolConfig {
     pub enabled: bool,
 }
 
-impl TeamProtocolConfig {
-    fn from_stored(content: Option<&str>) -> Self {
-        let content = content.unwrap_or_default().to_string();
-        let enabled = !content.trim().is_empty();
-        Self { content, enabled }
-    }
-}
-
 pub async fn get_team_protocol(
-    State(deployment): State<DeploymentImpl>,
+    Extension(session): Extension<ChatSession>,
 ) -> Result<ResponseJson<ApiResponse<TeamProtocolConfig>>, ApiError> {
-    let config = deployment.config().read().await;
-    let payload = TeamProtocolConfig::from_stored(config.chat_presets.team_protocol.as_deref());
-    Ok(ResponseJson(ApiResponse::success(payload)))
+    let content = session.team_protocol.unwrap_or_default();
+    let enabled = session.team_protocol_enabled;
+    Ok(ResponseJson(ApiResponse::success(TeamProtocolConfig {
+        content,
+        enabled,
+    })))
 }
 
 pub async fn update_team_protocol(
+    Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
     Json(payload): Json<TeamProtocolConfig>,
 ) -> Result<ResponseJson<ApiResponse<TeamProtocolConfig>>, ApiError> {
-    let mut next_config = deployment.config().read().await.clone();
     let content = if payload.enabled {
-        payload.content
+        payload.content.clone()
     } else {
         String::new()
     };
@@ -43,13 +39,21 @@ pub async fn update_team_protocol(
         enabled: !content.trim().is_empty(),
         content: content.clone(),
     };
-    next_config.chat_presets.team_protocol = Some(content);
 
-    services::services::config::save_config_to_file(&next_config, &config_path()).await?;
-
-    let mut config = deployment.config().write().await;
-    *config = next_config;
-    drop(config);
+    ChatSession::update(
+        &deployment.db().pool,
+        session.id,
+        &UpdateChatSession {
+            title: None,
+            status: None,
+            summary_text: None,
+            archive_ref: None,
+            last_seen_diff_key: None,
+            team_protocol: Some(content),
+            team_protocol_enabled: Some(effective.enabled),
+        },
+    )
+    .await?;
 
     Ok(ResponseJson(ApiResponse::success(effective)))
 }

@@ -486,6 +486,8 @@ pub async fn archive_session(
             summary_text: None,
             archive_ref: Some(archive_ref),
             last_seen_diff_key: None,
+            team_protocol: None,
+            team_protocol_enabled: None,
         },
     )
     .await?;
@@ -524,6 +526,8 @@ pub async fn restore_session(
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
+            team_protocol: None,
+            team_protocol_enabled: None,
         },
     )
     .await?;

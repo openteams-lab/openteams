@@ -151,6 +151,18 @@ jobs:
           npm version $new_version --no-git-tag-version --allow-same-version
           cd ..
 
+          # Update openteams-web-npx package.json to match
+          cd openteams-web-npx
+          npm version $new_version --no-git-tag-version --allow-same-version
+          # Update dependency version to match
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.dependencies['@openteams-lab/openteams-web'] = '^' + '$new_version';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          cd ..
+
           # Update frontend package.json to match
           cd frontend
           npm version $new_version --no-git-tag-version --allow-same-version
@@ -200,7 +212,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add package.json pnpm-lock.yaml openteams-npx/package.json frontend/package.json src-tauri/tauri.conf.json Cargo.lock
+          git add package.json pnpm-lock.yaml openteams-npx/package.json openteams-web-npx/package.json frontend/package.json src-tauri/tauri.conf.json Cargo.lock
           git add $(find . -name Cargo.toml)
           [ -f crates/remote/Cargo.lock ] && git add crates/remote/Cargo.lock || true
           git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
@@ -1382,7 +1394,23 @@ jobs:
           '
           npm pack
 
-      - name: Publish NPX package to npm
+      - name: Pack alias NPX package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd openteams-web-npx
+          # Update dependency version to match the main package version
+          node -e "
+            const fs = require('fs');
+            const mainPkg = require('../openteams-npx/package.json');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = mainPkg.version;
+            pkg.dependencies['@openteams-lab/openteams-web'] = '^' + mainPkg.version;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          npm pack
+
+      - name: Publish NPX packages to npm
         id: npm_publish
         if: ${{ github.event.inputs.publish_to_npm == 'true' }}
         env:
@@ -1394,13 +1422,31 @@ jobs:
             exit 1
           fi
 
+          # Publish main package (@openteams-lab/openteams-web)
           cd openteams-npx
-          tarball=$(ls -1t openteams-*.tgz | head -n 1)
+          tarball=$(ls -1t openteams-*.tgz 2>/dev/null | head -n 1)
           if [ -z "${tarball:-}" ]; then
-            echo "::error::No npm tarball found to publish"
+            echo "::error::No npm tarball found in openteams-npx"
             exit 1
           fi
+          echo "Publishing main package: $tarball"
           npm publish "$tarball" --access public
+          cd ..
+
+          # Wait for npm registry to propagate the main package
+          echo "Waiting for npm registry propagation..."
+          sleep 10
+
+          # Publish alias package (openteams-web)
+          cd openteams-web-npx
+          tarball_alias=$(ls -1t openteams-web-*.tgz 2>/dev/null | head -n 1)
+          if [ -z "${tarball_alias:-}" ]; then
+            echo "::error::No npm tarball found in openteams-web-npx"
+            exit 1
+          fi
+          echo "Publishing alias package: $tarball_alias"
+          npm publish "$tarball_alias" --access public
+          cd ..
 
       - name: Generate simple changelog summary
         id: changelog
@@ -1547,6 +1593,7 @@ jobs:
           files: |
             openteams-${{ needs.bump-version.outputs.new_tag }}.zip
             openteams-npx/openteams-*.tgz
+            openteams-web-npx/openteams-web-*.tgz
             release-assets/desktop/**/*.msi
             release-assets/desktop/**/*.dmg
             release-assets/desktop/**/*.AppImage

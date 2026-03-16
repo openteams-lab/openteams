@@ -1202,6 +1202,7 @@ export function ChatPresetsEditorPanel({
                   type="button"
                   className={cn(
                     sidebarTabButtonClassName,
+                    'whitespace-nowrap',
                     tab === 'teams'
                       ? 'border-[#E2E8F0] bg-white text-[#2563EB] shadow-sm'
                       : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70'
@@ -1214,6 +1215,7 @@ export function ChatPresetsEditorPanel({
                   type="button"
                   className={cn(
                     sidebarTabButtonClassName,
+                    'whitespace-nowrap',
                     tab === 'members'
                       ? 'border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm'
                       : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70'
@@ -1256,7 +1258,7 @@ export function ChatPresetsEditorPanel({
                     )}
                     <button
                       type="button"
-                      className="text-[12px] font-semibold text-[#2563EB] transition-colors duration-200 hover:text-[#1D4ED8]"
+                      className="whitespace-nowrap text-[12px] font-semibold text-[#2563EB] transition-colors duration-200 hover:text-[#1D4ED8]"
                       onClick={
                         tab === 'members'
                           ? handleAddMemberPreset
