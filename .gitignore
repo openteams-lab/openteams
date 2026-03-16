@@ -10,7 +10,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-**/.sqlx
+# SQLx offline mode cache - must be committed for CI
+# crates/db/.sqlx/ should be tracked
+.sqlx/
+!crates/db/.sqlx/
 
 # Build outputs
 /dist

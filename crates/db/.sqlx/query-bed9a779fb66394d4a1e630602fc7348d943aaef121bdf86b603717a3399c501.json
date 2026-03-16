@@ -1,0 +1,80 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id as \"id!: Uuid\",\n                      title,\n                      status as \"status!: ChatSessionStatus\",\n                      summary_text,\n                      archive_ref,\n                      last_seen_diff_key,\n                      team_protocol,\n                      team_protocol_enabled as \"team_protocol_enabled!: bool\",\n                      created_at as \"created_at!: DateTime<Utc>\",\n                      updated_at as \"updated_at!: DateTime<Utc>\",\n                      archived_at as \"archived_at: DateTime<Utc>\"\n               FROM chat_sessions\n               WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "title",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "status!: ChatSessionStatus",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "summary_text",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "archive_ref",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_seen_diff_key",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "team_protocol",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "team_protocol_enabled!: bool",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "archived_at: DateTime<Utc>",
+        "ordinal": 10,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "bed9a779fb66394d4a1e630602fc7348d943aaef121bdf86b603717a3399c501"
+}

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 20px; margin-bottom: 15px;">
+  <img src="frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 40px; margin-bottom: 20px;">
 
   <p><strong>Run agents as one team, multiply your efficiency in the AI era.</strong></p>
 
@@ -12,7 +12,6 @@
   </p>
 
   <p>
-    <a href="https://your-demo-link.com">Watch Demo</a> |
     <a href="#quick-start">Quick Start</a> |
     <a href="https://docs.openteams.com">Docs</a>
   </p>

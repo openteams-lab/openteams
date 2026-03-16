@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 20px; margin-bottom: 15px;">
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 40px; margin-bottom: 20px;">
 
   <p><strong>Exécutez les agents comme une équipe, multipliez votre efficacité à l'ère de l'IA.</strong></p>
 
@@ -12,7 +12,6 @@
   </p>
 
   <p>
-    <a href="https://your-demo-link.com">Voir la démo</a> |
     <a href="#démarrage-rapide">Démarrage rapide</a> |
     <a href="https://docs.openteams.com">Documentation</a>
   </p>
