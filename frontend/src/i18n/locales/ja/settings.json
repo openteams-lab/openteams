@@ -26,9 +26,7 @@
         "organizations": "Organization Settings",
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "プロジェクト",
-        "remote-projectsDesc": "プロジェクトを管理",
-        "presets": "プリセット",
-        "presetsDesc": "AIメンバーとチームのプリセットテンプレート"
+        "remote-projectsDesc": "プロジェクトを管理"
       }
     },
     "general": {
@@ -83,7 +81,7 @@
           "host": {
             "label": "リモートSSHホスト（オプション）",
             "placeholder": "例: ホスト名またはIPアドレス",
-            "helper": "agents-chatgroupがリモートサーバーで実行されている場合に設定してください。設定すると、「エディターで開く」をクリックしたときに、ローカルコマンドを実行する代わりにSSH経由でエディターを開くURLが生成されます。"
+            "helper": "openteamsがリモートサーバーで実行されている場合に設定してください。設定すると、「エディターで開く」をクリックしたときに、ローカルコマンドを実行する代わりにSSH経由でエディターを開くURLが生成されます。"
           },
           "user": {
             "label": "リモートSSHユーザー（オプション）",
@@ -209,7 +207,7 @@
       },
       "privacy": {
         "title": "プライバシー",
-        "description": "匿名の使用データを共有してagents-chatgroupの改善にご協力ください。",
+        "description": "匿名の使用データを共有してopenteamsの改善にご協力ください。",
         "telemetry": {
           "label": "テレメトリを有効化",
           "helper": "アプリケーションの改善に役立つ匿名の使用イベント追跡を有効にします。プロンプトやプロジェクト情報は収集されません。"
@@ -512,9 +510,13 @@
       "saveError": "プリセットの保存に失敗しました。",
       "builtin": "組み込み",
       "disabled": "無効",
+      "search": "検索",
+      "searchPlaceholder": "メンバーを検索...",
+      "searchMembersPlaceholder": "チームメンバーを検索...",
+      "noSearchResults": "結果が見つかりません",
       "tabs": {
-        "members": "メンバーテンプレート",
-        "teams": "チームテンプレート"
+        "members": "AI社員",
+        "teams": "AIチーム"
       },
       "actions": {
         "copy": "複製",
@@ -528,7 +530,7 @@
         "empty": "メンバープリセットがありません。追加して開始してください。",
         "fields": {
           "id": "プリセットID",
-          "name": "ハンドル（@メンション名）",
+          "name": "名前",
           "namePlaceholder": "例: backend",
           "description": "説明",
           "descriptionPlaceholder": "このAIメンバーの役割",
@@ -538,7 +540,7 @@
           "systemPromptPlaceholder": "このAIメンバーの役割設定を記述してください...",
           "workspacePath": "既定のワークスペースパス（任意）",
           "workspacePathPlaceholder": "例: backend",
-          "toolsEnabled": "ツール（JSON）"
+          "skills": "スキル"
         },
         "errors": {
           "toolsJsonInvalid": "ツールJSONが無効です。",
@@ -612,8 +614,8 @@
         "delete": "削除"
       },
       "tabs": {
-        "members": "メンバーテンプレート",
-        "teams": "チームテンプレート"
+        "members": "AI社員",
+        "teams": "AIチーム"
       },
       "members": {
         "title": "メンバーテンプレート",

@@ -31,7 +31,10 @@ pub struct AcpAgentHarness {
     session_namespace: String,
     model: Option<String>,
     mode: Option<String>,
+    max_resume_prompt_bytes: Option<usize>,
 }
+
+const DEFAULT_HISTORY_JSONL_BYTES: usize = 96 * 1024;
 
 impl Default for AcpAgentHarness {
     fn default() -> Self {
@@ -47,6 +50,7 @@ impl AcpAgentHarness {
             session_namespace: "gemini_sessions".to_string(),
             model: None,
             mode: None,
+            max_resume_prompt_bytes: None,
         }
     }
 
@@ -56,6 +60,7 @@ impl AcpAgentHarness {
             session_namespace: namespace.into(),
             model: None,
             mode: None,
+            max_resume_prompt_bytes: None,
         }
     }
 
@@ -66,6 +71,11 @@ impl AcpAgentHarness {
 
     pub fn with_mode(mut self, mode: impl Into<String>) -> Self {
         self.mode = Some(mode.into());
+        self
+    }
+
+    pub fn with_max_resume_prompt_bytes(mut self, max_resume_prompt_bytes: usize) -> Self {
+        self.max_resume_prompt_bytes = Some(max_resume_prompt_bytes);
         self
     }
 
@@ -108,6 +118,7 @@ impl AcpAgentHarness {
             self.session_namespace.clone(),
             self.model.clone(),
             self.mode.clone(),
+            self.max_resume_prompt_bytes,
             approvals,
             cancel.clone(),
         )
@@ -161,6 +172,7 @@ impl AcpAgentHarness {
             self.session_namespace.clone(),
             self.model.clone(),
             self.mode.clone(),
+            self.max_resume_prompt_bytes,
             approvals,
             cancel.clone(),
         )
@@ -183,6 +195,7 @@ impl AcpAgentHarness {
         session_namespace: String,
         model: Option<String>,
         mode: Option<String>,
+        max_resume_prompt_bytes: Option<usize>,
         approvals: Option<std::sync::Arc<dyn ExecutorApprovalService>>,
         cancel: CancellationToken,
     ) -> Result<(), ExecutorError> {
@@ -330,7 +343,12 @@ impl AcpAgentHarness {
                                 let new_ui_id = uuid::Uuid::new_v4().to_string();
                                 let _ = session_manager.fork_session(&existing, &new_ui_id);
 
-                                let history = session_manager.read_session_raw(&new_ui_id).ok();
+                                let history = session_manager
+                                    .compact_history_jsonl_with_limit(
+                                        &new_ui_id,
+                                        DEFAULT_HISTORY_JSONL_BYTES,
+                                    )
+                                    .ok();
                                 let meta =
                                     history.map(|h| serde_json::json!({ "history_jsonl": h }));
 
@@ -342,9 +360,16 @@ impl AcpAgentHarness {
                                 }
                                 match conn.new_session(req).await {
                                     Ok(resp) => {
-                                        let resume_prompt = session_manager
-                                            .generate_resume_prompt(&new_ui_id, &prompt)
-                                            .unwrap_or_else(|_| prompt.clone());
+                                        let resume_prompt = match max_resume_prompt_bytes {
+                                            Some(limit) => session_manager
+                                                .generate_resume_prompt_with_limit(
+                                                    &new_ui_id, &prompt, limit,
+                                                )
+                                                .unwrap_or_else(|_| prompt.clone()),
+                                            None => session_manager
+                                                .generate_resume_prompt(&new_ui_id, &prompt)
+                                                .unwrap_or_else(|_| prompt.clone()),
+                                        };
                                         (resp.session_id.0.to_string(), new_ui_id, resume_prompt)
                                     }
                                     Err(e) => {
@@ -429,13 +454,6 @@ impl AcpAgentHarness {
                                 let _ = sm_for_writer.append_raw_line(&sess_id_for_writer, &line);
                             }
                         });
-
-                        // Save prompt to session
-                        let _ = session_manager.append_raw_line(
-                            &display_session_id,
-                            &serde_json::to_string(&serde_json::json!({ "user": prompt_to_send }))
-                                .unwrap_or_default(),
-                        );
 
                         // Build prompt request
                         let initial_req = proto::PromptRequest::new(

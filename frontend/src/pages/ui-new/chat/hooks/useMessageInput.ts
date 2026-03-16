@@ -210,6 +210,9 @@ export function useMessageInput(
     setMentionQuery(null);
     setReplyToMessage(null);
     setHighlightedMentionIndex(0);
+    if (inputRef.current) {
+      inputRef.current.style.height = '44px';
+    }
   }, []);
 
   return {

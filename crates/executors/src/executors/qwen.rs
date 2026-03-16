@@ -36,8 +36,11 @@ pub struct QwenCode {
 }
 
 impl QwenCode {
+    const BASE_COMMAND: &'static str = "npx -y @qwen-code/qwen-code@0.12.1";
+    const MAX_RESUME_PROMPT_BYTES: usize = 160 * 1024;
+
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
-        let mut builder = CommandBuilder::new("npx -y @qwen-code/qwen-code@latest");
+        let mut builder = CommandBuilder::new(Self::BASE_COMMAND);
 
         if let Some(model) = &self.model {
             builder = builder.extend_params(["--model", model.as_str()]);
@@ -65,7 +68,8 @@ impl StandardCodingAgentExecutor for QwenCode {
     ) -> Result<SpawnedChild, ExecutorError> {
         let qwen_command = self.build_command_builder()?.build_initial()?;
         let combined_prompt = self.append_prompt.combine_prompt(prompt);
-        let harness = AcpAgentHarness::with_session_namespace("qwen_sessions");
+        let harness = AcpAgentHarness::with_session_namespace("qwen_sessions")
+            .with_max_resume_prompt_bytes(Self::MAX_RESUME_PROMPT_BYTES);
         let approvals = if self.yolo.unwrap_or(false) {
             None
         } else {
@@ -93,7 +97,8 @@ impl StandardCodingAgentExecutor for QwenCode {
     ) -> Result<SpawnedChild, ExecutorError> {
         let qwen_command = self.build_command_builder()?.build_follow_up(&[])?;
         let combined_prompt = self.append_prompt.combine_prompt(prompt);
-        let harness = AcpAgentHarness::with_session_namespace("qwen_sessions");
+        let harness = AcpAgentHarness::with_session_namespace("qwen_sessions")
+            .with_max_resume_prompt_bytes(Self::MAX_RESUME_PROMPT_BYTES);
         let approvals = if self.yolo.unwrap_or(false) {
             None
         } else {
@@ -119,6 +124,12 @@ impl StandardCodingAgentExecutor for QwenCode {
     // MCP configuration methods
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
         dirs::home_dir().map(|home| home.join(".qwen").join("settings.json"))
+    }
+
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".qwen").join("skills")])
+            .unwrap_or_default()
     }
 
     fn get_availability_info(&self) -> AvailabilityInfo {

@@ -120,8 +120,8 @@ jobs:
               }
             });
 
-            fs.mkdirSync('agents-chatgroup-npx', { recursive: true });
-            const filePath = path.join('agents-chatgroup-npx', tgzAsset.name);
+            fs.mkdirSync('openteams-npx', { recursive: true });
+            const filePath = path.join('openteams-npx', tgzAsset.name);
             fs.writeFileSync(filePath, Buffer.from(response.data));
 
             console.log(`Downloaded ${tgzAsset.name} to ${filePath}`);
@@ -132,7 +132,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd agents-chatgroup-npx
+          cd openteams-npx
 
           ls -la *.tgz
           npm pack --dry-run || echo 'Dry-run pack check reported differences (non-blocking).'
@@ -144,7 +144,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd agents-chatgroup-npx
+          cd openteams-npx
 
           PACKAGE_FILE='${{ steps.verify.outputs.package-file }}'
           echo "Publishing $PACKAGE_FILE to npm..."

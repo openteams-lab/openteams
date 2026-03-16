@@ -1,4 +1,4 @@
-﻿import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useCallback } from 'react';
 import { siDiscord } from 'simple-icons';
 import { Button } from '@/components/ui/button';
@@ -49,12 +49,12 @@ const EXTERNAL_LINKS = [
   {
     label: 'Docs',
     icon: BookOpen,
-    href: 'https://agents-chatgroup.com/docs',
+    href: 'https://openteams.com/docs',
   },
   {
     label: 'Support',
     icon: MessageCircleQuestion,
-    href: 'https://github.com/StarterraAI/AgentsChatGroup/issues',
+    href: 'https://github.com/StarterraAI/OpenTeams/issues',
   },
   {
     label: 'Discord',

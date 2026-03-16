@@ -60,7 +60,7 @@ export function DiffViewerModal({
     >
       <div
         className={cn(
-          'chat-session-modal-surface border border-border shadow-xl flex flex-col overflow-hidden',
+          'chat-session-modal-surface chat-session-diff-viewer-surface border border-border shadow-xl flex flex-col overflow-hidden',
           isFullscreen
             ? 'w-full h-full rounded-none'
             : 'w-[92vw] h-[85vh] max-w-[1200px] rounded-xl'
@@ -124,7 +124,7 @@ export function DiffViewerModal({
                 return (
                   <div
                     key={fileKey}
-                    className="border border-border rounded-sm bg-panel"
+                    className="chat-session-diff-file-item border border-border rounded-sm"
                   >
                     <button
                       type="button"
@@ -212,7 +212,7 @@ export function DiffViewerModal({
                 return (
                   <div
                     key={key}
-                    className="border border-border rounded-sm bg-panel px-base py-half"
+                    className="chat-session-diff-file-item border border-border rounded-sm px-base py-half"
                   >
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-ibm-plex-mono break-all">

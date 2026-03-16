@@ -20,6 +20,7 @@ use crate::{
         StandardCodingAgentExecutor, opencode::types::OpencodeExecutorEvent,
     },
     logs::utils::patch,
+    skill_config::NativeSkillConfigBackend,
     stdout_dup::create_stdout_pipe_writer,
 };
 
@@ -82,8 +83,10 @@ impl Drop for OpencodeServer {
 type ServerPassword = String;
 
 impl Opencode {
+    const BASE_COMMAND: &'static str = "npx -y opencode-ai@1.2.24";
+
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
-        let builder = CommandBuilder::new("npx -y opencode-ai@latest")
+        let builder = CommandBuilder::new(Self::BASE_COMMAND)
             // Pass hostname/port as separate args so OpenCode treats them as explicitly set
             // (it checks `process.argv.includes(\"--port\")` / `\"--hostname\"`).
             .extend_params(["serve", "--hostname", "127.0.0.1", "--port", "0"]);
@@ -421,6 +424,26 @@ impl StandardCodingAgentExecutor for Opencode {
                 .unwrap_or_else(|| config_dir.join("opencode.jsonc"));
             Some(path)
         }
+    }
+
+    fn default_skill_config_path(&self) -> Option<std::path::PathBuf> {
+        self.default_mcp_config_path()
+    }
+
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        let mut roots = Vec::new();
+
+        if let Some(home) = dirs::home_dir() {
+            roots.push(home.join(".opencode").join("skills"));
+            roots.push(home.join(".claude").join("skills"));
+            roots.push(home.join(".agents").join("skills"));
+        }
+
+        roots
+    }
+
+    fn native_skill_config_backend(&self) -> NativeSkillConfigBackend {
+        NativeSkillConfigBackend::Opencode
     }
 
     fn get_availability_info(&self) -> AvailabilityInfo {

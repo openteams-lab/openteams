@@ -33,7 +33,7 @@ pub async fn launch_codex_review(
                 config: thread_params.config,
                 base_instructions: thread_params.base_instructions,
                 developer_instructions: thread_params.developer_instructions,
-                history: None,
+                ..Default::default()
             };
             let response = client.resume_thread(params).await?;
             tracing::debug!(

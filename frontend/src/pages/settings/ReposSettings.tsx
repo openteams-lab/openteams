@@ -25,6 +25,7 @@ import { Loader2 } from 'lucide-react';
 import { useScriptPlaceholders } from '@/hooks/useScriptPlaceholders';
 import { AutoExpandingTextarea } from '@/components/ui/auto-expanding-textarea';
 import { MultiFileSearchTextarea } from '@/components/ui/multi-file-search-textarea';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import { repoApi } from '@/lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Repo, UpdateRepo } from 'shared/types';
@@ -86,14 +87,16 @@ export function ReposSettings() {
 
   // Handle repo selection from dropdown
   const handleRepoSelect = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (id === selectedRepoId) return;
 
       if (hasUnsavedChanges) {
-        const confirmed = window.confirm(
-          t('settings.repos.save.confirmSwitch')
-        );
-        if (!confirmed) return;
+        const result = await ConfirmDialog.show({
+          title: t('common:buttons.discard'),
+          message: t('settings.repos.save.confirmSwitch'),
+          confirmText: t('common:buttons.discard'),
+        });
+        if (result !== 'confirmed') return;
         setDraft(null);
         setSelectedRepo(null);
         setSuccess(false);
@@ -113,24 +116,43 @@ export function ReposSettings() {
   // Sync selectedRepoId when URL changes
   useEffect(() => {
     if (repoIdParam === selectedRepoId) return;
+    let cancelled = false;
 
-    if (hasUnsavedChanges) {
-      const confirmed = window.confirm(t('settings.repos.save.confirmSwitch'));
-      if (!confirmed) {
-        if (selectedRepoId) {
-          setSearchParams({ repoId: selectedRepoId });
-        } else {
-          setSearchParams({});
+    const syncSelectedRepo = async () => {
+      if (hasUnsavedChanges) {
+        const result = await ConfirmDialog.show({
+          title: t('common:buttons.discard'),
+          message: t('settings.repos.save.confirmSwitch'),
+          confirmText: t('common:buttons.discard'),
+        });
+
+        if (cancelled) return;
+
+        if (result !== 'confirmed') {
+          if (selectedRepoId) {
+            setSearchParams({ repoId: selectedRepoId });
+          } else {
+            setSearchParams({});
+          }
+          return;
         }
-        return;
-      }
-      setDraft(null);
-      setSelectedRepo(null);
-      setSuccess(false);
-      setError(null);
-    }
 
-    setSelectedRepoId(repoIdParam);
+        setDraft(null);
+        setSelectedRepo(null);
+        setSuccess(false);
+        setError(null);
+      }
+
+      if (!cancelled) {
+        setSelectedRepoId(repoIdParam);
+      }
+    };
+
+    void syncSelectedRepo();
+
+    return () => {
+      cancelled = true;
+    };
   }, [repoIdParam, hasUnsavedChanges, selectedRepoId, setSearchParams, t]);
 
   // Populate draft from server data

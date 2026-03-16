@@ -11,8 +11,25 @@ const Dialog = React.forwardRef<
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     uncloseable?: boolean;
+    hideCloseButton?: boolean;
+    containerClassName?: string;
+    overlayClassName?: string;
   }
->(({ className, open, onOpenChange, children, uncloseable, ...props }, ref) => {
+>(
+  (
+    {
+      className,
+      open,
+      onOpenChange,
+      children,
+      uncloseable,
+      hideCloseButton,
+      containerClassName,
+      overlayClassName,
+      ...props
+    },
+    ref
+  ) => {
   const { enableScope, disableScope } = useHotkeysContext();
 
   // Manage dialog scope when open/closed
@@ -108,9 +125,14 @@ const Dialog = React.forwardRef<
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-start justify-center p-4 overflow-y-auto">
+    <div
+      className={cn(
+        'fixed inset-0 z-[9999] flex items-start justify-center p-4 overflow-y-auto',
+        containerClassName
+      )}
+    >
       <div
-        className="fixed inset-0 bg-black/50"
+        className={cn('fixed inset-0 bg-black/50', overlayClassName)}
         onClick={() => (uncloseable ? {} : onOpenChange?.(false))}
       />
       <div
@@ -121,7 +143,7 @@ const Dialog = React.forwardRef<
         )}
         {...props}
       >
-        {!uncloseable && (
+        {!uncloseable && !hideCloseButton && (
           <button
             className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 z-10"
             onClick={() => onOpenChange?.(false)}
@@ -134,7 +156,8 @@ const Dialog = React.forwardRef<
       </div>
     </div>
   );
-});
+  }
+);
 Dialog.displayName = 'Dialog';
 
 const DialogHeader = ({

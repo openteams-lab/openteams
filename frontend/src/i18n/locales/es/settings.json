@@ -26,9 +26,7 @@
         "organizations": "Organization Settings",
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "Proyectos",
-        "remote-projectsDesc": "Gestionar proyectos",
-        "presets": "Preajustes",
-        "presetsDesc": "Plantillas predefinidas de miembros y equipos de IA"
+        "remote-projectsDesc": "Gestionar proyectos"
       }
     },
     "general": {
@@ -83,7 +81,7 @@
           "host": {
             "label": "Host SSH Remoto (Opcional)",
             "placeholder": "ej., nombre de host o dirección IP",
-            "helper": "Configura esto si agents-chatgroup se ejecuta en un servidor remoto. Cuando se establece, al hacer clic en \"Abrir en Editor\" se generará una URL para abrir tu editor a través de SSH en lugar de ejecutar un comando local."
+            "helper": "Configura esto si openteams se ejecuta en un servidor remoto. Cuando se establece, al hacer clic en \"Abrir en Editor\" se generará una URL para abrir tu editor a través de SSH en lugar de ejecutar un comando local."
           },
           "user": {
             "label": "Usuario SSH Remoto (Opcional)",
@@ -209,7 +207,7 @@
       },
       "privacy": {
         "title": "Privacidad",
-        "description": "Ayuda a mejorar agents-chatgroup compartiendo datos de uso anónimos.",
+        "description": "Ayuda a mejorar openteams compartiendo datos de uso anónimos.",
         "telemetry": {
           "label": "Habilitar Telemetría",
           "helper": "Habilita el seguimiento anónimo para ayudar a mejorar la aplicación. No se recopilan prompts ni información del proyecto."
@@ -512,9 +510,13 @@
       "saveError": "No se pudieron guardar los preajustes.",
       "builtin": "integrado",
       "disabled": "deshabilitado",
+      "search": "Buscar",
+      "searchPlaceholder": "Buscar miembros...",
+      "searchMembersPlaceholder": "Buscar miembros del equipo...",
+      "noSearchResults": "No se encontraron resultados",
       "tabs": {
-        "members": "Plantillas de miembros",
-        "teams": "Plantillas de equipos"
+        "members": "Empleados IA",
+        "teams": "Equipos IA"
       },
       "actions": {
         "copy": "Duplicar",
@@ -538,7 +540,7 @@
           "systemPromptPlaceholder": "Describe la configuración del rol de este miembro de IA...",
           "workspacePath": "Ruta de workspace predeterminada (opcional)",
           "workspacePathPlaceholder": "p. ej., backend",
-          "toolsEnabled": "Herramientas (JSON)"
+          "skills": "Habilidades"
         },
         "errors": {
           "toolsJsonInvalid": "El JSON de herramientas no es válido.",
@@ -612,8 +614,8 @@
         "delete": "Eliminar"
       },
       "tabs": {
-        "members": "Plantillas de miembros",
-        "teams": "Plantillas de equipos"
+        "members": "Empleados IA",
+        "teams": "Equipos IA"
       },
       "members": {
         "title": "Plantillas de miembros",

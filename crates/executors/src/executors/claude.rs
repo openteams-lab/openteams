@@ -49,11 +49,14 @@ use crate::{
     stdout_dup::create_stdout_pipe_writer,
 };
 
+const CLAUDE_CODE_ROUTER_BASE_COMMAND: &str = "npx -y @musistudio/claude-code-router@2.0.0 code";
+const CLAUDE_CODE_BASE_COMMAND: &str = "npx -y @anthropic-ai/claude-code@2.1.74";
+
 fn base_command(claude_code_router: bool) -> &'static str {
     if claude_code_router {
-        "npx -y @musistudio/claude-code-router@latest code"
+        CLAUDE_CODE_ROUTER_BASE_COMMAND
     } else {
-        "npx -y @anthropic-ai/claude-code@latest"
+        CLAUDE_CODE_BASE_COMMAND
     }
 }
 
@@ -242,6 +245,12 @@ impl StandardCodingAgentExecutor for ClaudeCode {
     // MCP configuration methods
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
         dirs::home_dir().map(|home| home.join(".claude.json"))
+    }
+
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".claude").join("skills")])
+            .unwrap_or_default()
     }
 
     fn get_availability_info(&self) -> AvailabilityInfo {
@@ -1748,6 +1757,13 @@ impl StreamingContentState {
                     "Mismatched content types: delta {:?}, kind {:?}",
                     delta,
                     self.kind
+                );
+                tracing::debug!(
+                    kind = ?self.kind,
+                    delta = ?delta,
+                    buffer_len = self.buffer.len(),
+                    entry_index = ?self.entry_index,
+                    "Dropped streaming delta due to content kind mismatch"
                 );
             }
         }

@@ -1,10 +1,15 @@
-﻿import {
+import {
   CheckCircleIcon,
   XCircleIcon,
   WarningCircleIcon,
-  PaperPlaneTiltIcon,
+  PaperclipIcon,
+  EyeIcon,
+  ArrowSquareUpRightIcon,
   CheckSquareIcon,
   SquareIcon,
+  CopyIcon,
+  ArrowClockwiseIcon,
+  QuotesIcon,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,6 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ChatEntryContainer } from '@/components/ui-new/primitives/conversation/ChatEntryContainer';
+import { ChatErrorMessage } from '@/components/ui-new/primitives/conversation/ChatErrorMessage';
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
 import { ChatSystemMessage } from '@/components/ui-new/primitives/conversation/ChatSystemMessage';
 import { chatApi } from '@/lib/api';
@@ -35,9 +41,17 @@ import {
   extractAttachments,
   detectApiError,
   formatBytes,
-  renderSendMessageDirectives,
+  tryParseAgentResponse,
+  buildAgentDisplayContent,
+  extractProtocolErrorMeta,
 } from '../utils';
 import { formatTokenCount } from '@/utils/string';
+
+const SUPPRESSED_PROTOCOL_ERROR_CODES = new Set([
+  'invalid_json',
+  'not_json_array',
+  'empty_message',
+]);
 
 export interface ChatMessageItemProps {
   message: ChatMessage;
@@ -56,8 +70,8 @@ export interface ChatMessageItemProps {
   // Attachments
   attachments: ChatAttachment[];
   activeSessionId: string | null;
-  onAddAttachmentAsFile: (
-    messageId: string,
+  onPreviewAttachment: (
+    message: ChatMessage,
     attachment: ChatAttachment
   ) => void;
   // Diff
@@ -81,7 +95,6 @@ export function ChatMessageItem({
   message,
   senderLabel,
   senderRunnerType,
-  tone,
   referenceMessage,
   referenceSenderLabel,
   referencePreview,
@@ -91,10 +104,7 @@ export function ChatMessageItem({
   agentIdByName,
   attachments,
   activeSessionId,
-  onAddAttachmentAsFile,
-  diffInfo,
-  runDiffs,
-  onOpenDiffViewer,
+  onPreviewAttachment,
   isArchived,
   onReply,
   isCleanupMode,
@@ -111,11 +121,6 @@ export function ChatMessageItem({
     ? getAgentAvatarStyle(agentAvatarSeed)
     : undefined;
 
-  const diffRunId = diffInfo?.runId ?? '';
-  const hasDiffInfo =
-    !!diffInfo &&
-    diffRunId.length > 0 &&
-    (diffInfo.available || diffInfo.untrackedFiles.length > 0);
   const referenceId =
     referenceMessage?.id ??
     (message.meta &&
@@ -131,11 +136,102 @@ export function ChatMessageItem({
     !Array.isArray(message.meta) &&
     (message.meta as { context_compacted?: unknown }).context_compacted ===
       true;
-  const displayContent = isAgent
-    ? renderSendMessageDirectives(message.content)
-    : message.content;
+  const isRawFallbackMessage =
+    isAgent &&
+    message.meta &&
+    typeof message.meta === 'object' &&
+    !Array.isArray(message.meta) &&
+    (message.meta as { protocol?: { mode?: unknown } }).protocol?.mode ===
+      'raw_fallback';
+  // Try to parse new JSON format for agent messages
+  const parsedAgentResponse =
+    isAgent && !isRawFallbackMessage
+      ? tryParseAgentResponse(message.content)
+      : null;
+  const displayContent = (() => {
+    if (!isAgent) return message.content;
+    if (parsedAgentResponse) {
+      return buildAgentDisplayContent(parsedAgentResponse, senderLabel);
+    }
+    return message.content;
+  })();
+
+  const meta = message.meta;
+  const tokenUsage =
+    isAgent &&
+    meta &&
+    typeof meta === 'object' &&
+    !Array.isArray(meta) &&
+    'token_usage' in meta
+      ? (
+          meta as {
+            token_usage?: {
+              total_tokens?: number;
+              is_estimated?: boolean;
+            };
+          }
+        ).token_usage
+      : null;
+  const tokenCount =
+    typeof tokenUsage?.total_tokens === 'number'
+      ? tokenUsage.total_tokens
+      : null;
+  const isEstimated = tokenUsage?.is_estimated === true;
+  const protocolError = extractProtocolErrorMeta(message.meta);
+  const shouldSuppressProtocolErrorCard =
+    protocolError?.code !== null &&
+    protocolError?.code !== undefined &&
+    SUPPRESSED_PROTOCOL_ERROR_CODES.has(protocolError.code);
+
   // System messages
   if (message.sender_type === ChatSenderType.system) {
+    if (shouldSuppressProtocolErrorCard) {
+      return null;
+    }
+
+    if (protocolError) {
+      const summary = protocolError.reason?.trim() || message.content;
+      const detail = protocolError.detail?.trim() ?? '';
+      const rawOutput = protocolError.rawOutput?.trim() ?? '';
+
+      return (
+        <div className="chat-session-message-row is-system flex items-start gap-base">
+          {isCleanupMode && (
+            <button
+              type="button"
+              className="flex-shrink-0 mt-1"
+              onClick={onToggleSelect}
+            >
+              {isSelected ? (
+                <CheckSquareIcon
+                  className="size-icon text-brand"
+                  weight="fill"
+                />
+              ) : (
+                <SquareIcon className="size-icon text-low" />
+              )}
+            </button>
+          )}
+          <div className="flex-1 rounded-xl border border-[rgba(239,68,68,0.25)] bg-[rgba(239,68,68,0.06)] px-base py-base">
+            <ChatErrorMessage content={summary} expanded />
+            {detail && (
+              <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-border/60 bg-panel px-3 py-2 font-ibm-plex-mono text-xs text-low">
+                {detail}
+              </pre>
+            )}
+            {rawOutput && (
+              <div className="mt-3 rounded-lg border border-border/60 bg-panel px-3 py-3">
+                <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-low">
+                  Raw assistant output
+                </div>
+                <ChatMarkdown content={rawOutput} hideCopyButton />
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="chat-session-message-row is-system flex items-start gap-base">
         {isCleanupMode && (
@@ -176,7 +272,7 @@ export function ChatMessageItem({
       <div
         id={`chat-message-${message.id}`}
         className={cn(
-          'chat-session-message-row flex items-start gap-base',
+          'chat-session-message-row group flex items-start gap-base',
           isUser ? 'is-user justify-end' : 'is-agent justify-start'
         )}
       >
@@ -193,321 +289,374 @@ export function ChatMessageItem({
             )}
           </button>
         )}
-        <ChatEntryContainer
-          variant={isUser ? 'user' : 'system'}
-          title={senderLabel}
-          icon={
-            isAgent ? (
-              <AgentBrandIcon
-                runnerType={senderRunnerType}
-                className="chat-session-agent-avatar-logo"
-              />
-            ) : undefined
-          }
-          expanded
-          iconContainerClassName={cn(
-            'chat-session-message-avatar',
-            isUser ? 'is-user' : 'chat-session-agent-avatar'
-          )}
-          iconContainerStyle={agentAvatarStyle}
-          iconClassName={
-            isUser ? 'chat-session-message-avatar-icon' : undefined
-          }
-          headerRight={
-            <div className="chat-session-message-meta flex items-center gap-half text-xs text-low">
+        <div className={cn('relative', !isUser && 'w-full max-w-[680px]')}>
+          <ChatEntryContainer
+            variant={isUser ? 'user' : 'system'}
+            title={isUser ? undefined : senderLabel}
+            icon={
+              isAgent ? (
+                <AgentBrandIcon
+                  runnerType={senderRunnerType}
+                  className="chat-session-agent-avatar-logo"
+                />
+              ) : undefined
+            }
+            expanded
+            iconContainerClassName={cn(
+              'chat-session-message-avatar',
+              isUser ? 'is-user' : 'chat-session-agent-avatar'
+            )}
+            iconContainerStyle={agentAvatarStyle}
+            iconClassName={
+              isUser ? 'chat-session-message-avatar-icon' : undefined
+            }
+            headerRight={
+              isUser ? (
+                <div className="chat-session-message-meta flex items-center gap-half text-xs text-low">
+                  <span>{formatDateShortWithTime(message.created_at)}</span>
+                </div>
+              ) : null
+            }
+            className={cn(
+              'chat-session-message-card shadow-sm rounded-3xl',
+              isUser
+                ? 'chat-session-message-card-self is-user-message ml-auto'
+                : 'chat-session-message-card-agent is-agent-message max-w-full',
+              isCleanupMode && isSelected && 'ring-2 ring-[#EF4444]'
+            )}
+            titleClassName={!isUser ? 'chat-session-message-title' : undefined}
+            headerClassName={cn(
+              'chat-session-message-header',
+              isUser && 'hidden'
+            )}
+            bodyClassName="chat-session-message-body"
+            style={
+              isUser
+                ? {
+                    backgroundColor: 'var(--chat-session-message-self-bg)',
+                    borderColor:
+                      isCleanupMode && isSelected
+                        ? '#EF4444'
+                        : 'var(--chat-session-message-self-border)',
+                    width: 'fit-content',
+                    maxWidth: 'min(600px, 100%)',
+                  }
+                : undefined
+            }
+          >
+            <div>
+              {referenceId && (
+                <div
+                  className="chat-session-reference-card mb-half border rounded-sm px-base py-half text-xs text-low"
+                  style={{
+                    backgroundColor: '#ecedf1',
+                    borderColor: 'var(--chat-session-message-self-bg, #e8f4fd)',
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-base">
+                    <span className="font-medium text-normal">
+                      {t('message.replyingTo', {
+                        name: referenceSenderLabel ?? 'message',
+                      })}
+                    </span>
+                    <button
+                      type="button"
+                      className="hover:opacity-80"
+                      style={{ color: '#5094FB' }}
+                      onClick={() => {
+                        if (referenceMessage) {
+                          const element = document.getElementById(
+                            `chat-message-${referenceMessage.id}`
+                          );
+                          element?.scrollIntoView({ behavior: 'smooth' });
+                        }
+                      }}
+                    >
+                      {t('message.view')}
+                    </button>
+                  </div>
+                  <div className="mt-half">
+                    {referencePreview ??
+                      t('message.referencedMessageUnavailable')}
+                  </div>
+                  {referenceMessage &&
+                    extractAttachments(referenceMessage.meta).length > 0 && (
+                      <div className="mt-half text-xs text-low">
+                        {t('message.attachments')}:{' '}
+                        {extractAttachments(referenceMessage.meta)
+                          .map((item) => item.name)
+                          .filter(Boolean)
+                          .slice(0, 3)
+                          .join(', ')}
+                      </div>
+                    )}
+                </div>
+              )}
+              {(() => {
+                const apiError = isAgent
+                  ? detectApiError(message.content)
+                  : null;
+                const isWarningApiError =
+                  apiError?.type === 'quota_exceeded' ||
+                  apiError?.type === 'rate_limit' ||
+                  apiError?.type === 'context_limit';
+                return apiError ? (
+                  <div
+                    className={cn(
+                      'mb-half flex items-center gap-half rounded-sm border px-base py-half text-xs',
+                      isWarningApiError
+                        ? 'bg-[rgba(245,158,11,0.10)] border-[rgba(245,158,11,0.35)] text-[#F59E0B]'
+                        : 'bg-[rgba(239,68,68,0.10)] border-[rgba(239,68,68,0.35)] text-[#EF4444]'
+                    )}
+                  >
+                    {isWarningApiError ? (
+                      <WarningCircleIcon
+                        className="size-icon-sm flex-shrink-0"
+                        weight="fill"
+                      />
+                    ) : (
+                      <XCircleIcon
+                        className="size-icon-sm flex-shrink-0"
+                        weight="fill"
+                      />
+                    )}
+                    <span className="font-medium">{apiError.message}</span>
+                    <span
+                      className={
+                        isWarningApiError
+                          ? 'text-[rgba(245,158,11,0.78)]'
+                          : 'text-[rgba(239,68,68,0.78)]'
+                      }
+                    >
+                      - {t('message.apiError.checkQuota')}
+                    </span>
+                  </div>
+                ) : null;
+              })()}
+              {isRawFallbackMessage && (
+                <div className="mb-half flex items-center gap-half">
+                  <Badge
+                    variant="secondary"
+                    className="border-[rgba(245,158,11,0.24)] bg-[rgba(245,158,11,0.10)] text-[10px] font-medium uppercase tracking-wide text-[#B45309]"
+                  >
+                    {t('message.rawFallbackBadge', {
+                      defaultValue: 'Raw fallback',
+                    })}
+                  </Badge>
+                </div>
+              )}
+              <ChatMarkdown content={displayContent} hideCopyButton />
+              {mentionList.length > 0 && (
+                <div className="chat-session-mentions mt-half flex flex-wrap items-center gap-half text-xs text-low">
+                  {mentionList.map((mention) => {
+                    const agentId = agentIdByName.get(mention);
+                    const mentionStatus = mentionStatusMap?.get(mention);
+                    const isFallbackRunning =
+                      !mentionStatusMap &&
+                      !!agentId &&
+                      agentStates[agentId] === ChatSessionAgentState.running;
+                    const isRunning =
+                      mentionStatus === 'running' || isFallbackRunning;
+                    const isCompleted = mentionStatus === 'completed';
+                    const isFailed = mentionStatus === 'failed';
+                    const showCheck = !isFailed && (isRunning || isCompleted);
+                    const pulse = mentionStatus === 'running';
+                    return (
+                      <Badge
+                        key={`${message.id}-mention-${mention}`}
+                        variant="secondary"
+                        className="chat-session-mention-tag flex items-center gap-1 px-2 py-0.5 text-xs"
+                      >
+                        @{mention}
+                        {showCheck && (
+                          <CheckCircleIcon
+                            className={cn(
+                              'size-icon-2xs text-success',
+                              pulse && 'animate-pulse'
+                            )}
+                            weight="fill"
+                          />
+                        )}
+                        {isFailed && (
+                          <XCircleIcon
+                            className="size-icon-2xs text-error"
+                            weight="fill"
+                          />
+                        )}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+              {attachments.length > 0 && (
+                <div className="chat-session-message-attachments mt-half">
+                  {attachments.map((attachment) => {
+                    const attachmentName = attachment.name ?? 'attachment';
+                    const attachmentUrl =
+                      activeSessionId && attachment.id
+                        ? chatApi.getChatAttachmentUrl(
+                            activeSessionId,
+                            message.id,
+                            attachment.id
+                          )
+                        : '#';
+                    const isImage =
+                      attachment.kind === 'image' ||
+                      (attachment.mime_type ?? '').startsWith('image/');
+                    const isHtml =
+                      (attachment.mime_type ?? '').includes('html') ||
+                      attachmentName.toLowerCase().endsWith('.html') ||
+                      attachmentName.toLowerCase().endsWith('.htm');
+                    const canPreviewInline = isImage || isHtml;
+                    return (
+                      <div
+                        key={attachment.id ?? `${message.id}-${attachmentName}`}
+                        className="chat-session-message-attachment-card"
+                      >
+                        <div className="chat-session-message-attachment-header">
+                          <div className="chat-session-message-attachment-main">
+                            <PaperclipIcon className="chat-session-message-attachment-icon" />
+                            <div className="min-w-0 flex-1">
+                              {canPreviewInline ? (
+                                <button
+                                  type="button"
+                                  className="chat-session-message-attachment-name"
+                                  onClick={() =>
+                                    onPreviewAttachment(message, attachment)
+                                  }
+                                >
+                                  <span
+                                    className="min-w-0 truncate"
+                                    title={attachmentName}
+                                  >
+                                    {attachmentName}
+                                  </span>
+                                  {attachment.size_bytes ? (
+                                    <span className="chat-session-message-attachment-size">
+                                      {formatBytes(attachment.size_bytes)}
+                                    </span>
+                                  ) : null}
+                                </button>
+                              ) : (
+                                <div className="chat-session-message-attachment-name">
+                                  <span
+                                    className="min-w-0 truncate"
+                                    title={attachmentName}
+                                  >
+                                    {attachmentName}
+                                  </span>
+                                  {attachment.size_bytes ? (
+                                    <span className="chat-session-message-attachment-size">
+                                      {formatBytes(attachment.size_bytes)}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="chat-session-message-attachment-actions">
+                            {canPreviewInline && (
+                              <button
+                                type="button"
+                                className="chat-session-message-attachment-action"
+                                onClick={() =>
+                                  onPreviewAttachment(message, attachment)
+                                }
+                                title={t('message.view')}
+                                aria-label={t('message.view')}
+                              >
+                                <EyeIcon className="size-icon-sm" />
+                              </button>
+                            )}
+                            <a
+                              className="chat-session-message-attachment-action"
+                              href={attachmentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={t('message.open')}
+                              aria-label={t('message.open')}
+                            >
+                              <ArrowSquareUpRightIcon className="size-icon-sm" />
+                            </a>
+                          </div>
+                        </div>
+                        {isImage && attachmentUrl !== '#' && (
+                          <button
+                            type="button"
+                            className="chat-session-message-attachment-preview"
+                            onClick={() =>
+                              onPreviewAttachment(message, attachment)
+                            }
+                          >
+                            <img
+                              src={attachmentUrl}
+                              alt={attachmentName}
+                              loading="lazy"
+                              className="chat-session-message-attachment-preview-image"
+                            />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {isAgent && (
+                <div className="chat-session-message-footer mt-4 flex items-center justify-between opacity-50 text-[10px] font-ibm-plex-mono">
+                  {tokenCount !== null && (
+                    <span>
+                      {isEstimated && (
+                        <span className="text-yellow-500 mr-0.5">~</span>
+                      )}
+                      Tokens: {formatTokenCount(tokenCount)}
+                    </span>
+                  )}
+                  <span className={tokenCount !== null ? '' : 'ml-auto'}>
+                    {formatDateShortWithTime(message.created_at)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </ChatEntryContainer>
+          {(isAgent || isUser) && (
+            <div
+              className={cn(
+                'chat-session-message-actions absolute opacity-0 group-hover:opacity-100 flex items-center gap-2 -bottom-8 transition-opacity duration-200',
+                'right-0'
+              )}
+            >
+              <button
+                type="button"
+                className="p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors"
+                onClick={() => {
+                  navigator.clipboard.writeText(message.content);
+                }}
+                title={t('message.copy')}
+              >
+                <CopyIcon className="size-icon-xs" />
+              </button>
+              <button
+                type="button"
+                className="p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors"
+                title={t('message.regenerate')}
+              >
+                <ArrowClockwiseIcon className="size-icon-xs" />
+              </button>
               <button
                 type="button"
                 className={cn(
-                  'chat-session-message-reply text-brand hover:text-brand-hover',
+                  'p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors',
                   isArchived && 'pointer-events-none opacity-50'
                 )}
                 onClick={() => onReply(message)}
                 disabled={isArchived}
+                title={t('message.quote')}
               >
-                {t('message.quote')}
+                <QuotesIcon className="size-icon-xs" />
               </button>
-              <span>{formatDateShortWithTime(message.created_at)}</span>
             </div>
-          }
-          className={cn(
-            'chat-session-message-card max-w-[760px] w-full md:w-[84%] shadow-sm rounded-2xl',
-            isUser && 'chat-session-message-card-self ml-auto',
-            !isUser && 'chat-session-message-card-agent',
-            isCleanupMode && isSelected && 'ring-2 ring-brand'
           )}
-          headerClassName="chat-session-message-header"
-          bodyClassName="chat-session-message-body"
-          style={{
-            backgroundColor: isUser
-              ? `var(--chat-session-message-self-bg, ${tone.bg})`
-              : `var(--chat-session-message-other-bg, ${tone.bg})`,
-            borderColor: isUser
-              ? `var(--chat-session-message-self-border, ${tone.border})`
-              : `var(--chat-session-message-other-border, ${tone.border})`,
-          }}
-        >
-          <div>
-            {referenceId && (
-              <div className="chat-session-reference-card mb-half border border-border rounded-sm bg-secondary/60 px-base py-half text-xs text-low">
-                <div className="flex items-center justify-between gap-base">
-                  <span className="font-medium text-normal">
-                    {t('message.replyingTo', {
-                      name: referenceSenderLabel ?? 'message',
-                    })}
-                  </span>
-                  <button
-                    type="button"
-                    className="text-brand hover:text-brand-hover"
-                    onClick={() => {
-                      if (referenceMessage) {
-                        const element = document.getElementById(
-                          `chat-message-${referenceMessage.id}`
-                        );
-                        element?.scrollIntoView({ behavior: 'smooth' });
-                      }
-                    }}
-                  >
-                    {t('message.view')}
-                  </button>
-                </div>
-                <div className="mt-half">
-                  {referencePreview ??
-                    t('message.referencedMessageUnavailable')}
-                </div>
-                {referenceMessage &&
-                  extractAttachments(referenceMessage.meta).length > 0 && (
-                    <div className="mt-half text-xs text-low">
-                      {t('message.attachments')}:{' '}
-                      {extractAttachments(referenceMessage.meta)
-                        .map((item) => item.name)
-                        .filter(Boolean)
-                        .slice(0, 3)
-                        .join(', ')}
-                    </div>
-                  )}
-              </div>
-            )}
-            {(() => {
-              const apiError = isAgent ? detectApiError(message.content) : null;
-              const isWarningApiError =
-                apiError?.type === 'quota_exceeded' ||
-                apiError?.type === 'rate_limit' ||
-                apiError?.type === 'context_limit';
-              return apiError ? (
-                <div
-                  className={cn(
-                    'mb-half flex items-center gap-half rounded-sm border px-base py-half text-xs',
-                    isWarningApiError
-                      ? 'bg-warning/10 border-warning/30 text-warning'
-                      : 'bg-error/10 border-error/30 text-error'
-                  )}
-                >
-                  {isWarningApiError ? (
-                    <WarningCircleIcon
-                      className="size-icon-sm flex-shrink-0"
-                      weight="fill"
-                    />
-                  ) : (
-                    <XCircleIcon
-                      className="size-icon-sm flex-shrink-0"
-                      weight="fill"
-                    />
-                  )}
-                  <span className="font-medium">{apiError.message}</span>
-                  <span
-                    className={
-                      isWarningApiError ? 'text-warning/70' : 'text-error/70'
-                    }
-                  >
-                    - {t('message.apiError.checkQuota')}
-                  </span>
-                </div>
-              ) : null;
-            })()}
-            <ChatMarkdown content={displayContent} />
-            {mentionList.length > 0 && (
-              <div className="chat-session-mentions mt-half flex flex-wrap items-center gap-half text-xs text-low">
-                <span>{t('message.mentions')}:</span>
-                {mentionList.map((mention) => {
-                  const agentId = agentIdByName.get(mention);
-                  const mentionStatus = mentionStatusMap?.get(mention);
-                  const isFallbackRunning =
-                    !mentionStatusMap &&
-                    !!agentId &&
-                    agentStates[agentId] === ChatSessionAgentState.running;
-                  const isRunning =
-                    mentionStatus === 'running' || isFallbackRunning;
-                  const isCompleted = mentionStatus === 'completed';
-                  const isFailed = mentionStatus === 'failed';
-                  const showCheck = !isFailed && (isRunning || isCompleted);
-                  const pulse = mentionStatus === 'running';
-                  return (
-                    <Badge
-                      key={`${message.id}-mention-${mention}`}
-                      variant="secondary"
-                      className="chat-session-mention-tag flex items-center gap-1 px-2 py-0.5 text-xs"
-                    >
-                      @{mention}
-                      {showCheck && (
-                        <CheckCircleIcon
-                          className={cn(
-                            'size-icon-2xs text-success',
-                            pulse && 'animate-pulse'
-                          )}
-                          weight="fill"
-                        />
-                      )}
-                      {isFailed && (
-                        <XCircleIcon
-                          className="size-icon-2xs text-error"
-                          weight="fill"
-                        />
-                      )}
-                    </Badge>
-                  );
-                })}
-              </div>
-            )}
-            {attachments.length > 0 && (
-              <div className="chat-session-attachments mt-half space-y-half">
-                {attachments.map((attachment) => {
-                  const attachmentUrl =
-                    activeSessionId && attachment.id
-                      ? chatApi.getChatAttachmentUrl(
-                          activeSessionId,
-                          message.id,
-                          attachment.id
-                        )
-                      : '#';
-                  const isImage =
-                    attachment.kind === 'image' ||
-                    (attachment.mime_type ?? '').startsWith('image/');
-                  return (
-                    <div
-                      key={attachment.id}
-                      className="chat-session-attachment-card border border-border rounded-sm bg-panel px-base py-half text-xs text-normal"
-                    >
-                      <div className="flex items-center justify-between gap-base">
-                        <span className="font-ibm-plex-mono break-all">
-                          {attachment.name}
-                        </span>
-                        <div className="flex gap-half">
-                          <button
-                            type="button"
-                            className="text-brand hover:text-brand-hover px-1 py-0.5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onAddAttachmentAsFile(message.id, attachment);
-                            }}
-                            title={t('message.sendToAgent')}
-                          >
-                            <PaperPlaneTiltIcon className="size-icon-sm" />
-                          </button>
-                          <a
-                            className="text-brand hover:text-brand-hover"
-                            href={attachmentUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {t('message.open')}
-                          </a>
-                        </div>
-                      </div>
-                      {attachment.size_bytes && (
-                        <div className="text-xs text-low">
-                          {formatBytes(attachment.size_bytes)}
-                        </div>
-                      )}
-                      {isImage && attachmentUrl !== '#' && (
-                        <img
-                          src={attachmentUrl}
-                          alt={attachment.name}
-                          loading="lazy"
-                          className="mt-half max-h-56 w-auto rounded-sm border border-border"
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {hasDiffInfo && diffInfo && (
-              <div className="chat-session-code-card mt-half border border-border rounded-sm bg-secondary/70 px-base py-half text-xs text-normal">
-                <div className="chat-session-code-card-header flex items-center justify-between gap-base">
-                  <span className="chat-session-code-card-title">
-                    {t('message.codeChanges')}
-                  </span>
-                  <button
-                    type="button"
-                    className="chat-session-code-card-link text-brand hover:text-brand-hover"
-                    onClick={() =>
-                      onOpenDiffViewer(
-                        diffRunId,
-                        diffInfo.untrackedFiles,
-                        diffInfo.available
-                      )
-                    }
-                  >
-                    {t('message.viewChanges')}
-                  </button>
-                </div>
-                {diffInfo.available && runDiffs[diffRunId]?.loading && (
-                  <div className="chat-session-code-card-meta mt-half text-xs text-low">
-                    {t('message.loadingDiff')}
-                  </div>
-                )}
-                {diffInfo.available && runDiffs[diffRunId]?.error && (
-                  <div className="chat-session-code-card-meta mt-half text-xs text-error">
-                    {runDiffs[diffRunId]?.error}
-                  </div>
-                )}
-                {diffInfo.untrackedFiles.length > 0 && (
-                  <div className="chat-session-code-card-meta mt-half text-xs text-low">
-                    {diffInfo.untrackedFiles.length}{' '}
-                    {diffInfo.untrackedFiles.length === 1
-                      ? t('message.untrackedFile')
-                      : t('message.untrackedFiles')}
-                  </div>
-                )}
-              </div>
-            )}
-            {(() => {
-              const meta = message.meta;
-              const tokenUsage =
-                isAgent &&
-                meta &&
-                typeof meta === 'object' &&
-                !Array.isArray(meta) &&
-                'token_usage' in meta
-                  ? (
-                      meta as {
-                        token_usage?: {
-                          total_tokens?: number;
-                          is_estimated?: boolean;
-                        };
-                      }
-                    ).token_usage
-                  : null;
-              const tokenCount =
-                typeof tokenUsage?.total_tokens === 'number'
-                  ? tokenUsage.total_tokens
-                  : null;
-              const isEstimated = tokenUsage?.is_estimated === true;
-              return tokenCount !== null ? (
-                <div className="chat-session-message-tokens flex justify-end mt-1">
-                  <span className="text-xs text-low opacity-60">
-                    {isEstimated && (
-                      <span className="text-yellow-500 mr-0.5">~</span>
-                    )}
-                    {t('message.replyTokenUsage', {
-                      value: formatTokenCount(tokenCount),
-                    })}
-                  </span>
-                </div>
-              ) : null;
-            })()}
-          </div>
-        </ChatEntryContainer>
+        </div>
         {isCleanupMode && isUser && (
           <button
             type="button"

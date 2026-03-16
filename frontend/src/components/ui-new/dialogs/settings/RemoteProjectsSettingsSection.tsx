@@ -24,6 +24,7 @@ import { PROJECT_ENTITY, type Project } from 'shared/remote-types';
 import { PRESET_COLORS } from '@/lib/colors';
 import { InlineColorPicker } from '../../primitives/ColorPicker';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import {
   SettingsCard,
   SettingsField,
@@ -137,12 +138,14 @@ export function RemoteProjectsSettingsSection({
   }, [isDirty, setContextDirty]);
 
   // Handlers
-  const handleOrgSelect = (orgId: string) => {
+  const handleOrgSelect = async (orgId: string) => {
     if (isDirty) {
-      const confirmed = window.confirm(
-        t('settings.common.discardChangesConfirm')
-      );
-      if (!confirmed) return;
+      const result = await ConfirmDialog.show({
+        title: t('common:buttons.discard'),
+        message: t('settings.common.discardChangesConfirm'),
+        confirmText: t('common:buttons.discard'),
+      });
+      if (result !== 'confirmed') return;
     }
     setSelectedOrgId(orgId);
     setSelectedProjectId(null);
@@ -151,12 +154,14 @@ export function RemoteProjectsSettingsSection({
     setSuccess(null);
   };
 
-  const handleProjectSelect = (projectId: string) => {
+  const handleProjectSelect = async (projectId: string) => {
     if (isDirty) {
-      const confirmed = window.confirm(
-        t('settings.common.discardChangesConfirm')
-      );
-      if (!confirmed) return;
+      const result = await ConfirmDialog.show({
+        title: t('common:buttons.discard'),
+        message: t('settings.common.discardChangesConfirm'),
+        confirmText: t('common:buttons.discard'),
+      });
+      if (result !== 'confirmed') return;
     }
     const project = projects.find((p) => p.id === projectId);
     setSelectedProjectId(projectId);

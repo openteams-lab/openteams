@@ -4,13 +4,14 @@ use codex_app_server_protocol::JSONRPCNotification;
 use codex_core::{
     AuthManager, RolloutRecorder, ThreadManager,
     config::{Config, ConfigOverrides},
-    protocol::{
-        AgentMessageEvent, ErrorEvent, Event, EventMsg, Op as CoreOp, RolloutItem, SessionSource,
-        TokenUsageInfo, TurnContextItem,
-    },
+    models_manager::collaboration_mode_presets::CollaborationModesConfig,
 };
 use codex_protocol::{
-    config_types::SandboxMode as CodexSandboxMode, protocol::AskForApproval as CodexAskForApproval,
+    config_types::SandboxMode as CodexSandboxMode,
+    protocol::{
+        AgentMessageEvent, AskForApproval as CodexAskForApproval, ErrorEvent, Event, EventMsg,
+        Op as CoreOp, RolloutItem, SessionSource, TokenUsageInfo, TurnContextItem,
+    },
 };
 use serde_json::json;
 
@@ -194,9 +195,10 @@ impl Codex {
             config.cli_auth_credentials_store_mode,
         );
         let thread_manager = ThreadManager::new(
-            config.codex_home.clone(),
+            &config,
             auth_manager.clone(),
             SessionSource::Exec,
+            CollaborationModesConfig::default(),
         );
         let new_thread = thread_manager
             .resume_thread_from_rollout(config, rollout_path, auth_manager)
@@ -274,7 +276,10 @@ impl Codex {
         self.spawn_static_reply_helper(
             current_dir,
             vec![match message {
-                Ok(message) => EventMsg::AgentMessage(AgentMessageEvent { message }),
+                Ok(message) => EventMsg::AgentMessage(AgentMessageEvent {
+                    message,
+                    phase: None,
+                }),
                 Err(message) => EventMsg::Error(ErrorEvent {
                     message,
                     codex_error_info: None,
@@ -506,7 +511,10 @@ pub async fn log_event_notification(
 pub async fn log_event_raw(log_writer: &LogWriter, message: String) -> Result<(), ExecutorError> {
     log_event_notification(
         log_writer,
-        EventMsg::AgentMessage(AgentMessageEvent { message }),
+        EventMsg::AgentMessage(AgentMessageEvent {
+            message,
+            phase: None,
+        }),
     )
     .await
 }
