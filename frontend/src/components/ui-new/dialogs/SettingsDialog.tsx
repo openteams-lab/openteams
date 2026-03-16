@@ -186,7 +186,7 @@ function SettingsDialogContent({
                       }
                     }}
                   >
-                    <Icon className="size-4 shrink-0" weight="fill" />
+                    <Icon className="size-icon-sm shrink-0" weight="fill" />
                     <span className="truncate">
                       {t(`settings.layout.nav.${section.id}`)}
                     </span>

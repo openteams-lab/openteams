@@ -117,7 +117,7 @@ export const SelectWidget = (props: WidgetProps) => {
           <span className="truncate">
             {selectedOption?.label || placeholder || t('form.selectOption')}
           </span>
-          <CaretDownIcon className="size-3 text-[#8C8C8C]" weight="fill" />
+          <CaretDownIcon className="size-icon-xs text-[#8C8C8C]" weight="fill" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="settings-select-dropdown settings-rjsf-select-dropdown w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
