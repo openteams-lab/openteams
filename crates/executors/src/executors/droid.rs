@@ -184,4 +184,10 @@ impl StandardCodingAgentExecutor for Droid {
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
         dirs::home_dir().map(|home| home.join(".factory").join("mcp.json"))
     }
+
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".factory").join("skills")])
+            .unwrap_or_default()
+    }
 }

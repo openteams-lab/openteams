@@ -6,17 +6,14 @@ import validator from '@rjsf/validator-ajv8';
 import { useTranslation } from 'react-i18next';
 import { BaseCodingAgent } from 'shared/types';
 import { settingsRjsfTheme } from './rjsf/theme';
-import { SettingsSaveBar } from './SettingsComponents';
+import { localizeExecutorSchema } from '@/lib/agentConfigLocalization';
 
 interface ExecutorConfigFormProps {
   executor: BaseCodingAgent;
   value: unknown;
   onChange?: (formData: unknown) => void;
-  onSave?: (formData: unknown) => Promise<void>;
-  onDiscard?: () => void;
+  onValidationChange?: (hasValidationErrors: boolean) => void;
   disabled?: boolean;
-  saving?: boolean;
-  isDirty?: boolean;
 }
 
 import schemas from 'virtual:executor-schemas';
@@ -25,21 +22,19 @@ export function ExecutorConfigForm({
   executor,
   value,
   onChange,
-  onSave,
-  onDiscard,
+  onValidationChange,
   disabled = false,
-  saving = false,
-  isDirty = false,
 }: ExecutorConfigFormProps) {
-  const { t } = useTranslation('settings');
+  const { t, i18n } = useTranslation('settings');
   const [formData, setFormData] = useState<unknown>(value || {});
   const [validationErrors, setValidationErrors] = useState<
     RJSFValidationError[]
   >([]);
 
   const schema = useMemo(() => {
-    return schemas[executor];
-  }, [executor]);
+    const baseSchema = schemas[executor];
+    return baseSchema ? localizeExecutorSchema(baseSchema, i18n.language) : null;
+  }, [executor, i18n.language]);
 
   // Custom handler for env field updates
   const handleEnvChange = useCallback(
@@ -78,17 +73,15 @@ export function ExecutorConfigForm({
     setValidationErrors([]);
   }, [value, executor]);
 
+  useEffect(() => {
+    onValidationChange?.(validationErrors.length > 0);
+  }, [onValidationChange, validationErrors]);
+
   const handleChange = (event: IChangeEvent<unknown>) => {
     const newFormData = event.formData;
     setFormData(newFormData);
     if (onChange) {
       onChange(newFormData);
-    }
-  };
-
-  const handleSave = async () => {
-    if (onSave) {
-      await onSave(formData);
     }
   };
 
@@ -98,7 +91,7 @@ export function ExecutorConfigForm({
 
   if (!schema) {
     return (
-      <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error">
+      <div className="rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
         {t('settings.agents.errors.schemaNotFound', { executor })}
       </div>
     );
@@ -123,12 +116,11 @@ export function ExecutorConfigForm({
         templates={settingsRjsfTheme.templates}
         fields={settingsRjsfTheme.fields}
       >
-        {/* No submit button - SettingsSaveBar handles saving */}
         <></>
       </Form>
 
       {hasValidationErrors && (
-        <div className="bg-error/10 border border-error/50 rounded-sm p-4 text-error">
+        <div className="rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
           <ul className="list-disc list-inside space-y-1">
             {validationErrors.map((error, index) => (
               <li key={index}>
@@ -137,17 +129,6 @@ export function ExecutorConfigForm({
             ))}
           </ul>
         </div>
-      )}
-
-      {onSave && (
-        <SettingsSaveBar
-          show={isDirty}
-          saving={saving}
-          saveDisabled={hasValidationErrors}
-          unsavedMessage={t('settings.agents.save.unsavedChanges')}
-          onSave={handleSave}
-          onDiscard={onDiscard}
-        />
       )}
     </div>
   );

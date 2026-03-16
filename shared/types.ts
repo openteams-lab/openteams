@@ -112,13 +112,13 @@ export type CreateScratch = { payload: ScratchPayload, };
 
 export type UpdateScratch = { payload: ScratchPayload, };
 
-export type ChatSession = { id: string, title: string | null, status: ChatSessionStatus, summary_text: string | null, archive_ref: string | null, created_at: string, updated_at: string, archived_at: string | null, };
+export type ChatSession = { id: string, title: string | null, status: ChatSessionStatus, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, team_protocol: string | null, team_protocol_enabled: boolean, created_at: string, updated_at: string, archived_at: string | null, };
 
 export enum ChatSessionStatus { active = "active", archived = "archived" }
 
 export type CreateChatSession = { title: string | null, };
 
-export type UpdateChatSession = { title: string | null, status: ChatSessionStatus | null, summary_text: string | null, archive_ref: string | null, };
+export type UpdateChatSession = { title: string | null, status: ChatSessionStatus | null, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, team_protocol: string | null, team_protocol_enabled: boolean | null, };
 
 export type ChatAgent = { id: string, name: string, runner_type: string, system_prompt: string, tools_enabled: JsonValue, created_at: string, updated_at: string, };
 
@@ -130,7 +130,7 @@ export type ChatMessage = { id: string, session_id: string, sender_type: ChatSen
 
 export enum ChatSenderType { user = "user", agent = "agent", system = "system" }
 
-export type ChatSessionAgent = { id: string, session_id: string, agent_id: string, state: ChatSessionAgentState, workspace_path: string | null, pty_session_key: string | null, agent_session_id: string | null, agent_message_id: string | null, created_at: string, updated_at: string, };
+export type ChatSessionAgent = { id: string, session_id: string, agent_id: string, state: ChatSessionAgentState, workspace_path: string | null, pty_session_key: string | null, agent_session_id: string | null, agent_message_id: string | null, allowed_skill_ids: string[], created_at: string, updated_at: string, };
 
 export enum ChatSessionAgentState { idle = "idle", running = "running", waitingapproval = "waitingapproval", dead = "dead" }
 
@@ -142,9 +142,57 @@ export type ChatArtifact = { id: string, session_id: string, name: string, path:
 
 export type ChatRun = { id: string, session_id: string, session_agent_id: string, run_index: bigint, run_dir: string, input_path: string | null, output_path: string | null, raw_log_path: string | null, meta_path: string | null, created_at: string, };
 
-export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, };
+export type ChatWorkItem = { id: string, session_id: string, run_id: string, session_agent_id: string, agent_id: string, item_type: ChatWorkItemType, content: string, created_at: string, };
+
+export enum ChatWorkItemType { artifact = "artifact", conclusion = "conclusion" }
+
+export type ChatSkill = { id: string, name: string, description: string, content: string, trigger_type: string, trigger_keywords: string[], enabled: boolean, source: string, source_url: string | null, version: string, author: string | null, tags: string[], category: string | null, compatible_agents: string[], 
+/**
+ * Download count from skills.sh registry
+ */
+download_count: bigint, created_at: string, updated_at: string, };
+
+export type ChatSkillTriggerType = "always" | "keyword" | "manual";
+
+export type CreateChatSkill = { name: string, description: string | null, content: string, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, source: string | null, source_url: string | null, version: string | null, author: string | null, tags: Array<string> | null, category: string | null, compatible_agents: Array<string> | null, 
+/**
+ * Download count from skills.sh registry
+ */
+download_count: bigint | null, };
+
+export type UpdateChatSkill = { name: string | null, description: string | null, content: string | null, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, source: string | null, source_url: string | null, version: string | null, author: string | null, tags: Array<string> | null, category: string | null, compatible_agents: Array<string> | null, 
+/**
+ * Download count from skills.sh registry
+ */
+download_count: bigint | null, };
+
+export type ChatAgentSkill = { id: string, agent_id: string, skill_id: string, enabled: boolean, created_at: string, };
+
+export type AssignSkillToAgent = { agent_id: string, skill_id: string, enabled: boolean | null, };
+
+export type UpdateAgentSkill = { enabled: boolean | null, };
+
+export type RemoteSkillMeta = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: string[], compatible_agents: string[], source_url: string | null, 
+/**
+ * Download count from skills.sh registry
+ */
+download_count: bigint | null, };
+
+export type RemoteSkillPackage = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: Array<string>, compatible_agents: Array<string>, source_url: string | null, content: string, 
+/**
+ * Download count from skills.sh registry
+ */
+download_count: bigint | null, };
+
+export type SkillCategory = { id: string, name: string, description: string | null, };
+
+export type InstalledNativeSkill = { skill: ChatSkill, enabled: boolean, can_toggle: boolean, native_path: string, config_path: string | null, };
+
+export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "work_item_new", work_item: ChatWorkItem, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, } | { "type": "protocol_notice", session_id: string, session_agent_id: string, agent_id: string, run_id: string, agent_name: string, code: ChatProtocolNoticeCode, target: string | null, detail: string | null, output_is_empty: boolean, };
 
 export type ChatStreamDeltaType = "assistant" | "thinking";
+
+export type ChatProtocolNoticeCode = "invalid_json" | "not_json_array" | "empty_message" | "missing_send_target" | "invalid_send_target" | "invalid_send_intent";
 
 export type MentionStatus = "received" | "running" | "completed" | "failed";
 
@@ -276,7 +324,7 @@ export type TagSearchParams = { search: string | null, };
 
 export type TokenResponse = { access_token: string, expires_at: string | null, };
 
-export type UserSystemInfo = { config: Config, analytics_user_id: string, login_status: LoginStatus, environment: Environment, 
+export type UserSystemInfo = { config: Config, analytics_user_id: string, login_status: LoginStatus, home_directory: string, environment: Environment, 
 /**
  * Capabilities supported per executor (e.g., { "CLAUDE_CODE": ["SESSION_FORK"] })
  */
@@ -302,11 +350,15 @@ export type CreateFollowUpAttempt = { prompt: string, executor_profile_id: Execu
 
 export type ChatSessionListQuery = { status: ChatSessionStatus | null, };
 
-export type CreateChatSessionAgentRequest = { agent_id: string, workspace_path: string | null, };
+export type CreateChatSessionAgentRequest = { agent_id: string, workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
 
-export type UpdateChatSessionAgentRequest = { workspace_path: string | null, };
+export type UpdateChatSessionAgentRequest = { workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
+
+export type UpdateNativeSkillRequest = { enabled: boolean, };
 
 export type ChatMessageListQuery = { limit: bigint | null, };
+
+export type ChatWorkItemListQuery = { limit: bigint | null, };
 
 export type CreateChatMessageRequest = { sender_type: ChatSenderType, sender_id: string | null, content: string, meta: JsonValue | null, };
 
@@ -494,7 +546,7 @@ export type SendMessageShortcut = "ModifierEnter" | "Enter";
 
 export type ChatCompressionConfig = { 
 /**
- * Token threshold before compression kicks in (default: 50000)
+ * Token threshold before compression kicks in (default: 5000000)
  */
 token_threshold: number, 
 /**
@@ -510,7 +562,11 @@ members: Array<ChatMemberPreset>,
 /**
  * List of team preset templates
  */
-teams: Array<ChatTeamPreset>, };
+teams: Array<ChatTeamPreset>, 
+/**
+ * Team collaboration protocol content; empty string disables injection
+ */
+team_protocol: string | null, };
 
 export type ChatMemberPreset = { 
 /**
@@ -530,6 +586,10 @@ description: string,
  */
 runner_type: string | null, 
 /**
+ * Optional recommended model identifier for the selected runner
+ */
+recommended_model: string | null, 
+/**
  * System prompt defining the agent's behavior
  */
 system_prompt: string, 
@@ -537,6 +597,10 @@ system_prompt: string,
  * Optional default workspace path
  */
 default_workspace_path: string | null, 
+/**
+ * Skills preselected for members created from this preset
+ */
+selected_skill_ids: Array<string>, 
 /**
  * Tools enabled for this preset
  */
@@ -568,6 +632,10 @@ description: string,
  */
 member_ids: Array<string>, 
 /**
+ * Optional team protocol injected when importing this team preset
+ */
+team_protocol: string, 
+/**
  * Whether this is a built-in preset (cannot be deleted)
  */
 is_builtin: boolean, 
@@ -575,6 +643,8 @@ is_builtin: boolean,
  * Whether this preset is enabled (visible for import)
  */
 enabled: boolean, };
+
+export type TeamProtocolConfig = { content: string, enabled: boolean, };
 
 export type GitBranch = { name: string, is_current: boolean, is_remote: boolean, last_commit_date: Date, };
 
@@ -627,7 +697,7 @@ export type AvailabilityInfo = { "type": "LOGIN_DETECTED", last_auth_timestamp: 
 
 export type CommandBuilder = { 
 /**
- * Base executable command (e.g., "npx -y @anthropic-ai/claude-code@latest")
+ * Base executable command (e.g., "npx -y @anthropic-ai/claude-code@2.1.74")
  */
 base: string, 
 /**
@@ -769,6 +839,6 @@ export type PatchType = { "type": "NORMALIZED_ENTRY", "content": NormalizedEntry
 
 export type JsonValue = number | string | boolean | Array<JsonValue> | { [key in string]?: JsonValue } | null;
 
-export const DEFAULT_PR_DESCRIPTION_PROMPT = "Update the PR that was just created with a better title and description.\nThe PR number is #{pr_number} and the URL is {pr_url}.\n\nAnalyze the changes in this branch and write:\n1. A concise, descriptive title that summarizes the changes, postfixed with \"(agents-chatgroup)\"\n2. A detailed description that explains:\n   - What changes were made\n   - Why they were made (based on the task context)\n   - Any important implementation details\n   - At the end, include a note: \"This PR was written using [agents-chatgroup](https://agents-chatgroup.com)\"\n\nUse the appropriate CLI tool to update the PR (gh pr edit for GitHub, az repos pr update for Azure DevOps).";
+export const DEFAULT_PR_DESCRIPTION_PROMPT = "Update the PR that was just created with a better title and description.\nThe PR number is #{pr_number} and the URL is {pr_url}.\n\nAnalyze the changes in this branch and write:\n1. A concise, descriptive title that summarizes the changes, postfixed with \"(openteams)\"\n2. A detailed description that explains:\n   - What changes were made\n   - Why they were made (based on the task context)\n   - Any important implementation details\n   - At the end, include a note: \"This PR was written using [openteams](https://openteams.com)\"\n\nUse the appropriate CLI tool to update the PR (gh pr edit for GitHub, az repos pr update for Azure DevOps).";
 
 export const DEFAULT_COMMIT_REMINDER_PROMPT = "There are uncommitted changes. Please stage and commit them now with a descriptive commit message.";

@@ -1,7 +1,18 @@
 import { parseDiffStats } from '@/utils/diffStatsParser';
 import type { TFunction } from 'i18next';
-import type { ChatMemberPreset, ChatTeamPreset, JsonValue } from 'shared/types';
+import type {
+  BaseCodingAgent,
+  ChatMemberPreset,
+  ChatTeamPreset,
+  ExecutorConfigs,
+  JsonValue,
+} from 'shared/types';
 import {
+  findVariantByModel,
+  withExecutorProfileVariant,
+} from '@/utils/executor';
+import {
+  isMentionAllAlias,
   mentionTokenRegex,
   messagePalette,
   userMessageTone,
@@ -11,7 +22,6 @@ import type {
   DiffFileEntry,
   DiffMeta,
   MessageTone,
-  SessionMember,
 } from './types';
 
 export function hashKey(value: string): number {
@@ -40,35 +50,271 @@ export function extractMentions(content: string): Set<string> {
   return mentions;
 }
 
-const sendMessageDirectiveRegex =
-  /\[sendMessageTo@@(?:\{([^}\]]+)\}|([^\]\s]+))\]/g;
-
-function isValidDirectiveTarget(target: string): boolean {
-  if (!target) return false;
-  return [...target].every((char) => {
-    if (char === '_' || char === '-') return true;
-    return /[\p{L}\p{N}]/u.test(char);
-  });
+export function stripMentionAllAliases(content: string): string {
+  return content
+    .replace(mentionTokenRegex, (match, prefix: string, name: string) =>
+      isMentionAllAlias(name) ? prefix : match
+    )
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
 }
 
-export function renderSendMessageDirectives(content: string): string {
-  return content.replace(
-    sendMessageDirectiveRegex,
-    (fullMatch, rawTargetWithBrace: string, rawTargetNoBrace: string) => {
-      const rawTarget = rawTargetWithBrace ?? rawTargetNoBrace ?? '';
-      const target = rawTarget.trim();
-      if (!isValidDirectiveTarget(target)) return fullMatch;
-      // Render as disabled in-app link to get consistent blue styling.
-      const anchor = `#session-agent-${encodeURIComponent(target)}`;
-      return `[${target}](${anchor})`;
+export type AgentProtocolSendIntent =
+  | 'request'
+  | 'reply'
+  | 'notify'
+  | 'blocker'
+  | 'confirm';
+
+const validProtocolSendIntents: AgentProtocolSendIntent[] = [
+  'request',
+  'reply',
+  'notify',
+  'blocker',
+  'confirm',
+];
+
+export interface AgentProtocolMessage {
+  type: 'send' | 'record' | 'artifact' | 'conclusion' | 'artiface';
+  to?: string;
+  intent?: AgentProtocolSendIntent;
+  content: string;
+}
+
+export interface ParsedAgentResponse {
+  sendMessages: Array<{
+    target: string;
+    intent?: AgentProtocolSendIntent;
+    content: string;
+  }>;
+}
+
+export interface ChatProtocolErrorMeta {
+  code: string | null;
+  reason: string | null;
+  detail: string | null;
+  target: string | null;
+  agentName: string | null;
+  sourceMessageId: string | null;
+  outputIsEmpty: boolean;
+  rawOutput: string | null;
+}
+
+/**
+ * Try to parse agent response JSON from message content
+ * Returns null if parsing fails or content is not in expected format
+ */
+export function tryParseAgentResponse(
+  content: string
+): ParsedAgentResponse | null {
+  if (!content || typeof content !== 'string') return null;
+
+  const trimmed = content.trim();
+
+  // Try direct JSON parse first
+  try {
+    const normalized = normalizeAgentResponse(JSON.parse(trimmed));
+    if (normalized) {
+      return normalized;
     }
-  );
+  } catch {
+    // Continue to try other formats
+  }
+
+  // Try to extract from markdown json code block
+  const jsonBlockMatch = trimmed.match(/```json\s*\n?([\s\S]*?)\n?```/);
+  if (jsonBlockMatch) {
+    try {
+      const normalized = normalizeAgentResponse(
+        JSON.parse(jsonBlockMatch[1].trim())
+      );
+      if (normalized) {
+        return normalized;
+      }
+    } catch {
+      // Continue to try other formats
+    }
+  }
+
+  // Try plain code block
+  const codeBlockMatch = trimmed.match(/```\s*\n?([\s\S]*?)\n?```/);
+  if (codeBlockMatch) {
+    const blockContent = codeBlockMatch[1].trim();
+    // Skip language identifier if present
+    const lines = blockContent.split('\n');
+    const jsonContent = lines[0].startsWith('[')
+      ? blockContent
+      : lines.slice(1).join('\n').trim();
+
+    if (jsonContent.startsWith('[')) {
+      try {
+        const normalized = normalizeAgentResponse(JSON.parse(jsonContent));
+        if (normalized) {
+          return normalized;
+        }
+      } catch {
+        // Continue to try other formats
+      }
+    }
+  }
+
+  // Try to find raw JSON array
+  const jsonArrayMatch = trimmed.match(/\[[\s\S]*\]/);
+  if (jsonArrayMatch) {
+    try {
+      const normalized = normalizeAgentResponse(JSON.parse(jsonArrayMatch[0]));
+      if (normalized) {
+        return normalized;
+      }
+    } catch {
+      // Parsing failed
+    }
+  }
+
+  return null;
+}
+
+function isValidProtocolMessage(obj: unknown): obj is AgentProtocolMessage {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  const message = obj as Record<string, unknown>;
+  if (typeof message.type !== 'string' || typeof message.content !== 'string') {
+    return false;
+  }
+  if (
+    !['send', 'record', 'artifact', 'conclusion', 'artiface'].includes(
+      message.type
+    )
+  ) {
+    return false;
+  }
+  if (message.type === 'send') {
+    if (typeof message.to !== 'string') {
+      return false;
+    }
+    if (message.intent === undefined) {
+      return true;
+    }
+    return (
+      typeof message.intent === 'string' &&
+      validProtocolSendIntents.includes(
+        message.intent as AgentProtocolSendIntent
+      )
+    );
+  }
+  return true;
+}
+
+function normalizeTarget(target: string): string {
+  const normalized = target.trim().replace(/^@/, '');
+  return normalized.toLowerCase() === 'user' ? 'you' : normalized;
+}
+
+function normalizeAgentResponse(obj: unknown): ParsedAgentResponse | null {
+  if (!Array.isArray(obj)) {
+    return null;
+  }
+
+  if (!obj.every((item) => isValidProtocolMessage(item))) {
+    return null;
+  }
+
+  return {
+    sendMessages: obj
+      .filter((item) => item.type === 'send')
+      .map((item) => ({
+        target: normalizeTarget(item.to ?? ''),
+        intent: item.intent,
+        content: item.content.trim(),
+      }))
+      .filter((item) => item.target.length > 0),
+  };
+}
+
+/**
+ * Build display content from agent response
+ * Only shows routed send items
+ */
+export function buildAgentDisplayContent(
+  response: ParsedAgentResponse,
+  agentName: string
+): string {
+  let content = response.sendMessages
+    .map(({ target, content: messageContent }) =>
+      messageContent ? `@${target} ${messageContent}` : `@${target}`
+    )
+    .join('\n\n');
+
+  if (!content.trim()) {
+    content = `[${agentName} completed task]`;
+  }
+
+  return content.trim();
+}
+
+/**
+ * Extract routing target from agent response
+ */
+export function extractAgentResponseTarget(
+  response: ParsedAgentResponse
+): string | null {
+  const target = response.sendMessages[0]?.target?.trim() ?? '';
+  return target.length > 0 ? target : null;
 }
 
 export function extractRunId(meta: unknown): string | null {
   if (!meta || typeof meta !== 'object') return null;
   const runId = (meta as { run_id?: unknown }).run_id;
   return typeof runId === 'string' ? runId : null;
+}
+
+export function extractProtocolErrorMeta(
+  meta: unknown
+): ChatProtocolErrorMeta | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+
+  const rawProtocolError = (meta as { protocol_error?: unknown })
+    .protocol_error;
+  if (
+    !rawProtocolError ||
+    typeof rawProtocolError !== 'object' ||
+    Array.isArray(rawProtocolError)
+  ) {
+    return null;
+  }
+
+  const protocolError = rawProtocolError as {
+    code?: unknown;
+    reason?: unknown;
+    detail?: unknown;
+    target?: unknown;
+    agent_name?: unknown;
+    source_message_id?: unknown;
+    output_is_empty?: unknown;
+    raw_output?: unknown;
+  };
+
+  return {
+    code: typeof protocolError.code === 'string' ? protocolError.code : null,
+    reason:
+      typeof protocolError.reason === 'string' ? protocolError.reason : null,
+    detail:
+      typeof protocolError.detail === 'string' ? protocolError.detail : null,
+    target:
+      typeof protocolError.target === 'string' ? protocolError.target : null,
+    agentName:
+      typeof protocolError.agent_name === 'string'
+        ? protocolError.agent_name
+        : null,
+    sourceMessageId:
+      typeof protocolError.source_message_id === 'string'
+        ? protocolError.source_message_id
+        : null,
+    outputIsEmpty: protocolError.output_is_empty === true,
+    rawOutput:
+      typeof protocolError.raw_output === 'string'
+        ? protocolError.raw_output
+        : null,
+  };
 }
 
 export function sanitizeHandle(value: string | null | undefined): string {
@@ -500,11 +746,33 @@ export function normalizePresetToolsEnabled(value: unknown): JsonValue {
   return value as JsonValue;
 }
 
+export function normalizePresetSelectedSkillIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      value
+        .filter((skillId): skillId is string => typeof skillId === 'string')
+        .map((skillId) => skillId.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 export function areToolsEnabledEqual(a: unknown, b: unknown): boolean {
   return (
     stableStringifyJson(normalizePresetToolsEnabled(a)) ===
     stableStringifyJson(normalizePresetToolsEnabled(b))
   );
+}
+
+function normalizeRunnerTypeValue(
+  value: string | null | undefined
+): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return trimmed.replace(/-/g, '_').toUpperCase();
 }
 
 export function resolvePresetRunnerType({
@@ -518,21 +786,44 @@ export function resolvePresetRunnerType({
   enabledRunnerTypes: string[];
   availableRunnerTypes: string[];
 }): string | null {
-  const trimmedPresetRunner = presetRunnerType?.trim();
-  if (
-    trimmedPresetRunner &&
-    (enabledRunnerTypes.includes(trimmedPresetRunner) ||
-      availableRunnerTypes.includes(trimmedPresetRunner))
-  ) {
-    return trimmedPresetRunner;
+  const enabledRunnerTypeMap = new Map(
+    enabledRunnerTypes.map((runnerType) => [
+      normalizeRunnerTypeValue(runnerType),
+      runnerType,
+    ])
+  );
+  const availableRunnerTypeMap = new Map(
+    availableRunnerTypes.map((runnerType) => [
+      normalizeRunnerTypeValue(runnerType),
+      runnerType,
+    ])
+  );
+
+  const normalizedPresetRunner = normalizeRunnerTypeValue(presetRunnerType);
+  if (normalizedPresetRunner) {
+    const matchedEnabledRunner = enabledRunnerTypeMap.get(
+      normalizedPresetRunner
+    );
+    if (matchedEnabledRunner) {
+      return matchedEnabledRunner;
+    }
+
+    const matchedAvailableRunner = availableRunnerTypeMap.get(
+      normalizedPresetRunner
+    );
+    if (matchedAvailableRunner) {
+      return matchedAvailableRunner;
+    }
   }
 
-  const trimmedDefaultRunner = defaultRunnerType?.trim();
-  if (
-    trimmedDefaultRunner &&
-    enabledRunnerTypes.includes(trimmedDefaultRunner)
-  ) {
-    return trimmedDefaultRunner;
+  const normalizedDefaultRunner = normalizeRunnerTypeValue(defaultRunnerType);
+  if (normalizedDefaultRunner) {
+    const matchedDefaultRunner = enabledRunnerTypeMap.get(
+      normalizedDefaultRunner
+    );
+    if (matchedDefaultRunner) {
+      return matchedDefaultRunner;
+    }
   }
 
   if (enabledRunnerTypes.length > 0) {
@@ -567,10 +858,36 @@ export function getSessionWorkspacePath(
   return `chat/session_${sessionId}/agents/${agentName}`;
 }
 
+function resolvePresetWorkspacePath(
+  explicitWorkspacePath: string | null | undefined,
+  fallbackWorkspacePath: string | null | undefined,
+  sessionId: string,
+  agentName: string
+): string {
+  return (
+    explicitWorkspacePath?.trim() ||
+    fallbackWorkspacePath?.trim() ||
+    getSessionWorkspacePath(sessionId, agentName)
+  );
+}
+
 export function validateWorkspacePath(path: string): string | null {
   const trimmed = path.trim();
   if (!trimmed) {
     return 'Workspace path is required.';
+  }
+
+  const isAbsolutePath =
+    // Windows: C:\, D:\, etc., or UNC paths \\server\share
+    /^[a-zA-Z]:[\\/]/.test(trimmed) ||
+    trimmed.startsWith('\\\\') ||
+    // Unix/macOS: /path
+    trimmed.startsWith('/') ||
+    // Home directory expansion (will be expanded by backend)
+    trimmed.startsWith('~');
+
+  if (!isAbsolutePath) {
+    return 'Workspace path must be an absolute path.';
   }
 
   const hasControlChars = [...trimmed].some((char) => {
@@ -639,6 +956,32 @@ export function validateWorkspacePath(path: string): string | null {
   return null;
 }
 
+export function translateWorkspacePathError(
+  error: string,
+  t: (key: string) => string,
+  prefix: 'importPreview.errors' | 'addMemberErrors' = 'importPreview.errors'
+): string {
+  if (error === 'Workspace path is required.') {
+    return t(`members.${prefix}.workspacePathRequired`);
+  }
+  if (error === 'Workspace path must be an absolute path.') {
+    return t(`members.${prefix}.workspacePathMustBeAbsolute`);
+  }
+  if (error === 'Workspace path does not exist.') {
+    return t(`members.${prefix}.workspacePathNotExist`);
+  }
+  if (error === 'Workspace path must be an existing directory.') {
+    return t(`members.${prefix}.workspacePathNotDirectory`);
+  }
+  if (error.startsWith('Workspace path is not accessible')) {
+    return t(`members.${prefix}.workspacePathNotAccessible`);
+  }
+  if (error === 'Invalid workspace path.') {
+    return t(`members.${prefix}.invalidWorkspacePath`);
+  }
+  return error;
+}
+
 export type MemberPresetImportAction = 'create' | 'reuse' | 'skip';
 
 export interface MemberPresetImportPlan {
@@ -648,6 +991,7 @@ export interface MemberPresetImportPlan {
   finalName: string;
   systemPrompt: string;
   toolsEnabled: JsonValue;
+  selectedSkillIds: string[];
   action: MemberPresetImportAction;
   reason: string;
   agentId: string | null;
@@ -687,20 +1031,24 @@ export function getLocalizedMemberPresetNameById(
 export function buildMemberPresetImportPlan({
   preset,
   sessionId,
-  sessionMembers,
+  fallbackWorkspacePath,
   defaultRunnerType,
   enabledRunnerTypes,
   availableRunnerTypes,
-  takenNamesLowercase,
+  profiles,
 }: {
   preset: ChatMemberPreset;
   sessionId: string;
-  sessionMembers: SessionMember[];
+  fallbackWorkspacePath?: string | null;
   defaultRunnerType: string | null | undefined;
   enabledRunnerTypes: string[];
   availableRunnerTypes: string[];
-  takenNamesLowercase: Set<string>;
+  profiles: ExecutorConfigs['executors'] | null | undefined;
 }): MemberPresetImportPlan | null {
+  const presetName =
+    preset.name.trim().length > 0 ? preset.name.trim() : preset.id;
+  const systemPrompt = preset.system_prompt?.trim() ?? '';
+  const baseToolsEnabled = normalizePresetToolsEnabled(preset.tools_enabled);
   const runnerType = resolvePresetRunnerType({
     presetRunnerType: preset.runner_type,
     defaultRunnerType,
@@ -708,46 +1056,54 @@ export function buildMemberPresetImportPlan({
     availableRunnerTypes,
   });
   if (!runnerType) {
-    return null;
-  }
-
-  const presetName =
-    preset.name.trim().length > 0 ? preset.name.trim() : preset.id;
-  const systemPrompt = preset.system_prompt?.trim() ?? '';
-  const toolsEnabled = normalizePresetToolsEnabled(preset.tools_enabled);
-  const hasSameNameInSession = sessionMembers.some(
-    (member) => member.agent.name.toLowerCase() === presetName.toLowerCase()
-  );
-  if (hasSameNameInSession) {
     return {
       presetId: preset.id,
       presetName: preset.name,
-      runnerType,
+      runnerType: '',
       finalName: presetName,
       systemPrompt,
-      toolsEnabled,
-      action: 'skip',
-      reason: 'duplicate-name-in-session',
+      toolsEnabled: baseToolsEnabled,
+      action: 'create',
+      reason: 'runner-not-available',
       agentId: null,
-      workspacePath:
-        preset.default_workspace_path?.trim() ||
-        getSessionWorkspacePath(sessionId, presetName),
+      workspacePath: resolvePresetWorkspacePath(
+        preset.default_workspace_path,
+        fallbackWorkspacePath,
+        sessionId,
+        presetName
+      ),
+      selectedSkillIds: normalizePresetSelectedSkillIds(
+        preset.selected_skill_ids
+      ),
     };
   }
 
-  const finalName = resolveUniqueAgentName(presetName, takenNamesLowercase);
+  const recommendedVariant = findVariantByModel(
+    runnerType as BaseCodingAgent,
+    preset.recommended_model,
+    profiles
+  );
+  const toolsEnabled = recommendedVariant
+    ? withExecutorProfileVariant(baseToolsEnabled, recommendedVariant)
+    : baseToolsEnabled;
   return {
     presetId: preset.id,
     presetName: preset.name,
     runnerType,
-    finalName,
+    finalName: presetName,
     systemPrompt,
     toolsEnabled,
     action: 'create',
     reason: 'create-new-agent',
     agentId: null,
-    workspacePath:
-      preset.default_workspace_path?.trim() ||
-      getSessionWorkspacePath(sessionId, finalName),
+    workspacePath: resolvePresetWorkspacePath(
+      preset.default_workspace_path,
+      fallbackWorkspacePath,
+      sessionId,
+      presetName
+    ),
+    selectedSkillIds: normalizePresetSelectedSkillIds(
+      preset.selected_skill_ids
+    ),
   };
 }

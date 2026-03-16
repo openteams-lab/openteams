@@ -61,6 +61,9 @@ export function useChatMutations(
         status: null,
         summary_text: null,
         archive_ref: null,
+        last_seen_diff_key: null,
+        team_protocol: null,
+        team_protocol_enabled: null,
       }),
     onSuccess: (session) => {
       queryClient.invalidateQueries({ queryKey: ['chatSessions'] });

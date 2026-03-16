@@ -6,6 +6,7 @@ import { tagsApi } from '@/lib/api';
 import { TagEditDialog } from '@/components/dialogs/tasks/TagEditDialog';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 import { IconButton } from '@/components/ui-new/primitives/IconButton';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import type { Tag } from 'shared/types';
 
 export function TagManager() {
@@ -48,13 +49,16 @@ export function TagManager() {
 
   const handleDelete = useCallback(
     async (tag: Tag) => {
-      if (
-        !confirm(
-          t('settings.general.tags.manager.deleteConfirm', {
-            tagName: tag.tag_name,
-          })
-        )
-      ) {
+      const result = await ConfirmDialog.show({
+        title: t('common:buttons.delete'),
+        message: t('settings.general.tags.manager.deleteConfirm', {
+          tagName: tag.tag_name,
+        }),
+        confirmText: t('common:buttons.delete'),
+        variant: 'destructive',
+      });
+
+      if (result !== 'confirmed') {
         return;
       }
 

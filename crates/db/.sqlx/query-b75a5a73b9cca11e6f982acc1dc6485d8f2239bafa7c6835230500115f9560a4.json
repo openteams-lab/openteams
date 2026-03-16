@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id as \"id!: Uuid\",\n                      agent_id as \"agent_id!: Uuid\",\n                      skill_id as \"skill_id!: Uuid\",\n                      enabled as \"enabled!: bool\",\n                      created_at as \"created_at!: DateTime<Utc>\"\n               FROM chat_agent_skills\n               WHERE skill_id = $1\n               ORDER BY created_at ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "agent_id!: Uuid",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "skill_id!: Uuid",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "enabled!: bool",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b75a5a73b9cca11e6f982acc1dc6485d8f2239bafa7c6835230500115f9560a4"
+}

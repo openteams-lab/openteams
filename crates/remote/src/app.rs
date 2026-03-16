@@ -1,4 +1,4 @@
-﻿use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{Context, bail};
 use secrecy::ExposeSecret;
@@ -98,7 +98,7 @@ impl Server {
         }
 
         let http_client = reqwest::Client::builder()
-            .user_agent("AgentChatgroupRemote/1.0")
+            .user_agent("OpenTeamsRemote/1.0")
             .build()
             .context("failed to create HTTP client")?;
 

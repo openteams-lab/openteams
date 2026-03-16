@@ -1,4 +1,4 @@
-﻿---
+---
 title: "OpenAI Codex"
 description: "Set up OpenAI Codex integration"
 icon: /logos/openai-logo.svg
@@ -17,12 +17,12 @@ icon: /logos/openai-logo.svg
   Alternatively, Codex can be used via the OpenAI API by setting the `OPENAI_API_KEY` environment variable. For more details, see the [OpenAI documentation](https://developers.openai.com/codex/pricing/#use-an-openai-api-key)
 </Step>
 
-<Step title="Start agents-chatgroup">
-  Once authenticated, launch agents-chatgroup:
+<Step title="Start openteams">
+  Once authenticated, launch openteams:
 
   **Option 1: Run with npx**
   ```bash
-  npx agents-chatgroup
+  npx openteams
   ```
 
   **Option 2: Use Desktop Installer**
@@ -34,12 +34,12 @@ icon: /logos/openai-logo.svg
 
 ## Custom Configuration Directory
 
-By default, Codex stores its configuration and session data in `~/.codex`. If you have configured a custom location using the `CODEX_HOME` environment variable, agents-chatgroup will automatically detect and use that location.
+By default, Codex stores its configuration and session data in `~/.codex`. If you have configured a custom location using the `CODEX_HOME` environment variable, openteams will automatically detect and use that location.
 
 ```bash
 # Example: Using a project-specific Codex configuration
 export CODEX_HOME=/path/to/custom/codex
-npx agents-chatgroup
+npx openteams
 ```
 
 This is useful for:

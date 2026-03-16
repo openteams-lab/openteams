@@ -454,6 +454,12 @@ impl StandardCodingAgentExecutor for KimiCode {
         dirs::home_dir().map(|home| home.join(".kimi").join("mcp.json"))
     }
 
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".agents").join("skills")])
+            .unwrap_or_default()
+    }
+
     fn get_availability_info(&self) -> AvailabilityInfo {
         if resolve_executable_path_blocking(Self::base_command()).is_none() {
             return AvailabilityInfo::NotFound;

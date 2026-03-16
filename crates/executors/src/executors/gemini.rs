@@ -15,6 +15,7 @@ use crate::{
     executors::{
         AppendPrompt, AvailabilityInfo, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
     },
+    skill_config::NativeSkillConfigBackend,
 };
 
 #[derive(Derivative, Clone, Serialize, Deserialize, TS, JsonSchema)]
@@ -38,8 +39,11 @@ pub struct Gemini {
 }
 
 impl Gemini {
+    const BASE_COMMAND: &'static str = "npx -y @google/gemini-cli@0.33.0";
+    const MAX_RESUME_PROMPT_BYTES: usize = 160 * 1024;
+
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
-        let mut builder = CommandBuilder::new("npx -y @google/gemini-cli@latest");
+        let mut builder = CommandBuilder::new(Self::BASE_COMMAND);
 
         if let Some(model) = &self.model {
             builder = builder.extend_params(["--model", model.as_str()]);
@@ -68,7 +72,8 @@ impl StandardCodingAgentExecutor for Gemini {
         prompt: &str,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let harness = AcpAgentHarness::new();
+        let harness =
+            AcpAgentHarness::new().with_max_resume_prompt_bytes(Self::MAX_RESUME_PROMPT_BYTES);
         let combined_prompt = self.append_prompt.combine_prompt(prompt);
         let gemini_command = self.build_command_builder()?.build_initial()?;
         let approvals = if self.yolo.unwrap_or(false) {
@@ -96,7 +101,8 @@ impl StandardCodingAgentExecutor for Gemini {
         _reset_to_message_id: Option<&str>,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let harness = AcpAgentHarness::new();
+        let harness =
+            AcpAgentHarness::new().with_max_resume_prompt_bytes(Self::MAX_RESUME_PROMPT_BYTES);
         let combined_prompt = self.append_prompt.combine_prompt(prompt);
         let gemini_command = self.build_command_builder()?.build_follow_up(&[])?;
         let approvals = if self.yolo.unwrap_or(false) {
@@ -123,6 +129,20 @@ impl StandardCodingAgentExecutor for Gemini {
 
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
         dirs::home_dir().map(|home| home.join(".gemini").join("settings.json"))
+    }
+
+    fn default_skill_config_path(&self) -> Option<std::path::PathBuf> {
+        self.default_mcp_config_path()
+    }
+
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".gemini").join("skills")])
+            .unwrap_or_default()
+    }
+
+    fn native_skill_config_backend(&self) -> NativeSkillConfigBackend {
+        NativeSkillConfigBackend::Gemini
     }
 
     fn get_availability_info(&self) -> AvailabilityInfo {

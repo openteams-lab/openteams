@@ -26,9 +26,7 @@
         "organizations": "Organization Settings",
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "Projects",
-        "remote-projectsDesc": "Manage projects",
-        "presets": "Presets",
-        "presetsDesc": "AI member and team preset templates"
+        "remote-projectsDesc": "Manage projects"
       }
     },
     "general": {
@@ -83,7 +81,7 @@
           "host": {
             "label": "Remote SSH Host (Optional)",
             "placeholder": "e.g., hostname or IP address",
-            "helper": "Set this if agents-chatgroup is running on a remote server. When set, clicking \"Open in Editor\" will generate a URL to open your editor via SSH instead of spawning a local command."
+            "helper": "Set this if openteams is running on a remote server. When set, clicking \"Open in Editor\" will generate a URL to open your editor via SSH instead of spawning a local command."
           },
           "user": {
             "label": "Remote SSH User (Optional)",
@@ -209,7 +207,7 @@
       },
       "privacy": {
         "title": "Privacy",
-        "description": "Help improve agents-chatgroup by sharing anonymous usage data.",
+        "description": "Help improve openteams by sharing anonymous usage data.",
         "telemetry": {
           "label": "Enable Telemetry",
           "helper": "Enables anonymous usage events tracking to help improve the application. No prompts or project information are collected."
@@ -512,9 +510,13 @@
       "saveError": "Failed to save presets.",
       "builtin": "built-in",
       "disabled": "disabled",
+      "search": "Search",
+      "searchPlaceholder": "Search members...",
+      "searchMembersPlaceholder": "Search team members...",
+      "noSearchResults": "No results found",
       "tabs": {
-        "members": "Member Templates",
-        "teams": "Team Templates"
+        "members": "AI Employees",
+        "teams": "AI Teams"
       },
       "actions": {
         "copy": "Duplicate",
@@ -528,17 +530,19 @@
         "empty": "No member presets. Add one to get started.",
         "fields": {
           "id": "Preset ID",
-          "name": "Handle (@mention name)",
+          "name": "Name",
           "namePlaceholder": "e.g. backend",
           "description": "Description",
           "descriptionPlaceholder": "What this AI member does",
           "runnerType": "Runner Type (optional)",
           "runnerTypePlaceholder": "Leave empty to use session default",
+          "recommendedModel": "Recommended Model (optional)",
+          "recommendedModelPlaceholder": "Leave empty to use executor default",
           "systemPrompt": "Role settings (required)",
           "systemPromptPlaceholder": "Describe this AI member's role settings...",
           "workspacePath": "Default Workspace Path (optional)",
           "workspacePathPlaceholder": "e.g. backend",
-          "toolsEnabled": "Tools (JSON)"
+          "skills": "Skills"
         },
         "errors": {
           "toolsJsonInvalid": "Tools JSON is invalid.",
@@ -612,8 +616,8 @@
         "delete": "Delete"
       },
       "tabs": {
-        "members": "Member Templates",
-        "teams": "Team Templates"
+        "members": "AI Employees",
+        "teams": "AI Teams"
       },
       "members": {
         "title": "Member Templates",
