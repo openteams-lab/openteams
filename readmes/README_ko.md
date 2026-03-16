@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 20px; margin-bottom: 15px;">
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 40px; margin-bottom: 20px;">
 
   <p><strong>팀으로 에이전트를 실행하고, AI 시대에 효율을 배가하세요.</strong></p>
 
@@ -12,7 +12,6 @@
   </p>
 
   <p>
-    <a href="https://your-demo-link.com">데모 보기</a> |
     <a href="#빠른-시작">빠른 시작</a> |
     <a href="https://docs.openteams.com">문서</a>
   </p>
