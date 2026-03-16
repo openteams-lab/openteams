@@ -6,11 +6,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/StarterraAI/OpenTeams"
+    "url": "https://github.com/openteams-lab/openteams"
   },
-  "homepage": "https://github.com/StarterraAI/OpenTeams",
+  "homepage": "https://github.com/openteams-lab/openteams",
   "bugs": {
-    "url": "https://github.com/StarterraAI/OpenTeams/issues"
+    "url": "https://github.com/openteams-lab/openteams/issues"
   },
   "keywords": [
     "ai",
