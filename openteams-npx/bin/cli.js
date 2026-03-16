@@ -28,7 +28,7 @@ const METADATA_PATH = path.join(INSTALL_DIR, "install.json");
 function printBanner() {
   console.log("");
   console.log("  ===============================================");
-  console.log("            Agents ChatGroup Binary Installer");
+  console.log("            OpenTeams Binary Installer");
   console.log("  ===============================================");
   console.log("");
 }
