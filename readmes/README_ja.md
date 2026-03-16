@@ -12,7 +12,6 @@
   </p>
 
   <p>
-    <a href="https://your-demo-link.com">デモを見る</a> |
     <a href="#クイックスタート">クイックスタート</a> |
     <a href="https://docs.openteams.com">ドキュメント</a>
   </p>
