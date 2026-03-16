@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320">
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 20px; margin-bottom: 15px;">
 
   <p><strong>팀으로 에이전트를 실행하고, AI 시대에 효율을 배가하세요.</strong></p>
 

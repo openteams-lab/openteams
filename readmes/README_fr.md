@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320">
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 20px; margin-bottom: 15px;">
 
   <p><strong>Exécutez les agents comme une équipe, multipliez votre efficacité à l'ère de l'IA.</strong></p>
 
