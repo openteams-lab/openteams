@@ -2228,27 +2228,19 @@ impl ChatRunner {
         Self::push_markdown_bool_field(&mut markdown, "only_send_items_enter_group_history", true);
         Self::push_markdown_block_field(
             &mut markdown,
-            "formatting standards",
+            "mandatory standards",
             concat!(
-                "1. Return ONLY a valid JSON array. Long messages must also be returned in JSON array.\n",
+                "1. Return ONLY a valid JSON array.\n",
                 "2. Your final reply MUST be parseable by a standard JSON parser.\n",
                 "3. Escape all double quotes, backslashes, and newlines inside JSON string values.\n",
                 "4. Before sending, verify that every `content` value is still a valid JSON string after escaping.\n",
-            ),
-            "text",
-        );
-        Self::push_markdown_block_field(
-            &mut markdown,
-            "mandatory instruction",
-            concat!(
-                "1. Cut the fluff.\n",
-                "2. Content in 'send' type messages must be concise: keep general messages to 1-3 sentences, and write complex content into files saved in the current workspace.\n",
-                "3. Artifact-type messages must exclusively list current work outputs, preserving only essential information and maintaining maximum conciseness.\n",
-                "4. Conclusion-type messages should only convey key findings and be limited to 3 sentences or fewer.\n",
-                "5. Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.\n",
-                "6. Use `to = \\\"you\\\"` when sending a message to the user. Here `you` refers to the human user.\n",
-                "7. Verify if a message is essential before sending it to the group; otherwise, do not send it.\n",
-                "8. For send items, `intent` is optional but recommended when the routing semantics matter.\n",
+                "5. The JSON array supports only these message types: send, artifact, conclusion, record.\n",
+                "6. Keep `send` messages concise, within 1-3 sentences. Put complex content into files saved in the current workspace.\n",
+                "7. `artifact` messages must only list current work outputs, keeping only essential information.\n",
+                "8. `conclusion` messages must contain only key findings and be no more than 3 sentences.\n",
+                "9. Do not include anything unrelated to the assigned work. Keep every reply concise and precise.\n",
+                "10. Use `to = \\\"you\\\"` when sending a message to the user.\n",
+                "11. Send a message only when it is essential.\n"
             ),
             "text",
         );
