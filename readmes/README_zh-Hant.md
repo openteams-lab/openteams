@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 20px; margin-bottom: 15px;">
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 40px; margin-bottom: 20px;">
 
   <p><strong>以團隊方式運行 Agent，讓效率在 AI 時代成倍提升。</strong></p>
 
@@ -12,7 +12,6 @@
   </p>
 
   <p>
-    <a href="https://your-demo-link.com">觀看演示</a> |
     <a href="#快速開始">快速開始</a> |
     <a href="https://docs.openteams.com">文檔</a>
   </p>
