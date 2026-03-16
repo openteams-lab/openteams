@@ -225,8 +225,9 @@ Open the frontend page at `http://localhost:<FRONTEND_PORT>` (example: `http://l
 
 ### Roadmap
 - [ ] Backend for Code Agent optimized for OpenTeams use cases
+- [ ] Develop multiple frontend color schemes
 - [ ] Establish a high-efficiency team collaboration framework
-- [ ] More agent integrations (Cursor, Windsurf, etc.)
+- [ ] More agent integrations (Kilo Code, OpenClaw, etc.)
 - [ ] Add more powerful, ready-to-use AI teams
 - [ ] Added more powerful skills
 - [ ] Offer a highly optimized, customized version
