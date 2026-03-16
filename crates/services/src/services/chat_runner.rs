@@ -2228,17 +2228,27 @@ impl ChatRunner {
         Self::push_markdown_bool_field(&mut markdown, "only_send_items_enter_group_history", true);
         Self::push_markdown_block_field(
             &mut markdown,
-            "instruction",
+            "formatting standards",
             concat!(
-                "- Return ONLY a valid JSON array. Long messages must also be returned in JSON array.\n",
-                "- Your final reply MUST be parseable by a standard JSON parser.\n",
-                "- Escape all double quotes, backslashes, and newlines inside JSON string values.\n",
-                "- Before sending, verify that every `content` value is still a valid JSON string after escaping.\n",
-                "- Only send items will be turned into visible group chat messages and written into group history.\n",
-                "- The current agent is always recorded as the sender automatically. Do not impersonate other senders.\n",
-                "- Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.\n",
-                "- Use `to = \\\"you\\\"` when sending a message to the user. Here `you` refers to the human user.\n",
-                "- For send items, `intent` is optional but recommended when the routing semantics matter.\n",
+                "1. Return ONLY a valid JSON array. Long messages must also be returned in JSON array.\n",
+                "2. Your final reply MUST be parseable by a standard JSON parser.\n",
+                "3. Escape all double quotes, backslashes, and newlines inside JSON string values.\n",
+                "4. Before sending, verify that every `content` value is still a valid JSON string after escaping.\n",
+            ),
+            "text",
+        );
+        Self::push_markdown_block_field(
+            &mut markdown,
+            "mandatory instruction",
+            concat!(
+                "1. Cut the fluff.\n",
+                "2. Content in 'send' type messages must be concise: keep general messages to 1-3 sentences, and write complex content into files saved in the current workspace.\n",
+                "3. Artifact-type messages must exclusively list current work outputs, preserving only essential information and maintaining maximum conciseness.\n",
+                "4. Conclusion-type messages should only convey key findings and be limited to 3 sentences or fewer.\n",
+                "5. Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.\n",
+                "6. Use `to = \\\"you\\\"` when sending a message to the user. Here `you` refers to the human user.\n",
+                "7. Verify if a message is essential before sending it to the group; otherwise, do not send it.\n",
+                "8. For send items, `intent` is optional but recommended when the routing semantics matter.\n",
             ),
             "text",
         );
@@ -2255,13 +2265,13 @@ impl ChatRunner {
             &mut markdown,
             "rules",
             concat!(
-                "- A send item targets exactly one receiver.\n",
-                "- The recipient must be one of the member names listed in group members.\n",
-                "- Use concise language with a clear goal.\n",
-                "- Content may be empty.\n",
-                "- Prefer setting `intent` for machine-readable routing semantics.\n",
-                "- Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply required; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.\n",
-                "- The system will render the final group message as `@receiver content` and route it to that receiver.\n",
+                "1. A send item targets exactly one receiver.\n",
+                "2. The recipient must be one of the member names listed in group members.\n",
+                "3. Use concise language with a clear goal.\n",
+                "4. Content can not be empty.\n",
+                "5. Prefer setting `intent` for machine-readable routing semantics.\n",
+                "6. Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply required; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.\n",
+                "7. The system will render the final group message as `@receiver content` and route it to that receiver.\n",
             ),
             "text",
         );
@@ -2521,13 +2531,8 @@ impl ChatRunner {
         }
         markdown.push('\n');
         markdown.push_str(value);
-        if value.contains('\n') || value.ends_with('\n') {
-            if !value.ends_with('\n') {
-                markdown.push('\n');
-            }
-            markdown.push_str(&fence);
-            markdown.push_str("\n\n");
-            return;
+        if !value.ends_with('\n') {
+            markdown.push('\n');
         }
         markdown.push_str(&fence);
         markdown.push_str("\n\n");
@@ -2544,14 +2549,14 @@ impl ChatRunner {
         let mut longest_run = 0usize;
         let mut current_run = 0usize;
         for ch in content.chars() {
-            if ch == '~' {
+            if ch == '`' {
                 current_run += 1;
                 longest_run = longest_run.max(current_run);
             } else {
                 current_run = 0;
             }
         }
-        "~".repeat(longest_run.max(2) + 1)
+        "`".repeat(longest_run.max(2) + 1)
     }
 
     fn resolve_prompt_language(
@@ -4983,8 +4988,8 @@ mod tests {
         assert!(prompt.contains("### message.attachments item 1"));
         assert!(prompt.contains("- **from**: agent:architect"));
         assert!(prompt.contains("- **to**: agent:product"));
-        assert!(prompt.contains("~~~text\n@product Please confirm the delivery scope\n~~~"));
-        assert!(prompt.contains("~~~text\nReferenced message\n~~~"));
+        assert!(prompt.contains("```text\n@product Please confirm the delivery scope\n```"));
+        assert!(prompt.contains("```text\nReferenced message\n```"));
         assert!(prompt.contains(r"- **local_path**: E:\workspace\projectSS\MainPage2\spec.md"));
         assert!(prompt.contains(r"- **local_path**: E:\workspace\projectSS\MainPage2\ui.png"));
         assert!(!prompt.contains("[message]"));
@@ -5112,8 +5117,9 @@ mod tests {
 - **sender**: you
 - **content**:
 
-~~~text
-@fullstack ~~~
+```text
+@fullstack 
+```
 
 # Must be obeyed
 
@@ -5123,19 +5129,27 @@ mod tests {
 - **format**: json
 - **container**: list
 - **only_send_items_enter_group_history**: true
-- **instruction**:
+- **formatting standards**:
 
-~~~text
-- Return ONLY a valid JSON array. Long messages must also be returned in JSON array.
-- Your final reply MUST be parseable by a standard JSON parser.
-- Escape all double quotes, backslashes, and newlines inside JSON string values.
-- Before sending, verify that every `content` value is still a valid JSON string after escaping.
-- Only send items will be turned into visible group chat messages and written into group history.
-- The current agent is always recorded as the sender automatically. Do not impersonate other senders.
-- Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.
-- Use `to = \"you\"` when sending a message to the user. Here `you` refers to the human user.
-- For send items, `intent` is optional but recommended when the routing semantics matter.
-~~~
+```text
+1. Return ONLY a valid JSON array. Long messages must also be returned in JSON array.
+2. Your final reply MUST be parseable by a standard JSON parser.
+3. Escape all double quotes, backslashes, and newlines inside JSON string values.
+4. Before sending, verify that every `content` value is still a valid JSON string after escaping.
+```
+
+- **mandatory instruction**:
+
+```text
+1. Cut the fluff.
+2. Content in 'send' type messages must be concise: keep general messages to 1-3 sentences, and write complex content into files saved in the current workspace.
+3. Artifact-type messages must exclusively list current work outputs, preserving only essential information and maintaining maximum conciseness.
+4. Conclusion-type messages should only convey key findings and be limited to 3 sentences or fewer.
+5. Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.
+6. Use `to = \"you\"` when sending a message to the user. Here `you` refers to the human user.
+7. Verify if a message is essential before sending it to the group; otherwise, do not send it.
+8. For send items, `intent` is optional but recommended when the routing semantics matter.
+```
 
 ### output.message_types item 1
 
@@ -5144,15 +5158,15 @@ mod tests {
 - **optional_fields**: ["intent"]
 - **rules**:
 
-~~~text
-- A send item targets exactly one receiver.
-- The recipient must be one of the member names listed in group members.
-- Use concise language with a clear goal.
-- Content may be empty.
-- Prefer setting `intent` for machine-readable routing semantics.
-- Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply required; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.
-- The system will render the final group message as `@receiver content` and route it to that receiver.
-~~~
+```text
+1. A send item targets exactly one receiver.
+2. The recipient must be one of the member names listed in group members.
+3. Use concise language with a clear goal.
+4. Content can not be empty.
+5. Prefer setting `intent` for machine-readable routing semantics.
+6. Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply required; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.
+7. The system will render the final group message as `@receiver content` and route it to that receiver.
+```
 
 ### output.message_types item 2
 
@@ -5177,7 +5191,7 @@ mod tests {
 
 - **json**:
 
-~~~json
+```json
 [
   {"type": "send", "to": "you", "intent": "request", "content": "I have finished the front implementation"},
   {"type": "send", "to": "architect", "intent": "confirm", "content": "The UI is ready. Please confirm the API contract before I continue."},
@@ -5185,7 +5199,7 @@ mod tests {
   {"type": "artifact", "content": "Saved the experiment plan to `docs/experiments/chat-metrics-plan.md`."},
   {"type": "conclusion", "content": "This round finished the metric definition. Next step is wiring collection into the runner."}
 ]
-~~~
+```
 
 ## agent
 
@@ -5194,9 +5208,9 @@ mod tests {
 - **name**: fullstack
 - **role**:
 
-~~~text
+```text
 You are the team "Full-stack Engineer". Your goal is to ship complete user-facing capabilities by aligning backend contracts, frontend behavior, and operational reliability.
-~~~
+```
 
 ### skills
 
@@ -5214,9 +5228,9 @@ You are the team "Full-stack Engineer". Your goal is to ship complete user-facin
 - **configured**: true
 - **guidelines**:
 
-~~~text
+```text
 Follow the team protocol.
-~~~
+```
 
 
 # Group Members
@@ -5234,12 +5248,12 @@ _No other AI members._
 - **optional**: true
 - **instruction**:
 
-~~~text
+```text
 If you need to understand the current group chat state, you MAY inspect this file yourself.
 Reading history is optional. Do not assume you must read history before acting.
 Prioritize reading history when the new message implies continuation or refinement, such as "continue", "继续", "接着", "基于前文", "refine", or "update".
 If the current task can be completed independently, you do not need to read history.
-~~~
+```
 
 ## history.shared_blackboard
 
@@ -5248,10 +5262,10 @@ If the current task can be completed independently, you do not need to read hist
 - **description**: Persisted shared messages generated from record items.
 - **instruction**:
 
-~~~text
+```text
 You can search by member name to find shared messages published by a specific member.
 Before writing a record item, if you are unsure whether the fact was already captured, check this file first.
-~~~
+```
 
 ## history.work_records
 
@@ -5260,11 +5274,11 @@ Before writing a record item, if you are unsure whether the fact was already cap
 - **description**: Persisted work outputs and summaries generated from artifact/conclusion items.
 - **instruction**:
 
-~~~text
+```text
 You can search by member name to find a specific member's work outputs and status summaries.
 Use this file when you need to review what members have already completed.
 Before writing an artifact or conclusion item, if you are unsure whether similar work or status was already recorded, check this file first.
-~~~
+```
 
 # envelope
 
