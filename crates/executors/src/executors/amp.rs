@@ -39,9 +39,11 @@ pub struct Amp {
 }
 
 impl Amp {
+    const BASE_COMMAND: &'static str = "npx -y @sourcegraph/amp@0.0.1773273801-g50314c";
+
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
-        let mut builder = CommandBuilder::new("npx -y @sourcegraph/amp@latest")
-            .params(["--execute", "--stream-json"]);
+        let mut builder =
+            CommandBuilder::new(Self::BASE_COMMAND).params(["--execute", "--stream-json"]);
         if let Some(model) = &self.model {
             builder = builder.extend_params(["--mode", model]);
         }
@@ -184,5 +186,11 @@ impl StandardCodingAgentExecutor for Amp {
     // MCP configuration methods
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
         dirs::home_dir().map(|home| home.join(".config").join("amp").join("settings.json"))
+    }
+
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".agents").join("skills")])
+            .unwrap_or_default()
     }
 }

@@ -55,8 +55,10 @@ pub struct Copilot {
 }
 
 impl Copilot {
+    const BASE_COMMAND: &'static str = "npx -y @github/copilot@1.0.4";
+
     fn build_command_builder(&self, log_dir: &str) -> Result<CommandBuilder, CommandBuildError> {
-        let mut builder = CommandBuilder::new("npx -y @github/copilot@latest").params([
+        let mut builder = CommandBuilder::new(Self::BASE_COMMAND).params([
             "--no-color",
             "--log-level",
             "debug",
@@ -216,6 +218,12 @@ impl StandardCodingAgentExecutor for Copilot {
     // MCP configuration methods
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
         dirs::home_dir().map(|home| home.join(".copilot").join("mcp-config.json"))
+    }
+
+    fn native_skill_discovery_roots(&self) -> Vec<std::path::PathBuf> {
+        dirs::home_dir()
+            .map(|home| vec![home.join(".github").join("skills")])
+            .unwrap_or_default()
     }
 
     fn get_availability_info(&self) -> AvailabilityInfo {

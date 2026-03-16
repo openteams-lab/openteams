@@ -99,10 +99,14 @@ type WysiwygProps = {
   findMatchingDiffPath?: (text: string) => string | null;
   /** Callback when clickable inline code is clicked (only in read-only mode) */
   onCodeClick?: (fullPath: string) => void;
-  /** Show a static toolbar below the editor content */
+/** Show a static toolbar below the editor content */
   showStaticToolbar?: boolean;
   /** Save status indicator for static toolbar */
   saveStatus?: 'idle' | 'saved';
+  /** Hide the copy button in read-only mode */
+  hideCopyButton?: boolean;
+  /** Preserve the last editor height after the content is cleared */
+  preserveHeightOnClear?: boolean;
 };
 
 /** Ref interface for WYSIWYGEditor, exposing imperative methods */
@@ -151,11 +155,16 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
       onCodeClick,
       showStaticToolbar = false,
       saveStatus,
+      hideCopyButton = false,
+      preserveHeightOnClear = false,
     }: WysiwygProps,
     ref: React.ForwardedRef<WYSIWYGEditorRef>
   ) {
     // Ref to capture the Lexical editor instance for imperative methods
     const editorInstanceRef = useRef<LexicalEditor | null>(null);
+    const contentEditableRef = useRef<HTMLDivElement | null>(null);
+    const latestValueRef = useRef(value);
+    const [preservedHeight, setPreservedHeight] = useState<number | null>(null);
 
     // Expose focus method via ref
     useImperativeHandle(ref, () => ({
@@ -163,6 +172,46 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
         editorInstanceRef.current?.focus();
       },
     }));
+
+    useEffect(() => {
+      latestValueRef.current = value;
+    }, [value]);
+
+    useEffect(() => {
+      if (!preserveHeightOnClear) {
+        setPreservedHeight(null);
+        return;
+      }
+
+      const element = contentEditableRef.current;
+      if (!element || typeof ResizeObserver === 'undefined') {
+        return;
+      }
+
+      const updatePreservedHeight = () => {
+        if (latestValueRef.current.trim() === '') {
+          return;
+        }
+
+        const nextHeight = Math.ceil(element.getBoundingClientRect().height);
+        if (nextHeight <= 0) {
+          return;
+        }
+
+        setPreservedHeight((currentHeight) =>
+          currentHeight === nextHeight ? currentHeight : nextHeight
+        );
+      };
+
+      updatePreservedHeight();
+
+      const observer = new ResizeObserver(() => {
+        updatePreservedHeight();
+      });
+      observer.observe(element);
+
+      return () => observer.disconnect();
+    }, [preserveHeightOnClear]);
 
     // Copy button state
     const [copied, setCopied] = useState(false);
@@ -303,7 +352,13 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
                   <RichTextPlugin
                     contentEditable={
                       <ContentEditable
+                        ref={contentEditableRef}
                         className={cn('outline-none', className)}
+                        style={
+                          preserveHeightOnClear && preservedHeight
+                            ? { minHeight: `${preservedHeight}px` }
+                            : undefined
+                        }
                         aria-label={
                           disabled ? 'Markdown content' : 'Markdown editor'
                         }
@@ -370,28 +425,30 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
       </div>
     );
 
-    // Wrap with action buttons in read-only mode
+// Wrap with action buttons in read-only mode
     if (disabled) {
       return (
         <div className="relative group">
           <div className="sticky top-0 right-2 z-10 pointer-events-none h-0">
             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
               {/* Copy button */}
-              <Button
-                type="button"
-                aria-label={copied ? 'Copied!' : 'Copy as Markdown'}
-                title={copied ? 'Copied!' : 'Copy as Markdown'}
-                variant="icon"
-                size="icon"
-                onClick={handleCopy}
-                className="pointer-events-auto p-2 bg-muted h-8 w-8"
-              >
-                {copied ? (
-                  <Check className="w-4 h-4 text-success" />
-                ) : (
-                  <Clipboard className="w-4 h-4 text-muted-foreground" />
-                )}
-              </Button>
+              {!hideCopyButton && (
+                <Button
+                  type="button"
+                  aria-label={copied ? 'Copied!' : 'Copy as Markdown'}
+                  title={copied ? 'Copied!' : 'Copy as Markdown'}
+                  variant="icon"
+                  size="icon"
+                  onClick={handleCopy}
+                  className="pointer-events-auto p-2 bg-muted h-8 w-8"
+                >
+                  {copied ? (
+                    <Check className="w-4 h-4 text-success" />
+                  ) : (
+                    <Clipboard className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </Button>
+              )}
               {/* Edit button - only if onEdit provided */}
               {onEdit && (
                 <Button

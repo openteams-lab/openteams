@@ -27,6 +27,7 @@ import { useAuth } from '@/hooks/auth/useAuth';
 import { LoginRequiredPrompt } from '@/components/dialogs/shared/LoginRequiredPrompt';
 import { CreateOrganizationDialog } from '@/components/dialogs/org/CreateOrganizationDialog';
 import { InviteMemberDialog } from '@/components/dialogs/org/InviteMemberDialog';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import type {
   InviteMemberResult,
   CreateOrganizationResult,
@@ -176,8 +177,13 @@ export function OrganizationSettings() {
   const handleRemoveMember = async (userId: string) => {
     if (!selectedOrgId) return;
 
-    const confirmed = window.confirm(t('confirmRemoveMember'));
-    if (!confirmed) return;
+    const result = await ConfirmDialog.show({
+      title: t('common:confirm.defaultConfirm'),
+      message: t('confirmRemoveMember'),
+      confirmText: t('common:buttons.delete'),
+      variant: 'destructive',
+    });
+    if (result !== 'confirmed') return;
 
     setError(null);
     removeMember.mutate({ orgId: selectedOrgId, userId });
@@ -193,10 +199,13 @@ export function OrganizationSettings() {
   const handleDeleteOrganization = async () => {
     if (!selectedOrgId || !selectedOrg) return;
 
-    const confirmed = window.confirm(
-      t('settings.confirmDelete', { orgName: selectedOrg.name })
-    );
-    if (!confirmed) return;
+    const result = await ConfirmDialog.show({
+      title: t('common:buttons.delete'),
+      message: t('settings.confirmDelete', { orgName: selectedOrg.name }),
+      confirmText: t('common:buttons.delete'),
+      variant: 'destructive',
+    });
+    if (result !== 'confirmed') return;
 
     setError(null);
     deleteOrganization.mutate(selectedOrgId);

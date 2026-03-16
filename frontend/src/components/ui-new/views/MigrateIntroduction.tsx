@@ -1,4 +1,4 @@
-﻿import {
+import {
   ArrowRightIcon,
   UsersIcon,
   TagIcon,
@@ -23,7 +23,7 @@ const features = [
       <>
         Access your projects from anywhere.{' '}
         <a
-          href="https://github.com/StarterraAI/AgentsChatGroup"
+          href="https://github.com/StarterraAI/OpenTeams"
           target="_blank"
           rel="noopener noreferrer"
           className="text-brand hover:underline"

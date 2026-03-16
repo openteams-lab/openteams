@@ -1,5 +1,6 @@
 import type {
   BaseCodingAgent,
+  ExecutorConfig,
   ExecutorConfigs,
   ExecutorAction,
   ExecutorProfileId,
@@ -25,6 +26,13 @@ function normalizeVariantValue(
     return null;
   }
   return trimmed;
+}
+
+function normalizeModelLookupValue(
+  value: string | null | undefined
+): string | null {
+  const trimmed = value?.trim() ?? '';
+  return trimmed ? trimmed.toLowerCase() : null;
 }
 
 export function isOpencodeExecutor(
@@ -83,11 +91,13 @@ export function areProfilesEqual(
  * Returns variants sorted: DEFAULT first, then alphabetically.
  */
 export function getVariantOptions(
-  executor: BaseCodingAgent | null | undefined,
+  executor: BaseCodingAgent | string | null | undefined,
   profiles: ExecutorConfigs['executors'] | null | undefined
 ): string[] {
   if (!executor || !profiles) return [];
-  const executorConfig = profiles[executor];
+  const executorConfig = (profiles as Record<string, ExecutorConfig | undefined>)[
+    executor
+  ];
   if (!executorConfig) return [];
 
   const variants = Object.keys(executorConfig);
@@ -118,7 +128,9 @@ export function getVariantModelName(
   profiles: ExecutorConfigs['executors'] | null | undefined
 ): string | null {
   if (!executor || !profiles) return null;
-  const executorConfig = profiles[executor as BaseCodingAgent];
+  const executorConfig = (profiles as Record<string, ExecutorConfig | undefined>)[
+    executor
+  ];
   if (!executorConfig) return null;
 
   const variantKey =
@@ -137,6 +149,35 @@ export function getVariantModelName(
   const model = innerConfig?.model;
   if (typeof model !== 'string' || model.trim().length === 0) return null;
   return model;
+}
+
+export function findVariantByModel(
+  executor: BaseCodingAgent | string | null | undefined,
+  model: string | null | undefined,
+  profiles: ExecutorConfigs['executors'] | null | undefined
+): string | null {
+  if (!executor || !profiles) return null;
+
+  const targetModel = normalizeModelLookupValue(model);
+  if (!targetModel) return null;
+
+  const variants = getVariantOptions(executor as BaseCodingAgent, profiles);
+  for (const variant of variants) {
+    const variantModel = getVariantModelName(executor, variant, profiles);
+    const normalizedVariantModel = normalizeModelLookupValue(variantModel);
+    if (normalizedVariantModel === targetModel) {
+      return variant;
+    }
+
+    const formattedVariantModel = normalizeModelLookupValue(
+      formatExecutorModelLabel(executor, variantModel)
+    );
+    if (formattedVariantModel === targetModel) {
+      return variant;
+    }
+  }
+
+  return null;
 }
 
 export function formatOpencodeModelLabel(model: string): string {

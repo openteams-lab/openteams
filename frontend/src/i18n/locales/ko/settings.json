@@ -26,9 +26,7 @@
         "organizations": "Organization Settings",
         "organizationsDesc": "Manage organization members and permissions",
         "remote-projects": "프로젝트",
-        "remote-projectsDesc": "프로젝트 관리",
-        "presets": "프리셋",
-        "presetsDesc": "AI 멤버 및 팀 프리셋 템플릿"
+        "remote-projectsDesc": "프로젝트 관리"
       }
     },
     "general": {
@@ -83,7 +81,7 @@
           "host": {
             "label": "원격 SSH 호스트 (선택사항)",
             "placeholder": "예: 호스트 이름 또는 IP 주소",
-            "helper": "agents-chatgroup이 원격 서버에서 실행 중인 경우 설정하세요. 설정하면 \"에디터에서 열기\"를 클릭할 때 로컬 명령을 실행하는 대신 SSH를 통해 에디터를 여는 URL이 생성됩니다."
+            "helper": "openteams이 원격 서버에서 실행 중인 경우 설정하세요. 설정하면 \"에디터에서 열기\"를 클릭할 때 로컬 명령을 실행하는 대신 SSH를 통해 에디터를 여는 URL이 생성됩니다."
           },
           "user": {
             "label": "원격 SSH 사용자 (선택사항)",
@@ -209,7 +207,7 @@
       },
       "privacy": {
         "title": "개인정보 보호",
-        "description": "익명 사용 데이터를 공유하여 agents-chatgroup 개선에 도움을 주세요.",
+        "description": "익명 사용 데이터를 공유하여 openteams 개선에 도움을 주세요.",
         "telemetry": {
           "label": "원격 분석 활성화",
           "helper": "애플리케이션 개선을 위한 익명 사용 이벤트 추적을 활성화합니다. 프롬프트나 프로젝트 정보는 수집되지 않습니다."
@@ -512,9 +510,13 @@
       "saveError": "프리셋 저장에 실패했습니다.",
       "builtin": "기본 제공",
       "disabled": "비활성화됨",
+      "search": "검색",
+      "searchPlaceholder": "멤버 검색...",
+      "searchMembersPlaceholder": "팀 멤버 검색...",
+      "noSearchResults": "결과를 찾을 수 없습니다",
       "tabs": {
-        "members": "멤버 템플릿",
-        "teams": "팀 템플릿"
+        "members": "AI 직원",
+        "teams": "AI 팀"
       },
       "actions": {
         "copy": "복제",
@@ -528,7 +530,7 @@
         "empty": "멤버 프리셋이 없습니다. 하나 추가해 시작하세요.",
         "fields": {
           "id": "프리셋 ID",
-          "name": "핸들(@멘션 이름)",
+          "name": "이름",
           "namePlaceholder": "예: backend",
           "description": "설명",
           "descriptionPlaceholder": "이 AI 멤버의 역할",
@@ -538,7 +540,7 @@
           "systemPromptPlaceholder": "이 AI 멤버의 역할 설정을 설명하세요...",
           "workspacePath": "기본 워크스페이스 경로(선택)",
           "workspacePathPlaceholder": "예: backend",
-          "toolsEnabled": "도구(JSON)"
+          "skills": "기술"
         },
         "errors": {
           "toolsJsonInvalid": "도구 JSON이 올바르지 않습니다.",
@@ -612,8 +614,8 @@
         "delete": "삭제"
       },
       "tabs": {
-        "members": "멤버 템플릿",
-        "teams": "팀 템플릿"
+        "members": "AI 직원",
+        "teams": "AI 팀"
       },
       "members": {
         "title": "멤버 템플릿",

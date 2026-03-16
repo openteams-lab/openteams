@@ -98,8 +98,10 @@ import {
   ChatSession,
   ChatSessionStatus,
   ChatMessage,
+  TeamProtocolConfig,
   ChatAgent,
   ChatSenderType,
+  ChatWorkItem,
   CreateChatAgent,
   CreateChatSession,
   UpdateChatSession,
@@ -108,9 +110,25 @@ import {
   CreateChatSessionAgentRequest,
   UpdateChatSessionAgentRequest,
   UpdateChatAgent,
+  ChatSkill,
+  CreateChatSkill,
+  UpdateChatSkill,
+  InstalledNativeSkill,
+  UpdateNativeSkillRequest,
+  ChatAgentSkill,
+  AssignSkillToAgent,
+  UpdateAgentSkill,
+  RemoteSkillMeta,
+  RemoteSkillPackage,
+  SkillCategory,
 } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { createWorkspaceWithSession } from '@/types/attempt';
+
+export interface AgentInfo {
+  id: string;
+  name: string;
+}
 
 export class ApiError<E = unknown> extends Error {
   public status?: number;
@@ -146,6 +164,11 @@ export type Err<E> = { success: false; error: E | undefined; message?: string };
 
 // Result type for endpoints that need typed errors
 export type Result<T, E> = Ok<T> | Err<E>;
+
+interface BuiltinSkillsStats {
+  total_skills: number;
+  categories: string[];
+}
 
 // Special handler for Result-returning endpoints
 const handleApiResponseAsResult = async <T, E>(
@@ -1456,6 +1479,23 @@ export const chatApi = {
     return handleApiResponse<ChatSession>(response);
   },
 
+  markDiffSeen: async (
+    sessionId: string,
+    diffKey: string
+  ): Promise<ChatSession> => {
+    const response = await makeRequest(`/api/chat/sessions/${sessionId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        title: null,
+        status: null,
+        summary_text: null,
+        archive_ref: null,
+        last_seen_diff_key: diffKey,
+      }),
+    });
+    return handleApiResponse<ChatSession>(response);
+  },
+
   archiveSession: async (sessionId: string): Promise<ChatSession> => {
     const response = await makeRequest(
       `/api/chat/sessions/${sessionId}/archive`,
@@ -1490,6 +1530,7 @@ export const chatApi = {
       senderHandle?: string;
       content?: string;
       referenceMessageId?: string;
+      appLanguage?: string;
     }
   ): Promise<ChatMessage> => {
     const form = new FormData();
@@ -1504,6 +1545,9 @@ export const chatApi = {
     }
     if (options?.referenceMessageId) {
       form.append('reference_message_id', options.referenceMessageId);
+    }
+    if (options?.appLanguage) {
+      form.append('app_language', options.appLanguage);
     }
 
     const response = await fetch(
@@ -1534,6 +1578,17 @@ export const chatApi = {
     return handleApiResponse<ChatMessage[]>(response);
   },
 
+  listWorkItems: async (
+    sessionId: string,
+    limit?: number
+  ): Promise<ChatWorkItem[]> => {
+    const queryParam = limit ? `?limit=${limit}` : '';
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/work-items${queryParam}`
+    );
+    return handleApiResponse<ChatWorkItem[]>(response);
+  },
+
   createMessage: async (
     sessionId: string,
     data: CreateChatMessageRequest
@@ -1553,6 +1608,22 @@ export const chatApi = {
       method: 'DELETE',
     });
     return handleApiResponse<void>(response);
+  },
+
+  getTeamProtocol: async (sessionId: string): Promise<TeamProtocolConfig> => {
+    const response = await makeRequest(`/api/chat/sessions/${sessionId}/team-protocol`);
+    return handleApiResponse<TeamProtocolConfig>(response);
+  },
+
+  updateTeamProtocol: async (
+    sessionId: string,
+    data: TeamProtocolConfig
+  ): Promise<TeamProtocolConfig> => {
+    const response = await makeRequest(`/api/chat/sessions/${sessionId}/team-protocol`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<TeamProtocolConfig>(response);
   },
 
   deleteMessagesBatch: async (
@@ -1673,8 +1744,30 @@ export const chatApi = {
     return response.text();
   },
 
-  getRunLog: async (runId: string): Promise<string> => {
-    const response = await makeRequest(`/api/chat/runs/${runId}/log`);
+  getRunLog: async (
+    runId: string,
+    options?: { offset?: number; limit?: number; tail?: boolean }
+  ): Promise<string> => {
+    const params = new URLSearchParams();
+    if (options?.offset !== undefined) {
+      params.set('offset', String(options.offset));
+    }
+    if (options?.limit !== undefined) {
+      params.set('limit', String(options.limit));
+    }
+    if (options?.tail !== undefined) {
+      params.set('tail', String(options.tail));
+    }
+    if (!params.has('limit')) {
+      params.set('limit', '262144');
+    }
+    if (!params.has('tail') && !params.has('offset')) {
+      params.set('tail', 'true');
+    }
+    const query = params.toString();
+    const response = await makeRequest(
+      `/api/chat/runs/${runId}/log${query ? `?${query}` : ''}`
+    );
     if (!response.ok) {
       throw new ApiError(
         response.statusText || 'Failed to fetch run log',
@@ -1707,6 +1800,218 @@ export const chatApi = {
     content,
     meta: meta ?? null,
   }),
+
+  // ─── Skills ───
+
+  listSkills: async (): Promise<ChatSkill[]> => {
+    const response = await makeRequest('/api/chat/skills');
+    return handleApiResponse<ChatSkill[]>(response);
+  },
+
+  listNativeSkills: async (
+    runnerType: string
+  ): Promise<InstalledNativeSkill[]> => {
+    const response = await makeRequest(
+      `/api/chat/skills/native/${encodeURIComponent(runnerType)}`
+    );
+    return handleApiResponse<InstalledNativeSkill[]>(response);
+  },
+
+  updateNativeSkill: async (
+    runnerType: string,
+    skillId: string,
+    enabled: boolean
+  ): Promise<InstalledNativeSkill> => {
+    const payload: UpdateNativeSkillRequest = { enabled };
+    const response = await makeRequest(
+      `/api/chat/skills/native/${encodeURIComponent(runnerType)}/${skillId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }
+    );
+    return handleApiResponse<InstalledNativeSkill>(response);
+  },
+
+  getSkill: async (skillId: string): Promise<ChatSkill> => {
+    const response = await makeRequest(`/api/chat/skills/${skillId}`);
+    return handleApiResponse<ChatSkill>(response);
+  },
+
+  createSkill: async (data: CreateChatSkill): Promise<ChatSkill> => {
+    const response = await makeRequest('/api/chat/skills', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<ChatSkill>(response);
+  },
+
+  updateSkill: async (
+    skillId: string,
+    data: UpdateChatSkill
+  ): Promise<ChatSkill> => {
+    const response = await makeRequest(`/api/chat/skills/${skillId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<ChatSkill>(response);
+  },
+
+  deleteSkill: async (skillId: string): Promise<void> => {
+    const response = await makeRequest(`/api/chat/skills/${skillId}`, {
+      method: 'DELETE',
+    });
+    return handleApiResponse<void>(response);
+  },
+
+  // ─── Agent-Skill Assignments ───
+
+  listAgentSkills: async (agentId: string): Promise<ChatAgentSkill[]> => {
+    const response = await makeRequest(
+      `/api/chat/agents/${agentId}/skills`
+    );
+    return handleApiResponse<ChatAgentSkill[]>(response);
+  },
+
+  assignSkillToAgent: async (
+    data: AssignSkillToAgent
+  ): Promise<ChatAgentSkill> => {
+    const response = await makeRequest(
+      `/api/chat/agents/${data.agent_id}/skills`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<ChatAgentSkill>(response);
+  },
+
+  updateAgentSkill: async (
+    agentId: string,
+    assignmentId: string,
+    data: UpdateAgentSkill
+  ): Promise<ChatAgentSkill> => {
+    const response = await makeRequest(
+      `/api/chat/agents/${agentId}/skills/${assignmentId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<ChatAgentSkill>(response);
+  },
+
+  unassignSkillFromAgent: async (
+    agentId: string,
+    assignmentId: string
+  ): Promise<void> => {
+    const response = await makeRequest(
+      `/api/chat/agents/${agentId}/skills/${assignmentId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    return handleApiResponse<void>(response);
+  },
+
+  // ─── Remote Skill Registry ───
+
+  listRegistrySkills: async (
+    registryUrl?: string
+  ): Promise<RemoteSkillMeta[]> => {
+    const url = registryUrl
+      ? `/api/chat/registry/skills?registry_url=${encodeURIComponent(registryUrl)}`
+      : '/api/chat/registry/skills';
+    const response = await makeRequest(url);
+    return handleApiResponse<RemoteSkillMeta[]>(response);
+  },
+
+  getRegistrySkill: async (
+    skillId: string,
+    registryUrl?: string
+  ): Promise<RemoteSkillPackage> => {
+    const url = registryUrl
+      ? `/api/chat/registry/skills/${skillId}?registry_url=${encodeURIComponent(registryUrl)}`
+      : `/api/chat/registry/skills/${skillId}`;
+    const response = await makeRequest(url);
+    return handleApiResponse<RemoteSkillPackage>(response);
+  },
+
+  listRegistryCategories: async (
+    registryUrl?: string
+  ): Promise<SkillCategory[]> => {
+    const url = registryUrl
+      ? `/api/chat/registry/categories?registry_url=${encodeURIComponent(registryUrl)}`
+      : '/api/chat/registry/categories';
+    const response = await makeRequest(url);
+    return handleApiResponse<SkillCategory[]>(response);
+  },
+
+  installRegistrySkill: async (
+    skillId: string,
+    registryUrl?: string,
+    agents?: string[]
+  ): Promise<ChatSkill> => {
+    const params = new URLSearchParams();
+    if (registryUrl) {
+      params.append('registry_url', registryUrl);
+    }
+    const paramStr = params.toString();
+    const url = `/api/chat/registry/skills/${skillId}/install${paramStr ? '?' + paramStr : ''}`;
+    const response = await makeRequest(url, {
+      method: 'POST',
+      body: JSON.stringify({ agents }),
+    });
+    return handleApiResponse<ChatSkill>(response);
+  },
+
+  listBuiltinSkills: async (params?: {
+    category?: string;
+    agent?: string;
+    search?: string;
+  }): Promise<RemoteSkillMeta[]> => {
+    const query = new URLSearchParams();
+    if (params?.category) query.set('category', params.category);
+    if (params?.agent) query.set('agent', params.agent);
+    if (params?.search) query.set('search', params.search);
+    const response = await makeRequest(
+      `/api/chat/builtin/skills${query.toString() ? `?${query.toString()}` : ''}`
+    );
+    return handleApiResponse<RemoteSkillMeta[]>(response);
+  },
+
+  getBuiltinSkill: async (skillId: string): Promise<RemoteSkillPackage> => {
+    const response = await makeRequest(`/api/chat/builtin/skills/${skillId}`);
+    return handleApiResponse<RemoteSkillPackage>(response);
+  },
+
+  installBuiltinSkill: async (skillId: string, agents?: string[]): Promise<ChatSkill> => {
+    const response = await makeRequest(`/api/chat/builtin/skills/${skillId}/install`, {
+      method: 'POST',
+      body: JSON.stringify({ agents }),
+    });
+    return handleApiResponse<ChatSkill>(response);
+  },
+
+  getBuiltinSkillsStats: async (): Promise<BuiltinSkillsStats> => {
+    const response = await makeRequest('/api/chat/builtin/skills/stats');
+    return handleApiResponse<BuiltinSkillsStats>(response);
+  },
+
+  listSupportedAgents: async (): Promise<AgentInfo[]> => {
+    const response = await makeRequest('/api/chat/skills/agents');
+    return handleApiResponse<AgentInfo[]>(response);
+  },
+
+  validateWorkspacePath: async (
+    workspacePath: string
+  ): Promise<{ valid: boolean; error?: string }> => {
+    const response = await makeRequest('/api/chat/validate-workspace-path', {
+      method: 'POST',
+      body: JSON.stringify({ workspace_path: workspacePath }),
+    });
+    return handleApiResponse<{ valid: boolean; error?: string }>(response);
+  },
 };
 
 // Search API (multi-repo file search)

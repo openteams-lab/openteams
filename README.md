@@ -1,36 +1,44 @@
 <div align="center">
-  <img src="frontend/public/agent-chatgroup-logo-white.png" alt="AgentsChatGroup" width="320">
+  <img src="frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320">
 
-  <h1>AgentsChatGroup</h1>
-
-  <p><strong>Run a team of AI agents in one group chat - they @mention each other, share context, and work in parallel.</strong></p>
+  <p><strong>Run agents as one team, multiply your efficiency in the AI era.</strong></p>
 
   <p>
-    <a href="https://www.npmjs.com/package/agents-chatgroup"><img alt="npm" src="https://img.shields.io/npm/v/agents-chatgroup?style=flat-square" /></a>
-    <a href="https://github.com/StarterraAI/AgentsChatGroup/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/StarterraAI/AgentsChatGroup/actions/workflows/pre-release.yml/badge.svg" /></a>
+    <a href="https://www.npmjs.com/package/openteams"><img alt="npm" src="https://img.shields.io/npm/v/openteams?style=flat-square" /></a>
+    <a href="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml/badge.svg" /></a>
     <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
     <a href="https://discord.gg/MbgNFJeWDc"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
-    <a href="https://docs.agentschatgroup.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
+    <a href="https://docs.openteams.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
   </p>
 
   <p>
     <a href="https://your-demo-link.com">Watch Demo</a> |
     <a href="#quick-start">Quick Start</a> |
-    <a href="https://docs.agentschatgroup.com">Docs</a>
+    <a href="https://docs.openteams.com">Docs</a>
   </p>
 
   <p align="center">
-    <a href="./README_zh.md">中文</a>
+    <a href="./README.md">English</a> |
+    <a href="./readmes/README_zh-Hans.md">简体中文</a> |
+    <a href="./readmes/README_zh-Hant.md">繁體中文</a> |
+    <a href="./readmes/README_ja.md">日本語</a> |
+    <a href="./readmes/README_ko.md">한국어</a> |
+    <a href="./readmes/README_fr.md">Français</a> |
+    <a href="./readmes/README_es.md">Español</a>
   </p>
-  
 </div>
 
 ---
 
-![AgentsChatGroup Demo](docs/images/demo.gif)
+![OpenTeams Demo](images/demo.gif)
+
+**One-Minute Getting Started Guide**
+
+1. Import a preset team and choose the base agent for each member.
+2. Set up workspaces for each member in the team.
+3. Message a specific member with `@mentions`.
 
 ---
-
 
 ## Quick Start
 
@@ -38,14 +46,16 @@
 
 ```bash
 # web
-npx agents-chatgroup
+npx openteams-web
 ```
 
 ### Option B: Download Desktop App
 
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
-[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
-[![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/StarterraAI/AgentsChatGroup/releases/latest)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/openteams-lab/openteams/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/openteams-lab/openteams/releases/latest)
+[![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest)
+
+### Requirements
 
 **You'll need at least one AI agent installed:**
 
@@ -54,102 +64,74 @@ npx agents-chatgroup
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm i -g @anthropic-ai/claude-code` |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @google/gemini-cli` |
 | [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex` |
-| [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code@latest` |
+| [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code` |
+| [OpenCode](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g opencode-ai` |
 
-📚 [Guides for Installing More Agents →](https://docs.agentschatgroup.com/getting-started)
-
-## Why develop this app?
-
-You might be using Claude Code, Gemini CLI, and Codex every day. Have you run into the following issues?
-
-- **you are the middleman.** you copy outputs from one agent and paste them into another, manually.
-- **No parallelism.** Tasks queue up. One agent finishes, then the next one starts.
-- **Lost context.** Every new agent conversation starts from zero.
-- **Context switching kills flow.** Jumping between multiple chat windows is exhausting.
-
-**AI is getting more powerful, but we developers are getting more exhausted.**
-
-## The Solution
-
-AgentsChatGroup puts all your AI agents into **one chat group**. They share context, `@mention` each other to hand off tasks, and work in parallel like a real team.
-
-
-```
-╭─────────────────────────────────────────────────────────────╮
-│                    AgentsChatGroup 🧩                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  👤 You                                                     │
-│  │  @coder Build a user login feature                       │
-│                                                             │
-│  🤖 Coder                                    [parallel ⚡] │
-│  │  Writing the login module...                             │
-│  │  └─ @reviewer Done! Please review this.                  │
-│                                                             │
-│  🤖 Reviewer                                 [parallel ⚡] │
-│  │  Found 2 security issues:                                │
-│  │  1. Passwords need hashing                               │
-│  │  2. Add rate limiting                                    │
-│  │  └─ @coder Please fix these.                             │
-│                                                             │
-│  🤖 Coder                                                   │
-│  │  Fixed. Pushing now...                                   │
-│                                                             │
-╰─────────────────────────────────────────────────────────────╯
-```
-
-You assign the task once. The agents figure out the rest.
-
-## How It's Different
-
-| Capability | 🧍 Traditional Single Agent | 🪟 Multi-window Workflow | 🤖 Claude Code-Agent Team | 🧩 AgentsChatGroup |
-|--|--|--|--|--|
-| Parallelism | ❌ No (sequential) | ⚠️ Partial (manual) | ✅ Yes (Claude subagents) | ✅ Yes (automatic) |
-| Shared context | ❌ No | ❌ No (copy-paste) | ⚠️ Partial (split subagent contexts) | ✅ Yes (always in sync) |
-| Multi-model collaboration | ❌ No | ⚠️ Partial (manual switching) | ❌ No (Claude-only) | ✅ Yes (Claude + Gemini + Codex + more) |
-| Agent handoff | ❌ No | ❌ No (you orchestrate) | ⚠️ Partial (delegated inside Claude) | ✅ Yes (@mention) |
-| Your effort | 🔺 High | 🔺 Very high | ◼️ Medium | 🔹 Low |
-
-## Features
-
-| Category | Details |
-|----------|---------|
-| **Agent Support** | Claude Code, Gemini CLI, Codex, Amp, QWen Coder, and other popular agents |
-| **Collaboration** | Group chat, shared context, @mention handoff, task tracking, session archive |
-| **Team Presets** | 22 built-in member presets, 8 built-in team presets, one-click team import, custom presets with full CRUD |
-| **Config** | Unified MCP config, flexible environment variables |
-| **Platform** | Desktop app (Windows / macOS / Linux), web app (npx) |
-| **Coming Soon** | Compact context optimization, more agent integrations |
-
-
-## AI Team Presets
-
-Stop configuring the same agents over and over. AgentsChatGroup includes **22 built-in member presets** and **8 built-in team presets** you can import in one click.
-
-![AgentsChatGroup_AddTeam](docs/images/add_team_en.png)
-
-You can also build and save your own custom presets. When importing a team, a preview shows exactly which members will be created, reused, or renamed - so there are no surprises.
-
-📚 [Team Presets documentation](https://docs.agentschatgroup.com/core-features/ai-team-presets)
+📚 [More agent installation guides](https://docs.openteams.com/getting-started)
 
 ---
 
-### Use Cases
+## Features
 
-**Full-stack Development Team**
-> Architect designs the schema -> Coder implements -> Reviewer checks security -> Tester writes coverage. All in one chat, in parallel.
+| Feature | What you get |
+|--|--|
+| **Supported agents** | supports 10 coding-agent runtimes, including `Claude Code`, `Gemini CLI`, `Codex`, `Qwen Code`, `Amp`, `Cursor Agent`, `Copilot`, `Droid`, `Kimi Code`, and `OpenCode`. And currently integrating other agents.|
+| **Shared group-chat context** | Every participant works from the same conversation history instead of juggling copied prompts across separate windows. |
+| **Parallel execution** | Multiple agents can work on the same task at the same time inside one shared session. Different agents handle the tasks they are best at. |
+| **Autonomous collaboration** | Agents can `@mention` each other, hand work off, and coordinate directly inside the chat. |
+| **Built-in AI members** | Start with 160+ built-in AI members across engineering, marketing, writing, research, and content production. |
+| **Built-in AI team presets** | Launch with 8 ready-to-use team presets for common workflows. |
+| **Team guidelines** | Define who leads, who can talk to whom, and how collaboration should happen. Customize your AI team and team guidelines. |
+| **Skill library** | Equip agents with 1000+ built-in skills, and import your own skills when needed. |
+| **Fully local execution** | Agents run against your local workspace, and runtime artifacts stay under `.openteams/` inside that workspace. There is no need to be concerned about data privacy. |
 
-**Content Production Team**
-> Researcher gathers sources -> Writer drafts -> Editor polishes. No copy-pasting between chats.
+### Parallel Agent Execution
 
-**Codebase Audit**
-> Multiple agents scan different modules simultaneously. Get a full report in a fraction of the time.
+*Run multiple agents in the same shared context and let them execute in parallel to speed up delivery.*
 
-**Data Pipeline**
-> Cleaner preps data -> Analyst runs queries -> Visualizer builds charts. Each agent picks up where the last left off.
+![OpenTeams parallel](images/parallel.gif)
 
-Assemble more AI teams. The future is yours to build.
+### Autonomous Agent Collaboration
 
+*openteams lets agents message each other directly without forcing a fixed workflow. If you want more structure, add team guidelines to control communication, appoint a lead agent, or let everyone collaborate freely. The communication pattern is entirely up to your use case.*
+
+![OpenTeams collaborate](images/collaborate.gif)
+
+### AI Members
+
+*openteams includes 160+ built-in AI members across engineering, marketing, writing, content production, and more. Mix and match them into different teams, customize them, and build role combinations that fit the way you work. We will continue expanding and improving the roster.*
+
+![OpenTeams members](images/members.gif)
+
+### AI Teams
+
+*openteams ships with 8 built-in team presets for common workflows, so you can get started immediately. We recommend defining team guidelines when you create a team so collaboration stays aligned with how you want the group to operate.*
+
+![OpenTeams team](images/team.gif)
+
+### Skill Library
+
+*openteams includes 1000+ built-in skills that you can combine and assign to different AI members. You can also import skills you create yourself and apply them directly to your agents. We will keep expanding the skill library with a focus on capabilities that hold up in real production environments.*
+
+![OpenTeams skills](images/skills.gif)
+
+---
+
+## Why we're better
+
+Legend: ✅ Full support | 🟡 Partial support | ❌ No support
+
+| **Capability** | Traditional Single Agent | Multi-window Workflow | Claude Code Agent Team | openteams |
+|--|--|--|--|--|
+| **Parallelism**| ❌ No, sequential | 🟡 Partial, manual | ✅ Yes, Claude subagents | ✅ Yes, automatic |
+| **Shared context** | ❌ No | ❌ No, copy-paste | 🟡 Partial, split subagent contexts | ✅ Yes, always in sync |
+| **Multi-model collaboration** | ❌ No | 🟡 Partial, manual switching | ❌ No, Claude only | ✅ Yes, Claude + Gemini + Codex + more |
+| **Agent handoff** | ❌ No | ❌ No, you orchestrate it | 🟡 Partial, delegated inside Claude | ✅ Yes, direct `@mentions` |
+| **Predefined AI member** | ❌ No | ❌ No | ❌ No | ✅ Yes, 160+ members |
+| **Team manager** | ❌ No | ❌ No | ❌ No | ✅ Yes, Customize team guidelines |
+| **Your effort** | 🔴 High | 🔴 Very high | 🟠 Medium | 🟢 Low |
+
+---
 
 ## Tech Stack
 
@@ -165,8 +147,8 @@ Assemble more AI teams. The future is yours to build.
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/StarterraAI/AgentsChatGroup.git
-cd agents-chatgroup
+git clone https://github.com/openteams-lab/openteams.git
+cd openteams
 
 # 2. Install dependencies
 pnpm i
@@ -187,16 +169,16 @@ pnpm desktop:build
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/StarterraAI/AgentsChatGroup.git
-cd AgentsChatGroup
+git clone https://github.com/openteams-lab/openteams.git
+cd openteams
 
 # 2. Install dependencies
 pnpm i
 
-# 3. generate typescript type
+# 3. Generate TypeScript types
 pnpm run generate-types
 
-# 4. run database migrate
+# 4. Run database migrations
 pnpm run prepare-db
 ```
 
@@ -220,9 +202,40 @@ pnpm dev -- --port $env:FRONTEND_PORT --host
 
 Open the frontend page at `http://localhost:<FRONTEND_PORT>` (example: `http://localhost:3001`).
 
+## Release Notes & Roadmap
+
+### V0.2
+
+- ~~[x] Multi-agent group chat with shared context~~
+- ~~[x] Parallel agent execution~~
+- ~~[x] Agent @mention and autonomous collaboration~~
+- ~~[x] 10 coding-agent runtimes support (Claude Code, Gemini CLI, Codex, Qwen Code, Amp, Cursor Agent, Copilot, Droid, Kimi Code, OpenCode)~~
+- ~~[x] Desktop apps (Windows, macOS, Linux)~~
+- ~~[x] Web app via npx~~
+- ~~[x] Multi-language support (EN, ZH, JA, KO, FR, ES)~~
+
+### V0.3
+- ~~[x] The frontend interface has been completely overhauled.~~
+- ~~[x] 160+ built-in AI members~~
+- ~~[x] 8 built-in AI team presets~~
+- ~~[x] Team rules configuration~~
+- ~~[x] 1000+ built-in skills~~
+- ~~[x] Fully local execution with workspace isolation~~
+- ~~[x] Redefine the input protocol~~
+
+### Roadmap
+- [ ] Backend for Code Agent optimized for OpenTeams use cases
+- [ ] Develop multiple frontend color schemes
+- [ ] Establish a high-efficiency team collaboration framework
+- [ ] More agent integrations (Kilo Code, OpenClaw, etc.)
+- [ ] Add more powerful, ready-to-use AI teams
+- [ ] Added more powerful skills
+- [ ] Offer a highly optimized, customized version
+
+
 ## Contributing
 
-We welcome contributions! Check what's needed in [Issues](https://github.com/StarterraAI/AgentsChatGroup/issues) or start a [Discussion](https://github.com/StarterraAI/AgentsChatGroup/discussions).
+We welcome contributions! Check what's needed in [Issues](https://github.com/StarterraAI/OpenTeams/issues) or start a [Discussion](https://github.com/StarterraAI/OpenTeams/discussions).
 
 1. Fork -> feature branch -> PR
 2. Please open an issue before large changes
@@ -232,10 +245,12 @@ We welcome contributions! Check what's needed in [Issues](https://github.com/Sta
 
 | | |
 |--|--|
-| **Bug Reports** | [GitHub Issues](https://github.com/StarterraAI/AgentsChatGroup/issues) |
-| **Discussions** | [GitHub Discussions](https://github.com/StarterraAI/AgentsChatGroup/discussions) |
+| **Bug Reports** | [GitHub Issues](https://github.com/StarterraAI/OpenTeams/issues) |
+| **Discussions** | [GitHub Discussions](https://github.com/StarterraAI/OpenTeams/discussions) |
 | **Community Chat** | [Discord](https://discord.gg/MbgNFJeWDc) |
 
 ## Acknowledgements
 
 Built on top of [Vibe Kanban](https://www.vibekanban.com/) - thanks to their team for the excellent open source foundation.
+
+Thanks as well to [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) for helping shape the built-in skill ecosystem, and to [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) for inspiration around agent role design and team composition.

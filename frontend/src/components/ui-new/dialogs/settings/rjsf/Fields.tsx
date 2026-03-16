@@ -62,8 +62,8 @@ export function KeyValueField({
   const isDisabled = disabled || readonly;
 
   const inputClassName = cn(
-    'settings-input settings-rjsf-keyvalue-input min-w-[50px] flex-1 bg-secondary border border-border rounded-sm px-base py-half text-base text-high font-mono text-sm',
-    'placeholder:text-low placeholder:opacity-80 focus:outline-none focus:ring-1 focus:ring-brand',
+    'settings-input settings-rjsf-keyvalue-input min-w-[50px] flex-1 rounded-[10px] border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] py-[10px] font-mono text-[13px] text-[#333333]',
+    'placeholder:text-[#8C8C8C] focus:border-[#4A90E2] focus:bg-white focus:outline-none focus:ring-0 focus:shadow-[0_0_0_3px_rgba(74,144,226,0.08)]',
     isDisabled && 'opacity-50 cursor-not-allowed'
   );
 
@@ -90,9 +90,9 @@ export function KeyValueField({
             onClick={() => handleRemove(key)}
             disabled={isDisabled}
             className={cn(
-              'settings-icon-action h-8 w-8 p-0 flex items-center justify-center shrink-0 rounded-sm',
-              'text-low hover:text-error hover:bg-error/10',
-              'focus:outline-none focus:ring-1 focus:ring-brand',
+              'settings-icon-action flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[#E8EEF5] bg-[#F3F5F8] p-0 text-[#8C8C8C]',
+              'focus:outline-none focus:ring-0',
+              'hover:bg-[#fff7f7] hover:text-[#d14343]',
               'disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
             )}
             aria-label={`Remove ${key}`}
@@ -131,9 +131,9 @@ export function KeyValueField({
           onClick={handleAdd}
           disabled={isDisabled || !newKey.trim()}
           className={cn(
-            'settings-add-button h-8 w-8 p-0 flex items-center justify-center shrink-0 rounded-sm',
-            'bg-secondary border border-border text-normal hover:bg-secondary/80',
-            'focus:outline-none focus:ring-1 focus:ring-brand',
+            'settings-add-button flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[#E8EEF5] bg-[#F3F5F8] p-0 text-[#333333]',
+            'focus:outline-none focus:ring-0',
+            'hover:bg-[#eceff3]',
             'disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
           )}
           aria-label="Add environment variable"

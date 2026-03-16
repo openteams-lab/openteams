@@ -4,6 +4,7 @@ import type { Invitation } from 'shared/types';
 import { MemberRole } from 'shared/types';
 import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 
 interface PendingInvitationItemProps {
   invitation: Invitation;
@@ -18,11 +19,15 @@ export function PendingInvitationItem({
 }: PendingInvitationItemProps) {
   const { t } = useTranslation('organization');
 
-  const handleRevoke = () => {
-    const confirmed = window.confirm(
-      t('invitationList.confirmRevoke', { email: invitation.email })
-    );
-    if (confirmed) {
+  const handleRevoke = async () => {
+    const result = await ConfirmDialog.show({
+      title: t('invitationList.revokeAction'),
+      message: t('invitationList.confirmRevoke', { email: invitation.email }),
+      confirmText: t('invitationList.revokeAction'),
+      variant: 'destructive',
+    });
+
+    if (result === 'confirmed') {
       onRevoke?.(invitation.id);
     }
   };

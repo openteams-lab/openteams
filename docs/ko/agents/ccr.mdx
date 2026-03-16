@@ -20,7 +20,7 @@ npx -y @musistudio/claude-code-router ui
 이렇게 하면 CCR 로컬 UI가 시작되어 제공업체와 모델을 구성할 수 있습니다.
 
 ## 인증
-agents-chatgroup 외부에서 CCR을 인증하고 구성합니다. CCR GitHub 저장소의 지침을 따르세요:
+openteams 외부에서 CCR을 인증하고 구성합니다. CCR GitHub 저장소의 지침을 따르세요:
 
 - GitHub: https://github.com/musistudio/claude-code-router
 
@@ -63,9 +63,9 @@ CCR은 JSON 구성 파일로도 구성할 수 있습니다. 정확한 스키마,
 <img src="/images/ccr-config-example.png" alt="CCR 모델 구성 예" />
 </Frame>
 
-## agents-chatgroup 구성
+## openteams 구성
 
-agents-chatgroup에는 CCR에 대한 기본 구성이 제공되지 않습니다. 기존 Claude Code 에이전트에 구성 추가:
+openteams에는 CCR에 대한 기본 구성이 제공되지 않습니다. 기존 Claude Code 에이전트에 구성 추가:
 
 1) "코딩 에이전트 구성" 페이지 열기.
 2) Claude Code 에이전트에 새 구성 추가 (또는 기존 구성 편집).
@@ -86,13 +86,13 @@ deepseek,deepseek-chat
 - 다른 모델 간에 쉽게 전환하려면 여러 구성을 만드세요.
 - CCR이 CCR UI 구성에 기반한 자체 라우팅(`default`/`longContext`/등 매핑)을 사용하게 하려면 모델 문자열을 비워두세요.
 
-### 예: agents-chatgroup에서의 Claude Code 에이전트 구성
+### 예: openteams에서의 Claude Code 에이전트 구성
 
 <Frame>
-<img src="/images/ccr-agent-config.png" alt="agents-chatgroup에서의 Claude Code 에이전트 구성" />
+<img src="/images/ccr-agent-config.png" alt="openteams에서의 Claude Code 에이전트 구성" />
 </Frame>
 
-## agents-chatgroup에서 CCR 사용
+## openteams에서 CCR 사용
 
 작업 시도를 생성할 때 코딩 에이전트와 구성을 선택: Claude Code 에이전트를 선택한 다음 CCR이 활성화된 구성 중 하나를 선택.
 

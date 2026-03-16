@@ -6,6 +6,7 @@ import {
   ChatSession,
   ChatSessionAgent,
   ChatSessionStatus,
+  ChatWorkItem,
 } from 'shared/types';
 import { chatApi } from '@/lib/api';
 import type { RunHistoryItem, SessionMember } from '../types';
@@ -19,6 +20,7 @@ export interface UseChatDataResult {
   agents: ChatAgent[];
   sessionAgents: ChatSessionAgent[];
   messagesData: ChatMessage[];
+  workItemsData: ChatWorkItem[];
   agentById: Map<string, ChatAgent>;
   sessionMembers: SessionMember[];
   mentionAgents: ChatAgent[];
@@ -26,6 +28,7 @@ export interface UseChatDataResult {
   isAgentsLoading: boolean;
   isSessionAgentsLoading: boolean;
   isMessagesLoading: boolean;
+  isWorkItemsLoading: boolean;
   isLoading: boolean;
 }
 
@@ -33,6 +36,9 @@ export function useChatData(activeSessionId: string | null): UseChatDataResult {
   const { data: sessions = [], isLoading: isSessionsLoading } = useQuery({
     queryKey: ['chatSessions'],
     queryFn: () => chatApi.listSessions(),
+    staleTime: 0,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
   });
 
   const { data: agents = [], isLoading: isAgentsLoading } = useQuery({
@@ -45,12 +51,19 @@ export function useChatData(activeSessionId: string | null): UseChatDataResult {
       queryKey: ['chatSessionAgents', activeSessionId],
       queryFn: () => chatApi.listSessionAgents(activeSessionId!),
       enabled: !!activeSessionId,
+      staleTime: 0,
       refetchOnMount: 'always',
     });
 
   const { data: messagesData = [], isLoading: isMessagesLoading } = useQuery({
     queryKey: ['chatMessages', activeSessionId],
     queryFn: () => chatApi.listMessages(activeSessionId!),
+    enabled: !!activeSessionId,
+  });
+
+  const { data: workItemsData = [], isLoading: isWorkItemsLoading } = useQuery({
+    queryKey: ['chatWorkItems', activeSessionId],
+    queryFn: () => chatApi.listWorkItems(activeSessionId!),
     enabled: !!activeSessionId,
   });
 
@@ -103,6 +116,7 @@ export function useChatData(activeSessionId: string | null): UseChatDataResult {
   const isLoading =
     isSessionsLoading ||
     isMessagesLoading ||
+    isWorkItemsLoading ||
     isAgentsLoading ||
     isSessionAgentsLoading;
 
@@ -114,6 +128,7 @@ export function useChatData(activeSessionId: string | null): UseChatDataResult {
     agents,
     sessionAgents,
     messagesData,
+    workItemsData,
     agentById,
     sessionMembers,
     mentionAgents,
@@ -121,6 +136,7 @@ export function useChatData(activeSessionId: string | null): UseChatDataResult {
     isAgentsLoading,
     isSessionAgentsLoading,
     isMessagesLoading,
+    isWorkItemsLoading,
     isLoading,
   };
 }
