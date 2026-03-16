@@ -220,12 +220,8 @@ export function GeneralSettings() {
               {t('settings.general.appearance.theme.label')}
             </Label>
             <Select
-              value={
-                draft?.theme === ThemeMode.DARK ? ThemeMode.LIGHT : draft?.theme
-              }
-              onValueChange={(value: ThemeMode) =>
-                updateDraft({ theme: value })
-              }
+              value={ThemeMode.LIGHT}
+              onValueChange={() => updateDraft({ theme: ThemeMode.LIGHT })}
             >
               <SelectTrigger id="theme">
                 <SelectValue
@@ -235,13 +231,9 @@ export function GeneralSettings() {
                 />
               </SelectTrigger>
               <SelectContent>
-                {Object.values(ThemeMode)
-                  .filter((theme) => theme !== ThemeMode.DARK)
-                  .map((theme) => (
-                    <SelectItem key={theme} value={theme}>
-                      {toPrettyCase(theme)}
-                    </SelectItem>
-                  ))}
+                <SelectItem key={ThemeMode.LIGHT} value={ThemeMode.LIGHT}>
+                  {toPrettyCase(ThemeMode.LIGHT)}
+                </SelectItem>
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground">

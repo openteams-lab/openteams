@@ -157,7 +157,7 @@ function AppContent() {
 
   return (
     <I18nextProvider i18n={i18n}>
-      <ThemeProvider initialTheme={config?.theme || ThemeMode.SYSTEM}>
+      <ThemeProvider initialTheme={config?.theme || ThemeMode.LIGHT}>
         <SearchProvider>
           <SentryRoutes>
             {/* ========== LEGACY DESIGN ROUTES ========== */}

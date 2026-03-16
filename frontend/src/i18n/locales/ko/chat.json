@@ -25,8 +25,15 @@
     "searchSessionsPlaceholder": "세션 이름 검색...",
     "clearSessionSearch": "세션 검색 지우기",
     "noSearchResults": "\"{{query}}\"와 일치하는 세션이 없습니다.",
-    "generatedSessionTitle": "{{date}} 시작",
+"generatedSessionTitle": "{{date}} 시작",
     "aiTeam": "AI 팀"
+  },
+  "contextMenu": {
+    "editTitle": "이름 편집",
+    "archive": "보관",
+    "restore": "복원",
+    "cleanupMessages": "메시지 정리",
+    "delete": "세션 삭제"
   },
   "header": {
     "untitledSession": "제목 없는 세션",

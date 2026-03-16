@@ -51,8 +51,8 @@ case "$1" in
         fi
 
         # Data directories
-        DATA_DIR="$REAL_HOME/.local/share/ai.starterra.ai/openteams"
-        CACHE_DIR="$REAL_HOME/.cache/ai.starterra.ai/openteams"
+        DATA_DIR="$REAL_HOME/.local/share/ai.openteams-lab/openteams"
+        CACHE_DIR="$REAL_HOME/.cache/ai.openteams-lab/openteams"
         TEMP_DIR="/var/tmp/openteams"
 
         # Always delete cache and temp

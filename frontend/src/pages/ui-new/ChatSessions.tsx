@@ -2880,8 +2880,8 @@ export function ChatSessions() {
     setMemberError(null);
     setTeamImportPlan(preparedPlan);
     try {
-      if (teamImportProtocol) {
-        await chatApi.updateTeamProtocol({
+      if (teamImportProtocol && activeSessionId) {
+        await chatApi.updateTeamProtocol(activeSessionId, {
           content: teamImportProtocol,
           enabled: true,
         });

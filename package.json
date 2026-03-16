@@ -30,6 +30,7 @@
     "prepare-db": "node scripts/prepare-db.js",
     "prepare-db:check": "node scripts/prepare-db.js --check",
     "build:npx": "bash ./local-build.sh",
+    "build:npx:alias": "cd openteams-web-npx && pnpm pack",
     "prepack": "pnpm run build:npx",
     "desktop:dev": "pnpm tauri dev",
     "desktop:build": "pnpm tauri build",

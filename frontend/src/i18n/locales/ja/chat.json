@@ -25,8 +25,15 @@
     "searchSessionsPlaceholder": "セッション名を検索...",
     "clearSessionSearch": "セッション検索をクリア",
     "noSearchResults": "「{{query}}」に一致するセッションはありません。",
-    "generatedSessionTitle": "{{date}} 開始",
+"generatedSessionTitle": "{{date}} 開始",
     "aiTeam": "AIチーム"
+  },
+  "contextMenu": {
+    "editTitle": "名前を編集",
+    "archive": "アーカイブ",
+    "restore": "復元",
+    "cleanupMessages": "メッセージをクリーンアップ",
+    "delete": "セッションを削除"
   },
   "header": {
     "untitledSession": "無題のセッション",

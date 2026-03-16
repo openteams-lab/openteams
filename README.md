@@ -1,9 +1,7 @@
 <div align="center">
-  <img src="frontend/public/openteams-logo-white.png" alt="OpenTeams" width="320">
+  <img src="frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320">
 
-  <h1>OpenTeams</h1>
-
-  <p><strong>Run a team of AI agents in one group chat - they @mention each other, share context, and work in parallel.</strong></p>
+  <p><strong>Run agents as one team, multiply your efficiency in the AI era.</strong></p>
 
   <p>
     <a href="https://www.npmjs.com/package/openteams"><img alt="npm" src="https://img.shields.io/npm/v/openteams?style=flat-square" /></a>
@@ -20,19 +18,27 @@
   </p>
 
   <p align="center">
-    <a href="./README_zh.md">中文</a>
+    <a href="./README.md">English</a> |
+    <a href="./readmes/README_zh-Hans.md">简体中文</a> |
+    <a href="./readmes/README_zh-Hant.md">繁體中文</a> |
+    <a href="./readmes/README_ja.md">日本語</a> |
+    <a href="./readmes/README_ko.md">한국어</a> |
+    <a href="./readmes/README_fr.md">Français</a> |
+    <a href="./readmes/README_es.md">Español</a>
   </p>
-  
 </div>
 
 ---
 
-![OpenTeams Demo](docs/images/demo.gif)
+![OpenTeams Demo](images/demo.gif)
 
-替换主页面展示demo，10s，内容：主页面->创建团队->导入->say hi
+**One-Minute Getting Started Guide**
+
+1. Import a preset team and choose the base agent for each member.
+2. Set up workspaces for each member in the team.
+3. Message a specific member with `@mentions`.
 
 ---
-
 
 ## Quick Start
 
@@ -40,7 +46,7 @@
 
 ```bash
 # web
-npx openteams
+npx openteams-web
 ```
 
 ### Option B: Download Desktop App
@@ -49,60 +55,83 @@ npx openteams
 [![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/openteams-lab/openteams/releases/latest)
 [![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest)
 
-### Dependency
+### Requirements
+
 **You'll need at least one AI agent installed:**
 
 | Agent | Install |
 |-------|---------|
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm i -g @anthropic-ai/claude-code@2.1.74` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @google/gemini-cli@0.33.0` |
-| [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex@0.114.0` |
-| [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code@0.12.1` |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm i -g @anthropic-ai/claude-code` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @google/gemini-cli` |
+| [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex` |
+| [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code` |
+| [OpenCode](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g opencode-ai` |
 
-📚 [Guides for Installing More Agents →](https://docs.openteams.com/getting-started)
-
-## Features
-`画个表，内容有：支持多少种code agent、群聊上下文共享、并行执行、自主协作、预设成员和预设团队、完全本地运行`
-
-
-### Agent并行执行任务
-`demo展示内容: 多个agent同时工作的场景 5s`
-
-同一个上下文环境下可同时指挥多个Agent并行执行任务
-
-### Agent自主协作
-`demo展示内容: agent A @ agent B干活的场景 5s`
-
-支持多个Agent之间能互相发送消息，不受任何约束。你可以让一个Agent指挥全局，你也可以让所有Agent畅所欲言，这完全取决于你的使用场景。
-
-### Agent技能库
-`demo展示内容：滚动的技能市场页面 + 内置技能数量 + 安装和使用操作`
-
-内置1000+个技能，可以任意配置组合，赋能给不同的AI成员，打造你的专属AI团队。支持你在软件中创建你自己的技能，直接应用到你的AI成员上。我们也将持续更新技能库
-
-### 预设AI成员
-`demo展示内容: 预设成员列表展示 + 使用预设成员操作 + 添加成员模板演示`
-
-内置160+ AI成员，涵盖开发、营销、写作、内容生产等不同领域，你可以将他们自由组合成不同的AI团队，为你提供独一无二的服务。我们也将持续更新成员列表
-
-### 预设AI团队
-`demo展示内容: 预设AI团队 + 团队协议介绍 + 添加团队演示`
-
-内置8类 常见AI团队，开箱即用。
-
-## How It's Different
-
-| Capability | 🧍 Traditional Single Agent | 🪟 Multi-window Workflow | 🤖 Claude Code-Agent Team | 🧩 OpenTeams |
-|--|--|--|--|--|
-| Parallelism | ❌ No (sequential) | ⚠️ Partial (manual) | ✅ Yes (Claude subagents) | ✅ Yes (automatic) |
-| Shared context | ❌ No | ❌ No (copy-paste) | ⚠️ Partial (split subagent contexts) | ✅ Yes (always in sync) |
-| Multi-model collaboration | ❌ No | ⚠️ Partial (manual switching) | ❌ No (Claude-only) | ✅ Yes (Claude + Gemini + Codex + more) |
-| Agent handoff | ❌ No | ❌ No (you orchestrate) | ⚠️ Partial (delegated inside Claude) | ✅ Yes (@mention) |
-| Your effort | 🔺 High | 🔺 Very high | ◼️ Medium | 🔹 Low |
-
+📚 [More agent installation guides](https://docs.openteams.com/getting-started)
 
 ---
 
+## Features
+
+| Feature | What you get |
+|--|--|
+| **Supported agents** | supports 10 coding-agent runtimes, including `Claude Code`, `Gemini CLI`, `Codex`, `Qwen Code`, `Amp`, `Cursor Agent`, `Copilot`, `Droid`, `Kimi Code`, and `OpenCode`. And currently integrating other agents.|
+| **Shared group-chat context** | Every participant works from the same conversation history instead of juggling copied prompts across separate windows. |
+| **Parallel execution** | Multiple agents can work on the same task at the same time inside one shared session. Different agents handle the tasks they are best at. |
+| **Autonomous collaboration** | Agents can `@mention` each other, hand work off, and coordinate directly inside the chat. |
+| **Built-in AI members** | Start with 160+ built-in AI members across engineering, marketing, writing, research, and content production. |
+| **Built-in AI team presets** | Launch with 8 ready-to-use team presets for common workflows. |
+| **Team guidelines** | Define who leads, who can talk to whom, and how collaboration should happen. Customize your AI team and team guidelines. |
+| **Skill library** | Equip agents with 1000+ built-in skills, and import your own skills when needed. |
+| **Fully local execution** | Agents run against your local workspace, and runtime artifacts stay under `.openteams/` inside that workspace. There is no need to be concerned about data privacy. |
+
+### Parallel Agent Execution
+
+*Run multiple agents in the same shared context and let them execute in parallel to speed up delivery.*
+
+![OpenTeams parallel](images/parallel.gif)
+
+### Autonomous Agent Collaboration
+
+*openteams lets agents message each other directly without forcing a fixed workflow. If you want more structure, add team guidelines to control communication, appoint a lead agent, or let everyone collaborate freely. The communication pattern is entirely up to your use case.*
+
+![OpenTeams collaborate](images/collaborate.gif)
+
+### AI Members
+
+*openteams includes 160+ built-in AI members across engineering, marketing, writing, content production, and more. Mix and match them into different teams, customize them, and build role combinations that fit the way you work. We will continue expanding and improving the roster.*
+
+![OpenTeams members](images/members.gif)
+
+### AI Teams
+
+*openteams ships with 8 built-in team presets for common workflows, so you can get started immediately. We recommend defining team guidelines when you create a team so collaboration stays aligned with how you want the group to operate.*
+
+![OpenTeams team](images/team.gif)
+
+### Skill Library
+
+*openteams includes 1000+ built-in skills that you can combine and assign to different AI members. You can also import skills you create yourself and apply them directly to your agents. We will keep expanding the skill library with a focus on capabilities that hold up in real production environments.*
+
+![OpenTeams skills](images/skills.gif)
+
+---
+
+## Why we're better
+
+Legend: ✅ Full support | 🟡 Partial support | ❌ No support
+
+| **Capability** | Traditional Single Agent | Multi-window Workflow | Claude Code Agent Team | openteams |
+|--|--|--|--|--|
+| **Parallelism**| ❌ No, sequential | 🟡 Partial, manual | ✅ Yes, Claude subagents | ✅ Yes, automatic |
+| **Shared context** | ❌ No | ❌ No, copy-paste | 🟡 Partial, split subagent contexts | ✅ Yes, always in sync |
+| **Multi-model collaboration** | ❌ No | 🟡 Partial, manual switching | ❌ No, Claude only | ✅ Yes, Claude + Gemini + Codex + more |
+| **Agent handoff** | ❌ No | ❌ No, you orchestrate it | 🟡 Partial, delegated inside Claude | ✅ Yes, direct `@mentions` |
+| **Predefined AI member** | ❌ No | ❌ No | ❌ No | ✅ Yes, 160+ members |
+| **Team manager** | ❌ No | ❌ No | ❌ No | ✅ Yes, Customize team guidelines |
+| **Your effort** | 🔴 High | 🔴 Very high | 🟠 Medium | 🟢 Low |
+
+---
 
 ## Tech Stack
 
@@ -118,7 +147,7 @@ npx openteams
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/StarterraAI/OpenTeams.git
+git clone https://github.com/openteams-lab/openteams.git
 cd openteams
 
 # 2. Install dependencies
@@ -140,16 +169,16 @@ pnpm desktop:build
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/StarterraAI/OpenTeams.git
-cd OpenTeams
+git clone https://github.com/openteams-lab/openteams.git
+cd openteams
 
 # 2. Install dependencies
 pnpm i
 
-# 3. generate typescript type
+# 3. Generate TypeScript types
 pnpm run generate-types
 
-# 4. run database migrate
+# 4. Run database migrations
 pnpm run prepare-db
 ```
 
@@ -173,6 +202,36 @@ pnpm dev -- --port $env:FRONTEND_PORT --host
 
 Open the frontend page at `http://localhost:<FRONTEND_PORT>` (example: `http://localhost:3001`).
 
+## Release Notes & Roadmap
+
+### V0.2
+
+- ~~[x] Multi-agent group chat with shared context~~
+- ~~[x] Parallel agent execution~~
+- ~~[x] Agent @mention and autonomous collaboration~~
+- ~~[x] 10 coding-agent runtimes support (Claude Code, Gemini CLI, Codex, Qwen Code, Amp, Cursor Agent, Copilot, Droid, Kimi Code, OpenCode)~~
+- ~~[x] Desktop apps (Windows, macOS, Linux)~~
+- ~~[x] Web app via npx~~
+- ~~[x] Multi-language support (EN, ZH, JA, KO, FR, ES)~~
+
+### V0.3
+- ~~[x] The frontend interface has been completely overhauled.~~
+- ~~[x] 160+ built-in AI members~~
+- ~~[x] 8 built-in AI team presets~~
+- ~~[x] Team rules configuration~~
+- ~~[x] 1000+ built-in skills~~
+- ~~[x] Fully local execution with workspace isolation~~
+- ~~[x] Redefine the input protocol~~
+
+### Roadmap
+- [ ] Backend for Code Agent optimized for OpenTeams use cases
+- [ ] Establish a high-efficiency team collaboration framework
+- [ ] More agent integrations (Cursor, Windsurf, etc.)
+- [ ] Add more powerful, ready-to-use AI teams
+- [ ] Added more powerful skills
+- [ ] Offer a highly optimized, customized version
+
+
 ## Contributing
 
 We welcome contributions! Check what's needed in [Issues](https://github.com/StarterraAI/OpenTeams/issues) or start a [Discussion](https://github.com/StarterraAI/OpenTeams/discussions).
@@ -192,3 +251,5 @@ We welcome contributions! Check what's needed in [Issues](https://github.com/Sta
 ## Acknowledgements
 
 Built on top of [Vibe Kanban](https://www.vibekanban.com/) - thanks to their team for the excellent open source foundation.
+
+Thanks as well to [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) for helping shape the built-in skill ecosystem, and to [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) for inspiration around agent role design and team composition.

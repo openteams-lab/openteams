@@ -55,6 +55,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             "/messages/{message_id}/attachments/{attachment_id}",
             get(messages::serve_message_attachment),
         )
+        .route(
+            "/team-protocol",
+            get(presets::get_team_protocol).post(presets::update_team_protocol),
+        )
         .layer(from_fn_with_state(
             deployment.clone(),
             load_chat_session_middleware,
@@ -142,10 +146,6 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             .nest("/sessions", sessions_router)
             .nest("/agents", agents_router)
             .nest("/messages", messages_router)
-            .route(
-                "/presets/team-protocol",
-                get(presets::get_team_protocol).post(presets::update_team_protocol),
-            )
             .nest("/skills", skills_router)
             .nest("/agents/{agent_id}/skills", agent_skills_router)
             .nest("/registry", registry_router)

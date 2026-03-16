@@ -25,8 +25,15 @@
     "searchSessionsPlaceholder": "Buscar nombres de sesiones...",
     "clearSessionSearch": "Borrar b?squeda de sesiones",
     "noSearchResults": "Ninguna sesi?n coincide con \"{{query}}\".",
-    "generatedSessionTitle": "Iniciada {{date}}",
+"generatedSessionTitle": "Iniciada {{date}}",
     "aiTeam": "Equipo de IA"
+  },
+  "contextMenu": {
+    "editTitle": "Editar nombre",
+    "archive": "Archivar",
+    "restore": "Restaurar",
+    "cleanupMessages": "Limpiar mensajes",
+    "delete": "Eliminar sesión"
   },
   "header": {
     "untitledSession": "Sesión sin título",

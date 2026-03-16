@@ -99,7 +99,7 @@ export default defineConfig({
         ],
       },
     }),
-    sentryVitePlugin({ org: 'starterra.ai-ai', project: 'openteams' }),
+    sentryVitePlugin({ org: 'openteams-lab-ai', project: 'openteams' }),
     executorSchemasPlugin(),
   ],
   resolve: {

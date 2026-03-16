@@ -37,7 +37,8 @@
     "save": "保存",
     "send": "送信",
     "addItem": "項目を追加",
-    "reply": "返信"
+    "reply": "返信",
+    "done": "完了"
   },
   "form": {
     "notSpecified": "指定なし",

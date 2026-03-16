@@ -39,9 +39,8 @@ import {
   type ChatTeamPreset,
   type JsonValue,
 } from 'shared/types';
-import { useUserSystem } from '@/components/ConfigProvider';
-import { chatApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { chatApi } from '@/lib/api';
 import { getWorkspacePathExample } from '@/utils/platform';
 import {
   extractExecutorProfileVariant,
@@ -530,7 +529,6 @@ export function AiMembersSidebar({
 }: AiMembersSidebarProps) {
   const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
-  const { reloadSystem } = useUserSystem();
   const [activeTab, setActiveTab] = useState<AddMemberTab>('preset');
   const [presetSearchQuery, setPresetSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -630,7 +628,7 @@ export function AiMembersSidebar({
     setTeamProtocolLoadError(null);
 
     void chatApi
-      .getTeamProtocol()
+      .getTeamProtocol(activeSessionId)
       .then((protocol) => {
         if (cancelled) return;
         setTeamProtocolContent(protocol.content);
@@ -675,16 +673,16 @@ export function AiMembersSidebar({
       content: string;
       enabled: boolean;
     }) => {
+      if (!activeSessionId) return false;
       setIsTeamProtocolSaving(true);
       setTeamProtocolSaveError(null);
       try {
-        const saved = await chatApi.updateTeamProtocol({
+        const saved = await chatApi.updateTeamProtocol(activeSessionId, {
           content,
           enabled,
         });
         setTeamProtocolContent(saved.content);
         setTeamProtocolEnabled(saved.enabled);
-        await reloadSystem();
         return true;
       } catch {
         setTeamProtocolSaveError(t('members.teamProtocol.saveError'));
@@ -693,7 +691,7 @@ export function AiMembersSidebar({
         setIsTeamProtocolSaving(false);
       }
     },
-    [reloadSystem, t]
+    [activeSessionId, t]
   );
 
   const handlePresetCategoryOpenChange = useCallback((open: boolean) => {

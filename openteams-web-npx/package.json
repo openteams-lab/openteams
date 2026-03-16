@@ -1,0 +1,47 @@
+{
+  "name": "openteams-web",
+  "version": "0.2.10",
+  "description": "AI Coding Agents Chatgroup - Alias package for @openteams-lab/openteams-web",
+  "author": "openteams-lab",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/StarterraAI/OpenTeams"
+  },
+  "homepage": "https://github.com/StarterraAI/OpenTeams",
+  "bugs": {
+    "url": "https://github.com/StarterraAI/OpenTeams/issues"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "chatgroup",
+    "coding",
+    "assistant",
+    "installer",
+    "cli",
+    "cross-platform"
+  ],
+  "bin": {
+    "openteams": "bin/cli.js"
+  },
+  "main": "bin/cli.js",
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "dependencies": {
+    "@openteams-lab/openteams-web": "^0.2.10"
+  }
+}
