@@ -12,7 +12,6 @@
   </p>
 
   <p>
-    <a href="https://your-demo-link.com">觀看演示</a> |
     <a href="#快速開始">快速開始</a> |
     <a href="https://docs.openteams.com">文檔</a>
   </p>
