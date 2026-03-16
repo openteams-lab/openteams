@@ -228,9 +228,10 @@ Abre la página frontend en `http://localhost:<FRONTEND_PORT>` (ejemplo: `http:/
 
 - [ ] Backend Code Agent optimizado para casos de uso de OpenTeams
 - [ ] Establecer un marco de colaboración de equipo eficiente
-- [ ] Más integraciones de agentes (Cursor, Windsurf, etc.)
+- [ ] Más integraciones de agentes (Kilo Code, OpenClaw, etc.)
 - [ ] Añadir equipos de IA más potentes listos para usar
 - [ ] Añadir habilidades más potentes
+- [ ] Desarrollar múltiples esquemas de color para la interfaz
 - [ ] Ofrecer una versión altamente optimizada y personalizada
 
 
