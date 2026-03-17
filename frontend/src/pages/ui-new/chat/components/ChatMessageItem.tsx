@@ -33,6 +33,7 @@ import {
 import type {
   ChatAttachment,
   DiffMeta,
+  MentionError,
   MentionStatus,
   MessageTone,
   RunDiffState,
@@ -65,6 +66,7 @@ export interface ChatMessageItemProps {
   // Mentions
   mentionList: string[];
   mentionStatusMap: Map<string, MentionStatus> | undefined;
+  mentionErrors: Map<string, MentionError> | undefined;
   agentStates: Record<string, ChatSessionAgentState>;
   agentIdByName: Map<string, string>;
   // Attachments
@@ -100,6 +102,7 @@ export function ChatMessageItem({
   referencePreview,
   mentionList,
   mentionStatusMap,
+  mentionErrors,
   agentStates,
   agentIdByName,
   attachments,
@@ -488,6 +491,35 @@ export function ChatMessageItem({
                   })}
                 </div>
               )}
+              {mentionErrors &&
+                isUser &&
+                (() => {
+                  const errors = mentionList
+                    .map((mention) => mentionErrors.get(mention))
+                    .filter((e): e is MentionError => e !== undefined);
+                  if (errors.length === 0) return null;
+                  return (
+                    <div className="mt-2 space-y-1.5">
+                      {errors.map((error) => (
+                        <div
+                          key={error.agentName}
+                          className="flex items-start gap-half rounded-sm border px-base py-half text-xs bg-[rgba(239,68,68,0.10)] border-[rgba(239,68,68,0.35)]"
+                        >
+                          <XCircleIcon
+                            className="size-icon-sm flex-shrink-0 text-[#EF4444]"
+                            weight="fill"
+                          />
+                          <span className="font-medium text-[#EF4444]">
+                            @{error.agentName}
+                          </span>
+                          <span className="text-[rgba(239,68,68,0.78)]">
+                            {error.reason}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               {attachments.length > 0 && (
                 <div className="chat-session-message-attachments mt-half">
                   {attachments.map((attachment) => {

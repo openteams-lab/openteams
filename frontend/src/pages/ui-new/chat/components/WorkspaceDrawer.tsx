@@ -18,7 +18,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { RunHistoryItem } from '../types';
-import { detectApiError, extractProtocolErrorMeta } from '../utils';
+import {
+  detectApiError,
+  extractMentionFailureMeta,
+  extractProtocolErrorMeta,
+} from '../utils';
 
 export interface FailedMessageInfo {
   message: ChatMessage;
@@ -68,41 +72,53 @@ export function WorkspaceDrawer({
     const failed: FailedMessageInfo[] = [];
 
     for (const message of messages) {
-      // Check if message is from this agent or is a system message about this agent
-      const isFromAgent =
-        message.sender_type === 'agent' && message.sender_id === agent.id;
-      const isSystemAboutAgent =
-        message.sender_type === 'system' &&
-        extractProtocolErrorMeta(message.meta)?.agentName === agent.name;
-
-      if (!isFromAgent && !isSystemAboutAgent) continue;
-
-      // Check for protocol errors in system messages
-      if (message.sender_type === 'system') {
-        const protocolError = extractProtocolErrorMeta(message.meta);
-        if (protocolError && protocolError.code) {
+      // 1. Agent messages with API errors
+      if (
+        message.sender_type === 'agent' &&
+        message.sender_id === agent.id
+      ) {
+        const apiError = detectApiError(message.content);
+        if (apiError) {
           failed.push({
             message,
-            errorType: 'protocol',
-            errorSummary:
-              protocolError.reason || `Protocol error: ${protocolError.code}`,
-            errorDetail: protocolError.detail || protocolError.rawOutput || undefined,
+            errorType: 'api',
+            errorSummary: apiError.message,
+            errorDetail: apiError.provider
+              ? `Provider: ${apiError.provider}`
+              : undefined,
           });
         }
         continue;
       }
 
-      // Check for API errors in agent messages
-      const apiError = detectApiError(message.content);
-      if (apiError) {
-        failed.push({
-          message,
-          errorType: 'api',
-          errorSummary: apiError.message,
-          errorDetail: apiError.provider
-            ? `Provider: ${apiError.provider}`
-            : undefined,
-        });
+      // 2. System messages about this agent
+      if (message.sender_type === 'system') {
+        // Protocol errors
+        const protocolError = extractProtocolErrorMeta(message.meta);
+        if (protocolError?.agentName === agent.name && protocolError.code) {
+          failed.push({
+            message,
+            errorType: 'protocol',
+            errorSummary:
+              protocolError.reason || `Protocol error: ${protocolError.code}`,
+            errorDetail:
+              protocolError.detail || protocolError.rawOutput || undefined,
+          });
+          continue;
+        }
+
+        // Mention failures (executor startup errors, etc.)
+        const mentionFailure = extractMentionFailureMeta(message.meta, agent.name);
+        if (mentionFailure) {
+          failed.push({
+            message,
+            errorType: 'protocol',
+            errorSummary: mentionFailure.reason,
+            errorDetail: mentionFailure.sourceMessageId
+              ? `Source message: ${mentionFailure.sourceMessageId.slice(0, 8)}...`
+              : undefined,
+          });
+        }
       }
     }
 
