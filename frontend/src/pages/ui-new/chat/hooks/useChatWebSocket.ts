@@ -9,7 +9,12 @@ import {
   type CompressionWarning,
 } from 'shared/types';
 import { chatApi } from '@/lib/api';
-import type { AgentStateInfo, MentionStatus, StreamRun } from '../types';
+import type {
+  AgentStateInfo,
+  MentionError,
+  MentionStatus,
+  StreamRun,
+} from '../types';
 import { extractRunId } from '../utils';
 
 type MentionAcknowledgedEvent = {
@@ -27,6 +32,7 @@ type AgentDeltaPayload = Extract<ChatStreamEvent, { type: 'agent_delta' }> & {
   stream_type?: 'assistant' | 'thinking';
 };
 type ProtocolNoticePayload = Extract<ChatStreamEvent, { type: 'protocol_notice' }>;
+type MentionErrorPayload = Extract<ChatStreamEvent, { type: 'mention_error' }>;
 
 export type ChatProtocolNotice = ProtocolNoticePayload & {
   id: string;
@@ -242,6 +248,7 @@ export interface UseChatWebSocketResult {
   agentStates: Record<string, ChatSessionAgentState>;
   agentStateInfos: Record<string, AgentStateInfo>;
   mentionStatuses: Map<string, Map<string, MentionStatus>>;
+  mentionErrors: Map<string, Map<string, MentionError>>;
   compressionWarning: CompressionWarning | null;
   protocolNotices: ChatProtocolNotice[];
   setAgentStates: React.Dispatch<
@@ -277,6 +284,9 @@ export function useChatWebSocket(
   >({});
   const [mentionStatuses, setMentionStatuses] = useState<
     Map<string, Map<string, MentionStatus>>
+  >(new Map());
+  const [mentionErrors, setMentionErrors] = useState<
+    Map<string, Map<string, MentionError>>
   >(new Map());
   const [compressionWarning, setCompressionWarning] =
     useState<CompressionWarning | null>(null);
@@ -527,6 +537,28 @@ export function useChatWebSocket(
     setProtocolNotices((prev) => [...prev, { ...payload, id: noticeId }]);
   }, [dismissProtocolNotice]);
 
+  const handleMentionError = useCallback((payload: MentionErrorPayload) => {
+    setMentionErrors((prev) => {
+      const next = new Map(prev);
+      const perMessage = new Map(next.get(payload.message_id) ?? []);
+      perMessage.set(payload.agent_name, {
+        agentName: payload.agent_name,
+        agentId: payload.agent_id,
+        reason: payload.reason,
+      });
+      next.set(payload.message_id, perMessage);
+      return next;
+    });
+
+    setMentionStatuses((prev) => {
+      const next = new Map(prev);
+      const perMessage = new Map(next.get(payload.message_id) ?? []);
+      perMessage.set(payload.agent_name, 'failed');
+      next.set(payload.message_id, perMessage);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     setStreamingRunsBySession((prev) => pruneExpiredStreamingRuns(prev));
   }, [activeSessionId]);
@@ -599,6 +631,11 @@ export function useChatWebSocket(
 
           if (payload.type === 'protocol_notice') {
             handleProtocolNotice(payload);
+            return;
+          }
+
+          if (payload.type === 'mention_error') {
+            handleMentionError(payload);
           }
         } catch (error) {
           console.warn('Failed to parse chat stream payload', error);
@@ -631,6 +668,7 @@ export function useChatWebSocket(
     handleAgentState,
     handleMentionAcknowledged,
     handleProtocolNotice,
+    handleMentionError,
   ]);
 
   // Reset state when session changes
@@ -639,6 +677,7 @@ export function useChatWebSocket(
     setAgentStates({});
     setAgentStateInfos({});
     setMentionStatuses(new Map());
+    setMentionErrors(new Map());
     setCompressionWarning(null);
     setProtocolNotices([]);
   }, [activeSessionId, clearAllProtocolNoticeTimeouts]);
@@ -654,6 +693,7 @@ export function useChatWebSocket(
     agentStates,
     agentStateInfos,
     mentionStatuses,
+    mentionErrors,
     compressionWarning,
     protocolNotices,
     setAgentStates,
