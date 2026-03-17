@@ -486,17 +486,19 @@ impl ChatRunner {
 
         if let Ok(Some(msg)) = ChatMessage::find_by_id(&self.db.pool, message_id).await {
             let mut meta = msg.meta.0.clone();
-            let mention_errors = meta
-                .entry("mention_errors")
-                .or_insert_with(|| serde_json::json!({}));
-            if let Some(errors) = mention_errors.as_object_mut() {
-                let mut error_info = serde_json::json!({
-                    "reason": compact_reason.clone(),
-                });
-                if let Some(aid) = agent_id {
-                    error_info["agent_id"] = serde_json::json!(aid);
+            if let Some(meta_obj) = meta.as_object_mut() {
+                let mention_errors = meta_obj
+                    .entry("mention_errors")
+                    .or_insert_with(|| serde_json::json!({}));
+                if let Some(errors) = mention_errors.as_object_mut() {
+                    let mut error_info = serde_json::json!({
+                        "reason": compact_reason.clone(),
+                    });
+                    if let Some(aid) = agent_id {
+                        error_info["agent_id"] = serde_json::json!(aid);
+                    }
+                    errors.insert(agent_name.to_string(), error_info);
                 }
-                errors.insert(agent_name.to_string(), error_info);
             }
             let _ = ChatMessage::update_meta(&self.db.pool, message_id, meta).await;
         }

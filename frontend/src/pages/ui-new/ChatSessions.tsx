@@ -830,6 +830,7 @@ export function ChatSessions() {
     agentStates,
     agentStateInfos,
     mentionStatuses,
+    mentionErrors,
     compressionWarning,
     protocolNotices,
     setAgentStates,
@@ -3711,6 +3712,7 @@ export function ChatSessions() {
                           }
                           mentionList={mentionList}
                           mentionStatusMap={mentionStatusMap}
+                          mentionErrors={mentionErrors.get(message.id)}
                           agentStates={agentStates}
                           agentIdByName={agentIdByName}
                           attachments={attachments}
