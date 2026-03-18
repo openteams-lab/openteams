@@ -45,6 +45,7 @@ import {
   tryParseAgentResponse,
   buildAgentDisplayContent,
   extractProtocolErrorMeta,
+  extractErrorFromMeta,
 } from '../utils';
 import { formatTokenCount } from '@/utils/string';
 
@@ -215,25 +216,37 @@ export function ChatMessageItem({
               )}
             </button>
           )}
-          <div className="flex-1 rounded-xl border border-[rgba(239,68,68,0.25)] bg-[rgba(239,68,68,0.06)] px-base py-base">
-            <ChatErrorMessage content={summary} expanded />
-            {detail && (
-              <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-border/60 bg-panel px-3 py-2 font-ibm-plex-mono text-xs text-low">
-                {detail}
-              </pre>
-            )}
-            {rawOutput && (
-              <div className="mt-3 rounded-lg border border-border/60 bg-panel px-3 py-3">
-                <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-low">
-                  Raw assistant output
-                </div>
-                <ChatMarkdown content={rawOutput} hideCopyButton />
+          <div className="relative w-full max-w-[680px]">
+            <ChatEntryContainer
+              variant="system"
+              title={senderLabel}
+              expanded
+              className="chat-session-message-card shadow-sm rounded-3xl chat-session-message-card-agent is-agent-message max-w-full"
+            >
+              <div className="min-w-0">
+                <ChatErrorMessage content={summary} expanded={false} />
               </div>
-            )}
+              {detail && (
+                <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-gray-100 px-3 py-2 font-ibm-plex-mono text-xs text-low dark:bg-gray-800">
+                  {detail}
+                </pre>
+              )}
+              {rawOutput && (
+                <div className="mt-3 rounded-lg border border-border/60 bg-secondary px-3 py-3">
+                  <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-low">
+                    Raw assistant output
+                  </div>
+                  <ChatMarkdown content={rawOutput} hideCopyButton />
+                </div>
+              )}
+            </ChatEntryContainer>
           </div>
         </div>
       );
     }
+
+    const errorInfo = extractErrorFromMeta(message.meta);
+    const hasError = !!errorInfo;
 
     return (
       <div className="chat-session-message-row is-system flex items-start gap-base">
@@ -250,8 +263,37 @@ export function ChatMessageItem({
             )}
           </button>
         )}
-        <div className="flex-1">
-          <ChatSystemMessage content={message.content} expanded />
+        <div className="relative w-full max-w-[680px]">
+          <ChatEntryContainer
+            variant="system"
+            title={senderLabel}
+            expanded
+            className="chat-session-message-card shadow-sm rounded-3xl chat-session-message-card-agent is-agent-message max-w-full"
+          >
+          {hasError ? (
+            <div className="min-w-0">
+              <ChatErrorMessage
+                content={errorInfo.summary}
+                expanded={false}
+                tone="error"
+              />
+            </div>
+          ) : (
+            <ChatSystemMessage content={message.content} expanded />
+          )}
+          {hasError && errorInfo.content && errorInfo.content !== errorInfo.summary && (
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs text-low hover:text-normal">
+                {t('modals.workspaceDrawer.viewDetails', {
+                  defaultValue: 'View Details',
+                })}
+              </summary>
+              <pre className="mt-2 max-h-[200px] overflow-auto rounded-lg bg-gray-100 p-2 text-xs font-ibm-plex-mono text-low whitespace-pre-wrap break-all dark:bg-gray-800">
+                {errorInfo.content}
+              </pre>
+            </details>
+          )}
+          </ChatEntryContainer>
         </div>
       </div>
     );
@@ -448,7 +490,83 @@ export function ChatMessageItem({
                   </Badge>
                 </div>
               )}
-              <ChatMarkdown content={displayContent} hideCopyButton />
+              {(() => {
+                const errorInfo = extractErrorFromMeta(message.meta);
+                const isErrorMessageOnly =
+                  errorInfo &&
+                  (message.content.trim() === '' ||
+                    message.content === errorInfo.content ||
+                    message.content === errorInfo.summary);
+                if (isErrorMessageOnly) {
+                  const errorMeta = (message.meta as Record<string, unknown>)
+                    ?.error as
+                    | { error_type?: { type?: string; provider?: string } }
+                    | undefined;
+                  const errorType = errorMeta?.error_type?.type;
+                  return (
+                    <div className="rounded-lg border border-error/30 bg-error/5 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <ChatErrorMessage
+                            content={errorInfo.summary}
+                            expanded={false}
+                            tone="error"
+                          />
+                        </div>
+                        {errorType && (
+                          <span className="shrink-0 rounded bg-error/10 px-1.5 py-0.5 text-[10px] font-medium text-error">
+                            {errorType.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                      </div>
+                      {errorInfo.content &&
+                        errorInfo.content !== errorInfo.summary && (
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-xs text-error/80 hover:text-error">
+                              {t('modals.workspaceDrawer.viewDetails', {
+                                defaultValue: 'View Details',
+                              })}
+                            </summary>
+                            <pre className="mt-2 max-h-[200px] overflow-auto rounded bg-gray-100 p-2 text-xs font-ibm-plex-mono text-low whitespace-pre-wrap break-all dark:bg-gray-800">
+                              {errorInfo.content}
+                            </pre>
+                          </details>
+                        )}
+                    </div>
+                  );
+                }
+                return (
+                  <>
+                    <ChatMarkdown content={displayContent} hideCopyButton />
+                    {errorInfo && (
+                      <div className="mt-base rounded-lg border border-error/30 bg-error/5 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <ChatErrorMessage
+                              content={errorInfo.summary}
+                              expanded={false}
+                              tone="error"
+                            />
+                          </div>
+                        </div>
+                        {errorInfo.content &&
+                          errorInfo.content !== errorInfo.summary && (
+                            <details className="mt-2">
+                              <summary className="cursor-pointer text-xs text-error/80 hover:text-error">
+                                {t('modals.workspaceDrawer.viewDetails', {
+                                  defaultValue: 'View Details',
+                                })}
+                              </summary>
+                              <pre className="mt-2 max-h-[200px] overflow-auto rounded bg-gray-100 p-2 text-xs font-ibm-plex-mono text-low whitespace-pre-wrap break-all dark:bg-gray-800">
+                                {errorInfo.content}
+                              </pre>
+                            </details>
+                          )}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               {mentionList.length > 0 && (
                 <div className="chat-session-mentions mt-half flex flex-wrap items-center gap-half text-xs text-low">
                   {mentionList.map((mention) => {

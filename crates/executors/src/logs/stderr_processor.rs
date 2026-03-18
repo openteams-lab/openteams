@@ -15,6 +15,7 @@ use workspace_utils::msg_store::MsgStore;
 
 use super::{
     NormalizedEntry, NormalizedEntryError, NormalizedEntryType,
+    api_errors::detect_api_error,
     plain_text_processor::PlainTextLogProcessor,
 };
 use crate::logs::utils::EntryIndexProvider;
@@ -38,17 +39,26 @@ use crate::logs::utils::EntryIndexProvider;
 /// * `entry_index_provider` - provider of incremental entry indices for patch ordering.
 pub fn normalize_stderr_logs(msg_store: Arc<MsgStore>, entry_index_provider: EntryIndexProvider) {
     tokio::spawn(async move {
-        let mut stderr = msg_store.stderr_chunked_stream();
+        // Use stderr_chunked_stream_until_close to ensure we process all stderr,
+        // including error messages that may arrive just before Finished signal.
+        let mut stderr = msg_store.stderr_chunked_stream_until_close();
 
         // Create a processor with time-based emission for stderr
         let mut processor = PlainTextLogProcessor::builder()
-            .normalized_entry_producer(Box::new(|content: String| NormalizedEntry {
-                timestamp: None,
-                entry_type: NormalizedEntryType::ErrorMessage {
-                    error_type: NormalizedEntryError::Other,
-                },
-                content: strip_ansi_escapes::strip_str(&content),
-                metadata: None,
+            .normalized_entry_producer(Box::new(|content: String| {
+                let stripped = strip_ansi_escapes::strip_str(&content);
+                let (error_type, display_content) =
+                    if let Some(detected) = detect_api_error(&stripped) {
+                        (detected.error_type, detected.message)
+                    } else {
+                        (NormalizedEntryError::Other, stripped)
+                    };
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::ErrorMessage { error_type },
+                    content: display_content,
+                    metadata: None,
+                }
             }))
             .time_gap(Duration::from_secs(2)) // Break messages if they are 2 seconds apart
             .index_provider(entry_index_provider)

@@ -29,7 +29,7 @@ type MentionAcknowledgedEvent = {
 type ChatStreamPayload = ChatStreamEvent | MentionAcknowledgedEvent;
 type AgentDeltaPayload = Extract<ChatStreamEvent, { type: 'agent_delta' }> & {
   type: 'agent_delta';
-  stream_type?: 'assistant' | 'thinking';
+  stream_type?: 'assistant' | 'thinking' | 'error';
 };
 type ProtocolNoticePayload = Extract<ChatStreamEvent, { type: 'protocol_notice' }>;
 type MentionErrorPayload = Extract<ChatStreamEvent, { type: 'mention_error' }>;
@@ -429,6 +429,7 @@ export function useChatWebSocket(
       const previousAssistant =
         previous?.assistantContent ?? previous?.content ?? '';
       const previousThinking = previous?.thinkingContent ?? '';
+      const previousError = previous?.errorContent ?? '';
       const applyDelta = (base: string) =>
         payload.delta ? `${base}${payload.content}` : payload.content;
       const assistantContent =
@@ -439,6 +440,8 @@ export function useChatWebSocket(
         streamType === 'thinking'
           ? applyDelta(previousThinking)
           : previousThinking;
+      const errorContent =
+        streamType === 'error' ? applyDelta(previousError) : previousError;
       const nowMs = Date.now();
 
       return {
@@ -450,6 +453,7 @@ export function useChatWebSocket(
             thinkingContent,
             assistantContent,
             content: assistantContent,
+            errorContent,
             isFinal: payload.is_final,
             updatedAtMs: nowMs,
           },
@@ -600,6 +604,7 @@ export function useChatWebSocket(
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as ChatStreamPayload;
+          console.debug("payload -- " + JSON.stringify(payload))
           if (payload.type === 'mention_acknowledged') {
             handleMentionAcknowledged(payload);
             return;

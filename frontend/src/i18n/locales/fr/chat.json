@@ -595,7 +595,7 @@
         "duplicateMemberName": "Nom de membre en double"
       },
       "messages": {
-        "agentRunning": "Le(s) agent(s) suivant(s) est/sont en cours d’exécution : @{{agents}}. Ils ne traiteront pas de nouveaux messages tant que la tâche en cours ne sera pas arrêtée. Voulez-vous quand même envoyer ce message ?",
+        "agentRunning": "Le(s) agent(s) suivant(s) est/sont en cours d'exécution : @{{agents}}. Ce message sera mis en file d'attente et traité après la fin de la tâche en cours. Voulez-vous quand même envoyer ce message ?",
         "removeMember": "Voulez-vous vraiment supprimer @{{name}} de cette session ?",
         "deleteSession": "Voulez-vous vraiment supprimer \"{{title}}\" ? Cette action est irréversible et tous les messages seront supprimés définitivement.",
         "deleteMessages": "Voulez-vous vraiment supprimer {{count}} message(s) ? Cette action est irréversible.",
@@ -650,6 +650,7 @@
       "refresh": "Actualiser",
       "loadingLog": "Chargement du journal...",
       "logEmpty": "Le journal est vide.",
+      "fullErrorLog": "Journal d'erreur complet",
       "workspaceTrail": "Espace de travail",
       "workspacePath": "Chemin de l'espace de travail"
     }

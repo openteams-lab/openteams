@@ -10,7 +10,7 @@ import {
 } from 'shared/types';
 import { chatApi } from '@/lib/api';
 import type { RunHistoryItem, SessionMember } from '../types';
-import { extractRunId } from '../utils';
+import { extractRunId, extractErrorFromMeta } from '../utils';
 
 export interface UseChatDataResult {
   sessions: ChatSession[];
@@ -150,11 +150,26 @@ export function useRunHistory(messages: ChatMessage[]): RunHistoryItem[] {
       }
       const runId = extractRunId(message.meta);
       if (!runId) continue;
+      const errorInfo = extractErrorFromMeta(message.meta);
+      const errorTypeData = (message.meta as Record<string, unknown>)?.error as
+        | { error_type?: { type?: string; provider?: string } }
+        | undefined;
+      const errorTypeInfo =
+        errorTypeData?.error_type?.type
+          ? {
+              type: errorTypeData.error_type.type,
+              provider: errorTypeData.error_type.provider,
+            }
+          : undefined;
       runs.push({
         runId,
         agentId: message.sender_id,
         createdAt: message.created_at,
         content: message.content,
+        errorSummary: errorInfo?.summary,
+        errorContent: errorInfo?.content,
+        errorType: errorTypeInfo,
+        hasError: !!errorInfo,
       });
     }
     return runs;

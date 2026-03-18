@@ -225,6 +225,8 @@ impl AcpAgentHarness {
                 data.push(b'\n');
                 let mut w = shared_writer.lock().await;
                 let _ = w.write_all(&data).await;
+                // Flush immediately to ensure data is sent through the pipe
+                let _ = w.flush().await;
             }
         });
 
@@ -464,6 +466,7 @@ impl AcpAgentHarness {
                         );
 
                         let mut current_req = Some(initial_req);
+                        let mut had_error = false;
 
                         while let Some(req) = current_req.take() {
                             if cancel.is_cancelled() {
@@ -490,6 +493,7 @@ impl AcpAgentHarness {
                                 }
                                 Err(e) => {
                                     tracing::debug!("error {} {e} {:?}", e.code, e.data);
+                                    had_error = true;
                                     if e.code
                                         == agent_client_protocol::ErrorCode::INTERNAL_ERROR.code
                                         && e.data
@@ -498,8 +502,14 @@ impl AcpAgentHarness {
                                     {
                                         tracing::debug!("ACP server killed");
                                     } else {
+                                        // Include e.data in the error message for more details
+                                        let error_msg = if let Some(data) = &e.data {
+                                            format!("{e}: {data}")
+                                        } else {
+                                            format!("{e}")
+                                        };
                                         let _ = log_tx
-                                            .send(AcpEvent::Error(format!("{e}")).to_string());
+                                            .send(AcpEvent::Error(error_msg).to_string());
                                     }
                                 }
                             }
@@ -524,11 +534,6 @@ impl AcpAgentHarness {
                             }
                         }
 
-                        // Notify container of completion
-                        if let Some(tx) = exit_signal_tx.take() {
-                            let _ = tx.send(ExecutorExitResult::Success);
-                        }
-
                         // Cancel session work
                         let _ = conn
                             .cancel(proto::CancelNotification::new(proto::SessionId::new(
@@ -536,11 +541,30 @@ impl AcpAgentHarness {
                             )))
                             .await;
 
-                        // Cleanup
+                        // Cleanup: drop log_tx first to ensure all log messages are flushed
+                        // before sending the exit signal. This prevents a race condition where
+                        // the exit signal triggers push_finished() before error logs are processed.
+                        drop(log_tx);
+
+                        // Delay to allow pipe data to be fully read and processed by normalize_logs
+                        // before push_finished() stops the stdout_lines_stream (which uses take_while).
+                        // 500ms should be enough for: pipe read -> msg_store push -> normalize_logs parse -> patch push
+                        // This is a conservative delay to handle slow systems or high load.
+                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+                        // Notify container of completion after logs are flushed
+                        if let Some(tx) = exit_signal_tx.take() {
+                            let result = if had_error {
+                                ExecutorExitResult::Failure
+                            } else {
+                                ExecutorExitResult::Success
+                            };
+                            let _ = tx.send(result);
+                        }
+
                         drop(conn);
                         let _ = shutdown_tx.send(true);
                         let _ = io_handle.await;
-                        drop(log_tx);
                     })
                     .await;
             });
