@@ -113,6 +113,7 @@
     "quote": "인용",
     "copy": "복사",
     "regenerate": "재생성",
+    "resend": "재전송",
     "replyingTo": "{{name}}에게 답장",
     "view": "보기",
     "referencedMessageUnavailable": "참조된 메시지를 사용할 수 없습니다.",
