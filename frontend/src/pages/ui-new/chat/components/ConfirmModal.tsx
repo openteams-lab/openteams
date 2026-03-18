@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   ConfirmationDialogChrome,
+  ConfirmationDialogTone,
   getConfirmationButtonClasses,
 } from '@/components/dialogs/shared/ConfirmationDialogChrome';
 
@@ -10,6 +11,7 @@ export interface ConfirmModalProps {
   message: string;
   isLoading: boolean;
   mode?: 'confirm' | 'alert';
+  tone?: ConfirmationDialogTone;
   confirmText?: string;
   cancelText?: string;
   onConfirm: () => void;
@@ -22,6 +24,7 @@ export function ConfirmModal({
   message,
   isLoading,
   mode = 'confirm',
+  tone = 'destructive',
   confirmText,
   cancelText,
   onConfirm,
@@ -45,7 +48,7 @@ export function ConfirmModal({
       onClose={onCancel}
       title={title}
       message={message}
-      tone="destructive"
+      tone={tone}
       closeLabel={t('common:buttons.close')}
       footer={
         <>

@@ -729,6 +729,7 @@ export function ChatSessions() {
 
   const handleIncomingMessage = useCallback(
     (message: ChatMessage) => {
+      console.info("message --- " + JSON.stringify(message))
       upsertMessage(message);
       if (isProtocolErrorMessage(message)) return;
 
@@ -996,6 +997,7 @@ export function ChatSessions() {
     message: string;
     onConfirm: () => void | Promise<void>;
     mode?: 'confirm' | 'alert';
+    tone?: 'default' | 'info' | 'success' | 'destructive';
     confirmText?: string;
     cancelText?: string;
   } | null>(null);
@@ -1028,6 +1030,7 @@ export function ChatSessions() {
   } | null>(null);
   const lastExpandedLeftWidthRef = useRef(340);
   const sessionUpdatedAtByIdRef = useRef<Map<string, string>>(new Map());
+  const hasShownAgentRunningWarningRef = useRef<Set<string>>(new Set());
 
   const showDuplicateMemberNameWarning = useCallback(
     (name: string) => {
@@ -2303,11 +2306,17 @@ export function ChatSessions() {
     });
 
     if (runningMentionedAgents.length > 0) {
+      if (hasShownAgentRunningWarningRef.current.has(activeSessionId)) {
+        await doSendMessage(content);
+        return;
+      }
+      hasShownAgentRunningWarningRef.current.add(activeSessionId);
       setConfirmModal({
         title: t('modals.confirm.titles.agentRunning'),
         message: t('modals.confirm.messages.agentRunning', {
           agents: runningMentionedAgents.join(', @'),
         }),
+        tone: 'info',
         onConfirm: async () => {
           await doSendMessage(content);
         },
@@ -4031,6 +4040,7 @@ export function ChatSessions() {
         message={confirmModal?.message ?? ''}
         isLoading={isConfirmLoading}
         mode={confirmModal?.mode}
+        tone={confirmModal?.tone}
         confirmText={confirmModal?.confirmText}
         cancelText={confirmModal?.cancelText}
         onConfirm={async () => {

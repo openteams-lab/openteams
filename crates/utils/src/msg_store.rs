@@ -134,6 +134,23 @@ impl MsgStore {
         self.stdout_chunked_stream().lines()
     }
 
+    /// Returns a stream of stdout lines that continues processing until the channel closes,
+    /// not stopping when `Finished` is received. This ensures all stdout content is processed
+    /// even if `Finished` arrives before all stdout has been consumed.
+    pub fn stdout_lines_stream_until_close(
+        &self,
+    ) -> futures::stream::BoxStream<'static, std::io::Result<String>> {
+        self.history_plus_stream()
+            .filter_map(|res| async move {
+                match res {
+                    Ok(LogMsg::Stdout(s)) => Some(Ok(s)),
+                    _ => None,
+                }
+            })
+            .boxed()
+            .lines()
+    }
+
     pub fn stderr_chunked_stream(
         &self,
     ) -> futures::stream::BoxStream<'static, Result<String, std::io::Error>> {
@@ -152,6 +169,22 @@ impl MsgStore {
         &self,
     ) -> futures::stream::BoxStream<'static, std::io::Result<String>> {
         self.stderr_chunked_stream().lines()
+    }
+
+    /// Returns a stream of stderr chunks that continues processing until the channel closes,
+    /// not stopping when `Finished` is received. This ensures all stderr content is processed
+    /// even if `Finished` arrives before all stderr has been consumed.
+    pub fn stderr_chunked_stream_until_close(
+        &self,
+    ) -> futures::stream::BoxStream<'static, Result<String, std::io::Error>> {
+        self.history_plus_stream()
+            .filter_map(|res| async move {
+                match res {
+                    Ok(LogMsg::Stderr(s)) => Some(Ok(s)),
+                    _ => None,
+                }
+            })
+            .boxed()
     }
 
     /// Same stream but mapped to `Event` for SSE handlers.

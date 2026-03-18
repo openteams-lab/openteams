@@ -55,20 +55,43 @@ impl StandardCodingAgentExecutor for QaMockExecutor {
             .await
             .map_err(|e| ExecutorError::Io(std::io::Error::other(e)))?;
 
-        // 3. Create shell script that reads file and outputs with delays
-        // Using IFS= read -r to preserve exact content (no word splitting, no backslash interpretation)
-        let script = format!(
-            r#"while IFS= read -r line; do echo "$line"; sleep 1; done < "{}"; rm -f "{}""#,
-            log_file.display(),
-            log_file.display()
-        );
+        let script = if cfg!(windows) {
+            format!(
+                r#"Get-Content "{}" | ForEach-Object {{ Write-Output $_; Start-Sleep -Seconds 1 }}; Remove-Item -Force "{}""#,
+                log_file.display(),
+                log_file.display()
+            )
+        } else {
+            format!(
+                r#"while IFS= read -r line; do echo "$line"; sleep 1; done < "{}"; rm -f "{}""#,
+                log_file.display(),
+                log_file.display()
+            )
+        };
 
-        let mut cmd = tokio::process::Command::new("sh");
-        cmd.arg("-c")
-            .arg(&script)
-            .current_dir(current_dir)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        #[cfg(windows)]
+        let mut cmd = {
+            let mut cmd = tokio::process::Command::new("powershell.exe");
+            cmd.arg("-NoProfile")
+                .arg("-NonInteractive")
+                .arg("-Command")
+                .arg(&script)
+                .current_dir(current_dir)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+            cmd
+        };
+
+        #[cfg(not(windows))]
+        let mut cmd = {
+            let mut cmd = tokio::process::Command::new("sh");
+            cmd.arg("-c")
+                .arg(&script)
+                .current_dir(current_dir)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+            cmd
+        };
 
         let child = cmd.group_spawn().map_err(ExecutorError::Io)?;
         Ok(SpawnedChild::from(child))

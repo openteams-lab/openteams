@@ -600,7 +600,7 @@
         "duplicateMemberName": "成员名称不可重复"
       },
       "messages": {
-        "agentRunning": "以下 Agent 正在运行：@{{agents}}。在当前任务停止前，它们不会处理新消息。仍要发送这条消息吗？",
+        "agentRunning": "以下 Agent 正在运行：@{{agents}}。这条消息将会排队等待，在当前任务结束后，它才会继续处理新消息。仍要发送这条消息吗？",
         "removeMember": "确定要将 @{{name}} 从此会话中移除吗？",
         "deleteSession": "确定要删除“{{title}}”吗？此操作无法撤销，所有消息将被永久删除。",
         "deleteMessages": "确定要删除 {{count}} 条消息吗？此操作无法撤销。",
@@ -656,7 +656,8 @@
       "selectRunToViewLog": "选择一次运行以查看其日志输出。",
       "refresh": "刷新",
       "loadingLog": "正在加载日志...",
-      "logEmpty": "日志为空。"
+      "logEmpty": "日志为空。",
+      "fullErrorLog": "完整错误日志"
     }
   },
   "workspacePreview": {

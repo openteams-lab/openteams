@@ -10,6 +10,11 @@
 //!
 //! The detection logic matches error patterns in API responses and logs
 //! to identify quota exhaustion, rate limiting, server overload, and auth failures.
+//!
+//! Supports both plain text and JSON error formats:
+//! - `{"Error": "message"}` (Gemini style)
+//! - `{"error": "message"}` or `{"error": {"message": "..."}}`
+//! - `{"code": "QuotaExhausted", "message": "..."}`
 
 use super::NormalizedEntryError;
 
@@ -24,7 +29,126 @@ pub struct DetectedApiError {
 ///
 /// Returns a categorized error if a known error pattern is detected,
 /// or None if the content doesn't match any known error patterns.
+///
+/// Supports JSON error formats in addition to plain text.
 pub fn detect_api_error(content: &str) -> Option<DetectedApiError> {
+    let trimmed = content.trim();
+    
+    tracing::debug!(
+        content_len = trimmed.len(),
+        content_preview = %trimmed.chars().take(100).collect::<String>(),
+        "[api_errors] Starting API error detection"
+    );
+
+    // Try to parse as JSON first
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(trimmed) {
+        tracing::debug!("[api_errors] Content parsed as JSON, checking formats");
+        
+        // Format 1: {"Error": "message"} (Gemini style)
+        if let Some(msg) = json.get("Error").and_then(|v| v.as_str())
+            && let Some(detected) = detect_api_error_from_string(msg, Some("Google"))
+        {
+            tracing::debug!(
+                error_type = ?detected.error_type,
+                "[api_errors] Detected Gemini-style JSON error"
+            );
+            return Some(detected);
+        }
+
+        // Format 2: {"error": "message"} or {"error": {"message": "..."}}
+        if let Some(error) = json.get("error") {
+            let msg = error
+                .as_str()
+                .or_else(|| error.get("message").and_then(|v| v.as_str()));
+            if let Some(msg) = msg
+                && let Some(detected) = detect_api_error_from_string(msg, None)
+            {
+                tracing::debug!(
+                    error_type = ?detected.error_type,
+                    "[api_errors] Detected standard JSON error format"
+                );
+                return Some(detected);
+            }
+        }
+
+        // Format 3: {"code": "QuotaExhausted", "message": "..."}
+        if let Some(code) = json.get("code").and_then(|v| v.as_str())
+            && let Some(detected) = detect_from_error_code(code)
+        {
+            tracing::debug!(
+                error_type = ?detected.error_type,
+                code = %code,
+                "[api_errors] Detected error from code field"
+            );
+            return Some(detected);
+        }
+    }
+
+    // Fallback to string matching
+    tracing::debug!("[api_errors] JSON parsing failed or no match, falling back to string matching");
+    let result = detect_api_error_from_string(trimmed, None);
+    if let Some(ref detected) = result {
+        tracing::debug!(
+            error_type = ?detected.error_type,
+            "[api_errors] Detected error via string matching"
+        );
+    } else {
+        tracing::debug!("[api_errors] No API error detected");
+    }
+    result
+}
+
+/// Detect API error from error code string.
+fn detect_from_error_code(code: &str) -> Option<DetectedApiError> {
+    let lowered = code.to_lowercase();
+
+    if lowered.contains("quota")
+        || lowered.contains("exhausted")
+        || lowered.contains("insufficient")
+    {
+        return Some(DetectedApiError {
+            error_type: NormalizedEntryError::QuotaExceeded { provider: None },
+            message: "API quota exceeded".to_string(),
+        });
+    }
+
+    if lowered.contains("rate") || lowered.contains("limit") || lowered.contains("throttl") {
+        return Some(DetectedApiError {
+            error_type: NormalizedEntryError::RateLimitExceeded { provider: None },
+            message: "API rate limit exceeded".to_string(),
+        });
+    }
+
+    if lowered.contains("auth") || lowered.contains("unauthorized") || lowered.contains("forbidden")
+    {
+        return Some(DetectedApiError {
+            error_type: NormalizedEntryError::AuthenticationFailed { provider: None },
+            message: "API authentication failed".to_string(),
+        });
+    }
+
+    if lowered.contains("overload") || lowered.contains("unavailable") {
+        return Some(DetectedApiError {
+            error_type: NormalizedEntryError::ServerOverloaded { provider: None },
+            message: "API server is overloaded".to_string(),
+        });
+    }
+
+    if lowered.contains("context") || lowered.contains("token") || lowered.contains("length") {
+        return Some(DetectedApiError {
+            error_type: NormalizedEntryError::ContextLimitExceeded { provider: None },
+            message: "Context or token limit exceeded".to_string(),
+        });
+    }
+
+    None
+}
+
+/// Detect API error from string content with optional provider hint.
+fn detect_api_error_from_string(
+    content: &str,
+    _provider_hint: Option<&str>,
+) -> Option<DetectedApiError> {
     let lowered = content.to_lowercase();
 
     // === Anthropic/Claude specific errors ===
@@ -339,5 +463,53 @@ mod tests {
         let msg = "Hello, how can I help you today?";
         let result = detect_api_error(msg);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_detect_gemini_json_error() {
+        let msg = r#"{"Error":"You have exhausted your daily quota on this model."}"#;
+        let result = detect_api_error(msg);
+        assert!(result.is_some());
+        let err = result.unwrap();
+        assert!(matches!(
+            err.error_type,
+            NormalizedEntryError::QuotaExceeded { .. }
+        ));
+    }
+
+    #[test]
+    fn test_detect_json_error_with_message() {
+        let msg = r#"{"error": {"message": "Rate limit exceeded. Please try again later."}}"#;
+        let result = detect_api_error(msg);
+        assert!(result.is_some());
+        let err = result.unwrap();
+        assert!(matches!(
+            err.error_type,
+            NormalizedEntryError::RateLimitExceeded { .. }
+        ));
+    }
+
+    #[test]
+    fn test_detect_json_error_code() {
+        let msg = r#"{"code": "QuotaExhausted", "message": "You have exceeded your quota"}"#;
+        let result = detect_api_error(msg);
+        assert!(result.is_some());
+        let err = result.unwrap();
+        assert!(matches!(
+            err.error_type,
+            NormalizedEntryError::QuotaExceeded { .. }
+        ));
+    }
+
+    #[test]
+    fn test_detect_json_simple_error() {
+        let msg = r#"{"error": "Authentication failed. Invalid API key."}"#;
+        let result = detect_api_error(msg);
+        assert!(result.is_some());
+        let err = result.unwrap();
+        assert!(matches!(
+            err.error_type,
+            NormalizedEntryError::AuthenticationFailed { .. }
+        ));
     }
 }
