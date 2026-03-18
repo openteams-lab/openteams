@@ -1093,7 +1093,9 @@ export function ChatPresetsEditorPanel({
                 ) : (
                   <div className="grid gap-3 md:grid-cols-2">
                     {filteredTeamMembers.map((member) => {
-                      const checked = selectedTeam.member_ids.includes(member.id);
+                      const checked = selectedTeam.member_ids.includes(
+                        member.id
+                      );
                       return (
                         <button
                           key={member.id}
@@ -1253,7 +1255,10 @@ export function ChatPresetsEditorPanel({
                         }}
                         title={t('settings.presets.search')}
                       >
-                        <MagnifyingGlassIcon className="h-3.5 w-3.5" weight="bold" />
+                        <MagnifyingGlassIcon
+                          className="h-3.5 w-3.5"
+                          weight="bold"
+                        />
                       </button>
                     )}
                     <button

@@ -25,7 +25,7 @@
     "searchSessionsPlaceholder": "搜尋會話名稱...",
     "clearSessionSearch": "清除會話搜尋",
     "noSearchResults": "沒有會話符合「{{query}}」。",
-"generatedSessionTitle": "開始於 {{date}}",
+    "generatedSessionTitle": "開始於 {{date}}",
     "aiTeam": "AI 團隊"
   },
   "contextMenu": {
@@ -183,7 +183,7 @@
     "workspacePath": "工作區路徑",
     "workspacePathPlaceholder": "AI成員工作的絕對路徑",
     "workspacePathCannotBeModified": "工作區路徑無法修改",
-"add": "新增",
+    "add": "新增",
     "save": "儲存",
     "teamBulletin": {
       "title": "團隊公告板",
@@ -542,7 +542,7 @@
       "installAria": "安裝技能",
       "scrollForMore": "向下捲動載入更多..."
     },
-"create": {
+    "create": {
       "title": "新增技能路徑",
       "pathLabel": "技能路徑",
       "pathPlaceholder": "C:\\skills\\my-skill"

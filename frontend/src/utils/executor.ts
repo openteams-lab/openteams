@@ -95,9 +95,9 @@ export function getVariantOptions(
   profiles: ExecutorConfigs['executors'] | null | undefined
 ): string[] {
   if (!executor || !profiles) return [];
-  const executorConfig = (profiles as Record<string, ExecutorConfig | undefined>)[
-    executor
-  ];
+  const executorConfig = (
+    profiles as Record<string, ExecutorConfig | undefined>
+  )[executor];
   if (!executorConfig) return [];
 
   const variants = Object.keys(executorConfig);
@@ -128,9 +128,9 @@ export function getVariantModelName(
   profiles: ExecutorConfigs['executors'] | null | undefined
 ): string | null {
   if (!executor || !profiles) return null;
-  const executorConfig = (profiles as Record<string, ExecutorConfig | undefined>)[
-    executor
-  ];
+  const executorConfig = (
+    profiles as Record<string, ExecutorConfig | undefined>
+  )[executor];
   if (!executorConfig) return null;
 
   const variantKey =

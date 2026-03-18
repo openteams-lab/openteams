@@ -63,8 +63,7 @@ const CANCEL_BUTTON_CLASS = cn(
   'border-transparent bg-transparent text-[#8C8C8C] hover:bg-[#F5F7FA] hover:text-[#333333] focus-visible:ring-[#E8EEF5]'
 );
 
-const HIGHLIGHTED_TEXT_PATTERN =
-  /(".*?"|“.*?”|'[^']*'|‘.*?’|「.*?」|『.*?』)/g;
+const HIGHLIGHTED_TEXT_PATTERN = /(".*?"|“.*?”|'[^']*'|‘.*?’|「.*?」|『.*?』)/g;
 
 function renderHighlightedMessage(message: string) {
   return message.split('\n').map((line, lineIndex) => {
@@ -198,7 +197,9 @@ export function ConfirmationDialogChrome({
         {hasBody && (
           <div className="px-7 pb-6">
             {message && <ConfirmationDialogMessage message={message} />}
-            {bodyExtra && <div className={cn(message && 'mt-4')}>{bodyExtra}</div>}
+            {bodyExtra && (
+              <div className={cn(message && 'mt-4')}>{bodyExtra}</div>
+            )}
           </div>
         )}
 

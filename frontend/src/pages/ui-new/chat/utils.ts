@@ -270,15 +270,13 @@ export function extractRunId(meta: unknown): string | null {
 export function extractErrorFromMeta(
   meta: unknown
 ): { summary: string; content: string } | null {
-  console.info("meta " + JSON.stringify(meta))
+  console.info('meta ' + JSON.stringify(meta));
   if (!meta || typeof meta !== 'object') return null;
   const error = (meta as { error?: unknown }).error;
   if (!error || typeof error !== 'object') return null;
   const errObj = error as { summary?: unknown; content?: unknown };
-  const summary =
-    typeof errObj.summary === 'string' ? errObj.summary : null;
-  const content =
-    typeof errObj.content === 'string' ? errObj.content : null;
+  const summary = typeof errObj.summary === 'string' ? errObj.summary : null;
+  const content = typeof errObj.content === 'string' ? errObj.content : null;
   if (summary || content) {
     return { summary: summary ?? content ?? '', content: content ?? '' };
   }

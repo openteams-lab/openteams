@@ -147,8 +147,9 @@ export function MessageInputArea({
         ? t('input.uploadingAttachments')
         : null;
   const replyPreviewText =
-    (replyToPreview ?? t('input.referencedMessage')).replace(/\s+/g, ' ').trim() ||
-    t('input.referencedMessage');
+    (replyToPreview ?? t('input.referencedMessage'))
+      .replace(/\s+/g, ' ')
+      .trim() || t('input.referencedMessage');
   const replySummaryText = replyToSenderLabel
     ? `${t('input.replyingTo', { name: replyToSenderLabel })} · ${replyPreviewText}`
     : replyPreviewText;
@@ -165,10 +166,7 @@ export function MessageInputArea({
         {replyToMessage && (
           <div className="chat-session-reply-card" title={replySummaryText}>
             <div className="chat-session-reply-main">
-              <QuotesIcon
-                className="chat-session-reply-quote"
-                weight="fill"
-              />
+              <QuotesIcon className="chat-session-reply-quote" weight="fill" />
               <div className="chat-session-reply-content">
                 {replySummaryText}
               </div>
@@ -193,7 +191,10 @@ export function MessageInputArea({
                 className="chat-session-attachment-item"
               >
                 <PaperclipIcon className="chat-session-attachment-icon" />
-                <span className="chat-session-attachment-name" title={file.name}>
+                <span
+                  className="chat-session-attachment-name"
+                  title={file.name}
+                >
                   {file.name}
                 </span>
                 {isAllowedAttachment(file) && (
@@ -362,7 +363,8 @@ export function MessageInputArea({
                       const start = textarea.selectionStart;
                       const end = textarea.selectionEnd;
                       const value = draft;
-                      const newValue = value.substring(0, start) + '@' + value.substring(end);
+                      const newValue =
+                        value.substring(0, start) + '@' + value.substring(end);
                       onDraftChange(newValue);
                       textarea.focus();
                       requestAnimationFrame(() => {
