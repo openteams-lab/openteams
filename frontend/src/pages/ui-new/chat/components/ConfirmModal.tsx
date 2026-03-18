@@ -57,10 +57,7 @@ export function ConfirmModal({
               type="button"
               onClick={onCancel}
               disabled={isLoading}
-              className={getConfirmationButtonClasses(
-                'destructive',
-                'cancel'
-              )}
+              className={getConfirmationButtonClasses('destructive', 'cancel')}
             >
               {resolvedCancelText}
             </button>
@@ -69,10 +66,7 @@ export function ConfirmModal({
             type="submit"
             onClick={onConfirm}
             disabled={isLoading}
-            className={getConfirmationButtonClasses(
-              'destructive',
-              'confirm'
-            )}
+            className={getConfirmationButtonClasses('destructive', 'confirm')}
           >
             {resolvedConfirmText}
           </button>

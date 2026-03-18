@@ -152,11 +152,7 @@ class AnalyticsService {
 
   // Session events
   trackSessionCreate(sessionId: string, titleLength: number) {
-    this.track(
-      'session_create',
-      { title_length: titleLength },
-      sessionId
-    );
+    this.track('session_create', { title_length: titleLength }, sessionId);
   }
 
   trackSessionArchive(

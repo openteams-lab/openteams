@@ -25,7 +25,7 @@
     "settingsInSidebar": "Settings",
     "searchSessions": "Search sessions",
     "searchSessionsPlaceholder": "Search session names...",
-"clearSessionSearch": "Clear session search",
+    "clearSessionSearch": "Clear session search",
     "noSearchResults": "No sessions match \"{{query}}\"."
   },
   "contextMenu": {
@@ -162,7 +162,7 @@
       "statusCount_other": "{{count}} status updates"
     }
   },
-"members": {
+  "members": {
     "title": "AI Member List",
     "countInSession": "{{count}} in session",
     "selectSessionToManage": "Select a session to manage AI members.",
@@ -518,7 +518,7 @@
       }
     }
   },
-"skillLibrary": {
+  "skillLibrary": {
     "title": "Skills",
     "description": "Manage installed and marketplace skills.",
     "actions": {

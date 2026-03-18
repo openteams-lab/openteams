@@ -101,7 +101,7 @@ function runnerKeyToAgentId(runnerKey: string): string {
   const mapping: Record<string, string> = {
     'claude-code': 'claude',
     'github-copilot': 'copilot',
-    'copilot': 'copilot',
+    copilot: 'copilot',
     'qwen-code': 'qwen',
     'kimi-code': 'kimi',
   };
@@ -176,9 +176,9 @@ export function SkillsPanel({
   onClose,
 }: SkillsPanelProps) {
   const { t } = useTranslation('chat');
-  const [installedSkills, setInstalledSkills] = useState<InstalledNativeSkill[]>(
-    []
-  );
+  const [installedSkills, setInstalledSkills] = useState<
+    InstalledNativeSkill[]
+  >([]);
   const [marketSkills, setMarketSkills] = useState<MarketSkill[]>([]);
 
   const [selectedRunnerKey, setSelectedRunnerKey] = useState('');
@@ -240,23 +240,26 @@ export function SkillsPanel({
   );
   const selectedRunnerLabel = selectedRunnerOption?.label ?? '';
 
-  const loadInstalledSkills = useCallback(async (runnerKey: string) => {
-    setIsLoadingInstalled(true);
-    setInstalledError(null);
-    try {
-      if (!runnerKey) {
-        setInstalledSkills([]);
-        return;
+  const loadInstalledSkills = useCallback(
+    async (runnerKey: string) => {
+      setIsLoadingInstalled(true);
+      setInstalledError(null);
+      try {
+        if (!runnerKey) {
+          setInstalledSkills([]);
+          return;
+        }
+        const skills = await chatApi.listNativeSkills(runnerKey);
+        setInstalledSkills(skills);
+      } catch (error) {
+        console.error('Failed to load installed skills', error);
+        setInstalledError(t('skillLibrary.errors.loadInstalled'));
+      } finally {
+        setIsLoadingInstalled(false);
       }
-      const skills = await chatApi.listNativeSkills(runnerKey);
-      setInstalledSkills(skills);
-    } catch (error) {
-      console.error('Failed to load installed skills', error);
-      setInstalledError(t('skillLibrary.errors.loadInstalled'));
-    } finally {
-      setIsLoadingInstalled(false);
-    }
-  }, [t]);
+    },
+    [t]
+  );
 
   const loadMarketSkills = useCallback(async () => {
     setIsLoadingMarket(true);
@@ -288,7 +291,9 @@ export function SkillsPanel({
   const refreshAll = useCallback(async () => {
     await Promise.all([
       loadMarketSkills(),
-      selectedRunnerKey ? loadInstalledSkills(selectedRunnerKey) : Promise.resolve(),
+      selectedRunnerKey
+        ? loadInstalledSkills(selectedRunnerKey)
+        : Promise.resolve(),
     ]);
   }, [loadInstalledSkills, loadMarketSkills, selectedRunnerKey]);
 
@@ -439,7 +444,9 @@ export function SkillsPanel({
       setIsSyncingSkillId(skillId);
       setInstalledError(null);
       try {
-        const current = installedSkills.find((item) => item.skill.id === skillId);
+        const current = installedSkills.find(
+          (item) => item.skill.id === skillId
+        );
         if (!current || !selectedRunnerKey) {
           return;
         }
@@ -544,13 +551,7 @@ export function SkillsPanel({
     } finally {
       setIsTryingSkill(false);
     }
-  }, [
-    closeDetail,
-    detailData,
-    loadInstalledSkills,
-    selectedRunnerKey,
-    t,
-  ]);
+  }, [closeDetail, detailData, loadInstalledSkills, selectedRunnerKey, t]);
   const handleToggleSkillEnabled = useCallback(async () => {
     if (
       !detailData?.installedSkillId ||
@@ -611,13 +612,7 @@ export function SkillsPanel({
     } finally {
       setIsSyncingSkillId(null);
     }
-  }, [
-    closeDetail,
-    detailData,
-    loadInstalledSkills,
-    selectedRunnerKey,
-    t,
-  ]);
+  }, [closeDetail, detailData, loadInstalledSkills, selectedRunnerKey, t]);
 
   const handleDeleteSkill = useCallback(async () => {
     if (!detailData?.installedSkillId) return;
@@ -628,7 +623,9 @@ export function SkillsPanel({
       await chatApi.deleteSkill(detailData.installedSkillId);
       await Promise.all([
         loadMarketSkills(),
-        selectedRunnerKey ? loadInstalledSkills(selectedRunnerKey) : Promise.resolve(),
+        selectedRunnerKey
+          ? loadInstalledSkills(selectedRunnerKey)
+          : Promise.resolve(),
       ]);
       closeDetail();
     } catch (error) {
@@ -672,7 +669,9 @@ export function SkillsPanel({
 
       await Promise.all([
         loadMarketSkills(),
-        selectedRunnerKey ? loadInstalledSkills(selectedRunnerKey) : Promise.resolve(),
+        selectedRunnerKey
+          ? loadInstalledSkills(selectedRunnerKey)
+          : Promise.resolve(),
       ]);
 
       setIsCreateModalOpen(false);
@@ -715,7 +714,9 @@ export function SkillsPanel({
         }
 
         await Promise.all([
-          selectedRunnerKey ? loadInstalledSkills(selectedRunnerKey) : Promise.resolve(),
+          selectedRunnerKey
+            ? loadInstalledSkills(selectedRunnerKey)
+            : Promise.resolve(),
           loadMarketSkills(),
         ]);
       } catch (error) {
@@ -869,7 +870,9 @@ export function SkillsPanel({
                 )}
               >
                 {runnerOptions.length === 0 && (
-                  <option value="">{t('skillLibrary.installed.noRunner')}</option>
+                  <option value="">
+                    {t('skillLibrary.installed.noRunner')}
+                  </option>
                 )}
                 {runnerOptions.map((option) => (
                   <option key={option.key} value={option.key}>
@@ -887,10 +890,13 @@ export function SkillsPanel({
               </div>
             )}
 
-            <div className={cn(
-              "grid grid-cols-1 gap-4 xl:grid-cols-2",
-              displayedInstalledSkills.length > 8 && "max-h-[280px] overflow-y-auto pr-1"
-            )}>
+            <div
+              className={cn(
+                'grid grid-cols-1 gap-4 xl:grid-cols-2',
+                displayedInstalledSkills.length > 8 &&
+                  'max-h-[280px] overflow-y-auto pr-1'
+              )}
+            >
               {isLoadingInstalled && (
                 <div className="col-span-full text-sm text-low py-4">
                   {t('members.skills.loading')}
@@ -918,7 +924,9 @@ export function SkillsPanel({
                       key={skill.id}
                       role="button"
                       tabIndex={0}
-                      onClick={() => openDetail({ kind: 'installed', skill: item })}
+                      onClick={() =>
+                        openDetail({ kind: 'installed', skill: item })
+                      }
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
@@ -954,7 +962,9 @@ export function SkillsPanel({
                           <ToggleSwitch
                             checked={item.enabled}
                             disabled={disabled}
-                            onClick={() => void handleToggleInstalledSkill(skill.id)}
+                            onClick={() =>
+                              void handleToggleInstalledSkill(skill.id)
+                            }
                           />
                         </div>
                       </div>
@@ -1026,12 +1036,15 @@ export function SkillsPanel({
                               <span className="truncate text-base font-medium text-normal">
                                 {skill.name}
                               </span>
-                              {skill.download_count != null && skill.download_count > 0 && (
-                                <span className="shrink-0 text-[10px] text-low flex items-center gap-0.5">
-                                  <DownloadIcon size={10} />
-                                  {formatDownloadCount(Number(skill.download_count))}
-                                </span>
-                              )}
+                              {skill.download_count != null &&
+                                skill.download_count > 0 && (
+                                  <span className="shrink-0 text-[10px] text-low flex items-center gap-0.5">
+                                    <DownloadIcon size={10} />
+                                    {formatDownloadCount(
+                                      Number(skill.download_count)
+                                    )}
+                                  </span>
+                                )}
                             </div>
                             <p className="truncate text-xs text-low">
                               {skill.description ||
@@ -1088,7 +1101,7 @@ export function SkillsPanel({
           detailData?.name ??
           (detailTarget?.kind === 'installed'
             ? detailTarget.skill.skill.name
-            : detailTarget?.skill.name ?? '')
+            : (detailTarget?.skill.name ?? ''))
         }
         description={detailData?.description}
         content={detailData?.content}
@@ -1105,23 +1118,24 @@ export function SkillsPanel({
                 })}
               </div>
             )}
-            {detailTarget?.kind === 'market' && detailData?.installedSkillId && (
-              <button
-                type="button"
-                onClick={() => void handleDeleteSkill()}
-                disabled={isDeletingSkill}
-                className={cn(
-                  'inline-flex h-10 items-center gap-1 rounded-2xl bg-[#fff1eb] px-4 text-sm !text-[#ff7f50]',
-                  isDeletingSkill && 'cursor-not-allowed opacity-60'
-                )}
-                style={{ color: '#ff7f50' }}
-              >
-                <TrashIcon size={16} />
-                {isDeletingSkill
-                  ? t('skillLibrary.actions.deleting')
-                  : t('skillLibrary.actions.delete')}
-              </button>
-            )}
+            {detailTarget?.kind === 'market' &&
+              detailData?.installedSkillId && (
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteSkill()}
+                  disabled={isDeletingSkill}
+                  className={cn(
+                    'inline-flex h-10 items-center gap-1 rounded-2xl bg-[#fff1eb] px-4 text-sm !text-[#ff7f50]',
+                    isDeletingSkill && 'cursor-not-allowed opacity-60'
+                  )}
+                  style={{ color: '#ff7f50' }}
+                >
+                  <TrashIcon size={16} />
+                  {isDeletingSkill
+                    ? t('skillLibrary.actions.deleting')
+                    : t('skillLibrary.actions.delete')}
+                </button>
+              )}
 
             {isInstalledDetail && detailData?.installedSkillId && (
               <button
@@ -1146,21 +1160,21 @@ export function SkillsPanel({
               detailData.enabled === true &&
               detailData.canToggle !== false &&
               !isInstalledDetail && (
-              <button
-                type="button"
-                onClick={() => void handleToggleSkillEnabled()}
-                disabled={isTogglingSkill}
-                className={cn(
-                  'inline-flex h-10 items-center rounded-2xl bg-[#ebebef] px-4 text-sm text-normal',
-                  isTogglingSkill && 'cursor-not-allowed opacity-60'
-                )}
-              >
-                {isTogglingSkill
-                  ? t('skillLibrary.actions.updating')
-                  : detailData.enabled
-                    ? t('skillLibrary.actions.disable')
-                    : t('skillLibrary.actions.enable')}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => void handleToggleSkillEnabled()}
+                  disabled={isTogglingSkill}
+                  className={cn(
+                    'inline-flex h-10 items-center rounded-2xl bg-[#ebebef] px-4 text-sm text-normal',
+                    isTogglingSkill && 'cursor-not-allowed opacity-60'
+                  )}
+                >
+                  {isTogglingSkill
+                    ? t('skillLibrary.actions.updating')
+                    : detailData.enabled
+                      ? t('skillLibrary.actions.disable')
+                      : t('skillLibrary.actions.enable')}
+                </button>
               )}
           </>
         }
