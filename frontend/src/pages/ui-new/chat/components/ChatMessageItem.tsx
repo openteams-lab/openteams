@@ -88,6 +88,7 @@ export interface ChatMessageItemProps {
   // Interaction
   isArchived: boolean;
   onReply: (message: ChatMessage) => void;
+  onResend?: (message: ChatMessage) => void;
   // Cleanup mode
   isCleanupMode: boolean;
   isSelected: boolean;
@@ -111,6 +112,7 @@ export function ChatMessageItem({
   onPreviewAttachment,
   isArchived,
   onReply,
+  onResend,
   isCleanupMode,
   isSelected,
   onToggleSelect,
@@ -778,20 +780,24 @@ export function ChatMessageItem({
               <button
                 type="button"
                 className="p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors"
-                onClick={() => {
-                  navigator.clipboard.writeText(message.content);
-                }}
                 title={t('message.copy')}
               >
                 <CopyIcon className="size-icon-xs" />
               </button>
-              <button
-                type="button"
-                className="p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors"
-                title={t('message.regenerate')}
-              >
-                <ArrowClockwiseIcon className="size-icon-xs" />
-              </button>
+              {isUser && (
+                <button
+                  type="button"
+                  className={cn(
+                    'p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors',
+                    isArchived && 'pointer-events-none opacity-50'
+                  )}
+                  onClick={() => onResend?.(message)}
+                  disabled={isArchived}
+                  title={t('message.resend')}
+                >
+                  <ArrowClockwiseIcon className="size-icon-xs" />
+                </button>
+              )}
               <button
                 type="button"
                 className={cn(

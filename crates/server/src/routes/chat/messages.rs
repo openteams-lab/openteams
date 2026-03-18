@@ -359,3 +359,30 @@ pub async fn delete_messages_batch(
 
     Ok(ResponseJson(ApiResponse::success(total_deleted)))
 }
+
+pub async fn resend_message(
+    Extension(session): Extension<ChatSession>,
+    State(deployment): State<DeploymentImpl>,
+    Path(message_id): Path<Uuid>,
+) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    let message = ChatMessage::find_by_id(&deployment.db().pool, message_id)
+        .await?
+        .ok_or(ApiError::Database(sqlx::Error::RowNotFound))?;
+
+    if message.session_id != session.id {
+        return Err(ApiError::Database(sqlx::Error::RowNotFound));
+    }
+
+    if message.sender_type != ChatSenderType::User {
+        return Err(ApiError::BadRequest(
+            "Only user messages can be resent.".to_string(),
+        ));
+    }
+
+    deployment
+        .chat_runner()
+        .handle_message(&session, &message)
+        .await;
+
+    Ok(ResponseJson(ApiResponse::success(())))
+}

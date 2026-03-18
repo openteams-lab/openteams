@@ -113,6 +113,7 @@
     "quote": "引用",
     "copy": "コピー",
     "regenerate": "再生成",
+    "resend": "再送信",
     "replyingTo": "{{name}}に返信",
     "view": "表示",
     "referencedMessageUnavailable": "参照メッセージは利用できません。",
