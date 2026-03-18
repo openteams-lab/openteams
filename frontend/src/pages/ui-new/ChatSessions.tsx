@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useTheme } from '@/components/ThemeProvider';
 import { formatDateShortWithTime } from '@/utils/date';
+import { formatTokenCount } from '@/utils/string';
 import { getActualTheme } from '@/utils/theme';
 import {
   extractExecutorProfileVariant,
@@ -1416,7 +1417,10 @@ export function ChatSessions() {
     }
     return sum;
   }, [messageList]);
-  void totalTokens;
+  const totalTokenUsageLabel =
+    totalTokens > 0
+      ? t('header.tokenUsage', { value: formatTokenCount(totalTokens) })
+      : null;
   const runHistory = useRunHistory(messages);
 
   const activeSession = useMemo(
@@ -3477,6 +3481,7 @@ export function ChatSessions() {
           <ChatHeader
             activeSession={activeSession ?? null}
             displayTitle={activeSessionDisplayTitle}
+            tokenUsageLabel={totalTokenUsageLabel}
             isGeneratedTitle={isGeneratedActiveSessionTitle}
             isSearchOpen={isMessageSearchOpen}
             searchQuery={messageSearchQuery}
