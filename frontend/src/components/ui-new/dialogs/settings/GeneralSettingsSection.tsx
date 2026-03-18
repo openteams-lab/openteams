@@ -195,7 +195,9 @@ export function GeneralSettingsSection() {
     );
   }
 
-  const themeOptions = [{ value: ThemeMode.LIGHT, label: toPrettyCase(ThemeMode.LIGHT) }];
+  const themeOptions = [
+    { value: ThemeMode.LIGHT, label: toPrettyCase(ThemeMode.LIGHT) },
+  ];
 
   const soundOptions = Object.values(SoundFile).map((sound) => ({
     value: sound,

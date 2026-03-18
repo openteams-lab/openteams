@@ -188,7 +188,7 @@
     "workspacePath": "工作区路径",
     "workspacePathPlaceholder": "AI成员工作的绝对路径",
     "workspacePathCannotBeModified": "工作区路径无法修改",
-"add": "添加",
+    "add": "添加",
     "save": "保存",
     "teamBulletin": {
       "title": "团队公告板",
@@ -547,7 +547,7 @@
       "installAria": "安装技能",
       "scrollForMore": "向下滚动加载更多..."
     },
-"create": {
+    "create": {
       "title": "添加技能路径",
       "pathLabel": "技能路径",
       "pathPlaceholder": "C:\\skills\\my-skill"

@@ -25,7 +25,7 @@
     "searchSessionsPlaceholder": "Rechercher des noms de session...",
     "clearSessionSearch": "Effacer la recherche de sessions",
     "noSearchResults": "Aucune session ne correspond ? \"{{query}}\".",
-"generatedSessionTitle": "Démarrée {{date}}",
+    "generatedSessionTitle": "Démarrée {{date}}",
     "aiTeam": "Équipe IA"
   },
   "contextMenu": {
@@ -183,7 +183,7 @@
     "workspacePath": "Chemin de l'espace de travail",
     "workspacePathPlaceholder": "Chemin d'accès absolu pour le travail des membres IA",
     "workspacePathCannotBeModified": "Le chemin de l'espace de travail ne peut pas être modifié",
-"add": "Ajouter",
+    "add": "Ajouter",
     "save": "Enregistrer",
     "teamBulletin": {
       "title": "Tableau d'équipe",
@@ -542,7 +542,7 @@
       "installAria": "Installer la compétence",
       "scrollForMore": "Faites défiler vers le bas pour en charger plus..."
     },
-"create": {
+    "create": {
       "title": "Ajouter un chemin de compétence",
       "pathLabel": "Chemin de la compétence",
       "pathPlaceholder": "C:\\skills\\my-skill"

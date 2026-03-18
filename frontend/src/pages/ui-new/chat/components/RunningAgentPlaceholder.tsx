@@ -46,7 +46,9 @@ export function RunningAgentPlaceholder({
   );
   const displayThinkingContent = (run?.thinkingContent ?? '').trim();
   const displayAssistantContent = (
-    run?.assistantContent || run?.content || ''
+    run?.assistantContent ||
+    run?.content ||
+    ''
   ).trim();
   const displayUnifiedContent = [
     displayThinkingContent,

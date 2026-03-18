@@ -714,7 +714,9 @@ export function ChatSessions() {
         ['chatWorkItems', workItem.session_id],
         (prev) => {
           if (!prev) return [workItem];
-          const existingIndex = prev.findIndex((item) => item.id === workItem.id);
+          const existingIndex = prev.findIndex(
+            (item) => item.id === workItem.id
+          );
           if (existingIndex >= 0) {
             const next = [...prev];
             next[existingIndex] = workItem;
@@ -729,7 +731,7 @@ export function ChatSessions() {
 
   const handleIncomingMessage = useCallback(
     (message: ChatMessage) => {
-      console.info("message --- " + JSON.stringify(message))
+      console.info('message --- ' + JSON.stringify(message));
       upsertMessage(message);
       if (isProtocolErrorMessage(message)) return;
 
@@ -1369,18 +1371,20 @@ export function ChatSessions() {
 
   const timelineEntries = useMemo<TimelineEntry[]>(
     () =>
-      [...messageList.map((message) => ({
-        kind: 'message' as const,
-        key: `message:${message.id}`,
-        createdAtMs: new Date(message.created_at).getTime(),
-        message,
-      })),
-      ...workItemGroups.map((group) => ({
-        kind: 'work_item' as const,
-        key: `work-item:${group.runId}`,
-        createdAtMs: new Date(group.createdAt).getTime(),
-        group,
-      }))].sort((a, b) => a.createdAtMs - b.createdAtMs),
+      [
+        ...messageList.map((message) => ({
+          kind: 'message' as const,
+          key: `message:${message.id}`,
+          createdAtMs: new Date(message.created_at).getTime(),
+          message,
+        })),
+        ...workItemGroups.map((group) => ({
+          kind: 'work_item' as const,
+          key: `work-item:${group.runId}`,
+          createdAtMs: new Date(group.createdAt).getTime(),
+          group,
+        })),
+      ].sort((a, b) => a.createdAtMs - b.createdAtMs),
     [messageList, workItemGroups]
   );
   const lastTimelineEntryKey =
@@ -1889,8 +1893,7 @@ export function ChatSessions() {
   );
 
   const getWorkItemSenderLabel = useCallback(
-    (group: ChatWorkItemGroup) =>
-      agentById.get(group.agentId)?.name ?? 'Agent',
+    (group: ChatWorkItemGroup) => agentById.get(group.agentId)?.name ?? 'Agent',
     [agentById]
   );
 
@@ -2106,7 +2109,9 @@ export function ChatSessions() {
       }
 
       return (
-        entry.group.artifacts.some((item) => messageSearchRegExp.test(item.content)) ||
+        entry.group.artifacts.some((item) =>
+          messageSearchRegExp.test(item.content)
+        ) ||
         entry.group.conclusions.some((item) =>
           messageSearchRegExp.test(item.content)
         )
@@ -2773,11 +2778,7 @@ export function ChatSessions() {
       setTeamImportPlan(plan);
       setMemberError(null);
     },
-    [
-      buildTeamImportPlan,
-      resolveTeamImportProtocol,
-      t,
-    ]
+    [buildTeamImportPlan, resolveTeamImportProtocol, t]
   );
 
   const handleUpdateTeamImportPlanEntry = useCallback(

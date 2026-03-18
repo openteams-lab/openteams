@@ -475,8 +475,7 @@
     );
     --chat-session-main-surface-border: rgba(255, 255, 255, 0.82);
     --chat-session-main-shadow:
-      0 24px 56px rgba(15, 23, 42, 0.08),
-      0 10px 24px rgba(148, 163, 184, 0.14);
+      0 24px 56px rgba(15, 23, 42, 0.08), 0 10px 24px rgba(148, 163, 184, 0.14);
     --chat-session-send-blue: #5094fb;
     --chat-session-send-blue-hover: #4084eb;
     --chat-session-sidebar-divider: rgba(255, 255, 255, 0.24);
@@ -2277,8 +2276,11 @@
     width: min(760px, 100%);
     border: 1px solid rgba(22, 163, 74, 0.18);
     border-radius: 18px;
-    background:
-      linear-gradient(180deg, rgba(240, 253, 244, 0.96), rgba(255, 255, 255, 0.96));
+    background: linear-gradient(
+      180deg,
+      rgba(240, 253, 244, 0.96),
+      rgba(255, 255, 255, 0.96)
+    );
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.92),
       0 16px 36px rgba(22, 163, 74, 0.08);
@@ -2299,7 +2301,11 @@
     width: 38px;
     height: 38px;
     border-radius: 14px;
-    background: linear-gradient(135deg, rgba(22, 163, 74, 0.18), rgba(52, 211, 153, 0.22));
+    background: linear-gradient(
+      135deg,
+      rgba(22, 163, 74, 0.18),
+      rgba(52, 211, 153, 0.22)
+    );
     border: 1px solid rgba(22, 163, 74, 0.2);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
   }
@@ -2366,7 +2372,9 @@
     padding: 0 18px 16px;
   }
 
-  .new-design .chat-session-work-item-section + .chat-session-work-item-section {
+  .new-design
+    .chat-session-work-item-section
+    + .chat-session-work-item-section {
     padding-top: 2px;
   }
 
@@ -2890,8 +2898,12 @@
     align-items: center;
     justify-content: center;
     border-radius: 999px;
-    background:
-      radial-gradient(circle at 30% 30%, #f8fafc 0%, #d9dde4 54%, #c6ccd6 100%);
+    background: radial-gradient(
+      circle at 30% 30%,
+      #f8fafc 0%,
+      #d9dde4 54%,
+      #c6ccd6 100%
+    );
     box-shadow:
       0 18px 30px rgba(80, 148, 251, 0.12),
       0 8px 18px rgba(15, 23, 42, 0.08),
@@ -2942,7 +2954,7 @@
     letter-spacing: 0.12em;
     font-weight: 300;
     font-family: sans-serif;
-    color: #33302E;
+    color: #33302e;
     background: linear-gradient(135deg, #3d3935 0%, #4a4640 50%, #3a3632 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -3529,8 +3541,12 @@
 
   .new-design.dark .chat-session-empty-state-logo-placeholder,
   .dark .new-design .chat-session-empty-state-logo-placeholder {
-    background:
-      radial-gradient(circle at 30% 30%, #475569 0%, #334155 52%, #1e293b 100%);
+    background: radial-gradient(
+      circle at 30% 30%,
+      #475569 0%,
+      #334155 52%,
+      #1e293b 100%
+    );
     box-shadow:
       0 18px 30px rgba(59, 130, 246, 0.16),
       0 10px 20px rgba(2, 6, 23, 0.28),
@@ -4308,7 +4324,9 @@
   }
 
   .new-design .chat-session-member-card:hover .chat-session-member-model,
-  .new-design .chat-session-member-card:focus-within .chat-session-member-model {
+  .new-design
+    .chat-session-member-card:focus-within
+    .chat-session-member-model {
     max-height: 24px;
     margin-top: 4px;
     opacity: 1;
@@ -4360,7 +4378,9 @@
       transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .new-design .chat-session-member-card:hover .chat-session-member-workspace-row,
+  .new-design
+    .chat-session-member-card:hover
+    .chat-session-member-workspace-row,
   .new-design
     .chat-session-member-card:focus-within
     .chat-session-member-workspace-row {
@@ -4448,9 +4468,7 @@
   .new-design
     .chat-session-member-card:hover
     .chat-session-member-action.workspace,
-  .new-design
-    .chat-session-member-card:hover
-    .chat-session-member-action.edit,
+  .new-design .chat-session-member-card:hover .chat-session-member-action.edit,
   .new-design
     .chat-session-member-card:focus-within
     .chat-session-member-action.workspace,

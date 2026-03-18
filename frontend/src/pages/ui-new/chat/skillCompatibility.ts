@@ -14,11 +14,7 @@ const runnerCompatibilityAliases: Record<string, string[]> = {
 };
 
 function normalizeAgentId(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/_/g, '-')
-    .replace(/\s+/g, '-');
+  return value.trim().toLowerCase().replace(/_/g, '-').replace(/\s+/g, '-');
 }
 
 export function getRunnerCompatibilityKeys(
@@ -44,7 +40,9 @@ export function isSkillCompatibleWithRunner(
   const runnerKeys = getRunnerCompatibilityKeys(runnerType);
 
   if (runnerKeys.length === 0) return true;
-  return runnerKeys.some((runnerKey) => normalizedCompatibleAgents.has(runnerKey));
+  return runnerKeys.some((runnerKey) =>
+    normalizedCompatibleAgents.has(runnerKey)
+  );
 }
 
 type SkillWithCompatibility = Pick<ChatSkill, 'compatible_agents'> &

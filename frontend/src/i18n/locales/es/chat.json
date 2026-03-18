@@ -25,7 +25,7 @@
     "searchSessionsPlaceholder": "Buscar nombres de sesiones...",
     "clearSessionSearch": "Borrar b?squeda de sesiones",
     "noSearchResults": "Ninguna sesi?n coincide con \"{{query}}\".",
-"generatedSessionTitle": "Iniciada {{date}}",
+    "generatedSessionTitle": "Iniciada {{date}}",
     "aiTeam": "Equipo de IA"
   },
   "contextMenu": {
@@ -184,7 +184,7 @@
     "workspacePath": "Ruta del espacio de trabajo",
     "workspacePathPlaceholder": "Ruta absoluta para el trabajo de los miembros de IA",
     "workspacePathCannotBeModified": "La ruta del espacio de trabajo no se puede modificar",
-"add": "Añadir",
+    "add": "Añadir",
     "save": "Guardar",
     "teamBulletin": {
       "title": "Tablón del equipo",
@@ -542,7 +542,7 @@
       "installAria": "Instalar habilidad",
       "scrollForMore": "Desplázate hacia abajo para cargar más..."
     },
-"create": {
+    "create": {
       "title": "Agregar ruta de habilidad",
       "pathLabel": "Ruta de la habilidad",
       "pathPlaceholder": "C:\\skills\\my-skill"

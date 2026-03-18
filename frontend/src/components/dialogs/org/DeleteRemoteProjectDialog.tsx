@@ -88,10 +88,7 @@ const DeleteRemoteProjectDialogImpl =
               type="submit"
               onClick={handleDelete}
               disabled={isDeleting}
-              className={getConfirmationButtonClasses(
-                'destructive',
-                'confirm'
-              )}
+              className={getConfirmationButtonClasses('destructive', 'confirm')}
             >
               {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
               {t('common:buttons.delete', 'Delete')}
