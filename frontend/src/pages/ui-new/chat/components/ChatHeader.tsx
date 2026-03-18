@@ -25,6 +25,7 @@ import {
 export interface ChatHeaderProps {
   activeSession: ChatSession | null;
   displayTitle: string;
+  tokenUsageLabel?: string | null;
   isGeneratedTitle: boolean;
   isSearchOpen: boolean;
   searchQuery: string;
@@ -59,6 +60,7 @@ export interface ChatHeaderProps {
 export function ChatHeader({
   activeSession,
   displayTitle,
+  tokenUsageLabel,
   isGeneratedTitle,
   isSearchOpen,
   searchQuery,
@@ -214,6 +216,11 @@ export function ChatHeader({
                   </span>
                 )}
               </div>
+              {tokenUsageLabel && (
+                <div className="mt-1 text-[11px] font-ibm-plex-mono text-low/80">
+                  {tokenUsageLabel}
+                </div>
+              )}
             </>
           )}
           {isEditingTitle && (

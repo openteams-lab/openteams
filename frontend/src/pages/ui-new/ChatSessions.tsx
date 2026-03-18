@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useTheme } from '@/components/ThemeProvider';
 import { formatDateShortWithTime } from '@/utils/date';
+import { formatTokenCount } from '@/utils/string';
 import { getActualTheme } from '@/utils/theme';
 import {
   extractExecutorProfileVariant,
@@ -714,7 +715,9 @@ export function ChatSessions() {
         ['chatWorkItems', workItem.session_id],
         (prev) => {
           if (!prev) return [workItem];
-          const existingIndex = prev.findIndex((item) => item.id === workItem.id);
+          const existingIndex = prev.findIndex(
+            (item) => item.id === workItem.id
+          );
           if (existingIndex >= 0) {
             const next = [...prev];
             next[existingIndex] = workItem;
@@ -1365,18 +1368,20 @@ export function ChatSessions() {
 
   const timelineEntries = useMemo<TimelineEntry[]>(
     () =>
-      [...messageList.map((message) => ({
-        kind: 'message' as const,
-        key: `message:${message.id}`,
-        createdAtMs: new Date(message.created_at).getTime(),
-        message,
-      })),
-      ...workItemGroups.map((group) => ({
-        kind: 'work_item' as const,
-        key: `work-item:${group.runId}`,
-        createdAtMs: new Date(group.createdAt).getTime(),
-        group,
-      }))].sort((a, b) => a.createdAtMs - b.createdAtMs),
+      [
+        ...messageList.map((message) => ({
+          kind: 'message' as const,
+          key: `message:${message.id}`,
+          createdAtMs: new Date(message.created_at).getTime(),
+          message,
+        })),
+        ...workItemGroups.map((group) => ({
+          kind: 'work_item' as const,
+          key: `work-item:${group.runId}`,
+          createdAtMs: new Date(group.createdAt).getTime(),
+          group,
+        })),
+      ].sort((a, b) => a.createdAtMs - b.createdAtMs),
     [messageList, workItemGroups]
   );
   const lastTimelineEntryKey =
@@ -1408,7 +1413,10 @@ export function ChatSessions() {
     }
     return sum;
   }, [messageList]);
-  void totalTokens;
+  const totalTokenUsageLabel =
+    totalTokens > 0
+      ? t('header.tokenUsage', { value: formatTokenCount(totalTokens) })
+      : null;
   const runHistory = useRunHistory(messages);
 
   const activeSession = useMemo(
@@ -1885,8 +1893,7 @@ export function ChatSessions() {
   );
 
   const getWorkItemSenderLabel = useCallback(
-    (group: ChatWorkItemGroup) =>
-      agentById.get(group.agentId)?.name ?? 'Agent',
+    (group: ChatWorkItemGroup) => agentById.get(group.agentId)?.name ?? 'Agent',
     [agentById]
   );
 
@@ -2102,7 +2109,9 @@ export function ChatSessions() {
       }
 
       return (
-        entry.group.artifacts.some((item) => messageSearchRegExp.test(item.content)) ||
+        entry.group.artifacts.some((item) =>
+          messageSearchRegExp.test(item.content)
+        ) ||
         entry.group.conclusions.some((item) =>
           messageSearchRegExp.test(item.content)
         )
@@ -2763,11 +2772,7 @@ export function ChatSessions() {
       setTeamImportPlan(plan);
       setMemberError(null);
     },
-    [
-      buildTeamImportPlan,
-      resolveTeamImportProtocol,
-      t,
-    ]
+    [buildTeamImportPlan, resolveTeamImportProtocol, t]
   );
 
   const handleUpdateTeamImportPlanEntry = useCallback(
@@ -3453,6 +3458,7 @@ export function ChatSessions() {
           <ChatHeader
             activeSession={activeSession ?? null}
             displayTitle={activeSessionDisplayTitle}
+            tokenUsageLabel={totalTokenUsageLabel}
             isGeneratedTitle={isGeneratedActiveSessionTitle}
             isSearchOpen={isMessageSearchOpen}
             searchQuery={messageSearchQuery}

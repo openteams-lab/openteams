@@ -21,7 +21,7 @@ import {
 } from 'shared/types';
 import type { LocalImageMetadata } from '@/components/ui/wysiwyg/context/task-attempt-context';
 import { formatDateShortWithTime } from '@/utils/date';
-import { toPrettyCase } from '@/utils/string';
+import { formatTokenCount, toPrettyCase } from '@/utils/string';
 import { AgentIcon } from '@/components/agents/AgentIcon';
 import {
   ChatBoxBase,
@@ -185,6 +185,7 @@ export function SessionChatBox({
   dropzone,
 }: SessionChatBoxProps) {
   const { t } = useTranslation('tasks');
+  const { t: tChat } = useTranslation('chat');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { capabilities } = useUserSystem();
 
@@ -284,6 +285,12 @@ export function SessionChatBox({
     : isLatestSelected
       ? t('conversation.sessions.latest')
       : t('conversation.sessions.previous');
+  const contextTokenUsageLabel =
+    tokenUsageInfo && tokenUsageInfo.total_tokens > 0
+      ? tChat('header.tokenUsage', {
+          value: `${tokenUsageInfo.is_estimated ? '~' : ''}${formatTokenCount(tokenUsageInfo.total_tokens)}`,
+        })
+      : null;
 
   // Stats
   const filesChanged = stats?.filesChanged ?? 0;
@@ -651,7 +658,14 @@ export function SessionChatBox({
           {/* Todo progress popup - always rendered, disabled when no todos */}
           <TodoProgressPopup todos={todos ?? []} />
           {supportsContextUsage && (
-            <ContextUsageGauge tokenUsageInfo={tokenUsageInfo} />
+            <div className="flex items-center gap-half">
+              <ContextUsageGauge tokenUsageInfo={tokenUsageInfo} />
+              {contextTokenUsageLabel && (
+                <span className="text-[11px] font-ibm-plex-mono text-low whitespace-nowrap">
+                  {contextTokenUsageLabel}
+                </span>
+              )}
+            </div>
           )}
           <ToolbarDropdown
             label={sessionLabel}
