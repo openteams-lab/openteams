@@ -118,6 +118,7 @@
     "quote": "Quote",
     "copy": "Copy",
     "regenerate": "Regenerate",
+    "resend": "Resend",
     "replyingTo": "Replying to {{name}}",
     "view": "View",
     "referencedMessageUnavailable": "Referenced message unavailable.",

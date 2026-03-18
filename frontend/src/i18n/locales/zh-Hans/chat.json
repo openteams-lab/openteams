@@ -118,6 +118,7 @@
     "quote": "引用",
     "copy": "复制",
     "regenerate": "重新生成",
+    "resend": "重新发送",
     "replyingTo": "回复 {{name}}",
     "view": "查看",
     "referencedMessageUnavailable": "引用的消息不可用。",

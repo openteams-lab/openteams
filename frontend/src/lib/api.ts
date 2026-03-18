@@ -1610,6 +1610,16 @@ export const chatApi = {
     return handleApiResponse<void>(response);
   },
 
+  resendMessage: async (sessionId: string, messageId: string): Promise<void> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/messages/${messageId}/resend`,
+      {
+        method: 'POST',
+      }
+    );
+    return handleApiResponse<void>(response);
+  },
+
   getTeamProtocol: async (sessionId: string): Promise<TeamProtocolConfig> => {
     const response = await makeRequest(`/api/chat/sessions/${sessionId}/team-protocol`);
     return handleApiResponse<TeamProtocolConfig>(response);
