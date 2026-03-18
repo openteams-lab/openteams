@@ -77,9 +77,13 @@ export function InstallSkillDialog({
       bodyExtra={
         <div className="space-y-3">
           <div>
-            <div className="text-sm font-medium text-[#333333]">{skillName}</div>
+            <div className="text-sm font-medium text-[#333333]">
+              {skillName}
+            </div>
             {skillDescription && (
-              <div className="mt-1 text-xs text-[#8C8C8C] line-clamp-2">{skillDescription}</div>
+              <div className="mt-1 text-xs text-[#8C8C8C] line-clamp-2">
+                {skillDescription}
+              </div>
             )}
           </div>
           <div>

@@ -73,10 +73,7 @@ export function WorkspaceDrawer({
 
     for (const message of messages) {
       // 1. Agent messages with API errors
-      if (
-        message.sender_type === 'agent' &&
-        message.sender_id === agent.id
-      ) {
+      if (message.sender_type === 'agent' && message.sender_id === agent.id) {
         const apiError = detectApiError(message.content);
         if (apiError) {
           failed.push({
@@ -108,7 +105,10 @@ export function WorkspaceDrawer({
         }
 
         // Mention failures (executor startup errors, etc.)
-        const mentionFailure = extractMentionFailureMeta(message.meta, agent.name);
+        const mentionFailure = extractMentionFailureMeta(
+          message.meta,
+          agent.name
+        );
         if (mentionFailure) {
           failed.push({
             message,
@@ -229,7 +229,9 @@ export function WorkspaceDrawer({
                           </span>
                         </div>
                         <span className="text-[10px] text-low flex-shrink-0">
-                          {formatDateShortWithTime(failedMsg.message.created_at)}
+                          {formatDateShortWithTime(
+                            failedMsg.message.created_at
+                          )}
                         </span>
                       </div>
                       {failedMsg.errorDetail && (
@@ -301,18 +303,19 @@ export function WorkspaceDrawer({
                         </span>
                       )}
                     </div>
-                    {run.errorContent && run.errorContent !== run.errorSummary && (
-                      <details className="text-xs">
-                        <summary className="cursor-pointer text-[#EF4444] hover:underline">
-                          {t('modals.workspaceDrawer.viewDetails', {
-                            defaultValue: 'View Details',
-                          })}
-                        </summary>
-                        <pre className="mt-1 max-h-[100px] overflow-auto rounded bg-[rgba(239,68,68,0.04)] p-2 text-[10px] font-mono text-low whitespace-pre-wrap break-all">
-                          {run.errorContent}
-                        </pre>
-                      </details>
-                    )}
+                    {run.errorContent &&
+                      run.errorContent !== run.errorSummary && (
+                        <details className="text-xs">
+                          <summary className="cursor-pointer text-[#EF4444] hover:underline">
+                            {t('modals.workspaceDrawer.viewDetails', {
+                              defaultValue: 'View Details',
+                            })}
+                          </summary>
+                          <pre className="mt-1 max-h-[100px] overflow-auto rounded bg-[rgba(239,68,68,0.04)] p-2 text-[10px] font-mono text-low whitespace-pre-wrap break-all">
+                            {run.errorContent}
+                          </pre>
+                        </details>
+                      )}
                   </div>
                 )}
                 {!run.hasError && (

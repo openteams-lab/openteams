@@ -272,29 +272,31 @@ export function ChatMessageItem({
             expanded
             className="chat-session-message-card shadow-sm rounded-3xl chat-session-message-card-agent is-agent-message max-w-full"
           >
-          {hasError ? (
-            <div className="min-w-0">
-              <ChatErrorMessage
-                content={errorInfo.summary}
-                expanded={false}
-                tone="error"
-              />
-            </div>
-          ) : (
-            <ChatSystemMessage content={message.content} expanded />
-          )}
-          {hasError && errorInfo.content && errorInfo.content !== errorInfo.summary && (
-            <details className="mt-3">
-              <summary className="cursor-pointer text-xs text-low hover:text-normal">
-                {t('modals.workspaceDrawer.viewDetails', {
-                  defaultValue: 'View Details',
-                })}
-              </summary>
-              <pre className="mt-2 max-h-[200px] overflow-auto rounded-lg bg-gray-100 p-2 text-xs font-ibm-plex-mono text-low whitespace-pre-wrap break-all dark:bg-gray-800">
-                {errorInfo.content}
-              </pre>
-            </details>
-          )}
+            {hasError ? (
+              <div className="min-w-0">
+                <ChatErrorMessage
+                  content={errorInfo.summary}
+                  expanded={false}
+                  tone="error"
+                />
+              </div>
+            ) : (
+              <ChatSystemMessage content={message.content} expanded />
+            )}
+            {hasError &&
+              errorInfo.content &&
+              errorInfo.content !== errorInfo.summary && (
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-xs text-low hover:text-normal">
+                    {t('modals.workspaceDrawer.viewDetails', {
+                      defaultValue: 'View Details',
+                    })}
+                  </summary>
+                  <pre className="mt-2 max-h-[200px] overflow-auto rounded-lg bg-gray-100 p-2 text-xs font-ibm-plex-mono text-low whitespace-pre-wrap break-all dark:bg-gray-800">
+                    {errorInfo.content}
+                  </pre>
+                </details>
+              )}
           </ChatEntryContainer>
         </div>
       </div>

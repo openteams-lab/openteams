@@ -31,7 +31,10 @@ type AgentDeltaPayload = Extract<ChatStreamEvent, { type: 'agent_delta' }> & {
   type: 'agent_delta';
   stream_type?: 'assistant' | 'thinking' | 'error';
 };
-type ProtocolNoticePayload = Extract<ChatStreamEvent, { type: 'protocol_notice' }>;
+type ProtocolNoticePayload = Extract<
+  ChatStreamEvent,
+  { type: 'protocol_notice' }
+>;
 type MentionErrorPayload = Extract<ChatStreamEvent, { type: 'mention_error' }>;
 
 export type ChatProtocolNotice = ProtocolNoticePayload & {
@@ -345,12 +348,15 @@ export function useChatWebSocket(
     timeouts.clear();
   }, []);
 
-  const dismissProtocolNotice = useCallback((noticeId: string) => {
-    clearProtocolNoticeTimeout(noticeId);
-    setProtocolNotices((prev) =>
-      prev.filter((notice) => notice.id !== noticeId)
-    );
-  }, [clearProtocolNoticeTimeout]);
+  const dismissProtocolNotice = useCallback(
+    (noticeId: string) => {
+      clearProtocolNoticeTimeout(noticeId);
+      setProtocolNotices((prev) =>
+        prev.filter((notice) => notice.id !== noticeId)
+      );
+    },
+    [clearProtocolNoticeTimeout]
+  );
 
   const pruneStreamingRunsForSession = useCallback(
     (
@@ -397,22 +403,19 @@ export function useChatWebSocket(
     []
   );
 
-  const handleMessageNew = useCallback(
-    (message: ChatMessage) => {
-      const metaWarning = extractCompressionWarningFromMeta(message.meta);
-      if (metaWarning) {
-        setCompressionWarning(metaWarning);
-      }
-      onMessageReceivedRef.current(message);
-      const runId = extractRunId(message.meta);
-      const sessionId = message.session_id;
-      if (!runId || !sessionId) return;
-      setStreamingRunsBySession((prev) =>
-        removeRunFromSession(prev, sessionId, runId)
-      );
-    },
-    []
-  );
+  const handleMessageNew = useCallback((message: ChatMessage) => {
+    const metaWarning = extractCompressionWarningFromMeta(message.meta);
+    if (metaWarning) {
+      setCompressionWarning(metaWarning);
+    }
+    onMessageReceivedRef.current(message);
+    const runId = extractRunId(message.meta);
+    const sessionId = message.session_id;
+    if (!runId || !sessionId) return;
+    setStreamingRunsBySession((prev) =>
+      removeRunFromSession(prev, sessionId, runId)
+    );
+  }, []);
 
   const handleWorkItemNew = useCallback((workItem: ChatWorkItem) => {
     onWorkItemReceivedRef.current(workItem);
@@ -525,21 +528,24 @@ export function useChatWebSocket(
     []
   );
 
-  const handleProtocolNotice = useCallback((payload: ProtocolNoticePayload) => {
-    if (SUPPRESSED_PROTOCOL_NOTICE_CODES.has(payload.code)) {
-      return;
-    }
+  const handleProtocolNotice = useCallback(
+    (payload: ProtocolNoticePayload) => {
+      if (SUPPRESSED_PROTOCOL_NOTICE_CODES.has(payload.code)) {
+        return;
+      }
 
-    const noticeId = `${payload.run_id}-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-    const timeoutId = setTimeout(() => {
-      dismissProtocolNotice(noticeId);
-    }, PROTOCOL_NOTICE_TTL_MS);
+      const noticeId = `${payload.run_id}-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+      const timeoutId = setTimeout(() => {
+        dismissProtocolNotice(noticeId);
+      }, PROTOCOL_NOTICE_TTL_MS);
 
-    protocolNoticeTimeoutsRef.current.set(noticeId, timeoutId);
-    setProtocolNotices((prev) => [...prev, { ...payload, id: noticeId }]);
-  }, [dismissProtocolNotice]);
+      protocolNoticeTimeoutsRef.current.set(noticeId, timeoutId);
+      setProtocolNotices((prev) => [...prev, { ...payload, id: noticeId }]);
+    },
+    [dismissProtocolNotice]
+  );
 
   const handleMentionError = useCallback((payload: MentionErrorPayload) => {
     setMentionErrors((prev) => {
@@ -604,7 +610,7 @@ export function useChatWebSocket(
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as ChatStreamPayload;
-          console.debug("payload -- " + JSON.stringify(payload))
+          console.debug('payload -- ' + JSON.stringify(payload));
           if (payload.type === 'mention_acknowledged') {
             handleMentionAcknowledged(payload);
             return;

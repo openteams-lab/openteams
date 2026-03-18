@@ -154,13 +154,12 @@ export function useRunHistory(messages: ChatMessage[]): RunHistoryItem[] {
       const errorTypeData = (message.meta as Record<string, unknown>)?.error as
         | { error_type?: { type?: string; provider?: string } }
         | undefined;
-      const errorTypeInfo =
-        errorTypeData?.error_type?.type
-          ? {
-              type: errorTypeData.error_type.type,
-              provider: errorTypeData.error_type.provider,
-            }
-          : undefined;
+      const errorTypeInfo = errorTypeData?.error_type?.type
+        ? {
+            type: errorTypeData.error_type.type,
+            provider: errorTypeData.error_type.provider,
+          }
+        : undefined;
       runs.push({
         runId,
         agentId: message.sender_id,
