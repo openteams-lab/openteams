@@ -363,7 +363,7 @@ pub async fn delete_messages_batch(
 pub async fn resend_message(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
-    Path(message_id): Path<Uuid>,
+    Path((_session_id, message_id)): Path<(Uuid, Uuid)>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
     let message = ChatMessage::find_by_id(&deployment.db().pool, message_id)
         .await?
