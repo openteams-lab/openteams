@@ -33,7 +33,7 @@ pub struct DetectedApiError {
 /// Supports JSON error formats in addition to plain text.
 pub fn detect_api_error(content: &str) -> Option<DetectedApiError> {
     let trimmed = content.trim();
-    
+
     tracing::debug!(
         content_len = trimmed.len(),
         content_preview = %trimmed.chars().take(100).collect::<String>(),
@@ -43,7 +43,7 @@ pub fn detect_api_error(content: &str) -> Option<DetectedApiError> {
     // Try to parse as JSON first
     if let Ok(json) = serde_json::from_str::<serde_json::Value>(trimmed) {
         tracing::debug!("[api_errors] Content parsed as JSON, checking formats");
-        
+
         // Format 1: {"Error": "message"} (Gemini style)
         if let Some(msg) = json.get("Error").and_then(|v| v.as_str())
             && let Some(detected) = detect_api_error_from_string(msg, Some("Google"))
@@ -85,7 +85,9 @@ pub fn detect_api_error(content: &str) -> Option<DetectedApiError> {
     }
 
     // Fallback to string matching
-    tracing::debug!("[api_errors] JSON parsing failed or no match, falling back to string matching");
+    tracing::debug!(
+        "[api_errors] JSON parsing failed or no match, falling back to string matching"
+    );
     let result = detect_api_error_from_string(trimmed, None);
     if let Some(ref detected) = result {
         tracing::debug!(

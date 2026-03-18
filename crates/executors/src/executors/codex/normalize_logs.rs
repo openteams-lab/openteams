@@ -1265,11 +1265,7 @@ fn handle_server_notification(
             {
                 command_state.stdout.push_str(&payload.delta);
                 if let Some(index) = command_state.index {
-                    replace_normalized_entry(
-                        msg_store,
-                        index,
-                        command_state.to_normalized_entry(),
-                    );
+                    replace_normalized_entry(msg_store, index, command_state.to_normalized_entry());
                 }
             }
         }
@@ -1461,10 +1457,7 @@ fn handle_v2_item_started(
         ThreadItem::WebSearch { id, query, .. } => {
             state.assistant = None;
             state.thinking = None;
-            let web_search_state = state
-                .web_searches
-                .entry(id)
-                .or_default();
+            let web_search_state = state.web_searches.entry(id).or_default();
             web_search_state.query = Some(query);
             if let Some(index) = web_search_state.index {
                 replace_normalized_entry(msg_store, index, web_search_state.to_normalized_entry());

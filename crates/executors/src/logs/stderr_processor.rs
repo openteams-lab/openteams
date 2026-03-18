@@ -14,8 +14,7 @@ use futures::StreamExt;
 use workspace_utils::msg_store::MsgStore;
 
 use super::{
-    NormalizedEntry, NormalizedEntryError, NormalizedEntryType,
-    api_errors::detect_api_error,
+    NormalizedEntry, NormalizedEntryError, NormalizedEntryType, api_errors::detect_api_error,
     plain_text_processor::PlainTextLogProcessor,
 };
 use crate::logs::utils::EntryIndexProvider;
