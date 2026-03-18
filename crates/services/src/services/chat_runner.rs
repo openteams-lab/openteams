@@ -4255,7 +4255,7 @@ impl ChatRunner {
         run_id: Uuid,
         output_path: PathBuf,
         meta_path: PathBuf,
-        workspace_path: PathBuf,
+        _workspace_path: PathBuf,
         run_dir: PathBuf,
         failed_flag: Arc<AtomicBool>,
         chain_depth: u32,

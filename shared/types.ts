@@ -674,12 +674,7 @@ export type ExecutorActionType = { "type": "CodingAgentInitialRequest" } & Codin
 
 export type ScriptContext = "SetupScript" | "CleanupScript" | "ArchiveScript" | "DevServer" | "ToolInstallScript";
 
-export type ScriptRequest = { script: string, language: ScriptRequestLanguage, context: ScriptContext, 
-/**
- * Optional relative path to execute the script in (relative to container_ref).
- * If None, uses the container_ref directory directly.
- */
-working_dir: string | null, };
+export type ScriptRequest = { script: string, language: ScriptRequestLanguage, context: ScriptContext, working_dir: string | null, };
 
 export type ScriptRequestLanguage = "Bash";
 
