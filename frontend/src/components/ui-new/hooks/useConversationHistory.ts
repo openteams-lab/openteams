@@ -218,12 +218,11 @@ export const useConversationHistory = ({
                 .entry_type as TokenUsageInfo;
             }
 
-            // Remove user messages (replaced with custom one) and token usage info (displayed separately)
+            // Remove user messages (replaced with custom one).
             const entriesExcludingUser = p.entries.filter(
               (e) =>
                 e.type !== 'NORMALIZED_ENTRY' ||
-                (e.content.entry_type.type !== 'user_message' &&
-                  e.content.entry_type.type !== 'token_usage_info')
+                e.content.entry_type.type !== 'user_message'
             );
 
             const hasPendingApprovalEntry = entriesExcludingUser.some(
