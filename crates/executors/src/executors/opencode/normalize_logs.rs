@@ -137,13 +137,13 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 }
                 OpencodeExecutorEvent::Error { message } => {
                     let idx = entry_index.next();
-                    let (error_type, content) =
-                        if let Some(detected) = crate::logs::api_errors::detect_api_error(&message)
-                        {
-                            (detected.error_type, detected.message)
-                        } else {
-                            (NormalizedEntryError::Other, message)
-                        };
+                    let (error_type, content) = if let Some(detected) =
+                        crate::logs::api_errors::detect_api_error(&message)
+                    {
+                        (detected.error_type, detected.message)
+                    } else {
+                        (NormalizedEntryError::Other, message)
+                    };
                     msg_store.push_patch(
                         crate::logs::utils::ConversationPatch::add_normalized_entry(
                             idx,
@@ -264,8 +264,7 @@ impl LogState {
                     Some(err) => {
                         let raw_str = err.raw.to_string();
                         let raw_msg = format!("OpenCode session error: {}", err.raw);
-                        if let Some(detected) =
-                            crate::logs::api_errors::detect_api_error(&raw_str)
+                        if let Some(detected) = crate::logs::api_errors::detect_api_error(&raw_str)
                         {
                             (detected.error_type, detected.message)
                         } else {

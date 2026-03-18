@@ -240,6 +240,26 @@ We welcome contributions! Check what's needed in [Issues](https://github.com/Sta
 2. Please open an issue before large changes
 3. Please follow our [Code of Conduct](./CODE_OF_CONDUCT.md)
 
+### Code Formatting
+
+Before submitting a PR, please ensure your code is properly formatted:
+
+```bash
+# Format both frontend and backend
+pnpm run format
+
+# Check formatting without making changes
+pnpm run format:check
+
+# Format frontend only
+pnpm run frontend:format
+
+# Format backend only (Rust)
+pnpm run backend:format
+```
+
+**Note:** CI will fail if code formatting is not correct. Always run `pnpm run format:check` before pushing.
+
 ## Community
 
 | | |

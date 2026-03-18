@@ -95,151 +95,576 @@ const ROLE_PRESET_MARKDOWN: &[(&str, &str)] = &[
         "market_analyst.md",
         include_str!("presets/roles/market_analyst.md"),
     ),
-
     // New agents (144 total) - alphabetically sorted
-    ("accessibility-auditor.md", include_str!("presets/roles/accessibility-auditor.md")),
-    ("account-strategist.md", include_str!("presets/roles/account-strategist.md")),
-    ("accounts-payable-agent.md", include_str!("presets/roles/accounts-payable-agent.md")),
-    ("ad-creative-strategist.md", include_str!("presets/roles/ad-creative-strategist.md")),
-    ("agentic-identity-trust-architect.md", include_str!("presets/roles/agentic-identity-trust-architect.md")),
-    ("agents-orchestrator.md", include_str!("presets/roles/agents-orchestrator.md")),
-    ("ai-data-remediation-engineer.md", include_str!("presets/roles/ai-data-remediation-engineer.md")),
-    ("ai-engineer.md", include_str!("presets/roles/ai-engineer.md")),
-    ("analytics-reporter.md", include_str!("presets/roles/analytics-reporter.md")),
+    (
+        "accessibility-auditor.md",
+        include_str!("presets/roles/accessibility-auditor.md"),
+    ),
+    (
+        "account-strategist.md",
+        include_str!("presets/roles/account-strategist.md"),
+    ),
+    (
+        "accounts-payable-agent.md",
+        include_str!("presets/roles/accounts-payable-agent.md"),
+    ),
+    (
+        "ad-creative-strategist.md",
+        include_str!("presets/roles/ad-creative-strategist.md"),
+    ),
+    (
+        "agentic-identity-trust-architect.md",
+        include_str!("presets/roles/agentic-identity-trust-architect.md"),
+    ),
+    (
+        "agents-orchestrator.md",
+        include_str!("presets/roles/agents-orchestrator.md"),
+    ),
+    (
+        "ai-data-remediation-engineer.md",
+        include_str!("presets/roles/ai-data-remediation-engineer.md"),
+    ),
+    (
+        "ai-engineer.md",
+        include_str!("presets/roles/ai-engineer.md"),
+    ),
+    (
+        "analytics-reporter.md",
+        include_str!("presets/roles/analytics-reporter.md"),
+    ),
     ("api-tester.md", include_str!("presets/roles/api-tester.md")),
-    ("app-store-optimizer.md", include_str!("presets/roles/app-store-optimizer.md")),
-    ("automation-governance-architect.md", include_str!("presets/roles/automation-governance-architect.md")),
-    ("autonomous-optimization-architect.md", include_str!("presets/roles/autonomous-optimization-architect.md")),
-    ("backend-architect.md", include_str!("presets/roles/backend-architect.md")),
-    ("baidu-seo-specialist.md", include_str!("presets/roles/baidu-seo-specialist.md")),
-    ("behavioral-nudge-engine.md", include_str!("presets/roles/behavioral-nudge-engine.md")),
-    ("bilibili-content-strategist.md", include_str!("presets/roles/bilibili-content-strategist.md")),
-    ("blockchain-security-auditor.md", include_str!("presets/roles/blockchain-security-auditor.md")),
-    ("book-co-author.md", include_str!("presets/roles/book-co-author.md")),
-    ("brand-guardian.md", include_str!("presets/roles/brand-guardian.md")),
-    ("carousel-growth-engine.md", include_str!("presets/roles/carousel-growth-engine.md")),
-    ("china-e-commerce-operator.md", include_str!("presets/roles/china-e-commerce-operator.md")),
-    ("code-reviewer.md", include_str!("presets/roles/code-reviewer.md")),
-    ("compliance-auditor.md", include_str!("presets/roles/compliance-auditor.md")),
-    ("content-creator.md", include_str!("presets/roles/content-creator.md")),
-    ("corporate-training-designer.md", include_str!("presets/roles/corporate-training-designer.md")),
-    ("cross-border-e-commerce-specialist.md", include_str!("presets/roles/cross-border-e-commerce-specialist.md")),
-    ("cultural-intelligence-strategist.md", include_str!("presets/roles/cultural-intelligence-strategist.md")),
-    ("data-consolidation-agent.md", include_str!("presets/roles/data-consolidation-agent.md")),
-    ("data-engineer.md", include_str!("presets/roles/data-engineer.md")),
-    ("database-optimizer.md", include_str!("presets/roles/database-optimizer.md")),
-    ("deal-strategist.md", include_str!("presets/roles/deal-strategist.md")),
-    ("developer-advocate.md", include_str!("presets/roles/developer-advocate.md")),
-    ("devops-automator.md", include_str!("presets/roles/devops-automator.md")),
-    ("discovery-coach.md", include_str!("presets/roles/discovery-coach.md")),
-    ("document-generator.md", include_str!("presets/roles/document-generator.md")),
-    ("douyin-strategist.md", include_str!("presets/roles/douyin-strategist.md")),
-    ("embedded-firmware-engineer.md", include_str!("presets/roles/embedded-firmware-engineer.md")),
-    ("evidence-collector.md", include_str!("presets/roles/evidence-collector.md")),
-    ("executive-summary-generator.md", include_str!("presets/roles/executive-summary-generator.md")),
-    ("experiment-tracker.md", include_str!("presets/roles/experiment-tracker.md")),
-    ("feedback-synthesizer.md", include_str!("presets/roles/feedback-synthesizer.md")),
-    ("feishu-integration-developer.md", include_str!("presets/roles/feishu-integration-developer.md")),
-    ("finance-tracker.md", include_str!("presets/roles/finance-tracker.md")),
-    ("frontend-developer.md", include_str!("presets/roles/frontend-developer.md")),
-    ("game-audio-engineer.md", include_str!("presets/roles/game-audio-engineer.md")),
-    ("game-designer.md", include_str!("presets/roles/game-designer.md")),
-    ("git-workflow-master.md", include_str!("presets/roles/git-workflow-master.md")),
-    ("godot-gameplay-scripter.md", include_str!("presets/roles/godot-gameplay-scripter.md")),
-    ("godot-multiplayer-engineer.md", include_str!("presets/roles/godot-multiplayer-engineer.md")),
-    ("godot-shader-developer.md", include_str!("presets/roles/godot-shader-developer.md")),
-    ("government-digital-presales-consultant.md", include_str!("presets/roles/government-digital-presales-consultant.md")),
-    ("growth-hacker.md", include_str!("presets/roles/growth-hacker.md")),
-    ("healthcare-marketing-compliance-specialist.md", include_str!("presets/roles/healthcare-marketing-compliance-specialist.md")),
-    ("identity-graph-operator.md", include_str!("presets/roles/identity-graph-operator.md")),
-    ("image-prompt-engineer.md", include_str!("presets/roles/image-prompt-engineer.md")),
-    ("incident-response-commander.md", include_str!("presets/roles/incident-response-commander.md")),
-    ("inclusive-visuals-specialist.md", include_str!("presets/roles/inclusive-visuals-specialist.md")),
-    ("infrastructure-maintainer.md", include_str!("presets/roles/infrastructure-maintainer.md")),
-    ("instagram-curator.md", include_str!("presets/roles/instagram-curator.md")),
-    ("jira-workflow-steward.md", include_str!("presets/roles/jira-workflow-steward.md")),
-    ("kuaishou-strategist.md", include_str!("presets/roles/kuaishou-strategist.md")),
-    ("legal-compliance-checker.md", include_str!("presets/roles/legal-compliance-checker.md")),
-    ("level-designer.md", include_str!("presets/roles/level-designer.md")),
-    ("linkedin-content-creator.md", include_str!("presets/roles/linkedin-content-creator.md")),
-    ("livestream-commerce-coach.md", include_str!("presets/roles/livestream-commerce-coach.md")),
-    ("lsp-index-engineer.md", include_str!("presets/roles/lsp-index-engineer.md")),
-    ("macos-spatial-metal-engineer.md", include_str!("presets/roles/macos-spatial-metal-engineer.md")),
-    ("mcp-builder.md", include_str!("presets/roles/mcp-builder.md")),
-    ("mobile-app-builder.md", include_str!("presets/roles/mobile-app-builder.md")),
-    ("model-qa-specialist.md", include_str!("presets/roles/model-qa-specialist.md")),
-    ("narrative-designer.md", include_str!("presets/roles/narrative-designer.md")),
-    ("outbound-strategist.md", include_str!("presets/roles/outbound-strategist.md")),
-    ("paid-media-auditor.md", include_str!("presets/roles/paid-media-auditor.md")),
-    ("paid-social-strategist.md", include_str!("presets/roles/paid-social-strategist.md")),
-    ("performance-benchmarker.md", include_str!("presets/roles/performance-benchmarker.md")),
-    ("pipeline-analyst.md", include_str!("presets/roles/pipeline-analyst.md")),
-    ("podcast-strategist.md", include_str!("presets/roles/podcast-strategist.md")),
-    ("ppc-campaign-strategist.md", include_str!("presets/roles/ppc-campaign-strategist.md")),
-    ("private-domain-operator.md", include_str!("presets/roles/private-domain-operator.md")),
-    ("programmatic-display-buyer.md", include_str!("presets/roles/programmatic-display-buyer.md")),
-    ("project-shepherd.md", include_str!("presets/roles/project-shepherd.md")),
-    ("proposal-strategist.md", include_str!("presets/roles/proposal-strategist.md")),
-    ("rapid-prototyper.md", include_str!("presets/roles/rapid-prototyper.md")),
-    ("reality-checker.md", include_str!("presets/roles/reality-checker.md")),
-    ("recruitment-specialist.md", include_str!("presets/roles/recruitment-specialist.md")),
-    ("reddit-community-builder.md", include_str!("presets/roles/reddit-community-builder.md")),
-    ("report-distribution-agent.md", include_str!("presets/roles/report-distribution-agent.md")),
-    ("roblox-avatar-creator.md", include_str!("presets/roles/roblox-avatar-creator.md")),
-    ("roblox-experience-designer.md", include_str!("presets/roles/roblox-experience-designer.md")),
-    ("roblox-systems-scripter.md", include_str!("presets/roles/roblox-systems-scripter.md")),
-    ("sales-coach.md", include_str!("presets/roles/sales-coach.md")),
-    ("sales-data-extraction-agent.md", include_str!("presets/roles/sales-data-extraction-agent.md")),
-    ("sales-engineer.md", include_str!("presets/roles/sales-engineer.md")),
-    ("search-query-analyst.md", include_str!("presets/roles/search-query-analyst.md")),
-    ("security-engineer.md", include_str!("presets/roles/security-engineer.md")),
-    ("senior-developer.md", include_str!("presets/roles/senior-developer.md")),
-    ("senior-project-manager.md", include_str!("presets/roles/senior-project-manager.md")),
-    ("seo-specialist.md", include_str!("presets/roles/seo-specialist.md")),
-    ("short-video-editing-coach.md", include_str!("presets/roles/short-video-editing-coach.md")),
-    ("social-media-strategist.md", include_str!("presets/roles/social-media-strategist.md")),
-    ("software-architect.md", include_str!("presets/roles/software-architect.md")),
-    ("solidity-smart-contract-engineer.md", include_str!("presets/roles/solidity-smart-contract-engineer.md")),
-    ("sprint-prioritizer.md", include_str!("presets/roles/sprint-prioritizer.md")),
-    ("sre-site-reliability-engineer.md", include_str!("presets/roles/sre-site-reliability-engineer.md")),
-    ("studio-operations.md", include_str!("presets/roles/studio-operations.md")),
-    ("studio-producer.md", include_str!("presets/roles/studio-producer.md")),
-    ("study-abroad-advisor.md", include_str!("presets/roles/study-abroad-advisor.md")),
-    ("supply-chain-strategist.md", include_str!("presets/roles/supply-chain-strategist.md")),
-    ("support-responder.md", include_str!("presets/roles/support-responder.md")),
-    ("technical-artist.md", include_str!("presets/roles/technical-artist.md")),
-    ("technical-writer.md", include_str!("presets/roles/technical-writer.md")),
-    ("terminal-integration-specialist.md", include_str!("presets/roles/terminal-integration-specialist.md")),
-    ("test-results-analyzer.md", include_str!("presets/roles/test-results-analyzer.md")),
-    ("threat-detection-engineer.md", include_str!("presets/roles/threat-detection-engineer.md")),
-    ("tiktok-strategist.md", include_str!("presets/roles/tiktok-strategist.md")),
-    ("tool-evaluator.md", include_str!("presets/roles/tool-evaluator.md")),
-    ("tracking-measurement-specialist.md", include_str!("presets/roles/tracking-measurement-specialist.md")),
-    ("trend-researcher.md", include_str!("presets/roles/trend-researcher.md")),
-    ("twitter-engager.md", include_str!("presets/roles/twitter-engager.md")),
-    ("ui-designer.md", include_str!("presets/roles/ui-designer.md")),
-    ("unity-architect.md", include_str!("presets/roles/unity-architect.md")),
-    ("unity-editor-tool-developer.md", include_str!("presets/roles/unity-editor-tool-developer.md")),
-    ("unity-multiplayer-engineer.md", include_str!("presets/roles/unity-multiplayer-engineer.md")),
-    ("unity-shader-graph-artist.md", include_str!("presets/roles/unity-shader-graph-artist.md")),
-    ("unreal-multiplayer-architect.md", include_str!("presets/roles/unreal-multiplayer-architect.md")),
-    ("unreal-systems-engineer.md", include_str!("presets/roles/unreal-systems-engineer.md")),
-    ("unreal-technical-artist.md", include_str!("presets/roles/unreal-technical-artist.md")),
-    ("unreal-world-builder.md", include_str!("presets/roles/unreal-world-builder.md")),
-    ("ux-architect.md", include_str!("presets/roles/ux-architect.md")),
-    ("ux-researcher.md", include_str!("presets/roles/ux-researcher.md")),
-    ("visionos-spatial-engineer.md", include_str!("presets/roles/visionos-spatial-engineer.md")),
-    ("visual-storyteller.md", include_str!("presets/roles/visual-storyteller.md")),
-    ("wechat-mini-program-developer.md", include_str!("presets/roles/wechat-mini-program-developer.md")),
-    ("wechat-official-account-manager.md", include_str!("presets/roles/wechat-official-account-manager.md")),
-    ("weibo-strategist.md", include_str!("presets/roles/weibo-strategist.md")),
-    ("whimsy-injector.md", include_str!("presets/roles/whimsy-injector.md")),
-    ("workflow-optimizer.md", include_str!("presets/roles/workflow-optimizer.md")),
-    ("xiaohongshu-specialist.md", include_str!("presets/roles/xiaohongshu-specialist.md")),
-    ("xr-cockpit-interaction-specialist.md", include_str!("presets/roles/xr-cockpit-interaction-specialist.md")),
-    ("xr-immersive-developer.md", include_str!("presets/roles/xr-immersive-developer.md")),
-    ("xr-interface-architect.md", include_str!("presets/roles/xr-interface-architect.md")),
-    ("zhihu-strategist.md", include_str!("presets/roles/zhihu-strategist.md")),
+    (
+        "app-store-optimizer.md",
+        include_str!("presets/roles/app-store-optimizer.md"),
+    ),
+    (
+        "automation-governance-architect.md",
+        include_str!("presets/roles/automation-governance-architect.md"),
+    ),
+    (
+        "autonomous-optimization-architect.md",
+        include_str!("presets/roles/autonomous-optimization-architect.md"),
+    ),
+    (
+        "backend-architect.md",
+        include_str!("presets/roles/backend-architect.md"),
+    ),
+    (
+        "baidu-seo-specialist.md",
+        include_str!("presets/roles/baidu-seo-specialist.md"),
+    ),
+    (
+        "behavioral-nudge-engine.md",
+        include_str!("presets/roles/behavioral-nudge-engine.md"),
+    ),
+    (
+        "bilibili-content-strategist.md",
+        include_str!("presets/roles/bilibili-content-strategist.md"),
+    ),
+    (
+        "blockchain-security-auditor.md",
+        include_str!("presets/roles/blockchain-security-auditor.md"),
+    ),
+    (
+        "book-co-author.md",
+        include_str!("presets/roles/book-co-author.md"),
+    ),
+    (
+        "brand-guardian.md",
+        include_str!("presets/roles/brand-guardian.md"),
+    ),
+    (
+        "carousel-growth-engine.md",
+        include_str!("presets/roles/carousel-growth-engine.md"),
+    ),
+    (
+        "china-e-commerce-operator.md",
+        include_str!("presets/roles/china-e-commerce-operator.md"),
+    ),
+    (
+        "code-reviewer.md",
+        include_str!("presets/roles/code-reviewer.md"),
+    ),
+    (
+        "compliance-auditor.md",
+        include_str!("presets/roles/compliance-auditor.md"),
+    ),
+    (
+        "content-creator.md",
+        include_str!("presets/roles/content-creator.md"),
+    ),
+    (
+        "corporate-training-designer.md",
+        include_str!("presets/roles/corporate-training-designer.md"),
+    ),
+    (
+        "cross-border-e-commerce-specialist.md",
+        include_str!("presets/roles/cross-border-e-commerce-specialist.md"),
+    ),
+    (
+        "cultural-intelligence-strategist.md",
+        include_str!("presets/roles/cultural-intelligence-strategist.md"),
+    ),
+    (
+        "data-consolidation-agent.md",
+        include_str!("presets/roles/data-consolidation-agent.md"),
+    ),
+    (
+        "data-engineer.md",
+        include_str!("presets/roles/data-engineer.md"),
+    ),
+    (
+        "database-optimizer.md",
+        include_str!("presets/roles/database-optimizer.md"),
+    ),
+    (
+        "deal-strategist.md",
+        include_str!("presets/roles/deal-strategist.md"),
+    ),
+    (
+        "developer-advocate.md",
+        include_str!("presets/roles/developer-advocate.md"),
+    ),
+    (
+        "devops-automator.md",
+        include_str!("presets/roles/devops-automator.md"),
+    ),
+    (
+        "discovery-coach.md",
+        include_str!("presets/roles/discovery-coach.md"),
+    ),
+    (
+        "document-generator.md",
+        include_str!("presets/roles/document-generator.md"),
+    ),
+    (
+        "douyin-strategist.md",
+        include_str!("presets/roles/douyin-strategist.md"),
+    ),
+    (
+        "embedded-firmware-engineer.md",
+        include_str!("presets/roles/embedded-firmware-engineer.md"),
+    ),
+    (
+        "evidence-collector.md",
+        include_str!("presets/roles/evidence-collector.md"),
+    ),
+    (
+        "executive-summary-generator.md",
+        include_str!("presets/roles/executive-summary-generator.md"),
+    ),
+    (
+        "experiment-tracker.md",
+        include_str!("presets/roles/experiment-tracker.md"),
+    ),
+    (
+        "feedback-synthesizer.md",
+        include_str!("presets/roles/feedback-synthesizer.md"),
+    ),
+    (
+        "feishu-integration-developer.md",
+        include_str!("presets/roles/feishu-integration-developer.md"),
+    ),
+    (
+        "finance-tracker.md",
+        include_str!("presets/roles/finance-tracker.md"),
+    ),
+    (
+        "frontend-developer.md",
+        include_str!("presets/roles/frontend-developer.md"),
+    ),
+    (
+        "game-audio-engineer.md",
+        include_str!("presets/roles/game-audio-engineer.md"),
+    ),
+    (
+        "game-designer.md",
+        include_str!("presets/roles/game-designer.md"),
+    ),
+    (
+        "git-workflow-master.md",
+        include_str!("presets/roles/git-workflow-master.md"),
+    ),
+    (
+        "godot-gameplay-scripter.md",
+        include_str!("presets/roles/godot-gameplay-scripter.md"),
+    ),
+    (
+        "godot-multiplayer-engineer.md",
+        include_str!("presets/roles/godot-multiplayer-engineer.md"),
+    ),
+    (
+        "godot-shader-developer.md",
+        include_str!("presets/roles/godot-shader-developer.md"),
+    ),
+    (
+        "government-digital-presales-consultant.md",
+        include_str!("presets/roles/government-digital-presales-consultant.md"),
+    ),
+    (
+        "growth-hacker.md",
+        include_str!("presets/roles/growth-hacker.md"),
+    ),
+    (
+        "healthcare-marketing-compliance-specialist.md",
+        include_str!("presets/roles/healthcare-marketing-compliance-specialist.md"),
+    ),
+    (
+        "identity-graph-operator.md",
+        include_str!("presets/roles/identity-graph-operator.md"),
+    ),
+    (
+        "image-prompt-engineer.md",
+        include_str!("presets/roles/image-prompt-engineer.md"),
+    ),
+    (
+        "incident-response-commander.md",
+        include_str!("presets/roles/incident-response-commander.md"),
+    ),
+    (
+        "inclusive-visuals-specialist.md",
+        include_str!("presets/roles/inclusive-visuals-specialist.md"),
+    ),
+    (
+        "infrastructure-maintainer.md",
+        include_str!("presets/roles/infrastructure-maintainer.md"),
+    ),
+    (
+        "instagram-curator.md",
+        include_str!("presets/roles/instagram-curator.md"),
+    ),
+    (
+        "jira-workflow-steward.md",
+        include_str!("presets/roles/jira-workflow-steward.md"),
+    ),
+    (
+        "kuaishou-strategist.md",
+        include_str!("presets/roles/kuaishou-strategist.md"),
+    ),
+    (
+        "legal-compliance-checker.md",
+        include_str!("presets/roles/legal-compliance-checker.md"),
+    ),
+    (
+        "level-designer.md",
+        include_str!("presets/roles/level-designer.md"),
+    ),
+    (
+        "linkedin-content-creator.md",
+        include_str!("presets/roles/linkedin-content-creator.md"),
+    ),
+    (
+        "livestream-commerce-coach.md",
+        include_str!("presets/roles/livestream-commerce-coach.md"),
+    ),
+    (
+        "lsp-index-engineer.md",
+        include_str!("presets/roles/lsp-index-engineer.md"),
+    ),
+    (
+        "macos-spatial-metal-engineer.md",
+        include_str!("presets/roles/macos-spatial-metal-engineer.md"),
+    ),
+    (
+        "mcp-builder.md",
+        include_str!("presets/roles/mcp-builder.md"),
+    ),
+    (
+        "mobile-app-builder.md",
+        include_str!("presets/roles/mobile-app-builder.md"),
+    ),
+    (
+        "model-qa-specialist.md",
+        include_str!("presets/roles/model-qa-specialist.md"),
+    ),
+    (
+        "narrative-designer.md",
+        include_str!("presets/roles/narrative-designer.md"),
+    ),
+    (
+        "outbound-strategist.md",
+        include_str!("presets/roles/outbound-strategist.md"),
+    ),
+    (
+        "paid-media-auditor.md",
+        include_str!("presets/roles/paid-media-auditor.md"),
+    ),
+    (
+        "paid-social-strategist.md",
+        include_str!("presets/roles/paid-social-strategist.md"),
+    ),
+    (
+        "performance-benchmarker.md",
+        include_str!("presets/roles/performance-benchmarker.md"),
+    ),
+    (
+        "pipeline-analyst.md",
+        include_str!("presets/roles/pipeline-analyst.md"),
+    ),
+    (
+        "podcast-strategist.md",
+        include_str!("presets/roles/podcast-strategist.md"),
+    ),
+    (
+        "ppc-campaign-strategist.md",
+        include_str!("presets/roles/ppc-campaign-strategist.md"),
+    ),
+    (
+        "private-domain-operator.md",
+        include_str!("presets/roles/private-domain-operator.md"),
+    ),
+    (
+        "programmatic-display-buyer.md",
+        include_str!("presets/roles/programmatic-display-buyer.md"),
+    ),
+    (
+        "project-shepherd.md",
+        include_str!("presets/roles/project-shepherd.md"),
+    ),
+    (
+        "proposal-strategist.md",
+        include_str!("presets/roles/proposal-strategist.md"),
+    ),
+    (
+        "rapid-prototyper.md",
+        include_str!("presets/roles/rapid-prototyper.md"),
+    ),
+    (
+        "reality-checker.md",
+        include_str!("presets/roles/reality-checker.md"),
+    ),
+    (
+        "recruitment-specialist.md",
+        include_str!("presets/roles/recruitment-specialist.md"),
+    ),
+    (
+        "reddit-community-builder.md",
+        include_str!("presets/roles/reddit-community-builder.md"),
+    ),
+    (
+        "report-distribution-agent.md",
+        include_str!("presets/roles/report-distribution-agent.md"),
+    ),
+    (
+        "roblox-avatar-creator.md",
+        include_str!("presets/roles/roblox-avatar-creator.md"),
+    ),
+    (
+        "roblox-experience-designer.md",
+        include_str!("presets/roles/roblox-experience-designer.md"),
+    ),
+    (
+        "roblox-systems-scripter.md",
+        include_str!("presets/roles/roblox-systems-scripter.md"),
+    ),
+    (
+        "sales-coach.md",
+        include_str!("presets/roles/sales-coach.md"),
+    ),
+    (
+        "sales-data-extraction-agent.md",
+        include_str!("presets/roles/sales-data-extraction-agent.md"),
+    ),
+    (
+        "sales-engineer.md",
+        include_str!("presets/roles/sales-engineer.md"),
+    ),
+    (
+        "search-query-analyst.md",
+        include_str!("presets/roles/search-query-analyst.md"),
+    ),
+    (
+        "security-engineer.md",
+        include_str!("presets/roles/security-engineer.md"),
+    ),
+    (
+        "senior-developer.md",
+        include_str!("presets/roles/senior-developer.md"),
+    ),
+    (
+        "senior-project-manager.md",
+        include_str!("presets/roles/senior-project-manager.md"),
+    ),
+    (
+        "seo-specialist.md",
+        include_str!("presets/roles/seo-specialist.md"),
+    ),
+    (
+        "short-video-editing-coach.md",
+        include_str!("presets/roles/short-video-editing-coach.md"),
+    ),
+    (
+        "social-media-strategist.md",
+        include_str!("presets/roles/social-media-strategist.md"),
+    ),
+    (
+        "software-architect.md",
+        include_str!("presets/roles/software-architect.md"),
+    ),
+    (
+        "solidity-smart-contract-engineer.md",
+        include_str!("presets/roles/solidity-smart-contract-engineer.md"),
+    ),
+    (
+        "sprint-prioritizer.md",
+        include_str!("presets/roles/sprint-prioritizer.md"),
+    ),
+    (
+        "sre-site-reliability-engineer.md",
+        include_str!("presets/roles/sre-site-reliability-engineer.md"),
+    ),
+    (
+        "studio-operations.md",
+        include_str!("presets/roles/studio-operations.md"),
+    ),
+    (
+        "studio-producer.md",
+        include_str!("presets/roles/studio-producer.md"),
+    ),
+    (
+        "study-abroad-advisor.md",
+        include_str!("presets/roles/study-abroad-advisor.md"),
+    ),
+    (
+        "supply-chain-strategist.md",
+        include_str!("presets/roles/supply-chain-strategist.md"),
+    ),
+    (
+        "support-responder.md",
+        include_str!("presets/roles/support-responder.md"),
+    ),
+    (
+        "technical-artist.md",
+        include_str!("presets/roles/technical-artist.md"),
+    ),
+    (
+        "technical-writer.md",
+        include_str!("presets/roles/technical-writer.md"),
+    ),
+    (
+        "terminal-integration-specialist.md",
+        include_str!("presets/roles/terminal-integration-specialist.md"),
+    ),
+    (
+        "test-results-analyzer.md",
+        include_str!("presets/roles/test-results-analyzer.md"),
+    ),
+    (
+        "threat-detection-engineer.md",
+        include_str!("presets/roles/threat-detection-engineer.md"),
+    ),
+    (
+        "tiktok-strategist.md",
+        include_str!("presets/roles/tiktok-strategist.md"),
+    ),
+    (
+        "tool-evaluator.md",
+        include_str!("presets/roles/tool-evaluator.md"),
+    ),
+    (
+        "tracking-measurement-specialist.md",
+        include_str!("presets/roles/tracking-measurement-specialist.md"),
+    ),
+    (
+        "trend-researcher.md",
+        include_str!("presets/roles/trend-researcher.md"),
+    ),
+    (
+        "twitter-engager.md",
+        include_str!("presets/roles/twitter-engager.md"),
+    ),
+    (
+        "ui-designer.md",
+        include_str!("presets/roles/ui-designer.md"),
+    ),
+    (
+        "unity-architect.md",
+        include_str!("presets/roles/unity-architect.md"),
+    ),
+    (
+        "unity-editor-tool-developer.md",
+        include_str!("presets/roles/unity-editor-tool-developer.md"),
+    ),
+    (
+        "unity-multiplayer-engineer.md",
+        include_str!("presets/roles/unity-multiplayer-engineer.md"),
+    ),
+    (
+        "unity-shader-graph-artist.md",
+        include_str!("presets/roles/unity-shader-graph-artist.md"),
+    ),
+    (
+        "unreal-multiplayer-architect.md",
+        include_str!("presets/roles/unreal-multiplayer-architect.md"),
+    ),
+    (
+        "unreal-systems-engineer.md",
+        include_str!("presets/roles/unreal-systems-engineer.md"),
+    ),
+    (
+        "unreal-technical-artist.md",
+        include_str!("presets/roles/unreal-technical-artist.md"),
+    ),
+    (
+        "unreal-world-builder.md",
+        include_str!("presets/roles/unreal-world-builder.md"),
+    ),
+    (
+        "ux-architect.md",
+        include_str!("presets/roles/ux-architect.md"),
+    ),
+    (
+        "ux-researcher.md",
+        include_str!("presets/roles/ux-researcher.md"),
+    ),
+    (
+        "visionos-spatial-engineer.md",
+        include_str!("presets/roles/visionos-spatial-engineer.md"),
+    ),
+    (
+        "visual-storyteller.md",
+        include_str!("presets/roles/visual-storyteller.md"),
+    ),
+    (
+        "wechat-mini-program-developer.md",
+        include_str!("presets/roles/wechat-mini-program-developer.md"),
+    ),
+    (
+        "wechat-official-account-manager.md",
+        include_str!("presets/roles/wechat-official-account-manager.md"),
+    ),
+    (
+        "weibo-strategist.md",
+        include_str!("presets/roles/weibo-strategist.md"),
+    ),
+    (
+        "whimsy-injector.md",
+        include_str!("presets/roles/whimsy-injector.md"),
+    ),
+    (
+        "workflow-optimizer.md",
+        include_str!("presets/roles/workflow-optimizer.md"),
+    ),
+    (
+        "xiaohongshu-specialist.md",
+        include_str!("presets/roles/xiaohongshu-specialist.md"),
+    ),
+    (
+        "xr-cockpit-interaction-specialist.md",
+        include_str!("presets/roles/xr-cockpit-interaction-specialist.md"),
+    ),
+    (
+        "xr-immersive-developer.md",
+        include_str!("presets/roles/xr-immersive-developer.md"),
+    ),
+    (
+        "xr-interface-architect.md",
+        include_str!("presets/roles/xr-interface-architect.md"),
+    ),
+    (
+        "zhihu-strategist.md",
+        include_str!("presets/roles/zhihu-strategist.md"),
+    ),
     ("zk-steward.md", include_str!("presets/roles/zk-steward.md")),
 ];
 
@@ -521,10 +946,7 @@ mod tests {
             .find(|preset| preset.id == "coordinator_pmo")
             .expect("planner preset should exist");
         assert_eq!(planner.runner_type.as_deref(), Some("OPENCODE"));
-        assert_eq!(
-            planner.recommended_model.as_deref(),
-            Some("glm-5")
-        );
+        assert_eq!(planner.recommended_model.as_deref(), Some("glm-5"));
 
         let designer = presets
             .members
@@ -694,10 +1116,7 @@ Coordinate tightly and document every handoff.
         let presets = PresetLoader::load_builtin_presets();
 
         for preset in &presets.members {
-            assert!(
-                !preset.id.is_empty(),
-                "Preset has empty ID"
-            );
+            assert!(!preset.id.is_empty(), "Preset has empty ID");
             assert!(
                 !preset.name.is_empty(),
                 "Preset {} has empty name",
@@ -764,7 +1183,11 @@ Coordinate tightly and document every handoff.
             if let Some(metadata) = preset.tools_enabled.get("metadata") {
                 // Verify metadata structure
                 if let Some(category) = metadata.get("category") {
-                    assert!(category.is_string(), "Preset {} has non-string category", preset.id);
+                    assert!(
+                        category.is_string(),
+                        "Preset {} has non-string category",
+                        preset.id
+                    );
                     with_metadata += 1;
                 }
             }

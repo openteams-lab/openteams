@@ -515,13 +515,16 @@ impl ChatRunner {
             let _ = ChatMessage::update_meta(&self.db.pool, message_id, meta).await;
         }
 
-        self.emit(session_id, ChatStreamEvent::MentionError {
+        self.emit(
             session_id,
-            message_id,
-            agent_name: agent_name.to_string(),
-            agent_id,
-            reason: compact_reason.clone(),
-        });
+            ChatStreamEvent::MentionError {
+                session_id,
+                message_id,
+                agent_name: agent_name.to_string(),
+                agent_id,
+                reason: compact_reason.clone(),
+            },
+        );
 
         let mut failure_meta = serde_json::json!({
             "mention_failure": {
@@ -955,7 +958,7 @@ impl ChatRunner {
             let run_dir =
                 run_records_dir.join(Self::run_records_prefix(session_agent_id, run_index));
             fs::create_dir_all(&run_dir).await?;
-            
+
             tracing::debug!(
                 session_id = %session_id,
                 run_id = %run_id,
@@ -1418,7 +1421,9 @@ impl ChatRunner {
         // Consider diff truncated if it's over 4KB (for UI display purposes)
         let truncated = diff.len() > 4000;
 
-        Some(DiffInfo { _truncated: truncated })
+        Some(DiffInfo {
+            _truncated: truncated,
+        })
     }
 
     #[allow(dead_code)]
@@ -3426,7 +3431,7 @@ impl ChatRunner {
         error_info: Option<(&str, Option<&NormalizedEntryError>)>,
     ) -> Result<(), ChatRunnerError> {
         let output_is_empty = raw_output.trim().is_empty();
-        
+
         tracing::debug!(
             session_id = %session_id,
             run_id = %run_id,
@@ -3458,8 +3463,8 @@ impl ChatRunner {
                 "summary": summary,
             });
             if let Some(et) = error_type {
-                error_meta["error_type"] = serde_json::to_value(et)
-                    .unwrap_or(serde_json::Value::Null);
+                error_meta["error_type"] =
+                    serde_json::to_value(et).unwrap_or(serde_json::Value::Null);
             }
             meta["error"] = error_meta;
         }
@@ -3511,8 +3516,7 @@ impl ChatRunner {
             "summary": summary,
         });
         if let Some(et) = error_type {
-            error_meta["error_type"] =
-                serde_json::to_value(et).unwrap_or(serde_json::Value::Null);
+            error_meta["error_type"] = serde_json::to_value(et).unwrap_or(serde_json::Value::Null);
         }
 
         let meta = serde_json::json!({
@@ -3744,7 +3748,7 @@ impl ChatRunner {
         let output_is_empty = latest_assistant.trim().is_empty();
         let has_error = error_content.is_some_and(|e| !e.is_empty());
         let error_info = error_content.map(|ec| (ec, error_type));
-        
+
         tracing::debug!(
             session_id = %session_id,
             run_id = %run_id,
@@ -3915,18 +3919,20 @@ impl ChatRunner {
             });
 
             // Sync error info from the run to the message meta so frontend can display it
-            if let Some(ref ec) = error_content && !ec.is_empty() {
+            if let Some(ref ec) = error_content
+                && !ec.is_empty()
+            {
                 let summary: String = ec.chars().take(200).collect();
                 let mut error_meta = serde_json::json!({
                     "content": ec,
                     "summary": summary,
                 });
                 if let Some(et) = error_type {
-                    error_meta["error_type"] = serde_json::to_value(et)
-                        .unwrap_or(serde_json::Value::Null);
+                    error_meta["error_type"] =
+                        serde_json::to_value(et).unwrap_or(serde_json::Value::Null);
                 }
                 meta["error"] = error_meta;
-                
+
                 tracing::debug!(
                     session_id = %session_id,
                     run_id = %run_id,
@@ -4340,7 +4346,7 @@ impl ChatRunner {
                             &mut stdout_line_buffer,
                             &mut last_token_usage,
                         );
-                        
+
                         tracing::debug!(
                             session_id = %session_id,
                             run_id = %run_id,
@@ -4497,11 +4503,11 @@ impl ChatRunner {
                                 "summary": summary,
                             });
                             if let Some(ref et) = error_type {
-                                error_meta["error_type"] = serde_json::to_value(et)
-                                    .unwrap_or(serde_json::Value::Null);
+                                error_meta["error_type"] =
+                                    serde_json::to_value(et).unwrap_or(serde_json::Value::Null);
                             }
                             meta["error"] = error_meta;
-                            
+
                             tracing::debug!(
                                 session_id = %session_id,
                                 run_id = %run_id,
@@ -4633,7 +4639,7 @@ impl ChatRunner {
                             MentionStatus::Completed
                         };
                         tracing::debug!(
-                            mention_status = ?mention_status, 
+                            mention_status = ?mention_status,
                             "mention status: "
                         );
                         let _ = sender.send(ChatStreamEvent::MentionAcknowledged {

@@ -1,13 +1,12 @@
 use std::{path::Path, sync::Arc};
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use ts_rs::TS;
-
 #[cfg(not(windows))]
 use command_group::AsyncCommandGroup;
+use serde::{Deserialize, Serialize};
 #[cfg(not(windows))]
 use tokio::process::Command;
+use ts_rs::TS;
 
 use crate::{
     actions::Executable,
