@@ -1,16 +1,16 @@
 {
   "name": "openteams-web",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "AI Coding Agents Chatgroup - Alias package for @openteams-lab/openteams-web",
   "author": "openteams-lab",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/StarterraAI/OpenTeams"
+    "url": "https://github.com/openteams-lab/openteams"
   },
-  "homepage": "https://github.com/StarterraAI/OpenTeams",
+  "homepage": "https://github.com/openteams-lab/openteams",
   "bugs": {
-    "url": "https://github.com/StarterraAI/OpenTeams/issues"
+    "url": "https://github.com/openteams-lab/openteams/issues"
   },
   "keywords": [
     "ai",
@@ -42,6 +42,6 @@
     "arm64"
   ],
   "dependencies": {
-    "@openteams-lab/openteams-web": "^0.3.1"
+    "@openteams-lab/openteams-web": "^0.3.2"
   }
 }
