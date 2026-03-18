@@ -102,7 +102,7 @@ const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
 ]"#;
 
 struct DiffInfo {
-    truncated: bool,
+    _truncated: bool,
 }
 
 struct ContextSnapshot {
@@ -1418,7 +1418,7 @@ impl ChatRunner {
         // Consider diff truncated if it's over 4KB (for UI display purposes)
         let truncated = diff.len() > 4000;
 
-        Some(DiffInfo { truncated })
+        Some(DiffInfo { _truncated: truncated })
     }
 
     #[allow(dead_code)]
@@ -3915,28 +3915,26 @@ impl ChatRunner {
             });
 
             // Sync error info from the run to the message meta so frontend can display it
-            if let Some(ref ec) = error_content {
-                if !ec.is_empty() {
-                    let summary: String = ec.chars().take(200).collect();
-                    let mut error_meta = serde_json::json!({
-                        "content": ec,
-                        "summary": summary,
-                    });
-                    if let Some(et) = error_type {
-                        error_meta["error_type"] = serde_json::to_value(et)
-                            .unwrap_or(serde_json::Value::Null);
-                    }
-                    meta["error"] = error_meta;
-                    
-                    tracing::debug!(
-                        session_id = %session_id,
-                        run_id = %run_id,
-                        agent_id = %agent_id,
-                        error_type = ?error_type,
-                        error_content_len = ec.len(),
-                        "[chat_runner] Syncing error info to message meta"
-                    );
+            if let Some(ref ec) = error_content && !ec.is_empty() {
+                let summary: String = ec.chars().take(200).collect();
+                let mut error_meta = serde_json::json!({
+                    "content": ec,
+                    "summary": summary,
+                });
+                if let Some(et) = error_type {
+                    error_meta["error_type"] = serde_json::to_value(et)
+                        .unwrap_or(serde_json::Value::Null);
                 }
+                meta["error"] = error_meta;
+                
+                tracing::debug!(
+                    session_id = %session_id,
+                    run_id = %run_id,
+                    agent_id = %agent_id,
+                    error_type = ?error_type,
+                    error_content_len = ec.len(),
+                    "[chat_runner] Syncing error info to message meta"
+                );
             }
 
             let routed_message = chat::create_message(
