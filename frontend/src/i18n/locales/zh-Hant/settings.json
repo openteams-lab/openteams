@@ -536,6 +536,8 @@
           "descriptionPlaceholder": "此 AI 成員的角色",
           "runnerType": "Runner 類型（選填）",
           "runnerTypePlaceholder": "留空則使用會話預設",
+          "recommendedModel": "推薦模型（選填）",
+          "recommendedModelPlaceholder": "留空則使用執行器預設模型",
           "systemPrompt": "角色設定（必填）",
           "systemPromptPlaceholder": "描述此 AI 成員的角色設定...",
           "workspacePath": "預設工作目錄（選填）",

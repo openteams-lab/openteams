@@ -536,6 +536,8 @@
           "descriptionPlaceholder": "Ce que fait ce membre IA",
           "runnerType": "Type de runner (optionnel)",
           "runnerTypePlaceholder": "Laissez vide pour utiliser la valeur par défaut de la session",
+          "recommendedModel": "Modèle recommandé (optionnel)",
+          "recommendedModelPlaceholder": "Laissez vide pour utiliser le modèle par défaut de l'exécuteur",
           "systemPrompt": "Paramètres du rôle (obligatoire)",
           "systemPromptPlaceholder": "Décrivez les paramètres du rôle de ce membre IA...",
           "workspacePath": "Chemin de workspace par défaut (optionnel)",
