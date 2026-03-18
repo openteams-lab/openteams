@@ -508,8 +508,7 @@ impl AcpAgentHarness {
                                         } else {
                                             format!("{e}")
                                         };
-                                        let _ = log_tx
-                                            .send(AcpEvent::Error(error_msg).to_string());
+                                        let _ = log_tx.send(AcpEvent::Error(error_msg).to_string());
                                     }
                                 }
                             }
