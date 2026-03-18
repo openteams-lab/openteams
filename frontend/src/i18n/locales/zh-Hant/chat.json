@@ -113,6 +113,7 @@
     "quote": "引用",
     "copy": "複製",
     "regenerate": "重新生成",
+    "resend": "重新發送",
     "replyingTo": "回覆 {{name}}",
     "view": "檢視",
     "referencedMessageUnavailable": "引用的訊息不可用。",

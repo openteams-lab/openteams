@@ -113,6 +113,7 @@
     "quote": "Citar",
     "copy": "Copiar",
     "regenerate": "Regenerar",
+    "resend": "Reenviar",
     "replyingTo": "Respondiendo a {{name}}",
     "view": "Ver",
     "referencedMessageUnavailable": "Mensaje referenciado no disponible.",

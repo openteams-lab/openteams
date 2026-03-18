@@ -3293,6 +3293,19 @@ export function ChatSessions() {
     [getMessageMentionHandle, handleReplySelect]
   );
 
+  const handleResend = useCallback(
+    async (message: ChatMessage) => {
+      if (!activeSessionId) return;
+      if (isArchived) return;
+      try {
+        await chatApi.resendMessage(activeSessionId, message.id);
+      } catch (error) {
+        console.error('Failed to resend message:', error);
+      }
+    },
+    [activeSessionId, isArchived]
+  );
+
   const handleStopAgent = useCallback(
     async (sessionAgentId: string, agentId: string) => {
       if (!activeSessionId) return;
@@ -3742,6 +3755,7 @@ export function ChatSessions() {
                           }
                           isArchived={isArchived}
                           onReply={handleLocalReplySelect}
+                          onResend={handleResend}
                           isCleanupMode={isCleanupMode}
                           isSelected={isSelected}
                           onToggleSelect={() => {
