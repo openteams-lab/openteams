@@ -183,6 +183,14 @@ export function ChatMessageItem({
       ? tokenUsage.total_tokens
       : null;
   const isEstimated = tokenUsage?.is_estimated === true;
+  const tokenUsageLabel =
+    tokenCount !== null
+      ? t('replyTokenUsage', {
+          ns: 'chat',
+          value: `${isEstimated ? '~' : ''}${formatTokenCount(tokenCount)}`,
+          defaultValue: `Reply tokens: ${isEstimated ? '~' : ''}${formatTokenCount(tokenCount)}`,
+        })
+      : null;
   const protocolError = extractProtocolErrorMeta(message.meta);
   const shouldSuppressProtocolErrorCard =
     protocolError?.code !== null &&
@@ -757,15 +765,10 @@ export function ChatMessageItem({
               )}
               {isAgent && (
                 <div className="chat-session-message-footer mt-4 flex items-center justify-between opacity-50 text-[10px] font-ibm-plex-mono">
-                  {tokenCount !== null && (
-                    <span>
-                      {isEstimated && (
-                        <span className="text-yellow-500 mr-0.5">~</span>
-                      )}
-                      Tokens: {formatTokenCount(tokenCount)}
-                    </span>
+                  {tokenUsageLabel && (
+                    <span className="text-low/90">{tokenUsageLabel}</span>
                   )}
-                  <span className={tokenCount !== null ? '' : 'ml-auto'}>
+                  <span className={tokenUsageLabel ? '' : 'ml-auto'}>
                     {formatDateShortWithTime(message.created_at)}
                   </span>
                 </div>
