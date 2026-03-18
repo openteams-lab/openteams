@@ -600,7 +600,7 @@
         "duplicateMemberName": "Duplicate Member Name"
       },
       "messages": {
-        "agentRunning": "The following agent(s) are currently running: @{{agents}}. They will not process new messages until the current task is stopped. Do you still want to send this message?",
+        "agentRunning": "The following agent(s) are currently running: @{{agents}}. This message will be queued and processed after the current task finishes. Do you still want to send this message?",
         "removeMember": "Are you sure you want to remove @{{name}} from this session?",
         "deleteSession": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone and all messages will be permanently deleted.",
         "deleteMessages": "Are you sure you want to delete {{count}} message(s)? This action cannot be undone.",
@@ -656,7 +656,8 @@
       "selectRunToViewLog": "Select a run to view its log output.",
       "refresh": "Refresh",
       "loadingLog": "Loading log...",
-      "logEmpty": "Log is empty."
+      "logEmpty": "Log is empty.",
+      "fullErrorLog": "Full Error Log"
     }
   },
   "workspacePreview": {

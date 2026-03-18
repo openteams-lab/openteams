@@ -4,6 +4,8 @@
 //! Also provides built-in skills from the awesome-claude-skills repository.
 //! Supports fallback to embedded local skill files when remote server is unavailable.
 
+#![allow(clippy::items_after_test_module)]
+
 use std::{
     collections::{HashMap, HashSet},
     path::{Component, Path, PathBuf},
@@ -1496,6 +1498,7 @@ pub async fn install_builtin_skill(
 /// 1. Try remote registry first
 /// 2. If remote fails, try builtin skill
 /// 3. Install files (remote or embedded)
+///
 /// Only returns error if skill not found anywhere
 ///
 /// # Arguments

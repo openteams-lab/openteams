@@ -887,7 +887,10 @@ export function SkillsPanel({
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className={cn(
+              "grid grid-cols-1 gap-4 xl:grid-cols-2",
+              displayedInstalledSkills.length > 8 && "max-h-[280px] overflow-y-auto pr-1"
+            )}>
               {isLoadingInstalled && (
                 <div className="col-span-full text-sm text-low py-4">
                   {t('members.skills.loading')}

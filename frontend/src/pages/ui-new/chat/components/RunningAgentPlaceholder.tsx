@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { CaretDownIcon } from '@phosphor-icons/react';
+import { CaretDownIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { ChatEntryContainer } from '@/components/ui-new/primitives/conversation/ChatEntryContainer';
+import { ChatErrorMessage } from '@/components/ui-new/primitives/conversation/ChatErrorMessage';
 import {
   AgentBrandIcon,
   getAgentAvatarSeed,
@@ -57,6 +58,7 @@ export function RunningAgentPlaceholder({
     .filter(Boolean)
     .join('\n\n');
   const hasThinking = displayUnifiedContent.length > 0;
+  const hasError = (run?.errorContent ?? '').trim().length > 0;
 
   return (
     <div className="chat-session-message-row is-agent flex justify-start">
@@ -142,6 +144,22 @@ export function RunningAgentPlaceholder({
                     </pre>
                   </div>
                 )}
+              </div>
+            )}
+
+            {hasError && (
+              <div className="rounded-lg border border-error/50 bg-error/5 p-3">
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[#EF4444] uppercase tracking-wide">
+                  <WarningCircleIcon className="size-3.5" weight="fill" />
+                  <span>{t('agent.error', { defaultValue: 'Error' })}</span>
+                </div>
+                <div className="rounded-[4px_8px_8px_4px] border-l-[3px] border-l-error/70 bg-white px-4 py-3 shadow-sm">
+                  <ChatErrorMessage
+                    content={run?.errorContent ?? ''}
+                    expanded
+                    tone="error"
+                  />
+                </div>
               </div>
             )}
           </div>

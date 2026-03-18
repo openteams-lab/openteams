@@ -453,7 +453,9 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
     let worktree_path_str = worktree_path.to_string_lossy().to_string();
     tokio::spawn(async move {
         let mut state = LogState::new(entry_index.clone());
-        let mut stdout_lines = msg_store.stdout_lines_stream();
+        // Use stdout_lines_stream_until_close to ensure we process all stdout,
+        // including error messages that may arrive just before Finished signal.
+        let mut stdout_lines = msg_store.stdout_lines_stream_until_close();
 
         while let Some(Ok(line)) = stdout_lines.next().await {
             if let Ok(error) = serde_json::from_str::<Error>(&line) {
@@ -1148,8 +1150,10 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 | EventMsg::CollabWaitingBegin(..)
                 | EventMsg::CollabWaitingEnd(..)
                 | EventMsg::CollabCloseBegin(..)
-                | EventMsg::CollabCloseEnd(..)
-                | _ => {}
+                | EventMsg::CollabCloseEnd(..) => {}
+                _ => {
+                    // Handle any new or untracked event types silently
+                }
             }
         }
     });
@@ -1182,11 +1186,11 @@ fn handle_jsonrpc_request(
                 });
             command_state.awaiting_approval = true;
             if let Some(index) = command_state.index {
-                replace_normalized_entry(&msg_store, index, command_state.to_normalized_entry());
+                replace_normalized_entry(msg_store, index, command_state.to_normalized_entry());
             } else {
                 let index = add_normalized_entry(
-                    &msg_store,
-                    &entry_index,
+                    msg_store,
+                    entry_index,
                     command_state.to_normalized_entry(),
                 );
                 command_state.index = Some(index);
@@ -1197,7 +1201,7 @@ fn handle_jsonrpc_request(
                 for entry in &mut patch_state.entries {
                     entry.awaiting_approval = true;
                     if let Some(index) = entry.index {
-                        replace_normalized_entry(&msg_store, index, entry.to_normalized_entry());
+                        replace_normalized_entry(msg_store, index, entry.to_normalized_entry());
                     }
                 }
             }
@@ -1221,11 +1225,11 @@ fn handle_server_notification(
 ) {
     match server_notification {
         ServerNotification::ThreadStarted(payload) => {
-            if let Some(path) = payload.thread.path.clone() {
-                if let Ok(session_id) = SessionHandler::extract_session_id_from_rollout_path(path) {
-                    msg_store.push_session_id(session_id);
-                    return;
-                }
+            if let Some(path) = payload.thread.path.clone()
+                && let Ok(session_id) = SessionHandler::extract_session_id_from_rollout_path(path)
+            {
+                msg_store.push_session_id(session_id);
+                return;
             }
 
             msg_store.push_session_id(payload.thread.id);
@@ -1256,16 +1260,16 @@ fn handle_server_notification(
             state.thinking = None;
         }
         ServerNotification::CommandExecutionOutputDelta(payload) => {
-            if let Some(command_state) = state.commands.get_mut(&payload.item_id) {
-                if !payload.delta.is_empty() {
-                    command_state.stdout.push_str(&payload.delta);
-                    if let Some(index) = command_state.index {
-                        replace_normalized_entry(
-                            msg_store,
-                            index,
-                            command_state.to_normalized_entry(),
-                        );
-                    }
+            if let Some(command_state) = state.commands.get_mut(&payload.item_id)
+                && !payload.delta.is_empty()
+            {
+                command_state.stdout.push_str(&payload.delta);
+                if let Some(index) = command_state.index {
+                    replace_normalized_entry(
+                        msg_store,
+                        index,
+                        command_state.to_normalized_entry(),
+                    );
                 }
             }
         }
@@ -1460,7 +1464,7 @@ fn handle_v2_item_started(
             let web_search_state = state
                 .web_searches
                 .entry(id)
-                .or_insert_with(WebSearchState::new);
+                .or_default();
             web_search_state.query = Some(query);
             if let Some(index) = web_search_state.index {
                 replace_normalized_entry(msg_store, index, web_search_state.to_normalized_entry());

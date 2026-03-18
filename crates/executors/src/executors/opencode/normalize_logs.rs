@@ -41,7 +41,9 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
         let mut stored_session_id = false;
         let mut state = LogState::new(entry_index.clone(), msg_store.clone());
 
-        let mut stdout_lines = msg_store.stdout_lines_stream();
+        // Use stdout_lines_stream_until_close to ensure we process all stdout,
+        // including error messages that may arrive just before Finished signal.
+        let mut stdout_lines = msg_store.stdout_lines_stream_until_close();
         while let Some(Ok(line)) = stdout_lines.next().await {
             let Some(event) = parse_event(&line) else {
                 let trimmed = line.trim();
@@ -135,15 +137,20 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 }
                 OpencodeExecutorEvent::Error { message } => {
                     let idx = entry_index.next();
+                    let (error_type, content) =
+                        if let Some(detected) = crate::logs::api_errors::detect_api_error(&message)
+                        {
+                            (detected.error_type, detected.message)
+                        } else {
+                            (NormalizedEntryError::Other, message)
+                        };
                     msg_store.push_patch(
                         crate::logs::utils::ConversationPatch::add_normalized_entry(
                             idx,
                             NormalizedEntry {
                                 timestamp: None,
-                                entry_type: NormalizedEntryType::ErrorMessage {
-                                    error_type: NormalizedEntryError::Other,
-                                },
-                                content: message,
+                                entry_type: NormalizedEntryType::ErrorMessage { error_type },
+                                content,
                                 metadata: None,
                             },
                         ),
@@ -254,10 +261,17 @@ impl LogState {
                         err.message()
                             .unwrap_or_else(|| format!("OpenCode session error: {}", err.raw)),
                     ),
-                    Some(err) => (
-                        NormalizedEntryError::Other,
-                        format!("OpenCode session error: {}", err.raw),
-                    ),
+                    Some(err) => {
+                        let raw_str = err.raw.to_string();
+                        let raw_msg = format!("OpenCode session error: {}", err.raw);
+                        if let Some(detected) =
+                            crate::logs::api_errors::detect_api_error(&raw_str)
+                        {
+                            (detected.error_type, detected.message)
+                        } else {
+                            (NormalizedEntryError::Other, raw_msg)
+                        }
+                    }
                     None => (
                         NormalizedEntryError::Other,
                         "OpenCode session error".to_string(),

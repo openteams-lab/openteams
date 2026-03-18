@@ -36,8 +36,10 @@ pub fn normalize_logs(
 
         let worktree_path_str = worktree_path.to_string_lossy();
 
+        // Use stdout_lines_stream_until_close to ensure we process all stdout,
+        // including error messages that may arrive just before Finished signal.
         let mut lines_stream = msg_store
-            .stdout_lines_stream()
+            .stdout_lines_stream_until_close()
             .filter_map(|res| ready(res.ok()));
 
         while let Some(line) = lines_stream.next().await {
@@ -670,7 +672,9 @@ pub fn normalize_logs(
 
 fn normalize_stderr_logs(msg_store: Arc<MsgStore>, entry_index_provider: EntryIndexProvider) {
     tokio::spawn(async move {
-        let mut stderr = msg_store.stderr_chunked_stream();
+        // Use stderr_chunked_stream_until_close to ensure we process all stderr,
+        // including error messages that may arrive just before Finished signal.
+        let mut stderr = msg_store.stderr_chunked_stream_until_close();
 
         let mut processor = PlainTextLogProcessor::builder()
             .normalized_entry_producer(Box::new(|content: String| NormalizedEntry {
