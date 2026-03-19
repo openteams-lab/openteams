@@ -13,11 +13,7 @@ interface AiTeamPresetsModalProps {
   onClose: () => void;
 }
 
-function AiTeamPresetsModalContent({
-  onClose,
-}: {
-  onClose: () => void;
-}) {
+function AiTeamPresetsModalContent({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation(['chat', 'settings', 'common']);
   const { isDirty } = useSettingsDirty();
   const isConfirmingRef = useRef(false);
@@ -74,14 +70,11 @@ function AiTeamPresetsModalContent({
         <div
           className="chat-settings-theme settings-dialog-shell flex h-full w-full flex-col overflow-hidden bg-[rgba(255,255,255,0.96)] animate-in fade-in-0 slide-in-from-bottom-4 duration-200 rounded-none border-0 md:mx-auto md:my-[5vh] md:h-[85vh] md:max-w-[1220px] md:rounded-[28px] md:border md:border-white/70 md:shadow-[0_30px_80px_rgba(15,23,42,0.18)] md:backdrop-blur-xl"
           style={{
-            fontFamily:
-              '"Inter", "PingFang SC", "Helvetica Neue", sans-serif',
+            fontFamily: '"Inter", "PingFang SC", "Helvetica Neue", sans-serif',
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          <div
-            className="settings-section-header flex items-center justify-between border-b border-[#F1F5F9] px-8 py-5"
-          >
+          <div className="settings-section-header flex items-center justify-between border-b border-[#F1F5F9] px-8 py-5">
             <div>
               <h2 className="m-0 text-[20px] font-semibold text-[#0F172A]">
                 {t('aiTeamPresets.title', {

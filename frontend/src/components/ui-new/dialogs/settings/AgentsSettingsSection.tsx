@@ -467,7 +467,8 @@ export function AgentsSettingsSection() {
                     value={
                       (executorsMap?.[selectedExecutorType]?.[
                         selectedConfiguration
-                      ]?.[selectedExecutorType] as Record<string, unknown>) || {}
+                      ]?.[selectedExecutorType] as Record<string, unknown>) ||
+                      {}
                     }
                     onChange={(formData) =>
                       handleExecutorConfigChange(

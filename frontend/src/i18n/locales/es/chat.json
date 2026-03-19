@@ -25,7 +25,7 @@
     "searchSessionsPlaceholder": "Buscar nombres de sesiones...",
     "clearSessionSearch": "Borrar b?squeda de sesiones",
     "noSearchResults": "Ninguna sesi?n coincide con \"{{query}}\".",
-"generatedSessionTitle": "Iniciada {{date}}",
+    "generatedSessionTitle": "Iniciada {{date}}",
     "aiTeam": "Equipo de IA"
   },
   "contextMenu": {
@@ -113,6 +113,7 @@
     "quote": "Citar",
     "copy": "Copiar",
     "regenerate": "Regenerar",
+    "resend": "Reenviar",
     "replyingTo": "Respondiendo a {{name}}",
     "view": "Ver",
     "referencedMessageUnavailable": "Mensaje referenciado no disponible.",
@@ -183,7 +184,7 @@
     "workspacePath": "Ruta del espacio de trabajo",
     "workspacePathPlaceholder": "Ruta absoluta para el trabajo de los miembros de IA",
     "workspacePathCannotBeModified": "La ruta del espacio de trabajo no se puede modificar",
-"add": "Añadir",
+    "add": "Añadir",
     "save": "Guardar",
     "teamBulletin": {
       "title": "Tablón del equipo",
@@ -541,7 +542,7 @@
       "installAria": "Instalar habilidad",
       "scrollForMore": "Desplázate hacia abajo para cargar más..."
     },
-"create": {
+    "create": {
       "title": "Agregar ruta de habilidad",
       "pathLabel": "Ruta de la habilidad",
       "pathPlaceholder": "C:\\skills\\my-skill"
@@ -595,7 +596,7 @@
         "duplicateMemberName": "Nombre de miembro duplicado"
       },
       "messages": {
-        "agentRunning": "Los siguientes agentes se están ejecutando: @{{agents}}. No procesarán mensajes nuevos hasta que se detenga la tarea actual. ¿Aun así quieres enviar este mensaje?",
+        "agentRunning": "Los siguientes agentes se están ejecutando: @{{agents}}. Este mensaje se pondrá en cola y se procesará después de que termine la tarea actual. ¿Aun así quieres enviar este mensaje?",
         "removeMember": "¿Seguro que quieres eliminar a @{{name}} de esta sesión?",
         "deleteSession": "¿Seguro que quieres eliminar \"{{title}}\"? Esta acción no se puede deshacer y todos los mensajes se eliminarán permanentemente.",
         "deleteMessages": "¿Seguro que quieres eliminar {{count}} mensaje(s)? Esta acción no se puede deshacer.",
@@ -650,6 +651,7 @@
       "refresh": "Actualizar",
       "loadingLog": "Cargando registro...",
       "logEmpty": "El registro está vacío.",
+      "fullErrorLog": "Registro de errores completo",
       "workspaceTrail": "Espacio de trabajo",
       "workspacePath": "Ruta del espacio de trabajo"
     }

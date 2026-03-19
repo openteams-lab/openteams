@@ -31,7 +31,7 @@ jobs:
         run: pnpm install
 
       - name: Lint frontend
-        run: cd frontend && npm run lint
+        run: cd frontend && pnpm run lint
 
       - name: Check i18n regressions
         env:
@@ -39,10 +39,10 @@ jobs:
         run: ./scripts/check-i18n.sh
 
       - name: Format check frontend
-        run: cd frontend && npm run format:check
+        run: cd frontend && pnpm run format:check
 
       - name: Type check frontend
-        run: cd frontend && npx tsc --noEmit
+        run: cd frontend && pnpm exec tsc --noEmit
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -76,7 +76,7 @@ jobs:
           features: sqlite,postgres
 
       - name: Build frontend
-        run: cd frontend && npm run build
+        run: cd frontend && pnpm run build
         env:
           NODE_OPTIONS: --max-old-space-size=8192
 
