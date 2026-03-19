@@ -456,10 +456,10 @@ mod tests {
             .iter()
             .find(|preset| preset.id == "coordinator_pmo")
             .expect("planner preset should exist");
-        assert_eq!(planner.runner_type.as_deref(), Some("CLAUDE_CODE"));
+        assert_eq!(planner.runner_type.as_deref(), Some("OPENCODE"));
         assert_eq!(
             planner.recommended_model.as_deref(),
-            Some("claude-sonnet-4-6")
+            Some("glm-5")
         );
 
         let fullstack = chat_presets
