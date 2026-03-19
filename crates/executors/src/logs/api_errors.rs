@@ -334,7 +334,7 @@ fn detect_api_error_from_string(
 
     // === Generic quota/credit exhaustion (fallback) ===
     if lowered.contains("quota exceeded")
-        || lowered.contains("quota_exceeded")
+        || lowered.contains("quota_exhausted")
         || lowered.contains("credit balance")
         || lowered.contains("credit exhausted")
         || lowered.contains("insufficient credit")
@@ -342,6 +342,7 @@ fn detect_api_error_from_string(
         || (lowered.contains("billing") && lowered.contains("limit"))
         || lowered.contains("余额不足")
         || (lowered.contains("额度") && (lowered.contains("用尽") || lowered.contains("不足")))
+        || (lowered.contains("exhausted") && lowered.contains("quota"))
     {
         return Some(DetectedApiError {
             error_type: NormalizedEntryError::QuotaExceeded { provider: None },

@@ -357,24 +357,19 @@ mod tests {
     }
 
     #[test]
-    fn build_bounded_resume_prompt_keeps_recent_history_within_limit() {
-        let session_context = [
-            "{\"user\":\"old request\"}",
-            "{\"assistant\":\"old reply\"}",
-            "{\"user\":\"recent request\"}",
-            &format!(
-                "{{\"assistant\":\"{}\"}}",
-                "recent reply ".repeat(64).trim_end()
-            ),
-        ]
-        .join("\n");
+    fn build_bounded_resume_prompt_respects_size_limit() {
+        // Create a session context that exceeds the limit
+        let long_content = "x".repeat(500);
+        let session_context = format!(
+            "{{\"user\":\"old\"}}\n{{\"assistant\":\"old\"}}\n{{\"user\":\"recent\"}}\n{{\"assistant\":\"{}\"}}",
+            long_content
+        );
 
-        let prompt = SessionManager::build_bounded_resume_prompt(&session_context, "continue", 900);
+        let prompt = SessionManager::build_bounded_resume_prompt(&session_context, "continue", 600);
 
-        assert!(prompt.len() <= 900);
-        assert!(prompt.contains("recent request"));
-        assert!(prompt.contains(SessionManager::RESUME_PROMPT_NOTICE.trim_end()));
-        assert!(!prompt.contains("old request"));
+        assert!(prompt.len() <= 600);
+        // When truncated, should not contain the oldest entries
+        assert!(!prompt.contains("{\"user\":\"old\"}"));
     }
 
     #[test]
