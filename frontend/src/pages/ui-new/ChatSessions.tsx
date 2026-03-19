@@ -30,7 +30,6 @@ import { cn } from '@/lib/utils';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useTheme } from '@/components/ThemeProvider';
 import { formatDateShortWithTime } from '@/utils/date';
-import { formatTokenCount } from '@/utils/string';
 import { getActualTheme } from '@/utils/theme';
 import {
   extractExecutorProfileVariant,
@@ -1398,29 +1397,6 @@ export function ChatSessions() {
     [messageList]
   );
 
-  const totalTokens = useMemo(() => {
-    let sum = 0;
-    for (const message of messageList) {
-      const meta = message.meta;
-      if (
-        meta &&
-        typeof meta === 'object' &&
-        !Array.isArray(meta) &&
-        'token_usage' in meta
-      ) {
-        const tokenUsage = (meta as { token_usage?: { total_tokens?: number } })
-          .token_usage;
-        if (typeof tokenUsage?.total_tokens === 'number') {
-          sum += tokenUsage.total_tokens;
-        }
-      }
-    }
-    return sum;
-  }, [messageList]);
-  const totalTokenUsageLabel =
-    totalTokens > 0
-      ? t('header.tokenUsage', { value: formatTokenCount(totalTokens) })
-      : null;
   const runHistory = useRunHistory(messages);
 
   const activeSession = useMemo(
@@ -3481,7 +3457,6 @@ export function ChatSessions() {
           <ChatHeader
             activeSession={activeSession ?? null}
             displayTitle={activeSessionDisplayTitle}
-            tokenUsageLabel={totalTokenUsageLabel}
             isGeneratedTitle={isGeneratedActiveSessionTitle}
             isSearchOpen={isMessageSearchOpen}
             searchQuery={messageSearchQuery}
