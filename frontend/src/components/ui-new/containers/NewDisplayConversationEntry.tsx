@@ -23,7 +23,7 @@ import { useChangesView } from '@/contexts/ChangesViewContext';
 import { useLogsPanel } from '@/contexts/LogsPanelContext';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
 import { cn } from '@/lib/utils';
-import { formatTokenCount } from '@/utils/string';
+import { formatTokenUsage } from '@/utils/string';
 import {
   ScriptFixerDialog,
   type ScriptType,
@@ -597,14 +597,7 @@ function AssistantMessageEntry({
 }
 
 function TokenUsageEntry({ info }: { info: TokenUsageInfo }) {
-  const { t } = useTranslation('chat');
-  const value = `${info.is_estimated ? '~' : ''}${formatTokenCount(info.total_tokens)}`;
-  const label = t('replyTokenUsage', {
-    ns: 'chat',
-    value,
-    defaultValue: `Reply tokens: ${value}`,
-  });
-
+  const label = formatTokenUsage(info);
   return (
     <div className="px-half">
       <div className="text-[11px] font-ibm-plex-mono text-low/80">{label}</div>

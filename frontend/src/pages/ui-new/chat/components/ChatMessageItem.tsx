@@ -47,7 +47,7 @@ import {
   extractProtocolErrorMeta,
   extractErrorFromMeta,
 } from '../utils';
-import { formatTokenCount } from '@/utils/string';
+import { formatTokenUsage } from '@/utils/string';
 
 const SUPPRESSED_PROTOCOL_ERROR_CODES = new Set([
   'invalid_json',
@@ -163,34 +163,24 @@ export function ChatMessageItem({
   })();
 
   const meta = message.meta;
-  const tokenUsage =
+  const rawTokenUsage =
     isAgent &&
     meta &&
     typeof meta === 'object' &&
     !Array.isArray(meta) &&
     'token_usage' in meta
-      ? (
-          meta as {
-            token_usage?: {
-              total_tokens?: number;
-              is_estimated?: boolean;
-            };
-          }
-        ).token_usage
+      ? (meta as { token_usage?: Record<string, unknown> }).token_usage
       : null;
-  const tokenCount =
-    typeof tokenUsage?.total_tokens === 'number'
-      ? tokenUsage.total_tokens
-      : null;
-  const isEstimated = tokenUsage?.is_estimated === true;
-  const tokenUsageLabel =
-    tokenCount !== null
-      ? t('replyTokenUsage', {
-          ns: 'chat',
-          value: `${isEstimated ? '~' : ''}${formatTokenCount(tokenCount)}`,
-          defaultValue: `Reply tokens: ${isEstimated ? '~' : ''}${formatTokenCount(tokenCount)}`,
-        })
-      : null;
+  const tokenUsageLabel = rawTokenUsage
+    ? formatTokenUsage({
+        total_tokens: (rawTokenUsage.total_tokens as number) ?? 0,
+        input_tokens: rawTokenUsage.input_tokens as number | null,
+        output_tokens: rawTokenUsage.output_tokens as number | null,
+        cache_read_tokens: rawTokenUsage.cache_read_tokens as number | null,
+        cache_write_tokens: rawTokenUsage.cache_write_tokens as number | null,
+        is_estimated: rawTokenUsage.is_estimated as boolean | undefined,
+      })
+    : null;
   const protocolError = extractProtocolErrorMeta(message.meta);
   const shouldSuppressProtocolErrorCard =
     protocolError?.code !== null &&

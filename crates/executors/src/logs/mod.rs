@@ -126,14 +126,19 @@ pub enum NormalizedEntryType {
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct TokenUsageInfo {
+    /// Billable tokens: input + output (cache_read excluded, it's billed at ~1/10 rate)
     pub total_tokens: u32,
     pub model_context_window: u32,
     #[serde(default)]
     pub input_tokens: Option<u32>,
     #[serde(default)]
     pub output_tokens: Option<u32>,
+    /// Tokens served from cache (Claude: cache_read_input_tokens, Codex: cached_input_tokens)
     #[serde(default)]
     pub cache_read_tokens: Option<u32>,
+    /// Tokens written into cache this turn (Claude: cache_creation_input_tokens)
+    #[serde(default)]
+    pub cache_write_tokens: Option<u32>,
     #[serde(default)]
     pub is_estimated: bool,
 }

@@ -3042,6 +3042,8 @@ impl ChatRunner {
                 "model_context_window": token_usage.model_context_window,
                 "input_tokens": token_usage.input_tokens,
                 "output_tokens": token_usage.output_tokens,
+                "cache_read_tokens": token_usage.cache_read_tokens,
+                "cache_write_tokens": token_usage.cache_write_tokens,
                 "is_estimated": token_usage.is_estimated,
             });
         }
@@ -3520,6 +3522,8 @@ impl ChatRunner {
                 "model_context_window": token_usage.model_context_window,
                 "input_tokens": token_usage.input_tokens,
                 "output_tokens": token_usage.output_tokens,
+                "cache_read_tokens": token_usage.cache_read_tokens,
+                "cache_write_tokens": token_usage.cache_write_tokens,
                 "is_estimated": token_usage.is_estimated,
             });
         }
@@ -4111,6 +4115,8 @@ impl ChatRunner {
         let value: serde_json::Value = serde_json::from_str(line).ok()?;
         let value_obj = value.as_object()?;
 
+        // Format: {"type":"token_usage","total_tokens":N,"model_context_window":N,...}
+        // Used by: Gemini CLI, QWen Coder (may include input/output breakdown)
         if value_obj.get("type").and_then(|v| v.as_str()) == Some("token_usage") {
             let total_tokens = value_obj
                 .get("total_tokens")
@@ -4120,16 +4126,35 @@ impl ChatRunner {
                 .get("model_context_window")
                 .and_then(|v| v.as_u64())
                 .and_then(|v| u32::try_from(v).ok())?;
+            let input_tokens = value_obj
+                .get("input_tokens")
+                .and_then(|v| v.as_u64())
+                .and_then(|v| u32::try_from(v).ok());
+            let output_tokens = value_obj
+                .get("output_tokens")
+                .and_then(|v| v.as_u64())
+                .and_then(|v| u32::try_from(v).ok());
+            let cache_read_tokens = value_obj
+                .get("cache_read_tokens")
+                .and_then(|v| v.as_u64())
+                .and_then(|v| u32::try_from(v).ok());
+            let cache_write_tokens = value_obj
+                .get("cache_write_tokens")
+                .and_then(|v| v.as_u64())
+                .and_then(|v| u32::try_from(v).ok());
             return Some(TokenUsageInfo {
                 total_tokens,
                 model_context_window,
-                input_tokens: None,
-                output_tokens: None,
-                cache_read_tokens: None,
+                input_tokens,
+                output_tokens,
+                cache_read_tokens,
+                cache_write_tokens,
                 is_estimated: false,
             });
         }
 
+        // Format: {"method":"codex/event/token_count","params":{"msg":{"info":{...}}}}
+        // Used by: Codex stdout JSON-RPC events
         if value_obj.get("method").and_then(|v| v.as_str()) != Some("codex/event/token_count") {
             return None;
         }
@@ -4139,9 +4164,9 @@ impl ChatRunner {
             .and_then(|v| v.get("msg"))
             .and_then(|v| v.get("info"))?;
 
-        let total_tokens = info
-            .get("last_token_usage")
-            .and_then(|v| v.get("total_tokens"))
+        let last = info.get("last_token_usage")?;
+        let total_tokens = last
+            .get("total_tokens")
             .and_then(|v| v.as_u64())
             .and_then(|v| u32::try_from(v).ok())?;
         let model_context_window = info
@@ -4149,13 +4174,27 @@ impl ChatRunner {
             .and_then(|v| v.as_u64())
             .and_then(|v| u32::try_from(v).ok())
             .unwrap_or(0);
+        let input_tokens = last
+            .get("input_tokens")
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u32::try_from(v).ok());
+        let output_tokens = last
+            .get("output_tokens")
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u32::try_from(v).ok());
+        // Codex calls it cached_input_tokens
+        let cache_read_tokens = last
+            .get("cached_input_tokens")
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u32::try_from(v).ok());
 
         Some(TokenUsageInfo {
             total_tokens,
             model_context_window,
-            input_tokens: None,
-            output_tokens: None,
-            cache_read_tokens: None,
+            input_tokens,
+            output_tokens,
+            cache_read_tokens,
+            cache_write_tokens: None,
             is_estimated: false,
         })
     }
@@ -4536,6 +4575,7 @@ impl ChatRunner {
                                 input_tokens: Some(estimated_input),
                                 output_tokens: Some(estimated_output),
                                 cache_read_tokens: None,
+                                cache_write_tokens: None,
                                 is_estimated: true,
                             }
                         };
@@ -4545,6 +4585,8 @@ impl ChatRunner {
                             "model_context_window": token_usage.model_context_window,
                             "input_tokens": token_usage.input_tokens,
                             "output_tokens": token_usage.output_tokens,
+                            "cache_read_tokens": token_usage.cache_read_tokens,
+                            "cache_write_tokens": token_usage.cache_write_tokens,
                             "is_estimated": token_usage.is_estimated,
                         });
 
@@ -5409,6 +5451,7 @@ mod tests {
             input_tokens: Some(1536),
             output_tokens: Some(512),
             cache_read_tokens: Some(256),
+            cache_write_tokens: None,
             is_estimated: false,
         };
 
