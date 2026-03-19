@@ -1088,6 +1088,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                                         input_tokens: Some(input),
                                         output_tokens: Some(output),
                                         cache_read_tokens: Some(cache_read),
+                                        cache_write_tokens: None,
                                         // Now accurate: input + output only
                                         is_estimated: false,
                                     },
@@ -1329,6 +1330,7 @@ fn handle_server_notification(
                         input_tokens: Some(last.input_tokens as u32),
                         output_tokens: Some(last.output_tokens as u32),
                         cache_read_tokens: Some(last.cached_input_tokens as u32),
+                        cache_write_tokens: None,
                         is_estimated: false,
                     }),
                     content: format!(
