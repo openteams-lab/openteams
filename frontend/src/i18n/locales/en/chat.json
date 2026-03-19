@@ -25,7 +25,7 @@
     "settingsInSidebar": "Settings",
     "searchSessions": "Search sessions",
     "searchSessionsPlaceholder": "Search session names...",
-"clearSessionSearch": "Clear session search",
+    "clearSessionSearch": "Clear session search",
     "noSearchResults": "No sessions match \"{{query}}\"."
   },
   "contextMenu": {
@@ -118,6 +118,7 @@
     "quote": "Quote",
     "copy": "Copy",
     "regenerate": "Regenerate",
+    "resend": "Resend",
     "replyingTo": "Replying to {{name}}",
     "view": "View",
     "referencedMessageUnavailable": "Referenced message unavailable.",
@@ -161,7 +162,7 @@
       "statusCount_other": "{{count}} status updates"
     }
   },
-"members": {
+  "members": {
     "title": "AI Member List",
     "countInSession": "{{count}} in session",
     "selectSessionToManage": "Select a session to manage AI members.",
@@ -517,7 +518,7 @@
       }
     }
   },
-"skillLibrary": {
+  "skillLibrary": {
     "title": "Skills",
     "description": "Manage installed and marketplace skills.",
     "actions": {
@@ -600,7 +601,7 @@
         "duplicateMemberName": "Duplicate Member Name"
       },
       "messages": {
-        "agentRunning": "The following agent(s) are currently running: @{{agents}}. They will not process new messages until the current task is stopped. Do you still want to send this message?",
+        "agentRunning": "The following agent(s) are currently running: @{{agents}}. This message will be queued and processed after the current task finishes. Do you still want to send this message?",
         "removeMember": "Are you sure you want to remove @{{name}} from this session?",
         "deleteSession": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone and all messages will be permanently deleted.",
         "deleteMessages": "Are you sure you want to delete {{count}} message(s)? This action cannot be undone.",
@@ -656,7 +657,8 @@
       "selectRunToViewLog": "Select a run to view its log output.",
       "refresh": "Refresh",
       "loadingLog": "Loading log...",
-      "logEmpty": "Log is empty."
+      "logEmpty": "Log is empty.",
+      "fullErrorLog": "Full Error Log"
     }
   },
   "workspacePreview": {

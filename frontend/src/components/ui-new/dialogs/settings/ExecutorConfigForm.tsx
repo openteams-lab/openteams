@@ -33,7 +33,9 @@ export function ExecutorConfigForm({
 
   const schema = useMemo(() => {
     const baseSchema = schemas[executor];
-    return baseSchema ? localizeExecutorSchema(baseSchema, i18n.language) : null;
+    return baseSchema
+      ? localizeExecutorSchema(baseSchema, i18n.language)
+      : null;
   }, [executor, i18n.language]);
 
   // Custom handler for env field updates

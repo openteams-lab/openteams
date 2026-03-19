@@ -1857,6 +1857,8 @@ mod tests {
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,
+                team_protocol TEXT DEFAULT '',
+                team_protocol_enabled INTEGER DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 archived_at TEXT

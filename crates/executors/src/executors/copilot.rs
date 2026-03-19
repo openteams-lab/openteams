@@ -198,7 +198,9 @@ impl StandardCodingAgentExecutor for Copilot {
 
         // Normalize Agent logs
         tokio::spawn(async move {
-            let mut stdout_lines = msg_store.stdout_lines_stream();
+            // Use stdout_lines_stream_until_close to ensure we process all stdout,
+            // including error messages that may arrive just before Finished signal.
+            let mut stdout_lines = msg_store.stdout_lines_stream_until_close();
 
             let mut processor = Self::create_simple_stdout_normalizer(entry_index_counter);
 

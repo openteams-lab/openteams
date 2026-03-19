@@ -52,6 +52,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
                 .layer(DefaultBodyLimit::max(25 * 1024 * 1024)),
         )
         .route(
+            "/messages/{message_id}/resend",
+            axum::routing::post(messages::resend_message),
+        )
+        .route(
             "/messages/{message_id}/attachments/{attachment_id}",
             get(messages::serve_message_attachment),
         )

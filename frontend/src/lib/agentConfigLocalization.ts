@@ -69,8 +69,7 @@ const FIELD_COPY: Record<
     disable_mcp_server: { label: 'Disable MCP server' },
     env: {
       label: 'Environment variables',
-      description:
-        'Environment variables to set when running the executor.',
+      description: 'Environment variables to set when running the executor.',
     },
     force: { label: 'Force' },
     include_apply_patch_tool: { label: 'Include apply_patch tool' },
@@ -340,19 +339,25 @@ function localizeSchemaNode(
 
   if (schema.oneOf) {
     next.oneOf = schema.oneOf.map((item) =>
-      typeof item === 'object' ? localizeSchemaNode(item as RJSFSchema, language) : item
+      typeof item === 'object'
+        ? localizeSchemaNode(item as RJSFSchema, language)
+        : item
     );
   }
 
   if (schema.anyOf) {
     next.anyOf = schema.anyOf.map((item) =>
-      typeof item === 'object' ? localizeSchemaNode(item as RJSFSchema, language) : item
+      typeof item === 'object'
+        ? localizeSchemaNode(item as RJSFSchema, language)
+        : item
     );
   }
 
   if (schema.allOf) {
     next.allOf = schema.allOf.map((item) =>
-      typeof item === 'object' ? localizeSchemaNode(item as RJSFSchema, language) : item
+      typeof item === 'object'
+        ? localizeSchemaNode(item as RJSFSchema, language)
+        : item
     );
   }
 
@@ -369,7 +374,5 @@ export function localizeExecutorSchema(
 export function getCreateConfigurationDialogCopy(
   language: string | undefined | null
 ): CreateConfigurationDialogCopy {
-  return CREATE_CONFIGURATION_DIALOG_COPY[
-    resolveAgentConfigLanguage(language)
-  ];
+  return CREATE_CONFIGURATION_DIALOG_COPY[resolveAgentConfigLanguage(language)];
 }

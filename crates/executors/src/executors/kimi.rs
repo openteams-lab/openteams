@@ -284,7 +284,9 @@ impl StandardCodingAgentExecutor for KimiCode {
         normalize_stderr_logs(msg_store.clone(), entry_index_provider.clone());
 
         tokio::spawn(async move {
-            let mut stdout_lines = msg_store.stdout_lines_stream();
+            // Use stdout_lines_stream_until_close to ensure we process all stdout,
+            // including error messages that may arrive just before Finished signal.
+            let mut stdout_lines = msg_store.stdout_lines_stream_until_close();
             let mut model_reported = false;
             let mut current_assistant_index: Option<usize> = None;
             let mut current_assistant_text = String::new();

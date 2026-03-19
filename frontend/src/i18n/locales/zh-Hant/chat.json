@@ -25,7 +25,7 @@
     "searchSessionsPlaceholder": "搜尋會話名稱...",
     "clearSessionSearch": "清除會話搜尋",
     "noSearchResults": "沒有會話符合「{{query}}」。",
-"generatedSessionTitle": "開始於 {{date}}",
+    "generatedSessionTitle": "開始於 {{date}}",
     "aiTeam": "AI 團隊"
   },
   "contextMenu": {
@@ -113,6 +113,7 @@
     "quote": "引用",
     "copy": "複製",
     "regenerate": "重新生成",
+    "resend": "重新發送",
     "replyingTo": "回覆 {{name}}",
     "view": "檢視",
     "referencedMessageUnavailable": "引用的訊息不可用。",
@@ -182,7 +183,7 @@
     "workspacePath": "工作區路徑",
     "workspacePathPlaceholder": "AI成員工作的絕對路徑",
     "workspacePathCannotBeModified": "工作區路徑無法修改",
-"add": "新增",
+    "add": "新增",
     "save": "儲存",
     "teamBulletin": {
       "title": "團隊公告板",
@@ -541,7 +542,7 @@
       "installAria": "安裝技能",
       "scrollForMore": "向下捲動載入更多..."
     },
-"create": {
+    "create": {
       "title": "新增技能路徑",
       "pathLabel": "技能路徑",
       "pathPlaceholder": "C:\\skills\\my-skill"
@@ -595,7 +596,7 @@
         "duplicateMemberName": "成員名稱不可重複"
       },
       "messages": {
-        "agentRunning": "以下 Agent 正在執行：@{{agents}}。在目前任務停止前，它們不會處理新訊息。仍要送出這則訊息嗎？",
+        "agentRunning": "以下 Agent 正在執行：@{{agents}}。這則訊息將會排隊等待，在目前任務結束後，它才會繼續處理新訊息。仍要送出這則訊息嗎？",
         "removeMember": "確定要將 @{{name}} 從此會話移除嗎？",
         "deleteSession": "確定要刪除「{{title}}」嗎？此操作無法復原，所有訊息都將永久刪除。",
         "deleteMessages": "確定要刪除 {{count}} 則訊息嗎？此操作無法復原。",
@@ -650,6 +651,7 @@
       "refresh": "重新整理",
       "loadingLog": "正在載入日誌...",
       "logEmpty": "日誌為空。",
+      "fullErrorLog": "完整錯誤日誌",
       "workspaceTrail": "工作區",
       "workspacePath": "工作區路徑"
     }

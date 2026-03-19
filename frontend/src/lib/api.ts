@@ -1610,8 +1610,23 @@ export const chatApi = {
     return handleApiResponse<void>(response);
   },
 
+  resendMessage: async (
+    sessionId: string,
+    messageId: string
+  ): Promise<void> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/messages/${messageId}/resend`,
+      {
+        method: 'POST',
+      }
+    );
+    return handleApiResponse<void>(response);
+  },
+
   getTeamProtocol: async (sessionId: string): Promise<TeamProtocolConfig> => {
-    const response = await makeRequest(`/api/chat/sessions/${sessionId}/team-protocol`);
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/team-protocol`
+    );
     return handleApiResponse<TeamProtocolConfig>(response);
   },
 
@@ -1619,10 +1634,13 @@ export const chatApi = {
     sessionId: string,
     data: TeamProtocolConfig
   ): Promise<TeamProtocolConfig> => {
-    const response = await makeRequest(`/api/chat/sessions/${sessionId}/team-protocol`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/team-protocol`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
     return handleApiResponse<TeamProtocolConfig>(response);
   },
 
@@ -1867,9 +1885,7 @@ export const chatApi = {
   // ─── Agent-Skill Assignments ───
 
   listAgentSkills: async (agentId: string): Promise<ChatAgentSkill[]> => {
-    const response = await makeRequest(
-      `/api/chat/agents/${agentId}/skills`
-    );
+    const response = await makeRequest(`/api/chat/agents/${agentId}/skills`);
     return handleApiResponse<ChatAgentSkill[]>(response);
   },
 
@@ -1985,11 +2001,17 @@ export const chatApi = {
     return handleApiResponse<RemoteSkillPackage>(response);
   },
 
-  installBuiltinSkill: async (skillId: string, agents?: string[]): Promise<ChatSkill> => {
-    const response = await makeRequest(`/api/chat/builtin/skills/${skillId}/install`, {
-      method: 'POST',
-      body: JSON.stringify({ agents }),
-    });
+  installBuiltinSkill: async (
+    skillId: string,
+    agents?: string[]
+  ): Promise<ChatSkill> => {
+    const response = await makeRequest(
+      `/api/chat/builtin/skills/${skillId}/install`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ agents }),
+      }
+    );
     return handleApiResponse<ChatSkill>(response);
   },
 

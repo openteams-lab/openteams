@@ -4,6 +4,8 @@
 //! Also provides built-in skills from the awesome-claude-skills repository.
 //! Supports fallback to embedded local skill files when remote server is unavailable.
 
+#![allow(clippy::items_after_test_module)]
+
 use std::{
     collections::{HashMap, HashSet},
     path::{Component, Path, PathBuf},
@@ -24,8 +26,7 @@ use uuid::Uuid;
 /// Production: https://skills.openteams.com
 pub fn default_registry_url() -> &'static str {
     static DEFAULT_URL: Lazy<String> = Lazy::new(|| {
-        std::env::var("SKILL_REGISTRY_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:3101".to_string())
+        std::env::var("SKILL_REGISTRY_URL").unwrap_or_else(|_| "http://127.0.0.1:3101".to_string())
     });
     DEFAULT_URL.as_str()
 }
@@ -919,7 +920,12 @@ fn filter_skill_roots_by_agents(
 
     // Add universal .agents directory if selected
     if has_universal {
-        roots.push(home_dir.join(GLOBAL_SKILLS_DIR).join("skills").join(&install_dir_name));
+        roots.push(
+            home_dir
+                .join(GLOBAL_SKILLS_DIR)
+                .join("skills")
+                .join(&install_dir_name),
+        );
     }
 
     // Add specific agent directories
@@ -934,7 +940,12 @@ fn filter_skill_roots_by_agents(
 
     // If no valid agents found, fall back to universal
     if roots.is_empty() {
-        roots.push(home_dir.join(GLOBAL_SKILLS_DIR).join("skills").join(&install_dir_name));
+        roots.push(
+            home_dir
+                .join(GLOBAL_SKILLS_DIR)
+                .join("skills")
+                .join(&install_dir_name),
+        );
     }
 
     roots
@@ -1279,7 +1290,11 @@ Open the page and inspect it carefully.
 
         let count = EmbeddedSkillFiles::iter().count();
         // Should have at least some files embedded
-        assert!(count > 100, "Expected at least 100 embedded files, got {}", count);
+        assert!(
+            count > 100,
+            "Expected at least 100 embedded files, got {}",
+            count
+        );
     }
 }
 
@@ -1496,6 +1511,7 @@ pub async fn install_builtin_skill(
 /// 1. Try remote registry first
 /// 2. If remote fails, try builtin skill
 /// 3. Install files (remote or embedded)
+///
 /// Only returns error if skill not found anywhere
 ///
 /// # Arguments
@@ -1514,7 +1530,8 @@ pub async fn install_skill_with_fallback(
         .ok_or_else(|| SkillRegistryError::SkillNotFound(skill_id.to_string()))?;
 
     // Try to install files with fallback
-    match install_skill_files_to_global_directory(&skill_package, registry_url, target_agents).await {
+    match install_skill_files_to_global_directory(&skill_package, registry_url, target_agents).await
+    {
         Ok(count) => {
             tracing::info!(
                 skill_id = %skill_id,

@@ -118,7 +118,7 @@ const teamRoleIcons: Record<string, Icon> = {
 
 /* Category-based default icons */
 const CATEGORY_DEFAULT_ICONS: Record<string, Icon> = {
-  'Development': CodeIcon,
+  Development: CodeIcon,
   'Product & Design': PaintBrushIcon,
   'Sales & Business': ChartBarIcon,
   'Content & Marketing': MegaphoneIcon,
@@ -330,7 +330,10 @@ function SidebarEmptyState({
       )}
     >
       <div className="chat-session-members-empty-state-icon">
-        <Icon className={variant === 'subtle' ? 'size-4' : 'size-5'} weight="duotone" />
+        <Icon
+          className={variant === 'subtle' ? 'size-4' : 'size-5'}
+          weight="duotone"
+        />
       </div>
       <div className="chat-session-members-empty-state-title">{title}</div>
       {description ? (
@@ -386,7 +389,9 @@ function PresetOptionCard({
       <span className="min-w-0 flex-1 text-left">
         <span className="chat-session-member-preset-title">{title}</span>
         {subtitle && (
-          <span className="chat-session-member-preset-subtitle">{subtitle}</span>
+          <span className="chat-session-member-preset-subtitle">
+            {subtitle}
+          </span>
         )}
       </span>
 
@@ -666,13 +671,7 @@ export function AiMembersSidebar({
   );
 
   const handleSaveTeamProtocol = useCallback(
-    async ({
-      content,
-      enabled,
-    }: {
-      content: string;
-      enabled: boolean;
-    }) => {
+    async ({ content, enabled }: { content: string; enabled: boolean }) => {
       if (!activeSessionId) return false;
       setIsTeamProtocolSaving(true);
       setTeamProtocolSaveError(null);
@@ -730,7 +729,9 @@ export function AiMembersSidebar({
               <button
                 type="button"
                 className="chat-session-member-preset-group-toggle"
-                onClick={() => setIsTeamPresetsExpanded((expanded) => !expanded)}
+                onClick={() =>
+                  setIsTeamPresetsExpanded((expanded) => !expanded)
+                }
                 aria-label={
                   isTeamPresetsExpanded
                     ? t('sidebar.collapseSidebar')
@@ -762,7 +763,11 @@ export function AiMembersSidebar({
                         icon={TeamIcon}
                         title={getLocalizedTeamPresetName(team, t)}
                         subtitle=""
-                        seed={getAgentAvatarSeed(team.id, 'PRESET_TEAM', team.name)}
+                        seed={getAgentAvatarSeed(
+                          team.id,
+                          'PRESET_TEAM',
+                          team.name
+                        )}
                         onClick={() => onImportTeamPreset(team)}
                         disabled={!!teamImportPlan}
                         type="team"
@@ -1200,9 +1205,7 @@ export function AiMembersSidebar({
                           'chat-session-status-breathe'
                       )}
                     />
-                    <span
-                      className="chat-session-member-avatar"
-                    >
+                    <span className="chat-session-member-avatar">
                       <AgentBrandIcon
                         runnerType={agent.runner_type}
                         className="chat-session-member-avatar-logo"
