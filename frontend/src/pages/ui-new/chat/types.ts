@@ -6,6 +6,7 @@ export type StreamRun = {
   assistantContent: string;
   // Backward-compatible alias used by some existing views.
   content: string;
+  errorContent?: string;
   isFinal: boolean;
 };
 
@@ -16,11 +17,26 @@ export type AgentStateInfo = {
 
 export type MentionStatus = 'received' | 'running' | 'completed' | 'failed';
 
+export type MentionError = {
+  agentName: string;
+  agentId: string | null;
+  reason: string;
+};
+
 export type RunHistoryItem = {
   runId: string;
   agentId: string;
   createdAt: string;
   content: string;
+  errorSummary?: string;
+  errorContent?: string;
+  errorType?: ErrorTypeInfo;
+  hasError?: boolean;
+};
+
+export type ErrorTypeInfo = {
+  type: string;
+  provider?: string;
 };
 
 export type SessionMember = {

@@ -267,6 +267,22 @@ export function extractRunId(meta: unknown): string | null {
   return typeof runId === 'string' ? runId : null;
 }
 
+export function extractErrorFromMeta(
+  meta: unknown
+): { summary: string; content: string } | null {
+  console.info('meta ' + JSON.stringify(meta));
+  if (!meta || typeof meta !== 'object') return null;
+  const error = (meta as { error?: unknown }).error;
+  if (!error || typeof error !== 'object') return null;
+  const errObj = error as { summary?: unknown; content?: unknown };
+  const summary = typeof errObj.summary === 'string' ? errObj.summary : null;
+  const content = typeof errObj.content === 'string' ? errObj.content : null;
+  if (summary || content) {
+    return { summary: summary ?? content ?? '', content: content ?? '' };
+  }
+  return null;
+}
+
 export function extractProtocolErrorMeta(
   meta: unknown
 ): ChatProtocolErrorMeta | null {
@@ -314,6 +330,62 @@ export function extractProtocolErrorMeta(
       typeof protocolError.raw_output === 'string'
         ? protocolError.raw_output
         : null,
+  };
+}
+
+export function extractMentionErrors(
+  meta: unknown
+): Map<string, import('./types').MentionError> {
+  if (!meta || typeof meta !== 'object') return new Map();
+  const mentionErrors = (meta as { mention_errors?: unknown }).mention_errors;
+  if (
+    !mentionErrors ||
+    typeof mentionErrors !== 'object' ||
+    Array.isArray(mentionErrors)
+  ) {
+    return new Map();
+  }
+
+  const result = new Map<string, import('./types').MentionError>();
+  const errors = mentionErrors as Record<string, unknown>;
+
+  for (const [agentName, error] of Object.entries(errors)) {
+    if (error && typeof error === 'object' && !Array.isArray(error)) {
+      const e = error as { reason?: unknown; agent_id?: unknown };
+      result.set(agentName, {
+        agentName,
+        agentId: typeof e.agent_id === 'string' ? e.agent_id : null,
+        reason: typeof e.reason === 'string' ? e.reason : 'Unknown error',
+      });
+    }
+  }
+  return result;
+}
+
+export function extractMentionFailureMeta(
+  meta: unknown,
+  agentName: string
+): { reason: string; sourceMessageId?: string } | null {
+  if (!meta || typeof meta !== 'object') return null;
+
+  const mentionFailure = (meta as { mention_failure?: unknown })
+    .mention_failure;
+  if (!mentionFailure || typeof mentionFailure !== 'object') return null;
+
+  const mf = mentionFailure as {
+    mentioned_agent?: unknown;
+    reason?: unknown;
+    source_message_id?: unknown;
+  };
+
+  if (mf.mentioned_agent !== agentName) return null;
+
+  return {
+    reason: typeof mf.reason === 'string' ? mf.reason : 'Unknown error',
+    sourceMessageId:
+      typeof mf.source_message_id === 'string'
+        ? mf.source_message_id
+        : undefined,
   };
 }
 

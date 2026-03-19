@@ -25,7 +25,7 @@
     "searchSessionsPlaceholder": "セッション名を検索...",
     "clearSessionSearch": "セッション検索をクリア",
     "noSearchResults": "「{{query}}」に一致するセッションはありません。",
-"generatedSessionTitle": "{{date}} 開始",
+    "generatedSessionTitle": "{{date}} 開始",
     "aiTeam": "AIチーム"
   },
   "contextMenu": {
@@ -113,6 +113,7 @@
     "quote": "引用",
     "copy": "コピー",
     "regenerate": "再生成",
+    "resend": "再送信",
     "replyingTo": "{{name}}に返信",
     "view": "表示",
     "referencedMessageUnavailable": "参照メッセージは利用できません。",
@@ -182,7 +183,7 @@
     "workspacePath": "ワークスペースパス",
     "workspacePathPlaceholder": "AIメンバーの作業用絶対パス",
     "workspacePathCannotBeModified": "ワークスペースパスは変更できません",
-"add": "追加",
+    "add": "追加",
     "save": "保存",
     "teamBulletin": {
       "title": "チーム掲示板",
@@ -541,7 +542,7 @@
       "installAria": "スキルをインストール",
       "scrollForMore": "さらに読み込むには下にスクロールしてください..."
     },
-"create": {
+    "create": {
       "title": "スキルパスを追加",
       "pathLabel": "スキルパス",
       "pathPlaceholder": "C:\\skills\\my-skill"
@@ -595,7 +596,7 @@
         "duplicateMemberName": "メンバー名が重複しています"
       },
       "messages": {
-        "agentRunning": "次のエージェントが実行中です: @{{agents}}。現在のタスクを停止するまで新しいメッセージは処理されません。それでもこのメッセージを送信しますか？",
+        "agentRunning": "次のエージェントが実行中です: @{{agents}}。このメッセージはキューに追加され、現在のタスクが完了した後に処理されます。それでもこのメッセージを送信しますか？",
         "removeMember": "@{{name}} をこのセッションから削除してもよろしいですか？",
         "deleteSession": "「{{title}}」を削除してもよろしいですか？この操作は元に戻せず、すべてのメッセージが完全に削除されます。",
         "deleteMessages": "{{count}} 件のメッセージを削除してもよろしいですか？この操作は元に戻せません。",
@@ -650,6 +651,7 @@
       "refresh": "更新",
       "loadingLog": "ログを読み込み中...",
       "logEmpty": "ログは空です。",
+      "fullErrorLog": "完全なエラーログ",
       "workspaceTrail": "ワークスペース",
       "workspacePath": "ワークスペースパス"
     }

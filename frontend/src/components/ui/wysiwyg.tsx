@@ -99,7 +99,7 @@ type WysiwygProps = {
   findMatchingDiffPath?: (text: string) => string | null;
   /** Callback when clickable inline code is clicked (only in read-only mode) */
   onCodeClick?: (fullPath: string) => void;
-/** Show a static toolbar below the editor content */
+  /** Show a static toolbar below the editor content */
   showStaticToolbar?: boolean;
   /** Save status indicator for static toolbar */
   saveStatus?: 'idle' | 'saved';
@@ -425,7 +425,7 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
       </div>
     );
 
-// Wrap with action buttons in read-only mode
+    // Wrap with action buttons in read-only mode
     if (disabled) {
       return (
         <div className="relative group">
