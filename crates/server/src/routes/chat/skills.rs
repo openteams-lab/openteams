@@ -15,11 +15,11 @@ use services::services::{
         update_native_skill_enabled_for_runner,
     },
     skill_registry::{
-        AgentInfo, RemoteSkillMeta, RemoteSkillPackage, SkillCategory,
-        builtin_skills_count, filter_builtin_skills_by_agent, filter_builtin_skills_by_category,
-        get_builtin_categories, get_skill_with_fallback, install_builtin_skill,
-        install_skill_with_fallback, list_categories_with_fallback, list_skills_with_fallback,
-        list_supported_agents, search_skills_with_fallback, sync_discovered_global_skills,
+        AgentInfo, RemoteSkillMeta, RemoteSkillPackage, SkillCategory, builtin_skills_count,
+        filter_builtin_skills_by_agent, filter_builtin_skills_by_category, get_builtin_categories,
+        get_skill_with_fallback, install_builtin_skill, install_skill_with_fallback,
+        list_categories_with_fallback, list_skills_with_fallback, list_supported_agents,
+        search_skills_with_fallback, sync_discovered_global_skills,
         uninstall_skill_files_from_global_directory,
     },
 };
@@ -374,9 +374,10 @@ pub async fn install_builtin_skill_api(
     axum::extract::Path(skill_id): axum::extract::Path<String>,
     Json(payload): Json<InstallSkillRequest>,
 ) -> Result<ResponseJson<ApiResponse<ChatSkill>>, ApiError> {
-    let installed = install_builtin_skill(&deployment.db().pool, &skill_id, payload.agents.as_deref())
-        .await
-        .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
+    let installed =
+        install_builtin_skill(&deployment.db().pool, &skill_id, payload.agents.as_deref())
+            .await
+            .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
 
     // Track analytics: skill_install
     let _ = track_skill_install(

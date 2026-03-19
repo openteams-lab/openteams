@@ -78,10 +78,7 @@ const DeleteTaskConfirmationDialogImpl =
               type="submit"
               onClick={handleConfirmDelete}
               disabled={isDeleting}
-              className={getConfirmationButtonClasses(
-                'destructive',
-                'confirm'
-              )}
+              className={getConfirmationButtonClasses('destructive', 'confirm')}
             >
               {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
               {isDeleting ? 'Deleting...' : 'Delete Task'}

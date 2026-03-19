@@ -60,10 +60,16 @@ export function SkillMarketplace({
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [installingSkillId, setInstallingSkillId] = useState<string | null>(null);
+  const [installingSkillId, setInstallingSkillId] = useState<string | null>(
+    null
+  );
   const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedSkill, setSelectedSkill] = useState<RemoteSkillMeta | null>(null);
-  const [skillDetail, setSkillDetail] = useState<RemoteSkillPackage | null>(null);
+  const [selectedSkill, setSelectedSkill] = useState<RemoteSkillMeta | null>(
+    null
+  );
+  const [skillDetail, setSkillDetail] = useState<RemoteSkillPackage | null>(
+    null
+  );
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   const loadRemoteSkills = useCallback(async () => {
@@ -77,7 +83,9 @@ export function SkillMarketplace({
       setRemoteSkills(skills);
       setCategories(cats);
     } catch (err) {
-      setError('Failed to load skill marketplace. Is the registry server running?');
+      setError(
+        'Failed to load skill marketplace. Is the registry server running?'
+      );
       console.error('Failed to load remote skills:', err);
     } finally {
       setIsLoading(false);
@@ -111,7 +119,9 @@ export function SkillMarketplace({
       !searchQuery ||
       skill.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       skill.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      skill.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+      skill.tags.some((tag) =>
+        tag.toLowerCase().includes(searchQuery.toLowerCase())
+      );
     const matchesCategory =
       !selectedCategory || skill.category === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -276,12 +286,13 @@ export function SkillMarketplace({
                             <span className="text-xs text-normal truncate">
                               {skill.name}
                             </span>
-                            {skill.download_count != null && skill.download_count > 0n && (
-                              <span className="text-[10px] text-low shrink-0 flex items-center gap-0.5">
-                                <DownloadIcon size={10} />
-                                {formatDownloadCount(skill.download_count)}
-                              </span>
-                            )}
+                            {skill.download_count != null &&
+                              skill.download_count > 0n && (
+                                <span className="text-[10px] text-low shrink-0 flex items-center gap-0.5">
+                                  <DownloadIcon size={10} />
+                                  {formatDownloadCount(skill.download_count)}
+                                </span>
+                              )}
                             {skill.category && (
                               <span className="text-[10px] text-low shrink-0">
                                 [{skill.category}]
@@ -300,9 +311,13 @@ export function SkillMarketplace({
                         >
                           <FolderIcon size={12} />
                         </button>
-                        {!readOnly && (
-                          installed ? (
-                            <CheckIcon size={14} className="text-accent shrink-0" weight="bold" />
+                        {!readOnly &&
+                          (installed ? (
+                            <CheckIcon
+                              size={14}
+                              className="text-accent shrink-0"
+                              weight="bold"
+                            />
                           ) : (
                             <button
                               type="button"
@@ -310,14 +325,15 @@ export function SkillMarketplace({
                               disabled={isInstalling}
                               className={cn(
                                 'shrink-0',
-                                isInstalling ? 'text-low' : 'text-low hover:text-accent'
+                                isInstalling
+                                  ? 'text-low'
+                                  : 'text-low hover:text-accent'
                               )}
                               title="Install"
                             >
                               <DownloadIcon size={14} />
                             </button>
-                          )
-                        )}
+                          ))}
                       </div>
                     );
                   })}
@@ -394,7 +410,9 @@ export function SkillMarketplace({
                 </div>
 
                 {isLoadingDetail ? (
-                  <div className="text-xs text-low py-2">Loading details...</div>
+                  <div className="text-xs text-low py-2">
+                    Loading details...
+                  </div>
                 ) : skillDetail ? (
                   <div className="space-y-2">
                     <p className="text-xs text-normal">
@@ -448,7 +466,11 @@ export function SkillMarketplace({
                       />
                       {!readOnly && !isSkillInstalled(selectedSkill.id) && (
                         <PrimaryButton
-                          value={installingSkillId === selectedSkill.id ? 'Installing...' : 'Install'}
+                          value={
+                            installingSkillId === selectedSkill.id
+                              ? 'Installing...'
+                              : 'Install'
+                          }
                           onClick={() => {
                             handleInstallSkill(selectedSkill);
                             setSelectedSkill(null);

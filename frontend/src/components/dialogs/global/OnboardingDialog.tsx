@@ -96,7 +96,10 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
         container:
           'border-[#B7EB8F] bg-[#F6FFED] text-[#389E0D] fill-[#52C41A]',
         icon: (
-          <Check className="mt-[2px] h-[14px] w-[14px] shrink-0" strokeWidth={3} />
+          <Check
+            className="mt-[2px] h-[14px] w-[14px] shrink-0"
+            strokeWidth={3}
+          />
         ),
         message: t('onboardingDialog.status.loginDetected'),
       };
@@ -107,7 +110,10 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
         container:
           'border-[#B7EB8F] bg-[#F6FFED] text-[#389E0D] fill-[#52C41A]',
         icon: (
-          <Check className="mt-[2px] h-[14px] w-[14px] shrink-0" strokeWidth={3} />
+          <Check
+            className="mt-[2px] h-[14px] w-[14px] shrink-0"
+            strokeWidth={3}
+          />
         ),
         message: t('onboardingDialog.status.installationFound'),
       };
@@ -128,8 +134,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
     }
 
     return {
-      container:
-        'border-[#D9E6F5] bg-[#F9FBFF] text-[#8C8C8C] fill-[#8C8C8C]',
+      container: 'border-[#D9E6F5] bg-[#F9FBFF] text-[#8C8C8C] fill-[#8C8C8C]',
       icon: (
         <Check
           className="mt-[2px] h-[14px] w-[14px] shrink-0 opacity-60"
@@ -157,8 +162,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
   const handleVariantChange = (value: string) => {
     setProfile((current) => ({
       ...current,
-      variant:
-        value === 'DEFAULT' && !hasExplicitDefaultVariant ? null : value,
+      variant: value === 'DEFAULT' && !hasExplicitDefaultVariant ? null : value,
     }));
   };
 

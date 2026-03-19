@@ -714,7 +714,9 @@ export function ChatSessions() {
         ['chatWorkItems', workItem.session_id],
         (prev) => {
           if (!prev) return [workItem];
-          const existingIndex = prev.findIndex((item) => item.id === workItem.id);
+          const existingIndex = prev.findIndex(
+            (item) => item.id === workItem.id
+          );
           if (existingIndex >= 0) {
             const next = [...prev];
             next[existingIndex] = workItem;
@@ -729,6 +731,7 @@ export function ChatSessions() {
 
   const handleIncomingMessage = useCallback(
     (message: ChatMessage) => {
+      console.info('message --- ' + JSON.stringify(message));
       upsertMessage(message);
       if (isProtocolErrorMessage(message)) return;
 
@@ -830,6 +833,7 @@ export function ChatSessions() {
     agentStates,
     agentStateInfos,
     mentionStatuses,
+    mentionErrors,
     compressionWarning,
     protocolNotices,
     setAgentStates,
@@ -995,6 +999,7 @@ export function ChatSessions() {
     message: string;
     onConfirm: () => void | Promise<void>;
     mode?: 'confirm' | 'alert';
+    tone?: 'default' | 'info' | 'success' | 'destructive';
     confirmText?: string;
     cancelText?: string;
   } | null>(null);
@@ -1027,6 +1032,7 @@ export function ChatSessions() {
   } | null>(null);
   const lastExpandedLeftWidthRef = useRef(340);
   const sessionUpdatedAtByIdRef = useRef<Map<string, string>>(new Map());
+  const hasShownAgentRunningWarningRef = useRef<Set<string>>(new Set());
 
   const showDuplicateMemberNameWarning = useCallback(
     (name: string) => {
@@ -1365,18 +1371,20 @@ export function ChatSessions() {
 
   const timelineEntries = useMemo<TimelineEntry[]>(
     () =>
-      [...messageList.map((message) => ({
-        kind: 'message' as const,
-        key: `message:${message.id}`,
-        createdAtMs: new Date(message.created_at).getTime(),
-        message,
-      })),
-      ...workItemGroups.map((group) => ({
-        kind: 'work_item' as const,
-        key: `work-item:${group.runId}`,
-        createdAtMs: new Date(group.createdAt).getTime(),
-        group,
-      }))].sort((a, b) => a.createdAtMs - b.createdAtMs),
+      [
+        ...messageList.map((message) => ({
+          kind: 'message' as const,
+          key: `message:${message.id}`,
+          createdAtMs: new Date(message.created_at).getTime(),
+          message,
+        })),
+        ...workItemGroups.map((group) => ({
+          kind: 'work_item' as const,
+          key: `work-item:${group.runId}`,
+          createdAtMs: new Date(group.createdAt).getTime(),
+          group,
+        })),
+      ].sort((a, b) => a.createdAtMs - b.createdAtMs),
     [messageList, workItemGroups]
   );
   const lastTimelineEntryKey =
@@ -1885,8 +1893,7 @@ export function ChatSessions() {
   );
 
   const getWorkItemSenderLabel = useCallback(
-    (group: ChatWorkItemGroup) =>
-      agentById.get(group.agentId)?.name ?? 'Agent',
+    (group: ChatWorkItemGroup) => agentById.get(group.agentId)?.name ?? 'Agent',
     [agentById]
   );
 
@@ -2102,7 +2109,9 @@ export function ChatSessions() {
       }
 
       return (
-        entry.group.artifacts.some((item) => messageSearchRegExp.test(item.content)) ||
+        entry.group.artifacts.some((item) =>
+          messageSearchRegExp.test(item.content)
+        ) ||
         entry.group.conclusions.some((item) =>
           messageSearchRegExp.test(item.content)
         )
@@ -2302,11 +2311,17 @@ export function ChatSessions() {
     });
 
     if (runningMentionedAgents.length > 0) {
+      if (hasShownAgentRunningWarningRef.current.has(activeSessionId)) {
+        await doSendMessage(content);
+        return;
+      }
+      hasShownAgentRunningWarningRef.current.add(activeSessionId);
       setConfirmModal({
         title: t('modals.confirm.titles.agentRunning'),
         message: t('modals.confirm.messages.agentRunning', {
           agents: runningMentionedAgents.join(', @'),
         }),
+        tone: 'info',
         onConfirm: async () => {
           await doSendMessage(content);
         },
@@ -2763,11 +2778,7 @@ export function ChatSessions() {
       setTeamImportPlan(plan);
       setMemberError(null);
     },
-    [
-      buildTeamImportPlan,
-      resolveTeamImportProtocol,
-      t,
-    ]
+    [buildTeamImportPlan, resolveTeamImportProtocol, t]
   );
 
   const handleUpdateTeamImportPlanEntry = useCallback(
@@ -3283,6 +3294,19 @@ export function ChatSessions() {
     [getMessageMentionHandle, handleReplySelect]
   );
 
+  const handleResend = useCallback(
+    async (message: ChatMessage) => {
+      if (!activeSessionId) return;
+      if (isArchived) return;
+      try {
+        await chatApi.resendMessage(activeSessionId, message.id);
+      } catch (error) {
+        console.error('Failed to resend message:', error);
+      }
+    },
+    [activeSessionId, isArchived]
+  );
+
   const handleStopAgent = useCallback(
     async (sessionAgentId: string, agentId: string) => {
       if (!activeSessionId) return;
@@ -3711,6 +3735,7 @@ export function ChatSessions() {
                           }
                           mentionList={mentionList}
                           mentionStatusMap={mentionStatusMap}
+                          mentionErrors={mentionErrors.get(message.id)}
                           agentStates={agentStates}
                           agentIdByName={agentIdByName}
                           attachments={attachments}
@@ -3731,6 +3756,7 @@ export function ChatSessions() {
                           }
                           isArchived={isArchived}
                           onReply={handleLocalReplySelect}
+                          onResend={handleResend}
                           isCleanupMode={isCleanupMode}
                           isSelected={isSelected}
                           onToggleSelect={() => {
@@ -4029,6 +4055,7 @@ export function ChatSessions() {
         message={confirmModal?.message ?? ''}
         isLoading={isConfirmLoading}
         mode={confirmModal?.mode}
+        tone={confirmModal?.tone}
         confirmText={confirmModal?.confirmText}
         cancelText={confirmModal?.cancelText}
         onConfirm={async () => {

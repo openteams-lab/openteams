@@ -161,10 +161,7 @@ export function AgentSkillsSection({
     void loadSkills();
   }, [loadSkills]);
 
-  const compatibleSkills = useMemo(
-    () => allSkills,
-    [allSkills]
-  );
+  const compatibleSkills = useMemo(() => allSkills, [allSkills]);
 
   const filteredSkills = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -299,7 +296,12 @@ export function AgentSkillsSection({
       updateSelectedSkillIds(nextSkillIds);
       return true;
     },
-    [effectiveSelectedSkillIds, readOnly, selectedSkillIdSet, updateSelectedSkillIds]
+    [
+      effectiveSelectedSkillIds,
+      readOnly,
+      selectedSkillIdSet,
+      updateSelectedSkillIds,
+    ]
   );
 
   const handleToggleSkill = useCallback(

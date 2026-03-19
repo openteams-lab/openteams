@@ -294,7 +294,10 @@ export function SettingsSelect<T extends string>({
           <span className="truncate">
             {selectedOption?.label || placeholder || ''}
           </span>
-          <CaretDownIcon className="size-icon-xs text-[#8C8C8C]" weight="fill" />
+          <CaretDownIcon
+            className="size-icon-xs text-[#8C8C8C]"
+            weight="fill"
+          />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

@@ -18,7 +18,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { RunHistoryItem } from '../types';
-import { detectApiError, extractProtocolErrorMeta } from '../utils';
+import {
+  detectApiError,
+  extractMentionFailureMeta,
+  extractProtocolErrorMeta,
+} from '../utils';
 
 export interface FailedMessageInfo {
   message: ChatMessage;
@@ -68,41 +72,53 @@ export function WorkspaceDrawer({
     const failed: FailedMessageInfo[] = [];
 
     for (const message of messages) {
-      // Check if message is from this agent or is a system message about this agent
-      const isFromAgent =
-        message.sender_type === 'agent' && message.sender_id === agent.id;
-      const isSystemAboutAgent =
-        message.sender_type === 'system' &&
-        extractProtocolErrorMeta(message.meta)?.agentName === agent.name;
-
-      if (!isFromAgent && !isSystemAboutAgent) continue;
-
-      // Check for protocol errors in system messages
-      if (message.sender_type === 'system') {
-        const protocolError = extractProtocolErrorMeta(message.meta);
-        if (protocolError && protocolError.code) {
+      // 1. Agent messages with API errors
+      if (message.sender_type === 'agent' && message.sender_id === agent.id) {
+        const apiError = detectApiError(message.content);
+        if (apiError) {
           failed.push({
             message,
-            errorType: 'protocol',
-            errorSummary:
-              protocolError.reason || `Protocol error: ${protocolError.code}`,
-            errorDetail: protocolError.detail || protocolError.rawOutput || undefined,
+            errorType: 'api',
+            errorSummary: apiError.message,
+            errorDetail: apiError.provider
+              ? `Provider: ${apiError.provider}`
+              : undefined,
           });
         }
         continue;
       }
 
-      // Check for API errors in agent messages
-      const apiError = detectApiError(message.content);
-      if (apiError) {
-        failed.push({
-          message,
-          errorType: 'api',
-          errorSummary: apiError.message,
-          errorDetail: apiError.provider
-            ? `Provider: ${apiError.provider}`
-            : undefined,
-        });
+      // 2. System messages about this agent
+      if (message.sender_type === 'system') {
+        // Protocol errors
+        const protocolError = extractProtocolErrorMeta(message.meta);
+        if (protocolError?.agentName === agent.name && protocolError.code) {
+          failed.push({
+            message,
+            errorType: 'protocol',
+            errorSummary:
+              protocolError.reason || `Protocol error: ${protocolError.code}`,
+            errorDetail:
+              protocolError.detail || protocolError.rawOutput || undefined,
+          });
+          continue;
+        }
+
+        // Mention failures (executor startup errors, etc.)
+        const mentionFailure = extractMentionFailureMeta(
+          message.meta,
+          agent.name
+        );
+        if (mentionFailure) {
+          failed.push({
+            message,
+            errorType: 'protocol',
+            errorSummary: mentionFailure.reason,
+            errorDetail: mentionFailure.sourceMessageId
+              ? `Source message: ${mentionFailure.sourceMessageId.slice(0, 8)}...`
+              : undefined,
+          });
+        }
       }
     }
 
@@ -213,7 +229,9 @@ export function WorkspaceDrawer({
                           </span>
                         </div>
                         <span className="text-[10px] text-low flex-shrink-0">
-                          {formatDateShortWithTime(failedMsg.message.created_at)}
+                          {formatDateShortWithTime(
+                            failedMsg.message.created_at
+                          )}
                         </span>
                       </div>
                       {failedMsg.errorDetail && (
@@ -252,17 +270,59 @@ export function WorkspaceDrawer({
             {runs.map((run: RunHistoryItem) => (
               <div
                 key={run.runId}
-                className="chat-session-workspace-run-card rounded-sm p-base space-y-half bg-[#e5e9f3]"
+                className={cn(
+                  'chat-session-workspace-run-card rounded-sm p-base space-y-half',
+                  run.hasError
+                    ? 'bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)]'
+                    : 'bg-[#e5e9f3]'
+                )}
               >
                 <div className="flex items-center justify-between text-xs text-low">
-                  <span>
-                    {t('modals.workspaceDrawer.run')} {run.runId.slice(0, 8)}
+                  <span className="flex items-center gap-1.5">
+                    {run.hasError && (
+                      <XCircleIcon
+                        className="size-icon-xs text-[#EF4444]"
+                        weight="fill"
+                      />
+                    )}
+                    <span>
+                      {t('modals.workspaceDrawer.run')} {run.runId.slice(0, 8)}
+                    </span>
                   </span>
                   <span>{formatDateShortWithTime(run.createdAt)}</span>
                 </div>
-                <div className="text-xs text-normal font-mono truncate">
-                  {run.content}
-                </div>
+                {run.hasError && run.errorSummary && (
+                  <div className="space-y-1">
+                    <div className="flex items-start gap-2">
+                      <div className="text-xs text-[#EF4444] font-medium flex-1 truncate">
+                        {run.errorSummary}
+                      </div>
+                      {run.errorType?.type && (
+                        <span className="shrink-0 rounded bg-[rgba(239,68,68,0.15)] px-1.5 py-0.5 text-[10px] font-medium text-[#EF4444]">
+                          {run.errorType.type.replace(/_/g, ' ')}
+                        </span>
+                      )}
+                    </div>
+                    {run.errorContent &&
+                      run.errorContent !== run.errorSummary && (
+                        <details className="text-xs">
+                          <summary className="cursor-pointer text-[#EF4444] hover:underline">
+                            {t('modals.workspaceDrawer.viewDetails', {
+                              defaultValue: 'View Details',
+                            })}
+                          </summary>
+                          <pre className="mt-1 max-h-[100px] overflow-auto rounded bg-[rgba(239,68,68,0.04)] p-2 text-[10px] font-mono text-low whitespace-pre-wrap break-all">
+                            {run.errorContent}
+                          </pre>
+                        </details>
+                      )}
+                  </div>
+                )}
+                {!run.hasError && (
+                  <div className="text-xs text-normal font-mono truncate">
+                    {run.content}
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-3">
                     <button
@@ -348,16 +408,55 @@ export function WorkspaceDrawer({
         }}
       >
         <DialogHeader>
-          <DialogTitle>
-            {expandedRun
-              ? `${t('modals.workspaceDrawer.run')} ${expandedRun.runId.slice(0, 8)}`
-              : t('modals.workspaceDrawer.run')}
+          <DialogTitle className="flex items-center gap-2">
+            {expandedRun?.hasError && (
+              <XCircleIcon className="size-5 text-[#EF4444]" weight="fill" />
+            )}
+            <span>
+              {expandedRun
+                ? `${t('modals.workspaceDrawer.run')} ${expandedRun.runId.slice(0, 8)}`
+                : t('modals.workspaceDrawer.run')}
+            </span>
+            {expandedRun?.errorType?.type && (
+              <span className="ml-2 rounded bg-[rgba(239,68,68,0.15)] px-2 py-0.5 text-xs font-medium text-[#EF4444]">
+                {expandedRun.errorType.type.replace(/_/g, ' ')}
+              </span>
+            )}
           </DialogTitle>
         </DialogHeader>
         <DialogContent>
-          <div className="max-h-[70vh] overflow-y-auto rounded-sm bg-[#ecedf1] p-base">
-            <div className="text-xs text-normal font-mono whitespace-pre-wrap break-all">
-              {expandedRun?.content ?? ''}
+          <div className="space-y-4">
+            {/* Error section */}
+            {expandedRun?.hasError && expandedRun.errorSummary && (
+              <div className="rounded-sm bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] p-base">
+                <div className="text-xs text-low mb-1">
+                  {t('modals.workspaceDrawer.errorSummary', {
+                    defaultValue: 'Error Summary',
+                  })}
+                </div>
+                <div className="text-sm text-[#EF4444] font-medium">
+                  {expandedRun.errorSummary}
+                </div>
+                {expandedRun.errorContent &&
+                  expandedRun.errorContent !== expandedRun.errorSummary && (
+                    <div className="mt-2">
+                      <div className="text-xs text-low mb-1">
+                        {t('modals.workspaceDrawer.fullErrorLog', {
+                          defaultValue: 'Full Error Log',
+                        })}
+                      </div>
+                      <pre className="max-h-[200px] overflow-auto rounded bg-[rgba(239,68,68,0.04)] p-2 text-xs font-mono text-low whitespace-pre-wrap break-all">
+                        {expandedRun.errorContent}
+                      </pre>
+                    </div>
+                  )}
+              </div>
+            )}
+            {/* Content section */}
+            <div className="max-h-[50vh] overflow-y-auto rounded-sm bg-[#ecedf1] p-base">
+              <div className="text-xs text-normal font-mono whitespace-pre-wrap break-all">
+                {expandedRun?.content ?? ''}
+              </div>
             </div>
           </div>
         </DialogContent>
