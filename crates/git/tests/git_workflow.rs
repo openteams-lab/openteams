@@ -5,7 +5,7 @@ use std::{
 };
 
 use git::{DiffTarget, GitCli, GitService};
-use git2::{build::CheckoutBuilder, Repository};
+use git2::{Repository, build::CheckoutBuilder};
 use tempfile::TempDir;
 use utils::diff::DiffChangeKind;
 
@@ -249,9 +249,11 @@ fn commit_and_is_worktree_clean() {
             None,
         )
         .unwrap();
-    assert!(diffs
-        .iter()
-        .any(|d| d.new_path.as_deref() == Some("foo.txt")));
+    assert!(
+        diffs
+            .iter()
+            .any(|d| d.new_path.as_deref() == Some("foo.txt"))
+    );
 }
 
 #[test]
@@ -381,12 +383,16 @@ fn worktree_diff_respects_path_filter() {
             Some(&["src"]),
         )
         .unwrap();
-    assert!(diffs
-        .iter()
-        .any(|d| d.new_path.as_deref() == Some("src/only.txt")));
-    assert!(!diffs
-        .iter()
-        .any(|d| d.new_path.as_deref() == Some("other/skip2.txt")));
+    assert!(
+        diffs
+            .iter()
+            .any(|d| d.new_path.as_deref() == Some("src/only.txt"))
+    );
+    assert!(
+        !diffs
+            .iter()
+            .any(|d| d.new_path.as_deref() == Some("other/skip2.txt"))
+    );
 }
 
 #[test]
