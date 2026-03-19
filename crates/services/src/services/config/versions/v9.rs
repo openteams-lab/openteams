@@ -457,10 +457,7 @@ mod tests {
             .find(|preset| preset.id == "coordinator_pmo")
             .expect("planner preset should exist");
         assert_eq!(planner.runner_type.as_deref(), Some("OPENCODE"));
-        assert_eq!(
-            planner.recommended_model.as_deref(),
-            Some("glm-5")
-        );
+        assert_eq!(planner.recommended_model.as_deref(), Some("glm-5"));
 
         let fullstack = chat_presets
             .teams
