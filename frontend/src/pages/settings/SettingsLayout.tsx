@@ -4,6 +4,7 @@ import {
   Settings,
   Cpu,
   Server,
+  Terminal,
   X,
   FolderOpen,
   Building2,
@@ -37,6 +38,10 @@ const settingsNavigation = [
   {
     path: 'agents',
     icon: Cpu,
+  },
+  {
+    path: 'cli',
+    icon: Terminal,
   },
   {
     path: 'mcp',

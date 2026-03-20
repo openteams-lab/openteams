@@ -3,6 +3,8 @@ pub mod approvals;
 pub mod auth;
 pub mod chat;
 pub mod chat_history_file;
+pub mod cli_config;
+pub mod cli_manager;
 pub mod chat_runner;
 pub mod config;
 pub mod container;

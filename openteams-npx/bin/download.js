@@ -224,6 +224,23 @@ async function ensureBinary(platform, binaryName, onProgress) {
   return zipPath;
 }
 
+async function ensureBinaries(platform, binaryNames, onProgress) {
+  const results = {};
+  for (const name of binaryNames) {
+    try {
+      results[name] = await ensureBinary(platform, name, onProgress);
+    } catch (err) {
+      if (name === "openteams-cli") {
+        console.warn(`Warning: CLI binary not available for ${platform}: ${err.message}`);
+        results[name] = null;
+      } else {
+        throw err;
+      }
+    }
+  }
+  return results;
+}
+
 async function getLatestVersion() {
   if (LOCAL_DEV_MODE) return null;
 
@@ -242,5 +259,6 @@ module.exports = {
   LOCAL_DIST_DIR,
   resolveRemoteSource,
   ensureBinary,
+  ensureBinaries,
   getLatestVersion,
 };

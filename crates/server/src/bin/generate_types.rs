@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, fs, path::Path};
 
-use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
+use schemars::{generate::SchemaSettings, JsonSchema, Schema, SchemaGenerator};
 use services::services::config::{DEFAULT_COMMIT_REMINDER_PROMPT, DEFAULT_PR_DESCRIPTION_PROMPT};
 use ts_rs::TS;
 
@@ -140,6 +140,10 @@ fn generate_types_content() -> String {
         server::routes::config::CheckEditorAvailabilityQuery::decl(),
         server::routes::config::CheckEditorAvailabilityResponse::decl(),
         server::routes::config::CheckAgentAvailabilityQuery::decl(),
+        server::routes::config::ProviderInfo::decl(),
+        server::routes::config::ModelInfo::decl(),
+        server::routes::config::ValidateProviderRequest::decl(),
+        server::routes::config::ValidateProviderResponse::decl(),
         server::routes::oauth::CurrentUserResponse::decl(),
         server::routes::sessions::CreateFollowUpAttempt::decl(),
         server::routes::chat::sessions::ChatSessionListQuery::decl(),
@@ -212,6 +216,23 @@ fn generate_types_content() -> String {
         services::services::config::ChatPresetsConfig::decl(),
         services::services::config::ChatMemberPreset::decl(),
         services::services::config::ChatTeamPreset::decl(),
+        services::services::cli_config::CliConfig::decl(),
+        services::services::cli_config::ProviderConfig::decl(),
+        services::services::cli_config::ProviderCredentials::decl(),
+        services::services::cli_config::OllamaConfig::decl(),
+        services::services::cli_config::CustomProviderConfig::decl(),
+        services::services::cli_config::ModelConfig::decl(),
+        services::services::cli_config::ProviderModelConfig::decl(),
+        services::services::cli_config::BehaviorConfig::decl(),
+        services::services::cli_config::OpenTeamsCliConfig::decl(),
+        services::services::cli_config::OpenTeamsCliProviderConfig::decl(),
+        services::services::cli_config::OpenTeamsCliProviderOptions::decl(),
+        services::services::cli_config::OpenTeamsCliModelConfig::decl(),
+        services::services::cli_config::ModelModalities::decl(),
+        services::services::cli_config::ModelLimits::decl(),
+        services::services::cli_config::ModelVariantConfig::decl(),
+        server::routes::config::SyncToCliRequest::decl(),
+        server::routes::config::SyncToCliResponse::decl(),
         server::routes::chat::presets::TeamProtocolConfig::decl(),
         git::GitBranch::decl(),
         services::services::queued_message::QueuedMessage::decl(),
@@ -244,6 +265,7 @@ fn generate_types_content() -> String {
         executors::executors::cursor::CursorAgent::decl(),
         executors::executors::copilot::Copilot::decl(),
         executors::executors::opencode::Opencode::decl(),
+        executors::executors::openteams_cli::OpenTeamsCli::decl(),
         executors::executors::qwen::QwenCode::decl(),
         executors::executors::droid::Droid::decl(),
         executors::executors::kimi::KimiCode::decl(),
@@ -338,6 +360,10 @@ fn generate_schemas() -> Result<HashMap<&'static str, String>, serde_json::Error
         (
             "opencode",
             generate_json_schema::<executors::executors::opencode::Opencode>()?,
+        ),
+        (
+            "open_teams_cli",
+            generate_json_schema::<executors::executors::openteams_cli::OpenTeamsCli>()?,
         ),
         (
             "qwen_code",

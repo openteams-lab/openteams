@@ -4,13 +4,15 @@ import { XIcon } from '@phosphor-icons/react';
 import { GeneralSettingsSectionContent } from './GeneralSettingsSection';
 import { AgentsSettingsSectionContent } from './AgentsSettingsSection';
 import { McpSettingsSectionContent } from './McpSettingsSection';
+import { CliSettings } from '@/pages/settings';
 
-export type SettingsSectionType = 'general' | 'agents' | 'mcp';
+export type SettingsSectionType = 'general' | 'agents' | 'cli' | 'mcp';
 
 // Section-specific initial state types
 export type SettingsSectionInitialState = {
   general: undefined;
   agents: { executor?: string; variant?: string } | undefined;
+  cli: undefined;
   mcp: undefined;
 };
 
@@ -28,6 +30,8 @@ export function SettingsSection({ type, onClose }: SettingsSectionProps) {
         return <GeneralSettingsSectionContent />;
       case 'agents':
         return <AgentsSettingsSectionContent />;
+      case 'cli':
+        return <CliSettings />;
       case 'mcp':
         return <McpSettingsSectionContent />;
       default:

@@ -22,7 +22,8 @@ use crate::{
     env::ExecutionEnv,
     executors::{
         amp::Amp, claude::ClaudeCode, codex::Codex, copilot::Copilot, cursor::CursorAgent,
-        droid::Droid, gemini::Gemini, kimi::KimiCode, opencode::Opencode, qwen::QwenCode,
+        droid::Droid, gemini::Gemini, kimi::KimiCode, opencode::Opencode,
+        openteams_cli::OpenTeamsCli, qwen::QwenCode,
     },
     logs::utils::patch,
     mcp_config::McpConfig,
@@ -42,6 +43,7 @@ pub mod droid;
 pub mod gemini;
 pub mod kimi;
 pub mod opencode;
+pub mod openteams_cli;
 #[cfg(feature = "qa-mode")]
 pub mod qa_mock;
 pub mod qwen;
@@ -115,6 +117,7 @@ pub enum CodingAgent {
     Gemini,
     Codex,
     Opencode,
+    OpenTeamsCli,
     #[serde(alias = "CURSOR")]
     #[strum_discriminants(serde(alias = "CURSOR"))]
     #[strum_discriminants(strum(serialize = "CURSOR", serialize = "CURSOR_AGENT"))]
@@ -155,6 +158,14 @@ impl CodingAgent {
                 self.preconfigured_mcp(),
                 false,
             ),
+            Self::OpenTeamsCli(_) => McpConfig::new(
+                vec!["mcp".to_string()],
+                serde_json::json!({
+                    "mcp": {}
+                }),
+                self.preconfigured_mcp(),
+                false,
+            ),
             Self::Droid(_) => McpConfig::new(
                 vec!["mcpServers".to_string()],
                 serde_json::json!({
@@ -184,7 +195,7 @@ impl CodingAgent {
                 BaseAgentCapability::SessionFork,
                 BaseAgentCapability::ContextUsage,
             ],
-            Self::Opencode(_) => vec![
+            Self::Opencode(_) | Self::OpenTeamsCli(_) => vec![
                 BaseAgentCapability::SessionFork,
                 BaseAgentCapability::ContextUsage,
             ],
