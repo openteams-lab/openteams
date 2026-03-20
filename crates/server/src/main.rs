@@ -44,7 +44,12 @@ async fn main() -> Result<(), OpenTeamsError> {
 
     sentry_utils::init_once(SentrySource::Backend);
 
-    let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
+    let default_log_level = if cfg!(debug_assertions) {
+        "info"
+    } else {
+        "error"
+    };
+    let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| default_log_level.to_string());
     let filter_string = format!(
         "warn,server={level},services={level},db={level},executors={level},deployment={level},local_deployment={level},utils={level}",
         level = log_level
