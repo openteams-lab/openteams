@@ -7,6 +7,7 @@ import {
   ToolStatus,
   ToolResult,
   TodoItem,
+  type TokenUsageInfo,
   type NormalizedEntryError,
   type RepoWithTargetBranch,
 } from 'shared/types';
@@ -22,6 +23,7 @@ import { useChangesView } from '@/contexts/ChangesViewContext';
 import { useLogsPanel } from '@/contexts/LogsPanelContext';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
 import { cn } from '@/lib/utils';
+import { formatTokenUsage } from '@/utils/string';
 import {
   ScriptFixerDialog,
   type ScriptType,
@@ -347,8 +349,7 @@ function NewDisplayConversationEntry(props: Props) {
       return null;
 
     case 'token_usage_info':
-      // Displayed in the chat header as the context-usage gauge
-      return null;
+      return <TokenUsageEntry info={entryType} />;
 
     case 'user_feedback':
     case 'loading':
@@ -592,6 +593,15 @@ function AssistantMessageEntry({
   const displayContent = stripTargetPrefix(content);
   return (
     <ChatAssistantMessage content={displayContent} workspaceId={workspaceId} />
+  );
+}
+
+function TokenUsageEntry({ info }: { info: TokenUsageInfo }) {
+  const label = formatTokenUsage(info);
+  return (
+    <div className="px-half">
+      <div className="text-[11px] font-ibm-plex-mono text-low/80">{label}</div>
+    </div>
   );
 }
 

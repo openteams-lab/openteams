@@ -436,6 +436,7 @@ pub struct ClaudeLogProcessor {
     input_tokens: u32,
     output_tokens: u32,
     cache_read_tokens: u32,
+    cache_write_tokens: u32,
 }
 
 impl ClaudeLogProcessor {
@@ -458,6 +459,7 @@ impl ClaudeLogProcessor {
             input_tokens: 0,
             output_tokens: 0,
             cache_read_tokens: 0,
+            cache_write_tokens: 0,
         }
     }
 
@@ -1362,11 +1364,13 @@ impl ClaudeLogProcessor {
                         let input_tokens = usage.input_tokens.unwrap_or(0);
                         let output_tokens = usage.output_tokens.unwrap_or(0);
                         let cache_read = usage.cache_read_input_tokens.unwrap_or(0);
+                        let cache_write = usage.cache_creation_input_tokens.unwrap_or(0);
                         let total_tokens = input_tokens + output_tokens;
                         self.context_tokens_used = total_tokens as u32;
                         self.input_tokens = input_tokens as u32;
                         self.output_tokens = output_tokens as u32;
                         self.cache_read_tokens = cache_read as u32;
+                        self.cache_write_tokens = cache_write as u32;
 
                         patches.push(self.add_token_usage_entry(entry_index_provider));
                     }
@@ -1588,6 +1592,7 @@ impl ClaudeLogProcessor {
                 input_tokens: Some(self.input_tokens),
                 output_tokens: Some(self.output_tokens),
                 cache_read_tokens: Some(self.cache_read_tokens),
+                cache_write_tokens: Some(self.cache_write_tokens).filter(|&v| v > 0),
                 is_estimated: false,
             }),
             content: format!(

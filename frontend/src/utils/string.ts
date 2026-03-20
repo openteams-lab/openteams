@@ -55,6 +55,55 @@ export function formatTokenCount(tokens: number): string {
   return tokens.toString();
 }
 
+/** Formats a TokenUsageInfo into a compact human-readable string.
+ *  Shows every non-null/non-zero breakdown field available.
+ *  Falls back to total_tokens when no breakdown is present.
+ *
+ *  Example outputs:
+ *   Claude Code:  "in:12.4K  out:2.6K  cache_rd:8.1K  cache_wr:512"
+ *   Codex:        "in:10K  out:1.2K  cache_rd:4K"
+ *   Gemini/QWen:  "14.6K"  (total only, fallback)
+ */
+export interface TokenUsageDisplayInfo {
+  total_tokens: number;
+  model_context_window?: number;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_read_tokens?: number | null;
+  cache_write_tokens?: number | null;
+  is_estimated?: boolean;
+}
+
+export function formatTokenUsage(info: TokenUsageDisplayInfo): string {
+  const parts: string[] = [];
+
+  if (typeof info.input_tokens === 'number') {
+    parts.push(`in:${formatTokenCount(info.input_tokens)}`);
+  }
+  if (typeof info.output_tokens === 'number') {
+    parts.push(`out:${formatTokenCount(info.output_tokens)}`);
+  }
+  if (
+    typeof info.cache_read_tokens === 'number' &&
+    info.cache_read_tokens > 0
+  ) {
+    parts.push(`cache_rd:${formatTokenCount(info.cache_read_tokens)}`);
+  }
+  if (
+    typeof info.cache_write_tokens === 'number' &&
+    info.cache_write_tokens > 0
+  ) {
+    parts.push(`cache_wr:${formatTokenCount(info.cache_write_tokens)}`);
+  }
+
+  // Fallback: no breakdown available
+  if (parts.length === 0) {
+    return `${info.is_estimated ? '~' : ''}${formatTokenCount(info.total_tokens)}`;
+  }
+
+  return `${info.is_estimated ? '~' : ''}${parts.join('  ')}`;
+}
+
 /**
  * Splits a message into title (max 100 chars) and description.
  * - First line becomes the title (truncated at word boundary if > 100 chars)

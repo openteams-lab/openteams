@@ -130,7 +130,6 @@ struct ReferenceContext {
 
 #[allow(dead_code)]
 struct MessageAttachmentContext {
-    message_id: Uuid,
     attachments: Vec<ReferenceAttachment>,
 }
 
@@ -1759,7 +1758,6 @@ impl ChatRunner {
         }
 
         Ok(Some(MessageAttachmentContext {
-            message_id: source_message.id,
             attachments: message_attachments,
         }))
     }
@@ -3004,6 +3002,55 @@ impl ChatRunner {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn build_protocol_send_message_meta(
+        app_language: &str,
+        run_id: Uuid,
+        session_agent_id: Uuid,
+        source_message_id: Uuid,
+        chain_depth: u32,
+        target: &str,
+        index: usize,
+        intent: Option<&str>,
+        intent_meaning: Option<&str>,
+        token_usage: Option<&TokenUsageInfo>,
+    ) -> serde_json::Value {
+        let mut protocol_meta = serde_json::json!({
+            "type": "send",
+            "to": target,
+            "index": index,
+        });
+        if let Some(intent) = intent {
+            protocol_meta["intent"] = serde_json::json!(intent);
+        }
+        if let Some(intent_meaning) = intent_meaning {
+            protocol_meta["intent_meaning"] = serde_json::json!(intent_meaning);
+        }
+
+        let mut meta = serde_json::json!({
+            "app_language": app_language,
+            "run_id": run_id,
+            "session_agent_id": session_agent_id,
+            "source_message_id": source_message_id,
+            "chain_depth": chain_depth + 1,
+            "protocol": protocol_meta
+        });
+
+        if let Some(token_usage) = token_usage {
+            meta["token_usage"] = serde_json::json!({
+                "total_tokens": token_usage.total_tokens,
+                "model_context_window": token_usage.model_context_window,
+                "input_tokens": token_usage.input_tokens,
+                "output_tokens": token_usage.output_tokens,
+                "cache_read_tokens": token_usage.cache_read_tokens,
+                "cache_write_tokens": token_usage.cache_write_tokens,
+                "is_estimated": token_usage.is_estimated,
+            });
+        }
+
+        meta
+    }
+
     /// Extract JSON from content, handling various formats
     fn extract_json_from_content(content: &str) -> Result<String, AgentProtocolError> {
         let content = content.trim();
@@ -3429,6 +3476,7 @@ impl ChatRunner {
         prompt_language: ResolvedPromptLanguage,
         raw_output: &str,
         error_info: Option<(&str, Option<&NormalizedEntryError>)>,
+        token_usage: Option<&TokenUsageInfo>,
     ) -> Result<(), ChatRunnerError> {
         let output_is_empty = raw_output.trim().is_empty();
 
@@ -3454,7 +3502,6 @@ impl ChatRunner {
                 "output_is_empty": output_is_empty
             }
         });
-
         // Include error info in meta if provided
         if let Some((error_content, error_type)) = error_info {
             let summary: String = error_content.chars().take(200).collect();
@@ -3469,6 +3516,17 @@ impl ChatRunner {
             meta["error"] = error_meta;
         }
 
+        if let Some(token_usage) = token_usage {
+            meta["token_usage"] = serde_json::json!({
+                "total_tokens": token_usage.total_tokens,
+                "model_context_window": token_usage.model_context_window,
+                "input_tokens": token_usage.input_tokens,
+                "output_tokens": token_usage.output_tokens,
+                "cache_read_tokens": token_usage.cache_read_tokens,
+                "cache_write_tokens": token_usage.cache_write_tokens,
+                "is_estimated": token_usage.is_estimated,
+            });
+        }
         let message = chat::create_message(
             &self.db.pool,
             session_id,
@@ -3744,6 +3802,7 @@ impl ChatRunner {
         latest_assistant: &str,
         error_content: Option<&str>,
         error_type: Option<&NormalizedEntryError>,
+        token_usage: Option<&TokenUsageInfo>,
     ) -> Result<usize, ChatRunnerError> {
         let output_is_empty = latest_assistant.trim().is_empty();
         let has_error = error_content.is_some_and(|e| !e.is_empty());
@@ -3786,6 +3845,7 @@ impl ChatRunner {
                             prompt_language,
                             latest_assistant,
                             error_info,
+                            token_usage,
                         )
                         .await?;
                         return Ok(1);
@@ -3825,6 +3885,7 @@ impl ChatRunner {
                         prompt_language,
                         latest_assistant,
                         error_info,
+                        token_usage,
                     )
                     .await?;
                     return Ok(1);
@@ -3898,25 +3959,20 @@ impl ChatRunner {
                 continue;
             };
             let content = Self::build_send_message_content(target, &message.content);
-            let mut protocol_meta = serde_json::json!({
-                "type": "send",
-                "to": target,
-                "index": index,
-            });
-            if let Some(intent) = message.intent.as_deref() {
-                protocol_meta["intent"] = serde_json::json!(intent);
-                if let Some(meaning) = Self::protocol_send_intent_meaning(intent) {
-                    protocol_meta["intent_meaning"] = serde_json::json!(meaning);
-                }
-            }
-            let mut meta = serde_json::json!({
-                "app_language": prompt_language.code,
-                "run_id": run_id,
-                "session_agent_id": session_agent_id,
-                "source_message_id": source_message_id,
-                "chain_depth": chain_depth + 1,
-                "protocol": protocol_meta
-            });
+            let intent = message.intent.as_deref();
+            let intent_meaning = intent.and_then(Self::protocol_send_intent_meaning);
+            let mut meta = Self::build_protocol_send_message_meta(
+                prompt_language.code,
+                run_id,
+                session_agent_id,
+                source_message_id,
+                chain_depth,
+                target,
+                index,
+                intent,
+                intent_meaning,
+                token_usage,
+            );
 
             // Sync error info from the run to the message meta so frontend can display it
             if let Some(ref ec) = error_content
@@ -4059,6 +4115,8 @@ impl ChatRunner {
         let value: serde_json::Value = serde_json::from_str(line).ok()?;
         let value_obj = value.as_object()?;
 
+        // Format: {"type":"token_usage","total_tokens":N,"model_context_window":N,...}
+        // Used by: Gemini CLI, QWen Coder (may include input/output breakdown)
         if value_obj.get("type").and_then(|v| v.as_str()) == Some("token_usage") {
             let total_tokens = value_obj
                 .get("total_tokens")
@@ -4068,16 +4126,35 @@ impl ChatRunner {
                 .get("model_context_window")
                 .and_then(|v| v.as_u64())
                 .and_then(|v| u32::try_from(v).ok())?;
+            let input_tokens = value_obj
+                .get("input_tokens")
+                .and_then(|v| v.as_u64())
+                .and_then(|v| u32::try_from(v).ok());
+            let output_tokens = value_obj
+                .get("output_tokens")
+                .and_then(|v| v.as_u64())
+                .and_then(|v| u32::try_from(v).ok());
+            let cache_read_tokens = value_obj
+                .get("cache_read_tokens")
+                .and_then(|v| v.as_u64())
+                .and_then(|v| u32::try_from(v).ok());
+            let cache_write_tokens = value_obj
+                .get("cache_write_tokens")
+                .and_then(|v| v.as_u64())
+                .and_then(|v| u32::try_from(v).ok());
             return Some(TokenUsageInfo {
                 total_tokens,
                 model_context_window,
-                input_tokens: None,
-                output_tokens: None,
-                cache_read_tokens: None,
+                input_tokens,
+                output_tokens,
+                cache_read_tokens,
+                cache_write_tokens,
                 is_estimated: false,
             });
         }
 
+        // Format: {"method":"codex/event/token_count","params":{"msg":{"info":{...}}}}
+        // Used by: Codex stdout JSON-RPC events
         if value_obj.get("method").and_then(|v| v.as_str()) != Some("codex/event/token_count") {
             return None;
         }
@@ -4087,9 +4164,9 @@ impl ChatRunner {
             .and_then(|v| v.get("msg"))
             .and_then(|v| v.get("info"))?;
 
-        let total_tokens = info
-            .get("last_token_usage")
-            .and_then(|v| v.get("total_tokens"))
+        let last = info.get("last_token_usage")?;
+        let total_tokens = last
+            .get("total_tokens")
             .and_then(|v| v.as_u64())
             .and_then(|v| u32::try_from(v).ok())?;
         let model_context_window = info
@@ -4097,13 +4174,27 @@ impl ChatRunner {
             .and_then(|v| v.as_u64())
             .and_then(|v| u32::try_from(v).ok())
             .unwrap_or(0);
+        let input_tokens = last
+            .get("input_tokens")
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u32::try_from(v).ok());
+        let output_tokens = last
+            .get("output_tokens")
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u32::try_from(v).ok());
+        // Codex calls it cached_input_tokens
+        let cache_read_tokens = last
+            .get("cached_input_tokens")
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u32::try_from(v).ok());
 
         Some(TokenUsageInfo {
             total_tokens,
             model_context_window,
-            input_tokens: None,
-            output_tokens: None,
-            cache_read_tokens: None,
+            input_tokens,
+            output_tokens,
+            cache_read_tokens,
+            cache_write_tokens: None,
             is_estimated: false,
         })
     }
@@ -4484,6 +4575,7 @@ impl ChatRunner {
                                 input_tokens: Some(estimated_input),
                                 output_tokens: Some(estimated_output),
                                 cache_read_tokens: None,
+                                cache_write_tokens: None,
                                 is_estimated: true,
                             }
                         };
@@ -4493,6 +4585,8 @@ impl ChatRunner {
                             "model_context_window": token_usage.model_context_window,
                             "input_tokens": token_usage.input_tokens,
                             "output_tokens": token_usage.output_tokens,
+                            "cache_read_tokens": token_usage.cache_read_tokens,
+                            "cache_write_tokens": token_usage.cache_write_tokens,
                             "is_estimated": token_usage.is_estimated,
                         });
 
@@ -4552,6 +4646,7 @@ impl ChatRunner {
                                 &latest_assistant,
                                 error_content_opt,
                                 error_type.as_ref(),
+                                Some(&token_usage),
                             )
                             .await;
 
@@ -4873,7 +4968,7 @@ mod tests {
     use super::{
         AgentProtocolError, AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner,
         MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON, MessageAttachmentContext, ReferenceAttachment,
-        ReferenceContext, ResolvedPromptLanguage, SessionAgentSummary,
+        ReferenceContext, ResolvedPromptLanguage, SessionAgentSummary, TokenUsageInfo,
     };
     use crate::services::config::UiLanguage;
 
@@ -5317,7 +5412,6 @@ mod tests {
             }],
         };
         let message_attachments = MessageAttachmentContext {
-            message_id: message.id,
             attachments: vec![ReferenceAttachment {
                 name: "ui.png".to_string(),
                 mime_type: Some("image/png".to_string()),
@@ -5347,6 +5441,57 @@ mod tests {
         assert!(prompt.contains(r"- **local_path**: E:\workspace\projectSS\MainPage2\ui.png"));
         assert!(!prompt.contains("[message]"));
         assert!(!prompt.contains("[message.reference]"));
+    }
+
+    #[test]
+    fn build_protocol_send_message_meta_includes_token_usage() {
+        let token_usage = TokenUsageInfo {
+            total_tokens: 2048,
+            model_context_window: 128000,
+            input_tokens: Some(1536),
+            output_tokens: Some(512),
+            cache_read_tokens: Some(256),
+            cache_write_tokens: None,
+            is_estimated: false,
+        };
+
+        let meta = ChatRunner::build_protocol_send_message_meta(
+            "zh-Hans",
+            Uuid::nil(),
+            Uuid::nil(),
+            Uuid::nil(),
+            0,
+            "you",
+            0,
+            Some("reply"),
+            Some("The receiver should reply."),
+            Some(&token_usage),
+        );
+
+        assert_eq!(meta["app_language"], json!("zh-Hans"));
+        assert_eq!(meta["protocol"]["type"], json!("send"));
+        assert_eq!(meta["protocol"]["to"], json!("you"));
+        assert_eq!(meta["protocol"]["intent"], json!("reply"));
+        assert_eq!(
+            meta["token_usage"]["total_tokens"],
+            json!(token_usage.total_tokens)
+        );
+        assert_eq!(
+            meta["token_usage"]["model_context_window"],
+            json!(token_usage.model_context_window)
+        );
+        assert_eq!(
+            meta["token_usage"]["input_tokens"],
+            json!(token_usage.input_tokens)
+        );
+        assert_eq!(
+            meta["token_usage"]["output_tokens"],
+            json!(token_usage.output_tokens)
+        );
+        assert_eq!(
+            meta["token_usage"]["is_estimated"],
+            json!(token_usage.is_estimated)
+        );
     }
 
     #[test]
