@@ -33,7 +33,12 @@ pub fn init_tracing() {
         return;
     }
 
-    let env_filter = env::var("RUST_LOG").unwrap_or_else(|_| "info,sqlx=warn".to_string());
+    let default_level = if cfg!(debug_assertions) {
+        "info,sqlx=warn"
+    } else {
+        "error,sqlx=error"
+    };
+    let env_filter = env::var("RUST_LOG").unwrap_or_else(|_| default_level.to_string());
     let fmt_layer = fmt::layer()
         .json()
         .with_target(false)
