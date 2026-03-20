@@ -21,6 +21,8 @@
         "reposDesc": "儲存庫腳本與設定",
         "agents": "代理",
         "agentsDesc": "編碼代理設定",
+        "cli": "OpenTeams CLI",
+        "cliDesc": "供應商、模型與行為設定",
         "mcp": "MCP 伺服器",
         "mcpDesc": "模型上下文協議伺服器",
         "organizations": "組織設定",
@@ -349,6 +351,99 @@
       "deleteConfigDialog": {
         "title": "刪除設定？",
         "description": "這將從 {{executorType}} 執行器中永久刪除「{{configName}}」。此操作無法復原。"
+      }
+    },
+    "cli": {
+      "title": "OpenTeams CLI",
+      "description": "管理內建 CLI 的供應商、模型與執行期行為設定。",
+      "loading": "正在載入 CLI 設定...",
+      "loadError": "載入 CLI 設定失敗。",
+      "save": {
+        "button": "儲存 CLI 設定",
+        "success": "CLI 設定已成功儲存。",
+        "error": "儲存 CLI 設定失敗",
+        "unsavedChanges": "你有尚未儲存的變更",
+        "discard": "捨棄"
+      },
+      "provider": {
+        "title": "供應商",
+        "description": "選擇啟用中的供應商，並設定憑證或自訂端點。",
+        "label": "預設供應商",
+        "placeholder": "選擇供應商",
+        "helper": "內建 CLI 預設會使用此供應商。",
+        "configured": "已設定",
+        "notConfigured": "未設定",
+        "loading": "正在載入供應商中繼資料...",
+        "loadError": "載入供應商中繼資料失敗。",
+        "customNameLabel": "供應商名稱",
+        "customNamePlaceholder": "例如：My Gateway",
+        "apiKeyLabel": "API 金鑰",
+        "apiKeyPlaceholder": "輸入 API 金鑰",
+        "apiKeyMasked": "已儲存的金鑰會以遮罩顯示。若要保留現有金鑰，請不要變更此值。",
+        "toggleApiKeyVisibility": "切換 API 金鑰顯示狀態",
+        "endpointLabel": "自訂端點",
+        "endpointPlaceholder": "https://api.example.com/v1",
+        "endpointHelper": "留空即可使用供應商預設端點。"
+      },
+      "model": {
+        "title": "模型",
+        "description": "為目前供應商選擇或輸入預設模型。",
+        "inputLabel": "模型 ID",
+        "inputPlaceholder": "輸入模型 ID",
+        "required": "模型 ID 為必填。",
+        "selectLabel": "建議模型",
+        "selectPlaceholder": "選擇模型",
+        "selectHelper": "選擇建議模型，或在上方輸入自訂 ID。",
+        "loading": "正在載入模型...",
+        "loadError": "載入此供應商的模型失敗。",
+        "empty": "此供應商沒有可用的建議模型。"
+      },
+      "behavior": {
+        "title": "行為",
+        "description": "設定 CLI 執行器的預設執行行為。",
+        "autoApproveLabel": "啟用自動批准",
+        "autoApproveHelper": "當 CLI 執行器支援時，自動批准支援的操作。",
+        "autoCompactLabel": "啟用自動壓縮",
+        "autoCompactHelper": "當 CLI 執行器支援時，自動壓縮過長的對話。"
+      },
+      "validation": {
+        "title": "連線測試",
+        "description": "在儲存前驗證目前的供應商設定。",
+        "button": "測試連線",
+        "testing": "測試中...",
+        "error": "測試供應商連線失敗。",
+        "missingApiKey": "請先輸入 API 金鑰再測試連線。",
+        "unsupportedCustom": "後端尚未實作 Custom Provider 的驗證。",
+        "unsupportedOllama": "目前無法驗證 Ollama，因為後端驗證端點仍要求 API 金鑰。",
+        "successTitle": "連線成功",
+        "failureTitle": "連線失敗"
+      },
+      "status": {
+        "title": "狀態",
+        "description": "此路由已準備完成，但設定 API 當時尚未可用。TASK-F2 與 TASK-F3 將在後端端點就緒後繼續。"
+      },
+      "planned": {
+        "title": "預計的設定區域",
+        "description": "完整頁面將建立在即將提供的後端 API 之上。",
+        "provider": {
+          "title": "供應商",
+          "description": "選擇預設供應商，並設定憑證或自訂端點。"
+        },
+        "model": {
+          "title": "模型",
+          "description": "選擇供應商返回的模型清單，並維持一致的預設值。"
+        },
+        "behavior": {
+          "title": "行為",
+          "description": "控制批准、壓縮與其他 CLI 執行期偏好設定。"
+        }
+      },
+      "readiness": {
+        "title": "目前準備狀態",
+        "description": "目前可用的內容，以及仍依賴後端的部分。",
+        "routeReady": "`/settings/cli` 路由與 Settings 導覽項目現已可用。",
+        "apiPending": "在 `GET/PUT /config/cli` 與供應商相關 API 就緒前，CLI 設定讀寫 hooks 仍會被阻擋。",
+        "uiPending": "互動式表單、驗證、載入狀態與錯誤狀態將在 TASK-F3 交付。"
       }
     },
     "mcp": {

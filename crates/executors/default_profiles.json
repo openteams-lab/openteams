@@ -177,6 +177,24 @@
         }
       }
     },
+    "OPEN_TEAMS_CLI": {
+      "DEFAULT": {
+        "OPEN_TEAMS_CLI": {
+          "auto_approve": true
+        }
+      },
+      "PLAN": {
+        "OPEN_TEAMS_CLI": {
+          "mode": "plan",
+          "auto_approve": true
+        }
+      },
+      "APPROVALS": {
+        "OPEN_TEAMS_CLI": {
+          "auto_approve": false
+        }
+      }
+    },
     "QWEN_CODE": {
       "DEFAULT": {
         "QWEN_CODE": {

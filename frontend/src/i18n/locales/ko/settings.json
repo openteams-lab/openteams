@@ -21,6 +21,8 @@
         "reposDesc": "저장소 스크립트 및 구성",
         "agents": "에이전트",
         "agentsDesc": "코딩 에이전트 구성",
+        "cli": "OpenTeams CLI",
+        "cliDesc": "공급자, 모델 및 동작 설정",
         "mcp": "MCP 서버",
         "mcpDesc": "Model Context Protocol 서버",
         "organizations": "Organization Settings",
@@ -349,6 +351,99 @@
       "deleteConfigDialog": {
         "title": "구성을 삭제하시겠습니까?",
         "description": "{{executorType}} 실행자에서 \"{{configName}}\"을(를) 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다."
+      }
+    },
+    "cli": {
+      "title": "OpenTeams CLI",
+      "description": "내장 CLI의 공급자, 모델 및 런타임 동작 설정을 관리합니다.",
+      "loading": "CLI 구성을 불러오는 중...",
+      "loadError": "CLI 구성을 불러오지 못했습니다.",
+      "save": {
+        "button": "CLI 설정 저장",
+        "success": "CLI 설정이 저장되었습니다.",
+        "error": "CLI 설정을 저장하지 못했습니다",
+        "unsavedChanges": "저장되지 않은 변경 사항이 있습니다",
+        "discard": "버리기"
+      },
+      "provider": {
+        "title": "공급자",
+        "description": "활성 공급자를 선택하고 자격 증명 또는 사용자 지정 엔드포인트를 설정합니다.",
+        "label": "기본 공급자",
+        "placeholder": "공급자 선택",
+        "helper": "내장 CLI는 기본적으로 이 공급자를 사용합니다.",
+        "configured": "설정됨",
+        "notConfigured": "설정되지 않음",
+        "loading": "공급자 메타데이터를 불러오는 중...",
+        "loadError": "공급자 메타데이터를 불러오지 못했습니다.",
+        "customNameLabel": "공급자 이름",
+        "customNamePlaceholder": "예: My Gateway",
+        "apiKeyLabel": "API 키",
+        "apiKeyPlaceholder": "API 키 입력",
+        "apiKeyMasked": "저장된 키는 마스킹되어 표시됩니다. 기존 키를 유지하려면 값을 변경하지 마세요.",
+        "toggleApiKeyVisibility": "API 키 표시 전환",
+        "endpointLabel": "사용자 지정 엔드포인트",
+        "endpointPlaceholder": "https://api.example.com/v1",
+        "endpointHelper": "비워 두면 공급자의 기본 엔드포인트를 사용합니다."
+      },
+      "model": {
+        "title": "모델",
+        "description": "현재 공급자의 기본 모델을 선택하거나 직접 입력합니다.",
+        "inputLabel": "모델 ID",
+        "inputPlaceholder": "모델 ID 입력",
+        "required": "모델 ID는 필수입니다.",
+        "selectLabel": "추천 모델",
+        "selectPlaceholder": "모델 선택",
+        "selectHelper": "추천 모델을 선택하거나 위에 사용자 지정 ID를 입력하세요.",
+        "loading": "모델을 불러오는 중...",
+        "loadError": "이 공급자의 모델을 불러오지 못했습니다.",
+        "empty": "이 공급자에는 추천 모델이 없습니다."
+      },
+      "behavior": {
+        "title": "동작",
+        "description": "CLI 실행기의 기본 런타임 동작을 설정합니다.",
+        "autoApproveLabel": "자동 승인 사용",
+        "autoApproveHelper": "CLI 실행기가 지원하는 경우 지원되는 작업을 자동으로 승인합니다.",
+        "autoCompactLabel": "자동 압축 사용",
+        "autoCompactHelper": "CLI 실행기가 지원하는 경우 긴 대화를 자동으로 압축합니다."
+      },
+      "validation": {
+        "title": "연결 테스트",
+        "description": "저장하기 전에 현재 공급자 구성을 확인합니다.",
+        "button": "연결 테스트",
+        "testing": "테스트 중...",
+        "error": "공급자 연결 테스트에 실패했습니다.",
+        "missingApiKey": "연결을 테스트하기 전에 API 키를 입력하세요.",
+        "unsupportedCustom": "Custom Provider 검증은 아직 백엔드에 구현되지 않았습니다.",
+        "unsupportedOllama": "백엔드 검증 엔드포인트가 아직 API 키를 요구하므로 현재 Ollama 검증을 사용할 수 없습니다.",
+        "successTitle": "연결 성공",
+        "failureTitle": "연결 실패"
+      },
+      "status": {
+        "title": "상태",
+        "description": "이 경로는 준비되었지만 설정 API는 아직 사용할 수 없습니다. TASK-F2와 TASK-F3는 백엔드 엔드포인트가 준비되면 계속 진행됩니다."
+      },
+      "planned": {
+        "title": "예정된 구성 영역",
+        "description": "전체 페이지는 향후 백엔드 API를 기반으로 구현됩니다.",
+        "provider": {
+          "title": "공급자",
+          "description": "기본 공급자를 선택하고 자격 증명 또는 사용자 지정 엔드포인트를 설정합니다."
+        },
+        "model": {
+          "title": "모델",
+          "description": "공급자가 반환한 모델 목록을 선택하고 기본값의 일관성을 유지합니다."
+        },
+        "behavior": {
+          "title": "동작",
+          "description": "승인, 압축 및 기타 CLI 런타임 기본 설정을 제어합니다."
+        }
+      },
+      "readiness": {
+        "title": "현재 준비 상태",
+        "description": "지금 사용 가능한 항목과 아직 백엔드에 의존하는 항목입니다.",
+        "routeReady": "`/settings/cli` 경로와 Settings 내비게이션 항목은 이미 사용할 수 있습니다.",
+        "apiPending": "`GET/PUT /config/cli` 및 공급자 관련 API가 준비될 때까지 CLI 구성 읽기/쓰기 훅은 보류됩니다.",
+        "uiPending": "인터랙티브 폼, 검증, 로딩 상태 및 오류 상태는 TASK-F3에서 제공됩니다."
       }
     },
     "mcp": {

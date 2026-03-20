@@ -8,6 +8,7 @@ const AdmZip = require("adm-zip");
 
 const {
   ensureBinary,
+  ensureBinaries,
   getLatestVersion,
   BINARY_TAG,
   CACHE_DIR,
@@ -128,8 +129,8 @@ function getBinaryName(baseName) {
   return process.platform === "win32" ? `${baseName}.exe` : baseName;
 }
 
-function getInstalledBinaryPath() {
-  return path.join(BIN_DIR, getBinaryName(APP_BINARY_BASE));
+function getInstalledBinaryPath(binaryBase = APP_BINARY_BASE) {
+  return path.join(BIN_DIR, getBinaryName(binaryBase));
 }
 
 function readInstallMetadata() {
@@ -304,10 +305,10 @@ function cleanupOldCaches() {
   }
 }
 
-function extractBinary(zipPath) {
+function extractBinary(zipPath, expectedBinaryName) {
   fs.mkdirSync(BIN_DIR, { recursive: true });
 
-  const expectedPath = getInstalledBinaryPath();
+  const expectedPath = path.join(BIN_DIR, expectedBinaryName);
   try {
     if (fs.existsSync(expectedPath)) {
       fs.unlinkSync(expectedPath);
@@ -324,7 +325,7 @@ function extractBinary(zipPath) {
     const candidates = fs
       .readdirSync(BIN_DIR)
       .filter((name) =>
-        [APP_BINARY_BASE, `${APP_BINARY_BASE}.exe`].includes(name),
+        [expectedBinaryName, `${expectedBinaryName}.exe`].includes(name),
       );
 
     if (candidates.length > 0) {
@@ -350,14 +351,8 @@ function extractBinary(zipPath) {
 }
 
 async function installBinary(options = {}) {
-  const { force = false } = options;
+  const { force = false, includeCli = true } = options;
   const target = getPlatformTarget();
-  const zipCachePath = path.join(
-    CACHE_DIR,
-    BINARY_TAG,
-    target.platformDir,
-    `${APP_BINARY_BASE}.zip`,
-  );
 
   if (target.note) {
     printWarning(target.note);
@@ -368,17 +363,22 @@ async function installBinary(options = {}) {
 
   if (force) {
     try {
-      fs.rmSync(zipCachePath, { force: true });
+      fs.rmSync(path.join(CACHE_DIR, BINARY_TAG, target.platformDir, `${APP_BINARY_BASE}.zip`), { force: true });
       fs.rmSync(getInstalledBinaryPath(), { force: true });
+      fs.rmSync(getInstalledBinaryPath("openteams-cli"), { force: true });
     } catch (_err) {
       // Ignore force-clean failures.
     }
   }
 
   printStep("2/3", "Downloading prebuilt binary...");
-  let zipPath;
+  const binaries = includeCli
+    ? [APP_BINARY_BASE, "openteams-cli"]
+    : [APP_BINARY_BASE];
+
+  let zipPaths;
   try {
-    zipPath = await ensureBinary(target.platformDir, APP_BINARY_BASE, showProgress);
+    zipPaths = await ensureBinaries(target.platformDir, binaries, showProgress);
     if (!LOCAL_DEV_MODE) {
       process.stderr.write("\n");
     }
@@ -388,7 +388,18 @@ async function installBinary(options = {}) {
   }
 
   printStep("3/3", "Extracting and installing binary...");
-  const binaryPath = extractBinary(zipPath);
+  const binaryPath = extractBinary(zipPaths[APP_BINARY_BASE], getBinaryName(APP_BINARY_BASE));
+
+  // Extract CLI if available
+  if (zipPaths["openteams-cli"]) {
+    try {
+      const cliBinaryName = getBinaryName("openteams-cli");
+      extractBinary(zipPaths["openteams-cli"], cliBinaryName);
+      printInfo("CLI binary installed alongside server.");
+    } catch (err) {
+      printWarning(`Failed to extract CLI binary: ${err.message}`);
+    }
+  }
 
   ensurePathConfigured();
   writeInstallMetadata(binaryPath, target.platformDir);

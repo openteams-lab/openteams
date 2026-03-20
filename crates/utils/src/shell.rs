@@ -103,7 +103,6 @@ async fn refresh_path() -> bool {
     if merged == existing {
         return false;
     }
-    tracing::debug!(?existing, ?refreshed, ?merged, "Refreshed PATH");
     unsafe {
         std::env::set_var("PATH", &merged);
     }

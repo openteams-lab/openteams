@@ -1206,7 +1206,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "url",
- "which",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -1352,7 +1352,7 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
- "which",
+ "which 8.0.0",
  "wildmatch",
  "windows-sys 0.52.0",
  "zip",
@@ -1571,7 +1571,7 @@ dependencies = [
  "tracing",
  "urlencoding",
  "webbrowser",
- "which",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -1608,7 +1608,7 @@ dependencies = [
  "tree-sitter",
  "tree-sitter-bash",
  "url",
- "which",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -2922,6 +2922,7 @@ dependencies = [
  "utils",
  "uuid",
  "walkdir",
+ "which 7.0.3",
  "winsplit",
  "xdg",
 ]
@@ -7805,6 +7806,7 @@ dependencies = [
  "chrono",
  "db",
  "deployment",
+ "dirs 6.0.0",
  "dotenv",
  "executors",
  "futures-util",
@@ -7835,6 +7837,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
+ "toml 0.8.23",
  "tower-http 0.5.2",
  "tracing",
  "tracing-appender",
@@ -7843,6 +7846,7 @@ dependencies = [
  "url",
  "utils",
  "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7898,6 +7902,7 @@ dependencies = [
  "url",
  "utils",
  "uuid",
+ "which 7.0.3",
 ]
 
 [[package]]
@@ -9571,7 +9576,7 @@ dependencies = [
  "ts-rs 11.0.1",
  "url",
  "uuid",
- "which",
+ "which 8.0.0",
  "windows-sys 0.61.2",
  "winreg 0.55.0",
 ]
@@ -9830,6 +9835,18 @@ name = "weezl"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
+
+[[package]]
+name = "which"
+version = "7.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24d643ce3fd3e5b54854602a080f34fb10ab75e0b813ee32d00ca2b44fa74762"
+dependencies = [
+ "either",
+ "env_home",
+ "rustix",
+ "winsafe",
+]
 
 [[package]]
 name = "which"

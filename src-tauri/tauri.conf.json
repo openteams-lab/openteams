@@ -40,7 +40,8 @@
         }
       },
       "externalBin": [
-        "bin/server"
+        "bin/server",
+        "bin/openteams-cli"
       ]
     },
     "updater": {

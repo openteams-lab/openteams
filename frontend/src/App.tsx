@@ -15,6 +15,7 @@ import { useUiPreferencesScratch } from '@/hooks/useUiPreferencesScratch';
 
 import {
   AgentSettings,
+  CliSettings,
   GeneralSettings,
   McpSettings,
   OrganizationSettings,
@@ -196,6 +197,7 @@ function AppContent() {
                   element={<OrganizationSettings />}
                 />
                 <Route path="agents" element={<AgentSettings />} />
+                <Route path="cli" element={<CliSettings />} />
                 <Route path="mcp" element={<McpSettings />} />
               </Route>
               <Route

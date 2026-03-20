@@ -123,6 +123,16 @@ import {
   SkillCategory,
 } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
+import type {
+  CliConfig,
+  CliModelInfo,
+  CliProviderId,
+  CliProviderInfo,
+  ValidateCliProviderRequest,
+  ValidateCliProviderResponse,
+  SyncToCliRequest,
+  SyncToCliResponse,
+} from '@/types/cliConfig';
 import { createWorkspaceWithSession } from '@/types/attempt';
 
 export interface AgentInfo {
@@ -1053,6 +1063,57 @@ export const mcpServersApi = {
         response
       );
     }
+  },
+};
+
+export const cliConfigApi = {
+  getConfig: async (): Promise<CliConfig> => {
+    const response = await makeRequest('/api/config/cli');
+    return handleApiResponse<CliConfig>(response);
+  },
+
+  updateConfig: async (data: CliConfig): Promise<CliConfig> => {
+    const response = await makeRequest('/api/config/cli', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<CliConfig>(response);
+  },
+
+  listProviders: async (): Promise<CliProviderInfo[]> => {
+    const response = await makeRequest('/api/config/cli/providers');
+    return handleApiResponse<CliProviderInfo[]>(response);
+  },
+
+  listProviderModels: async (
+    provider: CliProviderId
+  ): Promise<CliModelInfo[]> => {
+    const response = await makeRequest(
+      `/api/config/cli/providers/${encodeURIComponent(provider)}/models`
+    );
+    return handleApiResponse<CliModelInfo[]>(response);
+  },
+
+  validateProvider: async (
+    provider: CliProviderId,
+    data: ValidateCliProviderRequest
+  ): Promise<ValidateCliProviderResponse> => {
+    const response = await makeRequest(
+      `/api/config/cli/providers/${encodeURIComponent(provider)}/validate`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<ValidateCliProviderResponse>(response);
+  },
+
+  syncToCli: async (data?: SyncToCliRequest): Promise<SyncToCliResponse> => {
+    const response = await makeRequest('/api/config/cli/sync-to-cli', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    });
+    return handleApiResponse<SyncToCliResponse>(response);
   },
 };
 
