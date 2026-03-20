@@ -21,6 +21,8 @@
         "reposDesc": "リポジトリスクリプトと設定",
         "agents": "エージェント",
         "agentsDesc": "コーディングエージェントの設定",
+        "cli": "OpenTeams CLI",
+        "cliDesc": "プロバイダー、モデル、動作設定",
         "mcp": "MCPサーバー",
         "mcpDesc": "モデルコンテキストプロトコルサーバー",
         "organizations": "Organization Settings",
@@ -349,6 +351,99 @@
       "deleteConfigDialog": {
         "title": "設定を削除しますか？",
         "description": "「{{configName}}」を{{executorType}}エグゼキューターから完全に削除します。この操作は元に戻せません。"
+      }
+    },
+    "cli": {
+      "title": "OpenTeams CLI",
+      "description": "組み込み CLI のプロバイダー、モデル、実行時の動作設定を管理します。",
+      "loading": "CLI 設定を読み込み中...",
+      "loadError": "CLI 設定の読み込みに失敗しました。",
+      "save": {
+        "button": "CLI 設定を保存",
+        "success": "CLI 設定を保存しました。",
+        "error": "CLI 設定の保存に失敗しました",
+        "unsavedChanges": "未保存の変更があります",
+        "discard": "破棄"
+      },
+      "provider": {
+        "title": "プロバイダー",
+        "description": "有効なプロバイダーを選択し、認証情報またはカスタムエンドポイントを設定します。",
+        "label": "既定のプロバイダー",
+        "placeholder": "プロバイダーを選択",
+        "helper": "組み込み CLI は既定でこのプロバイダーを使用します。",
+        "configured": "設定済み",
+        "notConfigured": "未設定",
+        "loading": "プロバイダー情報を読み込み中...",
+        "loadError": "プロバイダー情報の読み込みに失敗しました。",
+        "customNameLabel": "プロバイダー名",
+        "customNamePlaceholder": "例: My Gateway",
+        "apiKeyLabel": "API キー",
+        "apiKeyPlaceholder": "API キーを入力",
+        "apiKeyMasked": "保存済みのキーはマスク表示されます。既存のキーを保持するには値を変更しないでください。",
+        "toggleApiKeyVisibility": "API キーの表示を切り替え",
+        "endpointLabel": "カスタムエンドポイント",
+        "endpointPlaceholder": "https://api.example.com/v1",
+        "endpointHelper": "空欄のままにすると、プロバイダー既定のエンドポイントを使用します。"
+      },
+      "model": {
+        "title": "モデル",
+        "description": "現在のプロバイダーの既定モデルを選択するか、直接入力します。",
+        "inputLabel": "モデル ID",
+        "inputPlaceholder": "モデル ID を入力",
+        "required": "モデル ID は必須です。",
+        "selectLabel": "候補モデル",
+        "selectPlaceholder": "モデルを選択",
+        "selectHelper": "候補から選択するか、上でカスタム ID を入力してください。",
+        "loading": "モデルを読み込み中...",
+        "loadError": "このプロバイダーのモデル読み込みに失敗しました。",
+        "empty": "このプロバイダーで利用可能な候補モデルはありません。"
+      },
+      "behavior": {
+        "title": "動作",
+        "description": "CLI 実行エージェントの既定動作を設定します。",
+        "autoApproveLabel": "自動承認を有効化",
+        "autoApproveHelper": "CLI 実行エージェントが対応している場合、対応アクションを自動承認します。",
+        "autoCompactLabel": "自動コンパクト化を有効化",
+        "autoCompactHelper": "CLI 実行エージェントが対応している場合、長い会話を自動で圧縮します。"
+      },
+      "validation": {
+        "title": "接続テスト",
+        "description": "保存前に現在のプロバイダー設定を確認します。",
+        "button": "接続をテスト",
+        "testing": "テスト中...",
+        "error": "プロバイダー接続のテストに失敗しました。",
+        "missingApiKey": "接続テストの前に API キーを入力してください。",
+        "unsupportedCustom": "Custom Provider の検証は、まだバックエンドで実装されていません。",
+        "unsupportedOllama": "バックエンドの検証エンドポイントがまだ API キーを必須としているため、現在 Ollama の検証は利用できません。",
+        "successTitle": "接続に成功しました",
+        "failureTitle": "接続に失敗しました"
+      },
+      "status": {
+        "title": "状態",
+        "description": "このルートは利用可能ですが、設定 API はまだ利用できません。TASK-F2 と TASK-F3 はバックエンドのエンドポイント準備後に継続されます。"
+      },
+      "planned": {
+        "title": "予定されている設定領域",
+        "description": "完全なページは今後のバックエンド API を基盤に実装されます。",
+        "provider": {
+          "title": "プロバイダー",
+          "description": "既定のプロバイダーを選択し、認証情報またはカスタムエンドポイントを設定します。"
+        },
+        "model": {
+          "title": "モデル",
+          "description": "プロバイダーが返すモデル一覧を選択し、既定値の一貫性を保ちます。"
+        },
+        "behavior": {
+          "title": "動作",
+          "description": "承認、コンパクト化、その他の CLI 実行設定を制御します。"
+        }
+      },
+      "readiness": {
+        "title": "現在の準備状況",
+        "description": "今すぐ使えるものと、まだバックエンドに依存しているものです。",
+        "routeReady": "`/settings/cli` ルートと Settings ナビゲーション項目はすでに利用可能です。",
+        "apiPending": "`GET/PUT /config/cli` とプロバイダー関連 API の準備が整うまで、CLI 設定の読み書きフックは保留です。",
+        "uiPending": "インタラクティブなフォーム、検証、読み込み状態、エラー状態は TASK-F3 で提供されます。"
       }
     },
     "mcp": {

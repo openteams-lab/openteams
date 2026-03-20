@@ -21,6 +21,8 @@
         "reposDesc": "Scripts et configuration des dépôts",
         "agents": "Agents",
         "agentsDesc": "Configurations des agents de codage",
+        "cli": "OpenTeams CLI",
+        "cliDesc": "Fournisseur, modèle et paramètres de comportement",
         "mcp": "Serveurs MCP",
         "mcpDesc": "Serveurs Model Context Protocol",
         "organizations": "Paramètres de l'organisation",
@@ -349,6 +351,99 @@
       "deleteConfigDialog": {
         "title": "Supprimer la configuration ?",
         "description": "Cela supprimera définitivement \"{{configName}}\" de l'exécuteur {{executorType}}. Cette action est irréversible."
+      }
+    },
+    "cli": {
+      "title": "OpenTeams CLI",
+      "description": "Gérez le fournisseur CLI intégré, le modèle et les paramètres de comportement d'exécution.",
+      "loading": "Chargement de la configuration CLI...",
+      "loadError": "Impossible de charger la configuration CLI.",
+      "save": {
+        "button": "Enregistrer les paramètres CLI",
+        "success": "Les paramètres CLI ont été enregistrés avec succès.",
+        "error": "Impossible d'enregistrer les paramètres CLI",
+        "unsavedChanges": "Vous avez des modifications non enregistrées",
+        "discard": "Ignorer"
+      },
+      "provider": {
+        "title": "Fournisseur",
+        "description": "Choisissez le fournisseur actif et configurez les identifiants ou endpoints personnalisés.",
+        "label": "Fournisseur par défaut",
+        "placeholder": "Sélectionner un fournisseur",
+        "helper": "Le CLI intégré utilisera ce fournisseur par défaut.",
+        "configured": "Configuré",
+        "notConfigured": "Non configuré",
+        "loading": "Chargement des métadonnées du fournisseur...",
+        "loadError": "Impossible de charger les métadonnées du fournisseur.",
+        "customNameLabel": "Nom du fournisseur",
+        "customNamePlaceholder": "ex. Mon Gateway",
+        "apiKeyLabel": "Clé API",
+        "apiKeyPlaceholder": "Saisir la clé API",
+        "apiKeyMasked": "Les clés enregistrées sont masquées. Laissez la valeur inchangée pour conserver la clé existante.",
+        "toggleApiKeyVisibility": "Afficher ou masquer la clé API",
+        "endpointLabel": "Endpoint personnalisé",
+        "endpointPlaceholder": "https://api.example.com/v1",
+        "endpointHelper": "Laissez vide pour utiliser l'endpoint par défaut du fournisseur."
+      },
+      "model": {
+        "title": "Modèle",
+        "description": "Sélectionnez ou saisissez le modèle par défaut pour le fournisseur actuel.",
+        "inputLabel": "ID du modèle",
+        "inputPlaceholder": "Saisir l'ID du modèle",
+        "required": "L'ID du modèle est obligatoire.",
+        "selectLabel": "Modèles suggérés",
+        "selectPlaceholder": "Sélectionner un modèle",
+        "selectHelper": "Choisissez un modèle suggéré ou saisissez un ID personnalisé ci-dessus.",
+        "loading": "Chargement des modèles...",
+        "loadError": "Impossible de charger les modèles pour ce fournisseur.",
+        "empty": "Aucun modèle suggéré n'est disponible pour ce fournisseur."
+      },
+      "behavior": {
+        "title": "Comportement",
+        "description": "Configurez les valeurs d'exécution par défaut pour l'exécuteur CLI.",
+        "autoApproveLabel": "Activer l'approbation automatique",
+        "autoApproveHelper": "Approuve automatiquement les actions prises en charge lorsque l'exécuteur CLI l'autorise.",
+        "autoCompactLabel": "Activer la compaction automatique",
+        "autoCompactHelper": "Compacte automatiquement les longues conversations lorsque l'exécuteur CLI le prend en charge."
+      },
+      "validation": {
+        "title": "Test de connexion",
+        "description": "Vérifiez la configuration actuelle du fournisseur avant d'enregistrer.",
+        "button": "Tester la connexion",
+        "testing": "Test en cours...",
+        "error": "Impossible de tester la connexion au fournisseur.",
+        "missingApiKey": "Saisissez une clé API avant de tester la connexion.",
+        "unsupportedCustom": "La validation de Custom Provider n'est pas encore implémentée côté backend.",
+        "unsupportedOllama": "La validation d'Ollama est actuellement indisponible, car l'endpoint de validation du backend exige encore une clé API.",
+        "successTitle": "Connexion réussie",
+        "failureTitle": "Échec de la connexion"
+      },
+      "status": {
+        "title": "Statut",
+        "description": "Cette route est prête, mais les API de configuration n'étaient pas encore disponibles. TASK-F2 et TASK-F3 continueront une fois les endpoints backend prêts."
+      },
+      "planned": {
+        "title": "Zones de configuration prévues",
+        "description": "La page complète sera implémentée sur les prochaines API backend.",
+        "provider": {
+          "title": "Fournisseur",
+          "description": "Sélectionnez le fournisseur par défaut et configurez les identifiants ou endpoints personnalisés."
+        },
+        "model": {
+          "title": "Modèle",
+          "description": "Choisissez la liste de modèles renvoyée par le fournisseur et conservez des valeurs par défaut cohérentes."
+        },
+        "behavior": {
+          "title": "Comportement",
+          "description": "Contrôlez l'approbation, la compaction et les autres préférences d'exécution du CLI."
+        }
+      },
+      "readiness": {
+        "title": "État actuel",
+        "description": "Ce qui est disponible maintenant et ce qui dépend encore du backend.",
+        "routeReady": "La route `/settings/cli` et l'entrée de navigation correspondante sont déjà disponibles.",
+        "apiPending": "Les hooks de lecture et d'écriture de la configuration CLI resteront bloqués tant que `GET/PUT /config/cli` et les API liées aux fournisseurs ne seront pas prêtes.",
+        "uiPending": "Le formulaire interactif, la validation, les états de chargement et les états d'erreur seront livrés dans TASK-F3."
       }
     },
     "mcp": {

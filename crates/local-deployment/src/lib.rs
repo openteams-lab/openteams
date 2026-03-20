@@ -10,6 +10,7 @@ use services::services::{
     approvals::Approvals,
     auth::AuthContext,
     chat_runner::ChatRunner,
+    cli_manager::CliManager,
     config::{Config, load_config_from_file, save_config_to_file},
     container::ContainerService,
     events::EventService,
@@ -59,6 +60,7 @@ pub struct LocalDeployment {
     auth_context: AuthContext,
     oauth_handoffs: Arc<RwLock<HashMap<Uuid, PendingHandoff>>>,
     pty: PtyService,
+    cli_manager: CliManager,
 }
 
 #[derive(Debug, Clone)]
@@ -203,6 +205,13 @@ impl Deployment for LocalDeployment {
             PrMonitorService::spawn(db, analytics, container, rc).await;
         }
 
+        let cli_manager = CliManager::new();
+        if cli_manager.is_available() {
+            tracing::info!("OpenTeams CLI binary found at {:?}", cli_manager.binary_path());
+        } else {
+            tracing::warn!("OpenTeams CLI binary not found; CLI features may be limited");
+        }
+
         let deployment = Self {
             config,
             user_id,
@@ -223,6 +232,7 @@ impl Deployment for LocalDeployment {
             auth_context,
             oauth_handoffs,
             pty,
+            cli_manager,
         };
 
         Ok(deployment)
@@ -353,5 +363,17 @@ impl LocalDeployment {
 
     pub fn pty(&self) -> &PtyService {
         &self.pty
+    }
+
+    pub fn cli_manager(&self) -> &CliManager {
+        &self.cli_manager
+    }
+
+    pub async fn start_cli(&self) -> Result<(String, u16), services::services::cli_manager::CliManagerError> {
+        self.cli_manager.start().await
+    }
+
+    pub async fn stop_cli(&self) -> Result<(), services::services::cli_manager::CliManagerError> {
+        self.cli_manager.stop().await
     }
 }

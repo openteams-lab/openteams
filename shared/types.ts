@@ -344,6 +344,14 @@ export type CheckEditorAvailabilityResponse = { available: boolean, };
 
 export type CheckAgentAvailabilityQuery = { executor: BaseCodingAgent, };
 
+export type ProviderInfo = { id: string, name: string, configured: boolean, };
+
+export type ModelInfo = { id: string, name: string, };
+
+export type ValidateProviderRequest = { api_key: string | null, endpoint: string | null, };
+
+export type ValidateProviderResponse = { valid: boolean, message: string, };
+
 export type CurrentUserResponse = { user_id: string, };
 
 export type CreateFollowUpAttempt = { prompt: string, executor_profile_id: ExecutorProfileId, retry_process_id: string | null, force_when_dirty: boolean | null, perform_git_reset: boolean | null, };
@@ -644,6 +652,30 @@ is_builtin: boolean,
  */
 enabled: boolean, };
 
+export type CliConfig = { provider: ProviderConfig, model: ModelConfig, behavior: BehaviorConfig, };
+
+export type ProviderConfig = { 
+/**
+ * Default provider name: anthropic, openai, google, openrouter, ollama, custom
+ */
+default: string, anthropic: ProviderCredentials | null, openai: ProviderCredentials | null, google: ProviderCredentials | null, openrouter: ProviderCredentials | null, ollama: OllamaConfig | null, custom: CustomProviderConfig | null, };
+
+export type ProviderCredentials = { api_key: string | null, endpoint: string | null, };
+
+export type OllamaConfig = { endpoint: string | null, };
+
+export type CustomProviderConfig = { name: string | null, endpoint: string | null, api_key: string | null, };
+
+export type ModelConfig = { 
+/**
+ * Default model name
+ */
+default: string, anthropic: ProviderModelConfig | null, openai: ProviderModelConfig | null, google: ProviderModelConfig | null, };
+
+export type ProviderModelConfig = { default: string | null, };
+
+export type BehaviorConfig = { auto_approve: boolean, auto_compact: boolean, };
+
 export type TeamProtocolConfig = { content: string, enabled: boolean, };
 
 export type GitBranch = { name: string, is_current: boolean, is_remote: boolean, last_commit_date: Date, };
@@ -678,9 +710,9 @@ export type ScriptRequest = { script: string, language: ScriptRequestLanguage, c
 
 export type ScriptRequestLanguage = "Bash";
 
-export enum BaseCodingAgent { CLAUDE_CODE = "CLAUDE_CODE", AMP = "AMP", GEMINI = "GEMINI", CODEX = "CODEX", OPENCODE = "OPENCODE", CURSOR_AGENT = "CURSOR_AGENT", QWEN_CODE = "QWEN_CODE", COPILOT = "COPILOT", DROID = "DROID", KIMI_CODE = "KIMI_CODE" }
+export enum BaseCodingAgent { CLAUDE_CODE = "CLAUDE_CODE", AMP = "AMP", GEMINI = "GEMINI", CODEX = "CODEX", OPENCODE = "OPENCODE", OPEN_TEAMS_CLI = "OPEN_TEAMS_CLI", CURSOR_AGENT = "CURSOR_AGENT", QWEN_CODE = "QWEN_CODE", COPILOT = "COPILOT", DROID = "DROID", KIMI_CODE = "KIMI_CODE" }
 
-export type CodingAgent = { "CLAUDE_CODE": ClaudeCode } | { "AMP": Amp } | { "GEMINI": Gemini } | { "CODEX": Codex } | { "OPENCODE": Opencode } | { "CURSOR_AGENT": CursorAgent } | { "QWEN_CODE": QwenCode } | { "COPILOT": Copilot } | { "DROID": Droid } | { "KIMI_CODE": KimiCode };
+export type CodingAgent = { "CLAUDE_CODE": ClaudeCode } | { "AMP": Amp } | { "GEMINI": Gemini } | { "CODEX": Codex } | { "OPENCODE": Opencode } | { "OPEN_TEAMS_CLI": OpenTeamsCli } | { "CURSOR_AGENT": CursorAgent } | { "QWEN_CODE": QwenCode } | { "COPILOT": Copilot } | { "DROID": Droid } | { "KIMI_CODE": KimiCode };
 
 export type SlashCommandDescription = { 
 /**
@@ -710,7 +742,7 @@ executor: BaseCodingAgent,
  */
 variant: string | null, };
 
-export type ExecutorConfig = { [key in string]?: { "CLAUDE_CODE": ClaudeCode } | { "AMP": Amp } | { "GEMINI": Gemini } | { "CODEX": Codex } | { "OPENCODE": Opencode } | { "CURSOR_AGENT": CursorAgent } | { "QWEN_CODE": QwenCode } | { "COPILOT": Copilot } | { "DROID": Droid } | { "KIMI_CODE": KimiCode } };
+export type ExecutorConfig = { [key in string]?: { "CLAUDE_CODE": ClaudeCode } | { "AMP": Amp } | { "GEMINI": Gemini } | { "CODEX": Codex } | { "OPENCODE": Opencode } | { "OPEN_TEAMS_CLI": OpenTeamsCli } | { "CURSOR_AGENT": CursorAgent } | { "QWEN_CODE": QwenCode } | { "COPILOT": Copilot } | { "DROID": Droid } | { "KIMI_CODE": KimiCode } };
 
 export type ExecutorConfigs = { executors: { [key in BaseCodingAgent]?: ExecutorConfig }, };
 
@@ -739,6 +771,16 @@ export type CursorAgent = { append_prompt: AppendPrompt, force?: boolean | null,
 export type Copilot = { append_prompt: AppendPrompt, model?: string | null, allow_all_tools?: boolean | null, allow_tool?: string | null, deny_tool?: string | null, add_dir?: Array<string> | null, disable_mcp_server?: Array<string> | null, base_command_override?: string | null, additional_params?: Array<string> | null, env?: { [key in string]?: string } | null, };
 
 export type Opencode = { append_prompt: AppendPrompt, model?: string | null, variant?: string | null, agent?: string | null, 
+/**
+ * Auto-approve agent actions
+ */
+auto_approve: boolean, 
+/**
+ * Enable auto-compaction when the context length approaches the model's context window limit
+ */
+auto_compact: boolean, base_command_override?: string | null, additional_params?: Array<string> | null, env?: { [key in string]?: string } | null, };
+
+export type OpenTeamsCli = { append_prompt: AppendPrompt, model?: string | null, variant?: string | null, agent?: string | null, 
 /**
  * Auto-approve agent actions
  */

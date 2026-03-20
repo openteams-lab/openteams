@@ -609,26 +609,41 @@ jobs:
             binary: openteams
             mcp_binary: openteams-mcp
             review_binary: openteams-review
+            cli_target: linux-x64
+            cli_build_output: openteams-cli-linux-x64
+            cli_binary: openteams-cli
           - target: x86_64-pc-windows-msvc
             name: windows-x64
             binary: openteams.exe
             mcp_binary: openteams-mcp.exe
             review_binary: openteams-review.exe
+            cli_target: windows-x64
+            cli_build_output: openteams-cli-windows-x64.exe
+            cli_binary: openteams-cli.exe
           - target: x86_64-apple-darwin
             name: macos-x64
             binary: openteams
             mcp_binary: openteams-mcp
             review_binary: openteams-review
+            cli_target: darwin-x64
+            cli_build_output: openteams-cli-darwin-x64
+            cli_binary: openteams-cli
           - target: aarch64-apple-darwin
             name: macos-arm64
             binary: openteams
             mcp_binary: openteams-mcp
             review_binary: openteams-review
+            cli_target: darwin-arm64
+            cli_build_output: openteams-cli-darwin-arm64
+            cli_binary: openteams-cli
           - target: aarch64-unknown-linux-musl
             name: linux-arm64
             binary: openteams
             mcp_binary: openteams-mcp
             review_binary: openteams-review
+            cli_target: linux-arm64
+            cli_build_output: openteams-cli-linux-arm64
+            cli_binary: openteams-cli
     steps:
       - uses: actions/checkout@v6
         with:
@@ -651,6 +666,26 @@ jobs:
           echo "Downloaded backend binaries:"
           find dist/
 
+      - name: Setup Bun for CLI build
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+
+      - name: Build CLI binary
+        run: |
+          if [ -d "openteams-cli" ]; then
+            echo "Building openteams-cli for ${{ matrix.cli_target }}..."
+            bun run scripts/build-openteams-cli.ts --target ${{ matrix.cli_target }}
+            mkdir -p dist
+            cp binaries/${{ matrix.cli_build_output }} dist/${{ matrix.cli_binary }}
+            if [[ "${{ matrix.name }}" != *"windows"* ]]; then
+              chmod +x dist/${{ matrix.cli_binary }}
+            fi
+            echo "CLI binary built: dist/${{ matrix.cli_binary }}"
+          else
+            echo "openteams-cli directory not found, skipping CLI build"
+          fi
+
       - name: Create platform package
         if: matrix.name != 'macos-arm64' && matrix.name != 'macos-x64'
         run: |
@@ -667,6 +702,14 @@ jobs:
           zip -j openteams-npx/dist/${{ matrix.name }}/openteams-mcp.zip openteams-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
           zip -j openteams-npx/dist/${{ matrix.name }}/openteams-review.zip openteams-review-${{ matrix.name }}/${{ matrix.review_binary }}
 
+          # Include CLI binary if it was built
+          if [ -f "dist/${{ matrix.cli_binary }}" ]; then
+            mkdir openteams-cli-${{ matrix.name }}
+            cp dist/${{ matrix.cli_binary }} openteams-cli-${{ matrix.name }}/
+            zip -j openteams-npx/dist/${{ matrix.name }}/openteams-cli.zip openteams-cli-${{ matrix.name }}/${{ matrix.cli_binary }}
+            echo "Packaged CLI binary"
+          fi
+
       - name: Create platform package (macOS)
         if: matrix.name == 'macos-arm64' || matrix.name == 'macos-x64'
         run: |
@@ -675,6 +718,14 @@ jobs:
           cp dist/openteams-${{ matrix.name }}* openteams-npx/dist/${{ matrix.name }}/openteams.zip
           cp dist/openteams-mcp-${{ matrix.name }}* openteams-npx/dist/${{ matrix.name }}/openteams-mcp.zip
           cp dist/openteams-review-${{ matrix.name }}* openteams-npx/dist/${{ matrix.name }}/openteams-review.zip
+
+          # Include CLI binary if it was built
+          if [ -f "dist/${{ matrix.cli_binary }}" ]; then
+            mkdir openteams-cli-${{ matrix.name }}
+            cp dist/${{ matrix.cli_binary }} openteams-cli-${{ matrix.name }}/
+            zip -j openteams-npx/dist/${{ matrix.name }}/openteams-cli.zip openteams-cli-${{ matrix.name }}/${{ matrix.cli_binary }}
+            echo "Packaged CLI binary"
+          fi
 
       - name: Upload platform package artifact
         uses: actions/upload-artifact@v6
@@ -814,7 +865,7 @@ jobs:
             const crypto = require('crypto');
             const manifest = { version: '$TAG', platforms: {} };
             const platforms = ['linux-x64', 'linux-arm64', 'windows-x64', 'macos-x64', 'macos-arm64'];
-            const binaries = ['openteams', 'openteams-mcp', 'openteams-review'];
+            const binaries = ['openteams', 'openteams-mcp', 'openteams-review', 'openteams-cli'];
 
             for (const platform of platforms) {
               manifest.platforms[platform] = {};
@@ -836,7 +887,7 @@ jobs:
 
           # Upload binaries (use full tag for path, allows multiple pre-releases to coexist)
           for platform in linux-x64 linux-arm64 windows-x64 macos-x64 macos-arm64; do
-            for binary in openteams openteams-mcp openteams-review; do
+            for binary in openteams openteams-mcp openteams-review openteams-cli; do
               if [ -f "binaries/$platform/$binary.zip" ]; then
                 echo "Uploading binaries/$platform/$binary.zip..."
                 aws s3 cp "binaries/$platform/$binary.zip" \
@@ -1334,6 +1385,8 @@ jobs:
             const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
             const requiredPlatforms = ["linux-x64", "linux-arm64", "windows-x64", "macos-x64", "macos-arm64"];
             const requiredBinaries = ["openteams", "openteams-mcp", "openteams-review"];
+            // CLI is optional for now during transition
+            const optionalBinaries = ["openteams-cli"];
 
             for (const platform of requiredPlatforms) {
               if (!manifest.platforms?.[platform]) {

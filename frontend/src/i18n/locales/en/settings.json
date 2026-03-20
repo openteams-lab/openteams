@@ -21,6 +21,8 @@
         "reposDesc": "Repository scripts and configuration",
         "agents": "Agents",
         "agentsDesc": "Coding agent configurations",
+        "cli": "OpenTeams CLI",
+        "cliDesc": "Provider, model, and behavior settings",
         "mcp": "MCP Servers",
         "mcpDesc": "Model Context Protocol servers",
         "organizations": "Organization Settings",
@@ -349,6 +351,99 @@
       "deleteConfigDialog": {
         "title": "Delete Configuration?",
         "description": "This will permanently remove \"{{configName}}\" from the {{executorType}} executor. You can't undo this action."
+      }
+    },
+    "cli": {
+      "title": "OpenTeams CLI",
+      "description": "Manage the built-in CLI provider, model, and runtime behavior settings.",
+      "loading": "Loading CLI configuration...",
+      "loadError": "Failed to load CLI configuration.",
+      "save": {
+        "button": "Save CLI Settings",
+        "success": "CLI settings saved successfully!",
+        "error": "Failed to save CLI settings",
+        "unsavedChanges": "You have unsaved changes",
+        "discard": "Discard"
+      },
+      "provider": {
+        "title": "Provider",
+        "description": "Choose the active provider and configure credentials or custom endpoints.",
+        "label": "Default provider",
+        "placeholder": "Select provider",
+        "helper": "The built-in CLI will use this provider by default.",
+        "configured": "Configured",
+        "notConfigured": "Not configured",
+        "loading": "Loading provider metadata...",
+        "loadError": "Failed to load provider metadata.",
+        "customNameLabel": "Provider name",
+        "customNamePlaceholder": "e.g. My Gateway",
+        "apiKeyLabel": "API key",
+        "apiKeyPlaceholder": "Enter API key",
+        "apiKeyMasked": "Saved keys are masked. Leave the value unchanged to keep the existing key.",
+        "toggleApiKeyVisibility": "Toggle API key visibility",
+        "endpointLabel": "Custom endpoint",
+        "endpointPlaceholder": "https://api.example.com/v1",
+        "endpointHelper": "Leave empty to use the provider default endpoint."
+      },
+      "model": {
+        "title": "Model",
+        "description": "Select or enter the default model for the current provider.",
+        "inputLabel": "Model ID",
+        "inputPlaceholder": "Enter model ID",
+        "required": "Model ID is required.",
+        "selectLabel": "Suggested models",
+        "selectPlaceholder": "Select model",
+        "selectHelper": "Choose a suggested model or type a custom ID above.",
+        "loading": "Loading models...",
+        "loadError": "Failed to load models for this provider.",
+        "empty": "No suggested models are available for this provider."
+      },
+      "behavior": {
+        "title": "Behavior",
+        "description": "Configure runtime defaults for the CLI executor.",
+        "autoApproveLabel": "Enable auto-approve",
+        "autoApproveHelper": "Automatically approve supported actions when the CLI executor allows it.",
+        "autoCompactLabel": "Enable auto-compact",
+        "autoCompactHelper": "Automatically compact long conversations when the CLI executor supports it."
+      },
+      "validation": {
+        "title": "Connection test",
+        "description": "Verify the current provider configuration before saving.",
+        "button": "Test Connection",
+        "testing": "Testing...",
+        "error": "Failed to test the provider connection.",
+        "missingApiKey": "Enter an API key before testing the connection.",
+        "unsupportedCustom": "Custom Provider validation is not implemented in the backend yet.",
+        "unsupportedOllama": "Ollama validation is currently unavailable because the backend validate endpoint still requires an API key.",
+        "successTitle": "Connection succeeded",
+        "failureTitle": "Connection failed"
+      },
+      "status": {
+        "title": "Status",
+        "description": "This route is ready, but configuration APIs are not available yet. TASK-F2 and TASK-F3 will continue once the backend endpoints are ready."
+      },
+      "planned": {
+        "title": "Planned configuration areas",
+        "description": "The full page will be implemented on top of the upcoming backend APIs.",
+        "provider": {
+          "title": "Provider",
+          "description": "Select the default provider and configure credentials or custom endpoints."
+        },
+        "model": {
+          "title": "Model",
+          "description": "Choose the model list returned by the provider and keep defaults consistent."
+        },
+        "behavior": {
+          "title": "Behavior",
+          "description": "Control approval, compaction, and other CLI runtime preferences."
+        }
+      },
+      "readiness": {
+        "title": "Current readiness",
+        "description": "What is available now versus what still depends on the backend.",
+        "routeReady": "The `/settings/cli` route and Settings navigation entry are available now.",
+        "apiPending": "CLI config read/write hooks are blocked until `GET/PUT /config/cli` and provider-related APIs are ready.",
+        "uiPending": "The interactive form, validation, loading, and error states will be delivered in TASK-F3."
       }
     },
     "mcp": {

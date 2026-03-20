@@ -5,6 +5,7 @@ import {
   GearIcon,
   CpuIcon,
   PlugIcon,
+  TerminalIcon,
   CaretLeftIcon,
   XIcon,
 } from '@phosphor-icons/react';
@@ -27,6 +28,7 @@ const SETTINGS_SECTIONS: {
 }[] = [
   { id: 'general', icon: GearIcon },
   { id: 'agents', icon: CpuIcon },
+  { id: 'cli', icon: TerminalIcon },
   { id: 'mcp', icon: PlugIcon },
 ];
 
