@@ -23,6 +23,7 @@ pub struct ChatSession {
     pub last_seen_diff_key: Option<String>,
     pub team_protocol: Option<String>,
     pub team_protocol_enabled: bool,
+    pub default_workspace_path: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub archived_at: Option<DateTime<Utc>>,
@@ -31,6 +32,7 @@ pub struct ChatSession {
 #[derive(Debug, Deserialize, TS)]
 pub struct CreateChatSession {
     pub title: Option<String>,
+    pub workspace_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -42,6 +44,7 @@ pub struct UpdateChatSession {
     pub last_seen_diff_key: Option<String>,
     pub team_protocol: Option<String>,
     pub team_protocol_enabled: Option<bool>,
+    pub default_workspace_path: Option<String>,
 }
 
 impl ChatSession {
@@ -60,6 +63,7 @@ impl ChatSession {
                           last_seen_diff_key,
                           team_protocol,
                           team_protocol_enabled as "team_protocol_enabled!: bool",
+                          default_workspace_path,
                           created_at as "created_at!: DateTime<Utc>",
                           updated_at as "updated_at!: DateTime<Utc>",
                           archived_at as "archived_at: DateTime<Utc>"
@@ -81,6 +85,7 @@ impl ChatSession {
                           last_seen_diff_key,
                           team_protocol,
                           team_protocol_enabled as "team_protocol_enabled!: bool",
+                          default_workspace_path,
                           created_at as "created_at!: DateTime<Utc>",
                           updated_at as "updated_at!: DateTime<Utc>",
                           archived_at as "archived_at: DateTime<Utc>"
@@ -105,6 +110,7 @@ impl ChatSession {
                       last_seen_diff_key,
                       team_protocol,
                       team_protocol_enabled as "team_protocol_enabled!: bool",
+                      default_workspace_path,
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>",
                       archived_at as "archived_at: DateTime<Utc>"
@@ -123,8 +129,8 @@ impl ChatSession {
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as!(
             ChatSession,
-            r#"INSERT INTO chat_sessions (id, title, status)
-               VALUES ($1, $2, $3)
+            r#"INSERT INTO chat_sessions (id, title, status, default_workspace_path)
+               VALUES ($1, $2, $3, $4)
                RETURNING id as "id!: Uuid",
                          title,
                          status as "status!: ChatSessionStatus",
@@ -133,12 +139,14 @@ impl ChatSession {
                          last_seen_diff_key,
                          team_protocol,
                          team_protocol_enabled as "team_protocol_enabled!: bool",
+                         default_workspace_path,
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>",
                          archived_at as "archived_at: DateTime<Utc>""#,
             id,
             data.title,
-            ChatSessionStatus::Active
+            ChatSessionStatus::Active,
+            data.workspace_path
         )
         .fetch_one(pool)
         .await
@@ -165,6 +173,10 @@ impl ChatSession {
         let team_protocol_enabled = data
             .team_protocol_enabled
             .unwrap_or(existing.team_protocol_enabled);
+        let default_workspace_path = data
+            .default_workspace_path
+            .clone()
+            .or(existing.default_workspace_path);
 
         let archived_at = if status == ChatSessionStatus::Archived {
             existing.archived_at.or(Some(Utc::now()))
@@ -183,6 +195,7 @@ impl ChatSession {
                    team_protocol = $7,
                    team_protocol_enabled = $8,
                    archived_at = $9,
+                   default_workspace_path = $10,
                    updated_at = datetime('now', 'subsec')
                WHERE id = $1
                RETURNING id as "id!: Uuid",
@@ -193,6 +206,7 @@ impl ChatSession {
                          last_seen_diff_key,
                          team_protocol,
                          team_protocol_enabled as "team_protocol_enabled!: bool",
+                         default_workspace_path,
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>",
                          archived_at as "archived_at: DateTime<Utc>""#,
@@ -204,7 +218,8 @@ impl ChatSession {
             last_seen_diff_key,
             team_protocol,
             team_protocol_enabled,
-            archived_at
+            archived_at,
+            default_workspace_path
         )
         .fetch_one(pool)
         .await

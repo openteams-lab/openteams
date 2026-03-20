@@ -112,13 +112,13 @@ export type CreateScratch = { payload: ScratchPayload, };
 
 export type UpdateScratch = { payload: ScratchPayload, };
 
-export type ChatSession = { id: string, title: string | null, status: ChatSessionStatus, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, team_protocol: string | null, team_protocol_enabled: boolean, created_at: string, updated_at: string, archived_at: string | null, };
+export type ChatSession = { id: string, title: string | null, status: ChatSessionStatus, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, team_protocol: string | null, team_protocol_enabled: boolean, default_workspace_path: string | null, created_at: string, updated_at: string, archived_at: string | null, };
 
 export enum ChatSessionStatus { active = "active", archived = "archived" }
 
-export type CreateChatSession = { title: string | null, };
+export type CreateChatSession = { title: string | null, workspace_path: string | null, };
 
-export type UpdateChatSession = { title: string | null, status: ChatSessionStatus | null, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, team_protocol: string | null, team_protocol_enabled: boolean | null, };
+export type UpdateChatSession = { title: string | null, status: ChatSessionStatus | null, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, team_protocol: string | null, team_protocol_enabled: boolean | null, default_workspace_path: string | null, };
 
 export type ChatAgent = { id: string, name: string, runner_type: string, system_prompt: string, tools_enabled: JsonValue, model_name: string | null, created_at: string, updated_at: string, };
 

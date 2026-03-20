@@ -488,6 +488,7 @@ pub async fn archive_session(
             last_seen_diff_key: None,
             team_protocol: None,
             team_protocol_enabled: None,
+            default_workspace_path: None,
         },
     )
     .await?;
@@ -528,6 +529,7 @@ pub async fn restore_session(
             last_seen_diff_key: None,
             team_protocol: None,
             team_protocol_enabled: None,
+            default_workspace_path: None,
         },
     )
     .await?;

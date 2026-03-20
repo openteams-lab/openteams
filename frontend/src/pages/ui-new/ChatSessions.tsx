@@ -40,6 +40,7 @@ import {
   withExecutorProfileVariant,
 } from '@/utils/executor';
 import { SettingsDialog } from '@/components/ui-new/dialogs/SettingsDialog';
+import { CreateSessionDialog } from './chat/components/CreateSessionDialog';
 
 import {
   type SessionMember,
@@ -1156,7 +1157,7 @@ export function ChatSessions() {
     hasBootstrappedInitialSessionRef.current = true;
     if (sortedSessions.length > 0) return;
 
-    createSession.mutate();
+    createSession.mutate(undefined);
   }, [createSession, isSessionsLoading, sortedSessions.length]);
 
   // Navigate to first session if needed
@@ -1699,12 +1700,12 @@ export function ChatSessions() {
     setNewMemberRunnerType('');
     setNewMemberVariant('DEFAULT');
     setNewMemberPrompt('');
-    setNewMemberWorkspace('');
+    setNewMemberWorkspace(activeSession?.default_workspace_path ?? '');
     setNewMemberSkillIds([]);
     setEditingMemberInitialSkillIds([]);
     setIsPromptEditorOpen(false);
     setPromptFileError(null);
-  }, []);
+  }, [activeSession?.default_workspace_path]);
 
   useEffect(() => {
     if (!activeSessionId) return;
@@ -2625,7 +2626,8 @@ export function ChatSessions() {
         const plan = buildMemberPresetImportPlan({
           preset,
           sessionId: importSessionId,
-          fallbackWorkspacePath: homeDirectory,
+          fallbackWorkspacePath:
+            activeSession?.default_workspace_path ?? homeDirectory,
           defaultRunnerType: config?.executor_profile?.executor ?? null,
           enabledRunnerTypes,
           availableRunnerTypes,
@@ -2843,8 +2845,9 @@ export function ChatSessions() {
       const plan = buildMemberPresetImportPlan({
         preset,
         sessionId: activeSessionId ?? 'preview',
-        fallbackWorkspacePath: homeDirectory,
-        defaultRunnerType: BaseCodingAgent.OPEN_TEAMS_CLI,
+        fallbackWorkspacePath:
+          activeSession?.default_workspace_path ?? homeDirectory,
+        defaultRunnerType: config?.executor_profile?.executor ?? null,
         enabledRunnerTypes,
         availableRunnerTypes,
         profiles,
@@ -3519,9 +3522,14 @@ export function ChatSessions() {
           setIsSkillsPanelOpen(false);
           navigate(`/chat/${id}`);
         }}
-        onCreateSession={() => {
+        onCreateSession={async () => {
           setIsSkillsPanelOpen(false);
-          createSession.mutate();
+          const result = await CreateSessionDialog.show({
+            existingSessions: sortedSessions,
+          });
+          if (result) {
+            createSession.mutate(result);
+          }
         }}
         isCreating={createSession.isPending}
         onOpenAiTeam={() => {

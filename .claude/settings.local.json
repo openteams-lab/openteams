@@ -17,7 +17,8 @@
       "Bash(powershell -Command \"\\(Get-Content ''.\\\\raw.log'' | Measure-Object -Line\\).Lines\")",
       "Bash(powershell -Command \"Get-Content ''.\\\\raw.log'' -Tail 5\")",
       "Bash(git rebase:*)",
-      "Bash(GIT_EDITOR=true git rebase --continue 2>&1)"
+      "Bash(GIT_EDITOR=true git rebase --continue 2>&1)",
+      "Bash(pnpm run:*)"
     ]
   }
 }

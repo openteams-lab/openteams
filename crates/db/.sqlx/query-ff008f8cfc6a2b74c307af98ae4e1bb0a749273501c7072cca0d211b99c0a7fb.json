@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: Uuid\",\n                          title,\n                          status as \"status!: ChatSessionStatus\",\n                          summary_text,\n                          archive_ref,\n                          last_seen_diff_key,\n                          team_protocol,\n                          team_protocol_enabled as \"team_protocol_enabled!: bool\",\n                          created_at as \"created_at!: DateTime<Utc>\",\n                          updated_at as \"updated_at!: DateTime<Utc>\",\n                          archived_at as \"archived_at: DateTime<Utc>\"\n                   FROM chat_sessions\n                   ORDER BY updated_at DESC",
+  "query": "SELECT id as \"id!: Uuid\",\n                      title,\n                      status as \"status!: ChatSessionStatus\",\n                      summary_text,\n                      archive_ref,\n                      last_seen_diff_key,\n                      team_protocol,\n                      team_protocol_enabled as \"team_protocol_enabled!: bool\",\n                      default_workspace_path,\n                      created_at as \"created_at!: DateTime<Utc>\",\n                      updated_at as \"updated_at!: DateTime<Utc>\",\n                      archived_at as \"archived_at: DateTime<Utc>\"\n               FROM chat_sessions\n               WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -44,23 +44,28 @@
         "type_info": "Integer"
       },
       {
-        "name": "created_at!: DateTime<Utc>",
+        "name": "default_workspace_path",
         "ordinal": 8,
         "type_info": "Text"
       },
       {
-        "name": "updated_at!: DateTime<Utc>",
+        "name": "created_at!: DateTime<Utc>",
         "ordinal": 9,
         "type_info": "Text"
       },
       {
-        "name": "archived_at: DateTime<Utc>",
+        "name": "updated_at!: DateTime<Utc>",
         "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "archived_at: DateTime<Utc>",
+        "ordinal": 11,
         "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       true,
@@ -71,10 +76,11 @@
       true,
       true,
       true,
+      true,
       false,
       false,
       true
     ]
   },
-  "hash": "5acd925988c2fcdbe8523e8cd1b2760d578f21dfc54d891e91e5a396a506a444"
+  "hash": "ff008f8cfc6a2b74c307af98ae4e1bb0a749273501c7072cca0d211b99c0a7fb"
 }

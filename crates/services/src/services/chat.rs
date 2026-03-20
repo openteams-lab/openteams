@@ -1901,7 +1901,7 @@ mod tests {
     }
 
     async fn create_active_session(pool: &SqlitePool) -> ChatSession {
-        ChatSession::create(pool, &CreateChatSession { title: None }, Uuid::new_v4())
+        ChatSession::create(pool, &CreateChatSession { title: None, workspace_path: None }, Uuid::new_v4())
             .await
             .expect("create chat session")
     }

@@ -51,6 +51,7 @@ pub async fn update_team_protocol(
             last_seen_diff_key: None,
             team_protocol: Some(content),
             team_protocol_enabled: Some(effective.enabled),
+            default_workspace_path: None,
         },
     )
     .await?;
