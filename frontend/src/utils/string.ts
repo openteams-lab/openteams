@@ -83,10 +83,16 @@ export function formatTokenUsage(info: TokenUsageDisplayInfo): string {
   if (typeof info.output_tokens === 'number') {
     parts.push(`out:${formatTokenCount(info.output_tokens)}`);
   }
-  if (typeof info.cache_read_tokens === 'number' && info.cache_read_tokens > 0) {
+  if (
+    typeof info.cache_read_tokens === 'number' &&
+    info.cache_read_tokens > 0
+  ) {
     parts.push(`cache_rd:${formatTokenCount(info.cache_read_tokens)}`);
   }
-  if (typeof info.cache_write_tokens === 'number' && info.cache_write_tokens > 0) {
+  if (
+    typeof info.cache_write_tokens === 'number' &&
+    info.cache_write_tokens > 0
+  ) {
     parts.push(`cache_wr:${formatTokenCount(info.cache_write_tokens)}`);
   }
 
