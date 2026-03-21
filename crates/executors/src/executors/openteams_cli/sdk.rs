@@ -1202,7 +1202,8 @@ pub async fn resolve_compaction_model(
     directory: &str,
     configured_model: Option<&str>,
 ) -> Result<ModelSpec, ExecutorError> {
-    if let Some(model) = resolve_request_model(client, base_url, directory, configured_model).await {
+    if let Some(model) = resolve_request_model(client, base_url, directory, configured_model).await
+    {
         return Ok(model);
     }
 
@@ -1825,12 +1826,9 @@ mod tests {
             default: HashMap::new(),
         };
 
-        let resolved = resolve_model_spec_from_config(
-            "gpt-5.3-codex-2026-02-24",
-            &providers,
-            Some("litellm"),
-        )
-        .expect("model should resolve");
+        let resolved =
+            resolve_model_spec_from_config("gpt-5.3-codex-2026-02-24", &providers, Some("litellm"))
+                .expect("model should resolve");
 
         assert_eq!(resolved.provider_id, "litellm");
         assert_eq!(resolved.model_id, "gpt-5.3-codex-2026-02-24");
@@ -1855,8 +1853,7 @@ mod tests {
         };
 
         assert!(
-            resolve_model_spec_from_config("gpt-5.3-codex-2026-02-24", &providers, None)
-                .is_none()
+            resolve_model_spec_from_config("gpt-5.3-codex-2026-02-24", &providers, None).is_none()
         );
     }
 

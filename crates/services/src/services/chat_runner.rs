@@ -51,6 +51,7 @@ use utils::{
     assets::{asset_dir, config_path},
     log_msg::LogMsg,
     msg_store::MsgStore,
+    process,
     utf8::Utf8LossyDecoder,
 };
 use uuid::Uuid;
@@ -94,6 +95,7 @@ const HISTORY_WORK_RECORDS_INSTRUCTION: &str = concat!(
 const RESERVED_USER_HANDLE: &str = "you";
 const PROTOCOL_SEND_INTENT_VALUES: &[&str] = &["request", "reply", "notify", "blocker", "confirm"];
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
+const EXECUTOR_GRACEFUL_STOP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
   {"type": "send", "to": "you", "intent": "request", "content": "I have finished the front implementation"},
   {"type": "send", "to": "architect", "intent": "confirm", "content": "The UI is ready. Please confirm the API contract before I continue."},
@@ -351,11 +353,22 @@ struct PendingMessage {
 }
 
 #[derive(Clone)]
+struct RunLifecycleControl {
+    stop: CancellationToken,
+}
+
+enum LifecycleEvent {
+    ProcessExited(std::io::Result<std::process::ExitStatus>),
+    ExitSignal(executors::executors::ExecutorExitResult),
+    StopRequested,
+}
+
+#[derive(Clone)]
 pub struct ChatRunner {
     db: DBService,
     streams: Arc<DashMap<Uuid, broadcast::Sender<ChatStreamEvent>>>,
-    // Store cancellation tokens for graceful shutdown, key = session_agent_id
-    cancellation_tokens: Arc<DashMap<Uuid, CancellationToken>>,
+    // Store per-run lifecycle controls, key = session_agent_id
+    run_controls: Arc<DashMap<Uuid, RunLifecycleControl>>,
     // Message queue for each session_agent, keyed by session_agent_id
     // When an agent is running, new messages are queued here and processed after completion
     pending_messages: Arc<DashMap<Uuid, VecDeque<PendingMessage>>>,
@@ -369,7 +382,7 @@ impl ChatRunner {
         Self {
             db,
             streams: Arc::new(DashMap::new()),
-            cancellation_tokens: Arc::new(DashMap::new()),
+            run_controls: Arc::new(DashMap::new()),
             pending_messages: Arc::new(DashMap::new()),
             background_compaction_inflight: Arc::new(DashMap::new()),
         }
@@ -1011,6 +1024,7 @@ impl ChatRunner {
                 &agent,
                 source_message,
                 &context_snapshot.workspace_path,
+                Path::new(&workspace_path),
                 &session_agents,
                 message_attachments.as_ref(),
                 reference_context.as_ref(),
@@ -2177,6 +2191,7 @@ impl ChatRunner {
         agent: &ChatAgent,
         message: &ChatMessage,
         context_dir: &Path,
+        workspace_path: &Path,
         session_agents: &[SessionAgentSummary],
         message_attachments: Option<&MessageAttachmentContext>,
         reference: Option<&ReferenceContext>,
@@ -2195,302 +2210,245 @@ impl ChatRunner {
             .collect::<Vec<_>>();
         let active_skills = Self::filter_active_skills(skills, Some(message.content.as_str()));
 
-        Self::push_markdown_section(&mut markdown, 1, "ChatGroup Message");
-        Self::push_markdown_section(&mut markdown, 2, "message");
-        Self::push_markdown_field(&mut markdown, "sender", &sender.label);
-        Self::push_markdown_content_block_field(&mut markdown, "content", &message.content, "text");
+        // Compute relative paths for context files
+        let messages_rel = pathdiff::diff_paths(&messages_path, workspace_path)
+            .unwrap_or_else(|| messages_path.clone());
+        let shared_blackboard_rel = pathdiff::diff_paths(&shared_blackboard_path, workspace_path)
+            .unwrap_or_else(|| shared_blackboard_path.clone());
+        let work_records_rel = pathdiff::diff_paths(&work_records_path, workspace_path)
+            .unwrap_or_else(|| work_records_path.clone());
+
+        markdown.push_str("# ChatGroup Message\n\n");
+
+        markdown.push_str("## Input Message\n");
+        markdown.push_str("- sender: ");
+        markdown.push_str(&sender.label);
+        markdown.push('\n');
+        markdown.push_str("- content:\n");
+        markdown.push_str("```text\n");
+        markdown.push_str(&message.content);
+        if !message.content.ends_with('\n') {
+            markdown.push('\n');
+        }
+        markdown.push_str("```\n");
         if let Some((intent, meaning)) = Self::routed_message_intent_context(message, &agent.name) {
-            Self::push_markdown_field(&mut markdown, "intent", &intent);
-            Self::push_markdown_field(&mut markdown, "intent_meaning", &meaning);
+            markdown.push_str("- intent: ");
+            markdown.push_str(&intent);
+            markdown.push('\n');
+            markdown.push_str("- intent_meaning: ");
+            markdown.push_str(&meaning);
+            markdown.push('\n');
         }
 
         if let Some(reference) = reference {
-            Self::push_markdown_section(&mut markdown, 3, "message.reference");
-            Self::push_markdown_field(
-                &mut markdown,
-                "note",
-                "User referenced the following historical message. Prioritize it.",
-            );
-            Self::push_markdown_field(
-                &mut markdown,
-                "message_id",
-                &reference.message_id.to_string(),
-            );
-            Self::push_markdown_field(&mut markdown, "sender", &reference.sender_label);
-            Self::push_markdown_field(
-                &mut markdown,
-                "sender_type",
-                &format!("{:?}", reference.sender_type),
-            );
-            Self::push_markdown_field(&mut markdown, "created_at", &reference.created_at);
-            Self::push_markdown_content_block_field(
-                &mut markdown,
-                "content",
-                &reference.content,
-                "text",
-            );
+            markdown.push_str("\n### Reference\n");
+            markdown.push_str("User referenced the following historical message. Prioritize it.\n");
+            markdown.push_str("- message_id: ");
+            markdown.push_str(&reference.message_id.to_string());
+            markdown.push('\n');
+            markdown.push_str("- sender: ");
+            markdown.push_str(&reference.sender_label);
+            markdown.push('\n');
+            markdown.push_str("- sender_type: ");
+            markdown.push_str(&format!("{:?}", reference.sender_type));
+            markdown.push('\n');
+            markdown.push_str("- created_at: ");
+            markdown.push_str(&reference.created_at);
+            markdown.push('\n');
+            markdown.push_str("- content:\n");
+            markdown.push_str("```text\n");
+            markdown.push_str(&reference.content);
+            if !reference.content.ends_with('\n') {
+                markdown.push('\n');
+            }
+            markdown.push_str("```\n");
 
             for (index, attachment) in reference.attachments.iter().enumerate() {
-                Self::push_markdown_section(
-                    &mut markdown,
-                    4,
-                    &format!("message.reference.attachments item {}", index + 1),
-                );
-                Self::push_markdown_field(&mut markdown, "name", &attachment.name);
-                Self::push_markdown_field(&mut markdown, "kind", &attachment.kind);
-                Self::push_markdown_number_field(
-                    &mut markdown,
-                    "size_bytes",
-                    attachment.size_bytes,
-                );
-                Self::push_markdown_field(
-                    &mut markdown,
-                    "mime_type",
-                    attachment.mime_type.as_deref().unwrap_or("unknown"),
-                );
-                Self::push_markdown_field(&mut markdown, "local_path", &attachment.local_path);
+                markdown.push_str(&format!("\n#### Attachment {}\n", index + 1));
+                markdown.push_str("- name: ");
+                markdown.push_str(&attachment.name);
+                markdown.push('\n');
+                markdown.push_str("- kind: ");
+                markdown.push_str(&attachment.kind);
+                markdown.push('\n');
+                markdown.push_str("- size_bytes: ");
+                markdown.push_str(&attachment.size_bytes.to_string());
+                markdown.push('\n');
+                markdown.push_str("- mime_type: ");
+                markdown.push_str(attachment.mime_type.as_deref().unwrap_or("unknown"));
+                markdown.push('\n');
+                markdown.push_str("- local_path: ");
+                markdown.push_str(&attachment.local_path);
+                markdown.push('\n');
             }
         }
 
         if let Some(attachments_ctx) = message_attachments {
             for (index, attachment) in attachments_ctx.attachments.iter().enumerate() {
-                Self::push_markdown_section(
-                    &mut markdown,
-                    3,
-                    &format!("message.attachments item {}", index + 1),
-                );
-                Self::push_markdown_field(&mut markdown, "name", &attachment.name);
-                Self::push_markdown_field(&mut markdown, "kind", &attachment.kind);
-                Self::push_markdown_number_field(
-                    &mut markdown,
-                    "size_bytes",
-                    attachment.size_bytes,
-                );
-                Self::push_markdown_field(
-                    &mut markdown,
-                    "mime_type",
-                    attachment.mime_type.as_deref().unwrap_or("unknown"),
-                );
-                Self::push_markdown_field(&mut markdown, "local_path", &attachment.local_path);
+                markdown.push_str(&format!("\n### Attachment {}\n", index + 1));
+                markdown.push_str("- name: ");
+                markdown.push_str(&attachment.name);
+                markdown.push('\n');
+                markdown.push_str("- kind: ");
+                markdown.push_str(&attachment.kind);
+                markdown.push('\n');
+                markdown.push_str("- size_bytes: ");
+                markdown.push_str(&attachment.size_bytes.to_string());
+                markdown.push('\n');
+                markdown.push_str("- mime_type: ");
+                markdown.push_str(attachment.mime_type.as_deref().unwrap_or("unknown"));
+                markdown.push('\n');
+                markdown.push_str("- local_path: ");
+                markdown.push_str(&attachment.local_path);
+                markdown.push('\n');
             }
         }
 
-        Self::set_trailing_newlines(&mut markdown, 2);
-        Self::push_markdown_section(&mut markdown, 1, "Must be obeyed");
-        Self::push_markdown_section(&mut markdown, 2, "output format (important)");
-        Self::push_markdown_bool_field(&mut markdown, "required", true);
-        Self::push_markdown_field(&mut markdown, "format", "json");
-        Self::push_markdown_field(&mut markdown, "container", "list");
-        Self::push_markdown_bool_field(&mut markdown, "only_send_items_enter_group_history", true);
-        Self::push_markdown_block_field(
-            &mut markdown,
-            "mandatory standards",
-            concat!(
-                "1. Return ONLY a valid JSON array.\n",
-                "2. Your final reply MUST be parseable by a standard JSON parser.\n",
-                "3. Escape all double quotes, backslashes, and newlines inside JSON string values.\n",
-                "4. Before sending, verify that every `content` value is still a valid JSON string after escaping.\n",
-                "5. The JSON array supports only these message types: send, artifact, conclusion, record.\n",
-                "6. Keep `send` messages concise, within 1-3 sentences. Put complex content into files saved in the current workspace.\n",
-                "7. `artifact` messages must only list current work outputs, keeping only essential information.\n",
-                "8. `conclusion` messages must contain only key findings and be no more than 3 sentences.\n",
-                "9. Do not include anything unrelated to the assigned work. Keep every reply concise and precise.\n",
-                "10. Use `to = \\\"you\\\"` when sending a message to the user.\n",
-                "11. Send a message only when it is essential.\n"
-            ),
-            "text",
+        markdown.push_str("\n## Output Requirements\n");
+        markdown.push_str(
+            "Return **only a JSON array** that must be parseable by a standard JSON parser.  \n",
+        );
+        markdown.push_str("Array items may only use these four message types: `send`, `record`, `artifact`, `conclusion`.\n\n");
+
+        markdown.push_str("### General Rules\n");
+        markdown.push_str("1. Output only content directly related to the current task.\n");
+        markdown.push_str("2. Keep messages concise. Put complex content into files in the current workspace instead of sending long text directly.\n");
+        markdown.push_str("3. Every `content` value must remain a valid JSON string, with quotes, backslashes, and newlines escaped properly.\n");
+        markdown.push_str("4. Send a `send` message only when necessary.\n");
+        markdown.push_str("5. When sending to the user, `to` must be `\"you\"`.\n\n");
+
+        markdown.push_str("### Message Types\n\n");
+
+        markdown.push_str("#### 1) send\n");
+        markdown.push_str("Fields:\n");
+        markdown.push_str("- Required: `type`, `to`, `content`\n");
+        markdown.push_str("- Optional: `intent`\n\n");
+        markdown.push_str("Rules:\n");
+        markdown.push_str("- One message targets exactly one receiver.\n");
+        markdown.push_str("- `to` must match a member name in `group members`.\n");
+        markdown.push_str("- `content` cannot be empty and should stay within 1 to 5 sentences.\n");
+        markdown.push_str(
+            "- Recommended `intent` values: `request`, `reply`, `notify`, `blocker`, `confirm`\n\n",
         );
 
-        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 1");
-        Self::push_markdown_field(&mut markdown, "type", "send");
-        Self::push_markdown_json_field(
-            &mut markdown,
-            "required_fields",
-            &["type", "to", "content"],
-        );
-        Self::push_markdown_json_field(&mut markdown, "optional_fields", &["intent"]);
-        Self::push_markdown_block_field(
-            &mut markdown,
-            "rules",
-            concat!(
-                "1. A send item targets exactly one receiver.\n",
-                "2. The recipient must be one of the member names listed in group members.\n",
-                "3. Use concise language with a clear goal.\n",
-                "4. Content can not be empty.\n",
-                "5. Prefer setting `intent` for machine-readable routing semantics.\n",
-                "6. Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply required; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.\n",
-                "7. The system will render the final group message as `@receiver content` and route it to that receiver.\n",
-            ),
-            "text",
-        );
+        markdown.push_str("#### 2) record\n");
+        markdown.push_str("Fields:\n");
+        markdown.push_str("- Required: `type`, `content`\n\n");
+        markdown.push_str("Rules:\n");
+        markdown.push_str("- Record only long-lived shared facts.\n");
+        markdown.push_str("- Do not write process notes, temporary status, or blockers.\n");
+        markdown.push_str("- Written to `");
+        markdown.push_str(&shared_blackboard_rel.to_string_lossy());
+        markdown.push_str("`.\n\n");
 
-        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 2");
-        Self::push_markdown_field(&mut markdown, "type", "record");
-        Self::push_markdown_bool_field(&mut markdown, "required", false);
-        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_RECORD_RULE);
+        markdown.push_str("#### 3) artifact\n");
+        markdown.push_str("Fields:\n");
+        markdown.push_str("- Required: `type`, `content`\n\n");
+        markdown.push_str("Rules:\n");
+        markdown.push_str("- Record only deliverables or concrete file paths.\n");
+        markdown.push_str("- Written to `");
+        markdown.push_str(&work_records_rel.to_string_lossy());
+        markdown.push_str("`.\n\n");
 
-        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 3");
-        Self::push_markdown_field(&mut markdown, "type", "artifact");
-        Self::push_markdown_bool_field(&mut markdown, "required", false);
-        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_ARTIFACT_RULE);
+        markdown.push_str("#### 4) conclusion\n");
+        markdown.push_str("Fields:\n");
+        markdown.push_str("- Required: `type`, `content`\n\n");
+        markdown.push_str("Rules:\n");
+        markdown.push_str("- Write only the current turn's summary, such as completed work, blockers, or next step.\n");
+        markdown.push_str("- Keep it within 3 sentences.\n");
+        markdown.push_str("- Do not write long-lived facts.\n");
+        markdown.push_str("- Written to `");
+        markdown.push_str(&work_records_rel.to_string_lossy());
+        markdown.push_str("`.\n\n");
 
-        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 4");
-        Self::push_markdown_field(&mut markdown, "type", "conclusion");
-        Self::push_markdown_bool_field(&mut markdown, "required", false);
-        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_CONCLUSION_RULE);
+        markdown.push_str("### Message Format Example\n");
+        markdown.push_str("```json\n");
+        markdown.push_str(MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON);
+        markdown.push_str("\n```\n\n");
 
-        Self::set_trailing_newlines(&mut markdown, 2);
-        Self::push_markdown_section(&mut markdown, 2, "output.example");
-        Self::push_markdown_block_field(
-            &mut markdown,
-            "json",
-            MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON,
-            "json",
-        );
-
-        Self::push_markdown_section(&mut markdown, 2, "agent");
-        Self::push_markdown_section(&mut markdown, 3, "role");
-        Self::push_markdown_field(&mut markdown, "name", &agent.name);
+        markdown.push_str("## Agent\n");
+        markdown.push_str("- name: ");
+        markdown.push_str(&agent.name);
+        markdown.push('\n');
         let normalized_system_prompt =
             Self::strip_embedded_team_protocol_from_system_prompt(&agent.system_prompt);
-        Self::push_markdown_block_field(&mut markdown, "role", &normalized_system_prompt, "text");
+        markdown.push_str("- role: ");
+        markdown.push_str(&normalized_system_prompt);
+        markdown.push('\n');
 
-        Self::push_markdown_section(&mut markdown, 3, "skills");
         if active_skills.is_empty() {
-            Self::push_markdown_field(
-                &mut markdown,
-                "restriction",
-                "You have no skills enabled. Do not attempt to use any skill.",
-            );
+            markdown.push_str("- skills: No skills enabled. Do not use any skills.\n");
         } else {
-            Self::push_markdown_block_field(
-                &mut markdown,
-                "restriction",
-                concat!(
-                    "Skills are available as local files in ~/.agents/skills and companion directories.\n",
-                    "You can ONLY use the skills listed below. Do not invent or use unlisted skills.\n",
-                ),
-                "text",
-            );
-            for (index, skill) in active_skills.iter().enumerate() {
-                Self::push_markdown_section(
-                    &mut markdown,
-                    4,
-                    &format!("agent.skills.allowed item {}", index + 1),
-                );
-                Self::push_markdown_field(&mut markdown, "name", &skill.name);
-                Self::push_markdown_field(&mut markdown, "description", &skill.description);
-            }
-        }
-
-        Self::set_trailing_newlines(&mut markdown, 3);
-        Self::push_markdown_section(&mut markdown, 2, "language");
-        Self::push_markdown_field(&mut markdown, "setting", prompt_language.setting);
-        Self::push_markdown_field(&mut markdown, "instruction", prompt_language.instruction);
-
-        Self::set_trailing_newlines(&mut markdown, 3);
-        Self::push_markdown_section(&mut markdown, 2, "team.protocol");
-        Self::push_markdown_bool_field(
-            &mut markdown,
-            "configured",
-            team_protocol.is_some_and(|content| !content.trim().is_empty()),
-        );
-        Self::push_markdown_block_field(
-            &mut markdown,
-            "guidelines",
-            &Self::resolve_team_protocol_guidelines(team_protocol),
-            "text",
-        );
-
-        Self::set_trailing_newlines(&mut markdown, 3);
-        Self::push_markdown_section(&mut markdown, 1, "Group Members");
-        Self::push_markdown_field(
-            &mut markdown,
-            "members_description",
-            "Other AI members currently in this group",
-        );
-        if visible_members.is_empty() {
-            markdown.push_str("_No other AI members._\n");
-        } else {
+            markdown.push_str("- skills: ");
+            let skill_names: Vec<&str> = active_skills.iter().map(|s| s.name.as_str()).collect();
+            markdown.push_str(&skill_names.join(", "));
             markdown.push('\n');
-            for (index, member) in visible_members.iter().enumerate() {
-                Self::push_markdown_section(
-                    &mut markdown,
-                    2,
-                    &format!("group.members item {}", index + 1),
-                );
-                Self::push_markdown_field(&mut markdown, "name", &member.name);
-                Self::push_markdown_field(
-                    &mut markdown,
-                    "responsibility",
-                    member.description.as_deref().unwrap_or("AI assistant"),
-                );
-                Self::push_markdown_field(&mut markdown, "state", &format!("{:?}", member.state));
-                Self::push_markdown_json_field(&mut markdown, "skills_used", &member.skills_used);
-            }
         }
 
-        Self::set_trailing_newlines(&mut markdown, 2);
-        Self::push_markdown_section(&mut markdown, 1, "History");
-        Self::push_markdown_section(&mut markdown, 2, "history.group_messages");
-        Self::push_markdown_field(&mut markdown, "path", &messages_path.to_string_lossy());
-        Self::push_markdown_field(&mut markdown, "format", "jsonl");
-        Self::push_markdown_field(
-            &mut markdown,
-            "description",
-            "Group chat history. Each line is a JSON message record containing sender and content, consistent with messages.jsonl history.",
-        );
-        Self::push_markdown_bool_field(&mut markdown, "optional", true);
-        Self::push_markdown_block_field(
-            &mut markdown,
-            "instruction",
-            HISTORY_GROUP_MESSAGES_INSTRUCTION,
-            "text",
-        );
+        markdown.push_str("- language: ");
+        markdown.push_str(prompt_language.setting);
+        markdown.push_str("\n\n");
 
-        Self::push_markdown_section(&mut markdown, 2, "history.shared_blackboard");
-        Self::push_markdown_field(
-            &mut markdown,
-            "path",
-            &shared_blackboard_path.to_string_lossy(),
-        );
-        Self::push_markdown_field(&mut markdown, "format", "jsonl");
-        Self::push_markdown_field(
-            &mut markdown,
-            "description",
-            "Persisted shared messages generated from record items.",
-        );
-        Self::push_markdown_field(
-            &mut markdown,
-            "instruction",
-            HISTORY_SHARED_BLACKBOARD_INSTRUCTION,
-        );
+        markdown.push_str("## Team Protocol\n");
+        if let Some(protocol) = team_protocol {
+            if !protocol.trim().is_empty() {
+                markdown.push_str(protocol.trim());
+                if !protocol.trim().ends_with('\n') {
+                    markdown.push('\n');
+                }
+            } else {
+                markdown.push_str("No team protocol configured.\n");
+            }
+        } else {
+            markdown.push_str("No team protocol configured.\n");
+        }
+        markdown.push('\n');
 
-        Self::push_markdown_section(&mut markdown, 2, "history.work_records");
-        Self::push_markdown_field(&mut markdown, "path", &work_records_path.to_string_lossy());
-        Self::push_markdown_field(&mut markdown, "format", "jsonl");
-        Self::push_markdown_field(
-            &mut markdown,
-            "description",
-            "Persisted work outputs and summaries generated from artifact/conclusion items.",
-        );
-        Self::push_markdown_field(
-            &mut markdown,
-            "instruction",
-            HISTORY_WORK_RECORDS_INSTRUCTION,
-        );
+        markdown.push_str("## Group Members\n");
+        if visible_members.is_empty() {
+            markdown.push_str("_None_\n\n");
+        } else {
+            for member in visible_members {
+                markdown.push_str("- ");
+                markdown.push_str(&member.name);
+                if let Some(desc) = &member.description {
+                    markdown.push_str(": ");
+                    markdown.push_str(desc);
+                }
+                markdown.push('\n');
+            }
+            markdown.push('\n');
+        }
 
-        Self::set_trailing_newlines(&mut markdown, 2);
-        Self::push_markdown_section(&mut markdown, 1, "envelope");
-        Self::push_markdown_field(&mut markdown, "session_id", &message.session_id.to_string());
-        Self::push_markdown_field(&mut markdown, "from", &sender.address);
-        Self::push_markdown_field(&mut markdown, "to", &format!("agent:{}", agent.name));
-        Self::push_markdown_field(&mut markdown, "message_id", &message.id.to_string());
-        Self::push_markdown_field(&mut markdown, "timestamp", &message.created_at.to_string());
-        Self::set_trailing_newlines(&mut markdown, 2);
+        markdown.push_str("## History\n");
+        markdown.push_str("Read history only when the task clearly depends on continuation, refinement, or prior context.  \n");
+        markdown.push_str("Available files:\n");
+        markdown.push_str("- `");
+        markdown.push_str(&messages_rel.to_string_lossy());
+        markdown.push_str("`\n");
+        markdown.push_str("- `");
+        markdown.push_str(&shared_blackboard_rel.to_string_lossy());
+        markdown.push_str("`\n");
+        markdown.push_str("- `");
+        markdown.push_str(&work_records_rel.to_string_lossy());
+        markdown.push_str("`\n\n");
+
+        markdown.push_str("## Envelope\n");
+        markdown.push_str("- session_id: ");
+        markdown.push_str(&message.session_id.to_string());
+        markdown.push('\n');
+        markdown.push_str("- from: ");
+        markdown.push_str(&sender.address);
+        markdown.push('\n');
+        markdown.push_str("- to: agent:");
+        markdown.push_str(&agent.name);
+        markdown.push('\n');
+        markdown.push_str("- message_id: ");
+        markdown.push_str(&message.id.to_string());
+        markdown.push('\n');
+        markdown.push_str("- timestamp: ");
+        markdown.push_str(&message.created_at.to_string());
+        markdown.push('\n');
 
         markdown
     }
@@ -2544,30 +2502,6 @@ impl ChatRunner {
     }
 
     fn push_markdown_block_field(markdown: &mut String, label: &str, value: &str, language: &str) {
-        markdown.push_str("- **");
-        markdown.push_str(label);
-        markdown.push_str("**:\n\n");
-
-        let fence = Self::markdown_fence_for_content(value);
-        markdown.push_str(&fence);
-        if !language.is_empty() {
-            markdown.push_str(language);
-        }
-        markdown.push('\n');
-        markdown.push_str(value);
-        if !value.ends_with('\n') {
-            markdown.push('\n');
-        }
-        markdown.push_str(&fence);
-        markdown.push_str("\n\n");
-    }
-
-    fn push_markdown_content_block_field(
-        markdown: &mut String,
-        label: &str,
-        value: &str,
-        language: &str,
-    ) {
         markdown.push_str("- **");
         markdown.push_str(label);
         markdown.push_str("**:\n\n");
@@ -3356,6 +3290,7 @@ impl ChatRunner {
         agent: &ChatAgent,
         message: &ChatMessage,
         context_path: &Path,
+        workspace_path: &Path,
         session_agents: &[SessionAgentSummary],
         message_attachments: Option<&MessageAttachmentContext>,
         reference: Option<&ReferenceContext>,
@@ -3369,6 +3304,7 @@ impl ChatRunner {
             agent,
             message,
             context_dir,
+            workspace_path,
             session_agents,
             message_attachments,
             reference,
@@ -4803,111 +4739,182 @@ impl ChatRunner {
 
     fn spawn_exit_watcher(
         &self,
-        mut child: command_group::AsyncGroupChild,
-        cancel_token: Option<CancellationToken>,
+        child: command_group::AsyncGroupChild,
+        executor_cancel: Option<CancellationToken>,
         exit_signal: Option<ExecutorExitSignal>,
         msg_store: Arc<MsgStore>,
         failed_flag: Arc<AtomicBool>,
         session_agent_id: Uuid,
     ) {
-        // Store the cancellation token for graceful shutdown
-        if let Some(ref token) = cancel_token {
-            self.cancellation_tokens
-                .insert(session_agent_id, token.clone());
-        }
+        let stop = CancellationToken::new();
+        self.run_controls
+            .insert(session_agent_id, RunLifecycleControl { stop: stop.clone() });
 
-        let finished_sent = Arc::new(AtomicBool::new(false));
-        let finished_from_exit_signal = Arc::new(AtomicBool::new(false));
-        let cancellation_tokens = self.cancellation_tokens.clone();
-        let process_finished = finished_sent.clone();
-        let process_finished_from_signal = finished_from_exit_signal.clone();
-        let process_msg_store = msg_store.clone();
-        let process_failed_flag = failed_flag.clone();
+        let run_controls = self.run_controls.clone();
         tokio::spawn(async move {
-            loop {
-                match child.try_wait() {
-                    Ok(Some(status)) => {
-                        let success = status.success();
+            Self::watch_executor_lifecycle(
+                child,
+                stop,
+                executor_cancel,
+                exit_signal,
+                msg_store,
+                failed_flag,
+                session_agent_id,
+            )
+            .await;
+            run_controls.remove(&session_agent_id);
+        });
+    }
+
+    async fn watch_executor_lifecycle(
+        child: command_group::AsyncGroupChild,
+        stop: CancellationToken,
+        executor_cancel: Option<CancellationToken>,
+        exit_signal: Option<ExecutorExitSignal>,
+        msg_store: Arc<MsgStore>,
+        failed_flag: Arc<AtomicBool>,
+        session_agent_id: Uuid,
+    ) {
+        Self::watch_executor_lifecycle_with_timeout(
+            child,
+            stop,
+            executor_cancel,
+            exit_signal,
+            msg_store,
+            failed_flag,
+            session_agent_id,
+            EXECUTOR_GRACEFUL_STOP_TIMEOUT,
+        )
+        .await;
+    }
+
+    async fn watch_executor_lifecycle_with_timeout(
+        mut child: command_group::AsyncGroupChild,
+        stop: CancellationToken,
+        executor_cancel: Option<CancellationToken>,
+        mut exit_signal: Option<ExecutorExitSignal>,
+        msg_store: Arc<MsgStore>,
+        failed_flag: Arc<AtomicBool>,
+        session_agent_id: Uuid,
+        graceful_timeout: std::time::Duration,
+    ) {
+        let event = Self::wait_for_lifecycle_event(
+            &mut child,
+            &stop,
+            &mut exit_signal,
+            &msg_store,
+            session_agent_id,
+        )
+        .await;
+
+        let mut failed = false;
+        match event {
+            LifecycleEvent::ProcessExited(Ok(status)) => {
+                tracing::debug!(
+                    session_agent_id = %session_agent_id,
+                    exit_success = status.success(),
+                    "[chat_runner] Executor process exited"
+                );
+                if !status.success() {
+                    failed = true;
+                }
+            }
+            LifecycleEvent::ProcessExited(Err(err)) => {
+                msg_store.push(LogMsg::Stderr(format!("process wait error: {err}")));
+                failed = true;
+            }
+            LifecycleEvent::ExitSignal(exit_result) => {
+                if matches!(
+                    exit_result,
+                    executors::executors::ExecutorExitResult::Failure
+                ) {
+                    failed = true;
+                }
+
+                match process::terminate_process_group(&mut child, graceful_timeout).await {
+                    Ok(cleanup) => {
                         tracing::debug!(
                             session_agent_id = %session_agent_id,
-                            exit_success = success,
-                            "[chat_runner] Executor process exited"
+                            forced_kill = cleanup.forced_kill,
+                            exit_success = cleanup.exit_status.success(),
+                            "[chat_runner] Executor exit signal cleanup finished"
                         );
-                        if !success {
-                            process_failed_flag.store(true, Ordering::Relaxed);
+                        if !cleanup.exit_status.success() {
+                            failed = true;
                         }
-                        if !process_finished.swap(true, Ordering::Relaxed) {
-                            process_msg_store.push_finished();
-                        }
-                        // If completion already came from exit_signal, token was cleaned there.
-                        if !process_finished_from_signal.load(Ordering::Relaxed) {
-                            cancellation_tokens.remove(&session_agent_id);
-                        }
-                        break;
-                    }
-                    Ok(None) => {
-                        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
                     }
                     Err(err) => {
-                        process_msg_store
-                            .push(LogMsg::Stderr(format!("process wait error: {err}")));
-                        process_failed_flag.store(true, Ordering::Relaxed);
-                        if !process_finished.swap(true, Ordering::Relaxed) {
-                            process_msg_store.push_finished();
-                        }
-                        if !process_finished_from_signal.load(Ordering::Relaxed) {
-                            cancellation_tokens.remove(&session_agent_id);
-                        }
-                        break;
+                        msg_store.push(LogMsg::Stderr(format!("process cleanup error: {err}")));
+                        failed = true;
                     }
                 }
             }
-        });
+            LifecycleEvent::StopRequested => {
+                if let Some(token) = executor_cancel.as_ref() {
+                    token.cancel();
+                }
 
-        if let Some(exit_signal_rx) = exit_signal {
-            let signal_msg_store = msg_store;
-            let signal_failed_flag = failed_flag;
-            let signal_finished = finished_sent;
-            let signal_finished_from_signal = finished_from_exit_signal;
-            let signal_cancel_token = cancel_token;
-            let signal_cancellation_tokens = self.cancellation_tokens.clone();
-            tokio::spawn(async move {
-                match exit_signal_rx.await {
-                    Ok(exit_result) => {
-                        if matches!(
-                            exit_result,
-                            executors::executors::ExecutorExitResult::Failure
-                        ) {
-                            signal_failed_flag.store(true, Ordering::Relaxed);
-                        }
-
-                        // Ignore completion emitted after manual cancellation (e.g. stop_agent).
-                        let manually_cancelled = signal_cancel_token
-                            .as_ref()
-                            .map(CancellationToken::is_cancelled)
-                            .unwrap_or(false);
-
-                        if !manually_cancelled {
-                            signal_finished_from_signal.store(true, Ordering::Relaxed);
-                            if !signal_finished.swap(true, Ordering::Relaxed) {
-                                signal_msg_store.push_finished();
-                            }
-                            signal_cancellation_tokens.remove(&session_agent_id);
-                        }
+                match process::terminate_process_group(&mut child, graceful_timeout).await {
+                    Ok(cleanup) => {
+                        tracing::debug!(
+                            session_agent_id = %session_agent_id,
+                            forced_kill = cleanup.forced_kill,
+                            exit_success = cleanup.exit_status.success(),
+                            "[chat_runner] Executor stop cleanup finished"
+                        );
                     }
                     Err(err) => {
-                        signal_msg_store
-                            .push(LogMsg::Stderr(format!("exit signal receive error: {err}")));
+                        msg_store.push(LogMsg::Stderr(format!("process cleanup error: {err}")));
                     }
                 }
-            });
+                failed = true;
+            }
+        }
+
+        failed_flag.store(failed, Ordering::Relaxed);
+        msg_store.push_finished();
+    }
+
+    async fn wait_for_lifecycle_event(
+        child: &mut command_group::AsyncGroupChild,
+        stop: &CancellationToken,
+        exit_signal: &mut Option<ExecutorExitSignal>,
+        msg_store: &MsgStore,
+        session_agent_id: Uuid,
+    ) -> LifecycleEvent {
+        loop {
+            tokio::select! {
+                status = child.wait() => {
+                    return LifecycleEvent::ProcessExited(status);
+                }
+                _ = stop.cancelled() => {
+                    return LifecycleEvent::StopRequested;
+                }
+                signal_result = async {
+                    let signal = exit_signal.as_mut().expect("exit signal checked");
+                    signal.await
+                }, if exit_signal.is_some() => {
+                    match signal_result {
+                        Ok(exit_result) => return LifecycleEvent::ExitSignal(exit_result),
+                        Err(err) => {
+                            msg_store.push(LogMsg::Stderr(format!("exit signal receive error: {err}")));
+                            tracing::warn!(
+                                session_agent_id = %session_agent_id,
+                                error = %err,
+                                "[chat_runner] Exit signal closed before process exit"
+                            );
+                            *exit_signal = None;
+                        }
+                    }
+                }
+            }
         }
     }
 
-    /// Stop a running agent by triggering graceful cancellation via CancellationToken
+    /// Stop a running agent by requesting centralized lifecycle cleanup.
     pub async fn stop_agent(
         &self,
-        session_id: Uuid,
+        _session_id: Uuid,
         session_agent_id: Uuid,
     ) -> Result<(), ChatRunnerError> {
         tracing::info!(
@@ -4915,44 +4922,18 @@ impl ChatRunner {
             session_agent_id
         );
 
-        // Try to cancel the agent via CancellationToken (graceful shutdown)
-        let token_found = self.cancellation_tokens.contains_key(&session_agent_id);
-        tracing::info!("CancellationToken found: {}", token_found);
+        let control_found = self.run_controls.contains_key(&session_agent_id);
+        tracing::info!("Run control found: {}", control_found);
 
-        if let Some(token) = self.cancellation_tokens.get(&session_agent_id) {
-            tracing::info!(
-                "Cancelling agent for session_agent_id: {}",
-                session_agent_id
-            );
-            token.cancel();
+        if let Some(control) = self.run_controls.get(&session_agent_id) {
+            tracing::info!("Requesting stop for session_agent_id: {}", session_agent_id);
+            control.stop.cancel();
         } else {
             tracing::warn!(
-                "No CancellationToken found for session_agent_id: {}",
+                "No run control found for session_agent_id: {}",
                 session_agent_id
             );
         }
-
-        // Update state to Dead
-        let session_agent = ChatSessionAgent::update_state(
-            &self.db.pool,
-            session_agent_id,
-            ChatSessionAgentState::Dead,
-        )
-        .await?;
-
-        // Emit state change event
-        self.emit(
-            session_id,
-            ChatStreamEvent::AgentState {
-                session_agent_id,
-                agent_id: session_agent.agent_id,
-                state: ChatSessionAgentState::Dead,
-                started_at: None,
-            },
-        );
-
-        // Clean up the cancellation token
-        self.cancellation_tokens.remove(&session_agent_id);
 
         Ok(())
     }
@@ -4960,16 +4941,26 @@ impl ChatRunner {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{
+        path::Path,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+    };
 
     use chrono::Utc;
+    use command_group::AsyncCommandGroup;
     use db::models::{
         chat_agent::ChatAgent,
         chat_message::{ChatMessage, ChatSenderType},
         chat_session_agent::ChatSessionAgentState,
         chat_skill::ChatSkill,
     };
+    use executors::executors::CancellationToken;
     use serde_json::json;
+    use tokio::{process::Command, sync::oneshot};
+    use utils::{log_msg::LogMsg, msg_store::MsgStore};
     use uuid::Uuid;
 
     use super::{
@@ -5034,6 +5025,35 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
+    }
+
+    fn sleep_command(seconds: u64) -> Command {
+        #[cfg(windows)]
+        {
+            let mut command = Command::new("powershell");
+            command.args([
+                "-NoLogo",
+                "-NoProfile",
+                "-Command",
+                &format!("Start-Sleep -Seconds {seconds}"),
+            ]);
+            command
+        }
+
+        #[cfg(unix)]
+        {
+            let mut command = Command::new("sh");
+            command.args(["-lc", &format!("sleep {seconds}")]);
+            command
+        }
+    }
+
+    fn finished_count(msg_store: &MsgStore) -> usize {
+        msg_store
+            .get_history()
+            .into_iter()
+            .filter(|msg| matches!(msg, LogMsg::Finished))
+            .count()
     }
 
     #[test]
@@ -5148,6 +5168,67 @@ mod tests {
         let content = r#"[{"type":"conclusion","content":"   "}]"#;
         let err = ChatRunner::parse_agent_protocol_messages(content).expect_err("error");
         assert_eq!(err.code, ChatProtocolNoticeCode::EmptyMessage);
+    }
+
+    #[tokio::test]
+    async fn exit_signal_waits_for_cleanup_before_finished() {
+        let child = sleep_command(1).group_spawn().expect("spawn child");
+        let stop = CancellationToken::new();
+        let msg_store = Arc::new(MsgStore::new());
+        let failed_flag = Arc::new(AtomicBool::new(false));
+        let (exit_tx, exit_rx) = oneshot::channel();
+        exit_tx
+            .send(executors::executors::ExecutorExitResult::Success)
+            .expect("send exit signal");
+
+        let watcher = tokio::spawn(ChatRunner::watch_executor_lifecycle_with_timeout(
+            child,
+            stop,
+            None,
+            Some(exit_rx),
+            msg_store.clone(),
+            failed_flag.clone(),
+            Uuid::new_v4(),
+            std::time::Duration::from_secs(3),
+        ));
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert_eq!(finished_count(&msg_store), 0);
+
+        watcher.await.expect("watcher complete");
+
+        assert_eq!(finished_count(&msg_store), 1);
+        assert!(!failed_flag.load(Ordering::Relaxed));
+    }
+
+    #[tokio::test]
+    async fn stop_request_uses_same_cleanup_flow() {
+        let child = sleep_command(30).group_spawn().expect("spawn child");
+        let stop = CancellationToken::new();
+        let executor_cancel = CancellationToken::new();
+        let msg_store = Arc::new(MsgStore::new());
+        let failed_flag = Arc::new(AtomicBool::new(false));
+
+        let watcher = tokio::spawn(ChatRunner::watch_executor_lifecycle_with_timeout(
+            child,
+            stop.clone(),
+            Some(executor_cancel.clone()),
+            None,
+            msg_store.clone(),
+            failed_flag.clone(),
+            Uuid::new_v4(),
+            std::time::Duration::from_millis(100),
+        ));
+
+        stop.cancel();
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        assert_eq!(finished_count(&msg_store), 0);
+
+        watcher.await.expect("watcher complete");
+
+        assert!(executor_cancel.is_cancelled());
+        assert!(failed_flag.load(Ordering::Relaxed));
+        assert_eq!(finished_count(&msg_store), 1);
     }
 
     #[test]
@@ -5526,6 +5607,7 @@ mod tests {
             &agent,
             &message,
             Path::new(r"E:\workspace\projectSS\MainPage2\.openteams\context\demo"),
+            Path::new(r"E:\workspace\projectSS\MainPage2"),
             &[],
             None,
             None,
@@ -5538,9 +5620,9 @@ mod tests {
             Some("Follow the team protocol."),
         );
 
-        assert!(prompt.contains("- **intent**: confirm"));
-        assert!(prompt.contains("- **intent_meaning**: Explicit confirmation is required."));
-        assert!(prompt.contains("## team.protocol"));
+        assert!(prompt.contains("- intent: confirm"));
+        assert!(prompt.contains("- intent_meaning: Explicit confirmation is required."));
+        assert!(prompt.contains("## Team Protocol"));
         assert!(prompt.contains("Follow the team protocol."));
     }
 
@@ -5554,6 +5636,7 @@ mod tests {
             &agent,
             &message,
             Path::new(r"E:\workspace\projectSS\MainPage2\.openteams\context\demo"),
+            Path::new(r"E:\workspace\projectSS\MainPage2"),
             &[],
             None,
             None,
@@ -5566,9 +5649,8 @@ mod tests {
             Some(" "),
         );
 
-        assert!(prompt.contains("## team.protocol"));
-        assert!(prompt.contains("- **configured**: false"));
-        assert!(prompt.contains("no team collaboration protocol"));
+        assert!(prompt.contains("## Team Protocol"));
+        assert!(prompt.contains("No team protocol configured."));
     }
 
     #[test]
@@ -5605,6 +5687,7 @@ mod tests {
             Path::new(
                 r"E:\workspace\projectSS\MainPage2\.openteams\context\1475cda0-6f11-464e-a61a-7dc81217810e",
             ),
+            Path::new(r"E:\workspace\projectSS\MainPage2"),
             &[],
             None,
             None,
@@ -5619,47 +5702,42 @@ mod tests {
 
         // Verify key sections exist instead of exact string match
         assert!(prompt.contains("# ChatGroup Message"));
-        assert!(prompt.contains("## message"));
-        assert!(prompt.contains("- **sender**: you"));
+        assert!(prompt.contains("## Input Message"));
+        assert!(prompt.contains("- sender: you"));
         assert!(prompt.contains("@fullstack"));
-        assert!(prompt.contains("# Must be obeyed"));
-        assert!(prompt.contains("## output format (important)"));
-        assert!(prompt.contains("- **required**: true"));
-        assert!(prompt.contains("- **format**: json"));
-        assert!(prompt.contains("- **container**: list"));
-        assert!(prompt.contains("- **only_send_items_enter_group_history**: true"));
-        assert!(prompt.contains("- **mandatory standards**:"));
-        assert!(prompt.contains("1. Return ONLY a valid JSON array."));
-        assert!(prompt.contains("11. Send a message only when it is essential."));
-        assert!(prompt.contains("### output.message_types item 1"));
-        assert!(prompt.contains("- **type**: send"));
-        assert!(prompt.contains("### output.message_types item 2"));
-        assert!(prompt.contains("- **type**: record"));
-        assert!(prompt.contains("### output.message_types item 3"));
-        assert!(prompt.contains("- **type**: artifact"));
-        assert!(prompt.contains("### output.message_types item 4"));
-        assert!(prompt.contains("- **type**: conclusion"));
-        assert!(prompt.contains("## output.example"));
-        assert!(prompt.contains("## agent"));
-        assert!(prompt.contains("- **name**: fullstack"));
+        assert!(prompt.contains("## Output Requirements"));
+        assert!(prompt.contains("### General Rules"));
+        assert!(prompt.contains("### Message Types"));
+        assert!(prompt.contains("#### 1) send"));
+        assert!(prompt.contains("#### 2) record"));
+        assert!(prompt.contains("#### 3) artifact"));
+        assert!(prompt.contains("#### 4) conclusion"));
+        assert!(prompt.contains("### Message Format Example"));
+        assert!(prompt.contains("## Agent"));
+        assert!(prompt.contains("- name: fullstack"));
         assert!(prompt.contains("Full-stack Engineer"));
-        assert!(prompt.contains("## language"));
-        assert!(prompt.contains("- **setting**: simplified_chinese"));
-        assert!(prompt.contains("You MUST respond in Simplified Chinese."));
-        assert!(prompt.contains("## team.protocol"));
-        assert!(prompt.contains("- **configured**: true"));
+        assert!(prompt.contains("- language: simplified_chinese"));
+        assert!(prompt.contains("## Team Protocol"));
         assert!(prompt.contains("Follow the team protocol."));
-        assert!(prompt.contains("# Group Members"));
-        assert!(prompt.contains("# History"));
-        assert!(prompt.contains("## history.group_messages"));
-        assert!(prompt.contains("## history.shared_blackboard"));
-        assert!(prompt.contains("## history.work_records"));
-        assert!(prompt.contains("# envelope"));
-        assert!(prompt.contains("- **session_id**: 1475cda0-6f11-464e-a61a-7dc81217810e"));
-        assert!(prompt.contains("- **from**: user:you"));
-        assert!(prompt.contains("- **to**: agent:fullstack"));
-        assert!(prompt.contains("- **message_id**: 88bd7b05-1ba3-407c-8ca3-a52f14c8aced"));
-        assert!(prompt.contains("- **timestamp**: 2026-03-10 06:22:12.973 UTC"));
+        assert!(prompt.contains("## Group Members"));
+        assert!(prompt.contains("## History"));
+        assert!(
+            prompt.contains(
+                ".openteams\\context\\1475cda0-6f11-464e-a61a-7dc81217810e\\messages.jsonl"
+            )
+        );
+        assert!(prompt.contains(
+            ".openteams\\context\\1475cda0-6f11-464e-a61a-7dc81217810e\\shared_blackboard.jsonl"
+        ));
+        assert!(prompt.contains(
+            ".openteams\\context\\1475cda0-6f11-464e-a61a-7dc81217810e\\work_records.jsonl"
+        ));
+        assert!(prompt.contains("## Envelope"));
+        assert!(prompt.contains("- session_id: 1475cda0-6f11-464e-a61a-7dc81217810e"));
+        assert!(prompt.contains("- from: user:you"));
+        assert!(prompt.contains("- to: agent:fullstack"));
+        assert!(prompt.contains("- message_id: 88bd7b05-1ba3-407c-8ca3-a52f14c8aced"));
+        assert!(prompt.contains("- timestamp: 2026-03-10 06:22:12.973 UTC"));
     }
 
     #[test]

@@ -98,9 +98,10 @@ pub async fn delete_agent(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::Utc;
     use serde_json::json;
+
+    use super::*;
 
     fn make_agent(tools_enabled: Value, model_name: Option<&str>) -> ChatAgent {
         ChatAgent {
@@ -159,7 +160,10 @@ mod tests {
 
     #[test]
     fn ignores_non_execution_changes() {
-        let agent = make_agent(json!({ "executor_profile_variant": "AUTO_MODEL_GPT_5_2" }), None);
+        let agent = make_agent(
+            json!({ "executor_profile_variant": "AUTO_MODEL_GPT_5_2" }),
+            None,
+        );
         let payload = UpdateChatAgent {
             name: Some("new-backend".to_string()),
             runner_type: None,

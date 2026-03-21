@@ -182,6 +182,15 @@ export function ChatMessageItem({
       })
     : null;
   const protocolError = extractProtocolErrorMeta(message.meta);
+  const errorInfo = extractErrorFromMeta(message.meta);
+  const apiError =
+    isAgent && !errorInfo
+      ? detectApiError(message.content, { requireStandalone: true })
+      : null;
+  const isWarningApiError =
+    apiError?.type === 'quota_exceeded' ||
+    apiError?.type === 'rate_limit' ||
+    apiError?.type === 'context_limit';
   const shouldSuppressProtocolErrorCard =
     protocolError?.code !== null &&
     protocolError?.code !== undefined &&
@@ -245,7 +254,6 @@ export function ChatMessageItem({
       );
     }
 
-    const errorInfo = extractErrorFromMeta(message.meta);
     const hasError = !!errorInfo;
 
     return (
@@ -439,47 +447,38 @@ export function ChatMessageItem({
                     )}
                 </div>
               )}
-              {(() => {
-                const apiError = isAgent
-                  ? detectApiError(message.content)
-                  : null;
-                const isWarningApiError =
-                  apiError?.type === 'quota_exceeded' ||
-                  apiError?.type === 'rate_limit' ||
-                  apiError?.type === 'context_limit';
-                return apiError ? (
-                  <div
-                    className={cn(
-                      'mb-half flex items-center gap-half rounded-sm border px-base py-half text-xs',
+              {apiError && (
+                <div
+                  className={cn(
+                    'mb-half flex items-center gap-half rounded-sm border px-base py-half text-xs',
+                    isWarningApiError
+                      ? 'bg-[rgba(245,158,11,0.10)] border-[rgba(245,158,11,0.35)] text-[#F59E0B]'
+                      : 'bg-[rgba(239,68,68,0.10)] border-[rgba(239,68,68,0.35)] text-[#EF4444]'
+                  )}
+                >
+                  {isWarningApiError ? (
+                    <WarningCircleIcon
+                      className="size-icon-sm flex-shrink-0"
+                      weight="fill"
+                    />
+                  ) : (
+                    <XCircleIcon
+                      className="size-icon-sm flex-shrink-0"
+                      weight="fill"
+                    />
+                  )}
+                  <span className="font-medium">{apiError.message}</span>
+                  <span
+                    className={
                       isWarningApiError
-                        ? 'bg-[rgba(245,158,11,0.10)] border-[rgba(245,158,11,0.35)] text-[#F59E0B]'
-                        : 'bg-[rgba(239,68,68,0.10)] border-[rgba(239,68,68,0.35)] text-[#EF4444]'
-                    )}
+                        ? 'text-[rgba(245,158,11,0.78)]'
+                        : 'text-[rgba(239,68,68,0.78)]'
+                    }
                   >
-                    {isWarningApiError ? (
-                      <WarningCircleIcon
-                        className="size-icon-sm flex-shrink-0"
-                        weight="fill"
-                      />
-                    ) : (
-                      <XCircleIcon
-                        className="size-icon-sm flex-shrink-0"
-                        weight="fill"
-                      />
-                    )}
-                    <span className="font-medium">{apiError.message}</span>
-                    <span
-                      className={
-                        isWarningApiError
-                          ? 'text-[rgba(245,158,11,0.78)]'
-                          : 'text-[rgba(239,68,68,0.78)]'
-                      }
-                    >
-                      - {t('message.apiError.checkQuota')}
-                    </span>
-                  </div>
-                ) : null;
-              })()}
+                    - {t('message.apiError.checkQuota')}
+                  </span>
+                </div>
+              )}
               {isRawFallbackMessage && (
                 <div className="mb-half flex items-center gap-half">
                   <Badge
@@ -493,7 +492,6 @@ export function ChatMessageItem({
                 </div>
               )}
               {(() => {
-                const errorInfo = extractErrorFromMeta(message.meta);
                 const isErrorMessageOnly =
                   errorInfo &&
                   (message.content.trim() === '' ||

@@ -48,3 +48,7 @@ export function useSettingsDirty() {
   }
   return context;
 }
+
+export function useOptionalSettingsDirty() {
+  return useContext(SettingsDirtyContext);
+}

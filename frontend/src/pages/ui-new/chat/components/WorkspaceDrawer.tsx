@@ -20,6 +20,7 @@ import {
 import type { RunHistoryItem } from '../types';
 import {
   detectApiError,
+  extractErrorFromMeta,
   extractMentionFailureMeta,
   extractProtocolErrorMeta,
 } from '../utils';
@@ -74,15 +75,22 @@ export function WorkspaceDrawer({
     for (const message of messages) {
       // 1. Agent messages with API errors
       if (message.sender_type === 'agent' && message.sender_id === agent.id) {
-        const apiError = detectApiError(message.content);
-        if (apiError) {
+        const errorInfo = extractErrorFromMeta(message.meta);
+        const apiError = errorInfo
+          ? null
+          : detectApiError(message.content, { requireStandalone: true });
+        if (errorInfo || apiError) {
           failed.push({
             message,
             errorType: 'api',
-            errorSummary: apiError.message,
-            errorDetail: apiError.provider
-              ? `Provider: ${apiError.provider}`
-              : undefined,
+            errorSummary: errorInfo?.summary ?? apiError?.message ?? '',
+            errorDetail: errorInfo
+              ? errorInfo.content !== errorInfo.summary
+                ? errorInfo.content
+                : undefined
+              : apiError?.provider
+                ? `Provider: ${apiError.provider}`
+                : undefined,
           });
         }
         continue;
