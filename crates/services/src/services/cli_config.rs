@@ -286,10 +286,10 @@ pub struct OpenTeamsCliConfig {
 
 impl OpenTeamsCliConfig {
     pub fn config_path() -> Option<std::path::PathBuf> {
-        dirs::config_dir().map(|c| c.join("openteams-cli").join("openteams.json"))
+        dirs::home_dir().map(|h| h.join(".config").join("openteams-cli").join("openteams.json"))
     }
 
     pub fn config_dir() -> Option<std::path::PathBuf> {
-        dirs::config_dir().map(|c| c.join("openteams-cli"))
+        dirs::home_dir().map(|h| h.join(".config").join("openteams-cli"))
     }
 }

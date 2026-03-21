@@ -444,6 +444,99 @@
         "routeReady": "已可通过 `/settings/cli` 访问页面，并在设置导航中显示入口。",
         "apiPending": "CLI 配置读写 hooks 需等待 `GET/PUT /config/cli` 及 provider 相关接口就绪。",
         "uiPending": "完整表单、校验、加载态和错误态会在 TASK-F3 中交付。"
+      },
+      "customProviders": {
+        "title": "自定义提供商",
+        "description": "管理会直接同步到 openteams-cli 配置中的自定义提供商条目。",
+        "loading": "正在加载自定义提供商...",
+        "loadError": "加载自定义提供商失败。",
+        "empty": {
+          "title": "还没有自定义提供商",
+          "description": "创建一个提供商，将自定义 endpoint 和模型元数据同步到 openteams-cli。"
+        },
+        "actions": {
+          "add": "添加提供商",
+          "showModels": "显示模型",
+          "hideModels": "隐藏模型",
+          "edit": "编辑",
+          "delete": "删除",
+          "deleting": "删除中...",
+          "removeModel": "移除模型"
+        },
+        "list": {
+          "modelsCount": "{{count}} 个模型",
+          "noBaseUrl": "未配置 Base URL。",
+          "npm": "NPM：{{npm}}",
+          "timeout": "超时：{{timeout}}",
+          "noModels": "此提供商尚未配置模型。"
+        },
+        "preview": {
+          "input": "输入模态",
+          "output": "输出模态",
+          "context": "上下文上限",
+          "outputLimit": "输出上限",
+          "none": "未设置"
+        },
+        "feedback": {
+          "created": "已创建自定义提供商。",
+          "updated": "已更新自定义提供商。",
+          "deleted": "已删除自定义提供商。",
+          "deleteFailed": "删除自定义提供商失败。"
+        },
+        "form": {
+          "createTitle": "新建自定义提供商",
+          "editTitle": "编辑自定义提供商",
+          "createDescription": "添加一个会写入 openteams-cli 配置的提供商条目。",
+          "editDescription": "更新提供商条目及其模型元数据。",
+          "errorTitle": "无法保存提供商",
+          "idLabel": "Provider ID",
+          "idPlaceholder": "例如 bailian-coding-plan",
+          "idHelper": "将作为 openteams-cli 中唯一的 provider key。创建后不可更改。",
+          "nameLabel": "显示名称",
+          "namePlaceholder": "例如 Model Studio Coding Plan",
+          "baseUrlLabel": "Base URL",
+          "baseUrlPlaceholder": "https://api.example.com/v1",
+          "apiKeyLabel": "API Key",
+          "apiKeyPlaceholder": "输入 API Key",
+          "apiKeyMasked": "已保存的密钥会保持脱敏。保持当前值不变即可继续使用现有密钥。",
+          "npmLabel": "NPM 包",
+          "npmPlaceholder": "@ai-sdk/anthropic",
+          "npmHelper": "可选。留空则使用默认包。",
+          "timeoutLabel": "超时（毫秒）",
+          "timeoutPlaceholder": "30000",
+          "modelsTitle": "模型",
+          "modelsDescription": "定义 openteams-cli 应向此提供商暴露的模型目录。",
+          "addModel": "添加模型",
+          "noModels": "还没有配置模型。",
+          "newModel": "新模型",
+          "modelIdLabel": "Model ID",
+          "modelIdPlaceholder": "例如 kimi-k2.5",
+          "modelNameLabel": "显示名称",
+          "modelNamePlaceholder": "例如 Kimi K2.5",
+          "inputModalitiesLabel": "输入模态",
+          "outputModalitiesLabel": "输出模态",
+          "modalitiesPlaceholder": "text, image",
+          "contextLimitLabel": "上下文上限",
+          "outputLimitLabel": "输出上限",
+          "limitPlaceholder": "32768",
+          "cancel": "取消",
+          "create": "创建提供商",
+          "update": "保存提供商",
+          "submitError": "保存自定义提供商失败。",
+          "validation": {
+            "providerIdRequired": "必须填写 Provider ID。",
+            "baseUrlRequired": "必须填写 Base URL。",
+            "modelIdRequired": "每个模型条目都必须填写 Model ID。",
+            "duplicateModelId": "Model ID \"{{id}}\" 重复。",
+            "numericLimit": "上限和超时时间必须是大于等于 0 的整数。"
+          }
+        },
+        "deleteDialog": {
+          "title": "删除自定义提供商？",
+          "description": "这会从 CLI 配置中永久移除 \"{{id}}\" 及其模型。",
+          "confirm": "删除提供商",
+          "cancel": "取消"
+        }
       }
     },
     "mcp": {

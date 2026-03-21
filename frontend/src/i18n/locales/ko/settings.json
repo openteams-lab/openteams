@@ -444,6 +444,99 @@
         "routeReady": "`/settings/cli` 경로와 Settings 내비게이션 항목은 이미 사용할 수 있습니다.",
         "apiPending": "`GET/PUT /config/cli` 및 공급자 관련 API가 준비될 때까지 CLI 구성 읽기/쓰기 훅은 보류됩니다.",
         "uiPending": "인터랙티브 폼, 검증, 로딩 상태 및 오류 상태는 TASK-F3에서 제공됩니다."
+      },
+      "customProviders": {
+        "title": "사용자 지정 공급자",
+        "description": "openteams-cli 구성과 직접 동기화되는 사용자 지정 공급자 항목을 관리합니다.",
+        "loading": "사용자 지정 공급자를 불러오는 중...",
+        "loadError": "사용자 지정 공급자를 불러오지 못했습니다.",
+        "empty": {
+          "title": "아직 사용자 지정 공급자가 없습니다",
+          "description": "사용자 지정 endpoint와 모델 메타데이터를 openteams-cli에 동기화할 공급자를 만드세요."
+        },
+        "actions": {
+          "add": "공급자 추가",
+          "showModels": "모델 보기",
+          "hideModels": "모델 숨기기",
+          "edit": "편집",
+          "delete": "삭제",
+          "deleting": "삭제 중...",
+          "removeModel": "모델 제거"
+        },
+        "list": {
+          "modelsCount": "모델 {{count}}개",
+          "noBaseUrl": "Base URL이 설정되지 않았습니다.",
+          "npm": "NPM: {{npm}}",
+          "timeout": "타임아웃: {{timeout}}",
+          "noModels": "이 공급자에는 아직 모델이 설정되지 않았습니다."
+        },
+        "preview": {
+          "input": "입력 모달리티",
+          "output": "출력 모달리티",
+          "context": "컨텍스트 한도",
+          "outputLimit": "출력 한도",
+          "none": "설정 안 됨"
+        },
+        "feedback": {
+          "created": "사용자 지정 공급자를 생성했습니다.",
+          "updated": "사용자 지정 공급자를 업데이트했습니다.",
+          "deleted": "사용자 지정 공급자를 삭제했습니다.",
+          "deleteFailed": "사용자 지정 공급자를 삭제하지 못했습니다."
+        },
+        "form": {
+          "createTitle": "사용자 지정 공급자 생성",
+          "editTitle": "사용자 지정 공급자 편집",
+          "createDescription": "openteams-cli 구성에 기록될 공급자 항목을 추가합니다.",
+          "editDescription": "공급자 항목과 모델 메타데이터를 업데이트합니다.",
+          "errorTitle": "공급자를 저장할 수 없습니다",
+          "idLabel": "Provider ID",
+          "idPlaceholder": "예: bailian-coding-plan",
+          "idHelper": "openteams-cli에서 고유한 provider key로 사용됩니다. 생성 후에는 변경할 수 없습니다.",
+          "nameLabel": "표시 이름",
+          "namePlaceholder": "예: Model Studio Coding Plan",
+          "baseUrlLabel": "Base URL",
+          "baseUrlPlaceholder": "https://api.example.com/v1",
+          "apiKeyLabel": "API 키",
+          "apiKeyPlaceholder": "API 키 입력",
+          "apiKeyMasked": "저장된 키는 계속 마스킹됩니다. 기존 키를 유지하려면 값을 변경하지 마세요.",
+          "npmLabel": "NPM 패키지",
+          "npmPlaceholder": "@ai-sdk/anthropic",
+          "npmHelper": "선택 사항입니다. 비워두면 기본 패키지를 사용합니다.",
+          "timeoutLabel": "타임아웃(ms)",
+          "timeoutPlaceholder": "30000",
+          "modelsTitle": "모델",
+          "modelsDescription": "이 공급자에 대해 openteams-cli가 노출할 모델 카탈로그를 정의합니다.",
+          "addModel": "모델 추가",
+          "noModels": "아직 설정된 모델이 없습니다.",
+          "newModel": "새 모델",
+          "modelIdLabel": "Model ID",
+          "modelIdPlaceholder": "예: kimi-k2.5",
+          "modelNameLabel": "표시 이름",
+          "modelNamePlaceholder": "예: Kimi K2.5",
+          "inputModalitiesLabel": "입력 모달리티",
+          "outputModalitiesLabel": "출력 모달리티",
+          "modalitiesPlaceholder": "text, image",
+          "contextLimitLabel": "컨텍스트 한도",
+          "outputLimitLabel": "출력 한도",
+          "limitPlaceholder": "32768",
+          "cancel": "취소",
+          "create": "공급자 생성",
+          "update": "공급자 저장",
+          "submitError": "사용자 지정 공급자를 저장하지 못했습니다.",
+          "validation": {
+            "providerIdRequired": "Provider ID를 입력하세요.",
+            "baseUrlRequired": "Base URL을 입력하세요.",
+            "modelIdRequired": "모든 모델 항목에는 Model ID가 필요합니다.",
+            "duplicateModelId": "Model ID \"{{id}}\"가 중복되었습니다.",
+            "numericLimit": "한도와 타임아웃은 0 이상의 정수여야 합니다."
+          }
+        },
+        "deleteDialog": {
+          "title": "사용자 지정 공급자를 삭제할까요?",
+          "description": "\"{{id}}\"와 해당 모델이 CLI 구성에서 영구적으로 제거됩니다.",
+          "confirm": "공급자 삭제",
+          "cancel": "취소"
+        }
       }
     },
     "mcp": {

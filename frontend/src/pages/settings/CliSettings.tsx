@@ -16,26 +16,38 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/dialogs/shared/ConfirmDialog';
 import {
   useCliConfig,
+  useCreateCustomProvider,
+  useCustomProviders,
+  useDeleteCustomProvider,
   useCliProviderModels,
   useCliProviders,
+  useUpdateCustomProvider,
   useValidateCliProvider,
 } from '@/hooks/useCliConfig';
+import {
+  customProvidersListToRecord,
+  customProvidersRecordToList,
+} from '@/types/cliConfig';
 import type {
   CliConfig,
   CliProviderId,
   CliProviderInfo,
+  CustomProviderEntry,
   CustomProviderConfig,
   OllamaConfig,
   ProviderCredentials,
   ProviderModelConfig,
 } from '@/types/cliConfig';
+import { CustomProviderForm } from './components/CustomProviderForm';
 
 const DEFAULT_PROVIDER_OPTIONS: CliProviderInfo[] = [
   { id: 'anthropic', name: 'Anthropic', configured: false },
@@ -60,6 +72,14 @@ const API_KEY_VALIDATION_REQUIRED_PROVIDERS = new Set<CliProviderId>([
   'openai',
   'google',
   'openrouter',
+]);
+
+const REMOTE_MODEL_PROVIDERS = new Set<CliProviderId>([
+  'anthropic',
+  'openai',
+  'google',
+  'openrouter',
+  'ollama',
 ]);
 
 type ProviderValidationState = {
@@ -92,6 +112,10 @@ function emptyCustomProviderConfig(): CustomProviderConfig {
 function trimToNull(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+function isRemoteModelProvider(provider: CliProviderId): boolean {
+  return REMOTE_MODEL_PROVIDERS.has(provider);
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -389,6 +413,19 @@ function sanitizeCliConfig(config: CliConfig): CliConfig {
   return next;
 }
 
+function withCustomProviders(
+  config: CliConfig | null | undefined,
+  customProviders: Record<string, CustomProviderEntry> | null | undefined
+): CliConfig | null {
+  if (!config) {
+    return null;
+  }
+
+  const next = cloneDeep(config);
+  next.provider.custom_providers = customProviders ?? null;
+  return next;
+}
+
 export function CliSettings() {
   const { t } = useTranslation(['settings', 'common']);
   const {
@@ -396,61 +433,166 @@ export function CliSettings() {
     isLoading,
     isError,
     error,
+    refetch,
     save,
     isSaving,
+    syncToCli,
+    isSyncing,
+    restartCliService,
+    isRestarting,
   } = useCliConfig();
   const {
     data: providersData,
     error: providersError,
     isLoading: isProvidersLoading,
   } = useCliProviders();
+  const {
+    data: customProvidersData,
+    error: customProvidersError,
+  } = useCustomProviders();
+  const createCustomProvider = useCreateCustomProvider();
+  const updateCustomProvider = useUpdateCustomProvider();
+  const deleteCustomProvider = useDeleteCustomProvider();
   const validateProvider = useValidateCliProvider();
 
   const [draft, setDraft] = useState<CliConfig | null>(null);
+  const [customProviderMessage, setCustomProviderMessage] = useState<
+    string | null
+  >(null);
+  const [customProviderStatusError, setCustomProviderStatusError] = useState<
+    string | null
+  >(null);
+  const [editingCustomProvider, setEditingCustomProvider] =
+    useState<CustomProviderEntry | null>(null);
+  const [isCustomProviderDialogOpen, setIsCustomProviderDialogOpen] =
+    useState(false);
+  const [isProviderSelectOpen, setIsProviderSelectOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(
+    null
+  );
   const [validationError, setValidationError] = useState<string | null>(null);
   const [validationResult, setValidationResult] =
     useState<ProviderValidationState | null>(null);
 
+  const customProviders = useMemo(
+    () =>
+      customProvidersData ??
+      customProvidersRecordToList(savedConfig?.provider.custom_providers),
+    [customProvidersData, savedConfig?.provider.custom_providers]
+  );
+  const customProvidersRecord = useMemo(
+    () =>
+      customProvidersData
+        ? customProvidersListToRecord(customProvidersData)
+        : (savedConfig?.provider.custom_providers ?? null),
+    [customProvidersData, savedConfig?.provider.custom_providers]
+  );
+  const comparableDraft = useMemo(
+    () => withCustomProviders(draft, customProvidersRecord),
+    [customProvidersRecord, draft]
+  );
+  const comparableSavedConfig = useMemo(
+    () => withCustomProviders(savedConfig, customProvidersRecord),
+    [customProvidersRecord, savedConfig]
+  );
+  const customProviderOptions = useMemo<CliProviderInfo[]>(
+    () =>
+      customProviders.map((provider) => ({
+        id: provider.id,
+        name: trimToNull(provider.name) ?? provider.id,
+        configured:
+          trimToNull(provider.options.baseURL) != null ||
+          trimToNull(provider.options.api_key) != null ||
+          Object.keys(provider.models ?? {}).length > 0,
+      })),
+    [customProviders]
+  );
+  const providerOptions = useMemo(() => {
+    const baseProviders =
+      providersData && providersData.length > 0
+        ? providersData
+        : DEFAULT_PROVIDER_OPTIONS;
+    const seen = new Set(baseProviders.map((provider) => provider.id));
+    return [
+      ...baseProviders,
+      ...customProviderOptions.filter((provider) => !seen.has(provider.id)),
+    ];
+  }, [customProviderOptions, providersData]);
+  const selectedProvider = draft?.provider.default ?? 'anthropic';
+  const selectedManagedCustomProvider =
+    selectedProvider === 'custom'
+      ? null
+      : (customProvidersRecord?.[selectedProvider] ?? null);
+  const selectedManagedCustomProviderModels = useMemo(
+    () =>
+      selectedManagedCustomProvider
+        ? Object.entries(selectedManagedCustomProvider.models ?? {})
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([id, model]) => ({
+              id,
+              name: trimToNull(model.name) ?? id,
+            }))
+        : [],
+    [selectedManagedCustomProvider]
+  );
+
   const hasUnsavedChanges = useMemo(() => {
-    if (!draft || !savedConfig) {
+    if (!comparableDraft || !comparableSavedConfig) {
       return false;
     }
 
-    return !isEqual(draft, savedConfig);
-  }, [draft, savedConfig]);
+    return !isEqual(comparableDraft, comparableSavedConfig);
+  }, [comparableDraft, comparableSavedConfig]);
 
   useEffect(() => {
     if (!savedConfig) {
       return;
     }
 
-    if (!draft) {
-      setDraft(cloneDeep(savedConfig));
+    const nextSavedConfig = withCustomProviders(
+      savedConfig,
+      customProvidersRecord
+    );
+    if (!nextSavedConfig) {
       return;
     }
 
-    if (!hasUnsavedChanges && !isEqual(draft, savedConfig)) {
-      setDraft(cloneDeep(savedConfig));
+    if (!draft) {
+      setDraft(cloneDeep(nextSavedConfig));
+      return;
     }
-  }, [draft, hasUnsavedChanges, savedConfig]);
 
-  const selectedProvider = draft?.provider.default ?? 'anthropic';
-  const providerOptions =
-    providersData && providersData.length > 0
-      ? providersData
-      : DEFAULT_PROVIDER_OPTIONS;
+    if (
+      !hasUnsavedChanges &&
+      !isEqual(comparableDraft, comparableSavedConfig)
+    ) {
+      setDraft(cloneDeep(nextSavedConfig));
+    }
+  }, [
+    comparableDraft,
+    comparableSavedConfig,
+    customProvidersRecord,
+    draft,
+    hasUnsavedChanges,
+    savedConfig,
+  ]);
+
   const selectedProviderInfo = providerOptions.find(
     (provider) => provider.id === selectedProvider
   );
+  const shouldLoadRemoteModels =
+    draft != null && isRemoteModelProvider(selectedProvider);
 
   const {
-    data: modelOptions = [],
+    data: remoteModelOptions = [],
     error: modelsError,
     isLoading: isModelsLoading,
-  } = useCliProviderModels(draft ? selectedProvider : null);
+  } = useCliProviderModels(shouldLoadRemoteModels ? selectedProvider : null);
+  const availableModelOptions = selectedManagedCustomProvider
+    ? selectedManagedCustomProviderModels
+    : remoteModelOptions;
 
   const providerApiKey = draft
     ? getProviderApiKey(draft, selectedProvider)
@@ -461,9 +603,14 @@ export function CliSettings() {
   const customProviderName = draft ? getCustomProviderName(draft) : '';
   const apiKeyMasked = providerApiKey.includes('***');
   const suggestedModelValue =
-    draft && modelOptions.some((model) => model.id === draft.model.default)
+    draft &&
+    availableModelOptions.some((model) => model.id === draft.model.default)
       ? draft.model.default
       : undefined;
+  const isSaveBusy = isSaving || isSyncing || isRestarting;
+  const deletingProviderId = deleteCustomProvider.isPending
+    ? (deleteCustomProvider.variables ?? null)
+    : null;
 
   const updateDraft = (updater: (config: CliConfig) => void) => {
     setDraft((current) => {
@@ -472,10 +619,13 @@ export function CliSettings() {
       }
 
       const next = cloneDeep(current);
+      next.provider.custom_providers = cloneDeep(customProvidersRecord);
       updater(next);
       return next;
     });
-    setSaveSuccess(false);
+    setCustomProviderMessage(null);
+    setCustomProviderStatusError(null);
+    setSaveSuccessMessage(null);
     setSaveError(null);
     setValidationError(null);
     setValidationResult(null);
@@ -484,7 +634,21 @@ export function CliSettings() {
   const handleProviderChange = (provider: CliProviderId) => {
     updateDraft((current) => {
       current.provider.default = provider;
-      ensureProviderConfig(current, provider);
+      if (provider === 'custom' || isRemoteModelProvider(provider)) {
+        ensureProviderConfig(current, provider);
+      }
+
+      const customProvider = customProvidersRecord?.[provider] ?? null;
+      if (customProvider) {
+        const nextModelIds = Object.keys(customProvider.models ?? {});
+        if (nextModelIds.length === 0) {
+          current.model.default = '';
+        } else if (!nextModelIds.includes(current.model.default)) {
+          current.model.default = nextModelIds[0];
+        }
+        return;
+      }
+
       const scopedDefault = getScopedModelDefault(current, provider);
       if (scopedDefault) {
         current.model.default = scopedDefault;
@@ -499,6 +663,7 @@ export function CliSettings() {
     }
 
     const sanitizedDraft = sanitizeCliConfig(draft);
+    sanitizedDraft.provider.custom_providers = cloneDeep(customProvidersRecord);
     if (!sanitizedDraft.model.default) {
       setSaveError(t('settings.cli.model.required'));
       return;
@@ -506,9 +671,26 @@ export function CliSettings() {
 
     try {
       const saved = await save(sanitizedDraft);
-      setDraft(cloneDeep(saved));
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setDraft(cloneDeep(withCustomProviders(saved, customProvidersRecord)));
+      setSaveSuccessMessage(t('settings.cli.save.success'));
+      setTimeout(() => setSaveSuccessMessage(null), 3000);
+
+      try {
+        await syncToCli(
+          selectedManagedCustomProvider
+            ? { custom_provider_id: selectedManagedCustomProvider.id }
+            : undefined
+        );
+        await restartCliService();
+      } catch (syncOrRestartErr) {
+        console.error(
+          'Failed to sync or restart openteams-cli after saving CLI config:',
+          syncOrRestartErr
+        );
+        setSaveError(
+          getErrorMessage(syncOrRestartErr, t('settings.cli.save.error'))
+        );
+      }
     } catch (saveErr) {
       console.error('Failed to save CLI config:', saveErr);
       setSaveError(t('settings.cli.save.error'));
@@ -516,15 +698,124 @@ export function CliSettings() {
   };
 
   const handleDiscard = () => {
-    if (!savedConfig) {
+    if (!comparableSavedConfig) {
       return;
     }
 
-    setDraft(cloneDeep(savedConfig));
+    setDraft(cloneDeep(comparableSavedConfig));
     setSaveError(null);
-    setSaveSuccess(false);
+    setSaveSuccessMessage(null);
     setValidationError(null);
     setValidationResult(null);
+  };
+
+  const handleCreateCustomProvider = () => {
+    setEditingCustomProvider(null);
+    setCustomProviderMessage(null);
+    setCustomProviderStatusError(null);
+    setIsCustomProviderDialogOpen(true);
+  };
+
+  const handleCreateCustomProviderFromSelect = () => {
+    setIsProviderSelectOpen(false);
+    handleCreateCustomProvider();
+  };
+
+  const handleEditCustomProvider = (provider: CustomProviderEntry) => {
+    setEditingCustomProvider(provider);
+    setCustomProviderMessage(null);
+    setCustomProviderStatusError(null);
+    setIsCustomProviderDialogOpen(true);
+  };
+
+  const handleSubmitCustomProvider = async (provider: CustomProviderEntry) => {
+    setCustomProviderMessage(null);
+    setCustomProviderStatusError(null);
+    const successMessage = editingCustomProvider
+      ? t('settings.cli.customProviders.feedback.updated')
+      : t('settings.cli.customProviders.feedback.created');
+
+    if (editingCustomProvider) {
+      await updateCustomProvider.mutateAsync({
+        id: editingCustomProvider.id,
+        provider,
+      });
+    } else {
+      await createCustomProvider.mutateAsync(provider);
+    }
+
+    setCustomProviderMessage(successMessage);
+    try {
+      await restartCliService();
+    } catch (restartErr) {
+      setCustomProviderStatusError(
+        getErrorMessage(restartErr, t('settings.cli.save.error'))
+      );
+    }
+
+    setEditingCustomProvider(null);
+  };
+
+  const handleDeleteCustomProvider = async (provider: CustomProviderEntry) => {
+    const result = await ConfirmDialog.show({
+      title: t('settings.cli.customProviders.deleteDialog.title'),
+      message: t('settings.cli.customProviders.deleteDialog.description', {
+        id: provider.id,
+      }),
+      confirmText: t('settings.cli.customProviders.deleteDialog.confirm'),
+      cancelText: t('settings.cli.customProviders.deleteDialog.cancel'),
+      variant: 'destructive',
+    });
+
+    if (result !== 'confirmed') {
+      return;
+    }
+
+    try {
+      setCustomProviderMessage(null);
+      setCustomProviderStatusError(null);
+      await deleteCustomProvider.mutateAsync(provider.id);
+      const nextCustomProvidersRecord = customProvidersListToRecord(
+        customProviders.filter((entry) => entry.id !== provider.id)
+      );
+      const refreshedConfig = (await refetch()).data;
+      if (refreshedConfig) {
+        setDraft(
+          cloneDeep(withCustomProviders(refreshedConfig, nextCustomProvidersRecord))
+        );
+      } else {
+        setDraft((current) => {
+          if (!current) {
+            return current;
+          }
+
+          const next = cloneDeep(current);
+          next.provider.custom_providers = nextCustomProvidersRecord;
+          return next;
+        });
+      }
+      setSaveError(null);
+      setSaveSuccessMessage(null);
+      setValidationError(null);
+      setValidationResult(null);
+      setCustomProviderMessage(
+        t('settings.cli.customProviders.feedback.deleted')
+      );
+      try {
+        await restartCliService();
+      } catch (restartErr) {
+        setCustomProviderStatusError(
+          getErrorMessage(restartErr, t('settings.cli.save.error'))
+        );
+      }
+    } catch (deleteErr) {
+      setCustomProviderStatusError(
+        getErrorMessage(
+          deleteErr,
+          t('settings.cli.customProviders.feedback.deleteFailed')
+        )
+      );
+    }
   };
 
   const handleValidateConnection = async () => {
@@ -597,11 +888,23 @@ export function CliSettings() {
         </Alert>
       )}
 
-      {saveSuccess && (
+      {saveSuccessMessage && (
         <Alert variant="success">
           <AlertDescription className="font-medium">
-            {t('settings.cli.save.success')}
+            {saveSuccessMessage}
           </AlertDescription>
+        </Alert>
+      )}
+
+      {customProviderMessage && (
+        <Alert variant="success">
+          <AlertDescription>{customProviderMessage}</AlertDescription>
+        </Alert>
+      )}
+
+      {customProviderStatusError && (
+        <Alert variant="destructive">
+          <AlertDescription>{customProviderStatusError}</AlertDescription>
         </Alert>
       )}
 
@@ -633,7 +936,20 @@ export function CliSettings() {
         </Alert>
       )}
 
-      {modelsError && selectedProvider !== 'custom' && (
+      {customProvidersError && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {getErrorMessage(
+              customProvidersError,
+              t('settings.cli.customProviders.loadError')
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {modelsError &&
+        selectedManagedCustomProvider == null &&
+        selectedProvider !== 'custom' && (
         <Alert variant="destructive">
           <AlertDescription>
             {getErrorMessage(modelsError, t('settings.cli.model.loadError'))}
@@ -661,7 +977,9 @@ export function CliSettings() {
               {t('settings.cli.provider.label')}
             </Label>
             <Select
+              open={isProviderSelectOpen}
               value={selectedProvider}
+              onOpenChange={setIsProviderSelectOpen}
               onValueChange={(value: CliProviderId) =>
                 handleProviderChange(value)
               }
@@ -680,50 +998,161 @@ export function CliSettings() {
                       : ''}
                   </SelectItem>
                 ))}
+                <SelectSeparator />
+                <div className="px-1 pb-1">
+                  <Button
+                    className="w-full justify-start"
+                    onClick={handleCreateCustomProviderFromSelect}
+                    onMouseDown={(event) => event.preventDefault()}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('settings.cli.customProviders.actions.add')}
+                  </Button>
+                </div>
               </SelectContent>
             </Select>
-            <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
-              <span>{t('settings.cli.provider.helper')}</span>
-              <span className="shrink-0">
-                {selectedProviderInfo?.configured
+          <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
+            <span>{t('settings.cli.provider.helper')}</span>
+            <span className="shrink-0">
+              {selectedProviderInfo?.configured
                   ? t('settings.cli.provider.configured')
                   : t('settings.cli.provider.notConfigured')}
-              </span>
-            </div>
+            </span>
+          </div>
           </div>
 
-          {selectedProvider === 'custom' && (
-            <div className="space-y-2">
-              <Label htmlFor="cli-provider-name">
-                {t('settings.cli.provider.customNameLabel')}
-              </Label>
-              <Input
-                id="cli-provider-name"
-                placeholder={t('settings.cli.provider.customNamePlaceholder')}
-                value={customProviderName}
-                onChange={(event) =>
-                  updateDraft((current) =>
-                    setCustomProviderName(current, event.target.value)
-                  )
-                }
-              />
+          {selectedManagedCustomProvider ? (
+            <div className="rounded-lg border p-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <p className="font-medium">
+                      {selectedManagedCustomProvider.name ||
+                        selectedManagedCustomProvider.id}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedManagedCustomProvider.options.baseURL ||
+                        t('settings.cli.customProviders.list.noBaseUrl')}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                    <span>
+                      {t('settings.cli.customProviders.list.modelsCount', {
+                        count: selectedManagedCustomProviderModels.length,
+                      })}
+                    </span>
+                    <span>
+                      {t('settings.cli.customProviders.list.timeout', {
+                        timeout:
+                          selectedManagedCustomProvider.options.timeout ?? '-',
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() =>
+                      handleEditCustomProvider(selectedManagedCustomProvider)
+                    }
+                    type="button"
+                    variant="outline"
+                  >
+                    {t('settings.cli.customProviders.actions.edit')}
+                  </Button>
+                  <Button
+                    disabled={deletingProviderId === selectedManagedCustomProvider.id}
+                    onClick={() =>
+                      handleDeleteCustomProvider(selectedManagedCustomProvider)
+                    }
+                    type="button"
+                    variant="destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {deletingProviderId === selectedManagedCustomProvider.id
+                      ? t('settings.cli.customProviders.actions.deleting')
+                      : t('settings.cli.customProviders.actions.delete')}
+                  </Button>
+                </div>
+              </div>
             </div>
-          )}
+          ) : (
+            <>
+              {selectedProvider === 'custom' && (
+                <div className="space-y-2">
+                  <Label htmlFor="cli-provider-name">
+                    {t('settings.cli.provider.customNameLabel')}
+                  </Label>
+                  <Input
+                    id="cli-provider-name"
+                    placeholder={t('settings.cli.provider.customNamePlaceholder')}
+                    value={customProviderName}
+                    onChange={(event) =>
+                      updateDraft((current) =>
+                        setCustomProviderName(current, event.target.value)
+                      )
+                    }
+                  />
+                </div>
+              )}
 
-          {selectedProvider !== 'ollama' && (
-            <div className="space-y-2">
-              <Label htmlFor="cli-provider-api-key">
-                {t('settings.cli.provider.apiKeyLabel')}
-              </Label>
-              <div className="flex gap-2">
+              {selectedProvider !== 'ollama' && (
+                <div className="space-y-2">
+                  <Label htmlFor="cli-provider-api-key">
+                    {t('settings.cli.provider.apiKeyLabel')}
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="cli-provider-api-key"
+                      type={showApiKey ? 'text' : 'password'}
+                      placeholder={t('settings.cli.provider.apiKeyPlaceholder')}
+                      value={providerApiKey}
+                      onChange={(event) =>
+                        updateDraft((current) =>
+                          setProviderApiKey(
+                            current,
+                            selectedProvider,
+                            event.target.value
+                          )
+                        )
+                      }
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowApiKey((visible) => !visible)}
+                      aria-label={t(
+                        'settings.cli.provider.toggleApiKeyVisibility'
+                      )}
+                    >
+                      {showApiKey ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {apiKeyMasked && (
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.cli.provider.apiKeyMasked')}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="cli-provider-endpoint">
+                  {t('settings.cli.provider.endpointLabel')}
+                </Label>
                 <Input
-                  id="cli-provider-api-key"
-                  type={showApiKey ? 'text' : 'password'}
-                  placeholder={t('settings.cli.provider.apiKeyPlaceholder')}
-                  value={providerApiKey}
+                  id="cli-provider-endpoint"
+                  placeholder={t('settings.cli.provider.endpointPlaceholder')}
+                  value={providerEndpoint}
                   onChange={(event) =>
                     updateDraft((current) =>
-                      setProviderApiKey(
+                      setProviderEndpoint(
                         current,
                         selectedProvider,
                         event.target.value
@@ -731,75 +1160,38 @@ export function CliSettings() {
                     )
                   }
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowApiKey((visible) => !visible)}
-                  aria-label={t('settings.cli.provider.toggleApiKeyVisibility')}
-                >
-                  {showApiKey ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              {apiKeyMasked && (
                 <p className="text-sm text-muted-foreground">
-                  {t('settings.cli.provider.apiKeyMasked')}
+                  {t('settings.cli.provider.endpointHelper')}
                 </p>
-              )}
-            </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <p className="font-medium">
+                      {t('settings.cli.validation.title')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.cli.validation.description')}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleValidateConnection}
+                    disabled={validateProvider.isPending}
+                  >
+                    {validateProvider.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {validateProvider.isPending
+                      ? t('settings.cli.validation.testing')
+                      : t('settings.cli.validation.button')}
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
-
-          <div className="space-y-2">
-            <Label htmlFor="cli-provider-endpoint">
-              {t('settings.cli.provider.endpointLabel')}
-            </Label>
-            <Input
-              id="cli-provider-endpoint"
-              placeholder={t('settings.cli.provider.endpointPlaceholder')}
-              value={providerEndpoint}
-              onChange={(event) =>
-                updateDraft((current) =>
-                  setProviderEndpoint(
-                    current,
-                    selectedProvider,
-                    event.target.value
-                  )
-                )
-              }
-            />
-            <p className="text-sm text-muted-foreground">
-              {t('settings.cli.provider.endpointHelper')}
-            </p>
-          </div>
-
-          <div className="rounded-lg border p-4">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-1">
-                <p className="font-medium">
-                  {t('settings.cli.validation.title')}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {t('settings.cli.validation.description')}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleValidateConnection}
-                disabled={validateProvider.isPending}
-              >
-                {validateProvider.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                {validateProvider.isPending
-                  ? t('settings.cli.validation.testing')
-                  : t('settings.cli.validation.button')}
-              </Button>
-            </div>
-          </div>
 
           {isProvidersLoading && (
             <p className="text-sm text-muted-foreground">
@@ -817,6 +1209,35 @@ export function CliSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {selectedManagedCustomProvider && (
+            <div className="rounded-lg border border-dashed p-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-1">
+                  <p className="font-medium">
+                    {selectedManagedCustomProvider.name ||
+                      selectedManagedCustomProvider.id}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedManagedCustomProviderModels.length > 0
+                      ? t('settings.cli.customProviders.list.modelsCount', {
+                          count: selectedManagedCustomProviderModels.length,
+                        })
+                      : t('settings.cli.customProviders.list.noModels')}
+                  </p>
+                </div>
+                <Button
+                  onClick={() =>
+                    handleEditCustomProvider(selectedManagedCustomProvider)
+                  }
+                  type="button"
+                  variant="outline"
+                >
+                  {t('settings.cli.customProviders.actions.edit')}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="cli-model-input">
               {t('settings.cli.model.inputLabel')}
@@ -845,7 +1266,10 @@ export function CliSettings() {
                     setModelValue(current, selectedProvider, value)
                   )
                 }
-                disabled={isModelsLoading || modelOptions.length === 0}
+                disabled={
+                  (selectedManagedCustomProvider == null && isModelsLoading) ||
+                  availableModelOptions.length === 0
+                }
               >
                 <SelectTrigger id="cli-model-select">
                   <SelectValue
@@ -853,7 +1277,7 @@ export function CliSettings() {
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {modelOptions.map((model) => (
+                  {availableModelOptions.map((model) => (
                     <SelectItem key={model.id} value={model.id}>
                       {model.name}
                     </SelectItem>
@@ -861,9 +1285,13 @@ export function CliSettings() {
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
-                {isModelsLoading
+                {selectedManagedCustomProvider
+                  ? availableModelOptions.length > 0
+                    ? t('settings.cli.model.selectHelper')
+                    : t('settings.cli.customProviders.list.noModels')
+                  : isModelsLoading
                   ? t('settings.cli.model.loading')
-                  : modelOptions.length > 0
+                  : availableModelOptions.length > 0
                     ? t('settings.cli.model.selectHelper')
                     : t('settings.cli.model.empty')}
               </p>
@@ -935,20 +1363,37 @@ export function CliSettings() {
             <Button
               variant="outline"
               onClick={handleDiscard}
-              disabled={!hasUnsavedChanges || isSaving}
+              disabled={!hasUnsavedChanges || isSaveBusy}
             >
               {t('settings.cli.save.discard')}
             </Button>
             <Button
               onClick={handleSave}
-              disabled={!hasUnsavedChanges || isSaving}
+              disabled={!hasUnsavedChanges || isSaveBusy}
             >
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSaveBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t('settings.cli.save.button')}
             </Button>
           </div>
         </div>
       </div>
+
+      <CustomProviderForm
+        initialProvider={editingCustomProvider}
+        isSubmitting={
+          createCustomProvider.isPending ||
+          updateCustomProvider.isPending ||
+          isRestarting
+        }
+        onOpenChange={(open) => {
+          setIsCustomProviderDialogOpen(open);
+          if (!open) {
+            setEditingCustomProvider(null);
+          }
+        }}
+        onSubmit={handleSubmitCustomProvider}
+        open={isCustomProviderDialogOpen}
+      />
     </div>
   );
 }

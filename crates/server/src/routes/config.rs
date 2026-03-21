@@ -72,6 +72,10 @@ pub fn router() -> Router<DeploymentImpl> {
             "/config/cli/custom-providers/{id}",
             put(update_custom_provider).delete(delete_custom_provider),
         )
+        .route(
+            "/config/cli/restart-service",
+            post(restart_cli_service),
+        )
         .route("/sounds/{sound}", get(get_sound))
         .route("/mcp-config", get(get_mcp_servers).post(update_mcp_servers))
         .route("/profiles", get(get_profiles).put(update_profiles))
@@ -255,7 +259,13 @@ async fn update_cli_config(
     }
 
     match write_cli_config_to_disk(&new_config).await {
-        Ok(_) => ResponseJson(ApiResponse::success(mask_api_keys(new_config))),
+        Ok(_) => {
+            // 同步默认 provider/model 到 openteams-cli
+            if let Err(e) = sync_custom_providers_to_cli(&new_config, None).await {
+                tracing::error!("Failed to sync config to openteams-cli: {}", e);
+            }
+            ResponseJson(ApiResponse::success(mask_api_keys(new_config)))
+        }
         Err(e) => ResponseJson(ApiResponse::error(&format!(
             "Failed to save CLI config: {}",
             e
@@ -349,6 +359,33 @@ async fn sync_to_openteams_cli(
     Ok(cli_config_path.to_string_lossy().to_string())
 }
 
+#[derive(Debug, Serialize, Deserialize, TS)]
+pub struct RestartCliResponse {
+    pub restarted: bool,
+    pub message: String,
+    pub base_url: Option<String>,
+    pub port: Option<u16>,
+}
+
+/// POST /config/cli/restart-service
+/// 重启 openteams-cli 服务，使配置变更生效
+async fn restart_cli_service(
+    State(deployment): State<DeploymentImpl>,
+) -> ResponseJson<ApiResponse<RestartCliResponse>> {
+    match deployment.restart_cli().await {
+        Ok((base_url, port)) => ResponseJson(ApiResponse::success(RestartCliResponse {
+            restarted: true,
+            message: "openteams-cli service restarted successfully".to_string(),
+            base_url: Some(base_url),
+            port: Some(port),
+        })),
+        Err(e) => ResponseJson(ApiResponse::error(&format!(
+            "Failed to restart openteams-cli: {}",
+            e
+        ))),
+    }
+}
+
 // ── Custom Providers CRUD ──────────────────────────────────────────
 
 /// GET /config/cli/custom-providers
@@ -394,9 +431,13 @@ async fn create_custom_provider(
         return ResponseJson(ApiResponse::error(&format!("Failed to save config: {}", e)));
     }
 
-    // 自动同步到 openteams-cli
-    if let Err(e) = sync_custom_providers_to_cli(&config.provider.custom_providers).await {
-        tracing::warn!("Failed to sync custom providers to cli: {}", e);
+    // 自动同步到 openteams-cli，失败时返回错误而非静默吞掉
+    if let Err(e) = sync_custom_providers_to_cli(&config, None).await {
+        tracing::error!("Failed to sync custom providers to cli: {}", e);
+        return ResponseJson(ApiResponse::error(&format!(
+            "Provider saved but failed to sync to openteams-cli: {}",
+            e
+        )));
     }
 
     let mut masked = entry;
@@ -437,8 +478,12 @@ async fn update_custom_provider(
         return ResponseJson(ApiResponse::error(&format!("Failed to save config: {}", e)));
     }
 
-    if let Err(e) = sync_custom_providers_to_cli(&config.provider.custom_providers).await {
-        tracing::warn!("Failed to sync custom providers to cli: {}", e);
+    if let Err(e) = sync_custom_providers_to_cli(&config, None).await {
+        tracing::error!("Failed to sync custom providers to cli: {}", e);
+        return ResponseJson(ApiResponse::error(&format!(
+            "Provider saved but failed to sync to openteams-cli: {}",
+            e
+        )));
     }
 
     mask_custom_provider_key(&mut entry);
@@ -460,37 +505,54 @@ async fn delete_custom_provider(
         )));
     }
 
+    // 任务7：如果删除的是当前默认 Provider，自动回退到 anthropic
+    if config.provider.default == id {
+        config.provider.default = "anthropic".to_string();
+        config.model.default = "claude-sonnet-4-20250514".to_string();
+    }
+
     if let Err(e) = write_cli_config_to_disk(&config).await {
         return ResponseJson(ApiResponse::error(&format!("Failed to save config: {}", e)));
     }
 
-    if let Err(e) = sync_custom_providers_to_cli(&config.provider.custom_providers).await {
-        tracing::warn!("Failed to sync custom providers to cli: {}", e);
+    if let Err(e) = sync_custom_providers_to_cli(&config, Some(&id)).await {
+        tracing::error!("Failed to sync custom providers to cli: {}", e);
+        return ResponseJson(ApiResponse::error(&format!(
+            "Provider deleted but failed to sync to openteams-cli: {}",
+            e
+        )));
     }
 
     ResponseJson(ApiResponse::success(()))
 }
 
-/// 将所有 custom_providers 同步到 ~/.config/openteams-cli/openteams.json
+/// 将 custom_providers 同步到 ~/.config/openteams-cli/openteams.json
+/// deleted_id: 如果有刚删除的 provider id，同步时从 CLI 配置中移除
 async fn sync_custom_providers_to_cli(
-    custom_providers: &Option<HashMap<String, CustomProviderEntry>>,
+    app_config: &CliConfig,
+    deleted_id: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let custom_providers = &app_config.provider.custom_providers;
     let mut cli_config = try_read_openteams_cli_config_from_disk().await?;
-    let cli_providers = cli_config.provider.get_or_insert_with(HashMap::new);
 
-    // 先移除所有由 custom_providers 管理的 provider（通过标记前缀或全量替换策略）
-    // 这里采用全量覆盖策略：读取旧的 custom provider id 列表并移除，再插入新的
-    // 为简化，先收集当前 custom_providers keys 以外的内置 provider
+    tracing::debug!(
+        cli_config = ?cli_config,
+        "cli config"
+    );
+
+    let cli_providers = cli_config.provider.get_or_insert_with(HashMap::new);
     let builtin_keys: std::collections::HashSet<&str> =
         ["anthropic", "openai", "google", "openrouter", "ollama"]
             .iter()
             .copied()
             .collect();
 
-    // 移除所有非内置 provider（它们由 custom_providers 管理）
-    cli_providers.retain(|k, _| builtin_keys.contains(k.as_str()));
+    // 任务8：如果有刚删除的 provider，从 CLI 配置中移除
+    if let Some(id) = deleted_id {
+        cli_providers.remove(id);
+    }
 
-    // 插入新的 custom providers
+    // 仅 upsert custom_providers 中的条目，不删除用户手工维护的其他 provider
     if let Some(providers) = custom_providers {
         for (id, entry) in providers {
             let cli_provider = OpenTeamsCliProviderConfig {
@@ -526,6 +588,18 @@ async fn sync_custom_providers_to_cli(
         }
     }
 
+    // 同步默认 provider/model 到 openteams-cli
+    let default_provider = &app_config.provider.default;
+    let default_model = &app_config.model.default;
+
+    if builtin_keys.contains(default_provider.as_str()) {
+        // 内置 provider：直接使用 provider/model 格式
+        cli_config.model = Some(format!("{}/{}", default_provider, default_model));
+    } else if cli_providers.contains_key(default_provider) {
+        // 自定义 provider：确认已注册后设置
+        cli_config.model = Some(format!("{}/{}", default_provider, default_model));
+    }
+
     write_openteams_cli_config_to_disk(&cli_config).await?;
     Ok(())
 }
@@ -556,15 +630,10 @@ async fn write_openteams_cli_config_to_disk(
     let path = OpenTeamsCliConfig::config_path()
         .ok_or("Cannot determine openteams-cli config directory")?;
 
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).await?;
-    }
-
     let content = serde_json::to_string_pretty(config)?;
 
-    let temp_path = path.with_extension("json.tmp");
-    fs::write(&temp_path, &content).await?;
-    fs::rename(&temp_path, &path).await?;
+    // 复用安全写入逻辑（Windows 上 fs::rename 不能覆盖已有文件）
+    write_secure_cli_config_file(path, content).await?;
 
     Ok(())
 }
@@ -1212,6 +1281,7 @@ fn write_secure_cli_config_file_sync(path: &StdPath, content: &str) -> std::io::
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| "config.toml".to_string());
+
     let temp_path = path.with_file_name(format!(".{file_name}.{}.tmp", Uuid::new_v4()));
 
     let write_result = (|| -> std::io::Result<()> {

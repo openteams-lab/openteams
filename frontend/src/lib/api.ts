@@ -125,9 +125,11 @@ import {
 import type { WorkspaceWithSession } from '@/types/attempt';
 import type {
   CliConfig,
+  CustomProviderEntry,
   CliModelInfo,
   CliProviderId,
   CliProviderInfo,
+  RestartCliResponse,
   ValidateCliProviderRequest,
   ValidateCliProviderResponse,
   SyncToCliRequest,
@@ -1114,6 +1116,52 @@ export const cliConfigApi = {
       body: JSON.stringify(data || {}),
     });
     return handleApiResponse<SyncToCliResponse>(response);
+  },
+
+  restartCliService: async (): Promise<RestartCliResponse> => {
+    const response = await makeRequest('/api/config/cli/restart-service', {
+      method: 'POST',
+    });
+    return handleApiResponse<RestartCliResponse>(response);
+  },
+
+  listCustomProviders: async (): Promise<CustomProviderEntry[]> => {
+    const response = await makeRequest('/api/config/cli/custom-providers');
+    return handleApiResponse<CustomProviderEntry[]>(response);
+  },
+
+  createCustomProvider: async (
+    provider: CustomProviderEntry
+  ): Promise<CustomProviderEntry> => {
+    const response = await makeRequest('/api/config/cli/custom-providers', {
+      method: 'POST',
+      body: JSON.stringify(provider),
+    });
+    return handleApiResponse<CustomProviderEntry>(response);
+  },
+
+  updateCustomProvider: async (
+    id: string,
+    provider: CustomProviderEntry
+  ): Promise<CustomProviderEntry> => {
+    const response = await makeRequest(
+      `/api/config/cli/custom-providers/${encodeURIComponent(id)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(provider),
+      }
+    );
+    return handleApiResponse<CustomProviderEntry>(response);
+  },
+
+  deleteCustomProvider: async (id: string): Promise<void> => {
+    const response = await makeRequest(
+      `/api/config/cli/custom-providers/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    await handleApiResponse<void>(response);
   },
 };
 

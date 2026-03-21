@@ -1913,6 +1913,7 @@ mod tests {
                 runner_type: "codex".to_string(),
                 system_prompt: None,
                 tools_enabled: None,
+                model_name: None,
             },
             Uuid::new_v4(),
         )
