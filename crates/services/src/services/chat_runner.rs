@@ -33,6 +33,7 @@ use executors::{
         NormalizedEntryError, NormalizedEntryType, TokenUsageInfo,
         utils::patch::extract_normalized_entry_from_patch,
     },
+    model_sync::with_model,
     profile::{ExecutorConfigs, ExecutorProfileId, canonical_variant_key},
 };
 use futures::StreamExt;
@@ -1039,6 +1040,12 @@ impl ChatRunner {
             let mut executor =
                 ExecutorConfigs::get_cached().get_coding_agent_or_default(&executor_profile_id);
             executor.use_approvals(Arc::new(NoopExecutorApprovalService));
+
+            if let Some(model_name) = &agent.model_name {
+                if let Some(executor_with_model) = with_model(&executor, model_name) {
+                    executor = executor_with_model;
+                }
+            }
 
             let repo_context = RepoContext::new(PathBuf::from(&workspace_path), Vec::new());
             let mut env = ExecutionEnv::new(repo_context, false, String::new());
@@ -5000,6 +5007,7 @@ mod tests {
             name: name.to_string(),
             runner_type: "codex".to_string(),
             system_prompt: system_prompt.to_string(),
+            model_name: None,
             tools_enabled: sqlx::types::Json(json!({})),
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -5575,6 +5583,7 @@ mod tests {
             name: "fullstack".to_string(),
             runner_type: "codex".to_string(),
             system_prompt: "You are the team \"Full-stack Engineer\". Your goal is to ship complete user-facing capabilities by aligning backend contracts, frontend behavior, and operational reliability.\n\n\n".to_string(),
+            model_name: None,
             tools_enabled: sqlx::types::Json(json!({})),
             created_at,
             updated_at: created_at,

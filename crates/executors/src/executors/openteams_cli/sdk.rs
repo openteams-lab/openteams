@@ -27,7 +27,9 @@ use crate::{
     env::RepoContext,
     executors::{
         ExecutorError,
-        openteams_cli::{OpenTeamsCliServer, models::maybe_emit_token_usage},
+        openteams_cli::{
+            DIRECTORY_HEADER, OpenTeamsCliServer, SERVER_USERNAME, models::maybe_emit_token_usage,
+        },
     },
 };
 
@@ -293,7 +295,13 @@ async fn run_session_inner(
         })
         .await?;
 
-    let model = config.model.as_deref().and_then(parse_model);
+    let model = resolve_request_model(
+        &client,
+        &config.base_url,
+        &config.directory,
+        config.model.as_deref(),
+    )
+    .await;
 
     let (control_tx, mut control_rx) = mpsc::unbounded_channel::<ControlEvent>();
 
@@ -381,7 +389,9 @@ async fn run_session_inner(
 
     event_handle.abort();
 
-    log_writer.log_event(&OpenTeamsCliExecutorEvent::Done).await?;
+    log_writer
+        .log_event(&OpenTeamsCliExecutorEvent::Done)
+        .await?;
 
     Ok(())
 }
@@ -389,9 +399,9 @@ async fn run_session_inner(
 pub(super) fn build_default_headers(directory: &str, password: &str) -> HeaderMap {
     let mut headers = HeaderMap::new();
     if let Ok(value) = HeaderValue::from_str(directory) {
-        headers.insert("x-opencode-directory", value);
+        headers.insert(DIRECTORY_HEADER, value);
     }
-    let credentials = BASE64.encode(format!("opencode:{password}"));
+    let credentials = BASE64.encode(format!("{SERVER_USERNAME}:{password}"));
     if let Ok(value) = HeaderValue::from_str(&format!("Basic {credentials}")) {
         headers.insert(AUTHORIZATION, value);
     }
@@ -464,9 +474,15 @@ pub async fn wait_for_health(
 ) -> Result<(), ExecutorError> {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
     let mut last_err: Option<String> = None;
+    tracing::debug!(base_url = %base_url, "Polling OpenTeamsCli health endpoint");
 
     loop {
         if tokio::time::Instant::now() > deadline {
+            tracing::warn!(
+                base_url = %base_url,
+                last_error = %last_err.as_deref().unwrap_or("unknown error"),
+                "Timed out waiting for OpenTeamsCli health"
+            );
             return Err(ExecutorError::Io(io::Error::other(format!(
                 "Timed out waiting for OpenTeamsCli server health: {}",
                 last_err.unwrap_or_else(|| "unknown error".to_string())
@@ -477,17 +493,41 @@ pub async fn wait_for_health(
         match resp {
             Ok(resp) => {
                 if !resp.status().is_success() {
+                    tracing::debug!(
+                        base_url = %base_url,
+                        status = %resp.status(),
+                        "OpenTeamsCli health check returned non-success status"
+                    );
                     last_err = Some(format!("HTTP {}", resp.status()));
                 } else if let Ok(body) = resp.json::<HealthResponse>().await {
                     if body.healthy {
+                        tracing::debug!(
+                            base_url = %base_url,
+                            version = %body.version,
+                            "OpenTeamsCli health check succeeded"
+                        );
                         return Ok(());
                     }
+                    tracing::debug!(
+                        base_url = %base_url,
+                        version = %body.version,
+                        "OpenTeamsCli health endpoint reported unhealthy"
+                    );
                     last_err = Some(format!("unhealthy server (version {})", body.version));
                 } else {
+                    tracing::debug!(
+                        base_url = %base_url,
+                        "Failed to parse OpenTeamsCli health response"
+                    );
                     last_err = Some("failed to parse health response".to_string());
                 }
             }
             Err(err) => {
+                tracing::debug!(
+                    base_url = %base_url,
+                    error = %err,
+                    "OpenTeamsCli health request failed"
+                );
                 last_err = Some(err.to_string());
             }
         }
@@ -501,6 +541,11 @@ pub async fn create_session(
     base_url: &str,
     directory: &str,
 ) -> Result<String, ExecutorError> {
+    tracing::debug!(
+        base_url = %base_url,
+        directory = %directory,
+        "Sending OpenTeamsCli session.create request"
+    );
     let resp = client
         .post(format!("{base_url}/session"))
         .query(&[("directory", directory)])
@@ -510,6 +555,12 @@ pub async fn create_session(
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
     if !resp.status().is_success() {
+        tracing::warn!(
+            base_url = %base_url,
+            directory = %directory,
+            status = %resp.status(),
+            "OpenTeamsCli session.create failed"
+        );
         return Err(ExecutorError::Io(io::Error::other(format!(
             "OpenTeamsCli session.create failed: HTTP {}",
             resp.status()
@@ -520,6 +571,12 @@ pub async fn create_session(
         .json::<SessionResponse>()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
+    tracing::debug!(
+        base_url = %base_url,
+        directory = %directory,
+        session_id = %session.id,
+        "OpenTeamsCli session.create succeeded"
+    );
     Ok(session.id)
 }
 
@@ -529,6 +586,12 @@ pub async fn fork_session(
     directory: &str,
     session_id: &str,
 ) -> Result<String, ExecutorError> {
+    tracing::debug!(
+        base_url = %base_url,
+        directory = %directory,
+        source_session_id = %session_id,
+        "Sending OpenTeamsCli session.fork request"
+    );
     let resp = client
         .post(format!("{base_url}/session/{session_id}/fork"))
         .query(&[("directory", directory)])
@@ -538,6 +601,13 @@ pub async fn fork_session(
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
     if !resp.status().is_success() {
+        tracing::warn!(
+            base_url = %base_url,
+            directory = %directory,
+            source_session_id = %session_id,
+            status = %resp.status(),
+            "OpenTeamsCli session.fork failed"
+        );
         return Err(ExecutorError::Io(io::Error::other(format!(
             "OpenTeamsCli session.fork failed: HTTP {}",
             resp.status()
@@ -548,6 +618,13 @@ pub async fn fork_session(
         .json::<SessionResponse>()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
+    tracing::debug!(
+        base_url = %base_url,
+        directory = %directory,
+        source_session_id = %session_id,
+        forked_session_id = %session.id,
+        "OpenTeamsCli session.fork succeeded"
+    );
     Ok(session.id)
 }
 
@@ -562,6 +639,16 @@ async fn prompt(
     model_variant: Option<String>,
     agent: Option<String>,
 ) -> Result<(), ExecutorError> {
+    tracing::debug!(
+        base_url = %base_url,
+        directory = %directory,
+        session_id = %session_id,
+        prompt_len = prompt.chars().count(),
+        model = ?model.as_ref().map(|m| format!("{}/{}", m.provider_id, m.model_id)),
+        model_variant = ?model_variant,
+        agent = ?agent,
+        "Sending OpenTeamsCli session.message request"
+    );
     let req = PromptRequest {
         model,
         agent,
@@ -589,6 +676,14 @@ async fn prompt(
     // The OpenTeamsCli server uses streaming responses and may set the HTTP status early; validate
     // success using the response body shape as well.
     if !status.is_success() {
+        tracing::warn!(
+            base_url = %base_url,
+            directory = %directory,
+            session_id = %session_id,
+            status = %status,
+            body_len = body.len(),
+            "OpenTeamsCli session.message returned non-success status"
+        );
         return Err(ExecutorError::Io(io::Error::other(format!(
             "OpenTeamsCli session.prompt failed: HTTP {status} {body}"
         ))));
@@ -606,6 +701,13 @@ async fn prompt(
 
     // Success response: { info, parts }
     if parsed.get("info").is_some() && parsed.get("parts").is_some() {
+        tracing::debug!(
+            base_url = %base_url,
+            directory = %directory,
+            session_id = %session_id,
+            response_len = body.len(),
+            "OpenTeamsCli session.message succeeded"
+        );
         return Ok(());
     }
 
@@ -649,6 +751,17 @@ pub async fn session_command(
     model: Option<String>,
     model_variant: Option<String>,
 ) -> Result<(), ExecutorError> {
+    tracing::debug!(
+        base_url = %base_url,
+        directory = %directory,
+        session_id = %session_id,
+        command = %command,
+        arguments_len = arguments.chars().count(),
+        agent = ?agent,
+        model = ?model,
+        model_variant = ?model_variant,
+        "Sending OpenTeamsCli session.command request"
+    );
     let req = SessionCommandRequest {
         command,
         arguments,
@@ -672,6 +785,14 @@ pub async fn session_command(
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
     if !status.is_success() {
+        tracing::warn!(
+            base_url = %base_url,
+            directory = %directory,
+            session_id = %session_id,
+            status = %status,
+            body_len = body.len(),
+            "OpenTeamsCli session.command returned non-success status"
+        );
         return Err(ExecutorError::Io(io::Error::other(format!(
             "OpenTeamsCli session.command failed: HTTP {status} {body}"
         ))));
@@ -688,6 +809,13 @@ pub async fn session_command(
         serde_json::from_str(trimmed).map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
     if parsed.get("info").is_some() && parsed.get("parts").is_some() {
+        tracing::debug!(
+            base_url = %base_url,
+            directory = %directory,
+            session_id = %session_id,
+            response_len = body.len(),
+            "OpenTeamsCli session.command succeeded"
+        );
         return Ok(());
     }
 
@@ -946,10 +1074,6 @@ pub async fn send_abort(
     .await;
 }
 
-fn parse_model(model: &str) -> Option<ModelSpec> {
-    parse_model_strict(model)
-}
-
 fn parse_model_strict(model: &str) -> Option<ModelSpec> {
     let (provider_id, model_id) = model.split_once('/')?;
     let model_id = model_id.trim();
@@ -962,13 +1086,123 @@ fn parse_model_strict(model: &str) -> Option<ModelSpec> {
     })
 }
 
+fn resolve_model_spec_from_config(
+    model: &str,
+    providers: &ConfigProvidersResponse,
+    preferred_provider_id: Option<&str>,
+) -> Option<ModelSpec> {
+    if let Some(parsed) = parse_model_strict(model) {
+        return Some(parsed);
+    }
+
+    let model_id = model.trim();
+    if model_id.is_empty() {
+        return None;
+    }
+
+    let matching_provider_ids = providers
+        .providers
+        .iter()
+        .filter(|provider| provider.models.contains_key(model_id))
+        .map(|provider| provider.id.as_str())
+        .collect::<Vec<_>>();
+
+    if matching_provider_ids.is_empty() {
+        return None;
+    }
+
+    if let Some(preferred_provider_id) = preferred_provider_id
+        && matching_provider_ids.contains(&preferred_provider_id)
+    {
+        return Some(ModelSpec {
+            provider_id: preferred_provider_id.to_string(),
+            model_id: model_id.to_string(),
+        });
+    }
+
+    let default_provider_ids = providers
+        .default
+        .iter()
+        .filter(|(provider_id, default_model_id)| {
+            default_model_id == &model_id && matching_provider_ids.contains(&provider_id.as_str())
+        })
+        .map(|(provider_id, _)| provider_id.as_str())
+        .collect::<Vec<_>>();
+
+    if default_provider_ids.len() == 1 {
+        return Some(ModelSpec {
+            provider_id: default_provider_ids[0].to_string(),
+            model_id: model_id.to_string(),
+        });
+    }
+
+    if matching_provider_ids.len() == 1 {
+        return Some(ModelSpec {
+            provider_id: matching_provider_ids[0].to_string(),
+            model_id: model_id.to_string(),
+        });
+    }
+
+    None
+}
+
+async fn resolve_request_model(
+    client: &reqwest::Client,
+    base_url: &str,
+    directory: &str,
+    configured_model: Option<&str>,
+) -> Option<ModelSpec> {
+    let configured_model = configured_model?.trim();
+    if configured_model.is_empty() {
+        return None;
+    }
+
+    if let Some(parsed) = parse_model_strict(configured_model) {
+        return Some(parsed);
+    }
+
+    let preferred_provider_id = config_get(client, base_url, directory)
+        .await
+        .ok()
+        .and_then(|config| config.model.as_deref().and_then(parse_model_strict))
+        .map(|model| model.provider_id);
+
+    let providers = match list_config_providers(client, base_url, directory).await {
+        Ok(providers) => providers,
+        Err(err) => {
+            tracing::warn!(
+                configured_model = configured_model,
+                error = %err,
+                "Failed to resolve OpenTeamsCli bare model id from config providers"
+            );
+            return None;
+        }
+    };
+
+    let resolved = resolve_model_spec_from_config(
+        configured_model,
+        &providers,
+        preferred_provider_id.as_deref(),
+    );
+
+    if resolved.is_none() {
+        tracing::warn!(
+            configured_model = configured_model,
+            preferred_provider_id = ?preferred_provider_id,
+            "Could not map OpenTeamsCli bare model id to a provider/model pair"
+        );
+    }
+
+    resolved
+}
+
 pub async fn resolve_compaction_model(
     client: &reqwest::Client,
     base_url: &str,
     directory: &str,
     configured_model: Option<&str>,
 ) -> Result<ModelSpec, ExecutorError> {
-    if let Some(model) = configured_model.and_then(parse_model_strict) {
+    if let Some(model) = resolve_request_model(client, base_url, directory, configured_model).await {
         return Ok(model);
     }
 
@@ -1010,6 +1244,12 @@ pub async fn connect_event_stream(
     directory: &str,
     last_event_id: Option<&str>,
 ) -> Result<reqwest::Response, ExecutorError> {
+    tracing::debug!(
+        base_url = %base_url,
+        directory = %directory,
+        last_event_id = ?last_event_id,
+        "Connecting to OpenTeamsCli event stream"
+    );
     let mut req = client
         .get(format!("{base_url}/event"))
         .header(reqwest::header::ACCEPT, "text/event-stream")
@@ -1030,11 +1270,25 @@ pub async fn connect_event_stream(
             .text()
             .await
             .unwrap_or_else(|_| "<failed to read response body>".to_string());
+        tracing::warn!(
+            base_url = %base_url,
+            directory = %directory,
+            last_event_id = ?last_event_id,
+            status = %status,
+            body_len = body.len(),
+            "OpenTeamsCli event stream connection failed"
+        );
         return Err(ExecutorError::Io(io::Error::other(format!(
             "OpenTeamsCli event stream failed: HTTP {status} {body}"
         ))));
     }
 
+    tracing::debug!(
+        base_url = %base_url,
+        directory = %directory,
+        last_event_id = ?last_event_id,
+        "Connected to OpenTeamsCli event stream"
+    );
     Ok(resp)
 }
 
@@ -1079,6 +1333,14 @@ pub async fn spawn_event_listener(config: EventListenerConfig, initial_resp: req
                 r
             }
             None => {
+                tracing::debug!(
+                    base_url = %base_url,
+                    directory = %directory,
+                    session_id = %session_id,
+                    attempt = attempt + 1,
+                    last_event_id = ?last_event_id,
+                    "Reconnecting OpenTeamsCli event stream"
+                );
                 match connect_event_stream(&client, &base_url, &directory, last_event_id.as_deref())
                     .await
                 {
@@ -1475,13 +1737,21 @@ async fn request_permission_approval(
 
 #[cfg(test)]
 mod tests {
-    use std::future;
+    use std::{collections::HashMap, future};
 
+    use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+    use reqwest::header::AUTHORIZATION;
     use serde_json::json;
     use tokio::sync::mpsc;
 
-    use super::{ControlEvent, extract_retry_status, run_request_with_control};
-    use crate::executors::ExecutorError;
+    use super::{
+        ConfigProvidersResponse, ControlEvent, ProviderInfo, build_default_headers,
+        extract_retry_status, resolve_model_spec_from_config, run_request_with_control,
+    };
+    use crate::executors::{
+        ExecutorError,
+        openteams_cli::{DIRECTORY_HEADER, SERVER_USERNAME},
+    };
 
     #[test]
     fn extract_retry_status_parses_retry_payload() {
@@ -1513,6 +1783,81 @@ mod tests {
         });
 
         assert!(extract_retry_status(&payload).is_none());
+    }
+
+    #[test]
+    fn build_default_headers_matches_openteams_server_auth_contract() {
+        let headers = build_default_headers("C:/workspace/project", "secret");
+        let expected_auth = format!(
+            "Basic {}",
+            BASE64.encode(format!("{SERVER_USERNAME}:secret"))
+        );
+
+        assert_eq!(
+            headers
+                .get(DIRECTORY_HEADER)
+                .and_then(|value| value.to_str().ok()),
+            Some("C:/workspace/project")
+        );
+        assert_eq!(
+            headers
+                .get(AUTHORIZATION)
+                .and_then(|value| value.to_str().ok()),
+            Some(expected_auth.as_str())
+        );
+    }
+
+    #[test]
+    fn resolve_model_spec_from_config_uses_preferred_provider_for_bare_model() {
+        let providers = ConfigProvidersResponse {
+            providers: vec![
+                ProviderInfo {
+                    id: "litellm".to_string(),
+                    name: "LiteLLM".to_string(),
+                    models: HashMap::from([(String::from("gpt-5.3-codex-2026-02-24"), json!({}))]),
+                },
+                ProviderInfo {
+                    id: "other".to_string(),
+                    name: "Other".to_string(),
+                    models: HashMap::from([(String::from("gpt-5.3-codex-2026-02-24"), json!({}))]),
+                },
+            ],
+            default: HashMap::new(),
+        };
+
+        let resolved = resolve_model_spec_from_config(
+            "gpt-5.3-codex-2026-02-24",
+            &providers,
+            Some("litellm"),
+        )
+        .expect("model should resolve");
+
+        assert_eq!(resolved.provider_id, "litellm");
+        assert_eq!(resolved.model_id, "gpt-5.3-codex-2026-02-24");
+    }
+
+    #[test]
+    fn resolve_model_spec_from_config_returns_none_for_ambiguous_bare_model() {
+        let providers = ConfigProvidersResponse {
+            providers: vec![
+                ProviderInfo {
+                    id: "litellm".to_string(),
+                    name: "LiteLLM".to_string(),
+                    models: HashMap::from([(String::from("gpt-5.3-codex-2026-02-24"), json!({}))]),
+                },
+                ProviderInfo {
+                    id: "other".to_string(),
+                    name: "Other".to_string(),
+                    models: HashMap::from([(String::from("gpt-5.3-codex-2026-02-24"), json!({}))]),
+                },
+            ],
+            default: HashMap::new(),
+        };
+
+        assert!(
+            resolve_model_spec_from_config("gpt-5.3-codex-2026-02-24", &providers, None)
+                .is_none()
+        );
     }
 
     #[tokio::test]

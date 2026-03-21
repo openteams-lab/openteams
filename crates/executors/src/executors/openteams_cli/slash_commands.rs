@@ -461,7 +461,9 @@ pub async fn execute(
         log_writer
             .log_slash_command_result(format_no_session())
             .await?;
-        log_writer.log_event(&OpenTeamsCliExecutorEvent::Done).await?;
+        log_writer
+            .log_event(&OpenTeamsCliExecutorEvent::Done)
+            .await?;
         return Ok(());
     }
 
@@ -575,7 +577,9 @@ pub async fn execute(
     event_handle.abort();
 
     request_result?;
-    log_writer.log_event(&OpenTeamsCliExecutorEvent::Done).await?;
+    log_writer
+        .log_event(&OpenTeamsCliExecutorEvent::Done)
+        .await?;
 
     Ok(())
 }

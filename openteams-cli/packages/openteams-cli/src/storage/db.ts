@@ -34,6 +34,7 @@ export namespace Database {
     const safe = channel.replace(/[^a-zA-Z0-9._-]/g, "-")
     return path.join(Global.Path.data, `openteams-cli-${safe}.db`)
   })
+  export const MigrationMarkerPath = Path
 
   export type Transaction = SQLiteTransaction<"sync", void>
 

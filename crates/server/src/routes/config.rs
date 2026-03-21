@@ -24,6 +24,7 @@ use executors::{
     mcp_config::{McpConfig, read_agent_config, write_agent_config},
     profile::{ExecutorConfigs, ExecutorProfileId},
 };
+use jsonc_parser::ParseOptions;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use services::services::{
@@ -54,7 +55,10 @@ pub fn router() -> Router<DeploymentImpl> {
         .route("/info", get(get_user_system_info))
         .route("/config", put(update_config))
         .route("/config/cli", get(get_cli_config).put(update_cli_config))
-        .route("/config/cli/sync-to-cli", post(sync_cli_config_to_openteams_cli))
+        .route(
+            "/config/cli/sync-to-cli",
+            post(sync_cli_config_to_openteams_cli),
+        )
         .route("/config/cli/providers", get(list_cli_providers))
         .route(
             "/config/cli/providers/{provider}/models",
@@ -72,10 +76,7 @@ pub fn router() -> Router<DeploymentImpl> {
             "/config/cli/custom-providers/{id}",
             put(update_custom_provider).delete(delete_custom_provider),
         )
-        .route(
-            "/config/cli/restart-service",
-            post(restart_cli_service),
-        )
+        .route("/config/cli/restart-service", post(restart_cli_service))
         .route("/sounds/{sound}", get(get_sound))
         .route("/mcp-config", get(get_mcp_servers).post(update_mcp_servers))
         .route("/profiles", get(get_profiles).put(update_profiles))
@@ -314,9 +315,7 @@ async fn sync_to_openteams_cli(
     let mut cli_config = try_read_openteams_cli_config_from_disk().await?;
 
     if let Some(custom) = &openteams_config.provider.custom {
-        let provider_id = custom_provider_id
-            .unwrap_or("custom")
-            .to_string();
+        let provider_id = custom_provider_id.unwrap_or("custom").to_string();
 
         let provider_config = OpenTeamsCliProviderConfig {
             name: custom.name.clone(),
@@ -349,7 +348,10 @@ async fn sync_to_openteams_cli(
     {
         if let Some(providers) = &cli_config.provider {
             if providers.contains_key(default_provider) {
-                cli_config.model = Some(format!("{}/{}", default_provider, openteams_config.model.default));
+                cli_config.model = Some(format!(
+                    "{}/{}",
+                    default_provider, openteams_config.model.default
+                ));
             }
         }
     }
@@ -416,7 +418,10 @@ async fn create_custom_provider(
     }
 
     let mut config = read_cli_config_from_disk().await;
-    let providers = config.provider.custom_providers.get_or_insert_with(HashMap::new);
+    let providers = config
+        .provider
+        .custom_providers
+        .get_or_insert_with(HashMap::new);
 
     if providers.contains_key(&entry.id) {
         return ResponseJson(ApiResponse::error(&format!(
@@ -454,13 +459,13 @@ async fn update_custom_provider(
     entry.id = id.clone();
 
     let mut config = read_cli_config_from_disk().await;
-    let providers = config.provider.custom_providers.get_or_insert_with(HashMap::new);
+    let providers = config
+        .provider
+        .custom_providers
+        .get_or_insert_with(HashMap::new);
 
     if !providers.contains_key(&id) {
-        return ResponseJson(ApiResponse::error(&format!(
-            "Provider '{}' not found",
-            id
-        )));
+        return ResponseJson(ApiResponse::error(&format!("Provider '{}' not found", id)));
     }
 
     // 如果 api_key 是掩码，保留旧值
@@ -496,13 +501,13 @@ async fn delete_custom_provider(
     Path(id): Path<String>,
 ) -> ResponseJson<ApiResponse<()>> {
     let mut config = read_cli_config_from_disk().await;
-    let providers = config.provider.custom_providers.get_or_insert_with(HashMap::new);
+    let providers = config
+        .provider
+        .custom_providers
+        .get_or_insert_with(HashMap::new);
 
     if providers.remove(&id).is_none() {
-        return ResponseJson(ApiResponse::error(&format!(
-            "Provider '{}' not found",
-            id
-        )));
+        return ResponseJson(ApiResponse::error(&format!("Provider '{}' not found", id)));
     }
 
     // 任务7：如果删除的是当前默认 Provider，自动回退到 anthropic
@@ -556,7 +561,7 @@ async fn sync_custom_providers_to_cli(
     if let Some(providers) = custom_providers {
         for (id, entry) in providers {
             let cli_provider = OpenTeamsCliProviderConfig {
-                npm: entry.npm.clone(),
+                npm: normalized_custom_provider_npm(id, entry),
                 name: entry.name.clone(),
                 options: Some(OpenTeamsCliProviderOptions {
                     api_key: entry.options.api_key.clone(),
@@ -570,13 +575,14 @@ async fn sync_custom_providers_to_cli(
                     models
                         .iter()
                         .map(|(model_id, model_cfg)| {
-                            let cli_model = services::services::cli_config::OpenTeamsCliModelConfig {
-                                name: model_cfg.name.clone(),
-                                modalities: model_cfg.modalities.clone(),
-                                options: model_cfg.options.clone(),
-                                limit: model_cfg.limit.clone(),
-                                variants: None,
-                            };
+                            let cli_model =
+                                services::services::cli_config::OpenTeamsCliModelConfig {
+                                    name: model_cfg.name.clone(),
+                                    modalities: model_cfg.modalities.clone(),
+                                    options: model_cfg.options.clone(),
+                                    limit: model_cfg.limit.clone(),
+                                    variants: None,
+                                };
                             (model_id.clone(), cli_model)
                         })
                         .collect()
@@ -604,6 +610,57 @@ async fn sync_custom_providers_to_cli(
     Ok(())
 }
 
+fn normalized_custom_provider_npm(id: &str, entry: &CustomProviderEntry) -> Option<String> {
+    if should_use_openai_compatible_npm(id, entry) {
+        return Some(DEFAULT_CUSTOM_PROVIDER_NPM.to_string());
+    }
+
+    entry
+        .npm
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn should_use_openai_compatible_npm(id: &str, entry: &CustomProviderEntry) -> bool {
+    let npm = entry
+        .npm
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let id_or_name_mentions_litellm = id.to_ascii_lowercase().contains("litellm")
+        || entry
+            .name
+            .as_deref()
+            .map(|name| name.to_ascii_lowercase().contains("litellm"))
+            .unwrap_or(false);
+    let endpoint_mentions_litellm = entry
+        .options
+        .base_url
+        .as_deref()
+        .map(|base_url| {
+            base_url.to_ascii_lowercase().contains("litellm")
+                || Url::parse(base_url)
+                    .ok()
+                    .and_then(|url| url.host_str().map(|host| host.to_ascii_lowercase()))
+                    .map(|host| host.contains("litellm"))
+                    .unwrap_or(false)
+        })
+        .unwrap_or(false);
+
+    (id_or_name_mentions_litellm || endpoint_mentions_litellm)
+        && matches!(npm, None | Some(LEGACY_CUSTOM_PROVIDER_NPM))
+}
+
+fn normalize_custom_provider_entries(config: &mut CliConfig) {
+    if let Some(custom_providers) = config.provider.custom_providers.as_mut() {
+        for (id, entry) in custom_providers.iter_mut() {
+            entry.npm = normalized_custom_provider_npm(id, entry);
+        }
+    }
+}
+
 fn mask_custom_provider_key(entry: &mut CustomProviderEntry) {
     if let Some(ref key) = entry.options.api_key {
         entry.options.api_key = Some(mask_key(key));
@@ -620,8 +677,84 @@ async fn try_read_openteams_cli_config_from_disk()
     }
 
     let content = fs::read_to_string(&path).await?;
-    let config: OpenTeamsCliConfig = serde_json::from_str(&content)?;
+    parse_openteams_cli_config_content(&content)
+}
+
+fn parse_openteams_cli_config_content(
+    content: &str,
+) -> Result<OpenTeamsCliConfig, Box<dyn std::error::Error + Send + Sync>> {
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return Ok(OpenTeamsCliConfig::default());
+    }
+
+    match jsonc_parser::parse_to_serde_value(trimmed, &ParseOptions::default()) {
+        Ok(Some(value)) => {
+            let config = serde_json::from_value(value)?;
+            return Ok(config);
+        }
+        Ok(None) => return Ok(OpenTeamsCliConfig::default()),
+        Err(err) => {
+            tracing::debug!(?err, "Failed to parse openteams-cli config as JSONC");
+        }
+    }
+
+    let config: OpenTeamsCliConfig = serde_json::from_str(trimmed).or_else(|e| {
+        let cleaned = remove_json_trailing_commas(trimmed);
+        serde_json::from_str(&cleaned).map_err(|_| e)
+    })?;
     Ok(config)
+}
+
+fn remove_json_trailing_commas(json: &str) -> String {
+    let mut result = String::with_capacity(json.len());
+    let mut in_string = false;
+    let mut escape_next = false;
+    let chars: Vec<char> = json.chars().collect();
+
+    for i in 0..chars.len() {
+        let c = chars[i];
+
+        if escape_next {
+            result.push(c);
+            escape_next = false;
+            continue;
+        }
+
+        if c == '\\' && in_string {
+            result.push(c);
+            escape_next = true;
+            continue;
+        }
+
+        if c == '"' && !escape_next {
+            in_string = !in_string;
+            result.push(c);
+            continue;
+        }
+
+        if in_string {
+            result.push(c);
+            continue;
+        }
+
+        // Check for trailing comma before ] or }
+        if c == ',' {
+            // Look ahead for the next non-whitespace character
+            let mut j = i + 1;
+            while j < chars.len() && chars[j].is_whitespace() {
+                j += 1;
+            }
+            if j < chars.len() && (chars[j] == ']' || chars[j] == '}') {
+                // Skip this trailing comma
+                continue;
+            }
+        }
+
+        result.push(c);
+    }
+
+    result
 }
 
 async fn write_openteams_cli_config_to_disk(
@@ -829,6 +962,8 @@ const DEFAULT_OPENAI_ENDPOINT: &str = "https://litellm.mybigai.ac.cn/v1/";
 const DEFAULT_GOOGLE_ENDPOINT: &str = "https://generativelanguage.googleapis.com/";
 const DEFAULT_OPENROUTER_ENDPOINT: &str = "https://openrouter.ai/api/v1/";
 const DEFAULT_OLLAMA_ENDPOINT: &str = "http://localhost:11434/";
+const DEFAULT_CUSTOM_PROVIDER_NPM: &str = "@ai-sdk/openai-compatible";
+const LEGACY_CUSTOM_PROVIDER_NPM: &str = "@ai-sdk/anthropic";
 
 struct ValidationRequestSpec {
     url: Url,
@@ -1005,16 +1140,10 @@ async fn build_validation_request(
                 )?,
                 "v1/models",
             )?;
-            validation_request_spec(
-                url,
-                Some(("x-api-key", api_key.to_string())),
-            )
-            .await
+            validation_request_spec(url, Some(("x-api-key", api_key.to_string()))).await
         }
         "openai" => {
-            tracing::debug!(
-                "openai matched"
-            );
+            tracing::debug!("openai matched");
             let url = join_validation_url(
                 validate_known_https_endpoint(
                     req.endpoint
@@ -1025,11 +1154,7 @@ async fn build_validation_request(
                 )?,
                 "models",
             )?;
-            validation_request_spec(
-                url,
-                Some(("Authorization", format!("Bearer {api_key}"))),
-            )
-            .await
+            validation_request_spec(url, Some(("Authorization", format!("Bearer {api_key}")))).await
         }
         "google" => {
             let url = join_validation_url(
@@ -1042,11 +1167,7 @@ async fn build_validation_request(
                 )?,
                 "v1beta/models",
             )?;
-            validation_request_spec(
-                url,
-                Some(("x-goog-api-key", api_key.to_string())),
-            )
-            .await
+            validation_request_spec(url, Some(("x-goog-api-key", api_key.to_string()))).await
         }
         "openrouter" => {
             let url = join_validation_url(
@@ -1059,11 +1180,7 @@ async fn build_validation_request(
                 )?,
                 "models",
             )?;
-            validation_request_spec(
-                url,
-                Some(("Authorization", format!("Bearer {api_key}"))),
-            )
-            .await
+            validation_request_spec(url, Some(("Authorization", format!("Bearer {api_key}")))).await
         }
         "ollama" => {
             let url = join_validation_url(
@@ -1078,9 +1195,7 @@ async fn build_validation_request(
             validation_request_spec(url, None).await
         }
         "custom" => {
-            tracing::debug!(
-                "custom matched"
-            );
+            tracing::debug!("custom matched");
             let endpoint = req
                 .endpoint
                 .as_deref()
@@ -1187,7 +1302,8 @@ async fn try_read_cli_config_from_disk()
 -> Result<CliConfig, Box<dyn std::error::Error + Send + Sync>> {
     let path = CliConfig::config_path().ok_or("Cannot determine home directory")?;
     let content = fs::read_to_string(&path).await?;
-    let config: CliConfig = toml::from_str(&content)?;
+    let mut config: CliConfig = toml::from_str(&content)?;
+    normalize_custom_provider_entries(&mut config);
     Ok(config)
 }
 
@@ -1195,7 +1311,9 @@ async fn write_cli_config_to_disk(
     config: &CliConfig,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let path = CliConfig::config_path().ok_or("Cannot determine home directory")?;
-    let content = toml::to_string_pretty(config)?;
+    let mut normalized = config.clone();
+    normalize_custom_provider_entries(&mut normalized);
+    let content = toml::to_string_pretty(&normalized)?;
     write_secure_cli_config_file(path, content).await?;
     Ok(())
 }
@@ -1420,6 +1538,7 @@ fn merge_masked_keys(new_config: &mut CliConfig, old_config: &CliConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     fn temp_test_path(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("openteams-config-test-{}", Uuid::new_v4()));
@@ -1528,6 +1647,159 @@ mod tests {
         let resolved = request_key.or_else(|| saved_provider_api_key(&config, "anthropic"));
 
         assert_eq!(resolved.as_deref(), Some("live-secret"));
+    }
+
+    #[test]
+    fn normalize_custom_provider_entries_fixes_legacy_litellm_npm() {
+        let mut config = CliConfig::default_config();
+        config.provider.custom_providers = Some(HashMap::from([(
+            "litellm".to_string(),
+            CustomProviderEntry {
+                id: "litellm".into(),
+                name: Some("LITELLM".into()),
+                npm: Some(LEGACY_CUSTOM_PROVIDER_NPM.into()),
+                options: services::services::cli_config::CustomProviderOptions {
+                    base_url: Some("https://litellm.example.com/v1".into()),
+                    api_key: Some("secret".into()),
+                    timeout: None,
+                },
+                models: None,
+            },
+        )]));
+
+        normalize_custom_provider_entries(&mut config);
+
+        assert_eq!(
+            config
+                .provider
+                .custom_providers
+                .as_ref()
+                .and_then(|providers| providers.get("litellm"))
+                .and_then(|provider| provider.npm.as_deref()),
+            Some(DEFAULT_CUSTOM_PROVIDER_NPM)
+        );
+    }
+
+    #[test]
+    fn normalize_custom_provider_entries_keeps_non_litellm_anthropic_provider() {
+        let mut config = CliConfig::default_config();
+        config.provider.custom_providers = Some(HashMap::from([(
+            "anthropic-proxy".to_string(),
+            CustomProviderEntry {
+                id: "anthropic-proxy".into(),
+                name: Some("Anthropic Proxy".into()),
+                npm: Some(LEGACY_CUSTOM_PROVIDER_NPM.into()),
+                options: services::services::cli_config::CustomProviderOptions {
+                    base_url: Some("https://api.anthropic.com".into()),
+                    api_key: Some("secret".into()),
+                    timeout: None,
+                },
+                models: None,
+            },
+        )]));
+
+        normalize_custom_provider_entries(&mut config);
+
+        assert_eq!(
+            config
+                .provider
+                .custom_providers
+                .as_ref()
+                .and_then(|providers| providers.get("anthropic-proxy"))
+                .and_then(|provider| provider.npm.as_deref()),
+            Some(LEGACY_CUSTOM_PROVIDER_NPM)
+        );
+    }
+
+    #[test]
+    fn openteams_cli_provider_options_serialize_with_camel_case_keys() {
+        let options = OpenTeamsCliProviderOptions {
+            api_key: Some("secret".into()),
+            base_url: Some("https://litellm.example.com/v1".into()),
+            timeout: Some(30_000),
+            chunk_timeout: Some(5_000),
+            enterprise_url: Some("https://ghe.example.com".into()),
+            set_cache_key: Some(true),
+        };
+
+        let value = serde_json::to_value(&options).expect("serialize provider options");
+
+        assert_eq!(
+            value,
+            json!({
+                "apiKey": "secret",
+                "baseURL": "https://litellm.example.com/v1",
+                "timeout": 30_000,
+                "chunkTimeout": 5_000,
+                "enterpriseUrl": "https://ghe.example.com",
+                "setCacheKey": true,
+            })
+        );
+    }
+
+    #[test]
+    fn openteams_cli_provider_options_deserialize_legacy_snake_case_keys() {
+        let value = json!({
+            "api_key": "secret",
+            "baseURL": "https://litellm.example.com/v1",
+            "chunk_timeout": 5_000,
+            "enterprise_url": "https://ghe.example.com",
+            "set_cache_key": true,
+        });
+
+        let options: OpenTeamsCliProviderOptions =
+            serde_json::from_value(value).expect("deserialize provider options");
+
+        assert_eq!(options.api_key.as_deref(), Some("secret"));
+        assert_eq!(
+            options.base_url.as_deref(),
+            Some("https://litellm.example.com/v1")
+        );
+        assert_eq!(options.chunk_timeout, Some(5_000));
+        assert_eq!(
+            options.enterprise_url.as_deref(),
+            Some("https://ghe.example.com")
+        );
+        assert_eq!(options.set_cache_key, Some(true));
+    }
+
+    #[test]
+    fn parse_openteams_cli_config_content_accepts_trailing_commas() {
+        let config = parse_openteams_cli_config_content(
+            r#"{
+  "provider": {
+    "custom": {
+      "npm": "@acme/provider",
+    },
+  },
+  "model": "custom/foo",
+}"#,
+        )
+        .expect("parse openteams cli config with trailing commas");
+
+        assert_eq!(config.model.as_deref(), Some("custom/foo"));
+        assert!(config
+            .provider
+            .as_ref()
+            .is_some_and(|providers| providers.contains_key("custom")));
+    }
+
+    #[test]
+    fn parse_openteams_cli_config_content_accepts_jsonc_comments() {
+        let config = parse_openteams_cli_config_content(
+            r#"{
+  // preferred provider
+  "provider": {
+    "custom": {
+      "npm": "@acme/provider"
+    }
+  },
+  "model": "custom/foo"
+}"#,
+        )
+        .expect("parse openteams cli config with comments");
+
+        assert_eq!(config.model.as_deref(), Some("custom/foo"));
     }
 
     #[test]

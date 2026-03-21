@@ -178,22 +178,26 @@ pub struct OpenTeamsCliProviderConfig {
 pub struct OpenTeamsCliProviderOptions {
     /// API key for the provider
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "apiKey", alias = "api_key")]
     pub api_key: Option<String>,
     /// Base URL for the provider API
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "baseURL")]
+    #[serde(rename = "baseURL", alias = "base_url")]
     pub base_url: Option<String>,
     /// Request timeout in milliseconds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
     /// Chunk timeout in milliseconds
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "chunkTimeout", alias = "chunk_timeout")]
     pub chunk_timeout: Option<u64>,
     /// GitHub Enterprise URL for copilot authentication
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "enterpriseUrl", alias = "enterprise_url")]
     pub enterprise_url: Option<String>,
     /// Enable promptCacheKey for this provider
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "setCacheKey", alias = "set_cache_key")]
     pub set_cache_key: Option<bool>,
 }
 
@@ -286,7 +290,17 @@ pub struct OpenTeamsCliConfig {
 
 impl OpenTeamsCliConfig {
     pub fn config_path() -> Option<std::path::PathBuf> {
-        dirs::home_dir().map(|h| h.join(".config").join("openteams-cli").join("openteams.json"))
+        dirs::home_dir().map(|h| {
+            let config_dir = h.join(".config").join("openteams-cli");
+            let jsonc_path = config_dir.join("openteams.jsonc");
+            let json_path = config_dir.join("openteams.json");
+
+            if jsonc_path.exists() {
+                jsonc_path
+            } else {
+                json_path
+            }
+        })
     }
 
     pub fn config_dir() -> Option<std::path::PathBuf> {

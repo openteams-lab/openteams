@@ -15,6 +15,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   createEmptyCustomProviderEntry,
   DEFAULT_CUSTOM_PROVIDER_NPM,
   normalizeCustomProviderEntry,
@@ -49,6 +56,31 @@ type CustomProviderFormProps = {
   onSubmit: (provider: CustomProviderEntry) => Promise<void>;
   open: boolean;
 };
+
+const CUSTOM_NPM_OPTION_VALUE = '__custom__';
+
+const AI_SDK_NPM_PACKAGES = [
+  { value: '@ai-sdk/amazon-bedrock', label: 'Amazon Bedrock' },
+  { value: '@ai-sdk/anthropic', label: 'Anthropic' },
+  { value: '@ai-sdk/azure', label: 'Azure OpenAI' },
+  { value: '@ai-sdk/cerebras', label: 'Cerebras' },
+  { value: '@ai-sdk/cohere', label: 'Cohere' },
+  { value: '@ai-sdk/deepinfra', label: 'DeepInfra' },
+  { value: '@ai-sdk/gateway', label: 'AI Gateway' },
+  { value: '@ai-sdk/google', label: 'Google AI' },
+  { value: '@ai-sdk/google-vertex', label: 'Google Vertex' },
+  { value: '@ai-sdk/groq', label: 'Groq' },
+  { value: '@ai-sdk/mistral', label: 'Mistral' },
+  { value: '@ai-sdk/openai', label: 'OpenAI' },
+  { value: '@ai-sdk/openai-compatible', label: 'OpenAI Compatible' },
+  { value: '@ai-sdk/perplexity', label: 'Perplexity' },
+  { value: '@ai-sdk/togetherai', label: 'Together AI' },
+  { value: '@ai-sdk/vercel', label: 'Vercel AI' },
+  { value: '@ai-sdk/xai', label: 'xAI' },
+  { value: '@openrouter/ai-sdk-provider', label: 'OpenRouter' },
+  { value: '@gitlab/gitlab-ai-provider', label: 'GitLab AI' },
+  { value: 'ai-gateway-provider', label: 'AI Gateway Provider' },
+] as const;
 
 let modelDraftCounter = 0;
 
@@ -129,6 +161,14 @@ function parseOptionalInteger(value: string): number | null {
   return parsed;
 }
 
+function isBuiltInNpmPackage(value: string): boolean {
+  return AI_SDK_NPM_PACKAGES.some((entry) => entry.value === value);
+}
+
+function getNpmSelectionValue(value: string): string {
+  return isBuiltInNpmPackage(value) ? value : CUSTOM_NPM_OPTION_VALUE;
+}
+
 export function CustomProviderForm({
   initialProvider,
   isSubmitting,
@@ -141,6 +181,9 @@ export function CustomProviderForm({
   const [formState, setFormState] = useState<CustomProviderFormState>(() =>
     createFormState(initialProvider)
   );
+  const [npmSelection, setNpmSelection] = useState<string>(() =>
+    getNpmSelectionValue(initialProvider?.npm ?? DEFAULT_CUSTOM_PROVIDER_NPM)
+  );
   const [showApiKey, setShowApiKey] = useState(false);
 
   useEffect(() => {
@@ -150,7 +193,9 @@ export function CustomProviderForm({
 
     setError(null);
     setShowApiKey(false);
-    setFormState(createFormState(initialProvider));
+    const nextFormState = createFormState(initialProvider);
+    setFormState(nextFormState);
+    setNpmSelection(getNpmSelectionValue(nextFormState.npm));
   }, [initialProvider, open]);
 
   const isEditing = initialProvider != null;
@@ -404,19 +449,53 @@ export function CustomProviderForm({
                   <Label htmlFor="custom-provider-npm">
                     {t('settings.cli.customProviders.form.npmLabel')}
                   </Label>
-                  <Input
-                    id="custom-provider-npm"
-                    onChange={(event) =>
+                  <Select
+                    value={npmSelection}
+                    onValueChange={(value) => {
+                      setNpmSelection(value);
                       setFormState((current) => ({
                         ...current,
-                        npm: event.target.value,
-                      }))
-                    }
-                    placeholder={t(
-                      'settings.cli.customProviders.form.npmPlaceholder'
-                    )}
-                    value={formState.npm}
-                  />
+                        npm:
+                          value === CUSTOM_NPM_OPTION_VALUE
+                            ? isBuiltInNpmPackage(current.npm)
+                              ? ''
+                              : current.npm
+                            : value,
+                      }));
+                    }}
+                  >
+                    <SelectTrigger id="custom-provider-npm">
+                      <SelectValue
+                        placeholder={t(
+                          'settings.cli.customProviders.form.npmPlaceholder'
+                        )}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AI_SDK_NPM_PACKAGES.map((entry) => (
+                        <SelectItem key={entry.value} value={entry.value}>
+                          {entry.label}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value={CUSTOM_NPM_OPTION_VALUE}>
+                        Custom
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {npmSelection === CUSTOM_NPM_OPTION_VALUE && (
+                    <Input
+                      onChange={(event) =>
+                        setFormState((current) => ({
+                          ...current,
+                          npm: event.target.value,
+                        }))
+                      }
+                      placeholder={t(
+                        'settings.cli.customProviders.form.npmPlaceholder'
+                      )}
+                      value={formState.npm}
+                    />
+                  )}
                   <p className="text-sm text-muted-foreground">
                     {t('settings.cli.customProviders.form.npmHelper')}
                   </p>

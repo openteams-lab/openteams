@@ -145,10 +145,11 @@ fn supports_model(config: &CodingAgent) -> bool {
             | CodingAgent::CursorAgent(_)
             | CodingAgent::Copilot(_)
             | CodingAgent::Droid(_)
+            | CodingAgent::OpenTeamsCli(_)
     )
 }
 
-fn with_model(config: &CodingAgent, model: &str) -> Option<CodingAgent> {
+pub fn with_model(config: &CodingAgent, model: &str) -> Option<CodingAgent> {
     let model = model.to_string();
     match config {
         CodingAgent::Codex(base) => {
@@ -190,6 +191,11 @@ fn with_model(config: &CodingAgent, model: &str) -> Option<CodingAgent> {
             let mut next = base.clone();
             next.model = Some(model);
             Some(CodingAgent::Droid(next))
+        }
+        CodingAgent::OpenTeamsCli(base) => {
+            let mut next = base.clone();
+            next.model = Some(model);
+            Some(CodingAgent::OpenTeamsCli(next))
         }
         _ => None,
     }

@@ -6,8 +6,8 @@ use serde_json::Value;
 use workspace_utils::{approvals::ApprovalStatus, msg_store::MsgStore, path::make_path_relative};
 
 use super::types::{
-    MessageInfo, MessageRole, OpenTeamsCliExecutorEvent, Part, PermissionAskedEvent, SdkEvent, SdkTodo,
-    SessionStatus, ToolPart, ToolStateUpdate,
+    MessageInfo, MessageRole, OpenTeamsCliExecutorEvent, Part, PermissionAskedEvent, SdkEvent,
+    SdkTodo, SessionStatus, ToolPart, ToolStateUpdate,
 };
 use crate::{
     approvals::ToolCallMetadata,

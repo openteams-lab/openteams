@@ -1,8 +1,4 @@
-use std::{
-    path::PathBuf,
-    sync::Arc,
-    time::Duration,
-};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use thiserror::Error;
 use tokio::{
@@ -80,7 +76,7 @@ impl CliManager {
     pub fn new() -> Self {
         let config = CliManagerConfig::from_env();
         let binary_path = Self::discover_binary();
-        
+
         Self {
             inner: Arc::new(RwLock::new(None)),
             config,
@@ -156,10 +152,13 @@ impl CliManager {
     }
 
     pub async fn start(&self) -> Result<(String, u16), CliManagerError> {
-        let binary_path = self.binary_path.as_ref().ok_or(CliManagerError::BinaryNotFound)?;
+        let binary_path = self
+            .binary_path
+            .as_ref()
+            .ok_or(CliManagerError::BinaryNotFound)?;
 
         let mut inner = self.inner.write().await;
-        
+
         if let Some(ref p) = *inner {
             return Ok((p.base_url.clone(), p.port));
         }
@@ -173,9 +172,12 @@ impl CliManager {
         let mut cmd = Command::new(binary_path);
         cmd.args([
             "serve",
-            "--hostname", "127.0.0.1",
-            "--port", &port_arg,
-            "--log-level", &self.config.log_level,
+            "--hostname",
+            "127.0.0.1",
+            "--port",
+            &port_arg,
+            "--log-level",
+            &self.config.log_level,
         ])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -200,11 +202,7 @@ impl CliManager {
 
         *inner = Some(cli_process);
 
-        tracing::info!(
-            "OpenTeams CLI started on {} (port {})",
-            base_url,
-            port
-        );
+        tracing::info!("OpenTeams CLI started on {} (port {})", base_url, port);
 
         Ok((base_url, port))
     }
@@ -257,10 +255,7 @@ impl CliManager {
             .ok()
             .and_then(|u| u.port())
             .ok_or_else(|| {
-                CliManagerError::ReadyTimeout(format!(
-                    "Could not extract port from URL: {}",
-                    url
-                ))
+                CliManagerError::ReadyTimeout(format!("Could not extract port from URL: {}", url))
             })
     }
 
@@ -288,10 +283,10 @@ impl CliManager {
 
     pub async fn health_check(&self) -> bool {
         let inner = self.inner.read().await;
-        
+
         if let Some(ref p) = *inner {
             let url = format!("{}/global/health", p.base_url);
-            
+
             match reqwest::Client::new()
                 .get(&url)
                 .timeout(Duration::from_secs(5))

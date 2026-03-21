@@ -1,4 +1,9 @@
-use std::{io, path::{Path, PathBuf}, sync::Arc, time::Duration};
+use std::{
+    io,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
@@ -80,6 +85,8 @@ impl Drop for OpenTeamsCliServer {
 }
 
 type ServerPassword = String;
+pub(crate) const SERVER_USERNAME: &str = "openteams-cli";
+pub(crate) const DIRECTORY_HEADER: &str = "x-openteams-directory";
 
 impl OpenTeamsCli {
     const BINARY_NAME: &'static str = "openteams-cli";
@@ -159,8 +166,13 @@ impl OpenTeamsCli {
             Some(path) => path.to_string_lossy().to_string(),
             None => Self::NPX_FALLBACK.to_string(),
         };
-        let builder = CommandBuilder::new(&base_command)
-            .extend_params(["serve", "--hostname", "127.0.0.1", "--port", "0"]);
+        let builder = CommandBuilder::new(&base_command).extend_params([
+            "serve",
+            "--hostname",
+            "127.0.0.1",
+            "--port",
+            "0",
+        ]);
         apply_overrides(builder, &self.cmd)
     }
 
@@ -204,6 +216,12 @@ impl OpenTeamsCli {
         let (program_path, args) = command_parts.into_resolved().await?;
 
         let server_password = generate_server_password();
+        tracing::debug!(
+            program = %program_path.display(),
+            arg_count = args.len(),
+            current_dir = %current_dir.display(),
+            "Starting OpenTeamsCli server process"
+        );
 
         let mut command = Command::new(program_path);
         command
@@ -215,7 +233,7 @@ impl OpenTeamsCli {
             .env("NPM_CONFIG_LOGLEVEL", "error")
             .env("NODE_NO_WARNINGS", "1")
             .env("NO_COLOR", "1")
-            .env("OPENTEAMS_SERVER_USERNAME", "openteams-cli")
+            .env("OPENTEAMS_SERVER_USERNAME", SERVER_USERNAME)
             .env("OPENTEAMS_SERVER_PASSWORD", &server_password)
             .args(&args);
 
@@ -239,6 +257,11 @@ impl OpenTeamsCli {
         })?;
 
         let base_url = wait_for_server_url(server_stdout, None).await?;
+        tracing::debug!(
+            base_url = %base_url,
+            current_dir = %current_dir.display(),
+            "OpenTeamsCli server is ready"
+        );
 
         Ok(OpenTeamsCliServer {
             child: Some(child),
@@ -301,6 +324,13 @@ impl OpenTeamsCli {
                     return;
                 }
             };
+            tracing::debug!(
+                base_url = %base_url,
+                directory = %directory,
+                resume_session_id = ?resume_session_id,
+                has_slash_command = slash_command.is_some(),
+                "OpenTeamsCli executor connected to local server"
+            );
 
             let config = RunConfig {
                 base_url,

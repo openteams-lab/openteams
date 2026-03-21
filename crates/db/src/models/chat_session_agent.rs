@@ -287,8 +287,8 @@ impl ChatSessionAgent {
     }
 
     /// Clear agent_session_id and agent_message_id for all session agents using a specific agent.
-    /// This should be called when the agent's runner_type changes, as the old session IDs
-    /// are no longer valid for the new model.
+    /// This should be called whenever the agent's executor identity changes (for example
+    /// runner type, variant, or model), because the old upstream session IDs are no longer valid.
     pub async fn clear_session_ids_for_agent(
         pool: &SqlitePool,
         agent_id: Uuid,

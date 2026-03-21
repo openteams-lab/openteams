@@ -11,4 +11,8 @@ describe("Database.Path", () => {
       : `openteams-cli-${Installation.CHANNEL.replace(/[^a-zA-Z0-9._-]/g, "-")}.db`
     expect(file).toBe(expected)
   })
+
+  test("uses the actual database path as the migration marker", () => {
+    expect(Database.MigrationMarkerPath).toBe(Database.Path)
+  })
 })

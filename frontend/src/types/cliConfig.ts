@@ -43,7 +43,7 @@ export type {
   ValidateProviderResponse,
 };
 
-export const DEFAULT_CUSTOM_PROVIDER_NPM = '@ai-sdk/anthropic';
+export const DEFAULT_CUSTOM_PROVIDER_NPM = '@ai-sdk/openai-compatible';
 
 export const CLI_PROVIDER_IDS = [
   'anthropic',

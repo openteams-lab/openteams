@@ -786,7 +786,7 @@ export type OpenTeamsCliProviderOptions = {
 /**
  * API key for the provider
  */
-api_key: string | null, 
+apiKey: string | null, 
 /**
  * Base URL for the provider API
  */
@@ -798,15 +798,15 @@ timeout: bigint | null,
 /**
  * Chunk timeout in milliseconds
  */
-chunk_timeout: bigint | null, 
+chunkTimeout: bigint | null, 
 /**
  * GitHub Enterprise URL for copilot authentication
  */
-enterprise_url: string | null, 
+enterpriseUrl: string | null, 
 /**
  * Enable promptCacheKey for this provider
  */
-set_cache_key: boolean | null, };
+setCacheKey: boolean | null, };
 
 export type OpenTeamsCliModelConfig = { 
 /**

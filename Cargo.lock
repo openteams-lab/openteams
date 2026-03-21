@@ -7813,6 +7813,7 @@ dependencies = [
  "git",
  "git2",
  "ignore",
+ "jsonc-parser",
  "local-deployment",
  "mime_guess",
  "nix 0.29.0",
