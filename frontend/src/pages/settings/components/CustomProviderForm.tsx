@@ -1,26 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash2, X } from 'lucide-react';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  SettingsField,
+  SettingsInput,
+  SettingsSelect,
+  settingsFieldClassName,
+  settingsIconButtonClassName,
+  settingsMutedPanelClassName,
+  settingsPrimaryButtonClassName,
+  settingsSecondaryButtonClassName,
+} from '@/components/ui-new/dialogs/settings/SettingsComponents';
 import {
   createEmptyCustomProviderEntry,
   DEFAULT_CUSTOM_PROVIDER_NPM,
@@ -176,7 +175,7 @@ export function CustomProviderForm({
   onSubmit,
   open,
 }: CustomProviderFormProps) {
-  const { t } = useTranslation('settings');
+  const { t } = useTranslation(['settings', 'common']);
   const [error, setError] = useState<string | null>(null);
   const [formState, setFormState] = useState<CustomProviderFormState>(() =>
     createFormState(initialProvider)
@@ -215,6 +214,16 @@ export function CustomProviderForm({
         : t('settings.cli.customProviders.form.createTitle'),
     }),
     [isEditing, t]
+  );
+  const npmOptions = useMemo(
+    () => [
+      ...AI_SDK_NPM_PACKAGES.map((entry) => ({
+        value: entry.value,
+        label: entry.label,
+      })),
+      { value: CUSTOM_NPM_OPTION_VALUE, label: 'Custom' },
+    ],
+    []
   );
 
   const updateModelDraft = (
@@ -319,409 +328,415 @@ export function CustomProviderForm({
   };
 
   return (
-    <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>{dialogCopy.title}</DialogTitle>
-          <DialogDescription>{dialogCopy.description}</DialogDescription>
+    <Dialog
+      onOpenChange={onOpenChange}
+      open={open}
+      hideCloseButton
+      overlayClassName="bg-black/5"
+      containerClassName="items-center p-4 md:p-6"
+      className="my-0 w-full max-w-[640px] max-h-[min(560px,calc(100vh-48px))] gap-0 overflow-hidden rounded-[16px] border border-[#E8EEF5] bg-white p-0 shadow-[0_20px_60px_rgba(0,0,0,0.1)]"
+    >
+      <DialogContent className="min-h-0 gap-0">
+        <DialogHeader className="border-b border-[#E8EEF5] px-6 py-5 text-left">
+          <div className="flex items-start gap-4">
+            <div className="flex-1">
+              <DialogTitle className="text-[18px] font-semibold text-[#333333]">
+                {dialogCopy.title}
+              </DialogTitle>
+              <DialogDescription className="mt-2 text-[13px] leading-6 text-[#8C8C8C]">
+                {dialogCopy.description}
+              </DialogDescription>
+            </div>
+            <button
+              type="button"
+              className={settingsIconButtonClassName}
+              onClick={() => onOpenChange(false)}
+              aria-label={t('close', { ns: 'common', defaultValue: 'Close' })}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </DialogHeader>
 
-        <form
-          className="flex min-h-0 flex-1 flex-col gap-4"
-          onSubmit={handleSubmit}
-        >
-          {error && (
-            <Alert variant="destructive">
-              <AlertTitle>
-                {t('settings.cli.customProviders.form.errorTitle')}
-              </AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
-            <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="custom-provider-id">
-                    {t('settings.cli.customProviders.form.idLabel')}
-                  </Label>
-                  <Input
-                    disabled={isEditing}
-                    id="custom-provider-id"
-                    onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        id: event.target.value,
-                      }))
-                    }
-                    placeholder={t(
-                      'settings.cli.customProviders.form.idPlaceholder'
-                    )}
-                    value={formState.id}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    {t('settings.cli.customProviders.form.idHelper')}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="custom-provider-name">
-                    {t('settings.cli.customProviders.form.nameLabel')}
-                  </Label>
-                  <Input
-                    id="custom-provider-name"
-                    onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))
-                    }
-                    placeholder={t(
-                      'settings.cli.customProviders.form.namePlaceholder'
-                    )}
-                    value={formState.name}
-                  />
-                </div>
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+            {error ? (
+              <div className="mb-5 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
+                <p className="mb-1 font-medium">
+                  {t('settings.cli.customProviders.form.errorTitle')}
+                </p>
+                <p>{error}</p>
               </div>
+            ) : null}
 
-              <div className="space-y-2">
-                <Label htmlFor="custom-provider-base-url">
-                  {t('settings.cli.customProviders.form.baseUrlLabel')}
-                </Label>
-                <Input
-                  id="custom-provider-base-url"
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      baseURL: event.target.value,
-                    }))
-                  }
-                  placeholder={t(
-                    'settings.cli.customProviders.form.baseUrlPlaceholder'
-                  )}
-                  value={formState.baseURL}
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-                <div className="space-y-2">
-                  <Label htmlFor="custom-provider-api-key">
-                    {t('settings.cli.customProviders.form.apiKeyLabel')}
-                  </Label>
-                  <Input
-                    id="custom-provider-api-key"
-                    onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        apiKey: event.target.value,
-                      }))
-                    }
-                    placeholder={t(
-                      'settings.cli.customProviders.form.apiKeyPlaceholder'
-                    )}
-                    type={showApiKey ? 'text' : 'password'}
-                    value={formState.apiKey}
-                  />
-                  {apiKeyMasked && (
-                    <p className="text-sm text-muted-foreground">
-                      {t('settings.cli.customProviders.form.apiKeyMasked')}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    onClick={() => setShowApiKey((visible) => !visible)}
-                    type="button"
-                    variant="outline"
+            <div className="space-y-8">
+              <div className="space-y-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <SettingsField
+                    label={t('settings.cli.customProviders.form.idLabel')}
+                    description={t('settings.cli.customProviders.form.idHelper')}
                   >
-                    {showApiKey ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="custom-provider-npm">
-                    {t('settings.cli.customProviders.form.npmLabel')}
-                  </Label>
-                  <Select
-                    value={npmSelection}
-                    onValueChange={(value) => {
-                      setNpmSelection(value);
-                      setFormState((current) => ({
-                        ...current,
-                        npm:
-                          value === CUSTOM_NPM_OPTION_VALUE
-                            ? isBuiltInNpmPackage(current.npm)
-                              ? ''
-                              : current.npm
-                            : value,
-                      }));
-                    }}
-                  >
-                    <SelectTrigger id="custom-provider-npm">
-                      <SelectValue
-                        placeholder={t(
-                          'settings.cli.customProviders.form.npmPlaceholder'
-                        )}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {AI_SDK_NPM_PACKAGES.map((entry) => (
-                        <SelectItem key={entry.value} value={entry.value}>
-                          {entry.label}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value={CUSTOM_NPM_OPTION_VALUE}>
-                        Custom
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {npmSelection === CUSTOM_NPM_OPTION_VALUE && (
-                    <Input
-                      onChange={(event) =>
+                    <SettingsInput
+                      disabled={isEditing}
+                      value={formState.id}
+                      onChange={(value) =>
                         setFormState((current) => ({
                           ...current,
-                          npm: event.target.value,
+                          id: value,
                         }))
                       }
                       placeholder={t(
-                        'settings.cli.customProviders.form.npmPlaceholder'
+                        'settings.cli.customProviders.form.idPlaceholder'
                       )}
-                      value={formState.npm}
                     />
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    {t('settings.cli.customProviders.form.npmHelper')}
-                  </p>
+                  </SettingsField>
+
+                  <SettingsField
+                    label={t('settings.cli.customProviders.form.nameLabel')}
+                  >
+                    <SettingsInput
+                      value={formState.name}
+                      onChange={(value) =>
+                        setFormState((current) => ({
+                          ...current,
+                          name: value,
+                        }))
+                      }
+                      placeholder={t(
+                        'settings.cli.customProviders.form.namePlaceholder'
+                      )}
+                    />
+                  </SettingsField>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="custom-provider-timeout">
-                    {t('settings.cli.customProviders.form.timeoutLabel')}
-                  </Label>
-                  <Input
-                    id="custom-provider-timeout"
-                    min="0"
-                    onChange={(event) =>
+                <SettingsField
+                  label={t('settings.cli.customProviders.form.baseUrlLabel')}
+                >
+                  <SettingsInput
+                    value={formState.baseURL}
+                    onChange={(value) =>
                       setFormState((current) => ({
                         ...current,
-                        timeout: event.target.value,
+                        baseURL: value,
                       }))
                     }
                     placeholder={t(
-                      'settings.cli.customProviders.form.timeoutPlaceholder'
+                      'settings.cli.customProviders.form.baseUrlPlaceholder'
                     )}
-                    type="number"
-                    value={formState.timeout}
                   />
-                </div>
-              </div>
-            </div>
+                </SettingsField>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h4 className="font-medium">
-                    {t('settings.cli.customProviders.form.modelsTitle')}
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    {t('settings.cli.customProviders.form.modelsDescription')}
-                  </p>
-                </div>
-                <Button
-                  onClick={() =>
-                    setFormState((current) => ({
-                      ...current,
-                      models: [...current.models, createEmptyModelDraft()],
-                    }))
+                <SettingsField
+                  label={t('settings.cli.customProviders.form.apiKeyLabel')}
+                  description={
+                    apiKeyMasked
+                      ? t('settings.cli.customProviders.form.apiKeyMasked')
+                      : undefined
                   }
-                  type="button"
-                  variant="outline"
                 >
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('settings.cli.customProviders.form.addModel')}
-                </Button>
-              </div>
+                  <div className="flex gap-2">
+                    <input
+                      id="custom-provider-api-key"
+                      type={showApiKey ? 'text' : 'password'}
+                      className={cn(settingsFieldClassName, 'flex-1')}
+                      placeholder={t(
+                        'settings.cli.customProviders.form.apiKeyPlaceholder'
+                      )}
+                      value={formState.apiKey}
+                      onChange={(event) =>
+                        setFormState((current) => ({
+                          ...current,
+                          apiKey: event.target.value,
+                        }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className={settingsIconButtonClassName}
+                      onClick={() => setShowApiKey((visible) => !visible)}
+                      aria-label={t(
+                        'settings.cli.customProviders.form.apiKeyLabel'
+                      )}
+                    >
+                      {showApiKey ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </SettingsField>
 
-              {!hasModels && (
-                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                  {t('settings.cli.customProviders.form.noModels')}
-                </div>
-              )}
-
-              <div className="space-y-4">
-                {formState.models.map((model) => (
-                  <div key={model.key} className="rounded-lg border p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <p className="font-medium">
-                        {model.name ||
-                          model.id ||
-                          t('settings.cli.customProviders.form.newModel')}
-                      </p>
-                      <Button
-                        onClick={() =>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <SettingsField
+                    label={t('settings.cli.customProviders.form.npmLabel')}
+                    description={t('settings.cli.customProviders.form.npmHelper')}
+                  >
+                    <SettingsSelect
+                      value={npmSelection}
+                      options={npmOptions}
+                      onChange={(value) => {
+                        setNpmSelection(value);
+                        setFormState((current) => ({
+                          ...current,
+                          npm:
+                            value === CUSTOM_NPM_OPTION_VALUE
+                              ? isBuiltInNpmPackage(current.npm)
+                                ? ''
+                                : current.npm
+                              : value,
+                        }));
+                      }}
+                      placeholder={t(
+                        'settings.cli.customProviders.form.npmPlaceholder'
+                      )}
+                    />
+                    {npmSelection === CUSTOM_NPM_OPTION_VALUE ? (
+                      <input
+                        type="text"
+                        className={cn(settingsFieldClassName, 'mt-3')}
+                        placeholder={t(
+                          'settings.cli.customProviders.form.npmPlaceholder'
+                        )}
+                        value={formState.npm}
+                        onChange={(event) =>
                           setFormState((current) => ({
                             ...current,
-                            models: current.models.filter(
-                              (entry) => entry.key !== model.key
-                            ),
+                            npm: event.target.value,
                           }))
                         }
-                        type="button"
-                        variant="ghost"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        {t('settings.cli.customProviders.actions.removeModel')}
-                      </Button>
-                    </div>
+                      />
+                    ) : null}
+                  </SettingsField>
 
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>
-                          {t('settings.cli.customProviders.form.modelIdLabel')}
-                        </Label>
-                        <Input
-                          onChange={(event) =>
-                            updateModelDraft(model.key, (draft) => ({
-                              ...draft,
-                              id: event.target.value,
+                  <SettingsField
+                    label={t('settings.cli.customProviders.form.timeoutLabel')}
+                  >
+                    <input
+                      id="custom-provider-timeout"
+                      type="number"
+                      min="0"
+                      className={settingsFieldClassName}
+                      placeholder={t(
+                        'settings.cli.customProviders.form.timeoutPlaceholder'
+                      )}
+                      value={formState.timeout}
+                      onChange={(event) =>
+                        setFormState((current) => ({
+                          ...current,
+                          timeout: event.target.value,
+                        }))
+                      }
+                    />
+                  </SettingsField>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h4 className="text-[14px] font-semibold text-[#333333]">
+                      {t('settings.cli.customProviders.form.modelsTitle')}
+                    </h4>
+                    <p className="mt-2 text-[12px] leading-5 text-[#8C8C8C]">
+                      {t('settings.cli.customProviders.form.modelsDescription')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={settingsSecondaryButtonClassName}
+                    onClick={() =>
+                      setFormState((current) => ({
+                        ...current,
+                        models: [...current.models, createEmptyModelDraft()],
+                      }))
+                    }
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t('settings.cli.customProviders.form.addModel')}
+                  </button>
+                </div>
+
+                {!hasModels ? (
+                  <div
+                    className={cn(
+                      settingsMutedPanelClassName,
+                      'border-dashed p-4 text-[13px] text-[#8C8C8C]'
+                    )}
+                  >
+                    {t('settings.cli.customProviders.form.noModels')}
+                  </div>
+                ) : null}
+
+                <div className="space-y-4">
+                  {formState.models.map((model) => (
+                    <div
+                      key={model.key}
+                      className={cn(settingsMutedPanelClassName, 'p-4')}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <p className="text-[14px] font-medium text-[#333333]">
+                          {model.name ||
+                            model.id ||
+                            t('settings.cli.customProviders.form.newModel')}
+                        </p>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center gap-2 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] px-3 py-[9px] text-[13px] text-[#d14343] transition-colors duration-200 hover:bg-[#fdeeee]"
+                          onClick={() =>
+                            setFormState((current) => ({
+                              ...current,
+                              models: current.models.filter(
+                                (entry) => entry.key !== model.key
+                              ),
                             }))
                           }
-                          placeholder={t(
-                            'settings.cli.customProviders.form.modelIdPlaceholder'
-                          )}
-                          value={model.id}
-                        />
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {t('settings.cli.customProviders.actions.removeModel')}
+                        </button>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label>
-                          {t(
-                            'settings.cli.customProviders.form.modelNameLabel'
-                          )}
-                        </Label>
-                        <Input
-                          onChange={(event) =>
-                            updateModelDraft(model.key, (draft) => ({
-                              ...draft,
-                              name: event.target.value,
-                            }))
-                          }
-                          placeholder={t(
-                            'settings.cli.customProviders.form.modelNamePlaceholder'
-                          )}
-                          value={model.name}
-                        />
-                      </div>
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <SettingsField
+                          label={t('settings.cli.customProviders.form.modelIdLabel')}
+                        >
+                          <SettingsInput
+                            value={model.id}
+                            onChange={(value) =>
+                              updateModelDraft(model.key, (draft) => ({
+                                ...draft,
+                                id: value,
+                              }))
+                            }
+                            placeholder={t(
+                              'settings.cli.customProviders.form.modelIdPlaceholder'
+                            )}
+                          />
+                        </SettingsField>
 
-                      <div className="space-y-2">
-                        <Label>
-                          {t(
+                        <SettingsField
+                          label={t('settings.cli.customProviders.form.modelNameLabel')}
+                        >
+                          <SettingsInput
+                            value={model.name}
+                            onChange={(value) =>
+                              updateModelDraft(model.key, (draft) => ({
+                                ...draft,
+                                name: value,
+                              }))
+                            }
+                            placeholder={t(
+                              'settings.cli.customProviders.form.modelNamePlaceholder'
+                            )}
+                          />
+                        </SettingsField>
+
+                        <SettingsField
+                          label={t(
                             'settings.cli.customProviders.form.inputModalitiesLabel'
                           )}
-                        </Label>
-                        <Input
-                          onChange={(event) =>
-                            updateModelDraft(model.key, (draft) => ({
-                              ...draft,
-                              inputModalities: event.target.value,
-                            }))
-                          }
-                          placeholder={t(
-                            'settings.cli.customProviders.form.modalitiesPlaceholder'
-                          )}
-                          value={model.inputModalities}
-                        />
-                      </div>
+                        >
+                          <SettingsInput
+                            value={model.inputModalities}
+                            onChange={(value) =>
+                              updateModelDraft(model.key, (draft) => ({
+                                ...draft,
+                                inputModalities: value,
+                              }))
+                            }
+                            placeholder={t(
+                              'settings.cli.customProviders.form.modalitiesPlaceholder'
+                            )}
+                          />
+                        </SettingsField>
 
-                      <div className="space-y-2">
-                        <Label>
-                          {t(
+                        <SettingsField
+                          label={t(
                             'settings.cli.customProviders.form.outputModalitiesLabel'
                           )}
-                        </Label>
-                        <Input
-                          onChange={(event) =>
-                            updateModelDraft(model.key, (draft) => ({
-                              ...draft,
-                              outputModalities: event.target.value,
-                            }))
-                          }
-                          placeholder={t(
-                            'settings.cli.customProviders.form.modalitiesPlaceholder'
-                          )}
-                          value={model.outputModalities}
-                        />
-                      </div>
+                        >
+                          <SettingsInput
+                            value={model.outputModalities}
+                            onChange={(value) =>
+                              updateModelDraft(model.key, (draft) => ({
+                                ...draft,
+                                outputModalities: value,
+                              }))
+                            }
+                            placeholder={t(
+                              'settings.cli.customProviders.form.modalitiesPlaceholder'
+                            )}
+                          />
+                        </SettingsField>
 
-                      <div className="space-y-2">
-                        <Label>
-                          {t(
+                        <SettingsField
+                          label={t(
                             'settings.cli.customProviders.form.contextLimitLabel'
                           )}
-                        </Label>
-                        <Input
-                          min="0"
-                          onChange={(event) =>
-                            updateModelDraft(model.key, (draft) => ({
-                              ...draft,
-                              contextLimit: event.target.value,
-                            }))
-                          }
-                          placeholder={t(
-                            'settings.cli.customProviders.form.limitPlaceholder'
-                          )}
-                          type="number"
-                          value={model.contextLimit}
-                        />
-                      </div>
+                        >
+                          <input
+                            type="number"
+                            min="0"
+                            className={settingsFieldClassName}
+                            placeholder={t(
+                              'settings.cli.customProviders.form.limitPlaceholder'
+                            )}
+                            value={model.contextLimit}
+                            onChange={(event) =>
+                              updateModelDraft(model.key, (draft) => ({
+                                ...draft,
+                                contextLimit: event.target.value,
+                              }))
+                            }
+                          />
+                        </SettingsField>
 
-                      <div className="space-y-2">
-                        <Label>
-                          {t(
+                        <SettingsField
+                          label={t(
                             'settings.cli.customProviders.form.outputLimitLabel'
                           )}
-                        </Label>
-                        <Input
-                          min="0"
-                          onChange={(event) =>
-                            updateModelDraft(model.key, (draft) => ({
-                              ...draft,
-                              outputLimit: event.target.value,
-                            }))
-                          }
-                          placeholder={t(
-                            'settings.cli.customProviders.form.limitPlaceholder'
-                          )}
-                          type="number"
-                          value={model.outputLimit}
-                        />
+                        >
+                          <input
+                            type="number"
+                            min="0"
+                            className={settingsFieldClassName}
+                            placeholder={t(
+                              'settings.cli.customProviders.form.limitPlaceholder'
+                            )}
+                            value={model.outputLimit}
+                            onChange={(event) =>
+                              updateModelDraft(model.key, (draft) => ({
+                                ...draft,
+                                outputLimit: event.target.value,
+                              }))
+                            }
+                          />
+                        </SettingsField>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button
-              onClick={() => onOpenChange(false)}
+          <div className="flex flex-col-reverse gap-3 border-t border-[#E8EEF5] px-6 py-4 sm:flex-row sm:justify-end">
+            <button
               type="button"
-              variant="outline"
+              className={settingsSecondaryButtonClassName}
+              onClick={() => onOpenChange(false)}
             >
               {t('settings.cli.customProviders.form.cancel')}
-            </Button>
-            <Button disabled={isSubmitting} type="submit">
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={settingsPrimaryButtonClassName}
+            >
               {dialogCopy.submitLabel}
-            </Button>
-          </DialogFooter>
+            </button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

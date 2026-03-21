@@ -470,12 +470,74 @@ export function truncateText(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
+function getApiErrorDetectionContent(content: string): string {
+  const parsedResponse = tryParseAgentResponse(content);
+  if (!parsedResponse) {
+    return content.trim();
+  }
+
+  return parsedResponse.sendMessages
+    .map((item) => item.content.trim())
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+}
+
+function isLikelyStandaloneApiError(content: string): boolean {
+  const normalized = content
+    .replace(/\r\n/g, '\n')
+    .replace(/^@\S+\s+/, '')
+    .trim()
+    .toLowerCase();
+
+  if (!normalized || normalized.length > 280) {
+    return false;
+  }
+
+  const lines = normalized
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0 || lines.length > 4) {
+    return false;
+  }
+
+  const firstLine = lines[0] ?? '';
+  const standalonePatterns = [
+    /^(error|warning)\b/,
+    /^(api )?authentication failed\b/,
+    /^unauthorized\b/,
+    /^invalid(?:_| )api key\b/,
+    /^incorrect api key\b/,
+    /^quota exceeded\b/,
+    /^rate limit\b/,
+    /^too many requests\b/,
+    /^service unavailable\b/,
+    /^server is busy\b/,
+    /^overloaded\b/,
+    /^openai\b.*\b(quota exceeded|rate limit exceeded|context length exceeded|api key invalid)\b/,
+    /^claude\b.*\b(credit balance exhausted|rate limit exceeded|api is overloaded)\b/,
+    /^google ai\b.*\b(quota exceeded|rate limit exceeded)\b/,
+    /^azure openai\b.*\b(quota exceeded|rate limit exceeded)\b/,
+    /^deepseek\b.*\b(quota|balance|rate limit)\b/,
+    /^qwen\b.*\b(quota|rate limit|accessdenied|invalidaccesskey)\b/,
+  ];
+
+  return standalonePatterns.some((pattern) => pattern.test(firstLine));
+}
+
 /**
  * Detect if message content contains common API error patterns
  * Returns an error type string if detected, or null otherwise
  * Supports: Claude, OpenAI/Codex, QWen Coder, Azure OpenAI, Google AI, and other providers
  */
-export function detectApiError(content: string): {
+export function detectApiError(
+  content: string,
+  options?: {
+    requireStandalone?: boolean;
+  }
+): {
   type:
     | 'quota_exceeded'
     | 'rate_limit'
@@ -487,7 +549,16 @@ export function detectApiError(content: string): {
   message: string;
   provider?: string;
 } | null {
-  const lowered = content.toLowerCase();
+  const candidate = getApiErrorDetectionContent(content);
+  if (!candidate) return null;
+  if (options?.requireStandalone && !isLikelyStandaloneApiError(candidate)) {
+    return null;
+  }
+
+  const lowered = candidate.toLowerCase();
+  const has401 = /\b401\b/.test(lowered);
+  const has429 = /\b429\b/.test(lowered);
+  const has503 = /\b503\b/.test(lowered);
 
   // === Anthropic/Claude specific errors ===
   if (lowered.includes('anthropic') || lowered.includes('claude')) {
@@ -622,7 +693,7 @@ export function detectApiError(content: string): {
         provider: 'Azure',
       };
     }
-    if (lowered.includes('rate limit') || lowered.includes('429')) {
+    if (lowered.includes('rate limit') || has429) {
       return {
         type: 'rate_limit',
         message: 'Azure OpenAI rate limit exceeded',
@@ -645,7 +716,7 @@ export function detectApiError(content: string): {
         provider: 'Google',
       };
     }
-    if (lowered.includes('rate limit') || lowered.includes('429')) {
+    if (lowered.includes('rate limit') || has429) {
       return {
         type: 'rate_limit',
         message: 'Google AI rate limit exceeded',
@@ -663,7 +734,7 @@ export function detectApiError(content: string): {
         provider: 'DeepSeek',
       };
     }
-    if (lowered.includes('rate limit') || lowered.includes('429')) {
+    if (lowered.includes('rate limit') || has429) {
       return {
         type: 'rate_limit',
         message: 'DeepSeek API 请求频率超限',
@@ -696,7 +767,7 @@ export function detectApiError(content: string): {
     lowered.includes('rate limit') ||
     lowered.includes('rate_limit') ||
     lowered.includes('too many requests') ||
-    lowered.includes('429') ||
+    has429 ||
     lowered.includes('请求过于频繁') ||
     lowered.includes('限流')
   ) {
@@ -710,7 +781,7 @@ export function detectApiError(content: string): {
   if (
     lowered.includes('overloaded') ||
     lowered.includes('server is busy') ||
-    lowered.includes('503') ||
+    has503 ||
     lowered.includes('service unavailable') ||
     lowered.includes('服务繁忙') ||
     lowered.includes('系统繁忙')
@@ -727,7 +798,7 @@ export function detectApiError(content: string): {
     lowered.includes('invalid_api_key') ||
     lowered.includes('authentication failed') ||
     lowered.includes('unauthorized') ||
-    lowered.includes('401') ||
+    has401 ||
     lowered.includes('密钥无效') ||
     lowered.includes('认证失败')
   ) {

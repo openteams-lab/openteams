@@ -1,28 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { cloneDeep, isEqual } from 'lodash';
 import { useTranslation } from 'react-i18next';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Loader2, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/dialogs/shared/ConfirmDialog';
+import { cn } from '@/lib/utils';
 import {
   useCliConfig,
   useCreateCustomProvider,
@@ -48,6 +29,19 @@ import type {
   ProviderModelConfig,
 } from '@/types/cliConfig';
 import { CustomProviderForm } from './components/CustomProviderForm';
+import {
+  SettingsCard,
+  SettingsCheckbox,
+  SettingsField,
+  SettingsInput,
+  SettingsSaveBar,
+  SettingsSelect,
+  settingsFieldClassName,
+  settingsIconButtonClassName,
+  settingsMutedPanelClassName,
+  settingsSecondaryButtonClassName,
+} from '@/components/ui-new/dialogs/settings/SettingsComponents';
+import { useOptionalSettingsDirty } from '@/components/ui-new/dialogs/settings/SettingsDirtyContext';
 
 const DEFAULT_PROVIDER_OPTIONS: CliProviderInfo[] = [
   { id: 'anthropic', name: 'Anthropic', configured: false },
@@ -73,6 +67,35 @@ const API_KEY_VALIDATION_REQUIRED_PROVIDERS = new Set<CliProviderId>([
   'google',
   'openrouter',
 ]);
+
+const SETTINGS_INLINE_PANEL_CLASS = cn(settingsMutedPanelClassName, 'p-4');
+const SETTINGS_STATUS_ROW_CLASS = cn(
+  settingsMutedPanelClassName,
+  'flex items-center justify-between gap-4 px-4 py-3 text-[12px] text-[#8C8C8C]'
+);
+
+function renderSettingsStatusMessage(
+  message: string,
+  tone: 'error' | 'success' = 'error',
+  title?: string
+) {
+  const toneClassName =
+    tone === 'success'
+      ? 'border-[#d8ead8] bg-[#f7fcf7] text-[#2f7d32]'
+      : 'border-[#f3d7d7] bg-[#fff7f7] text-[#d14343]';
+
+  return (
+    <div
+      className={cn(
+        'mb-5 rounded-[10px] border p-4 text-[13px]',
+        toneClassName
+      )}
+    >
+      {title ? <p className="mb-1 font-medium">{title}</p> : null}
+      <p>{message}</p>
+    </div>
+  );
+}
 
 const REMOTE_MODEL_PROVIDERS = new Set<CliProviderId>([
   'anthropic',
@@ -428,6 +451,7 @@ function withCustomProviders(
 
 export function CliSettings() {
   const { t } = useTranslation(['settings', 'common']);
+  const optionalDirtyContext = useOptionalSettingsDirty();
   const {
     data: savedConfig,
     isLoading,
@@ -446,10 +470,8 @@ export function CliSettings() {
     error: providersError,
     isLoading: isProvidersLoading,
   } = useCliProviders();
-  const {
-    data: customProvidersData,
-    error: customProvidersError,
-  } = useCustomProviders();
+  const { data: customProvidersData, error: customProvidersError } =
+    useCustomProviders();
   const createCustomProvider = useCreateCustomProvider();
   const updateCustomProvider = useUpdateCustomProvider();
   const deleteCustomProvider = useDeleteCustomProvider();
@@ -466,7 +488,6 @@ export function CliSettings() {
     useState<CustomProviderEntry | null>(null);
   const [isCustomProviderDialogOpen, setIsCustomProviderDialogOpen] =
     useState(false);
-  const [isProviderSelectOpen, setIsProviderSelectOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(
@@ -545,6 +566,11 @@ export function CliSettings() {
 
     return !isEqual(comparableDraft, comparableSavedConfig);
   }, [comparableDraft, comparableSavedConfig]);
+
+  useEffect(() => {
+    optionalDirtyContext?.setDirty('cli', hasUnsavedChanges);
+    return () => optionalDirtyContext?.setDirty('cli', false);
+  }, [hasUnsavedChanges, optionalDirtyContext]);
 
   useEffect(() => {
     if (!savedConfig) {
@@ -716,11 +742,6 @@ export function CliSettings() {
     setIsCustomProviderDialogOpen(true);
   };
 
-  const handleCreateCustomProviderFromSelect = () => {
-    setIsProviderSelectOpen(false);
-    handleCreateCustomProvider();
-  };
-
   const handleEditCustomProvider = (provider: CustomProviderEntry) => {
     setEditingCustomProvider(provider);
     setCustomProviderMessage(null);
@@ -781,7 +802,9 @@ export function CliSettings() {
       const refreshedConfig = (await refetch()).data;
       if (refreshedConfig) {
         setDraft(
-          cloneDeep(withCustomProviders(refreshedConfig, nextCustomProvidersRecord))
+          cloneDeep(
+            withCustomProviders(refreshedConfig, nextCustomProvidersRecord)
+          )
         );
       } else {
         setDraft((current) => {
@@ -860,9 +883,11 @@ export function CliSettings() {
 
   if (isLoading || !draft) {
     return (
-      <div className="flex items-center justify-center py-8">
+      <div className="flex items-center justify-center gap-2 py-8">
         <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">{t('settings.cli.loading')}</span>
+        <span className="text-[14px] text-[#333333]">
+          {t('settings.cli.loading')}
+        </span>
       </div>
     );
   }
@@ -870,514 +895,376 @@ export function CliSettings() {
   if (isError) {
     return (
       <div className="py-8">
-        <Alert variant="destructive">
-          <AlertTitle>{t('settings.cli.loadError')}</AlertTitle>
-          <AlertDescription>
-            {getErrorMessage(error, t('settings.cli.loadError'))}
-          </AlertDescription>
-        </Alert>
+        {renderSettingsStatusMessage(
+          getErrorMessage(error, t('settings.cli.loadError')),
+          'error',
+          t('settings.cli.loadError')
+        )}
       </div>
     );
   }
 
+  const providerSelectOptions = providerOptions.map((provider) => ({
+    value: provider.id,
+    label: provider.configured
+      ? `${provider.name} (${t('settings.cli.provider.configured')})`
+      : provider.name,
+  }));
+  const modelSelectOptions = availableModelOptions.map((model) => ({
+    value: model.id,
+    label: model.name,
+  }));
+  const saveBarLayout = optionalDirtyContext ? 'section' : 'floating-panel';
+
   return (
-    <div className="space-y-6">
-      {saveError && (
-        <Alert variant="destructive">
-          <AlertDescription>{saveError}</AlertDescription>
-        </Alert>
-      )}
-
-      {saveSuccessMessage && (
-        <Alert variant="success">
-          <AlertDescription className="font-medium">
-            {saveSuccessMessage}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {customProviderMessage && (
-        <Alert variant="success">
-          <AlertDescription>{customProviderMessage}</AlertDescription>
-        </Alert>
-      )}
-
-      {customProviderStatusError && (
-        <Alert variant="destructive">
-          <AlertDescription>{customProviderStatusError}</AlertDescription>
-        </Alert>
-      )}
-
-      {validationError && (
-        <Alert variant="destructive">
-          <AlertDescription>{validationError}</AlertDescription>
-        </Alert>
-      )}
-
-      {validationResult && validationResult.provider === selectedProvider && (
-        <Alert variant={validationResult.valid ? 'success' : 'destructive'}>
-          <AlertTitle>
-            {validationResult.valid
-              ? t('settings.cli.validation.successTitle')
-              : t('settings.cli.validation.failureTitle')}
-          </AlertTitle>
-          <AlertDescription>{validationResult.message}</AlertDescription>
-        </Alert>
-      )}
-
-      {providersError && (
-        <Alert variant="destructive">
-          <AlertDescription>
-            {getErrorMessage(
-              providersError,
-              t('settings.cli.provider.loadError')
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {customProvidersError && (
-        <Alert variant="destructive">
-          <AlertDescription>
-            {getErrorMessage(
-              customProvidersError,
-              t('settings.cli.customProviders.loadError')
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
-
+    <div className={cn(optionalDirtyContext ? '' : 'pb-8')}>
+      {saveError && renderSettingsStatusMessage(saveError)}
+      {saveSuccessMessage &&
+        renderSettingsStatusMessage(saveSuccessMessage, 'success')}
+      {customProviderMessage &&
+        renderSettingsStatusMessage(customProviderMessage, 'success')}
+      {customProviderStatusError &&
+        renderSettingsStatusMessage(customProviderStatusError)}
+      {validationError && renderSettingsStatusMessage(validationError)}
+      {validationResult &&
+        validationResult.provider === selectedProvider &&
+        renderSettingsStatusMessage(
+          validationResult.message,
+          validationResult.valid ? 'success' : 'error',
+          validationResult.valid
+            ? t('settings.cli.validation.successTitle')
+            : t('settings.cli.validation.failureTitle')
+        )}
+      {providersError &&
+        renderSettingsStatusMessage(
+          getErrorMessage(providersError, t('settings.cli.provider.loadError'))
+        )}
+      {customProvidersError &&
+        renderSettingsStatusMessage(
+          getErrorMessage(
+            customProvidersError,
+            t('settings.cli.customProviders.loadError')
+          )
+        )}
       {modelsError &&
         selectedManagedCustomProvider == null &&
-        selectedProvider !== 'custom' && (
-        <Alert variant="destructive">
-          <AlertDescription>
-            {getErrorMessage(modelsError, t('settings.cli.model.loadError'))}
-          </AlertDescription>
-        </Alert>
-      )}
+        selectedProvider !== 'custom' &&
+        renderSettingsStatusMessage(
+          getErrorMessage(modelsError, t('settings.cli.model.loadError'))
+        )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('settings.cli.title')}</CardTitle>
-          <CardDescription>{t('settings.cli.description')}</CardDescription>
-        </CardHeader>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('settings.cli.provider.title')}</CardTitle>
-          <CardDescription>
-            {t('settings.cli.provider.description')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="cli-provider">
-              {t('settings.cli.provider.label')}
-            </Label>
-            <Select
-              open={isProviderSelectOpen}
-              value={selectedProvider}
-              onOpenChange={setIsProviderSelectOpen}
-              onValueChange={(value: CliProviderId) =>
-                handleProviderChange(value)
-              }
-            >
-              <SelectTrigger id="cli-provider">
-                <SelectValue
-                  placeholder={t('settings.cli.provider.placeholder')}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {providerOptions.map((provider) => (
-                  <SelectItem key={provider.id} value={provider.id}>
-                    {provider.name}
-                    {provider.configured
-                      ? ` · ${t('settings.cli.provider.configured')}`
-                      : ''}
-                  </SelectItem>
-                ))}
-                <SelectSeparator />
-                <div className="px-1 pb-1">
-                  <Button
-                    className="w-full justify-start"
-                    onClick={handleCreateCustomProviderFromSelect}
-                    onMouseDown={(event) => event.preventDefault()}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    {t('settings.cli.customProviders.actions.add')}
-                  </Button>
-                </div>
-              </SelectContent>
-            </Select>
-          <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
+      <SettingsCard
+        title={t('settings.cli.provider.title')}
+        description={t('settings.cli.provider.description')}
+        headerAction={
+          <button
+            type="button"
+            className={settingsSecondaryButtonClassName}
+            onClick={handleCreateCustomProvider}
+          >
+            <Plus className="h-4 w-4" />
+            {t('settings.cli.customProviders.actions.add')}
+          </button>
+        }
+      >
+        <SettingsField label={t('settings.cli.provider.label')}>
+          <SettingsSelect
+            value={selectedProvider}
+            options={providerSelectOptions}
+            onChange={(value) => handleProviderChange(value as CliProviderId)}
+            placeholder={t('settings.cli.provider.placeholder')}
+          />
+          <div className={cn(SETTINGS_STATUS_ROW_CLASS, 'mt-3')}>
             <span>{t('settings.cli.provider.helper')}</span>
             <span className="shrink-0">
               {selectedProviderInfo?.configured
-                  ? t('settings.cli.provider.configured')
-                  : t('settings.cli.provider.notConfigured')}
+                ? t('settings.cli.provider.configured')
+                : t('settings.cli.provider.notConfigured')}
             </span>
           </div>
-          </div>
+        </SettingsField>
 
-          {selectedManagedCustomProvider ? (
-            <div className="rounded-lg border p-4">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <p className="font-medium">
-                      {selectedManagedCustomProvider.name ||
-                        selectedManagedCustomProvider.id}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedManagedCustomProvider.options.baseURL ||
-                        t('settings.cli.customProviders.list.noBaseUrl')}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                    <span>
-                      {t('settings.cli.customProviders.list.modelsCount', {
-                        count: selectedManagedCustomProviderModels.length,
-                      })}
-                    </span>
-                    <span>
-                      {t('settings.cli.customProviders.list.timeout', {
-                        timeout:
-                          selectedManagedCustomProvider.options.timeout ?? '-',
-                      })}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={() =>
-                      handleEditCustomProvider(selectedManagedCustomProvider)
-                    }
-                    type="button"
-                    variant="outline"
-                  >
-                    {t('settings.cli.customProviders.actions.edit')}
-                  </Button>
-                  <Button
-                    disabled={deletingProviderId === selectedManagedCustomProvider.id}
-                    onClick={() =>
-                      handleDeleteCustomProvider(selectedManagedCustomProvider)
-                    }
-                    type="button"
-                    variant="destructive"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    {deletingProviderId === selectedManagedCustomProvider.id
-                      ? t('settings.cli.customProviders.actions.deleting')
-                      : t('settings.cli.customProviders.actions.delete')}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              {selectedProvider === 'custom' && (
-                <div className="space-y-2">
-                  <Label htmlFor="cli-provider-name">
-                    {t('settings.cli.provider.customNameLabel')}
-                  </Label>
-                  <Input
-                    id="cli-provider-name"
-                    placeholder={t('settings.cli.provider.customNamePlaceholder')}
-                    value={customProviderName}
-                    onChange={(event) =>
-                      updateDraft((current) =>
-                        setCustomProviderName(current, event.target.value)
-                      )
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedProvider !== 'ollama' && (
-                <div className="space-y-2">
-                  <Label htmlFor="cli-provider-api-key">
-                    {t('settings.cli.provider.apiKeyLabel')}
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="cli-provider-api-key"
-                      type={showApiKey ? 'text' : 'password'}
-                      placeholder={t('settings.cli.provider.apiKeyPlaceholder')}
-                      value={providerApiKey}
-                      onChange={(event) =>
-                        updateDraft((current) =>
-                          setProviderApiKey(
-                            current,
-                            selectedProvider,
-                            event.target.value
-                          )
-                        )
-                      }
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowApiKey((visible) => !visible)}
-                      aria-label={t(
-                        'settings.cli.provider.toggleApiKeyVisibility'
-                      )}
-                    >
-                      {showApiKey ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  {apiKeyMasked && (
-                    <p className="text-sm text-muted-foreground">
-                      {t('settings.cli.provider.apiKeyMasked')}
-                    </p>
-                  )}
-                </div>
-              )}
-
+        {selectedManagedCustomProvider ? (
+          <div className={SETTINGS_INLINE_PANEL_CLASS}>
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="space-y-2">
-                <Label htmlFor="cli-provider-endpoint">
-                  {t('settings.cli.provider.endpointLabel')}
-                </Label>
-                <Input
-                  id="cli-provider-endpoint"
-                  placeholder={t('settings.cli.provider.endpointPlaceholder')}
-                  value={providerEndpoint}
-                  onChange={(event) =>
-                    updateDraft((current) =>
-                      setProviderEndpoint(
-                        current,
-                        selectedProvider,
-                        event.target.value
-                      )
-                    )
-                  }
-                />
-                <p className="text-sm text-muted-foreground">
-                  {t('settings.cli.provider.endpointHelper')}
-                </p>
-              </div>
-
-              <div className="rounded-lg border p-4">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-1">
-                    <p className="font-medium">
-                      {t('settings.cli.validation.title')}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {t('settings.cli.validation.description')}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleValidateConnection}
-                    disabled={validateProvider.isPending}
-                  >
-                    {validateProvider.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    {validateProvider.isPending
-                      ? t('settings.cli.validation.testing')
-                      : t('settings.cli.validation.button')}
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {isProvidersLoading && (
-            <p className="text-sm text-muted-foreground">
-              {t('settings.cli.provider.loading')}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('settings.cli.model.title')}</CardTitle>
-          <CardDescription>
-            {t('settings.cli.model.description')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {selectedManagedCustomProvider && (
-            <div className="rounded-lg border border-dashed p-4">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="space-y-1">
-                  <p className="font-medium">
+                  <p className="text-[14px] font-medium text-[#333333]">
                     {selectedManagedCustomProvider.name ||
                       selectedManagedCustomProvider.id}
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedManagedCustomProviderModels.length > 0
-                      ? t('settings.cli.customProviders.list.modelsCount', {
-                          count: selectedManagedCustomProviderModels.length,
-                        })
-                      : t('settings.cli.customProviders.list.noModels')}
+                  <p className="text-[12px] text-[#8C8C8C]">
+                    {selectedManagedCustomProvider.options.baseURL ||
+                      t('settings.cli.customProviders.list.noBaseUrl')}
                   </p>
                 </div>
-                <Button
+                <div className="flex flex-wrap gap-3 text-[12px] text-[#8C8C8C]">
+                  <span>
+                    {t('settings.cli.customProviders.list.modelsCount', {
+                      count: selectedManagedCustomProviderModels.length,
+                    })}
+                  </span>
+                  <span>
+                    {t('settings.cli.customProviders.list.timeout', {
+                      timeout:
+                        selectedManagedCustomProvider.options.timeout ?? '-',
+                    })}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={settingsSecondaryButtonClassName}
                   onClick={() =>
                     handleEditCustomProvider(selectedManagedCustomProvider)
                   }
-                  type="button"
-                  variant="outline"
                 >
                   {t('settings.cli.customProviders.actions.edit')}
-                </Button>
+                </button>
+                <button
+                  type="button"
+                  disabled={deletingProviderId === selectedManagedCustomProvider.id}
+                  className="inline-flex items-center justify-center gap-2 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] px-4 py-[10px] text-[14px] text-[#d14343] transition-colors duration-200 hover:bg-[#fdeeee] disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() =>
+                    handleDeleteCustomProvider(selectedManagedCustomProvider)
+                  }
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {deletingProviderId === selectedManagedCustomProvider.id
+                    ? t('settings.cli.customProviders.actions.deleting')
+                    : t('settings.cli.customProviders.actions.delete')}
+                </button>
               </div>
             </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="cli-model-input">
-              {t('settings.cli.model.inputLabel')}
-            </Label>
-            <Input
-              id="cli-model-input"
-              placeholder={t('settings.cli.model.inputPlaceholder')}
-              value={draft.model.default}
-              onChange={(event) =>
-                updateDraft((current) =>
-                  setModelValue(current, selectedProvider, event.target.value)
-                )
-              }
-            />
           </div>
+        ) : (
+          <>
+            {selectedProvider === 'custom' ? (
+              <SettingsField label={t('settings.cli.provider.customNameLabel')}>
+                <SettingsInput
+                  value={customProviderName}
+                  onChange={(value) =>
+                    updateDraft((current) =>
+                      setCustomProviderName(current, value)
+                    )
+                  }
+                  placeholder={t(
+                    'settings.cli.provider.customNamePlaceholder'
+                  )}
+                />
+              </SettingsField>
+            ) : null}
 
-          {selectedProvider !== 'custom' && (
-            <div className="space-y-2">
-              <Label htmlFor="cli-model-select">
-                {t('settings.cli.model.selectLabel')}
-              </Label>
-              <Select
-                value={suggestedModelValue}
-                onValueChange={(value) =>
-                  updateDraft((current) =>
-                    setModelValue(current, selectedProvider, value)
-                  )
-                }
-                disabled={
-                  (selectedManagedCustomProvider == null && isModelsLoading) ||
-                  availableModelOptions.length === 0
+            {selectedProvider !== 'ollama' ? (
+              <SettingsField
+                label={t('settings.cli.provider.apiKeyLabel')}
+                description={
+                  apiKeyMasked
+                    ? t('settings.cli.provider.apiKeyMasked')
+                    : undefined
                 }
               >
-                <SelectTrigger id="cli-model-select">
-                  <SelectValue
-                    placeholder={t('settings.cli.model.selectPlaceholder')}
+                <div className="flex gap-2">
+                  <input
+                    id="cli-provider-api-key"
+                    type={showApiKey ? 'text' : 'password'}
+                    className={cn(settingsFieldClassName, 'flex-1')}
+                    placeholder={t('settings.cli.provider.apiKeyPlaceholder')}
+                    value={providerApiKey}
+                    onChange={(event) =>
+                      updateDraft((current) =>
+                        setProviderApiKey(
+                          current,
+                          selectedProvider,
+                          event.target.value
+                        )
+                      )
+                    }
                   />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableModelOptions.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                {selectedManagedCustomProvider
-                  ? availableModelOptions.length > 0
-                    ? t('settings.cli.model.selectHelper')
-                    : t('settings.cli.customProviders.list.noModels')
-                  : isModelsLoading
+                  <button
+                    type="button"
+                    className={settingsIconButtonClassName}
+                    onClick={() => setShowApiKey((visible) => !visible)}
+                    aria-label={t(
+                      'settings.cli.provider.toggleApiKeyVisibility'
+                    )}
+                  >
+                    {showApiKey ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </SettingsField>
+            ) : null}
+
+            <SettingsField
+              label={t('settings.cli.provider.endpointLabel')}
+              description={t('settings.cli.provider.endpointHelper')}
+            >
+              <SettingsInput
+                value={providerEndpoint}
+                onChange={(value) =>
+                  updateDraft((current) =>
+                    setProviderEndpoint(current, selectedProvider, value)
+                  )
+                }
+                placeholder={t('settings.cli.provider.endpointPlaceholder')}
+              />
+            </SettingsField>
+
+            <div className={SETTINGS_INLINE_PANEL_CLASS}>
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-1">
+                  <p className="text-[14px] font-medium text-[#333333]">
+                    {t('settings.cli.validation.title')}
+                  </p>
+                  <p className="text-[12px] text-[#8C8C8C]">
+                    {t('settings.cli.validation.description')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={settingsSecondaryButtonClassName}
+                  onClick={handleValidateConnection}
+                  disabled={validateProvider.isPending}
+                >
+                  {validateProvider.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  {validateProvider.isPending
+                    ? t('settings.cli.validation.testing')
+                    : t('settings.cli.validation.button')}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {isProvidersLoading ? (
+          <p className="mt-4 text-[12px] text-[#8C8C8C]">
+            {t('settings.cli.provider.loading')}
+          </p>
+        ) : null}
+      </SettingsCard>
+
+      <SettingsCard
+        title={t('settings.cli.model.title')}
+        description={t('settings.cli.model.description')}
+      >
+        {selectedManagedCustomProvider ? (
+          <div className={cn(SETTINGS_INLINE_PANEL_CLASS, 'mb-5')}>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                <p className="text-[14px] font-medium text-[#333333]">
+                  {selectedManagedCustomProvider.name ||
+                    selectedManagedCustomProvider.id}
+                </p>
+                <p className="text-[12px] text-[#8C8C8C]">
+                  {selectedManagedCustomProviderModels.length > 0
+                    ? t('settings.cli.customProviders.list.modelsCount', {
+                        count: selectedManagedCustomProviderModels.length,
+                      })
+                    : t('settings.cli.customProviders.list.noModels')}
+                </p>
+              </div>
+              <button
+                type="button"
+                className={settingsSecondaryButtonClassName}
+                onClick={() =>
+                  handleEditCustomProvider(selectedManagedCustomProvider)
+                }
+              >
+                {t('settings.cli.customProviders.actions.edit')}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <SettingsField label={t('settings.cli.model.inputLabel')}>
+          <SettingsInput
+            value={draft.model.default}
+            onChange={(value) =>
+              updateDraft((current) =>
+                setModelValue(current, selectedProvider, value)
+              )
+            }
+            placeholder={t('settings.cli.model.inputPlaceholder')}
+          />
+        </SettingsField>
+
+        {selectedProvider !== 'custom' ? (
+          <SettingsField
+            label={t('settings.cli.model.selectLabel')}
+            description={
+              selectedManagedCustomProvider
+                ? availableModelOptions.length > 0
+                  ? t('settings.cli.model.selectHelper')
+                  : t('settings.cli.customProviders.list.noModels')
+                : isModelsLoading
                   ? t('settings.cli.model.loading')
                   : availableModelOptions.length > 0
                     ? t('settings.cli.model.selectHelper')
-                    : t('settings.cli.model.empty')}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('settings.cli.behavior.title')}</CardTitle>
-          <CardDescription>
-            {t('settings.cli.behavior.description')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-1">
-              <Label htmlFor="cli-auto-approve">
-                {t('settings.cli.behavior.autoApproveLabel')}
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                {t('settings.cli.behavior.autoApproveHelper')}
-              </p>
-            </div>
-            <Switch
-              id="cli-auto-approve"
-              checked={draft.behavior.auto_approve}
-              onCheckedChange={(checked) =>
-                updateDraft((current) => {
-                  current.behavior.auto_approve = checked;
-                })
+                    : t('settings.cli.model.empty')
+            }
+          >
+            <SettingsSelect
+              value={suggestedModelValue}
+              options={modelSelectOptions}
+              onChange={(value) =>
+                updateDraft((current) =>
+                  setModelValue(current, selectedProvider, value)
+                )
               }
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-1">
-              <Label htmlFor="cli-auto-compact">
-                {t('settings.cli.behavior.autoCompactLabel')}
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                {t('settings.cli.behavior.autoCompactHelper')}
-              </p>
-            </div>
-            <Switch
-              id="cli-auto-compact"
-              checked={draft.behavior.auto_compact}
-              onCheckedChange={(checked) =>
-                updateDraft((current) => {
-                  current.behavior.auto_compact = checked;
-                })
+              disabled={
+                (selectedManagedCustomProvider == null && isModelsLoading) ||
+                modelSelectOptions.length === 0
               }
+              placeholder={t('settings.cli.model.selectPlaceholder')}
             />
-          </div>
-        </CardContent>
-      </Card>
+          </SettingsField>
+        ) : null}
+      </SettingsCard>
 
-      <div className="sticky bottom-0 z-10 border-t bg-background/80 py-4 backdrop-blur-sm">
-        <div className="flex items-center justify-between">
-          {hasUnsavedChanges ? (
-            <span className="text-sm text-muted-foreground">
-              {t('settings.cli.save.unsavedChanges')}
-            </span>
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleDiscard}
-              disabled={!hasUnsavedChanges || isSaveBusy}
-            >
-              {t('settings.cli.save.discard')}
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={!hasUnsavedChanges || isSaveBusy}
-            >
-              {isSaveBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {t('settings.cli.save.button')}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <SettingsCard
+        title={t('settings.cli.behavior.title')}
+        description={t('settings.cli.behavior.description')}
+      >
+        <SettingsCheckbox
+          id="cli-auto-approve"
+          label={t('settings.cli.behavior.autoApproveLabel')}
+          description={t('settings.cli.behavior.autoApproveHelper')}
+          checked={draft.behavior.auto_approve}
+          onChange={(checked) =>
+            updateDraft((current) => {
+              current.behavior.auto_approve = checked;
+            })
+          }
+        />
+        <SettingsCheckbox
+          id="cli-auto-compact"
+          label={t('settings.cli.behavior.autoCompactLabel')}
+          description={t('settings.cli.behavior.autoCompactHelper')}
+          checked={draft.behavior.auto_compact}
+          onChange={(checked) =>
+            updateDraft((current) => {
+              current.behavior.auto_compact = checked;
+            })
+          }
+        />
+      </SettingsCard>
 
+      <SettingsSaveBar
+        show={hasUnsavedChanges}
+        saving={isSaveBusy}
+        saveDisabled={!hasUnsavedChanges || isSaveBusy}
+        unsavedMessage={t('settings.cli.save.unsavedChanges')}
+        onSave={handleSave}
+        onDiscard={handleDiscard}
+        layout={saveBarLayout}
+      />
       <CustomProviderForm
         initialProvider={editingCustomProvider}
         isSubmitting={

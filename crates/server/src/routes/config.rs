@@ -1537,8 +1537,9 @@ fn merge_masked_keys(new_config: &mut CliConfig, old_config: &CliConfig) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     fn temp_test_path(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("openteams-config-test-{}", Uuid::new_v4()));
@@ -1778,10 +1779,12 @@ mod tests {
         .expect("parse openteams cli config with trailing commas");
 
         assert_eq!(config.model.as_deref(), Some("custom/foo"));
-        assert!(config
-            .provider
-            .as_ref()
-            .is_some_and(|providers| providers.contains_key("custom")));
+        assert!(
+            config
+                .provider
+                .as_ref()
+                .is_some_and(|providers| providers.contains_key("custom"))
+        );
     }
 
     #[test]

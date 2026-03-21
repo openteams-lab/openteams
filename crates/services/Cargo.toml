@@ -59,3 +59,4 @@ command-group = { version = "5.0", features = ["with-tokio"] }
 tiktoken-rs = "0.6"
 sys-locale = "0.3"
 which = "7.0"
+pathdiff = "0.2"
