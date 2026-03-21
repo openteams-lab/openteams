@@ -2567,6 +2567,7 @@ export function ChatSessions() {
             runner_type: entry.runnerType,
             system_prompt: entry.systemPrompt,
             tools_enabled: entry.toolsEnabled as JsonValue,
+            model_name: null,
           });
           agentId = created.id;
         }
@@ -3064,6 +3065,7 @@ export function ChatSessions() {
           runner_type: runnerChanged ? runnerType : null,
           system_prompt: promptChanged ? prompt : null,
           tools_enabled: variantChanged ? toolsEnabledPayload : null,
+          model_name: null,
         };
 
         if (
@@ -3104,6 +3106,7 @@ export function ChatSessions() {
           runner_type: runnerType,
           system_prompt: prompt,
           tools_enabled: withExecutorProfileVariant({}, selectedVariant),
+          model_name: null,
         });
         const agentId = created.id;
 

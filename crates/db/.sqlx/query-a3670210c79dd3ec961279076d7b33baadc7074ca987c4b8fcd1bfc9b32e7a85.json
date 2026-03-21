@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "UPDATE chat_agents\n               SET name = $2,\n                   runner_type = $3,\n                   system_prompt = $4,\n                   tools_enabled = $5,\n                   updated_at = datetime('now', 'subsec')\n               WHERE id = $1\n               RETURNING id as \"id!: Uuid\",\n                         name,\n                         runner_type,\n                         system_prompt,\n                         tools_enabled as \"tools_enabled!: sqlx::types::Json<serde_json::Value>\",\n                         created_at as \"created_at!: DateTime<Utc>\",\n                         updated_at as \"updated_at!: DateTime<Utc>\"",
+  "query": "SELECT id as \"id!: Uuid\",\n                      name,\n                      runner_type,\n                      system_prompt,\n                      tools_enabled as \"tools_enabled!: sqlx::types::Json<serde_json::Value>\",\n                      model_name,\n                      created_at as \"created_at!: DateTime<Utc>\",\n                      updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM chat_agents\n               ORDER BY name ASC",
   "describe": {
     "columns": [
       {
@@ -29,18 +29,23 @@
         "type_info": "Text"
       },
       {
-        "name": "created_at!: DateTime<Utc>",
+        "name": "model_name",
         "ordinal": 5,
         "type_info": "Text"
       },
       {
-        "name": "updated_at!: DateTime<Utc>",
+        "name": "created_at!: DateTime<Utc>",
         "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 7,
         "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 5
+      "Right": 0
     },
     "nullable": [
       true,
@@ -48,9 +53,10 @@
       false,
       false,
       false,
+      true,
       false,
       false
     ]
   },
-  "hash": "219cc0e2812a2ebd04c500a8da8c7ae26115336b7067fa7d94657617ca0f771b"
+  "hash": "a3670210c79dd3ec961279076d7b33baadc7074ca987c4b8fcd1bfc9b32e7a85"
 }

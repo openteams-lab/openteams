@@ -120,11 +120,11 @@ export type CreateChatSession = { title: string | null, };
 
 export type UpdateChatSession = { title: string | null, status: ChatSessionStatus | null, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, team_protocol: string | null, team_protocol_enabled: boolean | null, };
 
-export type ChatAgent = { id: string, name: string, runner_type: string, system_prompt: string, tools_enabled: JsonValue, created_at: string, updated_at: string, };
+export type ChatAgent = { id: string, name: string, runner_type: string, system_prompt: string, tools_enabled: JsonValue, model_name: string | null, created_at: string, updated_at: string, };
 
-export type CreateChatAgent = { name: string, runner_type: string, system_prompt: string | null, tools_enabled: JsonValue | null, };
+export type CreateChatAgent = { name: string, runner_type: string, system_prompt: string | null, tools_enabled: JsonValue | null, model_name: string | null, };
 
-export type UpdateChatAgent = { name: string | null, runner_type: string | null, system_prompt: string | null, tools_enabled: JsonValue | null, };
+export type UpdateChatAgent = { name: string | null, runner_type: string | null, system_prompt: string | null, tools_enabled: JsonValue | null, model_name: string | null, };
 
 export type ChatMessage = { id: string, session_id: string, sender_type: ChatSenderType, sender_id: string | null, content: string, mentions: string[], meta: JsonValue, created_at: string, };
 
@@ -658,13 +658,43 @@ export type ProviderConfig = {
 /**
  * Default provider name: anthropic, openai, google, openrouter, ollama, custom
  */
-default: string, anthropic: ProviderCredentials | null, openai: ProviderCredentials | null, google: ProviderCredentials | null, openrouter: ProviderCredentials | null, ollama: OllamaConfig | null, custom: CustomProviderConfig | null, };
+default: string, anthropic: ProviderCredentials | null, openai: ProviderCredentials | null, google: ProviderCredentials | null, openrouter: ProviderCredentials | null, ollama: OllamaConfig | null, custom: CustomProviderConfig | null, 
+/**
+ * 多自定义 Provider 配置
+ */
+custom_providers?: { [key in string]?: CustomProviderEntry } | null, };
 
 export type ProviderCredentials = { api_key: string | null, endpoint: string | null, };
 
 export type OllamaConfig = { endpoint: string | null, };
 
 export type CustomProviderConfig = { name: string | null, endpoint: string | null, api_key: string | null, };
+
+export type CustomProviderEntry = { 
+/**
+ * 唯一标识，如 "bailian-coding-plan"
+ */
+id: string, 
+/**
+ * 显示名称
+ */
+name: string | null, 
+/**
+ * NPM 包名，默认 "@ai-sdk/anthropic"
+ */
+npm: string | null, 
+/**
+ * Provider 连接选项
+ */
+options: CustomProviderOptions, 
+/**
+ * 模型配置
+ */
+models: { [key in string]?: CustomModelConfig } | null, };
+
+export type CustomProviderOptions = { baseURL: string | null, api_key: string | null, timeout: bigint | null, };
+
+export type CustomModelConfig = { name: string | null, modalities: ModelModalities | null, options: JsonValue | null, limit: ModelLimits | null, };
 
 export type ModelConfig = { 
 /**
@@ -675,6 +705,142 @@ default: string, anthropic: ProviderModelConfig | null, openai: ProviderModelCon
 export type ProviderModelConfig = { default: string | null, };
 
 export type BehaviorConfig = { auto_approve: boolean, auto_compact: boolean, };
+
+export type OpenTeamsCliConfig = { 
+/**
+ * Provider configurations
+ */
+provider: { [key in string]?: OpenTeamsCliProviderConfig } | null, 
+/**
+ * Default model in provider/model format
+ */
+model: string | null, 
+/**
+ * Small model for tasks like title generation
+ */
+small_model: string | null, 
+/**
+ * Agent configurations
+ */
+agent: JsonValue | null, 
+/**
+ * Custom commands
+ */
+command: JsonValue | null, 
+/**
+ * MCP server configurations
+ */
+mcp: JsonValue | null, 
+/**
+ * Permission settings
+ */
+permission: JsonValue | null, 
+/**
+ * LSP server configurations
+ */
+lsp: JsonValue | null, 
+/**
+ * Formatter configurations
+ */
+formatter: JsonValue | null, 
+/**
+ * Experimental features
+ */
+experimental: JsonValue | null, 
+/**
+ * Username to display
+ */
+username: string | null, 
+/**
+ * Log level
+ */
+log_level: string | null, };
+
+export type OpenTeamsCliProviderConfig = { 
+/**
+ * NPM package for the provider (e.g., "@ai-sdk/anthropic")
+ */
+npm: string | null, 
+/**
+ * Display name for the provider
+ */
+name: string | null, 
+/**
+ * Provider options (apiKey, baseURL, etc.)
+ */
+options: OpenTeamsCliProviderOptions | null, 
+/**
+ * Model configurations
+ */
+models: { [key in string]?: OpenTeamsCliModelConfig } | null, 
+/**
+ * Whitelist of model IDs
+ */
+whitelist: Array<string> | null, 
+/**
+ * Blacklist of model IDs
+ */
+blacklist: Array<string> | null, };
+
+export type OpenTeamsCliProviderOptions = { 
+/**
+ * API key for the provider
+ */
+api_key: string | null, 
+/**
+ * Base URL for the provider API
+ */
+baseURL: string | null, 
+/**
+ * Request timeout in milliseconds
+ */
+timeout: bigint | null, 
+/**
+ * Chunk timeout in milliseconds
+ */
+chunk_timeout: bigint | null, 
+/**
+ * GitHub Enterprise URL for copilot authentication
+ */
+enterprise_url: string | null, 
+/**
+ * Enable promptCacheKey for this provider
+ */
+set_cache_key: boolean | null, };
+
+export type OpenTeamsCliModelConfig = { 
+/**
+ * Display name for the model
+ */
+name: string | null, 
+/**
+ * Model modalities (input/output capabilities)
+ */
+modalities: ModelModalities | null, 
+/**
+ * Model-specific options
+ */
+options: JsonValue | null, 
+/**
+ * Model limits (context window, output tokens)
+ */
+limit: ModelLimits | null, 
+/**
+ * Variant-specific configuration
+ */
+variants: { [key in string]?: ModelVariantConfig } | null, };
+
+export type ModelModalities = { input: Array<string> | null, output: Array<string> | null, };
+
+export type ModelLimits = { context: bigint | null, output: bigint | null, };
+
+export type ModelVariantConfig = { disabled: boolean | null, };
+
+export type SyncToCliRequest = { custom_provider_id: string | null, };
+
+export type SyncToCliResponse = { synced: boolean, message: string, config_path: string | null, };
+
+export type RestartCliResponse = { restarted: boolean, message: string, base_url: string | null, port: number | null, };
 
 export type TeamProtocolConfig = { content: string, enabled: boolean, };
 
