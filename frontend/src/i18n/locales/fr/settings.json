@@ -444,6 +444,99 @@
         "routeReady": "La route `/settings/cli` et l'entrée de navigation correspondante sont déjà disponibles.",
         "apiPending": "Les hooks de lecture et d'écriture de la configuration CLI resteront bloqués tant que `GET/PUT /config/cli` et les API liées aux fournisseurs ne seront pas prêtes.",
         "uiPending": "Le formulaire interactif, la validation, les états de chargement et les états d'erreur seront livrés dans TASK-F3."
+      },
+      "customProviders": {
+        "title": "Fournisseurs personnalisés",
+        "description": "Gérez les entrées de fournisseur personnalisées synchronisées directement avec la configuration d'openteams-cli.",
+        "loading": "Chargement des fournisseurs personnalisés...",
+        "loadError": "Impossible de charger les fournisseurs personnalisés.",
+        "empty": {
+          "title": "Aucun fournisseur personnalisé pour l'instant",
+          "description": "Créez un fournisseur pour synchroniser des endpoints personnalisés et les métadonnées de modèles dans openteams-cli."
+        },
+        "actions": {
+          "add": "Ajouter un fournisseur",
+          "showModels": "Afficher les modèles",
+          "hideModels": "Masquer les modèles",
+          "edit": "Modifier",
+          "delete": "Supprimer",
+          "deleting": "Suppression...",
+          "removeModel": "Retirer le modèle"
+        },
+        "list": {
+          "modelsCount": "{{count}} modèles",
+          "noBaseUrl": "Aucune Base URL configurée.",
+          "npm": "NPM : {{npm}}",
+          "timeout": "Délai : {{timeout}}",
+          "noModels": "Aucun modèle n'est encore configuré pour ce fournisseur."
+        },
+        "preview": {
+          "input": "Modalités d'entrée",
+          "output": "Modalités de sortie",
+          "context": "Limite de contexte",
+          "outputLimit": "Limite de sortie",
+          "none": "Non défini"
+        },
+        "feedback": {
+          "created": "Fournisseur personnalisé créé.",
+          "updated": "Fournisseur personnalisé mis à jour.",
+          "deleted": "Fournisseur personnalisé supprimé.",
+          "deleteFailed": "Échec de la suppression du fournisseur personnalisé."
+        },
+        "form": {
+          "createTitle": "Créer un fournisseur personnalisé",
+          "editTitle": "Modifier le fournisseur personnalisé",
+          "createDescription": "Ajoutez une entrée fournisseur qui sera écrite dans la configuration d'openteams-cli.",
+          "editDescription": "Mettez à jour l'entrée fournisseur et ses métadonnées de modèles.",
+          "errorTitle": "Impossible d'enregistrer le fournisseur",
+          "idLabel": "Provider ID",
+          "idPlaceholder": "ex. bailian-coding-plan",
+          "idHelper": "Utilisé comme clé fournisseur unique dans openteams-cli. Il ne peut plus être modifié après création.",
+          "nameLabel": "Nom d'affichage",
+          "namePlaceholder": "ex. Model Studio Coding Plan",
+          "baseUrlLabel": "Base URL",
+          "baseUrlPlaceholder": "https://api.example.com/v1",
+          "apiKeyLabel": "Clé API",
+          "apiKeyPlaceholder": "Saisir la clé API",
+          "apiKeyMasked": "Les clés enregistrées restent masquées. Laissez la valeur inchangée pour conserver la clé existante.",
+          "npmLabel": "Package NPM",
+          "npmPlaceholder": "@ai-sdk/anthropic",
+          "npmHelper": "Optionnel. Laissez vide pour utiliser le package par défaut.",
+          "timeoutLabel": "Délai (ms)",
+          "timeoutPlaceholder": "30000",
+          "modelsTitle": "Modèles",
+          "modelsDescription": "Définissez le catalogue de modèles que openteams-cli doit exposer pour ce fournisseur.",
+          "addModel": "Ajouter un modèle",
+          "noModels": "Aucun modèle configuré pour l'instant.",
+          "newModel": "Nouveau modèle",
+          "modelIdLabel": "Model ID",
+          "modelIdPlaceholder": "ex. kimi-k2.5",
+          "modelNameLabel": "Nom d'affichage",
+          "modelNamePlaceholder": "ex. Kimi K2.5",
+          "inputModalitiesLabel": "Modalités d'entrée",
+          "outputModalitiesLabel": "Modalités de sortie",
+          "modalitiesPlaceholder": "text, image",
+          "contextLimitLabel": "Limite de contexte",
+          "outputLimitLabel": "Limite de sortie",
+          "limitPlaceholder": "32768",
+          "cancel": "Annuler",
+          "create": "Créer le fournisseur",
+          "update": "Enregistrer le fournisseur",
+          "submitError": "Échec de l'enregistrement du fournisseur personnalisé.",
+          "validation": {
+            "providerIdRequired": "Le Provider ID est requis.",
+            "baseUrlRequired": "La Base URL est requise.",
+            "modelIdRequired": "Chaque entrée modèle doit avoir un Model ID.",
+            "duplicateModelId": "Le Model ID \"{{id}}\" est dupliqué.",
+            "numericLimit": "Les limites et le délai doivent être des entiers positifs ou nuls."
+          }
+        },
+        "deleteDialog": {
+          "title": "Supprimer le fournisseur personnalisé ?",
+          "description": "Cela supprimera définitivement \"{{id}}\" et ses modèles de la configuration CLI.",
+          "confirm": "Supprimer le fournisseur",
+          "cancel": "Annuler"
+        }
       }
     },
     "mcp": {

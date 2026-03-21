@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cliConfigApi } from '@/lib/api';
 import type {
   CliConfig,
+  CustomProviderEntry,
   CliProviderId,
   ValidateCliProviderRequest,
   SyncToCliRequest,
@@ -11,6 +12,7 @@ export const cliConfigKeys = {
   all: ['cli-config'] as const,
   config: () => ['cli-config', 'config'] as const,
   providers: () => ['cli-config', 'providers'] as const,
+  customProviders: () => ['cli-config', 'custom-providers'] as const,
   models: (provider: CliProviderId) =>
     ['cli-config', 'models', provider] as const,
 };
@@ -36,6 +38,10 @@ export function useCliConfig() {
     mutationFn: (data?: SyncToCliRequest) => cliConfigApi.syncToCli(data),
   });
 
+  const restartMutation = useMutation({
+    mutationFn: () => cliConfigApi.restartCliService(),
+  });
+
   return {
     data: query.data,
     isLoading: query.isLoading,
@@ -46,6 +52,8 @@ export function useCliConfig() {
     isSaving: saveMutation.isPending,
     syncToCli: syncMutation.mutateAsync,
     isSyncing: syncMutation.isPending,
+    restartCliService: restartMutation.mutateAsync,
+    isRestarting: restartMutation.isPending,
   };
 }
 
@@ -80,5 +88,60 @@ export function useValidateCliProvider() {
       provider: CliProviderId;
       data: ValidateCliProviderRequest;
     }) => cliConfigApi.validateProvider(provider, data),
+  });
+}
+
+export function useCustomProviders() {
+  return useQuery({
+    queryKey: cliConfigKeys.customProviders(),
+    queryFn: () => cliConfigApi.listCustomProviders(),
+    staleTime: 1000 * 60,
+  });
+}
+
+function invalidateCliConfigQueries(
+  queryClient: ReturnType<typeof useQueryClient>
+) {
+  queryClient.invalidateQueries({ queryKey: cliConfigKeys.config() });
+  queryClient.invalidateQueries({ queryKey: cliConfigKeys.customProviders() });
+}
+
+export function useCreateCustomProvider() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (provider: CustomProviderEntry) =>
+      cliConfigApi.createCustomProvider(provider),
+    onSuccess: () => {
+      invalidateCliConfigQueries(queryClient);
+    },
+  });
+}
+
+export function useUpdateCustomProvider() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      provider,
+    }: {
+      id: string;
+      provider: CustomProviderEntry;
+    }) => cliConfigApi.updateCustomProvider(id, provider),
+    onSuccess: () => {
+      invalidateCliConfigQueries(queryClient);
+    },
+  });
+}
+
+export function useDeleteCustomProvider() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => cliConfigApi.deleteCustomProvider(id),
+    onSuccess: () => {
+      invalidateCliConfigQueries(queryClient);
+    },
   });
 }

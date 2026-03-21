@@ -376,4 +376,8 @@ impl LocalDeployment {
     pub async fn stop_cli(&self) -> Result<(), services::services::cli_manager::CliManagerError> {
         self.cli_manager.stop().await
     }
+
+    pub async fn restart_cli(&self) -> Result<(String, u16), services::services::cli_manager::CliManagerError> {
+        self.cli_manager.restart().await
+    }
 }

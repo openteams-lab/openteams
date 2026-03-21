@@ -444,6 +444,99 @@
         "routeReady": "The `/settings/cli` route and Settings navigation entry are available now.",
         "apiPending": "CLI config read/write hooks are blocked until `GET/PUT /config/cli` and provider-related APIs are ready.",
         "uiPending": "The interactive form, validation, loading, and error states will be delivered in TASK-F3."
+      },
+      "customProviders": {
+        "title": "Custom Providers",
+        "description": "Manage custom provider entries that sync directly to the openteams-cli configuration.",
+        "loading": "Loading custom providers...",
+        "loadError": "Failed to load custom providers.",
+        "empty": {
+          "title": "No custom providers yet",
+          "description": "Create a provider to sync custom endpoints and model metadata into openteams-cli."
+        },
+        "actions": {
+          "add": "Add Provider",
+          "showModels": "Show Models",
+          "hideModels": "Hide Models",
+          "edit": "Edit",
+          "delete": "Delete",
+          "deleting": "Deleting...",
+          "removeModel": "Remove Model"
+        },
+        "list": {
+          "modelsCount": "{{count}} models",
+          "noBaseUrl": "No Base URL configured.",
+          "npm": "NPM: {{npm}}",
+          "timeout": "Timeout: {{timeout}}",
+          "noModels": "No models configured for this provider yet."
+        },
+        "preview": {
+          "input": "Input modalities",
+          "output": "Output modalities",
+          "context": "Context limit",
+          "outputLimit": "Output limit",
+          "none": "Not set"
+        },
+        "feedback": {
+          "created": "Custom provider created.",
+          "updated": "Custom provider updated.",
+          "deleted": "Custom provider deleted.",
+          "deleteFailed": "Failed to delete the custom provider."
+        },
+        "form": {
+          "createTitle": "Create Custom Provider",
+          "editTitle": "Edit Custom Provider",
+          "createDescription": "Add a provider entry that will be written into the openteams-cli config.",
+          "editDescription": "Update the provider entry and its model metadata.",
+          "errorTitle": "Unable to save provider",
+          "idLabel": "Provider ID",
+          "idPlaceholder": "e.g. bailian-coding-plan",
+          "idHelper": "Used as the unique provider key in openteams-cli. It cannot be changed after creation.",
+          "nameLabel": "Display name",
+          "namePlaceholder": "e.g. Model Studio Coding Plan",
+          "baseUrlLabel": "Base URL",
+          "baseUrlPlaceholder": "https://api.example.com/v1",
+          "apiKeyLabel": "API key",
+          "apiKeyPlaceholder": "Enter API key",
+          "apiKeyMasked": "Saved keys stay masked. Leave the value unchanged to keep the existing key.",
+          "npmLabel": "NPM package",
+          "npmPlaceholder": "@ai-sdk/anthropic",
+          "npmHelper": "Optional. Leave empty to use the default package.",
+          "timeoutLabel": "Timeout (ms)",
+          "timeoutPlaceholder": "30000",
+          "modelsTitle": "Models",
+          "modelsDescription": "Define the model catalog that openteams-cli should expose for this provider.",
+          "addModel": "Add Model",
+          "noModels": "No models configured yet.",
+          "newModel": "New model",
+          "modelIdLabel": "Model ID",
+          "modelIdPlaceholder": "e.g. kimi-k2.5",
+          "modelNameLabel": "Display name",
+          "modelNamePlaceholder": "e.g. Kimi K2.5",
+          "inputModalitiesLabel": "Input modalities",
+          "outputModalitiesLabel": "Output modalities",
+          "modalitiesPlaceholder": "text, image",
+          "contextLimitLabel": "Context limit",
+          "outputLimitLabel": "Output limit",
+          "limitPlaceholder": "32768",
+          "cancel": "Cancel",
+          "create": "Create Provider",
+          "update": "Save Provider",
+          "submitError": "Failed to save the custom provider.",
+          "validation": {
+            "providerIdRequired": "Provider ID is required.",
+            "baseUrlRequired": "Base URL is required.",
+            "modelIdRequired": "Every model entry needs a model ID.",
+            "duplicateModelId": "Model ID \"{{id}}\" is duplicated.",
+            "numericLimit": "Limits and timeout must be non-negative integers."
+          }
+        },
+        "deleteDialog": {
+          "title": "Delete custom provider?",
+          "description": "This will permanently remove \"{{id}}\" and its models from the CLI configuration.",
+          "confirm": "Delete provider",
+          "cancel": "Cancel"
+        }
       }
     },
     "mcp": {

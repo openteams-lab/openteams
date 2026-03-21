@@ -444,6 +444,99 @@
         "routeReady": "`/settings/cli` ルートと Settings ナビゲーション項目はすでに利用可能です。",
         "apiPending": "`GET/PUT /config/cli` とプロバイダー関連 API の準備が整うまで、CLI 設定の読み書きフックは保留です。",
         "uiPending": "インタラクティブなフォーム、検証、読み込み状態、エラー状態は TASK-F3 で提供されます。"
+      },
+      "customProviders": {
+        "title": "カスタムプロバイダー",
+        "description": "openteams-cli の設定に直接同期されるカスタムプロバイダー項目を管理します。",
+        "loading": "カスタムプロバイダーを読み込み中...",
+        "loadError": "カスタムプロバイダーの読み込みに失敗しました。",
+        "empty": {
+          "title": "まだカスタムプロバイダーはありません",
+          "description": "カスタム endpoint とモデルメタデータを openteams-cli に同期するプロバイダーを作成します。"
+        },
+        "actions": {
+          "add": "プロバイダーを追加",
+          "showModels": "モデルを表示",
+          "hideModels": "モデルを非表示",
+          "edit": "編集",
+          "delete": "削除",
+          "deleting": "削除中...",
+          "removeModel": "モデルを削除"
+        },
+        "list": {
+          "modelsCount": "{{count}} 件のモデル",
+          "noBaseUrl": "Base URL が設定されていません。",
+          "npm": "NPM: {{npm}}",
+          "timeout": "タイムアウト: {{timeout}}",
+          "noModels": "このプロバイダーにはまだモデルが設定されていません。"
+        },
+        "preview": {
+          "input": "入力モダリティ",
+          "output": "出力モダリティ",
+          "context": "コンテキスト上限",
+          "outputLimit": "出力上限",
+          "none": "未設定"
+        },
+        "feedback": {
+          "created": "カスタムプロバイダーを作成しました。",
+          "updated": "カスタムプロバイダーを更新しました。",
+          "deleted": "カスタムプロバイダーを削除しました。",
+          "deleteFailed": "カスタムプロバイダーの削除に失敗しました。"
+        },
+        "form": {
+          "createTitle": "カスタムプロバイダーを作成",
+          "editTitle": "カスタムプロバイダーを編集",
+          "createDescription": "openteams-cli の設定に書き込まれるプロバイダー項目を追加します。",
+          "editDescription": "プロバイダー項目とモデルメタデータを更新します。",
+          "errorTitle": "プロバイダーを保存できません",
+          "idLabel": "Provider ID",
+          "idPlaceholder": "例: bailian-coding-plan",
+          "idHelper": "openteams-cli 内で一意の provider key として使用されます。作成後は変更できません。",
+          "nameLabel": "表示名",
+          "namePlaceholder": "例: Model Studio Coding Plan",
+          "baseUrlLabel": "Base URL",
+          "baseUrlPlaceholder": "https://api.example.com/v1",
+          "apiKeyLabel": "API キー",
+          "apiKeyPlaceholder": "API キーを入力",
+          "apiKeyMasked": "保存済みのキーはマスクされたまま保持されます。既存のキーを使い続ける場合は値を変更しないでください。",
+          "npmLabel": "NPM パッケージ",
+          "npmPlaceholder": "@ai-sdk/anthropic",
+          "npmHelper": "任意です。空欄の場合はデフォルトのパッケージを使用します。",
+          "timeoutLabel": "タイムアウト（ms）",
+          "timeoutPlaceholder": "30000",
+          "modelsTitle": "モデル",
+          "modelsDescription": "このプロバイダー向けに openteams-cli が公開するモデルカタログを定義します。",
+          "addModel": "モデルを追加",
+          "noModels": "まだモデルは設定されていません。",
+          "newModel": "新しいモデル",
+          "modelIdLabel": "Model ID",
+          "modelIdPlaceholder": "例: kimi-k2.5",
+          "modelNameLabel": "表示名",
+          "modelNamePlaceholder": "例: Kimi K2.5",
+          "inputModalitiesLabel": "入力モダリティ",
+          "outputModalitiesLabel": "出力モダリティ",
+          "modalitiesPlaceholder": "text, image",
+          "contextLimitLabel": "コンテキスト上限",
+          "outputLimitLabel": "出力上限",
+          "limitPlaceholder": "32768",
+          "cancel": "キャンセル",
+          "create": "プロバイダーを作成",
+          "update": "プロバイダーを保存",
+          "submitError": "カスタムプロバイダーの保存に失敗しました。",
+          "validation": {
+            "providerIdRequired": "Provider ID は必須です。",
+            "baseUrlRequired": "Base URL は必須です。",
+            "modelIdRequired": "各モデル項目には Model ID が必要です。",
+            "duplicateModelId": "Model ID \"{{id}}\" が重複しています。",
+            "numericLimit": "上限値とタイムアウトは 0 以上の整数である必要があります。"
+          }
+        },
+        "deleteDialog": {
+          "title": "カスタムプロバイダーを削除しますか？",
+          "description": "\"{{id}}\" とそのモデルが CLI 設定から完全に削除されます。",
+          "confirm": "プロバイダーを削除",
+          "cancel": "キャンセル"
+        }
       }
     },
     "mcp": {

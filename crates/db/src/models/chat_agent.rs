@@ -12,6 +12,7 @@ pub struct ChatAgent {
     pub system_prompt: String,
     #[ts(type = "JsonValue")]
     pub tools_enabled: sqlx::types::Json<serde_json::Value>,
+    pub model_name: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -22,6 +23,7 @@ pub struct CreateChatAgent {
     pub runner_type: String,
     pub system_prompt: Option<String>,
     pub tools_enabled: Option<serde_json::Value>,
+    pub model_name: Option<String>,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -30,6 +32,7 @@ pub struct UpdateChatAgent {
     pub runner_type: Option<String>,
     pub system_prompt: Option<String>,
     pub tools_enabled: Option<serde_json::Value>,
+    pub model_name: Option<String>,
 }
 
 impl ChatAgent {
@@ -41,6 +44,7 @@ impl ChatAgent {
                       runner_type,
                       system_prompt,
                       tools_enabled as "tools_enabled!: sqlx::types::Json<serde_json::Value>",
+                      model_name,
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM chat_agents
@@ -58,6 +62,7 @@ impl ChatAgent {
                       runner_type,
                       system_prompt,
                       tools_enabled as "tools_enabled!: sqlx::types::Json<serde_json::Value>",
+                      model_name,
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM chat_agents
@@ -76,6 +81,7 @@ impl ChatAgent {
                       runner_type,
                       system_prompt,
                       tools_enabled as "tools_enabled!: sqlx::types::Json<serde_json::Value>",
+                      model_name,
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM chat_agents
@@ -101,20 +107,22 @@ impl ChatAgent {
 
         sqlx::query_as!(
             ChatAgent,
-            r#"INSERT INTO chat_agents (id, name, runner_type, system_prompt, tools_enabled)
-               VALUES ($1, $2, $3, $4, $5)
+            r#"INSERT INTO chat_agents (id, name, runner_type, system_prompt, tools_enabled, model_name)
+               VALUES ($1, $2, $3, $4, $5, $6)
                RETURNING id as "id!: Uuid",
                          name,
                          runner_type,
                          system_prompt,
                          tools_enabled as "tools_enabled!: sqlx::types::Json<serde_json::Value>",
+                         model_name,
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>""#,
             id,
             data.name,
             data.runner_type,
             system_prompt,
-            tools_enabled_json
+            tools_enabled_json,
+            data.model_name
         )
         .fetch_one(pool)
         .await
@@ -136,6 +144,11 @@ impl ChatAgent {
             .tools_enabled
             .clone()
             .unwrap_or(existing.tools_enabled.0);
+        let model_name = if data.model_name.is_some() {
+            data.model_name.clone()
+        } else {
+            existing.model_name
+        };
 
         let tools_enabled_json = sqlx::types::Json(tools_enabled);
 
@@ -146,6 +159,7 @@ impl ChatAgent {
                    runner_type = $3,
                    system_prompt = $4,
                    tools_enabled = $5,
+                   model_name = $6,
                    updated_at = datetime('now', 'subsec')
                WHERE id = $1
                RETURNING id as "id!: Uuid",
@@ -153,13 +167,15 @@ impl ChatAgent {
                          runner_type,
                          system_prompt,
                          tools_enabled as "tools_enabled!: sqlx::types::Json<serde_json::Value>",
+                         model_name,
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>""#,
             id,
             name,
             runner_type,
             system_prompt,
-            tools_enabled_json
+            tools_enabled_json,
+            model_name
         )
         .fetch_one(pool)
         .await

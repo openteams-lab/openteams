@@ -444,6 +444,99 @@
         "routeReady": "`/settings/cli` 路由與 Settings 導覽項目現已可用。",
         "apiPending": "在 `GET/PUT /config/cli` 與供應商相關 API 就緒前，CLI 設定讀寫 hooks 仍會被阻擋。",
         "uiPending": "互動式表單、驗證、載入狀態與錯誤狀態將在 TASK-F3 交付。"
+      },
+      "customProviders": {
+        "title": "自訂供應商",
+        "description": "管理會直接同步到 openteams-cli 設定中的自訂供應商項目。",
+        "loading": "正在載入自訂供應商...",
+        "loadError": "載入自訂供應商失敗。",
+        "empty": {
+          "title": "尚未建立自訂供應商",
+          "description": "建立一個供應商，將自訂 endpoint 與模型中繼資料同步到 openteams-cli。"
+        },
+        "actions": {
+          "add": "新增供應商",
+          "showModels": "顯示模型",
+          "hideModels": "隱藏模型",
+          "edit": "編輯",
+          "delete": "刪除",
+          "deleting": "刪除中...",
+          "removeModel": "移除模型"
+        },
+        "list": {
+          "modelsCount": "{{count}} 個模型",
+          "noBaseUrl": "尚未設定 Base URL。",
+          "npm": "NPM：{{npm}}",
+          "timeout": "逾時：{{timeout}}",
+          "noModels": "此供應商尚未設定任何模型。"
+        },
+        "preview": {
+          "input": "輸入模態",
+          "output": "輸出模態",
+          "context": "上下文上限",
+          "outputLimit": "輸出上限",
+          "none": "未設定"
+        },
+        "feedback": {
+          "created": "已建立自訂供應商。",
+          "updated": "已更新自訂供應商。",
+          "deleted": "已刪除自訂供應商。",
+          "deleteFailed": "刪除自訂供應商失敗。"
+        },
+        "form": {
+          "createTitle": "建立自訂供應商",
+          "editTitle": "編輯自訂供應商",
+          "createDescription": "新增一個會寫入 openteams-cli 設定的供應商項目。",
+          "editDescription": "更新供應商項目及其模型中繼資料。",
+          "errorTitle": "無法儲存供應商",
+          "idLabel": "Provider ID",
+          "idPlaceholder": "例如 bailian-coding-plan",
+          "idHelper": "作為 openteams-cli 中唯一的 provider key 使用。建立後不可變更。",
+          "nameLabel": "顯示名稱",
+          "namePlaceholder": "例如 Model Studio Coding Plan",
+          "baseUrlLabel": "Base URL",
+          "baseUrlPlaceholder": "https://api.example.com/v1",
+          "apiKeyLabel": "API Key",
+          "apiKeyPlaceholder": "輸入 API Key",
+          "apiKeyMasked": "已儲存的金鑰會保持遮罩。若要保留現有金鑰，請不要修改此值。",
+          "npmLabel": "NPM 套件",
+          "npmPlaceholder": "@ai-sdk/anthropic",
+          "npmHelper": "選填。留空將使用預設套件。",
+          "timeoutLabel": "逾時（毫秒）",
+          "timeoutPlaceholder": "30000",
+          "modelsTitle": "模型",
+          "modelsDescription": "定義 openteams-cli 應為此供應商公開的模型目錄。",
+          "addModel": "新增模型",
+          "noModels": "尚未設定任何模型。",
+          "newModel": "新模型",
+          "modelIdLabel": "Model ID",
+          "modelIdPlaceholder": "例如 kimi-k2.5",
+          "modelNameLabel": "顯示名稱",
+          "modelNamePlaceholder": "例如 Kimi K2.5",
+          "inputModalitiesLabel": "輸入模態",
+          "outputModalitiesLabel": "輸出模態",
+          "modalitiesPlaceholder": "text, image",
+          "contextLimitLabel": "上下文上限",
+          "outputLimitLabel": "輸出上限",
+          "limitPlaceholder": "32768",
+          "cancel": "取消",
+          "create": "建立供應商",
+          "update": "儲存供應商",
+          "submitError": "儲存自訂供應商失敗。",
+          "validation": {
+            "providerIdRequired": "必須填寫 Provider ID。",
+            "baseUrlRequired": "必須填寫 Base URL。",
+            "modelIdRequired": "每個模型項目都必須填寫 Model ID。",
+            "duplicateModelId": "Model ID \"{{id}}\" 重複。",
+            "numericLimit": "上限與逾時必須為大於等於 0 的整數。"
+          }
+        },
+        "deleteDialog": {
+          "title": "刪除自訂供應商？",
+          "description": "這會從 CLI 設定中永久移除 \"{{id}}\" 及其模型。",
+          "confirm": "刪除供應商",
+          "cancel": "取消"
+        }
       }
     },
     "mcp": {

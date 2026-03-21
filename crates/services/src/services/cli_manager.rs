@@ -38,7 +38,7 @@ impl Default for CliManagerConfig {
         Self {
             auto_start: true,
             port: 0,
-            log_level: "info".to_string(),
+            log_level: "INFO".to_string(),
         }
     }
 }
@@ -54,7 +54,8 @@ impl CliManagerConfig {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0),
             log_level: std::env::var("OPENTEAMS_CLI_LOG_LEVEL")
-                .unwrap_or_else(|_| "info".to_string()),
+                .map(|v| v.to_uppercase())
+                .unwrap_or_else(|_| "INFO".to_string()),
         }
     }
 }
@@ -265,10 +266,10 @@ impl CliManager {
 
     pub async fn stop(&self) -> Result<(), CliManagerError> {
         let mut inner = self.inner.write().await;
-        
+
         if let Some(mut cli_process) = inner.take() {
             tracing::info!("Stopping OpenTeams CLI...");
-            
+
             if let Err(e) = cli_process.child.kill().await {
                 tracing::warn!("Failed to kill CLI process: {}", e);
             }
@@ -277,11 +278,19 @@ impl CliManager {
         Ok(())
     }
 
+    pub async fn restart(&self) -> Result<(String, u16), CliManagerError> {
+        tracing::info!("Restarting OpenTeams CLI...");
+        self.stop().await?;
+        // Brief pause to ensure the port is released
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        self.start().await
+    }
+
     pub async fn health_check(&self) -> bool {
         let inner = self.inner.read().await;
         
         if let Some(ref p) = *inner {
-            let url = format!("{}/health", p.base_url);
+            let url = format!("{}/global/health", p.base_url);
             
             match reqwest::Client::new()
                 .get(&url)
