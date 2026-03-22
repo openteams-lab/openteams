@@ -82,7 +82,7 @@ const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
             <button
               type="button"
               onClick={handleAccept}
-              className="rounded-[24px] border-[1.5px] border-[#333333] bg-white px-8 py-3 text-sm font-semibold text-[#333333] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:-translate-y-px hover:bg-[#333333] hover:text-white hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] active:translate-y-0"
+              className="rounded-[24px] border-[1.5px] border-[#333333] bg-white px-8 py-3 text-sm font-semibold text-[#333333] transition-all duration-300 ease-in-out hover:-translate-y-px hover:bg-[#333333] hover:text-white hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] active:translate-y-0"
             >
               {t('disclaimerDialog.action')}
             </button>

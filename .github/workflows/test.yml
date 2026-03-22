@@ -98,4 +98,3 @@ jobs:
         if: ${{ steps.ssh-setup.outcome == 'success' }}
         run: |
           pnpm run remote:generate-types:check
-          pnpm run remote:prepare-db:check

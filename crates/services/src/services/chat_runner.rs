@@ -1055,10 +1055,10 @@ impl ChatRunner {
                 ExecutorConfigs::get_cached().get_coding_agent_or_default(&executor_profile_id);
             executor.use_approvals(Arc::new(NoopExecutorApprovalService));
 
-            if let Some(model_name) = &agent.model_name {
-                if let Some(executor_with_model) = with_model(&executor, model_name) {
-                    executor = executor_with_model;
-                }
+            if let Some(model_name) = &agent.model_name
+                && let Some(executor_with_model) = with_model(&executor, model_name)
+            {
+                executor = executor_with_model;
             }
 
             let repo_context = RepoContext::new(PathBuf::from(&workspace_path), Vec::new());
@@ -4788,6 +4788,7 @@ impl ChatRunner {
         .await;
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn watch_executor_lifecycle_with_timeout(
         mut child: command_group::AsyncGroupChild,
         stop: CancellationToken,
@@ -4844,7 +4845,10 @@ impl ChatRunner {
                         // explicitly signal success.  On Windows, a terminated process always
                         // returns a non-zero exit code, which would incorrectly override a
                         // successful exit signal.
-                        if !signaled_failure && !cleanup.exit_status.success() && !cleanup.forced_kill {
+                        if !signaled_failure
+                            && !cleanup.exit_status.success()
+                            && !cleanup.forced_kill
+                        {
                             failed = true;
                         }
                     }

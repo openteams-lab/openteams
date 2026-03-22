@@ -442,12 +442,11 @@ async fn update_custom_provider(
     }
 
     // 如果 api_key 是掩码，保留旧值
-    if let Some(old) = providers.get(&id) {
-        if let Some(ref new_key) = entry.options.api_key {
-            if new_key.contains("***") {
-                entry.options.api_key = old.options.api_key.clone();
-            }
-        }
+    if let Some(old) = providers.get(&id)
+        && let Some(ref new_key) = entry.options.api_key
+        && new_key.contains("***")
+    {
+        entry.options.api_key = old.options.api_key.clone();
     }
 
     providers.insert(id, entry.clone());
@@ -1277,10 +1276,10 @@ fn validate_known_https_endpoint(raw: &str, allowed_hosts: &[&str]) -> Result<Ur
         return Err("Endpoint host is not allowed for this provider".into());
     }
 
-    if let Some(port) = url.port() {
-        if port != 443 {
-            return Err("Endpoint port is not allowed for this provider".into());
-        }
+    if let Some(port) = url.port()
+        && port != 443
+    {
+        return Err("Endpoint port is not allowed for this provider".into());
     }
 
     Ok(url)
@@ -1713,10 +1712,10 @@ fn mask_api_keys(mut config: CliConfig) -> CliConfig {
 /// If user sends a masked key back (contains "***"), keep the old real key
 fn merge_masked_keys(new_config: &mut CliConfig, old_config: &CliConfig) {
     fn keep_old_if_masked(new_key: &mut Option<String>, old_key: &Option<String>) {
-        if let (Some(nk), Some(ok)) = (new_key.as_ref(), old_key.as_ref()) {
-            if nk.contains("***") {
-                *new_key = Some(ok.clone());
-            }
+        if let (Some(nk), Some(ok)) = (new_key.as_ref(), old_key.as_ref())
+            && nk.contains("***")
+        {
+            *new_key = Some(ok.clone());
         }
     }
 
@@ -2133,8 +2132,16 @@ mod tests {
 
         let gpt_variant_key = model_variant_key("litellm/gpt-4o");
         let claude_variant_key = model_variant_key("litellm/claude-sonnet-4-20250514");
-        assert!(executor_config.configurations.contains_key(&gpt_variant_key));
-        assert!(executor_config.configurations.contains_key(&claude_variant_key));
+        assert!(
+            executor_config
+                .configurations
+                .contains_key(&gpt_variant_key)
+        );
+        assert!(
+            executor_config
+                .configurations
+                .contains_key(&claude_variant_key)
+        );
     }
 
     #[test]

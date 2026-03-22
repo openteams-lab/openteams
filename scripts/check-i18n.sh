@@ -27,9 +27,8 @@ lint_count() {
   )
   
   # Parse the clean JSON file
-  jq --arg RULE "$RULE" \
-     '[.[].messages[] | select(.ruleId == $RULE)] | length' "$tmp" \
-     2>/dev/null || echo "0"
+  node "$REPO_ROOT/scripts/check-i18n-json.mjs" count-rule "$tmp" "$RULE" \
+    2>/dev/null || echo "0"
 }
 
 get_json_keys() {
@@ -37,11 +36,8 @@ get_json_keys() {
   if [ ! -f "$file" ]; then
     return 2
   fi
-  jq -r '
-    paths(scalars) as $p
-    | select(getpath($p) | type == "string")
-    | $p | join(".")
-  ' "$file" 2>/dev/null | LC_ALL=C sort -u
+  node "$REPO_ROOT/scripts/check-i18n-json.mjs" list-string-paths "$file" \
+    2>/dev/null | LC_ALL=C sort -u
 }
 
 check_duplicate_keys() {
@@ -50,16 +46,17 @@ check_duplicate_keys() {
     return 2
   fi
 
-  # Strategy: Use jq's --stream flag to detect duplicate keys
-  # jq --stream processes JSON before parsing (preserves duplicates)
-  # jq tostream processes JSON after parsing (duplicates already collapsed)
-  # If the outputs differ, duplicate keys exist
-  if ! diff -q <(jq --stream . "$file" 2>/dev/null) <(jq tostream "$file" 2>/dev/null) > /dev/null 2>&1; then
-    # Duplicates found
-    echo "duplicate keys detected"
+  local duplicates
+  if duplicates=$(node "$REPO_ROOT/scripts/check-i18n-json.mjs" check-duplicate-keys "$file" 2>/dev/null); then
+    return 0
+  fi
+
+  if [ -n "$duplicates" ]; then
+    printf '%s\n' "$duplicates"
     return 1
   fi
-  return 0
+
+  return 2
 }
 
 check_duplicate_json_keys() {

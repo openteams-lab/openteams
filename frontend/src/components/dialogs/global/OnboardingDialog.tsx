@@ -211,7 +211,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
               <select
                 value={profile.executor}
                 onChange={(event) => handleExecutorChange(event.target.value)}
-                className="h-11 min-w-0 flex-[2] appearance-none rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-sm text-[#333333] outline-none transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)]"
+                className="h-11 min-w-0 flex-[2] appearance-none rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-sm text-[#333333] outline-none transition-all duration-300 ease-in-out focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)]"
                 style={selectBackgroundStyle}
               >
                 {agentOptions.map((agent) => (
@@ -224,7 +224,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
               <select
                 value={variantValue}
                 onChange={(event) => handleVariantChange(event.target.value)}
-                className="h-11 min-w-0 flex-1 appearance-none rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-sm text-[#333333] outline-none transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)] disabled:cursor-not-allowed disabled:opacity-80"
+                className="h-11 min-w-0 flex-1 appearance-none rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-sm text-[#333333] outline-none transition-all duration-300 ease-in-out focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)] disabled:cursor-not-allowed disabled:opacity-80"
                 style={selectBackgroundStyle}
                 disabled={
                   variantOptions.length <= 1 && variantOptions[0] === 'DEFAULT'
@@ -255,7 +255,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
           <button
             type="button"
             onClick={handleComplete}
-            className="h-12 w-full rounded-[24px] border-0 bg-[#4A90E2] text-[15px] font-medium text-white shadow-[0_4px_14px_rgba(74,144,226,0.25)] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:-translate-y-px hover:bg-[#357ABD] hover:shadow-[0_6px_20px_rgba(74,144,226,0.35)] active:translate-y-0"
+            className="h-12 w-full rounded-[24px] border-0 bg-[#4A90E2] text-[15px] font-medium text-white shadow-[0_4px_14px_rgba(74,144,226,0.25)] transition-all duration-300 ease-in-out hover:-translate-y-px hover:bg-[#357ABD] hover:shadow-[0_6px_20px_rgba(74,144,226,0.35)] active:translate-y-0"
           >
             {t('buttons.continue')}
           </button>

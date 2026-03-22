@@ -1,10 +1,10 @@
 // vite.config.ts
-import { sentryVitePlugin } from "@sentry/vite-plugin";
-import { createLogger, defineConfig, Plugin } from "vite";
-import react from "@vitejs/plugin-react";
-import path from "path";
-import fs from "fs";
-import pkg from "./package.json";
+import { sentryVitePlugin } from '@sentry/vite-plugin';
+import react from '@vitejs/plugin-react';
+import fs from 'fs';
+import path from 'path';
+import { createLogger, defineConfig, Plugin } from 'vite';
+import pkg from './package.json';
 
 function createFilteredLogger() {
   const logger = createLogger();
@@ -15,14 +15,14 @@ function createFilteredLogger() {
 
   logger.error = (msg, options) => {
     const isProxyError =
-      msg.includes("ws proxy socket error") ||
-      msg.includes("ws proxy error:") ||
-      msg.includes("http proxy error:");
+      msg.includes('ws proxy socket error') ||
+      msg.includes('ws proxy error:') ||
+      msg.includes('http proxy error:');
 
     if (isProxyError) {
       const now = Date.now();
       if (now - lastRestartLog > DEBOUNCE_MS) {
-        logger.warn("Proxy connection closed, auto-reconnecting...");
+        logger.warn('Proxy connection closed, auto-reconnecting...');
         lastRestartLog = now;
       }
       return;
@@ -99,7 +99,15 @@ export default defineConfig({
         ],
       },
     }),
-    sentryVitePlugin({ org: 'openteams-lab-ai', project: 'openteams' }),
+    ...(process.env.SENTRY_AUTH_TOKEN
+      ? [
+          sentryVitePlugin({
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            org: 'openteams-lab-ai',
+            project: 'openteams',
+          }),
+        ]
+      : []),
     executorSchemasPlugin(),
   ],
   resolve: {
@@ -131,4 +139,3 @@ export default defineConfig({
   },
   build: { sourcemap: true },
 });
-
