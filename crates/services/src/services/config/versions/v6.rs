@@ -78,7 +78,7 @@ impl Config {
         // Validate and convert ProfileVariantLabel
         let old_coding_agent = old_config.profile.profile.to_uppercase();
         let base_coding_agent =
-            BaseCodingAgent::from_str(&old_coding_agent).unwrap_or(BaseCodingAgent::ClaudeCode);
+            BaseCodingAgent::from_str(&old_coding_agent).unwrap_or(BaseCodingAgent::OpenTeamsCli);
         let executor_profile = ExecutorProfileId::new(base_coding_agent);
 
         Ok(Self {
@@ -127,7 +127,7 @@ impl Default for Config {
         Self {
             config_version: "v6".to_string(),
             theme: ThemeMode::System,
-            executor_profile: ExecutorProfileId::new(BaseCodingAgent::ClaudeCode),
+            executor_profile: ExecutorProfileId::new(BaseCodingAgent::OpenTeamsCli),
             disclaimer_acknowledged: false,
             onboarding_acknowledged: false,
             github_login_acknowledged: false,

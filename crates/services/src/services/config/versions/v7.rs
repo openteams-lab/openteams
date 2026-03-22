@@ -132,7 +132,7 @@ impl Default for Config {
         Self {
             config_version: "v7".to_string(),
             theme: ThemeMode::System,
-            executor_profile: ExecutorProfileId::new(BaseCodingAgent::ClaudeCode),
+            executor_profile: ExecutorProfileId::new(BaseCodingAgent::OpenTeamsCli),
             disclaimer_acknowledged: false,
             onboarding_acknowledged: false,
             github_login_acknowledged: false,

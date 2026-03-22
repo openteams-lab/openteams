@@ -8,6 +8,7 @@ import { useUserSystem } from '@/components/ConfigProvider';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal, type NoProps } from '@/lib/modals';
 import { useAgentAvailability } from '@/hooks/useAgentAvailability';
+import { getVariantDisplayLabel, getVariantOptions } from '@/utils/executor';
 
 export type OnboardingResult = {
   profile: ExecutorProfileId;
@@ -20,14 +21,6 @@ const selectBackgroundStyle = {
   backgroundRepeat: 'no-repeat',
   backgroundPosition: 'calc(100% - 14px) center',
 } as const;
-
-function sortVariants(variants: string[]) {
-  return [...variants].sort((a, b) => {
-    if (a === 'DEFAULT') return -1;
-    if (b === 'DEFAULT') return 1;
-    return a.localeCompare(b);
-  });
-}
 
 const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
   const modal = useModal();
@@ -43,7 +36,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
 
   const [profile, setProfile] = useState<ExecutorProfileId>(
     config?.executor_profile || {
-      executor: BaseCodingAgent.CLAUDE_CODE,
+      executor: BaseCodingAgent.OPEN_TEAMS_CLI,
       variant: null,
     }
   );
@@ -69,13 +62,9 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
   );
 
   const variantOptions = useMemo(() => {
-    if (!selectedExecutorProfile) {
-      return ['DEFAULT'];
-    }
-
-    const variants = Object.keys(selectedExecutorProfile);
-    return variants.length > 0 ? sortVariants(variants) : ['DEFAULT'];
-  }, [selectedExecutorProfile]);
+    const variants = getVariantOptions(profile.executor, profiles);
+    return variants.length > 0 ? variants : ['DEFAULT'];
+  }, [profile.executor, profiles]);
 
   const variantValue =
     profile.variant && variantOptions.includes(profile.variant)
@@ -147,11 +136,10 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
 
   const handleExecutorChange = (value: string) => {
     const nextExecutor = value as BaseCodingAgent;
-    const nextProfile = profiles?.[nextExecutor];
-    const nextVariants = nextProfile ? Object.keys(nextProfile) : [];
+    const nextVariants = getVariantOptions(nextExecutor, profiles);
     const nextVariant = nextVariants.includes('DEFAULT')
       ? 'DEFAULT'
-      : (sortVariants(nextVariants)[0] ?? null);
+      : (nextVariants[0] ?? null);
 
     setProfile({
       executor: nextExecutor,
@@ -244,7 +232,11 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
               >
                 {variantOptions.map((variant) => (
                   <option key={variant} value={variant}>
-                    {variant}
+                    {getVariantDisplayLabel(
+                      profile.executor,
+                      variant,
+                      profiles
+                    )}
                   </option>
                 ))}
               </select>

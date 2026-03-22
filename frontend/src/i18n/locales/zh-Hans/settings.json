@@ -21,7 +21,7 @@
         "reposDesc": "仓库脚本和配置",
         "agents": "代理",
         "agentsDesc": "编码代理配置",
-        "cli": "OpenTeams CLI",
+        "cli": "服务提供商",
         "cliDesc": "提供商、模型与行为设置",
         "mcp": "MCP 服务器",
         "mcpDesc": "模型上下文协议服务器",
@@ -354,7 +354,7 @@
       }
     },
     "cli": {
-      "title": "OpenTeams CLI",
+      "title": "服务提供商",
       "description": "管理内置 CLI 的提供商、模型和运行行为设置。",
       "loading": "加载 CLI 配置中...",
       "loadError": "加载 CLI 配置失败。",
@@ -387,16 +387,16 @@
       },
       "model": {
         "title": "模型",
-        "description": "为当前提供商选择或输入默认模型。",
+        "description": "为当前提供商选择默认模型。",
         "inputLabel": "模型 ID",
         "inputPlaceholder": "输入模型 ID",
         "required": "模型 ID 不能为空。",
-        "selectLabel": "建议模型",
+        "selectLabel": "默认模型",
         "selectPlaceholder": "选择模型",
-        "selectHelper": "可从建议列表中选择，也可以在上方输入自定义模型 ID。",
+        "selectHelper": "从可用列表中选择默认模型。",
         "loading": "加载模型中...",
         "loadError": "加载该提供商的模型列表失败。",
-        "empty": "该提供商暂无建议模型。"
+        "empty": "该提供商暂无可用默认模型。"
       },
       "behavior": {
         "title": "行为",
@@ -466,7 +466,7 @@
         "list": {
           "modelsCount": "{{count}} 个模型",
           "noBaseUrl": "未配置 Base URL。",
-          "npm": "NPM：{{npm}}",
+          "npm": "SDK：{{npm}}",
           "timeout": "超时：{{timeout}}",
           "noModels": "此提供商尚未配置模型。"
         },
@@ -499,9 +499,9 @@
           "apiKeyLabel": "API Key",
           "apiKeyPlaceholder": "输入 API Key",
           "apiKeyMasked": "已保存的密钥会保持脱敏。保持当前值不变即可继续使用现有密钥。",
-          "npmLabel": "NPM 包",
+          "npmLabel": "SDK",
           "npmPlaceholder": "@ai-sdk/anthropic",
-          "npmHelper": "可选。留空则使用默认包。",
+          "npmHelper": "可选。留空则使用默认 SDK。",
           "timeoutLabel": "超时（毫秒）",
           "timeoutPlaceholder": "30000",
           "modelsTitle": "模型",
@@ -511,11 +511,11 @@
           "newModel": "新模型",
           "modelIdLabel": "Model ID",
           "modelIdPlaceholder": "例如 kimi-k2.5",
-          "modelNameLabel": "显示名称",
+          "modelNameLabel": "模型名称",
           "modelNamePlaceholder": "例如 Kimi K2.5",
           "inputModalitiesLabel": "输入模态",
           "outputModalitiesLabel": "输出模态",
-          "modalitiesPlaceholder": "text, image",
+          "modalitiesPlaceholder": "选择模态",
           "contextLimitLabel": "上下文上限",
           "outputLimitLabel": "输出上限",
           "limitPlaceholder": "32768",
@@ -528,7 +528,18 @@
             "baseUrlRequired": "必须填写 Base URL。",
             "modelIdRequired": "每个模型条目都必须填写 Model ID。",
             "duplicateModelId": "Model ID \"{{id}}\" 重复。",
-            "numericLimit": "上限和超时时间必须是大于等于 0 的整数。"
+            "numericLimit": "上限和超时时间必须是大于等于 0 的整数。",
+            "modelNameRequired": "每个模型条目都必须填写模型名称。",
+            "duplicateModelName": "模型名称“{{name}}”重复。",
+            "thinkingBudgetRequired": "启用思考后必须填写思考预算 Token。"
+          },
+          "thinkingLabel": "思考",
+          "thinkingHelper": "为当前模型启用思考模式。",
+          "thinkingBudgetLabel": "思考预算 Token",
+          "thinkingBudgetPlaceholder": "9216",
+          "modalities": {
+            "text": "文字",
+            "image": "图片"
           }
         },
         "deleteDialog": {

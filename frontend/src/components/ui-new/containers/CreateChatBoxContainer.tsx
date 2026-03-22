@@ -9,10 +9,11 @@ import {
   areProfilesEqual,
   getVariantDisplayLabel,
   getVariantOptions,
-  isOpencodeExecutor,
+  isAutoModelExecutor,
 } from '@/utils/executor';
 import { splitMessageToTitleDescription } from '@/utils/string';
-import type { ExecutorProfileId, BaseCodingAgent } from 'shared/types';
+import { BaseCodingAgent } from 'shared/types';
+import type { ExecutorProfileId } from 'shared/types';
 import { CreateChatBox } from '../primitives/CreateChatBox';
 import { SettingsDialog } from '../dialogs/SettingsDialog';
 
@@ -71,21 +72,22 @@ export function CreateChatBoxContainer() {
     noKeyboard: true,
   });
 
-  // Default to user's config profile or first available executor
+  // Default to user's config profile or OpenTeams CLI when available
   const effectiveProfile = useMemo<ExecutorProfileId | null>(() => {
     if (selectedProfile) return selectedProfile;
     if (config?.executor_profile) return config.executor_profile;
-    if (profiles) {
-      const firstExecutor = Object.keys(profiles)[0] as BaseCodingAgent;
-      if (firstExecutor) {
-        const variants = Object.keys(profiles[firstExecutor]);
-        return {
-          executor: firstExecutor,
-          variant: variants[0] ?? null,
-        };
-      }
-    }
-    return null;
+    if (!profiles) return null;
+
+    const preferredExecutor = profiles[BaseCodingAgent.OPEN_TEAMS_CLI]
+      ? BaseCodingAgent.OPEN_TEAMS_CLI
+      : ((Object.keys(profiles)[0] as BaseCodingAgent | undefined) ?? null);
+
+    if (!preferredExecutor) return null;
+
+    return {
+      executor: preferredExecutor,
+      variant: getVariantOptions(preferredExecutor, profiles)[0] ?? null,
+    };
   }, [selectedProfile, config?.executor_profile, profiles]);
 
   // Get variant options for the current executor
@@ -285,7 +287,7 @@ export function CreateChatBoxContainer() {
                   selected: effectiveProfile.variant ?? 'DEFAULT',
                   options: variantOptions,
                   onChange: handleVariantChange,
-                  getLabel: isOpencodeExecutor(effectiveProfile.executor)
+                  getLabel: isAutoModelExecutor(effectiveProfile.executor)
                     ? getVariantLabel
                     : undefined,
                   onCustomise: handleCustomise,

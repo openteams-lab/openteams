@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { WheelEvent as ReactWheelEvent } from 'react';
 import { XIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
-import type { JsonValue } from 'shared/types';
+import { BaseCodingAgent, type JsonValue } from 'shared/types';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
 import { cn } from '@/lib/utils';
@@ -184,6 +184,10 @@ export function TeamImportPreviewModal({
   const currentPlan = importPlan[activeCardIndex];
   const currentPlanVariant = getPlanVariant(currentPlan.toolsEnabled);
   const currentPlanVariantOptions = getVariantOptions(currentPlan.runnerType);
+  const variantFieldLabel =
+    currentPlan.runnerType === BaseCodingAgent.OPEN_TEAMS_CLI
+      ? t('members.model')
+      : t('members.modelVariant');
   const currentMemberName = getLocalizedMemberPresetNameById(
     currentPlan.presetId,
     currentPlan.presetName || currentPlan.presetId,
@@ -431,7 +435,7 @@ export function TeamImportPreviewModal({
                             {currentPlanVariantOptions.length > 0 && (
                               <div className="space-y-1">
                                 <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                  {t('members.modelVariant')}
+                                  {variantFieldLabel}
                                 </label>
                                 <select
                                   value={currentPlanVariant}

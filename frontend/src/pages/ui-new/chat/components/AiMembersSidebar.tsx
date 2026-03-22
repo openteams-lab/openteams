@@ -34,6 +34,7 @@ import {
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import {
+  BaseCodingAgent,
   ChatSessionAgentState,
   type ChatMemberPreset,
   type ChatTeamPreset,
@@ -534,6 +535,10 @@ export function AiMembersSidebar({
 }: AiMembersSidebarProps) {
   const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
+  const variantFieldLabel =
+    newMemberRunnerType === BaseCodingAgent.OPEN_TEAMS_CLI
+      ? t('members.model')
+      : t('members.modelVariant');
   const [activeTab, setActiveTab] = useState<AddMemberTab>('preset');
   const [presetSearchQuery, setPresetSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -941,7 +946,7 @@ export function AiMembersSidebar({
       {memberVariantOptions.length > 0 && (
         <div className="space-y-half">
           <label className="text-xs text-low">
-            {t('members.modelVariant')}
+            {variantFieldLabel}
           </label>
           <select
             value={newMemberVariant}

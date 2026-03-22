@@ -4824,10 +4824,11 @@ impl ChatRunner {
                 failed = true;
             }
             LifecycleEvent::ExitSignal(exit_result) => {
-                if matches!(
+                let signaled_failure = matches!(
                     exit_result,
                     executors::executors::ExecutorExitResult::Failure
-                ) {
+                );
+                if signaled_failure {
                     failed = true;
                 }
 
@@ -4839,13 +4840,19 @@ impl ChatRunner {
                             exit_success = cleanup.exit_status.success(),
                             "[chat_runner] Executor exit signal cleanup finished"
                         );
-                        if !cleanup.exit_status.success() {
+                        // Only treat process exit status as failure when the executor did NOT
+                        // explicitly signal success.  On Windows, a terminated process always
+                        // returns a non-zero exit code, which would incorrectly override a
+                        // successful exit signal.
+                        if !signaled_failure && !cleanup.exit_status.success() && !cleanup.forced_kill {
                             failed = true;
                         }
                     }
                     Err(err) => {
                         msg_store.push(LogMsg::Stderr(format!("process cleanup error: {err}")));
-                        failed = true;
+                        if signaled_failure {
+                            failed = true;
+                        }
                     }
                 }
             }

@@ -11,12 +11,12 @@ import {
   TrashIcon,
   XIcon,
 } from '@phosphor-icons/react';
-import type {
+import {
   BaseCodingAgent,
-  ChatMemberPreset,
-  ChatPresetsConfig,
-  ChatTeamPreset,
-  JsonValue,
+  type ChatMemberPreset,
+  type ChatPresetsConfig,
+  type ChatTeamPreset,
+  type JsonValue,
 } from 'shared/types';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { cn } from '@/lib/utils';
@@ -552,7 +552,7 @@ export function ChatPresetsEditorPanel({
         id,
         name,
         description: '',
-        runner_type: null,
+        runner_type: BaseCodingAgent.OPEN_TEAMS_CLI,
         recommended_model: null,
         system_prompt: '',
         default_workspace_path: homeDirectory,

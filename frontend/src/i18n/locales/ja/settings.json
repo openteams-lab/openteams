@@ -21,7 +21,7 @@
         "reposDesc": "リポジトリスクリプトと設定",
         "agents": "エージェント",
         "agentsDesc": "コーディングエージェントの設定",
-        "cli": "OpenTeams CLI",
+        "cli": "サービスプロバイダー",
         "cliDesc": "プロバイダー、モデル、動作設定",
         "mcp": "MCPサーバー",
         "mcpDesc": "モデルコンテキストプロトコルサーバー",
@@ -354,7 +354,7 @@
       }
     },
     "cli": {
-      "title": "OpenTeams CLI",
+      "title": "サービスプロバイダー",
       "description": "組み込み CLI のプロバイダー、モデル、実行時の動作設定を管理します。",
       "loading": "CLI 設定を読み込み中...",
       "loadError": "CLI 設定の読み込みに失敗しました。",
@@ -387,16 +387,16 @@
       },
       "model": {
         "title": "モデル",
-        "description": "現在のプロバイダーの既定モデルを選択するか、直接入力します。",
+        "description": "現在のプロバイダーのデフォルトモデルを選択します。",
         "inputLabel": "モデル ID",
         "inputPlaceholder": "モデル ID を入力",
         "required": "モデル ID は必須です。",
-        "selectLabel": "候補モデル",
+        "selectLabel": "デフォルトモデル",
         "selectPlaceholder": "モデルを選択",
-        "selectHelper": "候補から選択するか、上でカスタム ID を入力してください。",
+        "selectHelper": "利用可能な一覧からデフォルトモデルを選択します。",
         "loading": "モデルを読み込み中...",
         "loadError": "このプロバイダーのモデル読み込みに失敗しました。",
-        "empty": "このプロバイダーで利用可能な候補モデルはありません。"
+        "empty": "このプロバイダーで利用できるデフォルトモデルはありません。"
       },
       "behavior": {
         "title": "動作",
@@ -466,7 +466,7 @@
         "list": {
           "modelsCount": "{{count}} 件のモデル",
           "noBaseUrl": "Base URL が設定されていません。",
-          "npm": "NPM: {{npm}}",
+          "npm": "SDK: {{npm}}",
           "timeout": "タイムアウト: {{timeout}}",
           "noModels": "このプロバイダーにはまだモデルが設定されていません。"
         },
@@ -499,9 +499,9 @@
           "apiKeyLabel": "API キー",
           "apiKeyPlaceholder": "API キーを入力",
           "apiKeyMasked": "保存済みのキーはマスクされたまま保持されます。既存のキーを使い続ける場合は値を変更しないでください。",
-          "npmLabel": "NPM パッケージ",
+          "npmLabel": "SDK",
           "npmPlaceholder": "@ai-sdk/anthropic",
-          "npmHelper": "任意です。空欄の場合はデフォルトのパッケージを使用します。",
+          "npmHelper": "任意です。空欄の場合はデフォルト SDK を使用します。",
           "timeoutLabel": "タイムアウト（ms）",
           "timeoutPlaceholder": "30000",
           "modelsTitle": "モデル",
@@ -511,11 +511,11 @@
           "newModel": "新しいモデル",
           "modelIdLabel": "Model ID",
           "modelIdPlaceholder": "例: kimi-k2.5",
-          "modelNameLabel": "表示名",
+          "modelNameLabel": "モデル名",
           "modelNamePlaceholder": "例: Kimi K2.5",
           "inputModalitiesLabel": "入力モダリティ",
           "outputModalitiesLabel": "出力モダリティ",
-          "modalitiesPlaceholder": "text, image",
+          "modalitiesPlaceholder": "モダリティを選択",
           "contextLimitLabel": "コンテキスト上限",
           "outputLimitLabel": "出力上限",
           "limitPlaceholder": "32768",
@@ -528,7 +528,18 @@
             "baseUrlRequired": "Base URL は必須です。",
             "modelIdRequired": "各モデル項目には Model ID が必要です。",
             "duplicateModelId": "Model ID \"{{id}}\" が重複しています。",
-            "numericLimit": "上限値とタイムアウトは 0 以上の整数である必要があります。"
+            "numericLimit": "上限値とタイムアウトは 0 以上の整数である必要があります。",
+            "modelNameRequired": "各モデル項目にモデル名が必要です。",
+            "duplicateModelName": "モデル名「{{name}}」が重複しています。",
+            "thinkingBudgetRequired": "Thinking を有効にする場合は Thinking 予算トークンを入力してください。"
+          },
+          "thinkingLabel": "Thinking",
+          "thinkingHelper": "このモデルで Thinking モードを有効にします。",
+          "thinkingBudgetLabel": "Thinking 予算トークン",
+          "thinkingBudgetPlaceholder": "9216",
+          "modalities": {
+            "text": "テキスト",
+            "image": "画像"
           }
         },
         "deleteDialog": {

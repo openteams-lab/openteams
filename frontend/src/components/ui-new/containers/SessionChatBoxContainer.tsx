@@ -20,7 +20,7 @@ import { useTodos } from '@/hooks/useTodos';
 import {
   getLatestProfileFromProcesses,
   getVariantDisplayLabel,
-  isOpencodeExecutor,
+  isAutoModelExecutor,
 } from '@/utils/executor';
 import { useExecutorSelection } from '@/hooks/useExecutorSelection';
 import { useSessionMessageEditor } from '@/hooks/useSessionMessageEditor';
@@ -749,7 +749,7 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
         selected: selectedVariant,
         options: variantOptions,
         onChange: setSelectedVariant,
-        getLabel: isOpencodeExecutor(effectiveExecutor)
+        getLabel: isAutoModelExecutor(effectiveExecutor)
           ? getVariantLabel
           : undefined,
         onCustomise: handleCustomise,

@@ -38,6 +38,7 @@ export function useProfiles(): UseProfilesReturn {
         ['profiles'],
         (old) => (old ? { ...old, content } : old)
       );
+      queryClient.invalidateQueries({ queryKey: ['user-system'] });
     },
   });
 

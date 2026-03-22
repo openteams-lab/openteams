@@ -553,10 +553,12 @@ export function CliSettings() {
             .sort(([left], [right]) => left.localeCompare(right))
             .map(([id, model]) => ({
               id,
-              name: trimToNull(model.name) ?? id,
+              name:
+                trimToNull(model.name) ??
+                t('settings.cli.customProviders.form.newModel'),
             }))
         : [],
-    [selectedManagedCustomProvider]
+    [selectedManagedCustomProvider, t]
   );
 
   const hasUnsavedChanges = useMemo(() => {
@@ -1182,18 +1184,6 @@ export function CliSettings() {
             </div>
           </div>
         ) : null}
-
-        <SettingsField label={t('settings.cli.model.inputLabel')}>
-          <SettingsInput
-            value={draft.model.default}
-            onChange={(value) =>
-              updateDraft((current) =>
-                setModelValue(current, selectedProvider, value)
-              )
-            }
-            placeholder={t('settings.cli.model.inputPlaceholder')}
-          />
-        </SettingsField>
 
         {selectedProvider !== 'custom' ? (
           <SettingsField

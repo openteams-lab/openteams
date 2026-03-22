@@ -35,6 +35,7 @@ import { CreateConfigurationDialog } from '@/components/dialogs/settings/CreateC
 import { DeleteConfigurationDialog } from '@/components/dialogs/settings/DeleteConfigurationDialog';
 import { useAgentAvailability } from '@/hooks/useAgentAvailability';
 import { AgentAvailabilityIndicator } from '@/components/AgentAvailabilityIndicator';
+import { getVariantDisplayLabel } from '@/utils/executor';
 import type {
   BaseCodingAgent,
   ExecutorConfigs,
@@ -66,7 +67,7 @@ export function AgentSettings() {
   // Form-based editor state
   const [useFormEditor, setUseFormEditor] = useState(true);
   const [selectedExecutorType, setSelectedExecutorType] =
-    useState<BaseCodingAgent>('CLAUDE_CODE' as BaseCodingAgent);
+    useState<BaseCodingAgent>('OPEN_TEAMS_CLI' as BaseCodingAgent);
   const [selectedConfiguration, setSelectedConfiguration] =
     useState<string>('DEFAULT');
   const [localParsedProfiles, setLocalParsedProfiles] =
@@ -523,6 +524,14 @@ export function AgentSettings() {
                   selectedProfile && Object.keys(selectedProfile).length > 0;
 
                 if (hasVariants) {
+                  const selectedVariantKey =
+                    currentProfileVariant?.variant ?? 'DEFAULT';
+                  const selectedVariantLabel = getVariantDisplayLabel(
+                    currentProfileVariant?.executor,
+                    selectedVariantKey,
+                    profiles
+                  );
+
                   return (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -531,8 +540,7 @@ export function AgentSettings() {
                           className="w-full h-10 px-2 flex items-center justify-between"
                         >
                           <span className="text-sm truncate flex-1 text-left">
-                            {currentProfileVariant?.variant ||
-                              t('settings.general.taskExecution.defaultLabel')}
+                            {selectedVariantLabel}
                           </span>
                           <ChevronDown className="h-4 w-4 ml-1 flex-shrink-0" />
                         </Button>
@@ -555,7 +563,11 @@ export function AgentSettings() {
                                   : ''
                               }
                             >
-                              {variantLabel}
+                              {getVariantDisplayLabel(
+                                currentProfileVariant?.executor,
+                                variantLabel,
+                                profiles
+                              )}
                             </DropdownMenuItem>
                           )
                         )}
@@ -685,7 +697,11 @@ export function AgentSettings() {
                             {}
                         ).map((configuration) => (
                           <SelectItem key={configuration} value={configuration}>
-                            {configuration}
+                            {getVariantDisplayLabel(
+                              selectedExecutorType,
+                              configuration,
+                              localParsedProfiles?.executors
+                            )}
                           </SelectItem>
                         ))}
                         <SelectItem value="__create__">

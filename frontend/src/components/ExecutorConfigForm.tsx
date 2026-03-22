@@ -25,6 +25,25 @@ interface ExecutorConfigFormProps {
 
 import schemas from 'virtual:executor-schemas';
 
+function sanitizeExecutorFormData(
+  executor: BaseCodingAgent,
+  value: unknown
+): unknown {
+  if (
+    executor !== BaseCodingAgent.OPEN_TEAMS_CLI ||
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value)
+  ) {
+    return value;
+  }
+
+  const next = { ...(value as Record<string, unknown>) };
+  delete next.variant;
+  delete next.agent;
+  return next;
+}
+
 export function ExecutorConfigForm({
   executor,
   value,
@@ -35,7 +54,9 @@ export function ExecutorConfigForm({
   isSaving = false,
   isDirty = false,
 }: ExecutorConfigFormProps) {
-  const [formData, setFormData] = useState<unknown>(value || {});
+  const [formData, setFormData] = useState<unknown>(() =>
+    sanitizeExecutorFormData(executor, value || {})
+  );
   const [validationErrors, setValidationErrors] = useState<
     RJSFValidationError[]
   >([]);
@@ -64,8 +85,18 @@ export function ExecutorConfigForm({
       env: {
         'ui:field': 'KeyValueField',
       },
+      ...(executor === BaseCodingAgent.OPEN_TEAMS_CLI
+        ? {
+            variant: {
+              'ui:widget': 'hidden',
+            },
+            agent: {
+              'ui:widget': 'hidden',
+            },
+          }
+        : {}),
     }),
-    []
+    [executor]
   );
 
   // Pass the env update handler via formContext
@@ -77,12 +108,12 @@ export function ExecutorConfigForm({
   );
 
   useEffect(() => {
-    setFormData(value || {});
+    setFormData(sanitizeExecutorFormData(executor, value || {}));
     setValidationErrors([]);
   }, [value, executor]);
 
   const handleChange = (event: IChangeEvent<unknown>) => {
-    const newFormData = event.formData;
+    const newFormData = sanitizeExecutorFormData(executor, event.formData);
     setFormData(newFormData);
     if (onChange) {
       onChange(newFormData);
@@ -90,7 +121,7 @@ export function ExecutorConfigForm({
   };
 
   const handleSubmit = async (event: IChangeEvent<unknown>) => {
-    const submitData = event.formData;
+    const submitData = sanitizeExecutorFormData(executor, event.formData);
     setValidationErrors([]);
     if (onSave) {
       await onSave(submitData);

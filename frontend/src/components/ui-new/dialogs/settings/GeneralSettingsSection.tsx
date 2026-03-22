@@ -13,6 +13,7 @@ import {
 import { getModifierKey } from '@/utils/platform';
 import { getLanguageOptions } from '@/i18n/languages';
 import { toPrettyCase } from '@/utils/string';
+import { getVariantDisplayLabel } from '@/utils/executor';
 import { useTheme } from '@/components/ThemeProvider';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { cn } from '@/lib/utils';
@@ -287,7 +288,11 @@ export function GeneralSettingsSection() {
                 options={Object.keys(selectedAgentProfile).map(
                   (variantLabel) => ({
                     value: variantLabel,
-                    label: toPrettyCase(variantLabel),
+                    label: getVariantDisplayLabel(
+                      draft?.executor_profile?.executor,
+                      variantLabel,
+                      profiles
+                    ),
                   })
                 )}
                 onChange={(value: string) => {

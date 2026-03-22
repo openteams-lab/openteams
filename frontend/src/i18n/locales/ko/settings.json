@@ -21,7 +21,7 @@
         "reposDesc": "저장소 스크립트 및 구성",
         "agents": "에이전트",
         "agentsDesc": "코딩 에이전트 구성",
-        "cli": "OpenTeams CLI",
+        "cli": "서비스 제공자",
         "cliDesc": "공급자, 모델 및 동작 설정",
         "mcp": "MCP 서버",
         "mcpDesc": "Model Context Protocol 서버",
@@ -354,7 +354,7 @@
       }
     },
     "cli": {
-      "title": "OpenTeams CLI",
+      "title": "서비스 제공자",
       "description": "내장 CLI의 공급자, 모델 및 런타임 동작 설정을 관리합니다.",
       "loading": "CLI 구성을 불러오는 중...",
       "loadError": "CLI 구성을 불러오지 못했습니다.",
@@ -387,16 +387,16 @@
       },
       "model": {
         "title": "모델",
-        "description": "현재 공급자의 기본 모델을 선택하거나 직접 입력합니다.",
+        "description": "현재 공급자의 기본 모델을 선택하세요.",
         "inputLabel": "모델 ID",
         "inputPlaceholder": "모델 ID 입력",
         "required": "모델 ID는 필수입니다.",
-        "selectLabel": "추천 모델",
+        "selectLabel": "기본 모델",
         "selectPlaceholder": "모델 선택",
-        "selectHelper": "추천 모델을 선택하거나 위에 사용자 지정 ID를 입력하세요.",
+        "selectHelper": "사용 가능한 목록에서 기본 모델을 선택하세요.",
         "loading": "모델을 불러오는 중...",
         "loadError": "이 공급자의 모델을 불러오지 못했습니다.",
-        "empty": "이 공급자에는 추천 모델이 없습니다."
+        "empty": "이 공급자에는 사용할 수 있는 기본 모델이 없습니다."
       },
       "behavior": {
         "title": "동작",
@@ -466,7 +466,7 @@
         "list": {
           "modelsCount": "모델 {{count}}개",
           "noBaseUrl": "Base URL이 설정되지 않았습니다.",
-          "npm": "NPM: {{npm}}",
+          "npm": "SDK: {{npm}}",
           "timeout": "타임아웃: {{timeout}}",
           "noModels": "이 공급자에는 아직 모델이 설정되지 않았습니다."
         },
@@ -499,9 +499,9 @@
           "apiKeyLabel": "API 키",
           "apiKeyPlaceholder": "API 키 입력",
           "apiKeyMasked": "저장된 키는 계속 마스킹됩니다. 기존 키를 유지하려면 값을 변경하지 마세요.",
-          "npmLabel": "NPM 패키지",
+          "npmLabel": "SDK",
           "npmPlaceholder": "@ai-sdk/anthropic",
-          "npmHelper": "선택 사항입니다. 비워두면 기본 패키지를 사용합니다.",
+          "npmHelper": "선택 사항입니다. 비워 두면 기본 SDK 를 사용합니다.",
           "timeoutLabel": "타임아웃(ms)",
           "timeoutPlaceholder": "30000",
           "modelsTitle": "모델",
@@ -511,11 +511,11 @@
           "newModel": "새 모델",
           "modelIdLabel": "Model ID",
           "modelIdPlaceholder": "예: kimi-k2.5",
-          "modelNameLabel": "표시 이름",
+          "modelNameLabel": "모델 이름",
           "modelNamePlaceholder": "예: Kimi K2.5",
           "inputModalitiesLabel": "입력 모달리티",
           "outputModalitiesLabel": "출력 모달리티",
-          "modalitiesPlaceholder": "text, image",
+          "modalitiesPlaceholder": "모달리티 선택",
           "contextLimitLabel": "컨텍스트 한도",
           "outputLimitLabel": "출력 한도",
           "limitPlaceholder": "32768",
@@ -528,7 +528,18 @@
             "baseUrlRequired": "Base URL을 입력하세요.",
             "modelIdRequired": "모든 모델 항목에는 Model ID가 필요합니다.",
             "duplicateModelId": "Model ID \"{{id}}\"가 중복되었습니다.",
-            "numericLimit": "한도와 타임아웃은 0 이상의 정수여야 합니다."
+            "numericLimit": "한도와 타임아웃은 0 이상의 정수여야 합니다.",
+            "modelNameRequired": "각 모델 항목에는 모델 이름이 필요합니다.",
+            "duplicateModelName": "모델 이름 \"{{name}}\" 이 중복됩니다.",
+            "thinkingBudgetRequired": "Thinking 을 활성화하면 Thinking 예산 토큰을 입력해야 합니다."
+          },
+          "thinkingLabel": "Thinking",
+          "thinkingHelper": "이 모델에 Thinking 모드를 활성화합니다.",
+          "thinkingBudgetLabel": "Thinking 예산 토큰",
+          "thinkingBudgetPlaceholder": "9216",
+          "modalities": {
+            "text": "텍스트",
+            "image": "이미지"
           }
         },
         "deleteDialog": {

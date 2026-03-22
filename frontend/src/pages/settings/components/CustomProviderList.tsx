@@ -24,6 +24,23 @@ function formatValue(value: number | string | null | undefined): string {
   return String(value);
 }
 
+function formatModalities(
+  values: string[] | null | undefined,
+  t: ReturnType<typeof useTranslation>['t']
+): string {
+  if (!values || values.length === 0) {
+    return t('settings.cli.customProviders.preview.none');
+  }
+
+  return values
+    .map((value) =>
+      t(`settings.cli.customProviders.form.modalities.${value}`, {
+        defaultValue: value,
+      })
+    )
+    .join(', ');
+}
+
 export function CustomProviderList({
   deletingProviderId,
   expandedProviderId,
@@ -140,18 +157,17 @@ export function CustomProviderList({
                       key={modelId}
                       className="rounded-md border bg-muted/20 p-3"
                     >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium">{model.name || modelId}</p>
-                        <Badge variant="outline">{modelId}</Badge>
-                      </div>
+                      <p className="font-medium">
+                        {model.name ||
+                          t('settings.cli.customProviders.form.newModel')}
+                      </p>
                       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                         <div>
                           <dt className="text-muted-foreground">
                             {t('settings.cli.customProviders.preview.input')}
                           </dt>
                           <dd>
-                            {model.modalities?.input?.join(', ') ||
-                              t('settings.cli.customProviders.preview.none')}
+                            {formatModalities(model.modalities?.input, t)}
                           </dd>
                         </div>
                         <div>
@@ -159,8 +175,7 @@ export function CustomProviderList({
                             {t('settings.cli.customProviders.preview.output')}
                           </dt>
                           <dd>
-                            {model.modalities?.output?.join(', ') ||
-                              t('settings.cli.customProviders.preview.none')}
+                            {formatModalities(model.modalities?.output, t)}
                           </dd>
                         </div>
                         <div>

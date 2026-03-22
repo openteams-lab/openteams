@@ -75,7 +75,7 @@ export function AgentIcon({ agent, className = 'h-4 w-4' }: AgentIconProps) {
       iconPath = `/agents/opencode${suffix}.svg`;
       break;
     case BaseCodingAgent.OPEN_TEAMS_CLI:
-      iconPath = `/agents/opencode${suffix}.svg`;
+      iconPath = '/Logo/logo_black.svg';
       break;
     case BaseCodingAgent.CURSOR_AGENT:
       iconPath = `/agents/cursor${suffix}.svg`;

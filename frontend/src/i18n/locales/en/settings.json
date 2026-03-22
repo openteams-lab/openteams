@@ -21,7 +21,7 @@
         "reposDesc": "Repository scripts and configuration",
         "agents": "Agents",
         "agentsDesc": "Coding agent configurations",
-        "cli": "OpenTeams CLI",
+        "cli": "Service Providers",
         "cliDesc": "Provider, model, and behavior settings",
         "mcp": "MCP Servers",
         "mcpDesc": "Model Context Protocol servers",
@@ -354,7 +354,7 @@
       }
     },
     "cli": {
-      "title": "OpenTeams CLI",
+      "title": "Service Providers",
       "description": "Manage the built-in CLI provider, model, and runtime behavior settings.",
       "loading": "Loading CLI configuration...",
       "loadError": "Failed to load CLI configuration.",
@@ -387,16 +387,16 @@
       },
       "model": {
         "title": "Model",
-        "description": "Select or enter the default model for the current provider.",
+        "description": "Select the default model for the current provider.",
         "inputLabel": "Model ID",
         "inputPlaceholder": "Enter model ID",
         "required": "Model ID is required.",
-        "selectLabel": "Suggested models",
+        "selectLabel": "Default model",
         "selectPlaceholder": "Select model",
-        "selectHelper": "Choose a suggested model or type a custom ID above.",
+        "selectHelper": "Choose the default model from the available list.",
         "loading": "Loading models...",
         "loadError": "Failed to load models for this provider.",
-        "empty": "No suggested models are available for this provider."
+        "empty": "No default model is available for this provider."
       },
       "behavior": {
         "title": "Behavior",
@@ -466,7 +466,7 @@
         "list": {
           "modelsCount": "{{count}} models",
           "noBaseUrl": "No Base URL configured.",
-          "npm": "NPM: {{npm}}",
+          "npm": "SDK: {{npm}}",
           "timeout": "Timeout: {{timeout}}",
           "noModels": "No models configured for this provider yet."
         },
@@ -499,9 +499,9 @@
           "apiKeyLabel": "API key",
           "apiKeyPlaceholder": "Enter API key",
           "apiKeyMasked": "Saved keys stay masked. Leave the value unchanged to keep the existing key.",
-          "npmLabel": "NPM package",
+          "npmLabel": "SDK",
           "npmPlaceholder": "@ai-sdk/anthropic",
-          "npmHelper": "Optional. Leave empty to use the default package.",
+          "npmHelper": "Optional. Leave empty to use the default SDK.",
           "timeoutLabel": "Timeout (ms)",
           "timeoutPlaceholder": "30000",
           "modelsTitle": "Models",
@@ -511,11 +511,11 @@
           "newModel": "New model",
           "modelIdLabel": "Model ID",
           "modelIdPlaceholder": "e.g. kimi-k2.5",
-          "modelNameLabel": "Display name",
+          "modelNameLabel": "Model name",
           "modelNamePlaceholder": "e.g. Kimi K2.5",
           "inputModalitiesLabel": "Input modalities",
           "outputModalitiesLabel": "Output modalities",
-          "modalitiesPlaceholder": "text, image",
+          "modalitiesPlaceholder": "Select modalities",
           "contextLimitLabel": "Context limit",
           "outputLimitLabel": "Output limit",
           "limitPlaceholder": "32768",
@@ -528,7 +528,18 @@
             "baseUrlRequired": "Base URL is required.",
             "modelIdRequired": "Every model entry needs a model ID.",
             "duplicateModelId": "Model ID \"{{id}}\" is duplicated.",
-            "numericLimit": "Limits and timeout must be non-negative integers."
+            "numericLimit": "Limits and timeout must be non-negative integers.",
+            "modelNameRequired": "Every model entry needs a model name.",
+            "duplicateModelName": "Model name \"{{name}}\" is duplicated.",
+            "thinkingBudgetRequired": "Enter the thinking budget tokens when thinking is enabled."
+          },
+          "thinkingLabel": "Thinking",
+          "thinkingHelper": "Enable thinking mode for this model.",
+          "thinkingBudgetLabel": "Thinking budget tokens",
+          "thinkingBudgetPlaceholder": "9216",
+          "modalities": {
+            "text": "Text",
+            "image": "Image"
           }
         },
         "deleteDialog": {

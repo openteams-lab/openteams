@@ -21,6 +21,8 @@ pub fn canonical_variant_key<S: AsRef<str>>(raw: S) -> String {
     let key = raw.as_ref();
     if key.eq_ignore_ascii_case("DEFAULT") {
         "DEFAULT".to_string()
+    } else if key.contains('/') {
+        key.to_string()
     } else {
         // Convert to SCREAMING_SNAKE_CASE by first going to snake_case then uppercase
         key.to_case(Case::Snake).to_case(Case::ScreamingSnake)
@@ -511,5 +513,10 @@ mod tests {
 
         assert_model(default_codex);
         assert_model(gpt_5_4_codex);
+    }
+
+    #[test]
+    fn canonical_variant_key_preserves_provider_model_ids() {
+        assert_eq!(canonical_variant_key("litellm/gpt-5.4"), "litellm/gpt-5.4");
     }
 }

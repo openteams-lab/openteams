@@ -127,7 +127,7 @@ impl Default for Config {
         Self {
             config_version: "v8".to_string(),
             theme: ThemeMode::System,
-            executor_profile: ExecutorProfileId::new(BaseCodingAgent::ClaudeCode),
+            executor_profile: ExecutorProfileId::new(BaseCodingAgent::OpenTeamsCli),
             disclaimer_acknowledged: false,
             onboarding_acknowledged: false,
             notifications: NotificationConfig::default(),

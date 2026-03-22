@@ -1,6 +1,7 @@
+import { SquaresFourIcon } from '@phosphor-icons/react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Plus, Trash2, X } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Plus, Trash2, X } from 'lucide-react';
 
 import {
   Dialog,
@@ -9,8 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
 import {
+  SettingsCheckbox,
   SettingsField,
   SettingsInput,
   SettingsSelect,
@@ -21,21 +22,34 @@ import {
   settingsSecondaryButtonClassName,
 } from '@/components/ui-new/dialogs/settings/SettingsComponents';
 import {
+  MultiSelectDropdown,
+  type MultiSelectDropdownOption,
+} from '@/components/ui-new/primitives/MultiSelectDropdown';
+import { useValidateCliProvider } from '@/hooks/useCliConfig';
+import { cn } from '@/lib/utils';
+import {
   createEmptyCustomProviderEntry,
   DEFAULT_CUSTOM_PROVIDER_NPM,
   normalizeCustomProviderEntry,
 } from '@/types/cliConfig';
 import type { CustomModelConfig, CustomProviderEntry } from '@/types/cliConfig';
 
+const CUSTOM_NPM_OPTION_VALUE = '__custom__';
+const MODALITY_VALUES = ['text', 'image'] as const;
+
+type ModalityValue = (typeof MODALITY_VALUES)[number];
+
 type CustomModelDraft = {
   contextLimit: string;
   id: string;
-  inputModalities: string;
+  inputModalities: ModalityValue[];
   key: string;
   name: string;
   options: CustomModelConfig['options'];
   outputLimit: string;
-  outputModalities: string;
+  outputModalities: ModalityValue[];
+  thinkingBudget: string;
+  thinkingEnabled: boolean;
 };
 
 type CustomProviderFormState = {
@@ -56,7 +70,11 @@ type CustomProviderFormProps = {
   open: boolean;
 };
 
-const CUSTOM_NPM_OPTION_VALUE = '__custom__';
+type StatusState = {
+  message: string;
+  tone: 'error' | 'success';
+  title?: string;
+} | null;
 
 const AI_SDK_NPM_PACKAGES = [
   { value: '@ai-sdk/amazon-bedrock', label: 'Amazon Bedrock' },
@@ -88,16 +106,103 @@ function createModelDraftKey() {
   return `custom-model-${modelDraftCounter}`;
 }
 
+function trimToNull(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function isOptionsObject(
+  value: CustomModelConfig['options']
+): boolean {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseStoredModalities(
+  values: string[] | null | undefined
+): ModalityValue[] {
+  return MODALITY_VALUES.filter((value) => values?.includes(value));
+}
+
+function parseSelectedModalities(
+  values: ModalityValue[]
+): ModalityValue[] | null {
+  return values.length > 0 ? values : null;
+}
+
+function extractThinkingState(options: CustomModelConfig['options']) {
+  if (!isOptionsObject(options)) {
+    return {
+      thinkingBudget: '',
+      thinkingEnabled: false,
+    };
+  }
+
+  const thinking = (options as Record<string, unknown>).thinking;
+  const thinkingRecord =
+    thinking && typeof thinking === 'object' && !Array.isArray(thinking)
+      ? (thinking as Record<string, unknown>)
+      : null;
+
+  if (!thinkingRecord || thinkingRecord.type !== 'enabled') {
+    return {
+      thinkingBudget: '',
+      thinkingEnabled: false,
+    };
+  }
+
+  return {
+    thinkingBudget:
+      typeof thinkingRecord.budgetTokens === 'number' &&
+      Number.isFinite(thinkingRecord.budgetTokens)
+        ? String(thinkingRecord.budgetTokens)
+        : '',
+    thinkingEnabled: true,
+  };
+}
+
+function buildModelOptions(
+  model: CustomModelDraft
+): CustomModelConfig['options'] {
+  const baseOptions = isOptionsObject(model.options)
+    ? Object.fromEntries(
+        Object.entries(model.options as Record<string, unknown>).filter(
+          ([key]) => key !== 'thinking'
+        )
+      )
+    : {};
+
+  if (!model.thinkingEnabled) {
+    return Object.keys(baseOptions).length > 0
+      ? (baseOptions as CustomModelConfig['options'])
+      : null;
+  }
+
+  const thinkingBudget = parseOptionalInteger(model.thinkingBudget);
+  if (thinkingBudget == null) {
+    throw new Error('thinking-budget-required');
+  }
+
+  return {
+    ...baseOptions,
+    thinking: {
+      type: 'enabled',
+      budgetTokens: thinkingBudget,
+    },
+  } as CustomModelConfig['options'];
+}
+
 function createEmptyModelDraft(): CustomModelDraft {
   return {
     contextLimit: '',
     id: '',
-    inputModalities: '',
+    inputModalities: [],
     key: createModelDraftKey(),
     name: '',
     options: null,
     outputLimit: '',
-    outputModalities: '',
+    outputModalities: [],
+    thinkingBudget: '9216',
+    thinkingEnabled: true,
   };
 }
 
@@ -105,16 +210,20 @@ function createModelDraft(
   id: string,
   model: CustomModelConfig
 ): CustomModelDraft {
+  const thinkingState = extractThinkingState(model.options);
+
   return {
     contextLimit:
       model.limit?.context == null ? '' : String(model.limit.context),
     id,
-    inputModalities: model.modalities?.input?.join(', ') ?? '',
+    inputModalities: parseStoredModalities(model.modalities?.input),
     key: createModelDraftKey(),
     name: model.name ?? '',
     options: model.options ?? null,
     outputLimit: model.limit?.output == null ? '' : String(model.limit.output),
-    outputModalities: model.modalities?.output?.join(', ') ?? '',
+    outputModalities: parseStoredModalities(model.modalities?.output),
+    thinkingBudget: thinkingState.thinkingBudget,
+    thinkingEnabled: thinkingState.thinkingEnabled,
   };
 }
 
@@ -135,15 +244,6 @@ function createFormState(
     timeout:
       provider.options.timeout == null ? '' : String(provider.options.timeout),
   };
-}
-
-function parseModalities(value: string): string[] | null {
-  const normalized = value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  return normalized.length > 0 ? Array.from(new Set(normalized)) : null;
 }
 
 function parseOptionalInteger(value: string): number | null {
@@ -168,6 +268,44 @@ function getNpmSelectionValue(value: string): string {
   return isBuiltInNpmPackage(value) ? value : CUSTOM_NPM_OPTION_VALUE;
 }
 
+function formatModalitiesTriggerLabel(
+  values: ModalityValue[],
+  options: MultiSelectDropdownOption<ModalityValue>[],
+  placeholder: string
+) {
+  const selectedLabels = options
+    .filter((option) => values.includes(option.value))
+    .map((option) => option.label);
+
+  return selectedLabels.length > 0
+    ? selectedLabels.join(' / ')
+    : placeholder;
+}
+
+function renderStatusMessage(status: StatusState) {
+  if (!status) {
+    return null;
+  }
+
+  const toneClassName =
+    status.tone === 'success'
+      ? 'border-[#d8ead8] bg-[#f7fcf7] text-[#2f7d32]'
+      : 'border-[#f3d7d7] bg-[#fff7f7] text-[#d14343]';
+
+  return (
+    <div
+      className={cn(
+        'mb-5 rounded-[10px] border p-4 text-[13px]',
+        toneClassName
+      )}
+    >
+      {status.title ? <p className="mb-1 font-medium">{status.title}</p> : null}
+      <p>{status.message}</p>
+    </div>
+  );
+}
+
+
 export function CustomProviderForm({
   initialProvider,
   isSubmitting,
@@ -176,6 +314,7 @@ export function CustomProviderForm({
   open,
 }: CustomProviderFormProps) {
   const { t } = useTranslation(['settings', 'common']);
+  const validateProvider = useValidateCliProvider();
   const [error, setError] = useState<string | null>(null);
   const [formState, setFormState] = useState<CustomProviderFormState>(() =>
     createFormState(initialProvider)
@@ -184,6 +323,7 @@ export function CustomProviderForm({
     getNpmSelectionValue(initialProvider?.npm ?? DEFAULT_CUSTOM_PROVIDER_NPM)
   );
   const [showApiKey, setShowApiKey] = useState(false);
+  const [validationStatus, setValidationStatus] = useState<StatusState>(null);
 
   useEffect(() => {
     if (!open) {
@@ -192,6 +332,7 @@ export function CustomProviderForm({
 
     setError(null);
     setShowApiKey(false);
+    setValidationStatus(null);
     const nextFormState = createFormState(initialProvider);
     setFormState(nextFormState);
     setNpmSelection(getNpmSelectionValue(nextFormState.npm));
@@ -225,17 +366,72 @@ export function CustomProviderForm({
     ],
     []
   );
+  const modalityOptions = useMemo(
+    () =>
+      MODALITY_VALUES.map((value) => ({
+        value,
+        label: t(`settings.cli.customProviders.form.modalities.${value}`),
+      })) satisfies MultiSelectDropdownOption<ModalityValue>[],
+    [t]
+  );
+
+  const updateFormState = (
+    updater: (current: CustomProviderFormState) => CustomProviderFormState
+  ) => {
+    setFormState((current) => updater(current));
+    setError(null);
+    setValidationStatus(null);
+  };
 
   const updateModelDraft = (
     key: string,
     updater: (draft: CustomModelDraft) => CustomModelDraft
   ) => {
-    setFormState((current) => ({
+    updateFormState((current) => ({
       ...current,
       models: current.models.map((model) =>
         model.key === key ? updater(model) : model
       ),
     }));
+  };
+
+  const handleValidateBaseUrl = async () => {
+    const baseURL = trimToNull(formState.baseURL);
+    if (!baseURL) {
+      setValidationStatus({
+        message: t('settings.cli.customProviders.form.validation.baseUrlRequired'),
+        tone: 'error',
+        title: t('settings.cli.validation.failureTitle'),
+      });
+      return;
+    }
+
+    try {
+      const response = await validateProvider.mutateAsync({
+        provider: 'custom',
+        data: {
+          api_key: apiKeyMasked ? null : trimToNull(formState.apiKey),
+          endpoint: baseURL,
+        },
+      });
+
+      setValidationStatus({
+        message: response.message,
+        tone: response.valid ? 'success' : 'error',
+        title: response.valid
+          ? t('settings.cli.validation.successTitle')
+          : t('settings.cli.validation.failureTitle'),
+      });
+    } catch (validationError) {
+      setValidationStatus({
+        message:
+          validationError instanceof Error
+            ? validationError.message
+            : t('settings.cli.validation.error'),
+        tone: 'error',
+        title: t('settings.cli.validation.failureTitle'),
+      });
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -286,11 +482,11 @@ export function CustomProviderForm({
             output: parseOptionalInteger(model.outputLimit),
           },
           modalities: {
-            input: parseModalities(model.inputModalities),
-            output: parseModalities(model.outputModalities),
+            input: parseSelectedModalities(model.inputModalities),
+            output: parseSelectedModalities(model.outputModalities),
           },
           name: model.name.trim() || null,
-          options: model.options ?? null,
+          options: buildModelOptions(model),
         };
       }
 
@@ -309,6 +505,16 @@ export function CustomProviderForm({
       await onSubmit(provider);
       onOpenChange(false);
     } catch (submitError) {
+      if (
+        submitError instanceof Error &&
+        submitError.message === 'thinking-budget-required'
+      ) {
+        setError(
+          t('settings.cli.customProviders.form.validation.thinkingBudgetRequired')
+        );
+        return;
+      }
+
       if (
         submitError instanceof Error &&
         submitError.message === 'invalid-integer'
@@ -360,14 +566,14 @@ export function CustomProviderForm({
 
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-            {error ? (
-              <div className="mb-5 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
-                <p className="mb-1 font-medium">
-                  {t('settings.cli.customProviders.form.errorTitle')}
-                </p>
-                <p>{error}</p>
-              </div>
-            ) : null}
+            {error
+              ? renderStatusMessage({
+                  message: error,
+                  tone: 'error',
+                  title: t('settings.cli.customProviders.form.errorTitle'),
+                })
+              : null}
+            {renderStatusMessage(validationStatus)}
 
             <div className="space-y-8">
               <div className="space-y-5">
@@ -380,7 +586,7 @@ export function CustomProviderForm({
                       disabled={isEditing}
                       value={formState.id}
                       onChange={(value) =>
-                        setFormState((current) => ({
+                        updateFormState((current) => ({
                           ...current,
                           id: value,
                         }))
@@ -397,7 +603,7 @@ export function CustomProviderForm({
                     <SettingsInput
                       value={formState.name}
                       onChange={(value) =>
-                        setFormState((current) => ({
+                        updateFormState((current) => ({
                           ...current,
                           name: value,
                         }))
@@ -412,18 +618,38 @@ export function CustomProviderForm({
                 <SettingsField
                   label={t('settings.cli.customProviders.form.baseUrlLabel')}
                 >
-                  <SettingsInput
-                    value={formState.baseURL}
-                    onChange={(value) =>
-                      setFormState((current) => ({
-                        ...current,
-                        baseURL: value,
-                      }))
-                    }
-                    placeholder={t(
-                      'settings.cli.customProviders.form.baseUrlPlaceholder'
-                    )}
-                  />
+                  <div className="flex flex-col gap-3 md:flex-row">
+                    <div className="min-w-0 flex-1">
+                      <SettingsInput
+                        value={formState.baseURL}
+                        onChange={(value) =>
+                          updateFormState((current) => ({
+                            ...current,
+                            baseURL: value,
+                          }))
+                        }
+                        placeholder={t(
+                          'settings.cli.customProviders.form.baseUrlPlaceholder'
+                        )}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className={cn(
+                        settingsSecondaryButtonClassName,
+                        'shrink-0 whitespace-nowrap'
+                      )}
+                      onClick={handleValidateBaseUrl}
+                      disabled={validateProvider.isPending}
+                    >
+                      {validateProvider.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : null}
+                      {validateProvider.isPending
+                        ? t('settings.cli.validation.testing')
+                        : t('settings.cli.validation.button')}
+                    </button>
+                  </div>
                 </SettingsField>
 
                 <SettingsField
@@ -444,7 +670,7 @@ export function CustomProviderForm({
                       )}
                       value={formState.apiKey}
                       onChange={(event) =>
-                        setFormState((current) => ({
+                        updateFormState((current) => ({
                           ...current,
                           apiKey: event.target.value,
                         }))
@@ -477,7 +703,7 @@ export function CustomProviderForm({
                       options={npmOptions}
                       onChange={(value) => {
                         setNpmSelection(value);
-                        setFormState((current) => ({
+                        updateFormState((current) => ({
                           ...current,
                           npm:
                             value === CUSTOM_NPM_OPTION_VALUE
@@ -500,7 +726,7 @@ export function CustomProviderForm({
                         )}
                         value={formState.npm}
                         onChange={(event) =>
-                          setFormState((current) => ({
+                          updateFormState((current) => ({
                             ...current,
                             npm: event.target.value,
                           }))
@@ -522,7 +748,7 @@ export function CustomProviderForm({
                       )}
                       value={formState.timeout}
                       onChange={(event) =>
-                        setFormState((current) => ({
+                        updateFormState((current) => ({
                           ...current,
                           timeout: event.target.value,
                         }))
@@ -546,7 +772,7 @@ export function CustomProviderForm({
                     type="button"
                     className={settingsSecondaryButtonClassName}
                     onClick={() =>
-                      setFormState((current) => ({
+                      updateFormState((current) => ({
                         ...current,
                         models: [...current.models, createEmptyModelDraft()],
                       }))
@@ -584,7 +810,7 @@ export function CustomProviderForm({
                           type="button"
                           className="inline-flex items-center justify-center gap-2 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] px-3 py-[9px] text-[13px] text-[#d14343] transition-colors duration-200 hover:bg-[#fdeeee]"
                           onClick={() =>
-                            setFormState((current) => ({
+                            updateFormState((current) => ({
                               ...current,
                               models: current.models.filter(
                                 (entry) => entry.key !== model.key
@@ -597,122 +823,209 @@ export function CustomProviderForm({
                         </button>
                       </div>
 
-                      <div className="mt-4 grid gap-4 md:grid-cols-2">
-                        <SettingsField
-                          label={t('settings.cli.customProviders.form.modelIdLabel')}
-                        >
-                          <SettingsInput
-                            value={model.id}
-                            onChange={(value) =>
-                              updateModelDraft(model.key, (draft) => ({
-                                ...draft,
-                                id: value,
-                              }))
-                            }
-                            placeholder={t(
-                              'settings.cli.customProviders.form.modelIdPlaceholder'
+                      <div className="mt-4 space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <SettingsField
+                            label={t(
+                              'settings.cli.customProviders.form.modelIdLabel'
                             )}
-                          />
-                        </SettingsField>
+                          >
+                            <SettingsInput
+                              value={model.id}
+                              onChange={(value) =>
+                                updateModelDraft(model.key, (draft) => ({
+                                  ...draft,
+                                  id: value,
+                                }))
+                              }
+                              placeholder={t(
+                                'settings.cli.customProviders.form.modelIdPlaceholder'
+                              )}
+                            />
+                          </SettingsField>
 
-                        <SettingsField
-                          label={t('settings.cli.customProviders.form.modelNameLabel')}
-                        >
-                          <SettingsInput
-                            value={model.name}
-                            onChange={(value) =>
-                              updateModelDraft(model.key, (draft) => ({
-                                ...draft,
-                                name: value,
-                              }))
-                            }
-                            placeholder={t(
-                              'settings.cli.customProviders.form.modelNamePlaceholder'
+                          <SettingsField
+                            label={t(
+                              'settings.cli.customProviders.form.modelNameLabel'
                             )}
-                          />
-                        </SettingsField>
+                          >
+                            <SettingsInput
+                              value={model.name}
+                              onChange={(value) =>
+                                updateModelDraft(model.key, (draft) => ({
+                                  ...draft,
+                                  name: value,
+                                }))
+                              }
+                              placeholder={t(
+                                'settings.cli.customProviders.form.modelNamePlaceholder'
+                              )}
+                            />
+                          </SettingsField>
+                        </div>
 
-                        <SettingsField
-                          label={t(
-                            'settings.cli.customProviders.form.inputModalitiesLabel'
-                          )}
-                        >
-                          <SettingsInput
-                            value={model.inputModalities}
-                            onChange={(value) =>
-                              updateModelDraft(model.key, (draft) => ({
-                                ...draft,
-                                inputModalities: value,
-                              }))
-                            }
-                            placeholder={t(
-                              'settings.cli.customProviders.form.modalitiesPlaceholder'
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <SettingsField
+                            label={t(
+                              'settings.cli.customProviders.form.inputModalitiesLabel'
                             )}
-                          />
-                        </SettingsField>
+                          >
+                            <MultiSelectDropdown
+                              values={model.inputModalities}
+                              options={modalityOptions}
+                              icon={SquaresFourIcon}
+                              label={formatModalitiesTriggerLabel(
+                                model.inputModalities,
+                                modalityOptions,
+                                t(
+                                  'settings.cli.customProviders.form.modalitiesPlaceholder'
+                                )
+                              )}
+                              menuLabel={t(
+                                'settings.cli.customProviders.form.inputModalitiesLabel'
+                              )}
+                              triggerClassName={cn(
+                                settingsFieldClassName,
+                                'w-full justify-between gap-2 rounded-[10px] bg-[#F9FBFF] px-[14px] py-[10px] text-[14px] text-[#333333] hover:bg-white'
+                              )}
+                              menuContentClassName="w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+                              onChange={(values) =>
+                                updateModelDraft(model.key, (draft) => ({
+                                  ...draft,
+                                  inputModalities: values,
+                                }))
+                              }
+                            />
+                          </SettingsField>
 
-                        <SettingsField
-                          label={t(
-                            'settings.cli.customProviders.form.outputModalitiesLabel'
-                          )}
-                        >
-                          <SettingsInput
-                            value={model.outputModalities}
-                            onChange={(value) =>
-                              updateModelDraft(model.key, (draft) => ({
-                                ...draft,
-                                outputModalities: value,
-                              }))
-                            }
-                            placeholder={t(
-                              'settings.cli.customProviders.form.modalitiesPlaceholder'
+                          <SettingsField
+                            label={t(
+                              'settings.cli.customProviders.form.outputModalitiesLabel'
                             )}
-                          />
-                        </SettingsField>
+                          >
+                            <MultiSelectDropdown
+                              values={model.outputModalities}
+                              options={modalityOptions}
+                              icon={SquaresFourIcon}
+                              label={formatModalitiesTriggerLabel(
+                                model.outputModalities,
+                                modalityOptions,
+                                t(
+                                  'settings.cli.customProviders.form.modalitiesPlaceholder'
+                                )
+                              )}
+                              menuLabel={t(
+                                'settings.cli.customProviders.form.outputModalitiesLabel'
+                              )}
+                              triggerClassName={cn(
+                                settingsFieldClassName,
+                                'w-full justify-between gap-2 rounded-[10px] bg-[#F9FBFF] px-[14px] py-[10px] text-[14px] text-[#333333] hover:bg-white'
+                              )}
+                              menuContentClassName="w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+                              onChange={(values) =>
+                                updateModelDraft(model.key, (draft) => ({
+                                  ...draft,
+                                  outputModalities: values,
+                                }))
+                              }
+                            />
+                          </SettingsField>
+                        </div>
 
-                        <SettingsField
-                          label={t(
-                            'settings.cli.customProviders.form.contextLimitLabel'
-                          )}
-                        >
-                          <input
-                            type="number"
-                            min="0"
-                            className={settingsFieldClassName}
-                            placeholder={t(
-                              'settings.cli.customProviders.form.limitPlaceholder'
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <SettingsField
+                            label={t(
+                              'settings.cli.customProviders.form.contextLimitLabel'
                             )}
-                            value={model.contextLimit}
-                            onChange={(event) =>
-                              updateModelDraft(model.key, (draft) => ({
-                                ...draft,
-                                contextLimit: event.target.value,
-                              }))
-                            }
-                          />
-                        </SettingsField>
+                          >
+                            <input
+                              type="number"
+                              min="0"
+                              className={settingsFieldClassName}
+                              placeholder={t(
+                                'settings.cli.customProviders.form.limitPlaceholder'
+                              )}
+                              value={model.contextLimit}
+                              onChange={(event) =>
+                                updateModelDraft(model.key, (draft) => ({
+                                  ...draft,
+                                  contextLimit: event.target.value,
+                                }))
+                              }
+                            />
+                          </SettingsField>
 
-                        <SettingsField
-                          label={t(
-                            'settings.cli.customProviders.form.outputLimitLabel'
-                          )}
-                        >
-                          <input
-                            type="number"
-                            min="0"
-                            className={settingsFieldClassName}
-                            placeholder={t(
-                              'settings.cli.customProviders.form.limitPlaceholder'
+                          <SettingsField
+                            label={t(
+                              'settings.cli.customProviders.form.outputLimitLabel'
                             )}
-                            value={model.outputLimit}
-                            onChange={(event) =>
-                              updateModelDraft(model.key, (draft) => ({
-                                ...draft,
-                                outputLimit: event.target.value,
-                              }))
-                            }
-                          />
-                        </SettingsField>
+                          >
+                            <input
+                              type="number"
+                              min="0"
+                              className={settingsFieldClassName}
+                              placeholder={t(
+                                'settings.cli.customProviders.form.limitPlaceholder'
+                              )}
+                              value={model.outputLimit}
+                              onChange={(event) =>
+                                updateModelDraft(model.key, (draft) => ({
+                                  ...draft,
+                                  outputLimit: event.target.value,
+                                }))
+                              }
+                            />
+                          </SettingsField>
+                        </div>
+
+                        <div className="rounded-[10px] border border-[#E8EEF5] bg-white/80 p-4">
+                          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px] md:items-start">
+                            <div className="min-w-0">
+                              <SettingsCheckbox
+                                id={`custom-provider-thinking-${model.key}`}
+                                label={t(
+                                  'settings.cli.customProviders.form.thinkingLabel'
+                                )}
+                                description={t(
+                                  'settings.cli.customProviders.form.thinkingHelper'
+                                )}
+                                checked={model.thinkingEnabled}
+                                onChange={(checked) =>
+                                  updateModelDraft(model.key, (draft) => ({
+                                    ...draft,
+                                    thinkingEnabled: checked,
+                                    thinkingBudget: checked
+                                      ? draft.thinkingBudget || '9216'
+                                      : '',
+                                  }))
+                                }
+                              />
+                            </div>
+
+                            <SettingsField
+                              label={t(
+                                'settings.cli.customProviders.form.thinkingBudgetLabel'
+                              )}
+                            >
+                              <input
+                                type="number"
+                                min="0"
+                                disabled={!model.thinkingEnabled}
+                                className={settingsFieldClassName}
+                                placeholder={t(
+                                  'settings.cli.customProviders.form.thinkingBudgetPlaceholder'
+                                )}
+                                value={model.thinkingBudget}
+                                onChange={(event) =>
+                                  updateModelDraft(model.key, (draft) => ({
+                                    ...draft,
+                                    thinkingBudget: event.target.value,
+                                  }))
+                                }
+                              />
+                            </SettingsField>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}

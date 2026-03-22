@@ -17,6 +17,13 @@ export const cliConfigKeys = {
     ['cli-config', 'models', provider] as const,
 };
 
+function invalidateExecutorCaches(
+  queryClient: ReturnType<typeof useQueryClient>
+) {
+  queryClient.invalidateQueries({ queryKey: ['profiles'] });
+  queryClient.invalidateQueries({ queryKey: ['user-system'] });
+}
+
 export function useCliConfig() {
   const queryClient = useQueryClient();
 
@@ -31,11 +38,15 @@ export function useCliConfig() {
     onSuccess: (savedConfig) => {
       queryClient.setQueryData(cliConfigKeys.config(), savedConfig);
       queryClient.invalidateQueries({ queryKey: cliConfigKeys.providers() });
+      invalidateExecutorCaches(queryClient);
     },
   });
 
   const syncMutation = useMutation({
     mutationFn: (data?: SyncToCliRequest) => cliConfigApi.syncToCli(data),
+    onSuccess: () => {
+      invalidateExecutorCaches(queryClient);
+    },
   });
 
   const restartMutation = useMutation({
@@ -104,6 +115,7 @@ function invalidateCliConfigQueries(
 ) {
   queryClient.invalidateQueries({ queryKey: cliConfigKeys.config() });
   queryClient.invalidateQueries({ queryKey: cliConfigKeys.customProviders() });
+  invalidateExecutorCaches(queryClient);
 }
 
 export function useCreateCustomProvider() {

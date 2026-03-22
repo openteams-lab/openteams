@@ -21,7 +21,7 @@
         "reposDesc": "Scripts et configuration des dépôts",
         "agents": "Agents",
         "agentsDesc": "Configurations des agents de codage",
-        "cli": "OpenTeams CLI",
+        "cli": "Fournisseurs de services",
         "cliDesc": "Fournisseur, modèle et paramètres de comportement",
         "mcp": "Serveurs MCP",
         "mcpDesc": "Serveurs Model Context Protocol",
@@ -354,7 +354,7 @@
       }
     },
     "cli": {
-      "title": "OpenTeams CLI",
+      "title": "Fournisseurs de services",
       "description": "Gérez le fournisseur CLI intégré, le modèle et les paramètres de comportement d'exécution.",
       "loading": "Chargement de la configuration CLI...",
       "loadError": "Impossible de charger la configuration CLI.",
@@ -387,16 +387,16 @@
       },
       "model": {
         "title": "Modèle",
-        "description": "Sélectionnez ou saisissez le modèle par défaut pour le fournisseur actuel.",
+        "description": "Sélectionnez le modèle par défaut du fournisseur actuel.",
         "inputLabel": "ID du modèle",
         "inputPlaceholder": "Saisir l'ID du modèle",
         "required": "L'ID du modèle est obligatoire.",
-        "selectLabel": "Modèles suggérés",
+        "selectLabel": "Modèle par défaut",
         "selectPlaceholder": "Sélectionner un modèle",
-        "selectHelper": "Choisissez un modèle suggéré ou saisissez un ID personnalisé ci-dessus.",
+        "selectHelper": "Choisissez le modèle par défaut dans la liste disponible.",
         "loading": "Chargement des modèles...",
         "loadError": "Impossible de charger les modèles pour ce fournisseur.",
-        "empty": "Aucun modèle suggéré n'est disponible pour ce fournisseur."
+        "empty": "Aucun modèle par défaut n'est disponible pour ce fournisseur."
       },
       "behavior": {
         "title": "Comportement",
@@ -466,7 +466,7 @@
         "list": {
           "modelsCount": "{{count}} modèles",
           "noBaseUrl": "Aucune Base URL configurée.",
-          "npm": "NPM : {{npm}}",
+          "npm": "SDK : {{npm}}",
           "timeout": "Délai : {{timeout}}",
           "noModels": "Aucun modèle n'est encore configuré pour ce fournisseur."
         },
@@ -499,9 +499,9 @@
           "apiKeyLabel": "Clé API",
           "apiKeyPlaceholder": "Saisir la clé API",
           "apiKeyMasked": "Les clés enregistrées restent masquées. Laissez la valeur inchangée pour conserver la clé existante.",
-          "npmLabel": "Package NPM",
+          "npmLabel": "SDK",
           "npmPlaceholder": "@ai-sdk/anthropic",
-          "npmHelper": "Optionnel. Laissez vide pour utiliser le package par défaut.",
+          "npmHelper": "Optionnel. Laissez vide pour utiliser le SDK par défaut.",
           "timeoutLabel": "Délai (ms)",
           "timeoutPlaceholder": "30000",
           "modelsTitle": "Modèles",
@@ -511,11 +511,11 @@
           "newModel": "Nouveau modèle",
           "modelIdLabel": "Model ID",
           "modelIdPlaceholder": "ex. kimi-k2.5",
-          "modelNameLabel": "Nom d'affichage",
+          "modelNameLabel": "Nom du modèle",
           "modelNamePlaceholder": "ex. Kimi K2.5",
           "inputModalitiesLabel": "Modalités d'entrée",
           "outputModalitiesLabel": "Modalités de sortie",
-          "modalitiesPlaceholder": "text, image",
+          "modalitiesPlaceholder": "Sélectionner les modalités",
           "contextLimitLabel": "Limite de contexte",
           "outputLimitLabel": "Limite de sortie",
           "limitPlaceholder": "32768",
@@ -528,7 +528,18 @@
             "baseUrlRequired": "La Base URL est requise.",
             "modelIdRequired": "Chaque entrée modèle doit avoir un Model ID.",
             "duplicateModelId": "Le Model ID \"{{id}}\" est dupliqué.",
-            "numericLimit": "Les limites et le délai doivent être des entiers positifs ou nuls."
+            "numericLimit": "Les limites et le délai doivent être des entiers positifs ou nuls.",
+            "modelNameRequired": "Chaque modèle doit avoir un nom.",
+            "duplicateModelName": "Le nom de modèle \"{{name}}\" est en doublon.",
+            "thinkingBudgetRequired": "Saisissez le budget de tokens Thinking lorsque Thinking est activé."
+          },
+          "thinkingLabel": "Thinking",
+          "thinkingHelper": "Activer le mode Thinking pour ce modèle.",
+          "thinkingBudgetLabel": "Budget de tokens Thinking",
+          "thinkingBudgetPlaceholder": "9216",
+          "modalities": {
+            "text": "Texte",
+            "image": "Image"
           }
         },
         "deleteDialog": {

@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { CaretDownIcon, type Icon } from '@phosphor-icons/react';
+import {
+  CaretDownIcon,
+  CheckIcon,
+  type Icon,
+} from '@phosphor-icons/react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,6 +80,12 @@ export function MultiSelectDropdown<T extends string = string>({
           <DropdownMenuCheckboxItem
             key={option.value}
             checked={values.includes(option.value)}
+            className={cn(
+              'focus:bg-[#dbe9ff]',
+              'data-[state=checked]:bg-transparent data-[state=checked]:text-[#111827]',
+              'data-[state=checked]:focus:bg-transparent'
+            )}
+            onSelect={(event) => event.preventDefault()}
             onCheckedChange={() => {
               const newValues = values.includes(option.value)
                 ? values.filter((v) => v !== option.value)
@@ -83,7 +93,17 @@ export function MultiSelectDropdown<T extends string = string>({
               onChange(newValues);
             }}
           >
-            {option.renderOption?.() ?? option.label}
+            <div className="flex w-full items-center gap-base">
+              <div className="min-w-0 flex-1">
+                {option.renderOption?.() ?? option.label}
+              </div>
+              {values.includes(option.value) ? (
+                <CheckIcon
+                  className="size-icon-xs shrink-0 text-[#a8c9ff]"
+                  weight="bold"
+                />
+              ) : null}
+            </div>
           </DropdownMenuCheckboxItem>
         ))}
       </DropdownMenuContent>

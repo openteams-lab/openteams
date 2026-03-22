@@ -15,6 +15,7 @@ export const FieldTemplate = (props: FieldTemplateProps) => {
     rawErrors = [],
     rawHelp,
     rawDescription,
+    hidden,
     label,
     required,
     schema,
@@ -24,6 +25,10 @@ export const FieldTemplate = (props: FieldTemplateProps) => {
     (Array.isArray(schema.type) && schema.type.includes('boolean'));
 
   if (schema.type === 'object') {
+    return children;
+  }
+
+  if (hidden) {
     return children;
   }
 

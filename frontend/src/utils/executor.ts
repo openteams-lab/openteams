@@ -41,6 +41,22 @@ export function isOpencodeExecutor(
   return (executor ?? '').toString().toUpperCase() === 'OPENCODE';
 }
 
+export function isOpenTeamsCliExecutor(
+  executor: BaseCodingAgent | string | null | undefined
+): boolean {
+  return (executor ?? '').toString().toUpperCase() === 'OPEN_TEAMS_CLI';
+}
+
+export function isAutoModelExecutor(
+  executor: BaseCodingAgent | string | null | undefined
+): boolean {
+  const normalizedExecutor = (executor ?? '').toString().toUpperCase();
+  return (
+    normalizedExecutor === 'OPENCODE' ||
+    normalizedExecutor === 'OPEN_TEAMS_CLI'
+  );
+}
+
 export function extractExecutorProfileVariant(
   toolsEnabled: unknown
 ): string | null {
@@ -101,7 +117,7 @@ export function getVariantOptions(
   if (!executorConfig) return [];
 
   const variants = Object.keys(executorConfig);
-  const variantLabels = isOpencodeExecutor(executor)
+  const variantLabels = isAutoModelExecutor(executor)
     ? new Map(
         variants.map((variant) => [
           variant,
@@ -163,6 +179,14 @@ export function findVariantByModel(
 
   const variants = getVariantOptions(executor as BaseCodingAgent, profiles);
   for (const variant of variants) {
+    const normalizedVariantName =
+      isOpenTeamsCliExecutor(executor) && variant !== 'DEFAULT'
+        ? normalizeModelLookupValue(variant)
+        : null;
+    if (normalizedVariantName === targetModel) {
+      return variant;
+    }
+
     const variantModel = getVariantModelName(executor, variant, profiles);
     const normalizedVariantModel = normalizeModelLookupValue(variantModel);
     if (normalizedVariantModel === targetModel) {
@@ -208,7 +232,7 @@ export function formatExecutorModelLabel(
   model: string | null | undefined
 ): string | null {
   if (!model) return null;
-  if (isOpencodeExecutor(executor)) {
+  if (isAutoModelExecutor(executor)) {
     return formatOpencodeModelLabel(model);
   }
   return model;
@@ -219,14 +243,23 @@ export function getVariantDisplayLabel(
   variantName: string,
   profiles: ExecutorConfigs['executors'] | null | undefined
 ): string {
-  const prettyVariant = toPrettyCase(variantName);
+  const normalizedVariantName = variantName.trim();
   const modelName = getVariantModelName(executor, variantName, profiles);
+
+  if (isOpenTeamsCliExecutor(executor) && normalizedVariantName !== 'DEFAULT') {
+    if (normalizedVariantName.startsWith(AUTO_MODEL_VARIANT_PREFIX) && modelName) {
+      return formatExecutorModelLabel(executor, modelName) ?? modelName;
+    }
+    return normalizedVariantName;
+  }
+
+  const prettyVariant = toPrettyCase(variantName);
   if (!modelName) return prettyVariant;
 
   const modelLabel = formatExecutorModelLabel(executor, modelName) ?? modelName;
   if (
     isOpencodeExecutor(executor) &&
-    variantName.startsWith(AUTO_MODEL_VARIANT_PREFIX)
+    normalizedVariantName.startsWith(AUTO_MODEL_VARIANT_PREFIX)
   ) {
     return modelLabel;
   }

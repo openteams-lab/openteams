@@ -6,12 +6,17 @@ export const FieldTemplate = (props: FieldTemplateProps) => {
     rawErrors = [],
     rawHelp,
     rawDescription,
+    hidden,
     label,
     required,
     schema,
   } = props;
 
   if (schema.type === 'object') {
+    return children;
+  }
+
+  if (hidden) {
     return children;
   }
 

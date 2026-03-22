@@ -1633,6 +1633,7 @@ export function ChatSessions() {
     setMemberError(null);
     setEditingMember(null);
     setNewMemberName('');
+    setNewMemberRunnerType('');
     setNewMemberVariant('DEFAULT');
     setNewMemberPrompt('');
     setNewMemberWorkspace('');
@@ -1729,7 +1730,11 @@ export function ChatSessions() {
       return;
     }
     if (!newMemberRunnerType || !isRunnerAvailable(newMemberRunnerType)) {
-      setNewMemberRunnerType(enabledRunnerTypes[0]);
+      setNewMemberRunnerType(
+        enabledRunnerTypes.includes(BaseCodingAgent.OPEN_TEAMS_CLI)
+          ? BaseCodingAgent.OPEN_TEAMS_CLI
+          : enabledRunnerTypes[0]
+      );
     }
   }, [
     editingMember,
@@ -2718,7 +2723,7 @@ export function ChatSessions() {
         preset,
         sessionId: activeSessionId ?? 'preview',
         fallbackWorkspacePath: homeDirectory,
-        defaultRunnerType: config?.executor_profile?.executor ?? null,
+        defaultRunnerType: BaseCodingAgent.OPEN_TEAMS_CLI,
         enabledRunnerTypes,
         availableRunnerTypes,
         profiles,
@@ -2736,7 +2741,6 @@ export function ChatSessions() {
     [
       activeSessionId,
       availableRunnerTypes,
-      config?.executor_profile?.executor,
       enabledRunnerTypes,
       homeDirectory,
       profiles,

@@ -21,6 +21,7 @@ import { DeleteConfigurationDialog } from '@/components/dialogs/settings/DeleteC
 import type { BaseCodingAgent, ExecutorConfigs } from 'shared/types';
 import { cn } from '@/lib/utils';
 import { toPrettyCase } from '@/utils/string';
+import { getVariantDisplayLabel, getVariantOptions } from '@/utils/executor';
 import {
   settingsPanelClassName,
   SettingsSaveBar,
@@ -100,6 +101,11 @@ export function AgentsSettingsSection() {
     setLocalParsedProfiles(nextProfiles as ExecutorConfigs);
     setIsDirty(true);
   };
+
+  const getSortedConfigurations = (
+    executor: BaseCodingAgent | string | null,
+    executors = localParsedProfiles?.executors
+  ) => getVariantOptions(executor, executors);
 
   const handleCreateConfig = async (executor: string) => {
     try {
@@ -213,7 +219,10 @@ export function AgentsSettingsSection() {
           selectedExecutorType === executorType &&
           selectedConfiguration === configToDelete
         ) {
-          const nextConfigs = Object.keys(executorsMap[executorType] || {});
+          const nextConfigs = getSortedConfigurations(
+            executorType as BaseCodingAgent,
+            updatedProfiles.executors
+          );
           setSelectedConfiguration(nextConfigs[0] || 'DEFAULT');
         }
 
@@ -364,11 +373,8 @@ export function AgentsSettingsSection() {
                       selected={selectedExecutorType === executor}
                       onClick={() => {
                         setSelectedExecutorType(executor as BaseCodingAgent);
-                        // Select first config for this executor
-                        const configs = Object.keys(
-                          localParsedProfiles.executors[
-                            executor as BaseCodingAgent
-                          ] || {}
+                        const configs = getSortedConfigurations(
+                          executor as BaseCodingAgent
                         );
                         if (configs.length > 0) {
                           setSelectedConfiguration(configs[0]);
@@ -412,43 +418,47 @@ export function AgentsSettingsSection() {
               >
                 {selectedExecutorType &&
                 localParsedProfiles.executors[selectedExecutorType] ? (
-                  Object.keys(
-                    localParsedProfiles.executors[selectedExecutorType]
-                  ).map((configName) => {
-                    const isDefault =
-                      config?.executor_profile?.executor ===
-                        selectedExecutorType &&
-                      config?.executor_profile?.variant === configName;
-                    const configCount = Object.keys(
-                      localParsedProfiles.executors[selectedExecutorType] || {}
-                    ).length;
-                    return (
-                      <TwoColumnPickerItem
-                        key={configName}
-                        selected={selectedConfiguration === configName}
-                        onClick={() => setSelectedConfiguration(configName)}
-                        trailing={
-                          <>
-                            {isDefault && (
-                              <TwoColumnPickerBadge variant="brand">
-                                {t('settings.agents.editor.isDefault')}
-                              </TwoColumnPickerBadge>
-                            )}
-                            <ConfigActionsDropdown
-                              executorType={selectedExecutorType}
-                              configName={configName}
-                              isDefault={isDefault}
-                              configCount={configCount}
-                              onMakeDefault={handleMakeDefault}
-                              onDelete={handleDeleteConfig}
-                            />
-                          </>
-                        }
-                      >
-                        {toPrettyCase(configName)}
-                      </TwoColumnPickerItem>
-                    );
-                  })
+                  getSortedConfigurations(selectedExecutorType).map(
+                    (configName) => {
+                      const isDefault =
+                        config?.executor_profile?.executor ===
+                          selectedExecutorType &&
+                        config?.executor_profile?.variant === configName;
+                      const configCount = Object.keys(
+                        localParsedProfiles.executors[selectedExecutorType] || {}
+                      ).length;
+                      return (
+                        <TwoColumnPickerItem
+                          key={configName}
+                          selected={selectedConfiguration === configName}
+                          onClick={() => setSelectedConfiguration(configName)}
+                          trailing={
+                            <>
+                              {isDefault && (
+                                <TwoColumnPickerBadge variant="brand">
+                                  {t('settings.agents.editor.isDefault')}
+                                </TwoColumnPickerBadge>
+                              )}
+                              <ConfigActionsDropdown
+                                executorType={selectedExecutorType}
+                                configName={configName}
+                                isDefault={isDefault}
+                                configCount={configCount}
+                                onMakeDefault={handleMakeDefault}
+                                onDelete={handleDeleteConfig}
+                              />
+                            </>
+                          }
+                        >
+                          {getVariantDisplayLabel(
+                            selectedExecutorType,
+                            configName,
+                            localParsedProfiles?.executors
+                          )}
+                        </TwoColumnPickerItem>
+                      );
+                    }
+                  )
                 ) : (
                   <TwoColumnPickerEmpty>
                     {t('settings.agents.selectAgent')}

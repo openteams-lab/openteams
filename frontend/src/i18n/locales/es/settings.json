@@ -21,7 +21,7 @@
         "reposDesc": "Scripts y configuración de repositorios",
         "agents": "Agentes",
         "agentsDesc": "Configuraciones de agentes",
-        "cli": "OpenTeams CLI",
+        "cli": "Proveedores de servicios",
         "cliDesc": "Proveedor, modelo y ajustes de comportamiento",
         "mcp": "Servidores MCP",
         "mcpDesc": "Servidores de Protocolo de Contexto de Modelo (MCP)",
@@ -354,7 +354,7 @@
       }
     },
     "cli": {
-      "title": "OpenTeams CLI",
+      "title": "Proveedores de servicios",
       "description": "Administra el proveedor integrado de CLI, el modelo y la configuración de comportamiento en tiempo de ejecución.",
       "loading": "Cargando configuración de CLI...",
       "loadError": "No se pudo cargar la configuración de CLI.",
@@ -387,16 +387,16 @@
       },
       "model": {
         "title": "Modelo",
-        "description": "Selecciona o introduce el modelo predeterminado para el proveedor actual.",
+        "description": "Selecciona el modelo predeterminado del proveedor actual.",
         "inputLabel": "ID del modelo",
         "inputPlaceholder": "Introduce el ID del modelo",
         "required": "El ID del modelo es obligatorio.",
-        "selectLabel": "Modelos sugeridos",
+        "selectLabel": "Modelo predeterminado",
         "selectPlaceholder": "Seleccionar modelo",
-        "selectHelper": "Elige un modelo sugerido o escribe un ID personalizado arriba.",
+        "selectHelper": "Elige el modelo predeterminado de la lista disponible.",
         "loading": "Cargando modelos...",
         "loadError": "No se pudieron cargar los modelos de este proveedor.",
-        "empty": "No hay modelos sugeridos disponibles para este proveedor."
+        "empty": "No hay un modelo predeterminado disponible para este proveedor."
       },
       "behavior": {
         "title": "Comportamiento",
@@ -466,7 +466,7 @@
         "list": {
           "modelsCount": "{{count}} modelos",
           "noBaseUrl": "No hay Base URL configurada.",
-          "npm": "NPM: {{npm}}",
+          "npm": "SDK: {{npm}}",
           "timeout": "Tiempo de espera: {{timeout}}",
           "noModels": "Este proveedor todavía no tiene modelos configurados."
         },
@@ -499,9 +499,9 @@
           "apiKeyLabel": "Clave API",
           "apiKeyPlaceholder": "Introduce la clave API",
           "apiKeyMasked": "Las claves guardadas permanecen enmascaradas. Deja el valor igual para conservar la clave existente.",
-          "npmLabel": "Paquete NPM",
+          "npmLabel": "SDK",
           "npmPlaceholder": "@ai-sdk/anthropic",
-          "npmHelper": "Opcional. Déjalo vacío para usar el paquete predeterminado.",
+          "npmHelper": "Opcional. Déjalo vacío para usar el SDK predeterminado.",
           "timeoutLabel": "Tiempo de espera (ms)",
           "timeoutPlaceholder": "30000",
           "modelsTitle": "Modelos",
@@ -511,11 +511,11 @@
           "newModel": "Modelo nuevo",
           "modelIdLabel": "Model ID",
           "modelIdPlaceholder": "p. ej. kimi-k2.5",
-          "modelNameLabel": "Nombre visible",
+          "modelNameLabel": "Nombre del modelo",
           "modelNamePlaceholder": "p. ej. Kimi K2.5",
           "inputModalitiesLabel": "Modalidades de entrada",
           "outputModalitiesLabel": "Modalidades de salida",
-          "modalitiesPlaceholder": "text, image",
+          "modalitiesPlaceholder": "Selecciona modalidades",
           "contextLimitLabel": "Límite de contexto",
           "outputLimitLabel": "Límite de salida",
           "limitPlaceholder": "32768",
@@ -528,7 +528,18 @@
             "baseUrlRequired": "La Base URL es obligatoria.",
             "modelIdRequired": "Cada entrada de modelo necesita un Model ID.",
             "duplicateModelId": "El Model ID \"{{id}}\" está duplicado.",
-            "numericLimit": "Los límites y el tiempo de espera deben ser enteros no negativos."
+            "numericLimit": "Los límites y el tiempo de espera deben ser enteros no negativos.",
+            "modelNameRequired": "Cada modelo necesita un nombre.",
+            "duplicateModelName": "El nombre del modelo \"{{name}}\" está duplicado.",
+            "thinkingBudgetRequired": "Introduce los tokens de presupuesto de Thinking cuando Thinking esté activado."
+          },
+          "thinkingLabel": "Thinking",
+          "thinkingHelper": "Activa el modo Thinking para este modelo.",
+          "thinkingBudgetLabel": "Tokens de presupuesto de Thinking",
+          "thinkingBudgetPlaceholder": "9216",
+          "modalities": {
+            "text": "Texto",
+            "image": "Imagen"
           }
         },
         "deleteDialog": {
