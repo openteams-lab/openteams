@@ -295,6 +295,14 @@
           "label": "Porcentaje de Compresión",
           "helper": "Porcentaje de mensajes a comprimir cuando se supera el umbral (predeterminado: 25%)."
         }
+      },
+      "agentChaining": {
+        "title": "Encadenamiento de agentes",
+        "description": "Controla cuántos relevos automáticos entre agentes pueden ocurrir en una misma cadena.",
+        "maxDepth": {
+          "label": "Profundidad máxima de la cadena",
+          "helper": "Limita las menciones automáticas con @ para evitar bucles. El valor predeterminado es 8. Cuando se alcanza el límite, las siguientes menciones de agentes dejan de ejecutarse automáticamente."
+        }
       }
     },
     "agents": {

@@ -1,0 +1,114 @@
+---
+title: "把 AI 从单兵工具变成协作团队"
+description: "从会话、成员、运行记录到团队预设，理解 OpenTeams 如何把多代理协作做成一个可管理的产品闭环。"
+---
+
+很多 AI 编程产品已经证明了一件事：单个 Agent 可以很强。但当任务开始跨越产品、研发、测试、文档与审查时，真正拖慢团队的，往往不再是模型本身，而是协作成本。
+
+OpenTeams 的做法不是继续把更多模型塞进一个输入框，而是把**协作本身**设计成产品的一等对象：会话、成员、消息、运行记录、技能、工作项，都有明确的数据结构和交互路径。于是，AI 不再只是“一个会回答的工具”，而是一个可以被组织、被分工、被追踪的团队。
+
+## 不只是多开几个 Agent
+
+在 OpenTeams 里，一个聊天会话不是临时对话框，而是完整的协作容器。
+
+- **ChatSession** 承载一段完整任务周期
+- **ChatAgent** 定义一个可复用的代理角色
+- **ChatSessionAgent** 把代理放进具体会话，并记录其状态、工作空间与允许技能
+- **ChatMessage** 保存用户、代理与系统消息
+- **ChatRun** 记录一次具体执行
+- **ChatWorkItem** 把交付物和阶段性产出组织进时间线
+
+下面这张图，基本就是 OpenTeams 的协作骨架：
+
+```text
+User
+  |
+  v
+ChatSession
+  +-- ChatMessage ----------> mentions @AgentA / @AgentB
+  |
+  +-- ChatSessionAgent -----> state / workspace / allowed skills
+  |         |
+  |         +-------------> ChatRun (one execution at a time, repeatable)
+  |
+  +-- ChatWorkItem ---------> artifact / conclusion / deliverable trace
+```
+
+这套结构的价值在于，产品不再需要靠“用户自己记住谁做了什么”来维持秩序。系统天然知道：谁在会话里、谁被提及、谁正在运行、谁产出了什么。
+
+## 一条消息，驱动一支团队
+
+OpenTeams 把 `@提及` 做成了协作触发器。你发出一条消息后，被提及的成员会进入可见的执行流程，前端通过会话 WebSocket 流实时接收状态变化，用户可以直接看到任务被接收、执行和完成。
+
+```text
+你发消息
+   |
+   v
+@frontend   @backend   @reviewer
+   |            |           |
+received -> running -> completed/failed
+   |            |           |
+   +------ 所有状态回到同一条会话时间线 ------+
+```
+
+这意味着 OpenTeams 的“多代理”不是把多个终端窗口摆在一起，而是把并行协作收束到一条统一时间线上。对用户来说，体验上的关键变化有三点：
+
+### 1. 分工清晰，而不是上下文混杂
+
+同一会话里可以同时放入不同角色的成员，例如 `architect`、`backend`、`qa`、`tech_writer`。仓库内置了成员预设和团队预设，包含像 Content Studio Team、Full-stack Delivery Team 这样的组合，帮助用户在几秒内搭起一支可用 AI 团队。
+
+### 2. 并行协作，但不失控
+
+系统会为每个会话成员维护独立状态。成员正在运行时，新任务会进入该成员的待处理队列，等上一轮完成后继续执行，而不是把上下文打散到新的临时窗口里。
+
+<Note>
+OpenTeams 还限制了代理链式触发深度，以避免成员彼此不断 @ 提及而形成无限循环。
+</Note>
+
+### 3. 团队工作可以沉淀，而不是执行完即消失
+
+会话支持归档与恢复。归档后会话进入只读状态，但成员、消息与历史产出都会保留；恢复后又能继续在原上下文上推进。这让 OpenTeams 更像项目空间，而不只是一次性聊天记录。
+
+## 共享的不是“神秘记忆”，而是可检查的上下文
+
+许多多 Agent 产品喜欢强调“共享记忆”。OpenTeams 更务实一些：它把上下文同步到工作空间中的 `.openteams/context/<session_id>/`，核心文件包括：
+
+- `messages.jsonl`：会话消息历史
+- `shared_blackboard.jsonl`：长期共享事实
+- `work_records.jsonl`：交付物与本轮结论
+
+这件事的产品意义非常大。它让协作不是依赖黑盒记忆，而是依赖**明确、可读、可审计的上下文文件**。当多个 Agent 接力工作时，系统传递的是结构化记录，而不是一团不可验证的隐式状态。
+
+## 为什么这是一条更像产品而不是更像 demo 的路线
+
+从仓库能力看，OpenTeams 已经把多代理协作的关键环节串成闭环：
+
+- 前端有独立的 Chat Sessions 页面、成员侧栏、技能面板、差异查看器与工作空间抽屉
+- 后端有 `/chat/sessions`、`/chat/agents`、`/chat/skills`，以及按 `run_id` 查询日志、diff 与未跟踪文件的运行接口
+- 执行层会为每次运行写入输入、输出、日志和 diff
+- 技能体系支持远程注册表、本地发现和按代理安装
+
+这说明 OpenTeams 解决的不是“怎么再接一个模型”，而是“怎么让多个模型真的能一起工作”。前者更像功能点，后者才是产品能力。
+
+## 适合什么样的团队
+
+如果你的工作经常需要下面这种协作链路，这种设计会很有吸引力：
+
+- 产品先拆需求，再交给工程实现
+- 工程完成后需要 reviewer 或 QA 继续接力
+- 文档、代码、研究、发布说明需要同步推进
+- 你希望保留每一次 AI 参与的过程，而不只是最后答案
+
+换句话说，OpenTeams 并不是在争夺“单次回答谁更聪明”，而是在争夺“复杂任务里，谁更像一个真的团队”。
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card title="任务协作" icon="comments" href="/zh-Hans/core-features/task-collaboration">
+    了解 @提及、状态流转与链式协作如何运作。
+  </Card>
+
+  <Card title="代码审查与会话控制" icon="code" href="/zh-Hans/core-features/code-review">
+    查看差异、日志、运行历史与上下文管理能力。
+  </Card>
+</CardGroup>

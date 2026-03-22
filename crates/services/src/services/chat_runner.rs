@@ -63,7 +63,6 @@ use crate::services::{
 };
 
 const UNTRACKED_FILE_LIMIT: u64 = 1024 * 1024;
-const MAX_AGENT_CHAIN_DEPTH: u32 = 5;
 const OPENTEAMS_HOME_DIR: &str = ".openteams";
 const OPENTEAMS_WORKSPACE_DIR: &str = ".openteams";
 const RUNS_DIR_NAME: &str = "runs";
@@ -584,10 +583,15 @@ impl ChatRunner {
 
         // Check chain depth to prevent infinite loops
         let chain_depth = self.extract_chain_depth(&message.meta);
-        if chain_depth >= MAX_AGENT_CHAIN_DEPTH {
+        let max_agent_chain_depth = config::load_config_from_file(&config_path())
+            .await
+            .max_agent_chain_depth
+            .max(1);
+        if chain_depth >= max_agent_chain_depth {
             tracing::warn!(
                 session_id = %session.id,
                 chain_depth = chain_depth,
+                max_agent_chain_depth = max_agent_chain_depth,
                 "agent chain depth limit reached; not triggering further agents"
             );
             return;

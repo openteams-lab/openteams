@@ -530,7 +530,7 @@ chat_presets: ChatPresetsConfig,
 /**
  * Chat compression configuration
  */
-chat_compression: ChatCompressionConfig, };
+chat_compression: ChatCompressionConfig, max_agent_chain_depth: number, };
 
 export type NotificationConfig = { sound_enabled: boolean, push_enabled: boolean, sound_file: SoundFile, };
 

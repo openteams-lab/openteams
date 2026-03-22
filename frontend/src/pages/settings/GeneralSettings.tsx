@@ -123,6 +123,16 @@ export function GeneralSettings() {
     });
   }, []);
 
+  const updateMaxAgentChainDepth = useCallback(
+    (value: number) => {
+      const nextValue = Number.isFinite(value)
+        ? Math.max(1, Math.trunc(value))
+        : 8;
+      updateDraft({ max_agent_chain_depth: nextValue });
+    },
+    [updateDraft]
+  );
+
   const handleSave = async () => {
     if (!draft) return;
 
@@ -468,6 +478,35 @@ export function GeneralSettings() {
             />
             <p className="text-sm text-muted-foreground">
               {t('settings.general.pullRequests.customPrompt.helper')}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.general.agentChaining.title')}</CardTitle>
+          <CardDescription>
+            {t('settings.general.agentChaining.description')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="max-agent-chain-depth">
+              {t('settings.general.agentChaining.maxDepth.label')}
+            </Label>
+            <Input
+              id="max-agent-chain-depth"
+              type="number"
+              min={1}
+              step={1}
+              value={draft?.max_agent_chain_depth ?? 8}
+              onChange={(e) =>
+                updateMaxAgentChainDepth(Number(e.currentTarget.value))
+              }
+            />
+            <p className="text-sm text-muted-foreground">
+              {t('settings.general.agentChaining.maxDepth.helper')}
             </p>
           </div>
         </CardContent>
