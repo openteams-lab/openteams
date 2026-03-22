@@ -1,0 +1,10 @@
+{
+  "name": "openteams-cli-windows-x64",
+  "version": "0.0.0-feat/openteams-cli-202603221310",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}
