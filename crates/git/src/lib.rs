@@ -591,12 +591,11 @@ impl GitService {
 
     /// Helper function to convert blob to string content
     fn blob_to_string(blob: &git2::Blob) -> Option<String> {
-        if blob.is_binary() {
+        let content = blob.content();
+        if blob.is_binary() || content.contains(&0) {
             None // Skip binary files
         } else {
-            std::str::from_utf8(blob.content())
-                .ok()
-                .map(|s| s.to_string())
+            std::str::from_utf8(content).ok().map(|s| s.to_string())
         }
     }
 
@@ -651,17 +650,17 @@ impl GitService {
 
         // Try to get content from blob first (for non-zero OIDs)
         let content = if !blob_id.is_zero() {
-            repo.find_blob(*blob_id)
-                .ok()
-                .and_then(|blob| Self::blob_to_string(&blob))
-                .or_else(|| {
-                    // Fallback to filesystem for unstaged changes
+            match repo.find_blob(*blob_id) {
+                Ok(blob) => Self::blob_to_string(&blob),
+                Err(_) => {
+                    // Fallback to filesystem only when blob lookup fails (unstaged changes)
                     tracing::debug!(
                         "Blob not found for non-zero OID, reading from filesystem: {}",
                         file_name
                     );
                     Self::read_file_to_string(repo, path)
-                })
+                }
+            }
         } else {
             // For zero OIDs, check filesystem directly (covers new/untracked files)
             Self::read_file_to_string(repo, path)

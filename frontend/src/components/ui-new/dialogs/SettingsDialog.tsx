@@ -119,7 +119,7 @@ function SettingsDialogContent({
             'settings-dialog-shell chat-settings-theme h-full w-full flex overflow-hidden bg-white',
             'animate-in fade-in-0 slide-in-from-bottom-4 duration-200',
             'rounded-none border-0',
-            'md:h-[600px] md:w-[860px] md:rounded-[16px] md:border md:border-[#E8EEF5] md:shadow-[0_20px_60px_rgba(0,0,0,0.1)]'
+            'md:h-[800px] md:w-[966px] md:rounded-[16px] md:border md:border-[#E8EEF5] md:shadow-[0_20px_60px_rgba(0,0,0,0.1)]'
           )}
           style={{
             fontFamily:
@@ -131,7 +131,7 @@ function SettingsDialogContent({
               'settings-dialog-nav flex flex-col border-r border-[#E8EEF5] bg-[#F9FBFF]',
               'w-full',
               mobileShowContent && 'hidden',
-              'md:block md:w-[200px]'
+              'md:block md:w-[266px]'
             )}
             style={{ padding: '24px 12px' }}
           >

@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=Noto+Emoji:wght@300..700&display=swap');
 
+@config '../../../tailwind.legacy.config.js';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -304,5 +306,3 @@
     @apply underline;
   }
 }
-
-@config '../../../tailwind.legacy.config.js';

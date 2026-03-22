@@ -945,9 +945,7 @@ export function AiMembersSidebar({
       </div>
       {memberVariantOptions.length > 0 && (
         <div className="space-y-half">
-          <label className="text-xs text-low">
-            {variantFieldLabel}
-          </label>
+          <label className="text-xs text-low">{variantFieldLabel}</label>
           <select
             value={newMemberVariant}
             onChange={(event) => onVariantChange(event.target.value)}

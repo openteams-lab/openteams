@@ -52,8 +52,7 @@ export function isAutoModelExecutor(
 ): boolean {
   const normalizedExecutor = (executor ?? '').toString().toUpperCase();
   return (
-    normalizedExecutor === 'OPENCODE' ||
-    normalizedExecutor === 'OPEN_TEAMS_CLI'
+    normalizedExecutor === 'OPENCODE' || normalizedExecutor === 'OPEN_TEAMS_CLI'
   );
 }
 
@@ -247,7 +246,10 @@ export function getVariantDisplayLabel(
   const modelName = getVariantModelName(executor, variantName, profiles);
 
   if (isOpenTeamsCliExecutor(executor) && normalizedVariantName !== 'DEFAULT') {
-    if (normalizedVariantName.startsWith(AUTO_MODEL_VARIANT_PREFIX) && modelName) {
+    if (
+      normalizedVariantName.startsWith(AUTO_MODEL_VARIANT_PREFIX) &&
+      modelName
+    ) {
       return formatExecutorModelLabel(executor, modelName) ?? modelName;
     }
     return normalizedVariantName;

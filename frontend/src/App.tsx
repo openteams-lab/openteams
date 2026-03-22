@@ -13,16 +13,6 @@ import { useAuth } from '@/hooks';
 import { usePreviousPath } from '@/hooks/usePreviousPath';
 import { useUiPreferencesScratch } from '@/hooks/useUiPreferencesScratch';
 
-import {
-  AgentSettings,
-  CliSettings,
-  GeneralSettings,
-  McpSettings,
-  OrganizationSettings,
-  ProjectSettings,
-  ReposSettings,
-  SettingsLayout,
-} from '@/pages/settings/';
 import { UserSystemProvider, useUserSystem } from '@/components/ConfigProvider';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { SearchProvider } from '@/contexts/SearchContext';
@@ -186,23 +176,6 @@ function AppContent() {
               <Route
                 path="/local-projects/:projectId/tasks"
                 element={<ProjectTasks />}
-              />
-              <Route path="/settings/*" element={<SettingsLayout />}>
-                <Route index element={<Navigate to="general" replace />} />
-                <Route path="general" element={<GeneralSettings />} />
-                <Route path="projects" element={<ProjectSettings />} />
-                <Route path="repos" element={<ReposSettings />} />
-                <Route
-                  path="organizations"
-                  element={<OrganizationSettings />}
-                />
-                <Route path="agents" element={<AgentSettings />} />
-                <Route path="cli" element={<CliSettings />} />
-                <Route path="mcp" element={<McpSettings />} />
-              </Route>
-              <Route
-                path="/mcp-servers"
-                element={<Navigate to="/settings/mcp" replace />}
               />
               <Route
                 path="/local-projects/:projectId/tasks/:taskId"
