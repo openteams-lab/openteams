@@ -163,7 +163,16 @@ impl OpenTeamsCli {
 
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
         let base_command = match Self::find_binary() {
-            Some(path) => path.to_string_lossy().to_string(),
+            Some(path) => {
+                let s = path.to_string_lossy().to_string();
+                // Quote the path if it contains spaces so that
+                // split_command_line (winsplit/shlex) keeps it as one token.
+                if s.contains(' ') {
+                    format!("\"{}\"", s)
+                } else {
+                    s
+                }
+            }
             None => Self::NPX_FALLBACK.to_string(),
         };
         let builder = CommandBuilder::new(&base_command).extend_params([

@@ -19,7 +19,7 @@ export interface UseMessageInputResult {
   replyToMessage: ChatMessage | null;
   setReplyToMessage: React.Dispatch<React.SetStateAction<ChatMessage | null>>;
   inputRef: React.RefObject<HTMLTextAreaElement>;
-  handleDraftChange: (value: string) => void;
+  handleDraftChange: (value: string, cursorPosition?: number | null) => void;
   handleMentionSelect: (name: string) => void;
   handleReplySelect: (
     message: ChatMessage,
@@ -45,38 +45,92 @@ export function useMessageInput(
   );
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
 
-  const handleDraftChange = useCallback((value: string) => {
-    setDraft(value);
-    const match = mentionRegex.exec(value);
-    if (match) {
-      setMentionQuery(match[2] ?? '');
-      // Reset highlight to first item when query changes
-      setHighlightedMentionIndex(0);
-    } else {
+  const getActiveMentionMatch = useCallback(
+    (value: string, cursorPosition?: number | null) => {
+      const fallbackCursorPosition = value.length;
+      const safeCursorPosition = Math.max(
+        0,
+        Math.min(cursorPosition ?? fallbackCursorPosition, value.length)
+      );
+      const textBeforeCursor = value.slice(0, safeCursorPosition);
+      const match = mentionRegex.exec(textBeforeCursor);
+
+      if (!match) {
+        return null;
+      }
+
+      const replaceStart =
+        match.index +
+        (match[0].lastIndexOf('@') >= 0 ? match[0].lastIndexOf('@') : 0);
+
+      return {
+        query: match[2] ?? '',
+        replaceEnd: safeCursorPosition,
+        replaceStart,
+      };
+    },
+    []
+  );
+
+  const handleDraftChange = useCallback(
+    (value: string, cursorPosition?: number | null) => {
+      setDraft(value);
+      const activeMentionMatch = getActiveMentionMatch(value, cursorPosition);
+      if (activeMentionMatch) {
+        setMentionQuery(activeMentionMatch.query);
+        setHighlightedMentionIndex(0);
+        return;
+      }
+
       setMentionQuery(null);
       setHighlightedMentionIndex(0);
-    }
-  }, []);
+    },
+    [getActiveMentionMatch]
+  );
 
-  const handleMentionSelect = useCallback((name: string) => {
-    setDraft((prev) => {
-      const match = mentionRegex.exec(prev);
-      if (!match) {
-        return `${prev}${prev.endsWith(' ') || prev.length === 0 ? '' : ' '}@${name} `;
-      }
-      const matchIndex = match.index ?? prev.length;
-      const prefix = prev.slice(0, matchIndex);
-      const beforeAt = match[1] ?? '';
-      const needsSeparator = beforeAt.length > 0 && !/\s/u.test(beforeAt);
-      const normalizedBeforeAt = needsSeparator ? `${beforeAt} ` : beforeAt;
-      return `${prefix}${normalizedBeforeAt}@${name} `;
-    });
-    setSelectedMentions((prev) =>
-      prev.includes(name) ? prev : [...prev, name]
-    );
-    setMentionQuery(null);
-    inputRef.current?.focus();
-  }, []);
+  const handleMentionSelect = useCallback(
+    (name: string) => {
+      setDraft((prev) => {
+        const textarea = inputRef.current;
+        const selectionStart = textarea?.selectionStart ?? prev.length;
+        const selectionEnd = textarea?.selectionEnd ?? selectionStart;
+        const activeMentionMatch = getActiveMentionMatch(prev, selectionStart);
+
+        if (!activeMentionMatch) {
+          const prefix = prev.slice(0, selectionStart);
+          const suffix = prev.slice(selectionEnd);
+          const needsLeadingSpace = prefix.length > 0 && !/\s$/u.test(prefix);
+          const insertedMention = `${needsLeadingSpace ? ' ' : ''}@${name} `;
+
+          requestAnimationFrame(() => {
+            const nextCursor = selectionStart + insertedMention.length;
+            textarea?.focus();
+            textarea?.setSelectionRange(nextCursor, nextCursor);
+          });
+
+          return `${prefix}${insertedMention}${suffix}`;
+        }
+
+        const prefix = prev.slice(0, activeMentionMatch.replaceStart);
+        const suffix = prev.slice(activeMentionMatch.replaceEnd);
+        const nextValue = `${prefix}@${name} ${suffix}`;
+        const nextCursor = prefix.length + name.length + 2;
+
+        requestAnimationFrame(() => {
+          textarea?.focus();
+          textarea?.setSelectionRange(nextCursor, nextCursor);
+        });
+
+        return nextValue;
+      });
+      setSelectedMentions((prev) =>
+        prev.includes(name) ? prev : [...prev, name]
+      );
+      setMentionQuery(null);
+      inputRef.current?.focus();
+    },
+    [getActiveMentionMatch]
+  );
 
   const handleReplySelect = useCallback(
     (message: ChatMessage, mentionHandle: string | null) => {
