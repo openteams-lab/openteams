@@ -20,7 +20,6 @@ env:
 
 jobs:
   frontend:
-  frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -31,11 +30,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Frontend checks
-        run: |
-          pnpm run frontend:lint
-          pnpm run frontend:format:check
-          pnpm run frontend:check
       - name: Frontend checks
         run: |
           pnpm run frontend:lint
@@ -47,21 +41,6 @@ jobs:
           GITHUB_BASE_REF: ${{ github.base_ref || 'main' }}
         run: ./scripts/check-i18n.sh
 
-      - name: Build frontend
-        run: cd frontend && pnpm run build
-        env:
-          NODE_OPTIONS: --max-old-space-size=8192
-
-  backend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Node
-        uses: ./.github/actions/setup-node
-
-      - name: Install dependencies
-        run: pnpm install
       - name: Build frontend
         run: cd frontend && pnpm run build
         env:
@@ -102,23 +81,17 @@ jobs:
 
       - name: Install sqlx-cli
         uses: taiki-e/cache-cargo-install-action@v0.9.0
-        uses: taiki-e/cache-cargo-install-action@v0.9.0
         with:
           tool: sqlx-cli
           no-default-features: true
           features: sqlite,postgres
 
       - name: Backend checks
-      - name: Backend checks
         run: |
           pnpm run backend:format:check
           pnpm run generate-types:check
           pnpm run prepare-db:check
-          pnpm run backend:format:check
-          pnpm run generate-types:check
-          pnpm run prepare-db:check
           cargo test --workspace
-          pnpm run backend:lint
           pnpm run backend:lint
 
       - name: Remote crate checks
