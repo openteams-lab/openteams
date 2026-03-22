@@ -71,7 +71,7 @@ export const isAllowedAttachment = (file: File) =>
 export interface MessageInputAreaProps {
   // Input state
   draft: string;
-  onDraftChange: (value: string) => void;
+  onDraftChange: (value: string, cursorPosition?: number | null) => void;
   inputRef: RefObject<HTMLTextAreaElement>;
   // Mentions
   selectedMentions: string[];
@@ -235,7 +235,7 @@ export function MessageInputArea({
             ref={inputRef}
             value={draft}
             onChange={(event) => {
-              onDraftChange(event.target.value);
+              onDraftChange(event.target.value, event.target.selectionStart);
               resizeTextarea(event.target);
             }}
             onKeyDown={(event) => {
@@ -365,7 +365,7 @@ export function MessageInputArea({
                       const value = draft;
                       const newValue =
                         value.substring(0, start) + '@' + value.substring(end);
-                      onDraftChange(newValue);
+                      onDraftChange(newValue, start + 1);
                       textarea.focus();
                       requestAnimationFrame(() => {
                         textarea.setSelectionRange(start + 1, start + 1);
