@@ -225,7 +225,7 @@ pnpm dev -- --port $env:FRONTEND_PORT --host
 
 ### ロードマップ
 
-- [ ] OpenTeamsユースケースに最適化されたCode Agentバックエンド
+- [x] OpenTeamsユースケースに最適化されたCode Agentバックエンド —— v0.3.4
 - [ ] 高効率チームコラボレーションフレームワークの構築
 - [ ] より多くのエージェント統合（Kilo Code, OpenClawなど）
 - [ ] より強力なすぐに使えるAIチームを追加

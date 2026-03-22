@@ -223,7 +223,7 @@ Open the frontend page at `http://localhost:<FRONTEND_PORT>` (example: `http://l
 - ~~[x] Redefine the input protocol~~
 
 ### Roadmap
-- [ ] Backend for Code Agent optimized for OpenTeams use cases
+- [x] Backend for Code Agent optimized for OpenTeams use cases —— v0.3.4
 - [ ] Develop multiple frontend color schemes
 - [ ] Establish a high-efficiency team collaboration framework
 - [ ] More agent integrations (Kilo Code, OpenClaw, etc.)

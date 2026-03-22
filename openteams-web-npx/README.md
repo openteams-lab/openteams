@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/openteams-lab/openteams/main/frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320">
+  <img src="https://raw.githubusercontent.com/openteams-lab/openteams/main/frontend/public/Logo/logo_black.svg" alt="OpenTeams" width="320">
 
   <p><strong>Run agents as one team, multiply your efficiency in the AI era.</strong></p>
 

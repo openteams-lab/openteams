@@ -225,7 +225,7 @@ pnpm dev -- --port $env:FRONTEND_PORT --host
 
 ### 로드맵
 
-- [ ] OpenTeams 사용 사례에 최적화된 Code Agent 백엔드
+- [x] OpenTeams 사용 사례에 최적화된 Code Agent 백엔드 —— v0.3.4
 - [ ] 고효율 팀 협업 프레임워크 구축
 - [ ] 더 많은 에이전트 통합 (Kilo Code, OpenClaw 등)
 - [ ] 더 강력한 바로 사용 가능한 AI 팀 추가
