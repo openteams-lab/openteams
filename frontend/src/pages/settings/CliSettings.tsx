@@ -1026,7 +1026,9 @@ export function CliSettings() {
                 </button>
                 <button
                   type="button"
-                  disabled={deletingProviderId === selectedManagedCustomProvider.id}
+                  disabled={
+                    deletingProviderId === selectedManagedCustomProvider.id
+                  }
                   className="inline-flex items-center justify-center gap-2 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] px-4 py-[10px] text-[14px] text-[#d14343] transition-colors duration-200 hover:bg-[#fdeeee] disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() =>
                     handleDeleteCustomProvider(selectedManagedCustomProvider)
@@ -1051,9 +1053,7 @@ export function CliSettings() {
                       setCustomProviderName(current, value)
                     )
                   }
-                  placeholder={t(
-                    'settings.cli.provider.customNamePlaceholder'
-                  )}
+                  placeholder={t('settings.cli.provider.customNamePlaceholder')}
                 />
               </SettingsField>
             ) : null}

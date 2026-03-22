@@ -24,6 +24,7 @@ import { ChatErrorMessage } from '@/components/ui-new/primitives/conversation/Ch
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
 import { ChatSystemMessage } from '@/components/ui-new/primitives/conversation/ChatSystemMessage';
 import { chatApi } from '@/lib/api';
+import { writeClipboardViaBridge } from '@/vscode/bridge';
 import { formatDateShortWithTime } from '@/utils/date';
 import {
   AgentBrandIcon,
@@ -774,6 +775,7 @@ export function ChatMessageItem({
                 type="button"
                 className="p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors"
                 title={t('message.copy')}
+                onClick={() => void writeClipboardViaBridge(message.content)}
               >
                 <CopyIcon className="size-icon-xs" />
               </button>

@@ -1,10 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import {
-  CaretDownIcon,
-  CheckIcon,
-  type Icon,
-} from '@phosphor-icons/react';
+import { CaretDownIcon, CheckIcon, type Icon } from '@phosphor-icons/react';
 import {
   DropdownMenu,
   DropdownMenuContent,

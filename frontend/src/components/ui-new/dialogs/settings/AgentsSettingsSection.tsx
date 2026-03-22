@@ -425,7 +425,8 @@ export function AgentsSettingsSection() {
                           selectedExecutorType &&
                         config?.executor_profile?.variant === configName;
                       const configCount = Object.keys(
-                        localParsedProfiles.executors[selectedExecutorType] || {}
+                        localParsedProfiles.executors[selectedExecutorType] ||
+                          {}
                       ).length;
                       return (
                         <TwoColumnPickerItem

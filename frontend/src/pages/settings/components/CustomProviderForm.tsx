@@ -111,9 +111,7 @@ function trimToNull(value: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-function isOptionsObject(
-  value: CustomModelConfig['options']
-): boolean {
+function isOptionsObject(value: CustomModelConfig['options']): boolean {
   return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
@@ -277,9 +275,7 @@ function formatModalitiesTriggerLabel(
     .filter((option) => values.includes(option.value))
     .map((option) => option.label);
 
-  return selectedLabels.length > 0
-    ? selectedLabels.join(' / ')
-    : placeholder;
+  return selectedLabels.length > 0 ? selectedLabels.join(' / ') : placeholder;
 }
 
 function renderStatusMessage(status: StatusState) {
@@ -304,7 +300,6 @@ function renderStatusMessage(status: StatusState) {
     </div>
   );
 }
-
 
 export function CustomProviderForm({
   initialProvider,
@@ -399,7 +394,9 @@ export function CustomProviderForm({
     const baseURL = trimToNull(formState.baseURL);
     if (!baseURL) {
       setValidationStatus({
-        message: t('settings.cli.customProviders.form.validation.baseUrlRequired'),
+        message: t(
+          'settings.cli.customProviders.form.validation.baseUrlRequired'
+        ),
         tone: 'error',
         title: t('settings.cli.validation.failureTitle'),
       });
@@ -510,7 +507,9 @@ export function CustomProviderForm({
         submitError.message === 'thinking-budget-required'
       ) {
         setError(
-          t('settings.cli.customProviders.form.validation.thinkingBudgetRequired')
+          t(
+            'settings.cli.customProviders.form.validation.thinkingBudgetRequired'
+          )
         );
         return;
       }
@@ -540,7 +539,7 @@ export function CustomProviderForm({
       hideCloseButton
       overlayClassName="bg-black/5"
       containerClassName="items-center p-4 md:p-6"
-      className="my-0 w-full max-w-[640px] max-h-[min(560px,calc(100vh-48px))] gap-0 overflow-hidden rounded-[16px] border border-[#E8EEF5] bg-white p-0 shadow-[0_20px_60px_rgba(0,0,0,0.1)]"
+      className="my-0 w-full max-w-[720px] max-h-[min(640px,calc(100vh-48px))] gap-0 overflow-hidden rounded-[16px] border border-[#E8EEF5] bg-white p-0 shadow-[0_20px_60px_rgba(0,0,0,0.1)]"
     >
       <DialogContent className="min-h-0 gap-0">
         <DialogHeader className="border-b border-[#E8EEF5] px-6 py-5 text-left">
@@ -580,7 +579,9 @@ export function CustomProviderForm({
                 <div className="grid gap-4 md:grid-cols-2">
                   <SettingsField
                     label={t('settings.cli.customProviders.form.idLabel')}
-                    description={t('settings.cli.customProviders.form.idHelper')}
+                    description={t(
+                      'settings.cli.customProviders.form.idHelper'
+                    )}
                   >
                     <SettingsInput
                       disabled={isEditing}
@@ -696,7 +697,9 @@ export function CustomProviderForm({
                 <div className="grid gap-4 md:grid-cols-2">
                   <SettingsField
                     label={t('settings.cli.customProviders.form.npmLabel')}
-                    description={t('settings.cli.customProviders.form.npmHelper')}
+                    description={t(
+                      'settings.cli.customProviders.form.npmHelper'
+                    )}
                   >
                     <SettingsSelect
                       value={npmSelection}
@@ -819,7 +822,9 @@ export function CustomProviderForm({
                           }
                         >
                           <Trash2 className="h-4 w-4" />
-                          {t('settings.cli.customProviders.actions.removeModel')}
+                          {t(
+                            'settings.cli.customProviders.actions.removeModel'
+                          )}
                         </button>
                       </div>
 

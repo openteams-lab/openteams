@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=IBM+Plex+Mono:ital,wght@0,100..700;1,100..700&family=Noto+Emoji:wght@300..700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
+@config '../../../tailwind.new.config.js';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5265,5 +5267,3 @@
     box-shadow: inset 0 0 0 1px rgba(214, 220, 228, 0.98);
   }
 }
-
-@config '../../../tailwind.new.config.js';

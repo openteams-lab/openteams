@@ -7,6 +7,7 @@ use std::{
 use git::{DiffTarget, GitCli, GitService};
 use git2::{Repository, build::CheckoutBuilder};
 use tempfile::TempDir;
+#[cfg(unix)]
 use utils::diff::DiffChangeKind;
 
 fn add_path(repo_path: &Path, path: &str) {
@@ -192,8 +193,7 @@ fn diff_added_binary_file_has_no_content() {
     create_branch(&repo_path, "feature");
     checkout_branch(&repo_path, "feature");
     // write binary with null byte
-    let mut f = fs::File::create(repo_path.join("bin.dat")).unwrap();
-    f.write_all(&[0u8, 1, 2, 3]).unwrap();
+    fs::write(repo_path.join("bin.dat"), [0u8, 1, 2, 3]).unwrap();
     let _ = s.commit(&repo_path, "add binary").unwrap();
 
     let s = GitService::new();

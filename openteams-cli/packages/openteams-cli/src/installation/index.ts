@@ -90,7 +90,22 @@ export namespace Installation {
     return CHANNEL === "local"
   }
 
+  export function isDesktopBundle() {
+    const exec = process.execPath
+    // Tauri desktop: sidecar lives alongside the server binary inside the app bundle.
+    // macOS: MyApp.app/Contents/MacOS/openteams-cli
+    // Windows: C:\Program Files\MyApp\openteams-cli.exe
+    // Linux: /usr/lib/myapp/openteams-cli or /opt/myapp/openteams-cli
+    if (exec.includes(".app/Contents/")) return true
+    if (exec.includes("src-tauri/bin")) return true
+    // Tauri resource dir pattern (externalBin sidecar)
+    if (exec.includes(path.join("tauri", "bin"))) return true
+    return false
+  }
+
   export async function method() {
+    // Desktop bundle / Tauri sidecar — not user-managed, no self-upgrade
+    if (isDesktopBundle()) return "desktop"
     if (process.execPath.includes(path.join(".openteams", "bin"))) return "curl"
     if (process.execPath.includes(path.join(".local", "bin"))) return "curl"
     const exec = process.execPath.toLowerCase()

@@ -1871,6 +1871,7 @@ mod tests {
                 runner_type TEXT NOT NULL,
                 system_prompt TEXT NOT NULL DEFAULT '',
                 tools_enabled TEXT NOT NULL DEFAULT '{}',
+                model_name TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
             )
