@@ -24,6 +24,10 @@ fn default_commit_reminder_enabled() -> bool {
     true
 }
 
+fn default_max_agent_chain_depth() -> u32 {
+    8
+}
+
 /// Chat Member Preset Template
 #[derive(Clone, Debug, Serialize, Deserialize, TS, PartialEq, Eq)]
 pub struct ChatMemberPreset {
@@ -260,6 +264,8 @@ pub struct Config {
     /// Chat compression configuration
     #[serde(default = "default_chat_compression")]
     pub chat_compression: ChatCompressionConfig,
+    #[serde(default = "default_max_agent_chain_depth")]
+    pub max_agent_chain_depth: u32,
 }
 
 impl Config {
@@ -294,6 +300,7 @@ impl Config {
             send_message_shortcut: old_config.send_message_shortcut,
             chat_presets: default_chat_presets(),
             chat_compression: ChatCompressionConfig::default(),
+            max_agent_chain_depth: default_max_agent_chain_depth(),
         }
         .with_completed_chat_presets()
     }
@@ -352,6 +359,7 @@ impl Default for Config {
             send_message_shortcut: SendMessageShortcut::default(),
             chat_presets: default_chat_presets(),
             chat_compression: ChatCompressionConfig::default(),
+            max_agent_chain_depth: default_max_agent_chain_depth(),
         }
     }
 }
