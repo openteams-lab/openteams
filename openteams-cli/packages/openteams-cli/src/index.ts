@@ -85,13 +85,13 @@ let cli = yargs(hideBin(process.argv))
     const marker = Database.MigrationMarkerPath
     if (!(await Filesystem.exists(marker))) {
       const tty = process.stderr.isTTY
-      process.stderr.write("Performing one time database migration, may take a few minutes..." + EOL)
+      process.stdout.write("Performing one time database migration, may take a few minutes..." + EOL)
       const width = 36
       const orange = "\x1b[38;5;214m"
       const muted = "\x1b[0;2m"
       const reset = "\x1b[0m"
       let last = -1
-      if (tty) process.stderr.write("\x1b[?25l")
+      if (tty) process.stdout.write("\x1b[?25l")
       try {
         await JsonMigration.run(Database.Client().$client, {
           progress: (event) => {
@@ -101,22 +101,22 @@ let cli = yargs(hideBin(process.argv))
             if (tty) {
               const fill = Math.round((percent / 100) * width)
               const bar = `${"■".repeat(fill)}${"･".repeat(width - fill)}`
-              process.stderr.write(
+              process.stdout.write(
                 `\r${orange}${bar} ${percent.toString().padStart(3)}%${reset} ${muted}${event.label.padEnd(12)} ${event.current}/${event.total}${reset}`,
               )
-              if (event.current === event.total) process.stderr.write("\n")
+              if (event.current === event.total) process.stdout.write("\n")
             } else {
-              process.stderr.write(`sqlite-migration:${percent}${EOL}`)
+              process.stdout.write(`sqlite-migration:${percent}${EOL}`)
             }
           },
         })
       } finally {
-        if (tty) process.stderr.write("\x1b[?25h")
+        if (tty) process.stdout.write("\x1b[?25h")
         else {
-          process.stderr.write(`sqlite-migration:done${EOL}`)
+          process.stdout.write(`sqlite-migration:done${EOL}`)
         }
       }
-      process.stderr.write("Database migration complete." + EOL)
+      process.stdout.write("Database migration complete." + EOL)
     }
   })
   .usage("\n" + UI.logo())
