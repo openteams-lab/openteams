@@ -5,12 +5,10 @@ import { SpeakerHighIcon, SpinnerIcon } from '@phosphor-icons/react';
 import {
   type BaseCodingAgent,
   type ExecutorProfileId,
-  type SendMessageShortcut,
   SoundFile,
   ThemeMode,
   UiLanguage,
 } from 'shared/types';
-import { getModifierKey } from '@/utils/platform';
 import { getLanguageOptions } from '@/i18n/languages';
 import { toPrettyCase } from '@/utils/string';
 import { getVariantDisplayLabel } from '@/utils/executor';
@@ -122,6 +120,16 @@ export function GeneralSettingsSection() {
       console.warn('Failed to request notification permission', error);
     });
   }, []);
+
+  const updateMaxAgentChainDepth = useCallback(
+    (value: number) => {
+      const nextValue = Number.isFinite(value)
+        ? Math.max(1, Math.trunc(value))
+        : 8;
+      updateDraft({ max_agent_chain_depth: nextValue });
+    },
+    [updateDraft]
+  );
 
   const handleSave = async () => {
     if (!draft) return;
@@ -321,6 +329,23 @@ export function GeneralSettingsSection() {
         </SettingsField>
       </SettingsCard>
 
+      <SettingsCard
+        title={t('settings.general.agentChaining.title')}
+        description={t('settings.general.agentChaining.description')}
+      >
+        <SettingsField
+          label={t('settings.general.agentChaining.maxDepth.label')}
+          description={t('settings.general.agentChaining.maxDepth.helper')}
+        >
+          <SettingsNumberInput
+            value={draft?.max_agent_chain_depth ?? 8}
+            onChange={updateMaxAgentChainDepth}
+            min={1}
+            step={1}
+          />
+        </SettingsField>
+      </SettingsCard>
+
       {/* Notifications */}
       <SettingsCard
         title={t('settings.general.notifications.title')}
@@ -397,34 +422,6 @@ export function GeneralSettingsSection() {
             });
           }}
         />
-      </SettingsCard>
-
-      {/* Message Input */}
-      <SettingsCard
-        title={t('settings.general.messageInput.title')}
-        description={t('settings.general.messageInput.description')}
-      >
-        <SettingsField
-          label={t('settings.general.messageInput.shortcut.label')}
-          description={t('settings.general.messageInput.shortcut.helper')}
-        >
-          <SettingsSelect
-            value={draft?.send_message_shortcut ?? 'ModifierEnter'}
-            options={[
-              {
-                value: 'ModifierEnter' as SendMessageShortcut,
-                label: `${getModifierKey()}+Enter`,
-              },
-              {
-                value: 'Enter' as SendMessageShortcut,
-                label: t('settings.general.messageInput.shortcut.enterLabel'),
-              },
-            ]}
-            onChange={(value: SendMessageShortcut) =>
-              updateDraft({ send_message_shortcut: value })
-            }
-          />
-        </SettingsField>
       </SettingsCard>
 
       {/* Chat Compression */}

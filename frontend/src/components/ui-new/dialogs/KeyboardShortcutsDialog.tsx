@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { XIcon, GearIcon } from '@phosphor-icons/react';
+import { XIcon } from '@phosphor-icons/react';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal, type NoProps } from '@/lib/modals';
 import { usePortalContainer } from '@/contexts/PortalContainerContext';
@@ -13,13 +13,11 @@ import {
   Scope,
 } from '@/keyboard/registry';
 import { isMac, getModifierKey } from '@/utils/platform';
-import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
 
 interface ShortcutItem {
   keys: string | string[];
   description: string;
   hasScope?: boolean;
-  useHintKey?: boolean;
 }
 
 interface ShortcutGroup {
@@ -63,11 +61,10 @@ function useShortcutGroups(): ShortcutGroup[] {
       shortcuts: [
         { keys: [mod, 'K'], description: 'Open command bar' },
         sendShortcut === 'Enter'
-          ? { keys: enterKey, description: 'Send message', useHintKey: true }
+          ? { keys: enterKey, description: 'Send message' }
           : {
               keys: [mod, enterKey],
               description: 'Send message',
-              useHintKey: true,
             },
       ],
     };
@@ -123,11 +120,6 @@ function ShortcutRow({ item }: { item: ShortcutItem }) {
         {item.description}
         {item.hasScope && (
           <span className="text-low text-xs">{t('shortcuts.inWorkspace')}</span>
-        )}
-        {item.useHintKey && (
-          <Tooltip content={t('shortcuts.configurableHint')} side="top">
-            <GearIcon className="size-icon-xs text-low cursor-help" />
-          </Tooltip>
         )}
       </span>
       <div className="flex items-center gap-1">

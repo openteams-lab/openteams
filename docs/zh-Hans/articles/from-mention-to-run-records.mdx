@@ -1,0 +1,128 @@
+---
+title: "一次 @提及之后，系统究竟记录了什么？"
+description: "从消息流、运行目录到上下文压缩，理解 OpenTeams 如何把每次 Agent 执行变成可追踪资产。"
+---
+
+真正让团队放心使用 AI 的，往往不是生成能力，而是可追踪能力。
+
+在 OpenTeams 里，一次 `@提及` 不会只触发一段短暂执行。它会被写入消息历史、驱动会话流、生成运行记录，并沉淀为后续协作可复用的上下文。换句话说，系统留下的不是“AI 说过什么”，而是“这次协作到底怎么发生的”。
+
+## 从一条消息到一次运行
+
+OpenTeams 的链路很清晰：消息先进入会话，随后由运行器根据提及名单分发给对应成员。前端订阅会话 WebSocket 流，所以用户能实时看到新消息、工作项和状态更新。
+
+```text
+Message created
+     |
+     v
+mentions parsed
+     |
+     v
+run agent for mention
+     |
+     +--> mention status: received
+     +--> agent state: running
+     +--> run directory created
+     +--> output / diff / log streamed back
+     +--> mention status: completed or failed
+```
+
+对用户来说，这个过程体现为几个可见信号：
+
+- 被提及成员先进入 `received`
+- 执行开始后切换到 `running`
+- 完成后回到 `completed`，失败则标记为 `failed`
+- 如果某个成员正忙，新任务会排队，而不是静默丢失
+
+<Tip>
+这类显式状态非常重要，因为它把“模型有没有真的开始工作”从猜测变成了界面上的确定反馈。
+</Tip>
+
+## 运行资产不是抽象概念，而是真实文件
+
+OpenTeams 会把运行痕迹写进工作空间内的 `.openteams/` 目录。对一线团队来说，这几乎就是“可审计 AI 协作”的最小基础设施。
+
+```text
+<workspace>/
+`-- .openteams/
+    +-- context/<session_id>/
+    |   +-- messages.jsonl
+    |   +-- shared_blackboard.jsonl
+    |   `-- work_records.jsonl
+    `-- runs/<session_id>/run_records/
+        `-- session_agent_<id>_run_0001/
+            +-- input.md
+            +-- output.md
+            +-- raw.log
+            `-- diff.patch
+```
+
+这些文件分别承担不同职责：
+
+### `messages.jsonl`
+
+保存会话消息历史，是当前协作最完整的原始记录。
+
+### `shared_blackboard.jsonl`
+
+保存长期共享事实。它适合沉淀可复用结论，例如约定、指标定义、范围边界，而不是短期状态。
+
+### `work_records.jsonl`
+
+保存交付物路径与每轮结论，更接近“这次工作产出了什么”。
+
+### `input.md`、`output.md`、`raw.log`、`diff.patch`
+
+这是一次具体执行的证据链：给了什么输入、模型产出了什么、底层执行时打印了什么、代码改动了什么，一次 run 就能完整串起来。
+
+## 上下文不会阻塞当前执行
+
+这是 OpenTeams 很值得讲的一点。
+
+系统在启动一次新运行时，会先把完整上下文同步到工作空间，确保当前任务可以立即开始；随后再在后台做上下文压缩，把较长历史整理成更紧凑的版本，供后续运行继续使用。
+
+```text
+current run starts now
+        |
+        +--> write full messages.jsonl
+        |
+        `--> compact history in background for future runs
+```
+
+这个策略解决了多 Agent 产品里一个常见矛盾：
+
+- 如果每次都等上下文整理完再执行，响应会变慢
+- 如果完全不整理，历史会越来越重
+
+OpenTeams 选择把两件事拆开：**当前执行优先、上下文优化异步完成**。这是一种非常产品化的工程取舍。
+
+## 为什么这会直接影响用户信任
+
+当你在会话里打开差异查看器、工作空间抽屉或运行日志时，本质上是在消费这些底层记录。也正因为有这些记录，OpenTeams 才能提供更强的审查和追责能力：
+
+- 你可以知道某段代码是哪个成员在第几次 run 改出来的
+- 你可以回看失败原因，而不是只看到一句“执行失败”
+- 你可以在团队接力时，把事实、产物和结论持续传下去
+- 你可以在归档后保留完整过程，恢复时继续在原上下文上推进
+
+<Note>
+OpenTeams 不是把透明度当作额外功能，而是把透明度做成了协作流程的一部分。
+</Note>
+
+## 对产品团队意味着什么
+
+如果你希望 AI 真正进入生产流程，而不是停留在个人试用阶段，那么“可回看、可解释、可交接”几乎是必选项。OpenTeams 在仓库里已经把这条链路打通：会话流、状态流、运行流、上下文文件和代码 diff 都能连到一起。
+
+这也解释了为什么它更像一个团队协作系统，而不只是一个聊天壳子。因为每一次 `@提及`，最终都能留下资产。
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card title="聊天会话概述" icon="users" href="/zh-Hans/core-features/chat-session-overview">
+    从产品层面理解会话、成员与协作空间的关系。
+  </Card>
+
+  <Card title="代码审查与会话控制" icon="code" href="/zh-Hans/core-features/code-review">
+    继续查看差异、日志、运行历史和上下文管理细节。
+  </Card>
+</CardGroup>
