@@ -1013,6 +1013,11 @@ jobs:
             librsvg2-dev \
             libssl-dev \
             patchelf
+          if apt-cache show libfuse2 >/dev/null 2>&1; then
+            DEBIAN_FRONTEND=noninteractive sudo apt-get install -y libfuse2
+          else
+            DEBIAN_FRONTEND=noninteractive sudo apt-get install -y libfuse2t64
+          fi
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
