@@ -5736,15 +5736,16 @@ mod tests {
         assert!(prompt.contains("Follow the team protocol."));
         assert!(prompt.contains("## Group Members"));
         assert!(prompt.contains("## History"));
+        let prompt_normalized = prompt.replace('\\', "/");
         assert!(
-            prompt.contains(
+            prompt_normalized.contains(
                 ".openteams/context/1475cda0-6f11-464e-a61a-7dc81217810e/messages.jsonl"
             )
         );
-        assert!(prompt.contains(
+        assert!(prompt_normalized.contains(
             ".openteams/context/1475cda0-6f11-464e-a61a-7dc81217810e/shared_blackboard.jsonl"
         ));
-        assert!(prompt.contains(
+        assert!(prompt_normalized.contains(
             ".openteams/context/1475cda0-6f11-464e-a61a-7dc81217810e/work_records.jsonl"
         ));
         assert!(prompt.contains("## Envelope"));

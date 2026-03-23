@@ -1483,6 +1483,41 @@ jobs:
           "
           npm pack
 
+      - name: Prepare openteams-cli NPX package
+        shell: bash
+        env:
+          STORAGE_PROVIDER: ${{ needs.upload-to-r2.outputs.storage_provider }}
+          STORAGE_PUBLIC_URL: ${{ env.STORAGE_PUBLIC_URL_RESOLVED }}
+        run: |
+          set -euo pipefail
+          cd openteams-cli-npx
+          
+          # Update version to match
+          VERSION="${{ needs.bump-version.outputs.new_version }}"
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '$VERSION';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          
+          if [ -f bin/download.js ]; then
+            if [ -n "${STORAGE_PUBLIC_URL:-}" ] && [ "${STORAGE_PROVIDER}" = "oss" ]; then
+              echo "Injecting OSS URL into bin/download.js"
+              sed -i "s|__OSS_PUBLIC_URL__|${STORAGE_PUBLIC_URL}|g" bin/download.js
+            elif [ -n "${STORAGE_PUBLIC_URL:-}" ] && [ "${STORAGE_PROVIDER}" = "r2" ]; then
+              echo "Injecting R2 URL into bin/download.js"
+              sed -i "s|__R2_PUBLIC_URL__|${STORAGE_PUBLIC_URL}|g" bin/download.js
+            else
+              echo "Storage public URL is empty or provider unavailable; skipping URL injection"
+            fi
+            sed -i "s|__BINARY_TAG__|${{ needs.bump-version.outputs.new_tag }}|g" bin/download.js
+          else
+            echo "bin/download.js not found; skipping URL/tag injection"
+          fi
+          
+          npm pack
+
       - name: Publish NPX packages to npm
         id: npm_publish
         if: ${{ github.event.inputs.publish_to_npm == 'true' }}
@@ -1520,6 +1555,19 @@ jobs:
           echo "Publishing alias package: $tarball_alias"
           npm publish "$tarball_alias" --access public
           cd ..
+
+          # Publish openteams-cli package
+          if [ -d "openteams-cli-npx" ]; then
+            cd openteams-cli-npx
+            tarball_cli=$(ls -1t openteams-cli-*.tgz 2>/dev/null | head -n 1)
+            if [ -n "${tarball_cli:-}" ]; then
+              echo "Publishing CLI package: $tarball_cli"
+              npm publish "$tarball_cli" --access public
+            else
+              echo "::warning::No npm tarball found in openteams-cli-npx"
+            fi
+            cd ..
+          fi
 
       - name: Generate simple changelog summary
         id: changelog
@@ -1667,6 +1715,7 @@ jobs:
             openteams-${{ needs.bump-version.outputs.new_tag }}.zip
             openteams-npx/openteams-*.tgz
             openteams-web-npx/openteams-web-*.tgz
+            openteams-cli-npx/openteams-cli-*.tgz
             release-assets/desktop/**/*.msi
             release-assets/desktop/**/*.dmg
             release-assets/desktop/**/*.AppImage

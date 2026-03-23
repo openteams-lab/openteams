@@ -1,6 +1,6 @@
 {
   "name": "openteams-cli-windows-x64",
-  "version": "0.0.0-feat/openteams-cli-202603221310",
+  "version": "1.2.27",
   "os": [
     "win32"
   ],

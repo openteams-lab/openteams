@@ -1,4 +1,4 @@
-import { $ } from "bun"
+import { execFileSync } from "node:child_process"
 import semver from "semver"
 import path from "path"
 
@@ -23,12 +23,36 @@ const env = {
   OPENTEAMS_VERSION: process.env["OPENTEAMS_VERSION"],
   OPENTEAMS_RELEASE: process.env["OPENTEAMS_RELEASE"],
 }
-const CHANNEL = await (async () => {
+
+async function resolveChannel() {
   if (env.OPENTEAMS_CHANNEL) return env.OPENTEAMS_CHANNEL
   if (env.OPENTEAMS_BUMP) return "latest"
   if (env.OPENTEAMS_VERSION && !env.OPENTEAMS_VERSION.startsWith("0.0.0-")) return "latest"
-  return await $`git branch --show-current`.text().then((x) => x.trim())
-})()
+
+  const ciBranch =
+    process.env["GITHUB_HEAD_REF"] ||
+    process.env["CI_COMMIT_REF_NAME"] ||
+    process.env["BUILDKITE_BRANCH"]
+  if (ciBranch) return ciBranch
+
+  const githubRefName = process.env["GITHUB_REF_NAME"]
+  if (githubRefName && !githubRefName.startsWith("v")) return githubRefName
+
+  try {
+    const branch = execFileSync("git", ["branch", "--show-current"], {
+      cwd: path.resolve(import.meta.dir, "../../.."),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim()
+    if (branch) return branch
+  } catch {
+    // Fall back to a local preview channel when git metadata is unavailable.
+  }
+
+  return "local"
+}
+
+const CHANNEL = await resolveChannel()
 const IS_PREVIEW = CHANNEL !== "latest"
 
 const VERSION = await (async () => {

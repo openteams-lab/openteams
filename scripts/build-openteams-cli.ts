@@ -14,14 +14,18 @@
  */
 
 import { execFileSync } from "child_process";
-import { copyFileSync, existsSync, mkdirSync } from "fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from "fs";
 import { join, resolve } from "path";
 
 const ROOT = resolve(import.meta.dir, "..");
 const CLI_DIR = join(ROOT, "openteams-cli");
 const CLI_PACKAGE_DIR = join(CLI_DIR, "packages", "openteams-cli");
+const CLI_PACKAGE_JSON_PATH = join(CLI_PACKAGE_DIR, "package.json");
 const OUT_DIR = join(ROOT, "binaries");
 const BUN_EXECUTABLE = process.execPath;
+const CLI_PACKAGE_VERSION = JSON.parse(
+  readFileSync(CLI_PACKAGE_JSON_PATH, "utf8")
+).version as string;
 
 interface Target {
   name: string;
@@ -85,6 +89,11 @@ function getCurrentTarget(): Target {
   throw new Error(`Unsupported platform: ${platform}-${arch}`);
 }
 
+function isNativeTarget(target?: Target): boolean {
+  if (!target) return true;
+  return target.name === getCurrentTarget().name;
+}
+
 function resolveTarget(name: string): Target | undefined {
   return TARGETS.find(
     (target) => target.name === name || target.aliases?.includes(name)
@@ -102,10 +111,19 @@ function getRequestedTargetArg(args: string[]): string | undefined {
 }
 
 function runPackageBuild(args: string[]): void {
+  const buildEnv = {
+    ...process.env,
+    NODE_ENV: "production",
+    OPENTEAMS_VERSION: process.env.OPENTEAMS_VERSION || CLI_PACKAGE_VERSION,
+    OPENTEAMS_CHANNEL:
+      process.env.OPENTEAMS_CHANNEL ||
+      (CLI_PACKAGE_VERSION.startsWith("0.0.0-") ? "preview" : "latest"),
+  };
+
   execFileSync(BUN_EXECUTABLE, args, {
     cwd: CLI_DIR,
     stdio: "inherit",
-    env: { ...process.env, NODE_ENV: "production" },
+    env: buildEnv,
   });
 }
 
@@ -116,6 +134,10 @@ function runCliBuild(target?: Target): void {
     "packages/openteams-cli",
     "script/build.ts",
   ];
+
+  if (isNativeTarget(target)) {
+    buildArgs.push("--skip-install");
+  }
 
   if (target) {
     buildArgs.push("--target", target.packageTarget);
@@ -132,7 +154,6 @@ function runAllCliBuilds(): void {
     "--cwd",
     "packages/openteams-cli",
     "script/build.ts",
-    "--skip-install",
   ]);
 }
 

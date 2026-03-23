@@ -1,0 +1,44 @@
+{
+  "name": "openteams-cli",
+  "version": "0.3.5",
+  "description": "OpenTeams CLI - AI-powered development tool",
+  "author": "openteams-lab",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openteams-lab/openteams"
+  },
+  "homepage": "https://github.com/openteams-lab/openteams",
+  "bugs": {
+    "url": "https://github.com/openteams-lab/openteams/issues"
+  },
+  "keywords": [
+    "ai",
+    "cli",
+    "coding",
+    "assistant",
+    "agent"
+  ],
+  "bin": {
+    "openteams-cli": "bin/cli.js"
+  },
+  "main": "bin/cli.js",
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  }
+}
