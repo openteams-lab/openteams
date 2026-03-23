@@ -9,6 +9,7 @@ on:
         default: "patch"
         type: choice
         options:
+          - no-bump
           - patch
           - minor
           - major
@@ -78,6 +79,12 @@ jobs:
           echo "Suffix: $suffix"
           echo "suffix=$suffix" >> $GITHUB_OUTPUT
 
+      - name: Validate no-bump options
+        if: ${{ github.event.inputs.version_type == 'no-bump' && github.event.inputs.publish_to_npm == 'true' }}
+        run: |
+          echo "::error::publish_to_npm=true is not supported when version_type=no-bump."
+          exit 1
+
       - name: Determine and update versions
         id: version
         run: |
@@ -113,8 +120,11 @@ jobs:
 
           timestamp=$(date +%Y%m%d%H%M%S)
 
-          # Update root package.json based on base version
-          if [[ "${{ github.event.inputs.version_type }}" == "prerelease" ]]; then
+          if [[ "${{ github.event.inputs.version_type }}" == "no-bump" ]]; then
+            # Rebuild from the current checked-in version without incrementing it.
+            new_version="$current_repo_version"
+            new_tag="v${new_version}-build-${timestamp}"
+          elif [[ "${{ github.event.inputs.version_type }}" == "prerelease" ]]; then
             # For prerelease, align to stable release_base_version and keep
             # the same major.minor.patch without bumping.
             # Then append a numeric prerelease identifier.
@@ -140,9 +150,10 @@ jobs:
             new_tag="v${new_version}-${timestamp}"
           fi
 
-          # For desktop MSI builds, use a stable x.y.z app version in prerelease runs.
+          # Desktop installers require a stable x.y.z version when the package
+          # version carries a prerelease suffix.
           desktop_version="$new_version"
-          if [[ "${{ github.event.inputs.version_type }}" == "prerelease" ]]; then
+          if [[ "$new_version" == *-* ]]; then
             desktop_version="${new_version%%-*}"
           fi
 
@@ -168,7 +179,7 @@ jobs:
           npm version $new_version --no-git-tag-version --allow-same-version
           cd ..
 
-          # Keep desktop app version MSI-compatible on prerelease builds.
+          # Keep desktop app version MSI-compatible when using a prerelease version.
           cargo set-version --manifest-path src-tauri/Cargo.toml "$desktop_version"
           DESKTOP_VERSION="$desktop_version" node -e '
             const fs = require("fs");
@@ -215,9 +226,13 @@ jobs:
           git add package.json pnpm-lock.yaml openteams-npx/package.json openteams-web-npx/package.json frontend/package.json src-tauri/tauri.conf.json Cargo.lock
           git add $(find . -name Cargo.toml)
           [ -f crates/remote/Cargo.lock ] && git add crates/remote/Cargo.lock || true
-          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
+          if git diff --cached --quiet; then
+            echo "No version files changed; tagging current commit."
+          else
+            git commit -m "chore: prepare build for ${{ steps.version.outputs.new_version }}"
+            git push
+          fi
           git tag -a ${{ steps.version.outputs.new_tag }} -m "Release ${{ steps.version.outputs.new_tag }}"
-          git push
           git push --tags
 
   build-frontend:
@@ -1644,8 +1659,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.bump-version.outputs.new_tag }}
-          name: ${{ github.event.inputs.version_type == 'prerelease' && format('Pre-release {0}', needs.bump-version.outputs.new_tag) || format('Release {0}', needs.bump-version.outputs.new_tag) }}
-          prerelease: ${{ github.event.inputs.version_type == 'prerelease' }}
+          name: ${{ github.event.inputs.version_type == 'prerelease' && format('Pre-release {0}', needs.bump-version.outputs.new_tag) || github.event.inputs.version_type == 'no-bump' && format('Build {0}', needs.bump-version.outputs.new_tag) || format('Release {0}', needs.bump-version.outputs.new_tag) }}
+          prerelease: ${{ github.event.inputs.version_type == 'prerelease' || github.event.inputs.version_type == 'no-bump' }}
           generate_release_notes: false
           body: ${{ steps.changelog.outputs.body }}
           files: |
