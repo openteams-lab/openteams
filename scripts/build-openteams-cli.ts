@@ -115,7 +115,6 @@ function runCliBuild(target?: Target): void {
     "--cwd",
     "packages/openteams-cli",
     "script/build.ts",
-    "--skip-install",
   ];
 
   if (target) {
