@@ -184,32 +184,40 @@ if (!skipCli) {
         cwd: root,
         stdio: 'inherit',
       });
-      
+
+      if (cliBuildResult.error) {
+        console.error(`[cli] Failed to start CLI build: ${cliBuildResult.error.message}`);
+        process.exit(1);
+      }
       if (cliBuildResult.status !== 0) {
-        console.warn('[cli] Warning: CLI build failed, continuing without CLI');
-      } else {
-        const cliBuildDir = path.join(root, 'binaries');
-        const cliBuildPath = path.join(cliBuildDir, cliTarget.outputName);
-        
-        if (fs.existsSync(cliBuildPath)) {
-          fs.copyFileSync(cliBuildPath, cliOutPath);
-          if (process.platform !== 'win32') {
-            fs.chmodSync(cliOutPath, 0o755);
-          }
-          console.log(`[cli] CLI prepared: ${cliOutPath}`);
-          
-          if (targetTriple) {
-            const ext = process.platform === 'win32' ? '.exe' : '';
-            const cliTriplePath = path.join(outDir, `openteams-cli-${targetTriple}${ext}`);
-            fs.copyFileSync(cliBuildPath, cliTriplePath);
-            if (process.platform !== 'win32') {
-              fs.chmodSync(cliTriplePath, 0o755);
-            }
-            console.log(`[cli] CLI prepared: ${cliTriplePath}`);
-          }
-        } else {
-          console.warn(`[cli] Warning: CLI binary not found at ${cliBuildPath}`);
+        console.error(
+          `[cli] CLI build failed for ${cliTarget.buildTarget} with exit code ${cliBuildResult.status ?? 'unknown'}`
+        );
+        process.exit(cliBuildResult.status ?? 1);
+      }
+
+      const cliBuildDir = path.join(root, 'binaries');
+      const cliBuildPath = path.join(cliBuildDir, cliTarget.outputName);
+
+      if (!fs.existsSync(cliBuildPath)) {
+        console.error(`[cli] Expected CLI binary not found at ${cliBuildPath}`);
+        process.exit(1);
+      }
+
+      fs.copyFileSync(cliBuildPath, cliOutPath);
+      if (process.platform !== 'win32') {
+        fs.chmodSync(cliOutPath, 0o755);
+      }
+      console.log(`[cli] CLI prepared: ${cliOutPath}`);
+
+      if (targetTriple) {
+        const ext = process.platform === 'win32' ? '.exe' : '';
+        const cliTriplePath = path.join(outDir, `openteams-cli-${targetTriple}${ext}`);
+        fs.copyFileSync(cliBuildPath, cliTriplePath);
+        if (process.platform !== 'win32') {
+          fs.chmodSync(cliTriplePath, 0o755);
         }
+        console.log(`[cli] CLI prepared: ${cliTriplePath}`);
       }
     }
   } else {
