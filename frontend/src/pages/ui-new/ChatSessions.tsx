@@ -3353,7 +3353,7 @@ export function ChatSessions() {
         const newWidth = Math.max(200, Math.min(500, startWidth + delta));
         setLeftSidebarWidth(newWidth);
       } else if (isResizing === 'right') {
-        const delta = startX - e.clientX;
+        const delta = e.clientX - startX;
         const newWidth = Math.max(240, Math.min(600, startWidth + delta));
         setRightSidebarWidth(newWidth);
       }
@@ -3878,14 +3878,6 @@ export function ChatSessions() {
           </div>
         </section>
 
-        {/* Right Sidebar Resize Handle */}
-        {isRightSidebarOpen && (
-          <div
-            className="chat-session-resize-handle w-1 cursor-col-resize transition-colors shrink-0"
-            onMouseDown={(e) => handleResizeStart('right', e)}
-          />
-        )}
-
         {!isRightSidebarOpen && activeSessionId && (
           <button
             type="button"
@@ -3979,6 +3971,14 @@ export function ChatSessions() {
             onCancelTeamImport={handleCancelTeamImport}
           />
         </div>
+
+        {/* Right Sidebar Resize Handle */}
+        {isRightSidebarOpen && (
+          <div
+            className="chat-session-resize-handle w-1 cursor-col-resize transition-colors shrink-0"
+            onMouseDown={(e) => handleResizeStart('right', e)}
+          />
+        )}
       </div>
 
       <SkillsPanel

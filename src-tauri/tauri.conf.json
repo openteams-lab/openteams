@@ -29,6 +29,8 @@
       ],
       "windows": {
         "wix": {
+          "bannerPath": "wix/assets/banner.bmp",
+          "dialogImagePath": "wix/assets/dialog.bmp",
           "fragmentPaths": [
             "wix/fragments/openteams-directory.wxs"
           ]
