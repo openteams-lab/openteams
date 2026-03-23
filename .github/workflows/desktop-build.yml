@@ -98,7 +98,14 @@ jobs:
         run: pnpm install
 
       - name: Build desktop bundle
+        if: matrix.platform != 'linux'
         run: pnpm desktop:build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: Build desktop bundle (Linux deb)
+        if: matrix.platform == 'linux'
+        run: pnpm tauri build --bundles deb
         env:
           NODE_OPTIONS: --max-old-space-size=8192
 
@@ -280,7 +287,6 @@ jobs:
         with:
           name: ${{ steps.artifact_meta.outputs.name }}
           path: |
-            src-tauri/target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
           retention-days: 7
@@ -305,7 +311,6 @@ jobs:
           if [[ "${{ matrix.platform }}" == "macos" && "${{ inputs.macos_sign_and_notarize }}" == "true" ]]; then
             cp src-tauri/target/release/bundle/dmg/openteams-signed.dmg gh-package/files/
           elif [[ "${{ matrix.platform }}" == "linux" ]]; then
-            cp src-tauri/target/release/bundle/appimage/*.AppImage gh-package/files/
             cp src-tauri/target/release/bundle/deb/*.deb gh-package/files/
           elif [[ "${{ matrix.platform }}" == "windows" ]]; then
             cp src-tauri/target/release/bundle/msi/*.msi gh-package/files/

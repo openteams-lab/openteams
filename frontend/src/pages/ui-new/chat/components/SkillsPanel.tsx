@@ -89,6 +89,25 @@ function formatDownloadCount(count: number): string {
 }
 
 function toRunnerLabel(runnerType: string): string {
+  const normalized = runnerType.trim().toUpperCase();
+  const labelMap: Record<string, string> = {
+    [BaseCodingAgent.CLAUDE_CODE]: 'Claude Code',
+    [BaseCodingAgent.AMP]: 'AMP',
+    [BaseCodingAgent.GEMINI]: 'Gemini CLI',
+    [BaseCodingAgent.CODEX]: 'Codex',
+    [BaseCodingAgent.OPENCODE]: 'OpenCode',
+    [BaseCodingAgent.OPEN_TEAMS_CLI]: 'OpenTeams CLI',
+    [BaseCodingAgent.CURSOR_AGENT]: 'Cursor',
+    [BaseCodingAgent.QWEN_CODE]: 'Qwen Code',
+    [BaseCodingAgent.COPILOT]: 'GitHub Copilot',
+    [BaseCodingAgent.DROID]: 'Droid',
+    [BaseCodingAgent.KIMI_CODE]: 'Kimi Code',
+  };
+
+  if (labelMap[normalized]) {
+    return labelMap[normalized];
+  }
+
   return runnerType
     .toLowerCase()
     .split(/[_\s-]+/)
@@ -102,8 +121,10 @@ function runnerKeyToAgentId(runnerKey: string): string {
     'claude-code': 'claude',
     'github-copilot': 'copilot',
     copilot: 'copilot',
+    'cursor-agent': 'cursor',
     'qwen-code': 'qwen',
     'kimi-code': 'kimi',
+    'open-teams-cli': 'openteams-cli',
   };
   return mapping[normalized] ?? normalized;
 }
@@ -238,6 +259,29 @@ export function SkillsPanel({
       runnerOptions.find((option) => option.key === selectedRunnerKey) ?? null,
     [runnerOptions, selectedRunnerKey]
   );
+  const installableAgents = useMemo<AgentInfo[]>(() => {
+    const merged = new Map<string, AgentInfo>();
+
+    availableAgents.forEach((agent) => {
+      merged.set(agent.id, agent);
+    });
+
+    runnerOptions.forEach((option) => {
+      const agentId = runnerKeyToAgentId(option.key);
+      if (!merged.has(agentId)) {
+        merged.set(agentId, {
+          id: agentId,
+          name: option.label,
+        });
+      }
+    });
+
+    return Array.from(merged.values()).sort((a, b) => {
+      if (a.id === 'agents') return -1;
+      if (b.id === 'agents') return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [availableAgents, runnerOptions]);
   const selectedRunnerLabel = selectedRunnerOption?.label ?? '';
 
   const loadInstalledSkills = useCallback(
@@ -1236,7 +1280,7 @@ export function SkillsPanel({
         skillName={installDialog.skill?.name ?? ''}
         skillDescription={installDialog.skill?.description}
         defaultAgent={runnerKeyToAgentId(selectedRunnerKey)}
-        availableAgents={availableAgents}
+        availableAgents={installableAgents}
         isLoading={isInstallingMarketSkillKey !== null}
         onConfirm={handleConfirmInstall}
         onCancel={handleCancelInstall}

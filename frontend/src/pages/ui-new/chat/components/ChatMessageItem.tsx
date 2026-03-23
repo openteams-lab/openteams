@@ -11,6 +11,10 @@ import {
   ArrowClockwiseIcon,
   QuotesIcon,
 } from '@phosphor-icons/react';
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   type ChatMessage,
@@ -55,6 +59,16 @@ const SUPPRESSED_PROTOCOL_ERROR_CODES = new Set([
   'not_json_array',
   'empty_message',
 ]);
+
+const isInteractiveTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return !!target.closest(
+    'button, a, input, textarea, select, summary, details, [role="button"]'
+  );
+};
 
 export interface ChatMessageItemProps {
   message: ChatMessage;
@@ -196,6 +210,30 @@ export function ChatMessageItem({
     protocolError?.code !== null &&
     protocolError?.code !== undefined &&
     SUPPRESSED_PROTOCOL_ERROR_CODES.has(protocolError.code);
+  const handleCleanupCardSelect = () => {
+    if (!isCleanupMode) return;
+    onToggleSelect();
+  };
+  const handleCleanupCardClick = (event: ReactMouseEvent<HTMLElement>) => {
+    if (isInteractiveTarget(event.target)) {
+      return;
+    }
+    handleCleanupCardSelect();
+  };
+  const handleCleanupCardKeyDown = (
+    event: ReactKeyboardEvent<HTMLElement>
+  ) => {
+    if (!isCleanupMode || isInteractiveTarget(event.target)) {
+      return;
+    }
+
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    event.preventDefault();
+    handleCleanupCardSelect();
+  };
 
   // System messages
   if (message.sender_type === ChatSenderType.system) {
@@ -226,12 +264,25 @@ export function ChatMessageItem({
               )}
             </button>
           )}
-          <div className="relative w-full max-w-[680px]">
+          <div
+            className={cn(
+              'relative w-full max-w-[680px]',
+              isCleanupMode && 'cursor-pointer'
+            )}
+            onClick={handleCleanupCardClick}
+            onKeyDown={handleCleanupCardKeyDown}
+            role={isCleanupMode ? 'checkbox' : undefined}
+            aria-checked={isCleanupMode ? isSelected : undefined}
+            tabIndex={isCleanupMode ? 0 : undefined}
+          >
             <ChatEntryContainer
               variant="system"
               title={senderLabel}
               expanded
-              className="chat-session-message-card shadow-sm rounded-3xl chat-session-message-card-agent is-agent-message max-w-full"
+              className={cn(
+                'chat-session-message-card shadow-sm rounded-3xl chat-session-message-card-agent is-agent-message max-w-full',
+                isCleanupMode && isSelected && 'ring-2 ring-[#EF4444]'
+              )}
             >
               <div className="min-w-0">
                 <ChatErrorMessage content={summary} expanded={false} />
@@ -272,12 +323,25 @@ export function ChatMessageItem({
             )}
           </button>
         )}
-        <div className="relative w-full max-w-[680px]">
+        <div
+          className={cn(
+            'relative w-full max-w-[680px]',
+            isCleanupMode && 'cursor-pointer'
+          )}
+          onClick={handleCleanupCardClick}
+          onKeyDown={handleCleanupCardKeyDown}
+          role={isCleanupMode ? 'checkbox' : undefined}
+          aria-checked={isCleanupMode ? isSelected : undefined}
+          tabIndex={isCleanupMode ? 0 : undefined}
+        >
           <ChatEntryContainer
             variant="system"
             title={senderLabel}
             expanded
-            className="chat-session-message-card shadow-sm rounded-3xl chat-session-message-card-agent is-agent-message max-w-full"
+            className={cn(
+              'chat-session-message-card shadow-sm rounded-3xl chat-session-message-card-agent is-agent-message max-w-full',
+              isCleanupMode && isSelected && 'ring-2 ring-[#EF4444]'
+            )}
           >
             {hasError ? (
               <div className="min-w-0">
@@ -345,7 +409,18 @@ export function ChatMessageItem({
             )}
           </button>
         )}
-        <div className={cn('relative', !isUser && 'w-full max-w-[680px]')}>
+        <div
+          className={cn(
+            'relative',
+            !isUser && 'w-full max-w-[680px]',
+            isCleanupMode && 'cursor-pointer'
+          )}
+          onClick={handleCleanupCardClick}
+          onKeyDown={handleCleanupCardKeyDown}
+          role={isCleanupMode ? 'checkbox' : undefined}
+          aria-checked={isCleanupMode ? isSelected : undefined}
+          tabIndex={isCleanupMode ? 0 : undefined}
+        >
           <ChatEntryContainer
             variant={isUser ? 'user' : 'system'}
             title={isUser ? undefined : senderLabel}

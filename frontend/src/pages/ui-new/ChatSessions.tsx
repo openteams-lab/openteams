@@ -230,6 +230,10 @@ type TimelineEntry =
       group: ChatWorkItemGroup;
     };
 
+const getMessageEntryKey = (messageId: string) => `message:${messageId}`;
+
+const getWorkItemEntryKey = (runId: string) => `work-item:${runId}`;
+
 const normalizeSessionTitle = (value: string | null | undefined) => {
   const trimmed = value?.trim() ?? '';
   if (!trimmed) return '';
@@ -987,9 +991,12 @@ export function ChatSessions() {
   const [titleDraft, setTitleDraft] = useState('');
   const [titleError, setTitleError] = useState<string | null>(null);
   const [isCleanupMode, setIsCleanupMode] = useState(false);
-  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(
-    new Set()
-  );
+  const [selectedTimelineEntryKeys, setSelectedTimelineEntryKeys] = useState<
+    Set<string>
+  >(new Set());
+  const [workItemExpansionOverrides, setWorkItemExpansionOverrides] = useState<
+    Record<string, boolean>
+  >({});
   const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false);
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
   const [debouncedMessageSearchQuery, setDebouncedMessageSearchQuery] =
@@ -1327,6 +1334,23 @@ export function ChatSessions() {
       ),
     [messages]
   );
+  const messageIdsByRunId = useMemo(() => {
+    const map = new Map<string, string[]>();
+
+    for (const message of messageList) {
+      const runId = extractRunId(message.meta);
+      if (!runId) continue;
+
+      const existing = map.get(runId);
+      if (existing) {
+        existing.push(message.id);
+      } else {
+        map.set(runId, [message.id]);
+      }
+    }
+
+    return map;
+  }, [messageList]);
   const workItemGroups = useMemo<ChatWorkItemGroup[]>(() => {
     const sorted = [...workItems].sort(
       (a, b) =>
@@ -1368,29 +1392,68 @@ export function ChatSessions() {
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
   }, [workItems]);
+  const visibleWorkItemGroups = useMemo(
+    () => workItemGroups.filter((group) => messageIdsByRunId.has(group.runId)),
+    [messageIdsByRunId, workItemGroups]
+  );
 
   const timelineEntries = useMemo<TimelineEntry[]>(
     () =>
       [
         ...messageList.map((message) => ({
           kind: 'message' as const,
-          key: `message:${message.id}`,
+          key: getMessageEntryKey(message.id),
           createdAtMs: new Date(message.created_at).getTime(),
           message,
         })),
-        ...workItemGroups.map((group) => ({
+        ...visibleWorkItemGroups.map((group) => ({
           kind: 'work_item' as const,
-          key: `work-item:${group.runId}`,
+          key: getWorkItemEntryKey(group.runId),
           createdAtMs: new Date(group.createdAt).getTime(),
           group,
         })),
       ].sort((a, b) => a.createdAtMs - b.createdAtMs),
-    [messageList, workItemGroups]
+    [messageList, visibleWorkItemGroups]
   );
+  const latestWorkItemEntryKey =
+    visibleWorkItemGroups.length > 0
+      ? getWorkItemEntryKey(
+          visibleWorkItemGroups[visibleWorkItemGroups.length - 1].runId
+        )
+      : null;
   const lastTimelineEntryKey =
     timelineEntries.length > 0
       ? timelineEntries[timelineEntries.length - 1].key
       : null;
+  const workItemGroupByKey = useMemo(
+    () =>
+      new Map(
+        visibleWorkItemGroups.map((group) => [
+          getWorkItemEntryKey(group.runId),
+          group,
+        ])
+      ),
+    [visibleWorkItemGroups]
+  );
+  const selectedCleanupMessageIds = useMemo(() => {
+    const messageIds = new Set<string>();
+
+    for (const key of selectedTimelineEntryKeys) {
+      if (key.startsWith('message:')) {
+        messageIds.add(key.slice('message:'.length));
+        continue;
+      }
+
+      const group = workItemGroupByKey.get(key);
+      if (!group) continue;
+
+      for (const messageId of messageIdsByRunId.get(group.runId) ?? []) {
+        messageIds.add(messageId);
+      }
+    }
+
+    return Array.from(messageIds);
+  }, [messageIdsByRunId, selectedTimelineEntryKeys, workItemGroupByKey]);
 
   const messageById = useMemo(
     () => new Map(messageList.map((message) => [message.id, message])),
@@ -2108,6 +2171,61 @@ export function ChatSessions() {
     messageSearchRegExp,
     timelineEntries,
   ]);
+
+  useEffect(() => {
+    const validKeys = new Set(timelineEntries.map((entry) => entry.key));
+
+    setSelectedTimelineEntryKeys((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+
+      prev.forEach((key) => {
+        if (validKeys.has(key)) {
+          next.add(key);
+        } else {
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+
+    setWorkItemExpansionOverrides((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([key]) => validKeys.has(key))
+      );
+
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+  }, [timelineEntries]);
+
+  const handleToggleTimelineEntrySelection = useCallback((entryKey: string) => {
+    setSelectedTimelineEntryKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(entryKey)) {
+        next.delete(entryKey);
+      } else {
+        next.add(entryKey);
+      }
+      return next;
+    });
+  }, []);
+
+  const isWorkItemExpanded = useCallback(
+    (entryKey: string) =>
+      workItemExpansionOverrides[entryKey] ?? entryKey === latestWorkItemEntryKey,
+    [latestWorkItemEntryKey, workItemExpansionOverrides]
+  );
+
+  const handleToggleWorkItemExpanded = useCallback(
+    (entryKey: string) => {
+      setWorkItemExpansionOverrides((prev) => ({
+        ...prev,
+        [entryKey]: !(prev[entryKey] ?? entryKey === latestWorkItemEntryKey),
+      }));
+    },
+    [latestWorkItemEntryKey]
+  );
 
   const handleCloseMessageSearch = useCallback(() => {
     setIsMessageSearchOpen(false);
@@ -3517,7 +3635,7 @@ export function ChatSessions() {
             onToggleCleanupMode={() => {
               if (isCleanupMode) {
                 setIsCleanupMode(false);
-                setSelectedMessageIds(new Set());
+                setSelectedTimelineEntryKeys(new Set());
               } else {
                 setIsCleanupMode(true);
               }
@@ -3537,18 +3655,20 @@ export function ChatSessions() {
           {/* Cleanup mode controls */}
           {activeSession && isCleanupMode && (
             <CleanupModeBar
-              selectedCount={selectedMessageIds.size}
-              totalCount={messageList.length}
+              selectedCount={selectedTimelineEntryKeys.size}
+              totalCount={timelineEntries.length}
               onToggleSelectAll={() => {
-                if (selectedMessageIds.size === messageList.length) {
-                  setSelectedMessageIds(new Set());
+                if (selectedTimelineEntryKeys.size === timelineEntries.length) {
+                  setSelectedTimelineEntryKeys(new Set());
                 } else {
-                  setSelectedMessageIds(new Set(messageList.map((m) => m.id)));
+                  setSelectedTimelineEntryKeys(
+                    new Set(timelineEntries.map((entry) => entry.key))
+                  );
                 }
               }}
               onDeleteSelected={() => {
                 if (!activeSessionId) return;
-                const count = selectedMessageIds.size;
+                const count = selectedTimelineEntryKeys.size;
                 setConfirmModal({
                   title: t('modals.confirm.titles.deleteMessages'),
                   message: t('modals.confirm.messages.deleteMessages', {
@@ -3559,9 +3679,9 @@ export function ChatSessions() {
                     try {
                       await deleteMessages.mutateAsync({
                         sessionId: activeSessionId,
-                        messageIds: Array.from(selectedMessageIds),
+                        messageIds: selectedCleanupMessageIds,
                       });
-                      setSelectedMessageIds(new Set());
+                      setSelectedTimelineEntryKeys(new Set());
                       setIsCleanupMode(false);
                     } finally {
                       setIsDeletingMessages(false);
@@ -3571,7 +3691,7 @@ export function ChatSessions() {
               }}
               isDeletingMessages={isDeletingMessages}
               onCancel={() => {
-                setSelectedMessageIds(new Set());
+                setSelectedTimelineEntryKeys(new Set());
                 setIsCleanupMode(false);
               }}
             />
@@ -3651,6 +3771,8 @@ export function ChatSessions() {
 
                     {filteredTimelineEntries.map((entry) => {
                       if (entry.kind === 'work_item') {
+                        const isSelected = selectedTimelineEntryKeys.has(entry.key);
+
                         return (
                           <ChatWorkItemCard
                             key={entry.key}
@@ -3659,6 +3781,15 @@ export function ChatSessions() {
                             senderRunnerType={
                               agentById.get(entry.group.agentId)?.runner_type ??
                               null
+                            }
+                            isExpanded={isWorkItemExpanded(entry.key)}
+                            onToggleExpand={() =>
+                              handleToggleWorkItemExpanded(entry.key)
+                            }
+                            isCleanupMode={isCleanupMode}
+                            isSelected={isSelected}
+                            onToggleSelect={() =>
+                              handleToggleTimelineEntrySelection(entry.key)
                             }
                           />
                         );
@@ -3695,7 +3826,7 @@ export function ChatSessions() {
                         ? 'user'
                         : (message.sender_id ?? agentName ?? 'agent');
                       const tone = getMessageTone(String(toneKey), isUser);
-                      const isSelected = selectedMessageIds.has(message.id);
+                      const isSelected = selectedTimelineEntryKeys.has(entry.key);
 
                       return (
                         <ChatMessageItem
@@ -3746,17 +3877,9 @@ export function ChatSessions() {
                           onResend={handleResend}
                           isCleanupMode={isCleanupMode}
                           isSelected={isSelected}
-                          onToggleSelect={() => {
-                            setSelectedMessageIds((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(message.id)) {
-                                next.delete(message.id);
-                              } else {
-                                next.add(message.id);
-                              }
-                              return next;
-                            });
-                          }}
+                          onToggleSelect={() =>
+                            handleToggleTimelineEntrySelection(entry.key)
+                          }
                         />
                       );
                     })}
