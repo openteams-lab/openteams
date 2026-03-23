@@ -5738,9 +5738,8 @@ mod tests {
         assert!(prompt.contains("## History"));
         let prompt_normalized = prompt.replace('\\', "/");
         assert!(
-            prompt_normalized.contains(
-                ".openteams/context/1475cda0-6f11-464e-a61a-7dc81217810e/messages.jsonl"
-            )
+            prompt_normalized
+                .contains(".openteams/context/1475cda0-6f11-464e-a61a-7dc81217810e/messages.jsonl")
         );
         assert!(prompt_normalized.contains(
             ".openteams/context/1475cda0-6f11-464e-a61a-7dc81217810e/shared_blackboard.jsonl"
