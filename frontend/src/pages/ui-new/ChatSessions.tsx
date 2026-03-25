@@ -39,8 +39,8 @@ import {
   getVariantOptions as getExecutorVariantOptions,
   withExecutorProfileVariant,
 } from '@/utils/executor';
+import { CreateSessionDialog } from '@/components/ui-new/dialogs/CreateSessionDialog';
 import { SettingsDialog } from '@/components/ui-new/dialogs/SettingsDialog';
-import { CreateSessionDialog } from './chat/components/CreateSessionDialog';
 
 import {
   type SessionMember,
@@ -1467,6 +1467,8 @@ export function ChatSessions() {
     () => sortedSessions.find((session) => session.id === activeSessionId),
     [sortedSessions, activeSessionId]
   );
+  const sessionDefaultWorkspacePath = activeSession?.default_workspace_path;
+  const defaultExecutorRunnerType = config?.executor_profile?.executor ?? null;
 
   const memberPresetById = useMemo(() => {
     const map = new Map<string, ChatMemberPreset>();
@@ -2626,9 +2628,9 @@ export function ChatSessions() {
         const plan = buildMemberPresetImportPlan({
           preset,
           sessionId: importSessionId,
-          sessionWorkspacePath: activeSession?.default_workspace_path,
+          sessionWorkspacePath: sessionDefaultWorkspacePath,
           fallbackWorkspacePath: homeDirectory,
-          defaultRunnerType: config?.executor_profile?.executor ?? null,
+          defaultRunnerType: defaultExecutorRunnerType,
           enabledRunnerTypes,
           availableRunnerTypes,
           profiles,
@@ -2659,11 +2661,12 @@ export function ChatSessions() {
     [
       activeSessionId,
       availableRunnerTypes,
-      config?.executor_profile?.executor,
+      defaultExecutorRunnerType,
       enabledRunnerTypes,
       homeDirectory,
       memberPresetById,
       profiles,
+      sessionDefaultWorkspacePath,
     ]
   );
 
@@ -2845,9 +2848,9 @@ export function ChatSessions() {
       const plan = buildMemberPresetImportPlan({
         preset,
         sessionId: activeSessionId ?? 'preview',
-        sessionWorkspacePath: activeSession?.default_workspace_path,
+        sessionWorkspacePath: sessionDefaultWorkspacePath,
         fallbackWorkspacePath: homeDirectory,
-        defaultRunnerType: config?.executor_profile?.executor ?? null,
+        defaultRunnerType: defaultExecutorRunnerType,
         enabledRunnerTypes,
         availableRunnerTypes,
         profiles,
@@ -2865,9 +2868,11 @@ export function ChatSessions() {
     [
       activeSessionId,
       availableRunnerTypes,
+      defaultExecutorRunnerType,
       enabledRunnerTypes,
       homeDirectory,
       profiles,
+      sessionDefaultWorkspacePath,
       t,
     ]
   );

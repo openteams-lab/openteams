@@ -141,7 +141,7 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
                 className="px-base py-half bg-secondary border rounded hover:bg-panel"
                 title={t('session.browse', 'Browse')}
               >
-                <FolderIcon className="size-4 text-normal" />
+                <FolderIcon className="size-icon-base text-normal" />
               </button>
             </div>
             {validationError && (
