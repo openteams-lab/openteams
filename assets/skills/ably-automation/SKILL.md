@@ -1,6 +1,6 @@
 ---
 name: ably-automation
-description: "Automate Ably tasks via Rube MCP (Composio). Always search tools first for current schemas."
+description: "Automate Ably realtime messaging tasks via Rube MCP (Composio). Discover tools, manage connections, and execute operations. Use when the user asks to integrate Ably, manage channels, publish messages, or automate realtime workflows."
 requires:
   mcp: [rube]
 ---
