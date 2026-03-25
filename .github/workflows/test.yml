@@ -98,3 +98,30 @@ jobs:
         if: ${{ steps.ssh-setup.outcome == 'success' }}
         run: |
           pnpm run remote:generate-types:check
+
+  test:
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    needs:
+      - frontend
+      - backend
+    steps:
+      - name: Check aggregate test result
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+
+          needs = json.loads(os.environ['NEEDS_JSON'])
+          results = {name: info['result'] for name, info in needs.items()}
+          failed = {name: result for name, result in results.items() if result != 'success'}
+
+          if failed:
+              print(f"Aggregate test failed: {failed}")
+              sys.exit(1)
+
+          print(f"Aggregate test passed: {results}")
+          PY

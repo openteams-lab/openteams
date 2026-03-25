@@ -1,6 +1,10 @@
 <div align="center">
-  <img src="frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 40px; margin-bottom: 20px;">
+  <img src="frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="200">
+</div>
 
+<div align="center">
+  <img src="frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 10px; margin-bottom: 10px;">
+  
   <p><strong>Run agents as one team, multiply your efficiency in the AI era.</strong></p>
 
   <p>
@@ -38,6 +42,11 @@
 3. Message a specific member with `@mentions`.
 
 ---
+## 🔥 *News:*
+- **2025.03.24 (v0.3.7)**: 
+  - Added the built-in OpenTeams-CLI agent, removing the dependency on a locally installed agent.
+  - Fixed a memory leak issue in the executor.
+---
 
 ## Quick Start
 
@@ -56,7 +65,9 @@ npx openteams-web
 
 ### Requirements
 
-**You'll need at least one AI agent installed:**
+**Starting from v0.3.7, we have built in openteams-cli, so installing the AI Agent is no longer required. You can go to "Settings -> Service Providers" page to configure your API.**
+
+And You can choose any agent from the list of supported agents.:
 
 | Agent | Install |
 |-------|---------|
@@ -223,7 +234,7 @@ Open the frontend page at `http://localhost:<FRONTEND_PORT>` (example: `http://l
 - [x] Redefine the input protocol
 
 ### Roadmap
-- [x] Backend for Code Agent optimized for OpenTeams use cases —— v0.3.4
+- [x] Backend for Code Agent optimized for OpenTeams use cases —— v0.3.7
 - [ ] Develop multiple frontend color schemes
 - [ ] Establish a high-efficiency team collaboration framework
 - [ ] More agent integrations (Kilo Code, OpenClaw, etc.)

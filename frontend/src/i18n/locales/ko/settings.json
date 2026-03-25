@@ -475,7 +475,6 @@
           "modelsCount": "모델 {{count}}개",
           "noBaseUrl": "Base URL이 설정되지 않았습니다.",
           "npm": "SDK: {{npm}}",
-          "timeout": "타임아웃: {{timeout}}",
           "noModels": "이 공급자에는 아직 모델이 설정되지 않았습니다."
         },
         "preview": {

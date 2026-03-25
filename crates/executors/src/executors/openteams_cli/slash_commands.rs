@@ -471,7 +471,7 @@ pub async fn execute(
         Some(existing) if command.should_fork_session() => {
             tokio::select! {
                 _ = cancel.cancelled() => return Ok(()),
-                res = sdk::fork_session(&client, &config.base_url, &config.directory, existing) => res?,
+                res = sdk::resolve_session_id(&client, &config.base_url, &config.directory, Some(existing)) => res?,
             }
         }
         Some(existing) => existing.to_string(),

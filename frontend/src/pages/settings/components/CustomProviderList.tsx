@@ -100,11 +100,6 @@ export function CustomProviderList({
                       npm: provider.npm || DEFAULT_CUSTOM_PROVIDER_NPM,
                     })}
                   </span>
-                  <span>
-                    {t('settings.cli.customProviders.list.timeout', {
-                      timeout: formatValue(provider.options.timeout),
-                    })}
-                  </span>
                 </div>
               </div>
 

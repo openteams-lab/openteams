@@ -38,7 +38,8 @@
       },
       "deb": {
         "files": {
-          "/DEBIAN/postrm": "debian/postrm"
+          "/DEBIAN/postrm": "debian/postrm",
+          "/usr/share/icons/hicolor/scalable/apps/openteams.svg": "icons/logo_black.svg"
         }
       },
       "externalBin": [

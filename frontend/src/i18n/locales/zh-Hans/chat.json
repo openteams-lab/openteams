@@ -579,7 +579,7 @@
     "running": "Agent 正在运行",
     "runningElapsed": "Agent 正在运行。已用时 {{seconds}} 秒。",
     "processing": "正在处理您的请求...",
-    "thinking": "思考中...",
+    "thinking": "执行中...",
     "idle": "空闲",
     "completed": "已完成",
     "failed": "失败",

@@ -637,7 +637,7 @@
   },
   "conversation": {
     "you": "Tú",
-    "thinking": "Pensando",
+    "thinking": "En ejecución",
     "todo": "Tarea pendiente",
     "todos": "Tareas pendientes",
     "completed": "completado",

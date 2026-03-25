@@ -220,9 +220,7 @@ export function ChatMessageItem({
     }
     handleCleanupCardSelect();
   };
-  const handleCleanupCardKeyDown = (
-    event: ReactKeyboardEvent<HTMLElement>
-  ) => {
+  const handleCleanupCardKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
     if (!isCleanupMode || isInteractiveTarget(event.target)) {
       return;
     }

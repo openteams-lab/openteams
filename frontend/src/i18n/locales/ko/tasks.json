@@ -637,7 +637,7 @@
   },
   "conversation": {
     "you": "나",
-    "thinking": "생각 중",
+    "thinking": "실행 중",
     "todo": "할 일",
     "todos": "할 일",
     "completed": "완료됨",

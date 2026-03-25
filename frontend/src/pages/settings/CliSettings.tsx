@@ -1006,12 +1006,6 @@ export function CliSettings() {
                       count: selectedManagedCustomProviderModels.length,
                     })}
                   </span>
-                  <span>
-                    {t('settings.cli.customProviders.list.timeout', {
-                      timeout:
-                        selectedManagedCustomProvider.options.timeout ?? '-',
-                    })}
-                  </span>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">

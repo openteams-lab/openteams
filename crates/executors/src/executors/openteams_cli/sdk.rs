@@ -276,17 +276,14 @@ async fn run_session_inner(
         res = wait_for_health(&client, &config.base_url) => res?,
     }
 
-    let session_id = match config.resume_session_id.as_deref() {
-        Some(existing) => {
-            tokio::select! {
-                _ = cancel.cancelled() => return Ok(()),
-                res = fork_session(&client, &config.base_url, &config.directory, existing) => res?,
-            }
-        }
-        None => tokio::select! {
-            _ = cancel.cancelled() => return Ok(()),
-            res = create_session(&client, &config.base_url, &config.directory) => res?,
-        },
+    let session_id = tokio::select! {
+        _ = cancel.cancelled() => return Ok(()),
+        res = resolve_session_id(
+            &client,
+            &config.base_url,
+            &config.directory,
+            config.resume_session_id.as_deref(),
+        ) => res?,
     };
 
     log_writer
@@ -580,6 +577,30 @@ pub async fn create_session(
     Ok(session.id)
 }
 
+pub(super) async fn resolve_session_id(
+    client: &reqwest::Client,
+    base_url: &str,
+    directory: &str,
+    resume_session_id: Option<&str>,
+) -> Result<String, ExecutorError> {
+    match resume_session_id {
+        Some(existing) => match fork_session(client, base_url, directory, existing).await {
+            Ok(session_id) => Ok(session_id),
+            Err(ExecutorError::Io(err)) if err.kind() == io::ErrorKind::NotFound => {
+                tracing::warn!(
+                    base_url = %base_url,
+                    directory = %directory,
+                    source_session_id = %existing,
+                    "Stored OpenTeamsCli session was not found; creating a fresh session"
+                );
+                create_session(client, base_url, directory).await
+            }
+            Err(err) => Err(err),
+        },
+        None => create_session(client, base_url, directory).await,
+    }
+}
+
 pub async fn fork_session(
     client: &reqwest::Client,
     base_url: &str,
@@ -601,6 +622,11 @@ pub async fn fork_session(
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
     if !resp.status().is_success() {
+        let error_kind = if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            io::ErrorKind::NotFound
+        } else {
+            io::ErrorKind::Other
+        };
         tracing::warn!(
             base_url = %base_url,
             directory = %directory,
@@ -608,10 +634,10 @@ pub async fn fork_session(
             status = %resp.status(),
             "OpenTeamsCli session.fork failed"
         );
-        return Err(ExecutorError::Io(io::Error::other(format!(
-            "OpenTeamsCli session.fork failed: HTTP {}",
-            resp.status()
-        ))));
+        return Err(ExecutorError::Io(io::Error::new(
+            error_kind,
+            format!("OpenTeamsCli session.fork failed: HTTP {}", resp.status()),
+        )));
     }
 
     let session = resp
@@ -1740,6 +1766,7 @@ async fn request_permission_approval(
 mod tests {
     use std::{collections::HashMap, future};
 
+    use axum::{Json, Router, http::StatusCode, routing::post};
     use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
     use reqwest::header::AUTHORIZATION;
     use serde_json::json;
@@ -1747,7 +1774,8 @@ mod tests {
 
     use super::{
         ConfigProvidersResponse, ControlEvent, ProviderInfo, build_default_headers,
-        extract_retry_status, resolve_model_spec_from_config, run_request_with_control,
+        extract_retry_status, resolve_model_spec_from_config, resolve_session_id,
+        run_request_with_control,
     };
     use crate::executors::{
         ExecutorError,
@@ -1877,5 +1905,39 @@ mod tests {
             panic!("expected io error");
         };
         assert!(err.to_string().contains("retry limit reached"));
+    }
+
+    #[tokio::test]
+    async fn resolve_session_id_falls_back_to_create_when_resume_session_is_missing() {
+        let app = Router::new()
+            .route(
+                "/session/{session_id}/fork",
+                post(|| async { (StatusCode::NOT_FOUND, "missing") }),
+            )
+            .route(
+                "/session",
+                post(|| async { Json(json!({ "id": "fresh-session" })) }),
+            );
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test listener");
+        let addr = listener.local_addr().expect("listener addr");
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("serve test app");
+        });
+
+        let client = reqwest::Client::new();
+        let session_id = resolve_session_id(
+            &client,
+            &format!("http://{addr}"),
+            "C:/workspace/project",
+            Some("missing-session"),
+        )
+        .await
+        .expect("fallback session id");
+
+        assert_eq!(session_id, "fresh-session");
+        server.abort();
     }
 }

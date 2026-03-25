@@ -574,7 +574,7 @@
     "running": "에이전트 실행 중",
     "runningElapsed": "에이전트 실행 중. 경과 시간 {{seconds}}초.",
     "processing": "요청 처리 중...",
-    "thinking": "생각 중...",
+    "thinking": "실행 중...",
     "idle": "대기 중",
     "completed": "완료됨",
     "failed": "실패함",

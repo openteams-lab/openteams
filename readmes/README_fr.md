@@ -39,6 +39,12 @@
 
 ---
 
+## 🔥 *Nouvelles:*
+- **2025.03.24 (v0.3.7)**:
+  - Ajout de l'agent OpenTeams-CLI intégré, supprimant la dépendance stricte à un agent installé localement.
+  - Correction d'un problème de fuite de mémoire dans l'exécuteur.
+---
+
 ## Démarrage rapide
 
 ### Option A: Exécuter avec npx

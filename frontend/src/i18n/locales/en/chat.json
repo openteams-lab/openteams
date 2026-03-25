@@ -579,7 +579,7 @@
     "running": "Agent is running",
     "runningElapsed": "Agent is running. Elapsed {{seconds}}s.",
     "processing": "Processing your request...",
-    "thinking": "Thinking...",
+    "thinking": "Executing...",
     "idle": "Idle",
     "completed": "Completed",
     "failed": "Failed",

@@ -36,6 +36,8 @@ import type { CustomModelConfig, CustomProviderEntry } from '@/types/cliConfig';
 
 const CUSTOM_NPM_OPTION_VALUE = '__custom__';
 const MODALITY_VALUES = ['text', 'image'] as const;
+const DEFAULT_MODEL_CONTEXT_LIMIT = 262144;
+const DEFAULT_MODEL_OUTPUT_LIMIT = 32768;
 
 type ModalityValue = (typeof MODALITY_VALUES)[number];
 
@@ -463,6 +465,14 @@ export function CustomProviderForm({
           return;
         }
 
+        const modelName = model.name.trim();
+        if (!modelName) {
+          setError(
+            t('settings.cli.customProviders.form.validation.modelNameRequired')
+          );
+          return;
+        }
+
         if (seenModelIds.has(modelId)) {
           setError(
             t('settings.cli.customProviders.form.validation.duplicateModelId', {
@@ -473,16 +483,19 @@ export function CustomProviderForm({
         }
         seenModelIds.add(modelId);
 
+        const contextLimit = parseOptionalInteger(model.contextLimit);
+        const outputLimit = parseOptionalInteger(model.outputLimit);
+
         modelsRecord[modelId] = {
           limit: {
-            context: parseOptionalInteger(model.contextLimit),
-            output: parseOptionalInteger(model.outputLimit),
+            context: contextLimit ?? DEFAULT_MODEL_CONTEXT_LIMIT,
+            output: outputLimit ?? DEFAULT_MODEL_OUTPUT_LIMIT,
           },
           modalities: {
             input: parseSelectedModalities(model.inputModalities),
             output: parseSelectedModalities(model.outputModalities),
           },
-          name: model.name.trim() || null,
+          name: modelName,
           options: buildModelOptions(model),
         };
       }
@@ -947,9 +960,7 @@ export function CustomProviderForm({
                               type="number"
                               min="0"
                               className={settingsFieldClassName}
-                              placeholder={t(
-                                'settings.cli.customProviders.form.limitPlaceholder'
-                              )}
+                              placeholder={String(DEFAULT_MODEL_CONTEXT_LIMIT)}
                               value={model.contextLimit}
                               onChange={(event) =>
                                 updateModelDraft(model.key, (draft) => ({
@@ -969,9 +980,7 @@ export function CustomProviderForm({
                               type="number"
                               min="0"
                               className={settingsFieldClassName}
-                              placeholder={t(
-                                'settings.cli.customProviders.form.limitPlaceholder'
-                              )}
+                              placeholder={String(DEFAULT_MODEL_OUTPUT_LIMIT)}
                               value={model.outputLimit}
                               onChange={(event) =>
                                 updateModelDraft(model.key, (draft) => ({
