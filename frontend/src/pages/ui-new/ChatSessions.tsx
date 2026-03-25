@@ -2626,8 +2626,8 @@ export function ChatSessions() {
         const plan = buildMemberPresetImportPlan({
           preset,
           sessionId: importSessionId,
-          fallbackWorkspacePath:
-            activeSession?.default_workspace_path ?? homeDirectory,
+          sessionWorkspacePath: activeSession?.default_workspace_path,
+          fallbackWorkspacePath: homeDirectory,
           defaultRunnerType: config?.executor_profile?.executor ?? null,
           enabledRunnerTypes,
           availableRunnerTypes,
@@ -2845,8 +2845,8 @@ export function ChatSessions() {
       const plan = buildMemberPresetImportPlan({
         preset,
         sessionId: activeSessionId ?? 'preview',
-        fallbackWorkspacePath:
-          activeSession?.default_workspace_path ?? homeDirectory,
+        sessionWorkspacePath: activeSession?.default_workspace_path,
+        fallbackWorkspacePath: homeDirectory,
         defaultRunnerType: config?.executor_profile?.executor ?? null,
         enabledRunnerTypes,
         availableRunnerTypes,

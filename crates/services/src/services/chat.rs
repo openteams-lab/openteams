@@ -1901,9 +1901,16 @@ mod tests {
     }
 
     async fn create_active_session(pool: &SqlitePool) -> ChatSession {
-        ChatSession::create(pool, &CreateChatSession { title: None, workspace_path: None }, Uuid::new_v4())
-            .await
-            .expect("create chat session")
+        ChatSession::create(
+            pool,
+            &CreateChatSession {
+                title: None,
+                workspace_path: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create chat session")
     }
 
     async fn create_agent_member(pool: &SqlitePool, name: &str) -> ChatAgent {

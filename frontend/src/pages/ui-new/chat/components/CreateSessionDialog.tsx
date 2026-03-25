@@ -42,7 +42,9 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
         setIsValidating(true);
         try {
           const result = await chatApi.validateWorkspacePath(workspacePath);
-          setValidationError(result.valid ? '' : (result.error ?? 'Invalid path'));
+          setValidationError(
+            result.valid ? '' : (result.error ?? 'Invalid path')
+          );
         } catch {
           setValidationError('Validation failed');
         } finally {

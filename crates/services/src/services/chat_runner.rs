@@ -782,7 +782,9 @@ impl ChatRunner {
         };
 
         if session_agent.workspace_path.is_none() {
-            let workspace_path = self.build_workspace_path(session_id, agent.id);
+            let workspace_path = self
+                .resolve_workspace_path_for_agent(session_id, agent.id, None)
+                .await?;
             let updated = ChatSessionAgent::update_workspace_path(
                 &self.db.pool,
                 session_agent.id,
@@ -953,10 +955,13 @@ impl ChatRunner {
         let chain_depth = self.extract_chain_depth(&source_message.meta);
 
         let result = async {
-            let workspace_path = session_agent
-                .workspace_path
-                .clone()
-                .unwrap_or_else(|| self.build_workspace_path(session_id, agent_id));
+            let workspace_path = self
+                .resolve_workspace_path_for_agent(
+                    session_id,
+                    agent_id,
+                    session_agent.workspace_path.clone(),
+                )
+                .await?;
             fs::create_dir_all(&workspace_path).await?;
             let run_records_dir = Self::workspace_run_records_dir(
                 PathBuf::from(&workspace_path).as_path(),
@@ -1171,6 +1176,38 @@ impl ChatRunner {
         }
 
         result
+    }
+
+    async fn resolve_workspace_path_for_agent(
+        &self,
+        session_id: Uuid,
+        agent_id: Uuid,
+        session_agent_workspace_path: Option<String>,
+    ) -> Result<String, ChatRunnerError> {
+        if let Some(workspace_path) = session_agent_workspace_path {
+            return Ok(workspace_path);
+        }
+
+        let session_default_workspace_path = ChatSession::find_by_id(&self.db.pool, session_id)
+            .await?
+            .and_then(|session| session.default_workspace_path);
+
+        Ok(Self::select_workspace_path(
+            None,
+            session_default_workspace_path.as_deref(),
+            self.build_workspace_path(session_id, agent_id),
+        ))
+    }
+
+    fn select_workspace_path(
+        session_agent_workspace_path: Option<&str>,
+        session_default_workspace_path: Option<&str>,
+        generated_workspace_path: String,
+    ) -> String {
+        session_agent_workspace_path
+            .or(session_default_workspace_path)
+            .map(str::to_string)
+            .unwrap_or(generated_workspace_path)
     }
 
     fn build_workspace_path(&self, session_id: Uuid, agent_id: Uuid) -> String {
@@ -5085,6 +5122,28 @@ mod tests {
         let usage = ChatRunner::parse_token_usage_from_stdout_line(line).expect("usage");
         assert_eq!(usage.total_tokens, 14596);
         assert_eq!(usage.model_context_window, 258400);
+    }
+
+    #[test]
+    fn select_workspace_path_prefers_session_agent_override() {
+        let resolved = ChatRunner::select_workspace_path(
+            Some("/tmp/session-agent"),
+            Some("/tmp/session-default"),
+            "/tmp/generated".to_string(),
+        );
+
+        assert_eq!(resolved, "/tmp/session-agent");
+    }
+
+    #[test]
+    fn select_workspace_path_falls_back_to_session_default_before_generated_path() {
+        let resolved = ChatRunner::select_workspace_path(
+            None,
+            Some("/tmp/session-default"),
+            "/tmp/generated".to_string(),
+        );
+
+        assert_eq!(resolved, "/tmp/session-default");
     }
 
     #[test]
