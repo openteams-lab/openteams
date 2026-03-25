@@ -475,7 +475,6 @@
           "modelsCount": "{{count}} 件のモデル",
           "noBaseUrl": "Base URL が設定されていません。",
           "npm": "SDK: {{npm}}",
-          "timeout": "タイムアウト: {{timeout}}",
           "noModels": "このプロバイダーにはまだモデルが設定されていません。"
         },
         "preview": {

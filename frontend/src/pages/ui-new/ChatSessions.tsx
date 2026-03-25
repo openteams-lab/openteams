@@ -4009,7 +4009,9 @@ export function ChatSessions() {
             aria-label={t('header.openMembersPanel')}
             title={t('header.openMembersPanel')}
           >
-            <UsersThreeIcon className="size-icon-xs" />
+            <span className="chat-session-right-collapsed-toggle-icon">
+              <UsersThreeIcon className="size-icon-xs" />
+            </span>
             <span>
               {sessionMembers.length} {t('header.aiMembers')}
             </span>

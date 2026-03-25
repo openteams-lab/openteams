@@ -637,7 +637,7 @@
   },
   "conversation": {
     "you": "你",
-    "thinking": "思考中",
+    "thinking": "执行中",
     "todo": "待办",
     "todos": "待办事项",
     "completed": "已完成",

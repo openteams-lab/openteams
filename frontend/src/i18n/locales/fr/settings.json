@@ -475,7 +475,6 @@
           "modelsCount": "{{count}} modèles",
           "noBaseUrl": "Aucune Base URL configurée.",
           "npm": "SDK : {{npm}}",
-          "timeout": "Délai : {{timeout}}",
           "noModels": "Aucun modèle n'est encore configuré pour ce fournisseur."
         },
         "preview": {

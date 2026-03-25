@@ -475,7 +475,6 @@
           "modelsCount": "{{count}} 个模型",
           "noBaseUrl": "未配置 Base URL。",
           "npm": "SDK：{{npm}}",
-          "timeout": "超时：{{timeout}}",
           "noModels": "此提供商尚未配置模型。"
         },
         "preview": {

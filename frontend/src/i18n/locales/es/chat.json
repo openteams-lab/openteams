@@ -574,7 +574,7 @@
     "running": "Agente en ejecución",
     "runningElapsed": "Agente en ejecución. Tiempo transcurrido: {{seconds}}s.",
     "processing": "Procesando tu solicitud...",
-    "thinking": "Pensando...",
+    "thinking": "En ejecución...",
     "idle": "Inactivo",
     "completed": "Completado",
     "failed": "Fallido",

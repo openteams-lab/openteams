@@ -574,7 +574,7 @@
     "running": "Agent 正在執行",
     "runningElapsed": "Agent 正在執行。已用時 {{seconds}} 秒。",
     "processing": "正在處理您的請求...",
-    "thinking": "思考中…",
+    "thinking": "執行中…",
     "idle": "閒置",
     "completed": "已完成",
     "failed": "失敗",
