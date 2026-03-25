@@ -634,10 +634,10 @@ pub async fn fork_session(
             status = %resp.status(),
             "OpenTeamsCli session.fork failed"
         );
-        return Err(ExecutorError::Io(io::Error::new(error_kind, format!(
-            "OpenTeamsCli session.fork failed: HTTP {}",
-            resp.status()
-        ))));
+        return Err(ExecutorError::Io(io::Error::new(
+            error_kind,
+            format!("OpenTeamsCli session.fork failed: HTTP {}", resp.status()),
+        )));
     }
 
     let session = resp
@@ -1914,7 +1914,10 @@ mod tests {
                 "/session/{session_id}/fork",
                 post(|| async { (StatusCode::NOT_FOUND, "missing") }),
             )
-            .route("/session", post(|| async { Json(json!({ "id": "fresh-session" })) }));
+            .route(
+                "/session",
+                post(|| async { Json(json!({ "id": "fresh-session" })) }),
+            );
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await

@@ -2195,7 +2195,9 @@ export function ChatSessions() {
         Object.entries(prev).filter(([key]) => validKeys.has(key))
       );
 
-      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+      return Object.keys(next).length === Object.keys(prev).length
+        ? prev
+        : next;
     });
   }, [timelineEntries]);
 
@@ -2213,7 +2215,8 @@ export function ChatSessions() {
 
   const isWorkItemExpanded = useCallback(
     (entryKey: string) =>
-      workItemExpansionOverrides[entryKey] ?? entryKey === latestWorkItemEntryKey,
+      workItemExpansionOverrides[entryKey] ??
+      entryKey === latestWorkItemEntryKey,
     [latestWorkItemEntryKey, workItemExpansionOverrides]
   );
 
@@ -3771,7 +3774,9 @@ export function ChatSessions() {
 
                     {filteredTimelineEntries.map((entry) => {
                       if (entry.kind === 'work_item') {
-                        const isSelected = selectedTimelineEntryKeys.has(entry.key);
+                        const isSelected = selectedTimelineEntryKeys.has(
+                          entry.key
+                        );
 
                         return (
                           <ChatWorkItemCard
@@ -3826,7 +3831,9 @@ export function ChatSessions() {
                         ? 'user'
                         : (message.sender_id ?? agentName ?? 'agent');
                       const tone = getMessageTone(String(toneKey), isUser);
-                      const isSelected = selectedTimelineEntryKeys.has(entry.key);
+                      const isSelected = selectedTimelineEntryKeys.has(
+                        entry.key
+                      );
 
                       return (
                         <ChatMessageItem

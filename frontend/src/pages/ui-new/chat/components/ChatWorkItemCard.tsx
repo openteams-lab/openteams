@@ -138,7 +138,9 @@ export function ChatWorkItemCard({
                 {tCommon('conversation.taskCompleted')}
               </div>
               <div className="chat-session-work-item-title-row">
-                <div className="chat-session-work-item-title">{senderLabel}</div>
+                <div className="chat-session-work-item-title">
+                  {senderLabel}
+                </div>
                 {group.artifacts.length > 0 && (
                   <span className="chat-session-work-item-pill">
                     {t('timeline.workItem.artifactCount', {
