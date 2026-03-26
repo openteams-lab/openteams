@@ -1,10 +1,19 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
-import { FolderIcon } from '@phosphor-icons/react';
+import { FolderSimpleIcon, SpinnerIcon } from '@phosphor-icons/react';
 import { chatApi } from '@/lib/api';
 import { defineModal } from '@/lib/modals';
 import { FolderPickerDialog } from '@/components/dialogs/shared/FolderPickerDialog';
+import {
+  ConfirmationDialogChrome,
+  getConfirmationButtonClasses,
+} from '@/components/dialogs/shared/ConfirmationDialogChrome';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import type { ChatSession } from 'shared/types';
 
 export interface CreateSessionDialogProps {
@@ -15,6 +24,9 @@ export type CreateSessionResult = {
   title?: string;
   workspace_path?: string;
 };
+
+const fieldClassName =
+  'h-11 rounded-[14px] border border-[#DCE4EF] bg-[#F9FBFF] px-4 text-[14px] text-[#223044] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] placeholder:text-[#94A0B2] focus-visible:border-[#4A90E2] focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-[#4A90E2]/12';
 
 const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
   ({ existingSessions }) => {
@@ -71,6 +83,7 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
 
     const handleCreate = () => {
       if (validationError || isValidating) return;
+
       modal.resolve({
         title: title.trim() || undefined,
         workspace_path: workspacePath.trim() || undefined,
@@ -78,96 +91,139 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
       modal.hide();
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') handleCreate();
-      if (e.key === 'Escape') modal.hide();
+    const handleCancel = () => {
+      modal.resolve(null);
+      modal.hide();
     };
 
-    if (!modal.visible) return null;
-
     return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-        onKeyDown={handleKeyDown}
-      >
-        <div className="bg-primary border rounded w-[480px] p-base space-y-base shadow-xl">
-          <h2 className="text-base text-high font-medium">
-            {t('session.createNew', 'New Session')}
-          </h2>
-
-          <div className="space-y-half">
-            <label className="text-xs text-normal">
-              {t('session.title', 'Title')}
-            </label>
-            <input
-              autoFocus
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={t('session.titlePlaceholder', 'Optional title…')}
-              className="w-full px-base py-half bg-secondary border rounded text-sm text-normal placeholder:text-low focus:outline-none focus:ring-1 focus:ring-brand"
-            />
-          </div>
-
-          <div className="space-y-half">
-            <label className="text-xs text-normal">
-              {t('session.workspacePath', 'Default Workspace')}
-            </label>
-            <div className="flex gap-half">
-              <div className="flex-1 relative">
-                <input
-                  value={workspacePath}
-                  onChange={(e) => setWorkspacePath(e.target.value)}
-                  placeholder={t(
-                    'session.workspacePathPlaceholder',
-                    '/path/to/project'
-                  )}
-                  list="create-session-workspace-history"
-                  className="w-full px-base py-half bg-secondary border rounded text-sm text-normal placeholder:text-low focus:outline-none focus:ring-1 focus:ring-brand"
-                />
-                <datalist id="create-session-workspace-history">
-                  {workspaceHistory.map((path) => (
-                    <option key={path} value={path} />
-                  ))}
-                </datalist>
-                {isValidating && (
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-low">
-                    …
-                  </span>
-                )}
+      <ConfirmationDialogChrome
+        open={modal.visible}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCancel();
+          }
+        }}
+        onClose={handleCancel}
+        title={t('session.createNew', 'New Session')}
+        message={t(
+          'session.createNewDescription',
+          'Start a fresh conversation and optionally attach a default workspace.'
+        )}
+        tone="info"
+        closeLabel={t('buttons.close', 'Close')}
+        className="!max-w-[560px] !border-[#DCE4EF] !bg-[linear-gradient(180deg,#FFFFFF_0%,#F6F9FC_100%)] !shadow-[0_24px_64px_rgba(15,23,42,0.14)]"
+        bodyExtra={
+          <div className="space-y-4">
+            <div className="rounded-[18px] border border-white/70 bg-[rgba(247,250,252,0.9)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <Label
+                  htmlFor="create-session-title"
+                  className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#7A8699]"
+                >
+                  {t('session.title', 'Title')}
+                </Label>
+                <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#A0A9B8]">
+                  {t('session.optional', 'Optional')}
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={handleBrowse}
-                className="px-base py-half bg-secondary border rounded hover:bg-panel"
-                title={t('session.browse', 'Browse')}
-              >
-                <FolderIcon className="size-icon-base text-normal" />
-              </button>
+              <Input
+                id="create-session-title"
+                autoFocus
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={t('session.titlePlaceholder', 'Optional title…')}
+                className={fieldClassName}
+              />
             </div>
+
+            <div className="rounded-[18px] border border-[#E4EBF3] bg-white/90 p-4 shadow-[0_10px_30px_rgba(148,163,184,0.08)]">
+              <div className="mb-2 space-y-1">
+                <Label
+                  htmlFor="create-session-workspace"
+                  className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#7A8699]"
+                >
+                  {t('session.workspacePath', 'Default Workspace')}
+                </Label>
+                <p className="text-sm leading-6 text-[#6B778C]">
+                  {t(
+                    'session.workspacePathHelp',
+                    'Set a starting folder so the team opens with the right project context.'
+                  )}
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="relative flex-1">
+                  <Input
+                    id="create-session-workspace"
+                    value={workspacePath}
+                    onChange={(e) => setWorkspacePath(e.target.value)}
+                    placeholder={t(
+                      'session.workspacePathPlaceholder',
+                      '/path/to/project'
+                    )}
+                    list="create-session-workspace-history"
+                    className={cn(
+                      fieldClassName,
+                      'pr-10 font-mono text-[13px]'
+                    )}
+                  />
+                  <datalist id="create-session-workspace-history">
+                    {workspaceHistory.map((path) => (
+                      <option key={path} value={path} />
+                    ))}
+                  </datalist>
+                  {isValidating && (
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[#7A8699]">
+                      <SpinnerIcon className="h-4 w-4 animate-spin" />
+                    </span>
+                  )}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleBrowse}
+                  className="h-11 w-11 rounded-[14px] border-[#DCE4EF] bg-white text-[#4A5A70] hover:bg-[#F2F6FB] hover:text-[#223044]"
+                  title={t('session.browse', 'Browse')}
+                >
+                  <FolderSimpleIcon className="h-4 w-4" weight="fill" />
+                </Button>
+              </div>
+            </div>
+
             {validationError && (
-              <p className="text-xs text-error">{validationError}</p>
+              <Alert
+                variant="destructive"
+                className="rounded-[16px] border border-[#F2D5D8] bg-[#FFF7F8] px-4 py-3 text-[#C25B63] [&>svg]:hidden [&>svg~*]:pl-0"
+              >
+                <AlertDescription>{validationError}</AlertDescription>
+              </Alert>
             )}
           </div>
-
-          <div className="flex justify-end gap-half">
+        }
+        footer={
+          <>
             <button
               type="button"
-              onClick={() => modal.hide()}
-              className="px-base py-half bg-secondary border rounded text-sm text-normal hover:bg-panel"
+              onClick={handleCancel}
+              className={getConfirmationButtonClasses('info', 'cancel')}
             >
-              {t('common.cancel', 'Cancel')}
+              {t('buttons.cancel', 'Cancel')}
             </button>
             <button
-              type="button"
+              type="submit"
               onClick={handleCreate}
               disabled={!!validationError || isValidating}
-              className="px-base py-half bg-brand border rounded text-sm text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={getConfirmationButtonClasses('info', 'confirm')}
             >
               {t('session.create', 'Create')}
             </button>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
     );
   }
 );
