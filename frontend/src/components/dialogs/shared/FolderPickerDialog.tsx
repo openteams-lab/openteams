@@ -155,7 +155,10 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                   {t('folderPicker.legend')}
                 </p>
                 <span className="rounded-full border border-[#DCE4EF] bg-white px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[#8B98AA]">
-                  {filteredEntries.length} items
+                  {t('folderPicker.itemCount', {
+                    count: filteredEntries.length,
+                    defaultValue: '{{count}} items',
+                  })}
                 </span>
               </div>
             </div>
@@ -167,7 +170,7 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                     {t('folderPicker.manualPathLabel')}
                   </Label>
                   <span className="rounded-full bg-[#EEF5FF] px-3 py-1 text-[11px] font-medium text-[#4A90E2]">
-                    Path
+                    {t('folderPicker.pathBadge', 'Path')}
                   </span>
                 </div>
 
@@ -202,7 +205,7 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                     {t('folderPicker.searchLabel')}
                   </Label>
                   <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#A0A9B8]">
-                    filter
+                    {t('folderPicker.filterBadge', 'Filter')}
                   </span>
                 </div>
 
@@ -241,7 +244,7 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                 </Button>
                 <div className="min-w-0 flex-1 rounded-[14px] border border-[#E6EDF5] bg-[#F8FBFF] px-4 py-3">
                   <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#A0A9B8]">
-                    Current Location
+                    {t('folderPicker.currentLocation', 'Current Location')}
                   </div>
                   <div className="truncate font-mono text-[13px] text-[#334155]">
                     {currentPath || 'Home'}
@@ -262,17 +265,19 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                 <div className="flex items-center justify-between border-b border-[#E6EDF5] px-4 py-3">
                   <div>
                     <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#7A8699]">
-                      Directory Browser
+                      {t('folderPicker.browserTitle', 'Directory Browser')}
                     </div>
                     <div className="mt-1 text-sm text-[#6B778C]">
-                      Click folders to drill down, then confirm the selected
-                      path.
+                      {t(
+                        'folderPicker.browserDescription',
+                        'Click folders to drill down, then confirm the selected path.'
+                      )}
                     </div>
                   </div>
                   {loading && (
                     <div className="inline-flex items-center gap-2 rounded-full border border-[#DCE4EF] bg-white px-3 py-1 text-xs font-medium text-[#6B778C]">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Loading
+                      {t('folderPicker.loading', 'Loading')}
                     </div>
                   )}
                 </div>
@@ -293,13 +298,25 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                       </div>
                       <p className="text-sm font-medium text-[#334155]">
                         {searchTerm.trim()
-                          ? 'No matches found'
-                          : 'No folders found'}
+                          ? t(
+                              'folderPicker.emptySearchTitle',
+                              'No matches found'
+                            )
+                          : t(
+                              'folderPicker.emptyDirectoryTitle',
+                              'No folders found'
+                            )}
                       </p>
                       <p className="mt-1 text-sm text-[#7A8699]">
                         {searchTerm.trim()
-                          ? 'Try a broader keyword or clear the filter.'
-                          : 'This directory does not contain visible entries.'}
+                          ? t(
+                              'folderPicker.emptySearchHint',
+                              'Try a broader keyword or clear the filter.'
+                            )
+                          : t(
+                              'folderPicker.emptyDirectoryHint',
+                              'This directory does not contain visible entries.'
+                            )}
                       </p>
                     </div>
                   ) : (

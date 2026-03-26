@@ -66,11 +66,22 @@
   "folderPicker": {
     "legend": "Cliquez sur les noms de dossiers pour naviguer • Utilisez les boutons d'action pour sélectionner",
     "manualPathLabel": "Saisir le chemin manuellement :",
+    "itemCount": "{{count}} éléments",
+    "pathBadge": "Chemin",
+    "filterBadge": "Filtre",
     "go": "Aller",
     "searchLabel": "Rechercher dans le répertoire actuel :",
+    "currentLocation": "Emplacement actuel",
     "selectCurrent": "Sélectionner l'actuel",
+    "browserTitle": "Explorateur de répertoires",
+    "browserDescription": "Cliquez sur les dossiers pour naviguer, puis confirmez le chemin sélectionné.",
+    "loading": "Chargement",
     "gitRepo": "dépôt git",
-    "selectPath": "Sélectionner le chemin"
+    "selectPath": "Sélectionner le chemin",
+    "emptySearchTitle": "Aucun résultat trouvé",
+    "emptySearchHint": "Essayez un terme plus large ou effacez le filtre.",
+    "emptyDirectoryTitle": "Aucun dossier trouvé",
+    "emptyDirectoryHint": "Ce répertoire ne contient aucune entrée visible."
   },
   "branchSelector": {
     "placeholder": "Sélectionner une branche",

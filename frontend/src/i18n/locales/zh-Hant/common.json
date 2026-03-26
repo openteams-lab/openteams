@@ -66,11 +66,22 @@
   "folderPicker": {
     "legend": "點擊資料夾名稱進行導覽 • 使用操作按鈕進行選擇",
     "manualPathLabel": "手動輸入路徑:",
+    "itemCount": "{{count}} 項",
+    "pathBadge": "路徑",
+    "filterBadge": "篩選",
     "go": "前往",
     "searchLabel": "搜尋目前目錄:",
+    "currentLocation": "目前位置",
     "selectCurrent": "選取目前",
+    "browserTitle": "目錄瀏覽器",
+    "browserDescription": "點擊資料夾逐層進入，然後確認你要選擇的路徑。",
+    "loading": "載入中",
     "gitRepo": "Git 儲存庫",
-    "selectPath": "選取路徑"
+    "selectPath": "選取路徑",
+    "emptySearchTitle": "找不到相符項目",
+    "emptySearchHint": "請嘗試更寬鬆的關鍵字，或清除篩選條件。",
+    "emptyDirectoryTitle": "找不到資料夾",
+    "emptyDirectoryHint": "此目錄中沒有可見項目。"
   },
   "branchSelector": {
     "placeholder": "選擇分支",

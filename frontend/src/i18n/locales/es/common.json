@@ -2,11 +2,22 @@
   "folderPicker": {
     "legend": "Haz clic en los nombres de carpetas para navegar • Usa los botones de acción para seleccionar",
     "manualPathLabel": "Ingresar ruta manualmente:",
+    "itemCount": "{{count}} elementos",
+    "pathBadge": "Ruta",
+    "filterBadge": "Filtro",
     "go": "Ir",
     "searchLabel": "Buscar en el directorio actual:",
+    "currentLocation": "Ubicación actual",
     "selectCurrent": "Seleccionar actual",
+    "browserTitle": "Explorador de directorios",
+    "browserDescription": "Haz clic en las carpetas para navegar y luego confirma la ruta seleccionada.",
+    "loading": "Cargando",
     "gitRepo": "repositorio git",
-    "selectPath": "Seleccionar ruta"
+    "selectPath": "Seleccionar ruta",
+    "emptySearchTitle": "No se encontraron coincidencias",
+    "emptySearchHint": "Prueba una palabra más amplia o borra el filtro.",
+    "emptyDirectoryTitle": "No se encontraron carpetas",
+    "emptyDirectoryHint": "Este directorio no contiene entradas visibles."
   },
   "branchSelector": {
     "badges": {
