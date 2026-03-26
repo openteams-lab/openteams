@@ -2,11 +2,22 @@
   "folderPicker": {
     "legend": "フォルダ名をクリックして移動 • アクションボタンで選択",
     "manualPathLabel": "パスを手動入力:",
+    "itemCount": "{{count}} 件",
+    "pathBadge": "パス",
+    "filterBadge": "フィルター",
     "go": "移動",
     "searchLabel": "現在のディレクトリを検索:",
+    "currentLocation": "現在の場所",
     "selectCurrent": "現在を選択",
+    "browserTitle": "ディレクトリブラウザー",
+    "browserDescription": "フォルダをクリックして移動し、選択したパスを確定してください。",
+    "loading": "読み込み中",
     "gitRepo": "git リポジトリ",
-    "selectPath": "パスを選択"
+    "selectPath": "パスを選択",
+    "emptySearchTitle": "一致する項目がありません",
+    "emptySearchHint": "より広いキーワードを試すか、フィルターを解除してください。",
+    "emptyDirectoryTitle": "フォルダが見つかりません",
+    "emptyDirectoryHint": "このディレクトリには表示できる項目がありません。"
   },
   "branchSelector": {
     "badges": {
