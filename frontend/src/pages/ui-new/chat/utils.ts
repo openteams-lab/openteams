@@ -1002,12 +1002,14 @@ export function getSessionWorkspacePath(
 }
 
 function resolvePresetWorkspacePath(
+  sessionWorkspacePath: string | null | undefined,
   explicitWorkspacePath: string | null | undefined,
   fallbackWorkspacePath: string | null | undefined,
   sessionId: string,
   agentName: string
 ): string {
   return (
+    sessionWorkspacePath?.trim() ||
     explicitWorkspacePath?.trim() ||
     fallbackWorkspacePath?.trim() ||
     getSessionWorkspacePath(sessionId, agentName)
@@ -1174,6 +1176,7 @@ export function getLocalizedMemberPresetNameById(
 export function buildMemberPresetImportPlan({
   preset,
   sessionId,
+  sessionWorkspacePath,
   fallbackWorkspacePath,
   defaultRunnerType,
   enabledRunnerTypes,
@@ -1182,6 +1185,7 @@ export function buildMemberPresetImportPlan({
 }: {
   preset: ChatMemberPreset;
   sessionId: string;
+  sessionWorkspacePath?: string | null;
   fallbackWorkspacePath?: string | null;
   defaultRunnerType: string | null | undefined;
   enabledRunnerTypes: string[];
@@ -1210,6 +1214,7 @@ export function buildMemberPresetImportPlan({
       reason: 'runner-not-available',
       agentId: null,
       workspacePath: resolvePresetWorkspacePath(
+        sessionWorkspacePath,
         preset.default_workspace_path,
         fallbackWorkspacePath,
         sessionId,
@@ -1240,6 +1245,7 @@ export function buildMemberPresetImportPlan({
     reason: 'create-new-agent',
     agentId: null,
     workspacePath: resolvePresetWorkspacePath(
+      sessionWorkspacePath,
       preset.default_workspace_path,
       fallbackWorkspacePath,
       sessionId,

@@ -1,15 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertCircle,
@@ -18,18 +11,30 @@ import {
   Folder,
   FolderOpen,
   Home,
+  Loader2,
   Search,
 } from 'lucide-react';
 import { fileSystemApi } from '@/lib/api';
 import { DirectoryEntry, DirectoryListResponse } from 'shared/types';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal } from '@/lib/modals';
+import {
+  ConfirmationDialogChrome,
+  getConfirmationButtonClasses,
+} from './ConfirmationDialogChrome';
+import { cn } from '@/lib/utils';
 
 export interface FolderPickerDialogProps {
   value?: string;
   title?: string;
   description?: string;
 }
+
+const fieldClassName =
+  'h-11 rounded-[14px] border border-[#DCE4EF] bg-[#F9FBFF] px-4 text-[14px] text-[#223044] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] placeholder:text-[#94A0B2] focus-visible:border-[#4A90E2] focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-[#4A90E2]/12';
+
+const toolbarButtonClassName =
+  'h-11 rounded-[14px] border-[#DCE4EF] bg-white text-[#4A5A70] hover:bg-[#F2F6FB] hover:text-[#223044]';
 
 const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
   ({
@@ -56,7 +61,8 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
     useEffect(() => {
       if (modal.visible) {
         setManualPath(value);
-        loadDirectory();
+        setSearchTerm('');
+        void loadDirectory();
       }
     }, [modal.visible, value]);
 
@@ -67,16 +73,15 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
       try {
         const result: DirectoryListResponse = await fileSystemApi.list(path);
 
-        // Ensure result exists and has the expected structure
         if (!result || typeof result !== 'object') {
           throw new Error('Invalid response from file system API');
         }
-        // Safely access entries, ensuring it's an array
-        const entries = Array.isArray(result.entries) ? result.entries : [];
-        setEntries(entries);
+
+        const nextEntries = Array.isArray(result.entries) ? result.entries : [];
+        setEntries(nextEntries);
         const newPath = result.current_path || '';
         setCurrentPath(newPath);
-        // Update manual path if we have a specific path (not for initial home directory load)
+
         if (path) {
           setManualPath(newPath);
         }
@@ -84,7 +89,6 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
         setError(
           err instanceof Error ? err.message : 'Failed to load directory'
         );
-        // Reset entries to empty array on error
         setEntries([]);
       } finally {
         setLoading(false);
@@ -92,31 +96,25 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
     };
 
     const handleFolderClick = (entry: DirectoryEntry) => {
-      if (entry.is_directory) {
-        setSearchTerm('');
-        loadDirectory(entry.path);
-        setManualPath(entry.path); // Auto-populate the manual path field
-      }
+      if (!entry.is_directory) return;
+      setSearchTerm('');
+      void loadDirectory(entry.path);
+      setManualPath(entry.path);
     };
 
     const handleParentDirectory = () => {
       const parentPath = currentPath.split('/').slice(0, -1).join('/');
       const newPath = parentPath || '/';
-      loadDirectory(newPath);
+      void loadDirectory(newPath);
       setManualPath(newPath);
     };
 
     const handleHomeDirectory = () => {
-      loadDirectory();
-      // Don't set manual path here since home directory path varies by system
-    };
-
-    const handleManualPathChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setManualPath(e.target.value);
+      void loadDirectory();
     };
 
     const handleManualPathSubmit = () => {
-      loadDirectory(manualPath);
+      void loadDirectory(manualPath);
     };
 
     const handleSelectCurrent = () => {
@@ -135,169 +133,276 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
       modal.hide();
     };
 
-    const handleOpenChange = (open: boolean) => {
-      if (!open) {
-        handleCancel();
-      }
-    };
-
     return (
-      <div className="fixed inset-0 z-[10000] pointer-events-none [&>*]:pointer-events-auto">
-        <Dialog open={modal.visible} onOpenChange={handleOpenChange}>
-          <DialogContent className="max-w-[600px] w-full h-[700px] flex flex-col overflow-hidden">
-            <DialogHeader>
-              <DialogTitle>{title}</DialogTitle>
-              <DialogDescription>{description}</DialogDescription>
-            </DialogHeader>
-
-            <div className="flex-1 flex flex-col space-y-4 overflow-hidden">
-              {/* Legend */}
-              <div className="text-xs text-muted-foreground border-b pb-2">
-                {t('folderPicker.legend')}
+      <ConfirmationDialogChrome
+        open={modal.visible}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCancel();
+          }
+        }}
+        onClose={handleCancel}
+        title={title}
+        message={description}
+        tone="info"
+        closeLabel={t('buttons.close', 'Close')}
+        className="!max-w-[760px] !border-[#DCE4EF] !bg-[linear-gradient(180deg,#FFFFFF_0%,#F4F8FC_100%)] !shadow-[0_28px_84px_rgba(15,23,42,0.18)]"
+        bodyExtra={
+          <div className="space-y-4">
+            <div className="rounded-[16px] border border-white/70 bg-[rgba(247,250,252,0.92)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#7A8699]">
+                  {t('folderPicker.legend')}
+                </p>
+                <span className="rounded-full border border-[#DCE4EF] bg-white px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[#8B98AA]">
+                  {t('folderPicker.itemCount', {
+                    count: filteredEntries.length,
+                    defaultValue: '{{count}} items',
+                  })}
+                </span>
               </div>
+            </div>
 
-              {/* Manual path input */}
-              <div className="space-y-2">
-                <div className="text-sm font-medium">
-                  {t('folderPicker.manualPathLabel')}
+            <div className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
+              <div className="rounded-[20px] border border-[#E4EBF3] bg-white/90 p-4 shadow-[0_12px_32px_rgba(148,163,184,0.08)]">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <Label className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#7A8699]">
+                    {t('folderPicker.manualPathLabel')}
+                  </Label>
+                  <span className="rounded-full bg-[#EEF5FF] px-3 py-1 text-[11px] font-medium text-[#4A90E2]">
+                    {t('folderPicker.pathBadge', 'Path')}
+                  </span>
                 </div>
-                <div className="flex space-x-2 min-w-0">
+
+                <div className="flex gap-3">
                   <Input
                     value={manualPath}
-                    onChange={handleManualPathChange}
+                    onChange={(e) => setManualPath(e.target.value)}
                     placeholder="/path/to/your/project"
-                    className="flex-1 min-w-0"
+                    className={cn(
+                      fieldClassName,
+                      'flex-1 min-w-0 font-mono text-[13px]'
+                    )}
                   />
                   <Button
+                    type="button"
                     onClick={handleManualPathSubmit}
                     variant="outline"
-                    size="sm"
-                    className="flex-shrink-0"
+                    className={cn(toolbarButtonClassName, 'px-5')}
                   >
-                    {t('folderPicker.go')}
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      t('folderPicker.go')
+                    )}
                   </Button>
                 </div>
               </div>
 
-              {/* Search input */}
-              <div className="space-y-2">
-                <div className="text-sm font-medium">
-                  {t('folderPicker.searchLabel')}
+              <div className="rounded-[20px] border border-[#E4EBF3] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] p-4 shadow-[0_12px_32px_rgba(148,163,184,0.08)]">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <Label className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#7A8699]">
+                    {t('folderPicker.searchLabel')}
+                  </Label>
+                  <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#A0A9B8]">
+                    {t('folderPicker.filterBadge', 'Filter')}
+                  </span>
                 </div>
+
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A0B2]" />
                   <Input
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Filter folders and files..."
-                    className="pl-10"
+                    className={cn(fieldClassName, 'pl-11')}
                   />
                 </div>
               </div>
+            </div>
 
-              {/* Navigation */}
-              <div className="flex items-center space-x-2 min-w-0">
+            <div className="rounded-[22px] border border-[#DCE4EF] bg-white/95 p-4 shadow-[0_18px_42px_rgba(148,163,184,0.1)]">
+              <div className="mb-4 flex flex-wrap items-center gap-3">
                 <Button
+                  type="button"
                   onClick={handleHomeDirectory}
                   variant="outline"
-                  size="sm"
-                  className="flex-shrink-0"
+                  size="icon"
+                  className={toolbarButtonClassName}
                 >
                   <Home className="h-4 w-4" />
                 </Button>
                 <Button
+                  type="button"
                   onClick={handleParentDirectory}
                   variant="outline"
-                  size="sm"
+                  size="icon"
                   disabled={!currentPath || currentPath === '/'}
-                  className="flex-shrink-0"
+                  className={toolbarButtonClassName}
                 >
                   <ChevronUp className="h-4 w-4" />
                 </Button>
-                <div className="text-sm text-muted-foreground flex-1 truncate min-w-0">
-                  {currentPath || 'Home'}
+                <div className="min-w-0 flex-1 rounded-[14px] border border-[#E6EDF5] bg-[#F8FBFF] px-4 py-3">
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#A0A9B8]">
+                    {t('folderPicker.currentLocation', 'Current Location')}
+                  </div>
+                  <div className="truncate font-mono text-[13px] text-[#334155]">
+                    {currentPath || 'Home'}
+                  </div>
                 </div>
                 <Button
+                  type="button"
                   onClick={handleSelectCurrent}
                   variant="outline"
-                  size="sm"
                   disabled={!currentPath}
-                  className="flex-shrink-0"
+                  className={cn(toolbarButtonClassName, 'px-5')}
                 >
                   {t('folderPicker.selectCurrent')}
                 </Button>
               </div>
 
-              {/* Directory listing */}
-              <div className="flex-1 border rounded-md overflow-auto">
-                {loading ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    Loading...
+              <div className="overflow-hidden rounded-[18px] border border-[#E6EDF5] bg-[linear-gradient(180deg,#FBFDFF_0%,#F5F8FC_100%)]">
+                <div className="flex items-center justify-between border-b border-[#E6EDF5] px-4 py-3">
+                  <div>
+                    <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#7A8699]">
+                      {t('folderPicker.browserTitle', 'Directory Browser')}
+                    </div>
+                    <div className="mt-1 text-sm text-[#6B778C]">
+                      {t(
+                        'folderPicker.browserDescription',
+                        'Click folders to drill down, then confirm the selected path.'
+                      )}
+                    </div>
                   </div>
-                ) : error ? (
-                  <Alert variant="destructive" className="m-4">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                ) : filteredEntries.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    {searchTerm.trim()
-                      ? 'No matches found'
-                      : 'No folders found'}
-                  </div>
-                ) : (
-                  <div className="p-2">
-                    {filteredEntries.map((entry, index) => (
-                      <div
-                        key={index}
-                        className={`flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-accent ${
-                          !entry.is_directory
-                            ? 'opacity-50 cursor-not-allowed'
-                            : ''
-                        }`}
-                        onClick={() =>
-                          entry.is_directory && handleFolderClick(entry)
-                        }
-                        title={entry.name} // Show full name on hover
-                      >
-                        {entry.is_directory ? (
-                          entry.is_git_repo ? (
-                            <FolderOpen className="h-4 w-4 text-success flex-shrink-0" />
-                          ) : (
-                            <Folder className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                          )
-                        ) : (
-                          <File className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        )}
-                        <span className="text-sm flex-1 truncate min-w-0">
-                          {entry.name}
-                        </span>
-                        {entry.is_git_repo && (
-                          <span className="text-xs text-success bg-green-100 px-2 py-1 rounded flex-shrink-0">
-                            {t('folderPicker.gitRepo')}
-                          </span>
-                        )}
+                  {loading && (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#DCE4EF] bg-white px-3 py-1 text-xs font-medium text-[#6B778C]">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      {t('folderPicker.loading', 'Loading')}
+                    </div>
+                  )}
+                </div>
+
+                <div className="max-h-[340px] overflow-auto p-3">
+                  {error ? (
+                    <Alert
+                      variant="destructive"
+                      className="rounded-[16px] border border-[#F2D5D8] bg-[#FFF7F8] px-4 py-3 text-[#C25B63]"
+                    >
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  ) : filteredEntries.length === 0 ? (
+                    <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[16px] border border-dashed border-[#DCE4EF] bg-white/70 px-6 text-center">
+                      <div className="mb-2 rounded-full bg-[#EEF5FF] p-3 text-[#4A90E2]">
+                        <Search className="h-5 w-5" />
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <p className="text-sm font-medium text-[#334155]">
+                        {searchTerm.trim()
+                          ? t(
+                              'folderPicker.emptySearchTitle',
+                              'No matches found'
+                            )
+                          : t(
+                              'folderPicker.emptyDirectoryTitle',
+                              'No folders found'
+                            )}
+                      </p>
+                      <p className="mt-1 text-sm text-[#7A8699]">
+                        {searchTerm.trim()
+                          ? t(
+                              'folderPicker.emptySearchHint',
+                              'Try a broader keyword or clear the filter.'
+                            )
+                          : t(
+                              'folderPicker.emptyDirectoryHint',
+                              'This directory does not contain visible entries.'
+                            )}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredEntries.map((entry) => {
+                        const isDirectory = entry.is_directory;
+
+                        return (
+                          <button
+                            key={entry.path}
+                            type="button"
+                            disabled={!isDirectory}
+                            onClick={() => handleFolderClick(entry)}
+                            className={cn(
+                              'flex w-full items-center gap-3 rounded-[16px] border px-4 py-3 text-left transition-all duration-150',
+                              isDirectory
+                                ? 'border-[#E6EDF5] bg-white hover:border-[#C9D8EA] hover:bg-[#F7FBFF] hover:shadow-[0_8px_20px_rgba(148,163,184,0.12)]'
+                                : 'cursor-not-allowed border-transparent bg-transparent opacity-55'
+                            )}
+                            title={entry.name}
+                          >
+                            <span
+                              className={cn(
+                                'flex h-10 w-10 flex-none items-center justify-center rounded-[12px]',
+                                isDirectory
+                                  ? entry.is_git_repo
+                                    ? 'bg-[#EEF9F0] text-[#4F9D69]'
+                                    : 'bg-[#EEF5FF] text-[#4A90E2]'
+                                  : 'bg-[#F3F4F6] text-[#9CA3AF]'
+                              )}
+                            >
+                              {isDirectory ? (
+                                entry.is_git_repo ? (
+                                  <FolderOpen className="h-4 w-4" />
+                                ) : (
+                                  <Folder className="h-4 w-4" />
+                                )
+                              ) : (
+                                <File className="h-4 w-4" />
+                              )}
+                            </span>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-medium text-[#223044]">
+                                {entry.name}
+                              </div>
+                              <div className="mt-1 truncate text-xs text-[#7A8699]">
+                                {entry.path}
+                              </div>
+                            </div>
+
+                            {entry.is_git_repo && (
+                              <span className="rounded-full border border-[#D7EEDB] bg-[#F2FAEC] px-3 py-1 text-[11px] font-medium text-[#4F9D69]">
+                                {t('folderPicker.gitRepo')}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCancel}>
-                {t('buttons.cancel')}
-              </Button>
-              <Button
-                onClick={handleSelectManual}
-                disabled={!manualPath.trim()}
-              >
-                {t('folderPicker.selectPath')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
+        }
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className={getConfirmationButtonClasses('info', 'cancel')}
+            >
+              {t('buttons.cancel')}
+            </button>
+            <button
+              type="submit"
+              onClick={handleSelectManual}
+              disabled={!manualPath.trim()}
+              className={getConfirmationButtonClasses('info', 'confirm')}
+            >
+              {t('folderPicker.selectPath')}
+            </button>
+          </>
+        }
+      />
     );
   }
 );

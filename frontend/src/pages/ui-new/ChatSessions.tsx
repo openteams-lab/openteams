@@ -39,6 +39,7 @@ import {
   getVariantOptions as getExecutorVariantOptions,
   withExecutorProfileVariant,
 } from '@/utils/executor';
+import { CreateSessionDialog } from '@/components/ui-new/dialogs/CreateSessionDialog';
 import { SettingsDialog } from '@/components/ui-new/dialogs/SettingsDialog';
 
 import {
@@ -1156,7 +1157,7 @@ export function ChatSessions() {
     hasBootstrappedInitialSessionRef.current = true;
     if (sortedSessions.length > 0) return;
 
-    createSession.mutate();
+    createSession.mutate(undefined);
   }, [createSession, isSessionsLoading, sortedSessions.length]);
 
   // Navigate to first session if needed
@@ -1466,6 +1467,8 @@ export function ChatSessions() {
     () => sortedSessions.find((session) => session.id === activeSessionId),
     [sortedSessions, activeSessionId]
   );
+  const sessionDefaultWorkspacePath = activeSession?.default_workspace_path;
+  const defaultExecutorRunnerType = config?.executor_profile?.executor ?? null;
 
   const memberPresetById = useMemo(() => {
     const map = new Map<string, ChatMemberPreset>();
@@ -1699,12 +1702,12 @@ export function ChatSessions() {
     setNewMemberRunnerType('');
     setNewMemberVariant('DEFAULT');
     setNewMemberPrompt('');
-    setNewMemberWorkspace('');
+    setNewMemberWorkspace(activeSession?.default_workspace_path ?? '');
     setNewMemberSkillIds([]);
     setEditingMemberInitialSkillIds([]);
     setIsPromptEditorOpen(false);
     setPromptFileError(null);
-  }, []);
+  }, [activeSession?.default_workspace_path]);
 
   useEffect(() => {
     if (!activeSessionId) return;
@@ -2625,8 +2628,9 @@ export function ChatSessions() {
         const plan = buildMemberPresetImportPlan({
           preset,
           sessionId: importSessionId,
+          sessionWorkspacePath: sessionDefaultWorkspacePath,
           fallbackWorkspacePath: homeDirectory,
-          defaultRunnerType: config?.executor_profile?.executor ?? null,
+          defaultRunnerType: defaultExecutorRunnerType,
           enabledRunnerTypes,
           availableRunnerTypes,
           profiles,
@@ -2657,11 +2661,12 @@ export function ChatSessions() {
     [
       activeSessionId,
       availableRunnerTypes,
-      config?.executor_profile?.executor,
+      defaultExecutorRunnerType,
       enabledRunnerTypes,
       homeDirectory,
       memberPresetById,
       profiles,
+      sessionDefaultWorkspacePath,
     ]
   );
 
@@ -2843,8 +2848,9 @@ export function ChatSessions() {
       const plan = buildMemberPresetImportPlan({
         preset,
         sessionId: activeSessionId ?? 'preview',
+        sessionWorkspacePath: sessionDefaultWorkspacePath,
         fallbackWorkspacePath: homeDirectory,
-        defaultRunnerType: BaseCodingAgent.OPEN_TEAMS_CLI,
+        defaultRunnerType: defaultExecutorRunnerType,
         enabledRunnerTypes,
         availableRunnerTypes,
         profiles,
@@ -2862,9 +2868,11 @@ export function ChatSessions() {
     [
       activeSessionId,
       availableRunnerTypes,
+      defaultExecutorRunnerType,
       enabledRunnerTypes,
       homeDirectory,
       profiles,
+      sessionDefaultWorkspacePath,
       t,
     ]
   );
@@ -3519,9 +3527,14 @@ export function ChatSessions() {
           setIsSkillsPanelOpen(false);
           navigate(`/chat/${id}`);
         }}
-        onCreateSession={() => {
+        onCreateSession={async () => {
           setIsSkillsPanelOpen(false);
-          createSession.mutate();
+          const result = await CreateSessionDialog.show({
+            existingSessions: sortedSessions,
+          });
+          if (result) {
+            createSession.mutate(result);
+          }
         }}
         isCreating={createSession.isPending}
         onOpenAiTeam={() => {

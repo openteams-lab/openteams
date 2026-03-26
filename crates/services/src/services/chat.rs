@@ -1859,6 +1859,7 @@ mod tests {
                 last_seen_diff_key TEXT,
                 team_protocol TEXT DEFAULT '',
                 team_protocol_enabled INTEGER DEFAULT 0,
+                default_workspace_path TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 archived_at TEXT
@@ -1901,9 +1902,16 @@ mod tests {
     }
 
     async fn create_active_session(pool: &SqlitePool) -> ChatSession {
-        ChatSession::create(pool, &CreateChatSession { title: None }, Uuid::new_v4())
-            .await
-            .expect("create chat session")
+        ChatSession::create(
+            pool,
+            &CreateChatSession {
+                title: None,
+                workspace_path: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create chat session")
     }
 
     async fn create_agent_member(pool: &SqlitePool, name: &str) -> ChatAgent {
