@@ -234,6 +234,16 @@ async fn normalize_workspace_path(
     Ok(Some(trimmed.to_string()))
 }
 
+async fn normalize_or_inherit_workspace_path(
+    session: &ChatSession,
+    workspace_path: Option<String>,
+) -> Result<Option<String>, ApiError> {
+    match workspace_path {
+        Some(path) => normalize_workspace_path(Some(path)).await,
+        None => Ok(session.default_workspace_path.clone()),
+    }
+}
+
 fn normalize_allowed_skill_ids(allowed_skill_ids: Option<Vec<String>>) -> Vec<String> {
     let mut normalized = allowed_skill_ids
         .unwrap_or_default()
@@ -286,7 +296,8 @@ pub async fn create_session_agent(
         return Err(ApiError::Conflict("Chat session is archived".to_string()));
     }
 
-    let workspace_path = normalize_workspace_path(payload.workspace_path).await?;
+    let workspace_path =
+        normalize_or_inherit_workspace_path(&session, payload.workspace_path).await?;
     let allowed_skill_ids = normalize_allowed_skill_ids(payload.allowed_skill_ids.clone());
 
     if let Some(existing) = ChatSessionAgent::find_by_session_and_agent(
@@ -488,6 +499,7 @@ pub async fn archive_session(
             last_seen_diff_key: None,
             team_protocol: None,
             team_protocol_enabled: None,
+            default_workspace_path: None,
         },
     )
     .await?;
@@ -528,6 +540,7 @@ pub async fn restore_session(
             last_seen_diff_key: None,
             team_protocol: None,
             team_protocol_enabled: None,
+            default_workspace_path: None,
         },
     )
     .await?;
@@ -672,5 +685,55 @@ pub async fn validate_workspace_path_endpoint(
                 },
             )))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+    use db::models::chat_session::ChatSessionStatus;
+    use uuid::Uuid;
+
+    use super::*;
+
+    fn test_session(default_workspace_path: Option<&str>) -> ChatSession {
+        ChatSession {
+            id: Uuid::new_v4(),
+            title: Some("Test Session".to_string()),
+            status: ChatSessionStatus::Active,
+            summary_text: None,
+            archive_ref: None,
+            last_seen_diff_key: None,
+            team_protocol: None,
+            team_protocol_enabled: false,
+            default_workspace_path: default_workspace_path.map(str::to_string),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            archived_at: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn normalize_or_inherit_workspace_path_uses_session_default_when_missing() {
+        let session = test_session(Some("/tmp/openteams-default"));
+
+        let resolved = normalize_or_inherit_workspace_path(&session, None)
+            .await
+            .expect("resolve workspace path");
+
+        assert_eq!(resolved.as_deref(), Some("/tmp/openteams-default"));
+    }
+
+    #[tokio::test]
+    async fn normalize_or_inherit_workspace_path_prefers_explicit_request_value() {
+        let session = test_session(Some("/tmp/openteams-default"));
+        let tempdir = tempfile::tempdir().expect("create temp directory");
+        let explicit_path = tempdir.path().to_string_lossy().to_string();
+
+        let resolved = normalize_or_inherit_workspace_path(&session, Some(explicit_path.clone()))
+            .await
+            .expect("resolve explicit workspace path");
+
+        assert_eq!(resolved.as_deref(), Some(explicit_path.as_str()));
     }
 }

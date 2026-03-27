@@ -2,11 +2,22 @@
   "folderPicker": {
     "legend": "폴더 이름을 클릭하여 탐색 • 작업 버튼을 사용하여 선택",
     "manualPathLabel": "경로 직접 입력:",
+    "itemCount": "{{count}}개 항목",
+    "pathBadge": "경로",
+    "filterBadge": "필터",
     "go": "이동",
     "searchLabel": "현재 디렉토리 검색:",
+    "currentLocation": "현재 위치",
     "selectCurrent": "현재 선택",
+    "browserTitle": "디렉토리 브라우저",
+    "browserDescription": "폴더를 클릭해 이동한 다음 선택한 경로를 확인하세요.",
+    "loading": "로딩 중",
     "gitRepo": "git 저장소",
-    "selectPath": "경로 선택"
+    "selectPath": "경로 선택",
+    "emptySearchTitle": "일치하는 항목이 없습니다",
+    "emptySearchHint": "더 넓은 키워드를 사용하거나 필터를 지워 보세요.",
+    "emptyDirectoryTitle": "폴더를 찾을 수 없습니다",
+    "emptyDirectoryHint": "이 디렉토리에는 표시할 수 있는 항목이 없습니다."
   },
   "branchSelector": {
     "badges": {

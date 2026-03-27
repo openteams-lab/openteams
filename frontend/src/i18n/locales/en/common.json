@@ -68,11 +68,22 @@
   "folderPicker": {
     "legend": "Click folder names to navigate • Use action buttons to select",
     "manualPathLabel": "Enter path manually:",
+    "itemCount": "{{count}} items",
+    "pathBadge": "Path",
+    "filterBadge": "Filter",
     "go": "Go",
     "searchLabel": "Search current directory:",
+    "currentLocation": "Current Location",
     "selectCurrent": "Select Current",
+    "browserTitle": "Directory Browser",
+    "browserDescription": "Click folders to drill down, then confirm the selected path.",
+    "loading": "Loading",
     "gitRepo": "git repo",
-    "selectPath": "Select Path"
+    "selectPath": "Select Path",
+    "emptySearchTitle": "No matches found",
+    "emptySearchHint": "Try a broader keyword or clear the filter.",
+    "emptyDirectoryTitle": "No folders found",
+    "emptyDirectoryHint": "This directory does not contain visible entries."
   },
   "branchSelector": {
     "placeholder": "Select a branch",

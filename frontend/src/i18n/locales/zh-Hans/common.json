@@ -66,11 +66,22 @@
   "folderPicker": {
     "legend": "点击文件夹名称进行导航 • 使用操作按钮进行选择",
     "manualPathLabel": "手动输入路径:",
+    "itemCount": "{{count}} 项",
+    "pathBadge": "路径",
+    "filterBadge": "筛选",
     "go": "前往",
     "searchLabel": "搜索当前目录:",
+    "currentLocation": "当前位置",
     "selectCurrent": "选择当前",
+    "browserTitle": "目录浏览器",
+    "browserDescription": "点击文件夹逐级进入，然后确认你要选择的路径。",
+    "loading": "加载中",
     "gitRepo": "git 仓库",
-    "selectPath": "选择路径"
+    "selectPath": "选择路径",
+    "emptySearchTitle": "没有找到匹配项",
+    "emptySearchHint": "尝试更宽泛的关键词，或清空筛选条件。",
+    "emptyDirectoryTitle": "没有找到文件夹",
+    "emptyDirectoryHint": "该目录下没有可见条目。"
   },
   "branchSelector": {
     "placeholder": "选择分支",

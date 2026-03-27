@@ -2,8 +2,15 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ChatMessage, ChatSession, JsonValue } from 'shared/types';
 import { chatApi } from '@/lib/api';
 
+export interface CreateSessionParams {
+  title?: string;
+  workspace_path?: string;
+}
+
 export interface UseChatMutationsResult {
-  createSession: ReturnType<typeof useMutation<ChatSession, Error, void>>;
+  createSession: ReturnType<
+    typeof useMutation<ChatSession, Error, CreateSessionParams | undefined>
+  >;
   updateSession: ReturnType<
     typeof useMutation<
       ChatSession,
@@ -40,7 +47,11 @@ export function useChatMutations(
   const queryClient = useQueryClient();
 
   const createSession = useMutation({
-    mutationFn: () => chatApi.createSession({ title: null }),
+    mutationFn: (params?: CreateSessionParams) =>
+      chatApi.createSession({
+        title: params?.title ?? null,
+        workspace_path: params?.workspace_path ?? null,
+      }),
     onSuccess: (session) => {
       // Add new session to cache immediately to prevent race condition
       // where useEffect navigates back before invalidateQueries completes
@@ -64,6 +75,7 @@ export function useChatMutations(
         last_seen_diff_key: null,
         team_protocol: null,
         team_protocol_enabled: null,
+        default_workspace_path: null,
       }),
     onSuccess: (session) => {
       queryClient.invalidateQueries({ queryKey: ['chatSessions'] });

@@ -1,6 +1,6 @@
 {
   "name": "openteams",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "private": true,
   "bin": {
     "openteams": "npx-cli/bin/cli.js"
@@ -35,7 +35,7 @@
     "build:npx": "bash ./local-build.sh",
     "build:npx:alias": "cd openteams-web-npx && pnpm pack",
     "prepack": "pnpm run build:npx",
-    "desktop:dev": "pnpm tauri dev",
+    "desktop:dev": "pnpm -C frontend build && node scripts/desktop/prepare-sidecar.js --debug --skip-cli && pnpm tauri dev --config src-tauri/tauri.dev.conf.json",
     "desktop:build": "pnpm tauri build",
     "desktop:prepare-sidecar": "node scripts/desktop/prepare-sidecar.js --release"
   },
