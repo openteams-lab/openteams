@@ -107,6 +107,10 @@ type WysiwygProps = {
   hideCopyButton?: boolean;
   /** Preserve the last editor height after the content is cleared */
   preserveHeightOnClear?: boolean;
+  /** Allow file:// and local filesystem links in read-only mode */
+  allowFileLinks?: boolean;
+  /** Resolve relative read-only links against this local file path */
+  readOnlyLinkBasePath?: string | null;
 };
 
 /** Ref interface for WYSIWYGEditor, exposing imperative methods */
@@ -157,6 +161,8 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
       saveStatus,
       hideCopyButton = false,
       preserveHeightOnClear = false,
+      allowFileLinks = false,
+      readOnlyLinkBasePath = null,
     }: WysiwygProps,
     ref: React.ForwardedRef<WYSIWYGEditorRef>
   ) {
@@ -410,7 +416,12 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
                   </>
                 )}
                 {/* Link sanitization for read-only mode */}
-                {disabled && <ReadOnlyLinkPlugin />}
+                {disabled && (
+                  <ReadOnlyLinkPlugin
+                    allowFileLinks={allowFileLinks}
+                    basePath={readOnlyLinkBasePath}
+                  />
+                )}
                 {/* Clickable code for file paths in read-only mode */}
                 {disabled && findMatchingDiffPath && onCodeClick && (
                   <ClickableCodePlugin

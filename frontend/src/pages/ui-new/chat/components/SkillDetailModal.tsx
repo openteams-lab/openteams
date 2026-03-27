@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
 import { usePortalContainer } from '@/contexts/PortalContainerContext';
 import { cn } from '@/lib/utils';
+import { pathToFileHref } from '@/utils/readOnlyLinks';
 
 const iconPalette = [
   'bg-sky-100 text-sky-600',
@@ -15,23 +16,24 @@ const iconPalette = [
   'bg-cyan-100 text-cyan-600',
 ];
 
-function getSourceHref(sourceUrl: string | null | undefined): string | null {
-  if (!sourceUrl) return null;
-  const trimmed = sourceUrl.trim();
-  if (!trimmed) return null;
+function getSourceHref(
+  sourceUrl: string | null | undefined,
+  nativePath: string | null | undefined
+): string | null {
+  const trimmed = sourceUrl?.trim();
 
-  if (/^https?:\/\//i.test(trimmed) || /^file:\/\//i.test(trimmed)) {
-    return trimmed;
+  if (trimmed) {
+    if (/^https?:\/\//i.test(trimmed) || /^file:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+
+    const localHref = pathToFileHref(trimmed);
+    if (localHref) {
+      return localHref;
+    }
   }
 
-  const normalizedPath = trimmed.replace(/\\/g, '/');
-  if (/^[a-zA-Z]:\//.test(normalizedPath)) {
-    return `file:///${encodeURI(normalizedPath)}`;
-  }
-  if (normalizedPath.startsWith('/')) {
-    return `file://${encodeURI(normalizedPath)}`;
-  }
-  return null;
+  return pathToFileHref(nativePath);
 }
 
 function SkillDetailIcon({ name }: { name: string }) {
@@ -57,6 +59,7 @@ interface SkillDetailModalProps {
   description?: string | null;
   content?: string | null;
   sourceUrl?: string | null;
+  nativePath?: string | null;
   isLoading?: boolean;
   error?: string | null;
   onClose: () => void;
@@ -76,6 +79,7 @@ export function SkillDetailModal({
   description,
   content,
   sourceUrl,
+  nativePath,
   isLoading = false,
   error,
   onClose,
@@ -100,7 +104,7 @@ export function SkillDetailModal({
 
   if (!isOpen) return null;
 
-  const sourceHref = getSourceHref(sourceUrl);
+  const sourceHref = getSourceHref(sourceUrl, nativePath);
   const modal = (
     <>
       <div
@@ -182,6 +186,8 @@ export function SkillDetailModal({
                 content={content || t('members.skills.detail.emptyContent')}
                 maxWidth="100%"
                 textClassName="text-[13px] leading-5 text-normal/85"
+                allowFileLinks={Boolean(nativePath)}
+                readOnlyLinkBasePath={nativePath}
               />
             )}
           </div>

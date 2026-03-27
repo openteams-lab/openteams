@@ -34,6 +34,7 @@ type DetailData = {
   description: string;
   content: string;
   sourceUrl: string | null;
+  nativePath: string | null;
   installedSkillId: string | null;
   enabled: boolean | null;
   canToggle: boolean | null;
@@ -533,6 +534,7 @@ export function SkillsPanel({
             description: detail.description ?? '',
             content: detail.content,
             sourceUrl: detail.source_url,
+            nativePath: detailTarget.skill.native_path,
             installedSkillId: detail.id,
             enabled: detailTarget.skill.enabled,
             canToggle: detailTarget.skill.can_toggle,
@@ -552,6 +554,7 @@ export function SkillsPanel({
           description: pkg.description,
           content: pkg.content,
           sourceUrl: pkg.source_url,
+          nativePath: installed?.native_path ?? null,
           installedSkillId: installed?.skill.id ?? null,
           enabled: installed?.enabled ?? null,
           canToggle: installed?.can_toggle ?? null,
@@ -1150,6 +1153,7 @@ export function SkillsPanel({
         description={detailData?.description}
         content={detailData?.content}
         sourceUrl={detailData?.sourceUrl}
+        nativePath={detailData?.nativePath}
         isLoading={isLoadingDetail}
         error={detailError}
         onClose={closeDetail}

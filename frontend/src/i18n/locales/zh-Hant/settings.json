@@ -370,6 +370,7 @@
         "button": "儲存 CLI 設定",
         "success": "CLI 設定已成功儲存。",
         "error": "儲存 CLI 設定失敗",
+        "restartError": "重新啟動 CLI 服務失敗。",
         "unsavedChanges": "你有尚未儲存的變更",
         "discard": "捨棄"
       },

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { cloneDeep, isEqual } from 'lodash';
 import { useTranslation } from 'react-i18next';
 import { Loader2, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
-import { ConfirmDialog } from '@/components/dialogs/shared/ConfirmDialog';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import { cn } from '@/lib/utils';
 import {
   useCliConfig,
@@ -143,6 +143,33 @@ function isRemoteModelProvider(provider: CliProviderId): boolean {
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+const CLI_RESTART_WARNING =
+  'Warning: OPENTEAMS_SERVER_PASSWORD is not set; server is unsecured.';
+
+function getCliRestartErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof Error)) {
+    return fallback;
+  }
+
+  const message = error.message.trim();
+  if (!message) {
+    return fallback;
+  }
+
+  const filteredMessage = message
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && line !== CLI_RESTART_WARNING)
+    .join('\n')
+    .trim();
+
+  if (!filteredMessage || filteredMessage !== message) {
+    return fallback;
+  }
+
+  return filteredMessage;
 }
 
 function getProviderApiKey(config: CliConfig, provider: CliProviderId): string {
@@ -698,6 +725,7 @@ export function CliSettings() {
     }
 
     try {
+      const restartErrorMessage = t('settings.cli.save.restartError');
       const saved = await save(sanitizedDraft);
       setDraft(cloneDeep(withCustomProviders(saved, customProvidersRecord)));
       setSaveSuccessMessage(t('settings.cli.save.success'));
@@ -716,7 +744,7 @@ export function CliSettings() {
           syncOrRestartErr
         );
         setSaveError(
-          getErrorMessage(syncOrRestartErr, t('settings.cli.save.error'))
+          getCliRestartErrorMessage(syncOrRestartErr, restartErrorMessage)
         );
       }
     } catch (saveErr) {
@@ -754,6 +782,7 @@ export function CliSettings() {
   const handleSubmitCustomProvider = async (provider: CustomProviderEntry) => {
     setCustomProviderMessage(null);
     setCustomProviderStatusError(null);
+    const restartErrorMessage = t('settings.cli.save.restartError');
     const successMessage = editingCustomProvider
       ? t('settings.cli.customProviders.feedback.updated')
       : t('settings.cli.customProviders.feedback.created');
@@ -772,7 +801,7 @@ export function CliSettings() {
       await restartCliService();
     } catch (restartErr) {
       setCustomProviderStatusError(
-        getErrorMessage(restartErr, t('settings.cli.save.error'))
+        getCliRestartErrorMessage(restartErr, restartErrorMessage)
       );
     }
 
@@ -795,6 +824,7 @@ export function CliSettings() {
     }
 
     try {
+      const restartErrorMessage = t('settings.cli.save.restartError');
       setCustomProviderMessage(null);
       setCustomProviderStatusError(null);
       await deleteCustomProvider.mutateAsync(provider.id);
@@ -830,7 +860,7 @@ export function CliSettings() {
         await restartCliService();
       } catch (restartErr) {
         setCustomProviderStatusError(
-          getErrorMessage(restartErr, t('settings.cli.save.error'))
+          getCliRestartErrorMessage(restartErr, restartErrorMessage)
         );
       }
     } catch (deleteErr) {

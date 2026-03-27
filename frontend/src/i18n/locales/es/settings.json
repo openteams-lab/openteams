@@ -370,6 +370,7 @@
         "button": "Guardar configuración de CLI",
         "success": "La configuración de CLI se guardó correctamente.",
         "error": "No se pudo guardar la configuración de CLI",
+        "restartError": "No se pudo reiniciar el servicio CLI.",
         "unsavedChanges": "Tienes cambios sin guardar",
         "discard": "Descartar"
       },

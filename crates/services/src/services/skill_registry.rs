@@ -11,7 +11,10 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
-use db::models::chat_skill::{ChatSkill, CreateChatSkill};
+use db::models::{
+    chat_session_agent::ChatSessionAgent,
+    chat_skill::{ChatSkill, CreateChatSkill, UpdateChatSkill},
+};
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use rust_embed::RustEmbed;
@@ -391,6 +394,35 @@ impl DiscoveredSkillDraft {
             download_count: Some(0),
         }
     }
+
+    fn sorted_compatible_agents(&self) -> Vec<String> {
+        let mut compatible_agents = self.compatible_agents.iter().cloned().collect::<Vec<_>>();
+        compatible_agents.sort();
+        compatible_agents
+    }
+}
+
+fn discovered_skill_needs_refresh(skill: &ChatSkill, discovered: &DiscoveredSkillDraft) -> bool {
+    skill.compatible_agents.0 != discovered.sorted_compatible_agents()
+}
+
+fn discovered_skill_refresh_update(discovered: &DiscoveredSkillDraft) -> UpdateChatSkill {
+    UpdateChatSkill {
+        name: None,
+        description: None,
+        content: None,
+        trigger_type: None,
+        trigger_keywords: None,
+        enabled: None,
+        source: None,
+        source_url: None,
+        version: None,
+        author: None,
+        tags: None,
+        category: None,
+        compatible_agents: Some(discovered.sorted_compatible_agents()),
+        download_count: None,
+    }
 }
 
 /// Skill Registry client for fetching skills from a remote service
@@ -574,27 +606,121 @@ pub async fn sync_discovered_global_skills(pool: &SqlitePool) -> Result<usize, S
         }
     };
 
-    let existing_skills = ChatSkill::find_all(pool).await?;
-    let mut existing_by_slug = existing_skills
-        .iter()
-        .map(|skill| (slugify_skill_name(&skill.name), skill.id))
-        .collect::<HashMap<_, _>>();
+    sync_discovered_global_skills_at_home_dir(pool, &home_dir).await
+}
 
-    let discovered = discover_global_skills(&home_dir).await;
+async fn sync_discovered_global_skills_at_home_dir(
+    pool: &SqlitePool,
+    home_dir: &Path,
+) -> Result<usize, SkillRegistryError> {
+    let existing_skills = ChatSkill::find_all(pool).await?;
+    let discovered = discover_global_skills(home_dir).await;
+    let discovered_slugs = discovered.keys().cloned().collect::<HashSet<_>>();
+    let stale_skill_ids = existing_skills
+        .iter()
+        .filter(|skill| should_prune_missing_discovered_skill(skill, &discovered_slugs))
+        .map(|skill| skill.id)
+        .collect::<Vec<_>>();
+    let stale_skill_ids_set = stale_skill_ids.iter().copied().collect::<HashSet<_>>();
+
+    let mut existing_by_slug = existing_skills
+        .into_iter()
+        .filter(|skill| !stale_skill_ids_set.contains(&skill.id))
+        .map(|skill| (slugify_skill_name(&skill.name), skill))
+        .collect::<HashMap<_, _>>();
     let mut synced_count = 0;
+
+    for skill_id in stale_skill_ids {
+        synced_count += ChatSkill::delete(pool, skill_id).await? as usize;
+    }
+
+    prune_stale_session_agent_skill_ids(pool, &stale_skill_ids_set).await?;
 
     for (_, skill) in discovered {
         let slug = slugify_skill_name(&skill.name);
-        if existing_by_slug.contains_key(&slug) {
+        if let Some(existing) = existing_by_slug.get_mut(&slug) {
+            if discovered_skill_needs_refresh(existing, &skill) {
+                let updated = ChatSkill::update(
+                    pool,
+                    existing.id,
+                    &discovered_skill_refresh_update(&skill),
+                )
+                .await?;
+                *existing = updated;
+                synced_count += 1;
+            }
             continue;
         }
 
         let created = ChatSkill::create(pool, &skill.into_create_data(), Uuid::new_v4()).await?;
-        existing_by_slug.insert(slug, created.id);
+        existing_by_slug.insert(slug, created);
         synced_count += 1;
     }
 
     Ok(synced_count)
+}
+
+fn should_prune_missing_discovered_skill(
+    skill: &ChatSkill,
+    discovered_slugs: &HashSet<String>,
+) -> bool {
+    if discovered_slugs.contains(&slugify_skill_name(&skill.name)) {
+        return false;
+    }
+
+    matches!(
+        skill.source.as_str(),
+        "local" | "registry" | "github" | "url"
+    )
+}
+
+async fn prune_stale_session_agent_skill_ids(
+    pool: &SqlitePool,
+    stale_skill_ids: &HashSet<Uuid>,
+) -> Result<(), SkillRegistryError> {
+    if stale_skill_ids.is_empty() {
+        return Ok(());
+    }
+
+    let stale_skill_id_strings = stale_skill_ids
+        .iter()
+        .map(Uuid::to_string)
+        .collect::<HashSet<_>>();
+    let session_agents = sqlx::query_as::<_, ChatSessionAgent>(
+        r#"SELECT id,
+                  session_id,
+                  agent_id,
+                  state,
+                  workspace_path,
+                  pty_session_key,
+                  agent_session_id,
+                  agent_message_id,
+                  allowed_skill_ids,
+                  created_at,
+                  updated_at
+           FROM chat_session_agents
+           WHERE allowed_skill_ids IS NOT NULL
+             AND allowed_skill_ids != '[]'"#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    for session_agent in session_agents {
+        let next_allowed_skill_ids = session_agent
+            .allowed_skill_ids
+            .0
+            .iter()
+            .filter(|skill_id| !stale_skill_id_strings.contains(skill_id.trim()))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if next_allowed_skill_ids != session_agent.allowed_skill_ids.0 {
+            ChatSessionAgent::update_allowed_skill_ids(pool, session_agent.id, next_allowed_skill_ids)
+                .await?;
+        }
+    }
+
+    Ok(())
 }
 
 async fn discover_global_skills(home_dir: &Path) -> HashMap<String, DiscoveredSkillDraft> {
@@ -1179,7 +1305,17 @@ fn clean_metadata_text(value: &str) -> String {
 mod tests {
     use std::path::Path;
 
-    use super::{discover_global_skills, global_skill_roots, parse_discovered_skill_markdown};
+    use db::models::{
+        chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
+        chat_skill::{ChatSkill, CreateChatSkill},
+    };
+    use sqlx::SqlitePool;
+    use uuid::Uuid;
+
+    use super::{
+        discover_global_skills, global_skill_roots, parse_discovered_skill_markdown,
+        sync_discovered_global_skills_at_home_dir,
+    };
 
     #[test]
     fn global_skill_roots_use_slugified_skill_name() {
@@ -1262,6 +1398,259 @@ Open the page and inspect it carefully.
 
         assert_eq!(skill.name, "Browser Automation");
         assert!(skill.compatible_agents.contains("claude"));
+    }
+
+    #[tokio::test]
+    async fn sync_discovered_global_skills_prunes_removed_installed_skill_rows() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let skill_dir = temp_dir
+            .path()
+            .join(".claude")
+            .join("skills")
+            .join("browser-automation");
+        std::fs::create_dir_all(&skill_dir).expect("create skill dir");
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            "# Browser Automation\n\n> Drive browser tasks safely.\n\nOpen the page.\n",
+        )
+        .expect("write skill file");
+
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("connect sqlite");
+        sqlx::query(
+            r#"CREATE TABLE chat_skills (
+                id TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                content TEXT NOT NULL,
+                trigger_type TEXT NOT NULL,
+                trigger_keywords TEXT NOT NULL DEFAULT '[]',
+                enabled BOOLEAN NOT NULL DEFAULT 1,
+                source TEXT NOT NULL DEFAULT 'local',
+                source_url TEXT,
+                version TEXT NOT NULL DEFAULT '1.0.0',
+                author TEXT,
+                tags TEXT NOT NULL DEFAULT '[]',
+                category TEXT,
+                compatible_agents TEXT NOT NULL DEFAULT '[]',
+                download_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )"#,
+        )
+        .execute(&pool)
+        .await
+        .expect("create chat_skills table");
+        sqlx::query(
+            r#"CREATE TABLE chat_session_agents (
+                id TEXT PRIMARY KEY NOT NULL,
+                session_id TEXT NOT NULL,
+                agent_id TEXT NOT NULL,
+                state TEXT NOT NULL DEFAULT 'idle',
+                workspace_path TEXT,
+                pty_session_key TEXT,
+                agent_session_id TEXT,
+                agent_message_id TEXT,
+                allowed_skill_ids TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )"#,
+        )
+        .execute(&pool)
+        .await
+        .expect("create chat_session_agents table");
+
+        let installed_skill = ChatSkill::create(
+            &pool,
+            &CreateChatSkill {
+                name: "Browser Automation".to_string(),
+                description: Some("Drive browser tasks safely.".to_string()),
+                content: "Open the page.".to_string(),
+                trigger_type: Some("always".to_string()),
+                trigger_keywords: None,
+                enabled: Some(true),
+                source: Some("registry".to_string()),
+                source_url: Some("https://skills.example/browser-automation".to_string()),
+                version: Some("1.0.0".to_string()),
+                author: None,
+                tags: Some(vec!["automation".to_string()]),
+                category: None,
+                compatible_agents: Some(vec!["claude".to_string()]),
+                download_count: Some(0),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create installed skill row");
+
+        let custom_skill = ChatSkill::create(
+            &pool,
+            &CreateChatSkill {
+                name: "Imported Local Path".to_string(),
+                description: Some("Imported from a custom path".to_string()),
+                content: "Use skill files from path".to_string(),
+                trigger_type: Some("manual".to_string()),
+                trigger_keywords: None,
+                enabled: Some(true),
+                source: Some("local_path".to_string()),
+                source_url: Some("C:/tmp/custom-skill".to_string()),
+                version: Some("1.0.0".to_string()),
+                author: None,
+                tags: Some(vec!["local".to_string()]),
+                category: None,
+                compatible_agents: Some(vec![]),
+                download_count: Some(0),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create local path skill row");
+        let session_agent = ChatSessionAgent::create(
+            &pool,
+            &CreateChatSessionAgent {
+                session_id: Uuid::new_v4(),
+                agent_id: Uuid::new_v4(),
+                workspace_path: None,
+                allowed_skill_ids: vec![
+                    installed_skill.id.to_string(),
+                    custom_skill.id.to_string(),
+                ],
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create session agent");
+
+        let initial_sync = sync_discovered_global_skills_at_home_dir(&pool, temp_dir.path())
+            .await
+            .expect("initial sync succeeds");
+        assert_eq!(initial_sync, 0);
+
+        std::fs::remove_dir_all(&skill_dir).expect("remove skill dir");
+
+        let pruned = sync_discovered_global_skills_at_home_dir(&pool, temp_dir.path())
+            .await
+            .expect("prune sync succeeds");
+        assert_eq!(pruned, 1);
+
+        let remaining_skills = ChatSkill::find_all(&pool)
+            .await
+            .expect("load remaining skills");
+        let remaining_ids = remaining_skills
+            .into_iter()
+            .map(|skill| skill.id)
+            .collect::<Vec<_>>();
+        let refreshed_session_agent = ChatSessionAgent::find_by_id(&pool, session_agent.id)
+            .await
+            .expect("load session agent")
+            .expect("session agent exists");
+
+        assert!(!remaining_ids.contains(&installed_skill.id));
+        assert!(remaining_ids.contains(&custom_skill.id));
+        assert_eq!(
+            refreshed_session_agent.allowed_skill_ids.0,
+            vec![custom_skill.id.to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn sync_discovered_global_skills_refreshes_compatible_agents_after_root_removal() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let universal_skill_dir = temp_dir
+            .path()
+            .join(".agents")
+            .join("skills")
+            .join("browser-automation");
+        let claude_skill_dir = temp_dir
+            .path()
+            .join(".claude")
+            .join("skills")
+            .join("browser-automation");
+
+        for skill_dir in [&universal_skill_dir, &claude_skill_dir] {
+            std::fs::create_dir_all(skill_dir).expect("create skill dir");
+            std::fs::write(
+                skill_dir.join("SKILL.md"),
+                "# Browser Automation\n\n> Drive browser tasks safely.\n\nOpen the page.\n",
+            )
+            .expect("write skill file");
+        }
+
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("connect sqlite");
+        sqlx::query(
+            r#"CREATE TABLE chat_skills (
+                id TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                content TEXT NOT NULL,
+                trigger_type TEXT NOT NULL,
+                trigger_keywords TEXT NOT NULL DEFAULT '[]',
+                enabled BOOLEAN NOT NULL DEFAULT 1,
+                source TEXT NOT NULL DEFAULT 'local',
+                source_url TEXT,
+                version TEXT NOT NULL DEFAULT '1.0.0',
+                author TEXT,
+                tags TEXT NOT NULL DEFAULT '[]',
+                category TEXT,
+                compatible_agents TEXT NOT NULL DEFAULT '[]',
+                download_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )"#,
+        )
+        .execute(&pool)
+        .await
+        .expect("create chat_skills table");
+
+        let installed_skill = ChatSkill::create(
+            &pool,
+            &CreateChatSkill {
+                name: "Browser Automation".to_string(),
+                description: Some("Drive browser tasks safely.".to_string()),
+                content: "Open the page.".to_string(),
+                trigger_type: Some("always".to_string()),
+                trigger_keywords: None,
+                enabled: Some(true),
+                source: Some("registry".to_string()),
+                source_url: Some("https://skills.example/browser-automation".to_string()),
+                version: Some("1.0.0".to_string()),
+                author: None,
+                tags: Some(vec!["automation".to_string()]),
+                category: None,
+                compatible_agents: Some(vec![]),
+                download_count: Some(0),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create installed skill row");
+
+        let initial_sync = sync_discovered_global_skills_at_home_dir(&pool, temp_dir.path())
+            .await
+            .expect("initial sync succeeds");
+        assert_eq!(initial_sync, 1);
+
+        let refreshed = ChatSkill::find_by_id(&pool, installed_skill.id)
+            .await
+            .expect("load refreshed skill")
+            .expect("skill exists");
+        assert_eq!(refreshed.compatible_agents.0, vec!["claude".to_string()]);
+
+        std::fs::remove_dir_all(&claude_skill_dir).expect("remove claude skill dir");
+
+        let resynced = sync_discovered_global_skills_at_home_dir(&pool, temp_dir.path())
+            .await
+            .expect("refresh sync succeeds");
+        assert_eq!(resynced, 1);
+
+        let universal_only = ChatSkill::find_by_id(&pool, installed_skill.id)
+            .await
+            .expect("load universal-only skill")
+            .expect("skill still exists");
+        assert!(universal_only.compatible_agents.0.is_empty());
     }
 
     #[test]

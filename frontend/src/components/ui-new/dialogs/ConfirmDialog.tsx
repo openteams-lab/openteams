@@ -30,14 +30,18 @@ const ConfirmDialogImpl = NiceModal.create<ConfirmDialogProps>((props) => {
     showCancelButton = true,
   } = props;
 
-  const handleConfirm = () => {
-    modal.resolve('confirmed' as ConfirmResult);
+  const closeWithResult = (result: ConfirmResult) => {
+    modal.resolve(result);
     modal.hide();
+    modal.remove();
+  };
+
+  const handleConfirm = () => {
+    closeWithResult('confirmed');
   };
 
   const handleCancel = () => {
-    modal.resolve('canceled' as ConfirmResult);
-    modal.hide();
+    closeWithResult('canceled');
   };
 
   const tone: ConfirmationDialogTone =

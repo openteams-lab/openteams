@@ -370,6 +370,7 @@
         "button": "CLI 설정 저장",
         "success": "CLI 설정이 저장되었습니다.",
         "error": "CLI 설정을 저장하지 못했습니다",
+        "restartError": "CLI 서비스 재시작에 실패했습니다.",
         "unsavedChanges": "저장되지 않은 변경 사항이 있습니다",
         "discard": "버리기"
       },

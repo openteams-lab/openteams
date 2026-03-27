@@ -370,6 +370,7 @@
         "button": "Enregistrer les paramètres CLI",
         "success": "Les paramètres CLI ont été enregistrés avec succès.",
         "error": "Impossible d'enregistrer les paramètres CLI",
+        "restartError": "Échec du redémarrage du service CLI.",
         "unsavedChanges": "Vous avez des modifications non enregistrées",
         "discard": "Ignorer"
       },

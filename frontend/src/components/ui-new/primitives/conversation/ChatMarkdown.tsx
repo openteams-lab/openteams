@@ -9,6 +9,8 @@ interface ChatMarkdownProps {
   textClassName?: string;
   workspaceId?: string;
   hideCopyButton?: boolean;
+  allowFileLinks?: boolean;
+  readOnlyLinkBasePath?: string | null;
 }
 
 export function ChatMarkdown({
@@ -18,6 +20,8 @@ export function ChatMarkdown({
   textClassName = 'text-sm',
   workspaceId,
   hideCopyButton,
+  allowFileLinks = false,
+  readOnlyLinkBasePath = null,
 }: ChatMarkdownProps) {
   const { viewFileInChanges, findMatchingDiffPath } = useChangesView();
 
@@ -31,6 +35,8 @@ export function ChatMarkdown({
         findMatchingDiffPath={findMatchingDiffPath}
         onCodeClick={viewFileInChanges}
         hideCopyButton={hideCopyButton}
+        allowFileLinks={allowFileLinks}
+        readOnlyLinkBasePath={readOnlyLinkBasePath}
       />
     </div>
   );

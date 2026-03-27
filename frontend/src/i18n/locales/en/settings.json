@@ -370,6 +370,7 @@
         "button": "Save CLI Settings",
         "success": "CLI settings saved successfully!",
         "error": "Failed to save CLI settings",
+        "restartError": "Failed to restart CLI service.",
         "unsavedChanges": "You have unsaved changes",
         "discard": "Discard"
       },

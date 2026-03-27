@@ -1,45 +1,69 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { LinkNode } from '@lexical/link';
+import { resolveReadOnlyLink } from '@/utils/readOnlyLinks';
 
-/**
- * Sanitize href to block dangerous protocols.
- * Returns undefined if the href is blocked.
- */
-function sanitizeHref(href?: string): string | undefined {
-  if (typeof href !== 'string') return undefined;
-  const trimmed = href.trim();
-  // Block dangerous protocols
-  if (/^(javascript|vbscript|data):/i.test(trimmed)) return undefined;
-  // Allow anchors and common relative forms (but they'll be disabled)
-  if (
-    trimmed.startsWith('#') ||
-    trimmed.startsWith('./') ||
-    trimmed.startsWith('../') ||
-    trimmed.startsWith('/')
-  )
-    return trimmed;
-  // Allow only https
-  if (/^https:\/\//i.test(trimmed)) return trimmed;
-  // Block everything else by default
-  return undefined;
-}
+function applyLinkState(
+  dom: HTMLAnchorElement,
+  href: string | null,
+  options: {
+    allowFileLinks?: boolean;
+    basePath?: string | null;
+  }
+) {
+  const resolved = resolveReadOnlyLink(href, options);
 
-/**
- * Check if href is an external HTTPS link.
- */
-function isExternalHref(href?: string): boolean {
-  if (!href) return false;
-  return /^https:\/\//i.test(href);
+  if (!resolved) {
+    dom.removeAttribute('href');
+    dom.removeAttribute('role');
+    dom.removeAttribute('target');
+    dom.removeAttribute('rel');
+    dom.removeAttribute('aria-disabled');
+    dom.style.cursor = 'not-allowed';
+    dom.style.pointerEvents = 'none';
+    dom.title = href ?? '';
+    dom.onclick = null;
+    return;
+  }
+
+  if (resolved.clickable) {
+    dom.setAttribute('href', resolved.href);
+    dom.removeAttribute('role');
+    dom.setAttribute('target', '_blank');
+    dom.setAttribute('rel', 'noopener noreferrer');
+    dom.removeAttribute('aria-disabled');
+    dom.style.cursor = 'pointer';
+    dom.style.pointerEvents = 'auto';
+    dom.title = href ?? resolved.href;
+    dom.onclick = (event) => event.stopPropagation();
+    return;
+  }
+
+  dom.removeAttribute('href');
+  dom.removeAttribute('target');
+  dom.removeAttribute('rel');
+  dom.setAttribute('role', 'link');
+  dom.setAttribute('aria-disabled', 'true');
+  dom.style.cursor = 'not-allowed';
+  dom.style.pointerEvents = 'none';
+  dom.title = href ?? '';
+  dom.onclick = null;
 }
 
 /**
  * Plugin that handles link sanitization and security attributes in read-only mode.
  * - Blocks dangerous protocols (javascript:, vbscript:, data:)
  * - External HTTPS links: clickable with target="_blank" and rel="noopener noreferrer"
- * - Internal/relative links: rendered but not clickable
+ * - Optional local file links: clickable when explicitly enabled
+ * - Internal/relative links: rendered but not clickable unless resolved to a local file
  */
-export function ReadOnlyLinkPlugin() {
+export function ReadOnlyLinkPlugin({
+  allowFileLinks = false,
+  basePath = null,
+}: {
+  allowFileLinks?: boolean;
+  basePath?: string | null;
+}) {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
@@ -53,33 +77,10 @@ export function ReadOnlyLinkPlugin() {
           const dom = editor.getElementByKey(nodeKey);
           if (!dom || !(dom instanceof HTMLAnchorElement)) continue;
 
-          const href = dom.getAttribute('href');
-          const safeHref = sanitizeHref(href ?? undefined);
-
-          if (!safeHref) {
-            // Dangerous protocol - remove href entirely
-            dom.removeAttribute('href');
-            dom.style.cursor = 'not-allowed';
-            dom.style.pointerEvents = 'none';
-            continue;
-          }
-
-          const isExternal = isExternalHref(safeHref);
-
-          if (isExternal) {
-            // External HTTPS link - add security attributes
-            dom.setAttribute('target', '_blank');
-            dom.setAttribute('rel', 'noopener noreferrer');
-            dom.onclick = (e) => e.stopPropagation();
-          } else {
-            // Internal/relative link - disable clicking
-            dom.removeAttribute('href');
-            dom.style.cursor = 'not-allowed';
-            dom.style.pointerEvents = 'none';
-            dom.setAttribute('role', 'link');
-            dom.setAttribute('aria-disabled', 'true');
-            dom.title = href ?? '';
-          }
+          applyLinkState(dom, dom.getAttribute('href'), {
+            allowFileLinks,
+            basePath,
+          });
         }
       }
     );
@@ -91,35 +92,15 @@ export function ReadOnlyLinkPlugin() {
 
       const links = root.querySelectorAll('a');
       links.forEach((link) => {
-        const href = link.getAttribute('href');
-        const safeHref = sanitizeHref(href ?? undefined);
-
-        if (!safeHref) {
-          link.removeAttribute('href');
-          link.style.cursor = 'not-allowed';
-          link.style.pointerEvents = 'none';
-          return;
-        }
-
-        const isExternal = isExternalHref(safeHref);
-
-        if (isExternal) {
-          link.setAttribute('target', '_blank');
-          link.setAttribute('rel', 'noopener noreferrer');
-          link.onclick = (e) => e.stopPropagation();
-        } else {
-          link.removeAttribute('href');
-          link.style.cursor = 'not-allowed';
-          link.style.pointerEvents = 'none';
-          link.setAttribute('role', 'link');
-          link.setAttribute('aria-disabled', 'true');
-          link.title = href ?? '';
-        }
+        applyLinkState(link, link.getAttribute('href'), {
+          allowFileLinks,
+          basePath,
+        });
       });
     });
 
     return unregister;
-  }, [editor]);
+  }, [allowFileLinks, basePath, editor]);
 
   return null;
 }
