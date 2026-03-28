@@ -9,6 +9,23 @@ type AvatarTone = {
   border: string;
 };
 
+function hexToRgbChannels(hex: string): string {
+  const normalized = hex.replace('#', '');
+  const value =
+    normalized.length === 3
+      ? normalized
+          .split('')
+          .map((char) => `${char}${char}`)
+          .join('')
+      : normalized;
+
+  const red = Number.parseInt(value.slice(0, 2), 16);
+  const green = Number.parseInt(value.slice(2, 4), 16);
+  const blue = Number.parseInt(value.slice(4, 6), 16);
+
+  return `${red} ${green} ${blue}`;
+}
+
 const avatarPalette: AvatarTone[] = [
   { bg: '#fef4f0', border: '#f6d8cb' },
   { bg: '#fdf8ed', border: '#f2e1bf' },
@@ -35,6 +52,7 @@ export function getAgentAvatarStyle(seed: string): CSSProperties {
   const tone = avatarPalette[paletteIndex];
   return {
     '--chat-agent-avatar-bg': tone.bg,
+    '--chat-agent-avatar-bg-rgb': hexToRgbChannels(tone.bg),
     '--chat-agent-avatar-border': tone.border,
   } as CSSProperties;
 }

@@ -111,6 +111,7 @@ export function ChatWorkItemCard({
           isCleanupMode && 'is-cleanup-mode',
           isSelected && 'is-selected'
         )}
+        style={agentAvatarStyle}
         onClick={handleCardClick}
         onKeyDown={handleCardKeyDown}
         role={isCleanupMode ? 'checkbox' : undefined}

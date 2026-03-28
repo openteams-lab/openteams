@@ -264,7 +264,7 @@ async fn update_cli_config(
     match write_cli_config_to_disk(&new_config).await {
         Ok(_) => {
             // 同步默认 provider/model 到 openteams-cli
-            if let Err(e) = sync_openteams_cli_profiles_from_app_config(&new_config) {
+            if let Err(e) = sync_openteams_cli_profiles_from_disk().await {
                 tracing::error!("Failed to sync OpenTeams CLI profiles: {}", e);
             }
             ResponseJson(ApiResponse::success(mask_api_keys(new_config)))
@@ -322,7 +322,7 @@ async fn sync_to_openteams_cli(
     if cli_config_changed(&original_cli_config, &cli_config)? {
         write_openteams_cli_config_to_disk(&cli_config).await?;
     }
-    sync_openteams_cli_profiles_from_app_config(openteams_config)?;
+    sync_openteams_cli_profiles_from_cli_config(&cli_config)?;
 
     Ok(cli_config_path.to_string_lossy().to_string())
 }
@@ -410,7 +410,7 @@ async fn create_custom_provider(
             e
         )));
     }
-    if let Err(e) = sync_openteams_cli_profiles_from_app_config(&config) {
+    if let Err(e) = sync_openteams_cli_profiles_from_disk().await {
         tracing::error!("Failed to sync OpenTeams CLI profiles: {}", e);
         return ResponseJson(ApiResponse::error(&format!(
             "Provider saved but failed to sync OpenTeams CLI profiles: {}",
@@ -462,7 +462,7 @@ async fn update_custom_provider(
             e
         )));
     }
-    if let Err(e) = sync_openteams_cli_profiles_from_app_config(&config) {
+    if let Err(e) = sync_openteams_cli_profiles_from_disk().await {
         tracing::error!("Failed to sync OpenTeams CLI profiles: {}", e);
         return ResponseJson(ApiResponse::error(&format!(
             "Provider saved but failed to sync OpenTeams CLI profiles: {}",
@@ -506,7 +506,7 @@ async fn delete_custom_provider(
             e
         )));
     }
-    if let Err(e) = sync_openteams_cli_profiles_from_app_config(&config) {
+    if let Err(e) = sync_openteams_cli_profiles_from_disk().await {
         tracing::error!("Failed to sync OpenTeams CLI profiles: {}", e);
         return ResponseJson(ApiResponse::error(&format!(
             "Provider deleted but failed to sync OpenTeams CLI profiles: {}",
@@ -701,13 +701,18 @@ fn cli_config_changed(
     Ok(serde_json::to_value(original)? != serde_json::to_value(updated)?)
 }
 
-fn sync_openteams_cli_profiles_from_app_config(
-    app_config: &CliConfig,
+async fn sync_openteams_cli_profiles_from_disk(
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let cli_config = try_read_openteams_cli_config_from_disk().await?;
+    sync_openteams_cli_profiles_from_cli_config(&cli_config)
+}
+
+fn sync_openteams_cli_profiles_from_cli_config(
+    cli_config: &OpenTeamsCliConfig,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     ExecutorConfigs::reload();
     let mut profiles = ExecutorConfigs::get_cached();
-    let changed =
-        sync_default_provider_models_into_open_teams_cli_profiles(&mut profiles, app_config);
+    let changed = sync_openteams_cli_models_into_profiles(&mut profiles, cli_config);
 
     if changed {
         profiles.save_overrides()?;
@@ -717,9 +722,9 @@ fn sync_openteams_cli_profiles_from_app_config(
     Ok(())
 }
 
-fn sync_default_provider_models_into_open_teams_cli_profiles(
+fn sync_openteams_cli_models_into_profiles(
     profiles: &mut ExecutorConfigs,
-    app_config: &CliConfig,
+    cli_config: &OpenTeamsCliConfig,
 ) -> bool {
     let Some(executor_config) = profiles.executors.get_mut(&BaseCodingAgent::OpenTeamsCli) else {
         return false;
@@ -739,31 +744,67 @@ fn sync_default_provider_models_into_open_teams_cli_profiles(
     executor_config.configurations.remove("APPROVALS");
     executor_config.set_default(base_config.clone());
 
-    let existing_auto_variants: Vec<_> = executor_config
-        .configurations
-        .keys()
-        .filter(|key| key.starts_with(AUTO_MODEL_VARIANT_PREFIX))
-        .cloned()
+    let desired_variant_keys: BTreeSet<_> = resolve_openteams_cli_model_ids(cli_config)
+        .into_iter()
+        .map(|qualified_model| model_variant_key(&qualified_model))
         .collect();
-    for variant_key in existing_auto_variants {
-        executor_config.configurations.remove(&variant_key);
+
+    let existing_managed_variants: Vec<_> = executor_config
+        .configurations
+        .iter()
+        .filter_map(|(key, config)| {
+            is_managed_openteams_cli_model_variant(key, config, &base_config).then_some(key.clone())
+        })
+        .collect();
+    for variant_key in existing_managed_variants {
+        if !desired_variant_keys.contains(&variant_key) {
+            executor_config.configurations.remove(&variant_key);
+        }
     }
 
-    let default_provider = app_config.provider.default.trim();
-    let synced_model_ids = resolve_default_provider_model_ids(app_config);
-    for model_id in synced_model_ids {
-        let Some(qualified_model) = qualify_model_id(default_provider, &model_id) else {
-            continue;
-        };
-        let Some(model_config) = with_model(&base_config, &qualified_model) else {
+    for variant_key in desired_variant_keys {
+        let Some(model_config) = with_model(&base_config, &variant_key) else {
             continue;
         };
         executor_config
             .configurations
-            .insert(model_variant_key(&qualified_model), model_config);
+            .insert(variant_key, model_config);
     }
 
     before != *executor_config
+}
+
+fn is_managed_openteams_cli_model_variant(
+    variant_key: &str,
+    config: &CodingAgent,
+    base_config: &CodingAgent,
+) -> bool {
+    if variant_key.starts_with(AUTO_MODEL_VARIANT_PREFIX) {
+        return true;
+    }
+
+    if !variant_key.contains('/') {
+        return false;
+    }
+
+    match (config, base_config) {
+        (CodingAgent::OpenTeamsCli(current), CodingAgent::OpenTeamsCli(base)) => {
+            if current.model.as_deref() != Some(variant_key)
+                || current.variant.is_some()
+                || current.agent.is_some()
+            {
+                return false;
+            }
+
+            let mut normalized = current.clone();
+            normalized.model = None;
+            normalized.variant = None;
+            normalized.agent = None;
+
+            normalized == *base
+        }
+        _ => false,
+    }
 }
 
 fn openteams_cli_default_config(config: CodingAgent) -> Option<CodingAgent> {
@@ -778,32 +819,24 @@ fn openteams_cli_default_config(config: CodingAgent) -> Option<CodingAgent> {
     }
 }
 
-fn resolve_default_provider_model_ids(app_config: &CliConfig) -> Vec<String> {
+fn resolve_openteams_cli_model_ids(cli_config: &OpenTeamsCliConfig) -> Vec<String> {
     let mut model_ids = BTreeSet::new();
-    let default_provider = app_config.provider.default.trim();
-
-    if let Some(models) = app_config
-        .provider
-        .custom_providers
-        .as_ref()
-        .and_then(|providers| providers.get(default_provider))
-        .and_then(|entry| entry.models.as_ref())
-    {
-        for model_id in models.keys() {
-            let trimmed = model_id.trim();
-            if !trimmed.is_empty() {
-                model_ids.insert(trimmed.to_string());
+    if let Some(providers) = &cli_config.provider {
+        for (provider_id, provider) in providers {
+            if let Some(models) = &provider.models {
+                for model_id in models.keys() {
+                    if let Some(qualified) = qualify_model_id(provider_id, model_id) {
+                        model_ids.insert(qualified);
+                    }
+                }
             }
         }
     }
 
-    let default_model = app_config.model.default.trim();
-    if !default_model.is_empty() {
-        model_ids.insert(
-            bare_model_id(default_provider, default_model)
-                .unwrap_or(default_model)
-                .to_string(),
-        );
+    if let Some(default_model) = cli_config.model.as_deref().map(str::trim)
+        && !default_model.is_empty()
+    {
+        model_ids.insert(default_model.to_string());
     }
 
     model_ids.into_iter().collect()
@@ -819,16 +852,6 @@ fn qualify_model_id(provider_id: &str, model_id: &str) -> Option<String> {
         return Some(model_id.to_string());
     }
     Some(format!("{provider_id}/{model_id}"))
-}
-
-fn bare_model_id<'a>(provider_id: &str, model_id: &'a str) -> Option<&'a str> {
-    let trimmed = model_id.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    let prefix = format!("{}/", provider_id.trim());
-    Some(trimmed.strip_prefix(&prefix).unwrap_or(trimmed))
 }
 
 fn model_variant_key(model_id: &str) -> String {
@@ -1954,57 +1977,56 @@ mod tests {
         assert!(cli_config.provider.is_none());
     }
 
-    #[test]
-    fn sync_default_provider_models_into_open_teams_cli_profiles_replaces_builtin_variants() {
-        let mut profiles = ExecutorConfigs::from_defaults();
-        let mut app_config = CliConfig::default_config();
-        app_config.provider.default = "litellm".into();
-        app_config.model.default = "gpt-4o".into();
-        app_config.provider.custom_providers = Some(HashMap::from([(
-            "litellm".to_string(),
-            CustomProviderEntry {
-                id: "litellm".into(),
-                name: Some("LiteLLM".into()),
-                npm: Some(DEFAULT_CUSTOM_PROVIDER_NPM.into()),
-                options: services::services::cli_config::CustomProviderOptions {
-                    base_url: Some("https://litellm.example.com/v1".into()),
-                    api_key: Some("secret".into()),
-                    timeout: None,
+    fn build_test_openteams_cli_config(models: &[&str], default_model: Option<&str>) -> OpenTeamsCliConfig {
+        OpenTeamsCliConfig {
+            provider: Some(HashMap::from([(
+                "litellm".to_string(),
+                OpenTeamsCliProviderConfig {
+                    npm: Some(DEFAULT_CUSTOM_PROVIDER_NPM.into()),
+                    name: Some("LiteLLM".into()),
+                    options: Some(OpenTeamsCliProviderOptions {
+                        api_key: Some("secret".into()),
+                        base_url: Some("https://litellm.example.com/v1".into()),
+                        timeout: None,
+                        chunk_timeout: None,
+                        enterprise_url: None,
+                        set_cache_key: None,
+                    }),
+                    models: Some(
+                        models
+                            .iter()
+                            .map(|model_id| {
+                                (
+                                    (*model_id).to_string(),
+                                    services::services::cli_config::OpenTeamsCliModelConfig {
+                                        name: Some((*model_id).to_string()),
+                                        modalities: None,
+                                        options: None,
+                                        limit: None,
+                                        variants: None,
+                                    },
+                                )
+                            })
+                            .collect(),
+                    ),
+                    whitelist: None,
+                    blacklist: None,
                 },
-                models: Some(HashMap::from([
-                    (
-                        "gpt-4o".to_string(),
-                        services::services::cli_config::CustomModelConfig {
-                            name: Some("GPT-4o".into()),
-                            modalities: None,
-                            options: None,
-                            limit: None,
-                        },
-                    ),
-                    (
-                        "claude-sonnet-4-20250514".to_string(),
-                        services::services::cli_config::CustomModelConfig {
-                            name: Some("Claude Sonnet 4".into()),
-                            modalities: None,
-                            options: None,
-                            limit: None,
-                        },
-                    ),
-                    (
-                        "gemini-2.5-pro".to_string(),
-                        services::services::cli_config::CustomModelConfig {
-                            name: Some("Gemini 2.5 Pro".into()),
-                            modalities: None,
-                            options: None,
-                            limit: None,
-                        },
-                    ),
-                ])),
-            },
-        )]));
+            )])),
+            model: default_model.map(str::to_string),
+            ..OpenTeamsCliConfig::default()
+        }
+    }
 
-        let changed =
-            sync_default_provider_models_into_open_teams_cli_profiles(&mut profiles, &app_config);
+    #[test]
+    fn sync_openteams_cli_models_into_profiles_replaces_builtin_variants() {
+        let mut profiles = ExecutorConfigs::from_defaults();
+        let cli_config = build_test_openteams_cli_config(
+            &["gpt-4o", "claude-sonnet-4-20250514", "gemini-2.5-pro"],
+            Some("litellm/gpt-4o"),
+        );
+
+        let changed = sync_openteams_cli_models_into_profiles(&mut profiles, &cli_config);
 
         assert!(changed);
 
@@ -2062,55 +2084,21 @@ mod tests {
     }
 
     #[test]
-    fn sync_default_provider_models_into_open_teams_cli_profiles_keeps_generic_default_on_resync() {
+    fn sync_openteams_cli_models_into_profiles_keeps_generic_default_on_resync() {
         let mut profiles = ExecutorConfigs::from_defaults();
-        let mut app_config = CliConfig::default_config();
-        app_config.provider.default = "litellm".into();
-        app_config.model.default = "gpt-4o".into();
-        app_config.provider.custom_providers = Some(HashMap::from([(
-            "litellm".to_string(),
-            CustomProviderEntry {
-                id: "litellm".into(),
-                name: Some("LiteLLM".into()),
-                npm: Some(DEFAULT_CUSTOM_PROVIDER_NPM.into()),
-                options: services::services::cli_config::CustomProviderOptions {
-                    base_url: Some("https://litellm.example.com/v1".into()),
-                    api_key: Some("secret".into()),
-                    timeout: None,
-                },
-                models: Some(HashMap::from([
-                    (
-                        "gpt-4o".to_string(),
-                        services::services::cli_config::CustomModelConfig {
-                            name: Some("GPT-4o".into()),
-                            modalities: None,
-                            options: None,
-                            limit: None,
-                        },
-                    ),
-                    (
-                        "claude-sonnet-4-20250514".to_string(),
-                        services::services::cli_config::CustomModelConfig {
-                            name: Some("Claude Sonnet 4".into()),
-                            modalities: None,
-                            options: None,
-                            limit: None,
-                        },
-                    ),
-                ])),
-            },
-        )]));
+        let cli_config = build_test_openteams_cli_config(
+            &["gpt-4o", "claude-sonnet-4-20250514"],
+            Some("litellm/gpt-4o"),
+        );
 
-        assert!(sync_default_provider_models_into_open_teams_cli_profiles(
+        assert!(sync_openteams_cli_models_into_profiles(
             &mut profiles,
-            &app_config
+            &cli_config
         ));
 
-        app_config.model.default = "claude-sonnet-4-20250514".into();
-
-        assert!(!sync_default_provider_models_into_open_teams_cli_profiles(
+        assert!(!sync_openteams_cli_models_into_profiles(
             &mut profiles,
-            &app_config
+            &cli_config
         ));
 
         let executor_config = profiles
@@ -2142,6 +2130,69 @@ mod tests {
                 .configurations
                 .contains_key(&claude_variant_key)
         );
+    }
+
+    #[test]
+    fn sync_openteams_cli_models_into_profiles_removes_deleted_custom_models() {
+        let mut profiles = ExecutorConfigs::from_defaults();
+        let mut cli_config = build_test_openteams_cli_config(
+            &["gpt-4o", "claude-sonnet-4-20250514"],
+            Some("litellm/gpt-4o"),
+        );
+
+        assert!(sync_openteams_cli_models_into_profiles(
+            &mut profiles,
+            &cli_config
+        ));
+
+        cli_config
+            .provider
+            .as_mut()
+            .and_then(|providers| providers.get_mut("litellm"))
+            .and_then(|provider| provider.models.as_mut())
+            .expect("custom provider models should exist")
+            .remove("claude-sonnet-4-20250514");
+
+        assert!(sync_openteams_cli_models_into_profiles(
+            &mut profiles,
+            &cli_config
+        ));
+
+        let executor_config = profiles
+            .executors
+            .get(&BaseCodingAgent::OpenTeamsCli)
+            .expect("OpenTeams CLI executor should exist");
+        let gpt_variant_key = model_variant_key("litellm/gpt-4o");
+        let claude_variant_key = model_variant_key("litellm/claude-sonnet-4-20250514");
+
+        assert!(executor_config.configurations.contains_key(&gpt_variant_key));
+        assert!(!executor_config.configurations.contains_key(&claude_variant_key));
+    }
+
+    #[test]
+    fn sync_openteams_cli_models_into_profiles_keeps_all_models_from_provider_map() {
+        let mut profiles = ExecutorConfigs::from_defaults();
+        let cli_config = build_test_openteams_cli_config(
+            &["gpt-5.3-codex-2026-02-24", "gpt-5.4-2026-03-05"],
+            Some("codingplane/glm-5"),
+        );
+
+        assert!(sync_openteams_cli_models_into_profiles(
+            &mut profiles,
+            &cli_config
+        ));
+
+        let executor_config = profiles
+            .executors
+            .get(&BaseCodingAgent::OpenTeamsCli)
+            .expect("OpenTeams CLI executor should exist");
+        let gpt53_variant_key = model_variant_key("litellm/gpt-5.3-codex-2026-02-24");
+        let gpt54_variant_key = model_variant_key("litellm/gpt-5.4-2026-03-05");
+        let default_variant_key = model_variant_key("codingplane/glm-5");
+
+        assert!(executor_config.configurations.contains_key(&gpt53_variant_key));
+        assert!(executor_config.configurations.contains_key(&gpt54_variant_key));
+        assert!(executor_config.configurations.contains_key(&default_variant_key));
     }
 
     #[test]

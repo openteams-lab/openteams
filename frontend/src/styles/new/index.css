@@ -2307,12 +2307,12 @@
 
   .new-design .chat-session-work-item-card {
     width: min(760px, 100%);
-    border: 1px solid rgba(22, 163, 74, 0.18);
+    border: 1px solid var(--chat-agent-avatar-border, rgba(22, 163, 74, 0.18));
     border-radius: 18px;
     background: linear-gradient(
       180deg,
-      rgba(240, 253, 244, 0.96),
-      rgba(255, 255, 255, 0.96)
+      rgb(var(--chat-agent-avatar-bg-rgb, 242 245 255) / 0.72),
+      rgba(255, 255, 255, 0.94)
     );
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.92),

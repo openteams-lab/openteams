@@ -3787,6 +3787,10 @@ export function ChatSessions() {
 
                     {filteredTimelineEntries.map((entry) => {
                       if (entry.kind === 'work_item') {
+                        if (entry.group.artifacts.length === 0) {
+                          return null;
+                        }
+
                         const isSelected = selectedTimelineEntryKeys.has(
                           entry.key
                         );
