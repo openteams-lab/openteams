@@ -51,6 +51,7 @@
 ## Quick Start
 
 ### Option A: Run with npx
+**This installation method is recommended for Mac and Linux.**
 
 ```bash
 # web
