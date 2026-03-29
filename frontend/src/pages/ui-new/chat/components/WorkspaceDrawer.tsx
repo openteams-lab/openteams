@@ -393,7 +393,10 @@ export function WorkspaceDrawer({
                 {!logLoading && !logError && (
                   <div className="chat-session-workspace-log-body min-h-[320px] max-h-[420px] overflow-y-auto border-t border-[#d8dce6] bg-[#ecedf1] pt-base select-text">
                     {logContent ? (
-                      <RawLogText content={logContent} className="select-text" />
+                      <RawLogText
+                        content={logContent}
+                        className="select-text"
+                      />
                     ) : (
                       <div className="text-xs text-low">
                         {t('modals.workspaceDrawer.logEmpty')}
