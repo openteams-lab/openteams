@@ -69,7 +69,7 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
       }, 500);
 
       return () => clearTimeout(timer);
-    }, [workspacePath]);
+    }, [t, workspacePath]);
 
     const handleBrowse = async () => {
       const selected = await FolderPickerDialog.show({
