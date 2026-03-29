@@ -1,0 +1,19 @@
+#navbar nav-logo img,
+#navbar .nav-logo img,
+#navbar [class*='nav-logo'] img,
+#navbar a img[src*='characters_black.png'],
+#navbar a img[src*='characters_blue.png'],
+#navbar picture img[src*='characters_black.png'],
+#navbar picture img[src*='characters_blue.png'],
+#navbar img[src*='characters_black.png'],
+#navbar img[src*='characters_blue.png'] {
+  height: 20px !important;
+  width: auto !important;
+  max-height: 30px !important;
+  max-width: none !important;
+  object-fit: contain !important;
+}
+
+#navbar #localization-select-trigger {
+  margin-left: 9.0rem;
+}

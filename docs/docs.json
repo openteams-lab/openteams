@@ -1,18 +1,25 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "openteams",
+  "name": "OpenTeams",
   "basePath": "/docs",
   "description": "openteams - Run agents as one team, multiply your efficiency in the AI era.",
   "appearance": {
     "default": "light"
   },
- "colors": {
-    "primary": "#c56a35",
-    "light": "#d98a52",
-    "dark": "#a85528"
+  "colors": {
+    "primary": "#5094fb",
+    "light": "#1d4ed8",
+    "dark": "#1d4ed8"
   },
-  "favicon": "/logos/favicon_black.svg",
+  "background": {
+    "decoration": "gradient",
+    "color": {
+      "light": "#f8fbff",
+      "dark": "#0f172a"
+    }
+  },
+  "favicon": "/logos/logo_black.svg",
   "navigation": {
     "languages": [
       {
@@ -22,10 +29,18 @@
             "group": "Getting started",
             "pages": [
               "index",
-              "getting-started",
+              "getting-started"
+            ]
+          },
+          {
+            "group": "Advanced Usage",
+            "pages": [
+              "advanced-usage/create-team",
+              "advanced-usage/skills",
+              "advanced-usage/custom-provider",
               {
                 "group": "Supported Coding Agents",
-                "expanded": true,
+                "expanded": false,
                 "pages": [
                   "supported-coding-agents",
                   "agents/claude-code",
@@ -47,17 +62,14 @@
             "group": "Core Features",
             "pages": [
               "core-features/chat-session-overview",
-              "core-features/managing-sessions",
               "core-features/ai-members",
-              "core-features/ai-team-presets",
-              "core-features/task-collaboration",
-              "core-features/code-review"
+              "core-features/task-collaboration"
             ]
           },
           {
             "group": "Help",
             "pages": [
-              "troubleshooting"
+              "help/faq"
             ]
           }
         ]
@@ -69,10 +81,18 @@
             "group": "开始使用",
             "pages": [
               "zh-Hans/index",
-              "zh-Hans/getting-started",
+              "zh-Hans/getting-started"
+            ]
+          },
+          {
+            "group": "进阶使用",
+            "pages": [
+              "zh-Hans/advanced-usage/create-team",
+              "zh-Hans/advanced-usage/skills",
+              "zh-Hans/advanced-usage/custom-provider",
               {
                 "group": "支持的编程代理",
-                "expanded": true,
+                "expanded": false,
                 "pages": [
                   "zh-Hans/supported-coding-agents",
                   "zh-Hans/agents/claude-code",
@@ -94,17 +114,14 @@
             "group": "核心功能",
             "pages": [
               "zh-Hans/core-features/chat-session-overview",
-              "zh-Hans/core-features/managing-sessions",
               "zh-Hans/core-features/ai-members",
-              "zh-Hans/core-features/ai-team-presets",
-              "zh-Hans/core-features/task-collaboration",
-              "zh-Hans/core-features/code-review"
+              "zh-Hans/core-features/task-collaboration"
             ]
           },
           {
             "group": "帮助",
             "pages": [
-              "zh-Hans/troubleshooting"
+              "zh-Hans/help/faq"
             ]
           }
         ]
@@ -116,10 +133,18 @@
             "group": "開始使用",
             "pages": [
               "zh-Hant/index",
-              "zh-Hant/getting-started",
+              "zh-Hant/getting-started"
+            ]
+          },
+          {
+            "group": "進階使用",
+            "pages": [
+              "zh-Hant/advanced-usage/create-team",
+              "zh-Hant/advanced-usage/skills",
+              "zh-Hant/advanced-usage/custom-provider",
               {
                 "group": "支援的程式設計代理",
-                "expanded": true,
+                "expanded": false,
                 "pages": [
                   "zh-Hant/supported-coding-agents",
                   "zh-Hant/agents/claude-code",
@@ -141,17 +166,14 @@
             "group": "核心功能",
             "pages": [
               "zh-Hant/core-features/chat-session-overview",
-              "zh-Hant/core-features/managing-sessions",
               "zh-Hant/core-features/ai-members",
-              "zh-Hant/core-features/ai-team-presets",
-              "zh-Hant/core-features/task-collaboration",
-              "zh-Hant/core-features/code-review"
+              "zh-Hant/core-features/task-collaboration"
             ]
           },
           {
             "group": "幫助",
             "pages": [
-              "zh-Hant/troubleshooting"
+              "zh-Hant/help/faq"
             ]
           }
         ]
@@ -163,10 +185,18 @@
             "group": "はじめに",
             "pages": [
               "ja/index",
-              "ja/getting-started",
+              "ja/getting-started"
+            ]
+          },
+          {
+            "group": "応用",
+            "pages": [
+              "ja/advanced-usage/create-team",
+              "ja/advanced-usage/skills",
+              "ja/advanced-usage/custom-provider",
               {
                 "group": "サポートエージェント",
-                "expanded": true,
+                "expanded": false,
                 "pages": [
                   "ja/supported-coding-agents",
                   "ja/agents/claude-code",
@@ -188,17 +218,14 @@
             "group": "コア機能",
             "pages": [
               "ja/core-features/chat-session-overview",
-              "ja/core-features/managing-sessions",
               "ja/core-features/ai-members",
-              "ja/core-features/ai-team-presets",
-              "ja/core-features/task-collaboration",
-              "ja/core-features/code-review"
+              "ja/core-features/task-collaboration"
             ]
           },
           {
             "group": "ヘルプ",
             "pages": [
-              "ja/troubleshooting"
+              "ja/help/faq"
             ]
           }
         ]
@@ -210,10 +237,18 @@
             "group": "시작하기",
             "pages": [
               "ko/index",
-              "ko/getting-started",
+              "ko/getting-started"
+            ]
+          },
+          {
+            "group": "고급 사용",
+            "pages": [
+              "ko/advanced-usage/create-team",
+              "ko/advanced-usage/skills",
+              "ko/advanced-usage/custom-provider",
               {
                 "group": "지원 에이전트",
-                "expanded": true,
+                "expanded": false,
                 "pages": [
                   "ko/supported-coding-agents",
                   "ko/agents/claude-code",
@@ -235,17 +270,14 @@
             "group": "핵심 기능",
             "pages": [
               "ko/core-features/chat-session-overview",
-              "ko/core-features/managing-sessions",
               "ko/core-features/ai-members",
-              "ko/core-features/ai-team-presets",
-              "ko/core-features/task-collaboration",
-              "ko/core-features/code-review"
+              "ko/core-features/task-collaboration"
             ]
           },
           {
             "group": "도움말",
             "pages": [
-              "ko/troubleshooting"
+              "ko/help/faq"
             ]
           }
         ]
@@ -257,10 +289,18 @@
             "group": "Démarrage",
             "pages": [
               "fr/index",
-              "fr/getting-started",
+              "fr/getting-started"
+            ]
+          },
+          {
+            "group": "Utilisation avancée",
+            "pages": [
+              "fr/advanced-usage/create-team",
+              "fr/advanced-usage/skills",
+              "fr/advanced-usage/custom-provider",
               {
                 "group": "Agents Supportés",
-                "expanded": true,
+                "expanded": false,
                 "pages": [
                   "fr/supported-coding-agents",
                   "fr/agents/claude-code",
@@ -282,17 +322,14 @@
             "group": "Fonctionnalités",
             "pages": [
               "fr/core-features/chat-session-overview",
-              "fr/core-features/managing-sessions",
               "fr/core-features/ai-members",
-              "fr/core-features/ai-team-presets",
-              "fr/core-features/task-collaboration",
-              "fr/core-features/code-review"
+              "fr/core-features/task-collaboration"
             ]
           },
           {
             "group": "Aide",
             "pages": [
-              "fr/troubleshooting"
+              "fr/help/faq"
             ]
           }
         ]
@@ -300,8 +337,8 @@
     ]
   },
   "logo": {
-    "light": "/logos/light.png",
-    "dark": "/logos/dark.png"
+    "light": "/logos/characters_black.png",
+    "dark": "/logos/characters_blue.png"
   },
   "navbar": {
     "links": [
@@ -341,4 +378,3 @@
     }
   }
 }
-
