@@ -640,12 +640,9 @@ async fn sync_discovered_global_skills_at_home_dir(
         let slug = slugify_skill_name(&skill.name);
         if let Some(existing) = existing_by_slug.get_mut(&slug) {
             if discovered_skill_needs_refresh(existing, &skill) {
-                let updated = ChatSkill::update(
-                    pool,
-                    existing.id,
-                    &discovered_skill_refresh_update(&skill),
-                )
-                .await?;
+                let updated =
+                    ChatSkill::update(pool, existing.id, &discovered_skill_refresh_update(&skill))
+                        .await?;
                 *existing = updated;
                 synced_count += 1;
             }
@@ -715,8 +712,12 @@ async fn prune_stale_session_agent_skill_ids(
             .collect::<Vec<_>>();
 
         if next_allowed_skill_ids != session_agent.allowed_skill_ids.0 {
-            ChatSessionAgent::update_allowed_skill_ids(pool, session_agent.id, next_allowed_skill_ids)
-                .await?;
+            ChatSessionAgent::update_allowed_skill_ids(
+                pool,
+                session_agent.id,
+                next_allowed_skill_ids,
+            )
+            .await?;
         }
     }
 

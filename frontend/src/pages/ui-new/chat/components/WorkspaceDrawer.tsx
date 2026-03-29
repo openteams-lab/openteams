@@ -179,7 +179,7 @@ export function WorkspaceDrawer({
                   <FolderNotchOpenIcon className="size-icon-xs" />
                   <span>{t('modals.workspaceDrawer.workspacePath')}</span>
                 </div>
-                <div className="chat-session-workspace-path-raw">
+                <div className="chat-session-workspace-path-raw select-text">
                   {workspacePath}
                 </div>
               </div>
@@ -319,7 +319,7 @@ export function WorkspaceDrawer({
                               defaultValue: 'View Details',
                             })}
                           </summary>
-                          <pre className="mt-1 max-h-[100px] overflow-auto rounded bg-[rgba(239,68,68,0.04)] p-2 text-[10px] font-mono text-low whitespace-pre-wrap break-all">
+                          <pre className="mt-1 max-h-[100px] overflow-auto rounded bg-[rgba(239,68,68,0.04)] p-2 text-[10px] font-mono text-low whitespace-pre-wrap break-all select-text">
                             {run.errorContent}
                           </pre>
                         </details>
@@ -391,9 +391,9 @@ export function WorkspaceDrawer({
                   <div className="text-xs text-error">{logError}</div>
                 )}
                 {!logLoading && !logError && (
-                  <div className="chat-session-workspace-log-body min-h-[320px] max-h-[420px] overflow-y-auto border-t border-[#d8dce6] bg-[#ecedf1] pt-base">
+                  <div className="chat-session-workspace-log-body min-h-[320px] max-h-[420px] overflow-y-auto border-t border-[#d8dce6] bg-[#ecedf1] pt-base select-text">
                     {logContent ? (
-                      <RawLogText content={logContent} />
+                      <RawLogText content={logContent} className="select-text" />
                     ) : (
                       <div className="text-xs text-low">
                         {t('modals.workspaceDrawer.logEmpty')}
@@ -432,7 +432,7 @@ export function WorkspaceDrawer({
             )}
           </DialogTitle>
         </DialogHeader>
-        <DialogContent>
+        <DialogContent className="select-text">
           <div className="space-y-4">
             {/* Error section */}
             {expandedRun?.hasError && expandedRun.errorSummary && (
@@ -453,7 +453,7 @@ export function WorkspaceDrawer({
                           defaultValue: 'Full Error Log',
                         })}
                       </div>
-                      <pre className="max-h-[200px] overflow-auto rounded bg-[rgba(239,68,68,0.04)] p-2 text-xs font-mono text-low whitespace-pre-wrap break-all">
+                      <pre className="max-h-[200px] overflow-auto rounded bg-[rgba(239,68,68,0.04)] p-2 text-xs font-mono text-low whitespace-pre-wrap break-all select-text">
                         {expandedRun.errorContent}
                       </pre>
                     </div>
@@ -461,8 +461,8 @@ export function WorkspaceDrawer({
               </div>
             )}
             {/* Content section */}
-            <div className="max-h-[50vh] overflow-y-auto rounded-sm bg-[#ecedf1] p-base">
-              <div className="text-xs text-normal font-mono whitespace-pre-wrap break-all">
+            <div className="max-h-[50vh] overflow-y-auto rounded-sm bg-[#ecedf1] p-base select-text">
+              <div className="text-xs text-normal font-mono whitespace-pre-wrap break-all select-text">
                 {expandedRun?.content ?? ''}
               </div>
             </div>
@@ -490,7 +490,7 @@ export function WorkspaceDrawer({
             </span>
           </DialogTitle>
         </DialogHeader>
-        <DialogContent>
+        <DialogContent className="select-text">
           <div className="space-y-4">
             {/* Error Summary */}
             <div className="rounded-sm bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] p-base">
@@ -503,7 +503,7 @@ export function WorkspaceDrawer({
                 {expandedError?.errorSummary}
               </div>
               {expandedError?.errorDetail && (
-                <div className="mt-2 text-xs text-low">
+                <div className="mt-2 text-xs text-low select-text">
                   {expandedError.errorDetail}
                 </div>
               )}
@@ -527,8 +527,8 @@ export function WorkspaceDrawer({
                   defaultValue: 'Message Content',
                 })}
               </div>
-              <div className="max-h-[50vh] overflow-y-auto rounded-sm bg-[#ecedf1] p-base">
-                <div className="text-xs text-normal font-mono whitespace-pre-wrap break-all">
+              <div className="max-h-[50vh] overflow-y-auto rounded-sm bg-[#ecedf1] p-base select-text">
+                <div className="text-xs text-normal font-mono whitespace-pre-wrap break-all select-text">
                   {expandedError?.message?.content ?? ''}
                 </div>
               </div>

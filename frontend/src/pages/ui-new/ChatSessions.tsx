@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { UsersThreeIcon } from '@phosphor-icons/react';
+import { UsersThreeIcon, CaretDoubleDownIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -954,6 +954,10 @@ export function ChatSessions() {
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const previousSessionIdRef = useRef<string | null>(null);
+  const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const isUserScrolledUpRef = useRef(false);
+  const prevLastTimelineEntryKeyRef = useRef<string | null>(null);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<SessionMember | null>(
     null
@@ -1893,13 +1897,61 @@ export function ChatSessions() {
     }
   }, [activeSession?.status]);
 
-  // Auto-scroll
+  // Track scroll position to detect user scrolling up
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      const scrolledUp = distanceFromBottom > 100;
+      isUserScrolledUpRef.current = scrolledUp;
+      setIsUserScrolledUp(scrolledUp);
+      if (!scrolledUp) {
+        setHasNewMessages(false);
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [activeSessionId]);
+
+  // Auto-scroll (skip when user is viewing history; streaming/running changes are not "new messages")
   useEffect(() => {
     const isSessionChanged = previousSessionIdRef.current !== activeSessionId;
     previousSessionIdRef.current = activeSessionId;
+
+    // Detect whether this effect fired because of a genuinely new timeline entry
+    const isNewTimelineEntry =
+      lastTimelineEntryKey !== prevLastTimelineEntryKeyRef.current;
+    prevLastTimelineEntryKeyRef.current = lastTimelineEntryKey;
+
+    if (isSessionChanged) {
+      // Always scroll on session switch
+      setIsUserScrolledUp(false);
+      setHasNewMessages(false);
+      isUserScrolledUpRef.current = false;
+      const animationFrame = requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({
+          behavior: 'auto',
+          block: 'end',
+        });
+      });
+      return () => cancelAnimationFrame(animationFrame);
+    }
+
+    if (isUserScrolledUpRef.current) {
+      // Only show "new messages" badge for actual new messages, not streaming/running updates
+      if (isNewTimelineEntry) {
+        setHasNewMessages(true);
+      }
+      return;
+    }
+
     const animationFrame = requestAnimationFrame(() => {
       bottomRef.current?.scrollIntoView({
-        behavior: isSessionChanged ? 'auto' : 'smooth',
+        behavior: 'smooth',
         block: 'end',
       });
     });
@@ -3958,6 +4010,28 @@ export function ChatSessions() {
                     <div ref={bottomRef} />
                   </div>
                 </div>
+
+                {/* New messages indicator */}
+                {hasNewMessages && isUserScrolledUp && (
+                  <div className="relative">
+                    <div className="absolute bottom-2 right-4 z-10">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          bottomRef.current?.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'end',
+                          });
+                          setHasNewMessages(false);
+                        }}
+                        className="flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[10px] font-bold text-[#5094fb] shadow-md border border-[#e0e7ef] hover:bg-[#f5f8ff] transition-colors"
+                      >
+                        <CaretDoubleDownIcon className="h-3 w-3" weight="bold" />
+                        <span>{t('timeline.newMessages')}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Message Input */}
                 <MessageInputArea

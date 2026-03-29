@@ -551,22 +551,28 @@ pub async fn create_session(
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
-    if !resp.status().is_success() {
+    let status = resp.status();
+    let body = resp
+        .text()
+        .await
+        .unwrap_or_else(|_| "<failed to read response body>".to_string());
+    let body_preview = preview_http_error_body(&body);
+
+    if !status.is_success() {
         tracing::warn!(
             base_url = %base_url,
             directory = %directory,
-            status = %resp.status(),
+            status = %status,
+            body_len = body.len(),
+            body = %body_preview,
             "OpenTeamsCli session.create failed"
         );
         return Err(ExecutorError::Io(io::Error::other(format!(
-            "OpenTeamsCli session.create failed: HTTP {}",
-            resp.status()
+            "OpenTeamsCli session.create failed: HTTP {status} {body_preview}"
         ))));
     }
 
-    let session = resp
-        .json::<SessionResponse>()
-        .await
+    let session = serde_json::from_str::<SessionResponse>(&body)
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
     tracing::debug!(
         base_url = %base_url,
@@ -621,8 +627,15 @@ pub async fn fork_session(
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
-    if !resp.status().is_success() {
-        let error_kind = if resp.status() == reqwest::StatusCode::NOT_FOUND {
+    let status = resp.status();
+    let body = resp
+        .text()
+        .await
+        .unwrap_or_else(|_| "<failed to read response body>".to_string());
+    let body_preview = preview_http_error_body(&body);
+
+    if !status.is_success() {
+        let error_kind = if status == reqwest::StatusCode::NOT_FOUND {
             io::ErrorKind::NotFound
         } else {
             io::ErrorKind::Other
@@ -631,18 +644,18 @@ pub async fn fork_session(
             base_url = %base_url,
             directory = %directory,
             source_session_id = %session_id,
-            status = %resp.status(),
+            status = %status,
+            body_len = body.len(),
+            body = %body_preview,
             "OpenTeamsCli session.fork failed"
         );
         return Err(ExecutorError::Io(io::Error::new(
             error_kind,
-            format!("OpenTeamsCli session.fork failed: HTTP {}", resp.status()),
+            format!("OpenTeamsCli session.fork failed: HTTP {status} {body_preview}"),
         )));
     }
 
-    let session = resp
-        .json::<SessionResponse>()
-        .await
+    let session = serde_json::from_str::<SessionResponse>(&body)
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
     tracing::debug!(
         base_url = %base_url,
@@ -652,6 +665,23 @@ pub async fn fork_session(
         "OpenTeamsCli session.fork succeeded"
     );
     Ok(session.id)
+}
+
+fn preview_http_error_body(body: &str) -> String {
+    let trimmed = body.trim();
+    if trimmed.is_empty() {
+        return "<empty body>".to_string();
+    }
+
+    const MAX_CHARS: usize = 1200;
+    let total_chars = trimmed.chars().count();
+    if total_chars <= MAX_CHARS {
+        return trimmed.to_string();
+    }
+
+    let mut preview = trimmed.chars().take(MAX_CHARS).collect::<String>();
+    preview.push_str(" ...<truncated>");
+    preview
 }
 
 #[allow(clippy::too_many_arguments)]

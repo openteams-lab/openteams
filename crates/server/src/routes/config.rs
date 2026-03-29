@@ -701,8 +701,8 @@ fn cli_config_changed(
     Ok(serde_json::to_value(original)? != serde_json::to_value(updated)?)
 }
 
-async fn sync_openteams_cli_profiles_from_disk(
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn sync_openteams_cli_profiles_from_disk()
+-> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cli_config = try_read_openteams_cli_config_from_disk().await?;
     sync_openteams_cli_profiles_from_cli_config(&cli_config)
 }
@@ -1977,7 +1977,10 @@ mod tests {
         assert!(cli_config.provider.is_none());
     }
 
-    fn build_test_openteams_cli_config(models: &[&str], default_model: Option<&str>) -> OpenTeamsCliConfig {
+    fn build_test_openteams_cli_config(
+        models: &[&str],
+        default_model: Option<&str>,
+    ) -> OpenTeamsCliConfig {
         OpenTeamsCliConfig {
             provider: Some(HashMap::from([(
                 "litellm".to_string(),
@@ -2165,8 +2168,16 @@ mod tests {
         let gpt_variant_key = model_variant_key("litellm/gpt-4o");
         let claude_variant_key = model_variant_key("litellm/claude-sonnet-4-20250514");
 
-        assert!(executor_config.configurations.contains_key(&gpt_variant_key));
-        assert!(!executor_config.configurations.contains_key(&claude_variant_key));
+        assert!(
+            executor_config
+                .configurations
+                .contains_key(&gpt_variant_key)
+        );
+        assert!(
+            !executor_config
+                .configurations
+                .contains_key(&claude_variant_key)
+        );
     }
 
     #[test]
@@ -2190,9 +2201,21 @@ mod tests {
         let gpt54_variant_key = model_variant_key("litellm/gpt-5.4-2026-03-05");
         let default_variant_key = model_variant_key("codingplane/glm-5");
 
-        assert!(executor_config.configurations.contains_key(&gpt53_variant_key));
-        assert!(executor_config.configurations.contains_key(&gpt54_variant_key));
-        assert!(executor_config.configurations.contains_key(&default_variant_key));
+        assert!(
+            executor_config
+                .configurations
+                .contains_key(&gpt53_variant_key)
+        );
+        assert!(
+            executor_config
+                .configurations
+                .contains_key(&gpt54_variant_key)
+        );
+        assert!(
+            executor_config
+                .configurations
+                .contains_key(&default_variant_key)
+        );
     }
 
     #[test]
