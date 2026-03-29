@@ -4026,7 +4026,10 @@ export function ChatSessions() {
                         }}
                         className="flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[10px] font-bold text-[#5094fb] shadow-md border border-[#e0e7ef] hover:bg-[#f5f8ff] transition-colors"
                       >
-                        <CaretDoubleDownIcon className="h-3 w-3" weight="bold" />
+                        <CaretDoubleDownIcon
+                          className="h-3 w-3"
+                          weight="bold"
+                        />
                         <span>{t('timeline.newMessages')}</span>
                       </button>
                     </div>
