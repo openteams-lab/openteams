@@ -410,7 +410,11 @@
       "title": "需要登录",
       "description": "请登录以查看此项目。",
       "action": "登录"
-    }
+    },
+    "linkWorkspace": "关联工作区...",
+    "createNewWorkspace": "创建新工作区",
+    "workspaces": "工作区",
+    "showingWorkspaces": "显示 {{count}} / {{total}}"
   },
   "syncError": {
     "networkErrors": "网络错误",
@@ -418,6 +422,22 @@
     "streamsAffected_other": "{{count}} 个数据流受影响",
     "status": "(状态 {{status}})",
     "refreshPage": "刷新页面"
+  },
+  "session": {
+    "createNew": "新建会话",
+    "createNewDescription": "开始一个新的对话，可选择附加一个默认工作区。",
+    "title": "标题",
+    "optional": "可选",
+    "titlePlaceholder": "可选标题…",
+    "workspacePath": "默认工作区",
+    "workspacePathHelp": "设置一个起始文件夹，以便团队在正确的项目上下文中开始。",
+    "workspacePathPlaceholder": "/项目/路径",
+    "selectWorkspace": "选择工作区",
+    "selectWorkspaceDescription": "为此会话选择一个默认工作区文件夹",
+    "browse": "浏览",
+    "create": "创建",
+    "invalidPath": "无效路径",
+    "validationFailed": "验证失败"
   },
   "issues": {
     "deleteConfirm": {

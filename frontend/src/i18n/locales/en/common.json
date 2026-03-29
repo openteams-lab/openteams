@@ -410,7 +410,11 @@
       "title": "Sign in required",
       "description": "Please sign in to view this project.",
       "action": "Sign in"
-    }
+    },
+    "linkWorkspace": "Link workspace...",
+    "createNewWorkspace": "Create new workspace",
+    "workspaces": "Workspaces",
+    "showingWorkspaces": "Showing {{count}} of {{total}}"
   },
   "syncError": {
     "networkErrors": "Network Errors",
@@ -418,6 +422,22 @@
     "streamsAffected_other": "{{count}} streams affected",
     "status": "(status {{status}})",
     "refreshPage": "Refresh Page"
+  },
+  "session": {
+    "createNew": "New Session",
+    "createNewDescription": "Start a fresh conversation and optionally attach a default workspace.",
+    "title": "Title",
+    "optional": "Optional",
+    "titlePlaceholder": "Optional title…",
+    "workspacePath": "Default Workspace",
+    "workspacePathHelp": "Set a starting folder so the team opens with the right project context.",
+    "workspacePathPlaceholder": "/path/to/project",
+    "selectWorkspace": "Select Workspace",
+    "selectWorkspaceDescription": "Choose a default workspace folder for this session",
+    "browse": "Browse",
+    "create": "Create",
+    "invalidPath": "Invalid path",
+    "validationFailed": "Validation failed"
   },
   "issues": {
     "deleteConfirm": {

@@ -410,7 +410,11 @@
       "title": "로그인 필요",
       "description": "이 프로젝트를 보려면 로그인하세요.",
       "action": "로그인"
-    }
+    },
+    "linkWorkspace": "워크스페이스 연결...",
+    "createNewWorkspace": "새 워크스페이스 만들기",
+    "workspaces": "워크스페이스",
+    "showingWorkspaces": "{{total}}개 중 {{count}}개 표시"
   },
   "syncError": {
     "networkErrors": "네트워크 오류",
@@ -418,6 +422,22 @@
     "streamsAffected_other": "{{count}}개 스트림이 영향을 받음",
     "status": "(상태 {{status}})",
     "refreshPage": "페이지 새로고침"
+  },
+  "session": {
+    "createNew": "새 세션",
+    "createNewDescription": "새 대화를 시작하고, 필요에 따라 기본 워크스페이스를 설정합니다.",
+    "title": "제목",
+    "optional": "선택사항",
+    "titlePlaceholder": "선택 제목…",
+    "workspacePath": "기본 워크스페이스",
+    "workspacePathHelp": "팀이 올바른 프로젝트 컨텍스트에서 시작할 수 있도록 시작 폴더를 설정합니다.",
+    "workspacePathPlaceholder": "/프로젝트/경로",
+    "selectWorkspace": "워크스페이스 선택",
+    "selectWorkspaceDescription": "이 세션의 기본 워크스페이스 폴더를 선택하세요",
+    "browse": "찾아보기",
+    "create": "생성",
+    "invalidPath": "잘못된 경로",
+    "validationFailed": "검증 실패"
   },
   "issues": {
     "deleteConfirm": {
