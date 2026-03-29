@@ -410,7 +410,11 @@
       "title": "Se requiere iniciar sesión",
       "description": "Por favor inicia sesión para ver este proyecto.",
       "action": "Iniciar sesión"
-    }
+    },
+    "linkWorkspace": "Vincular espacio de trabajo...",
+    "createNewWorkspace": "Crear nuevo espacio de trabajo",
+    "workspaces": "Espacios de trabajo",
+    "showingWorkspaces": "Mostrando {{count}} de {{total}}"
   },
   "syncError": {
     "networkErrors": "Errores de red",
@@ -418,6 +422,22 @@
     "streamsAffected_other": "{{count}} flujos afectados",
     "status": "(estado {{status}})",
     "refreshPage": "Actualizar página"
+  },
+  "session": {
+    "createNew": "Nueva sesión",
+    "createNewDescription": "Inicia una conversación nueva y, opcionalmente, adjunta un espacio de trabajo predeterminado.",
+    "title": "Título",
+    "optional": "Opcional",
+    "titlePlaceholder": "Título opcional…",
+    "workspacePath": "Espacio de trabajo predeterminado",
+    "workspacePathHelp": "Establece una carpeta inicial para que el equipo comience con el contexto de proyecto correcto.",
+    "workspacePathPlaceholder": "/ruta/al/proyecto",
+    "selectWorkspace": "Seleccionar espacio de trabajo",
+    "selectWorkspaceDescription": "Elige una carpeta de espacio de trabajo predeterminada para esta sesión",
+    "browse": "Explorar",
+    "create": "Crear",
+    "invalidPath": "Ruta no válida",
+    "validationFailed": "Falló la validación"
   },
   "issues": {
     "deleteConfirm": {

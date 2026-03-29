@@ -410,7 +410,11 @@
       "title": "サインインが必要です",
       "description": "このプロジェクトを表示するにはサインインしてください。",
       "action": "サインイン"
-    }
+    },
+    "linkWorkspace": "ワークスペースをリンク...",
+    "createNewWorkspace": "新しいワークスペースを作成",
+    "workspaces": "ワークスペース",
+    "showingWorkspaces": "{{total}}件中{{count}}件を表示"
   },
   "syncError": {
     "networkErrors": "ネットワークエラー",
@@ -418,6 +422,22 @@
     "streamsAffected_other": "{{count}}件のストリームが影響を受けています",
     "status": "(ステータス {{status}})",
     "refreshPage": "ページを更新"
+  },
+  "session": {
+    "createNew": "新規セッション",
+    "createNewDescription": "新しい会話を開始し、必要に応じてデフォルトのワークスペースを設定します。",
+    "title": "タイトル",
+    "optional": "任意",
+    "titlePlaceholder": "任意のタイトル…",
+    "workspacePath": "デフォルトワークスペース",
+    "workspacePathHelp": "チームが適切なプロジェクトコンテキストで開始できるように、開始フォルダを設定します。",
+    "workspacePathPlaceholder": "/プロジェクト/パス",
+    "selectWorkspace": "ワークスペースを選択",
+    "selectWorkspaceDescription": "このセッションのデフォルトワークスペースフォルダを選択してください",
+    "browse": "参照",
+    "create": "作成",
+    "invalidPath": "無効なパス",
+    "validationFailed": "検証に失敗しました"
   },
   "issues": {
     "deleteConfirm": {

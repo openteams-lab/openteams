@@ -148,6 +148,7 @@
     "archivedReadonly": "이 세션은 보관되었으며 메시지와 멤버는 읽기 전용입니다.",
     "empty": "아직 메시지가 없습니다. 아래에서 대화를 시작하세요.",
     "noMatches": "\"{{query}}\"에 일치하는 메시지가 없습니다.",
+    "newMessages": "새 메시지",
     "workItem": {
       "artifacts": "산출물",
       "conclusion": "결론",

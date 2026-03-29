@@ -148,6 +148,7 @@
     "archivedReadonly": "このセッションはアーカイブ済みで、メッセージとメンバーは読み取り専用です。",
     "empty": "まだメッセージがありません。下の入力欄から会話を始めてください。",
     "noMatches": "「{{query}}」に一致するメッセージはありません。",
+    "newMessages": "新着メッセージ",
     "workItem": {
       "artifacts": "成果物",
       "conclusion": "結論",

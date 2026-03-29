@@ -410,7 +410,11 @@
       "title": "需要登入",
       "description": "請登入以查看此專案。",
       "action": "登入"
-    }
+    },
+    "linkWorkspace": "關聯工作區...",
+    "createNewWorkspace": "建立新工作區",
+    "workspaces": "工作區",
+    "showingWorkspaces": "顯示 {{count}} / {{total}}"
   },
   "syncError": {
     "networkErrors": "網路錯誤",
@@ -418,6 +422,22 @@
     "streamsAffected_other": "{{count}} 個資料流受影響",
     "status": "(狀態 {{status}})",
     "refreshPage": "重新整理頁面"
+  },
+  "session": {
+    "createNew": "新建工作階段",
+    "createNewDescription": "開始一個新的對話，可選擇附加一個預設工作區。",
+    "title": "標題",
+    "optional": "選填",
+    "titlePlaceholder": "選填標題…",
+    "workspacePath": "預設工作區",
+    "workspacePathHelp": "設定一個起始資料夾，讓團隊在正確的專案上下文中開始。",
+    "workspacePathPlaceholder": "/專案/路徑",
+    "selectWorkspace": "選擇工作區",
+    "selectWorkspaceDescription": "為此工作階段選擇一個預設工作區資料夾",
+    "browse": "瀏覽",
+    "create": "建立",
+    "invalidPath": "無效路徑",
+    "validationFailed": "驗證失敗"
   },
   "issues": {
     "deleteConfirm": {

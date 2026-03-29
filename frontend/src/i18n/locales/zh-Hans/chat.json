@@ -153,6 +153,7 @@
     "archivedReadonly": "当前会话已归档，消息和成员均为只读。",
     "empty": "还没有消息，可以在下方开始对话。",
     "noMatches": "没有找到与「{{query}}」匹配的消息。",
+    "newMessages": "新消息",
     "workItem": {
       "artifacts": "交付物",
       "conclusion": "结论",

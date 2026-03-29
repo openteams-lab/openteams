@@ -148,6 +148,7 @@
     "archivedReadonly": "Esta sesion esta archivada. Los mensajes y miembros son de solo lectura.",
     "empty": "Todavia no hay mensajes. Inicia la conversacion abajo.",
     "noMatches": "Ningun mensaje coincide con \"{{query}}\".",
+    "newMessages": "Mensajes nuevos",
     "workItem": {
       "artifacts": "Artefactos",
       "conclusion": "Conclusión",

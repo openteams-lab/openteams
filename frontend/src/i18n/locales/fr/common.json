@@ -410,7 +410,11 @@
       "title": "Connexion requise",
       "description": "Veuillez vous connecter pour voir ce projet.",
       "action": "Se connecter"
-    }
+    },
+    "linkWorkspace": "Associer un espace de travail...",
+    "createNewWorkspace": "Créer un nouvel espace de travail",
+    "workspaces": "Espaces de travail",
+    "showingWorkspaces": "Affichage de {{count}} sur {{total}}"
   },
   "syncError": {
     "networkErrors": "Erreurs réseau",
@@ -418,6 +422,22 @@
     "streamsAffected_other": "{{count}} flux affectés",
     "status": "(statut {{status}})",
     "refreshPage": "Actualiser la page"
+  },
+  "session": {
+    "createNew": "Nouvelle session",
+    "createNewDescription": "Démarrez une nouvelle conversation et associez éventuellement un espace de travail par défaut.",
+    "title": "Titre",
+    "optional": "Facultatif",
+    "titlePlaceholder": "Titre facultatif…",
+    "workspacePath": "Espace de travail par défaut",
+    "workspacePathHelp": "Définissez un dossier de départ pour que l'équipe commence avec le bon contexte de projet.",
+    "workspacePathPlaceholder": "/chemin/vers/projet",
+    "selectWorkspace": "Sélectionner un espace de travail",
+    "selectWorkspaceDescription": "Choisissez un dossier d'espace de travail par défaut pour cette session",
+    "browse": "Parcourir",
+    "create": "Créer",
+    "invalidPath": "Chemin invalide",
+    "validationFailed": "Échec de la validation"
   },
   "issues": {
     "deleteConfirm": {

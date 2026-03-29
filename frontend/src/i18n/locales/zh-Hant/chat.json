@@ -148,6 +148,7 @@
     "archivedReadonly": "目前會話已封存，訊息與成員均為唯讀。",
     "empty": "目前還沒有訊息，可以在下方開始對話。",
     "noMatches": "沒有找到與「{{query}}」相符的訊息。",
+    "newMessages": "新訊息",
     "workItem": {
       "artifacts": "交付物",
       "conclusion": "結論",

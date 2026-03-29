@@ -153,6 +153,7 @@
     "archivedReadonly": "This session is archived. Messages and members are read-only.",
     "empty": "No messages yet. Start the conversation below.",
     "noMatches": "No messages match \"{{query}}\".",
+    "newMessages": "New messages",
     "workItem": {
       "artifacts": "Artifacts",
       "conclusion": "Conclusion",
