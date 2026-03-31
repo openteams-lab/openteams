@@ -34,6 +34,7 @@ env:
   PNPM_VERSION: 10.13.1
   RUST_TOOLCHAIN: nightly-2025-12-04
   CARGO_XWIN_VERSION: 0.20.2
+  ENABLE_MACOS_DMG: "false"
 
 jobs:
   bump-version:
@@ -1021,17 +1022,58 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build desktop bundle
-        if: matrix.platform != 'linux'
+      - name: Prepare Tauri updater signing key
+        shell: bash
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAURI_PRIVATE_KEY}" ]; then
+            echo "::error::Missing secret: TAURI_PRIVATE_KEY"
+            exit 1
+          fi
+          printf '%s' "$TAURI_PRIVATE_KEY" > tauri-updater.key
+
+      - name: Configure GitHub Releases updater
+        shell: bash
+        env:
+          TAURI_UPDATER_PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
+        run: |
+          set -euo pipefail
+          node scripts/desktop/apply-updater-config.mjs \
+            --config src-tauri/tauri.conf.json
+
+      - name: Build desktop bundle (Windows)
+        if: matrix.platform == 'windows'
         run: pnpm desktop:build
         env:
           NODE_OPTIONS: --max-old-space-size=8192
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
-      - name: Build desktop bundle (Linux deb)
-        if: matrix.platform == 'linux'
-        run: pnpm tauri build --bundles deb
+      - name: Build desktop bundle (macOS with DMG)
+        if: matrix.platform == 'macos' && env.ENABLE_MACOS_DMG == 'true'
+        run: pnpm desktop:build
         env:
           NODE_OPTIONS: --max-old-space-size=8192
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Build desktop bundle (macOS updater only)
+        if: matrix.platform == 'macos' && env.ENABLE_MACOS_DMG != 'true'
+        run: pnpm tauri build --bundles updater
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Build desktop bundle (Linux)
+        if: matrix.platform == 'linux'
+        run: pnpm tauri build --bundles deb,appimage
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
       - name: Detect Windows signing configuration
         id: windows_signing
@@ -1102,6 +1144,33 @@ jobs:
             }
           }
 
+      - name: Rebuild Windows updater bundles
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          $msiFiles = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter *.msi -File
+          if ($msiFiles.Count -eq 0) {
+            throw "No MSI files found to package for updater."
+          }
+
+          foreach ($file in $msiFiles) {
+            $zipPath = "$($file.FullName).zip"
+            Remove-Item -Path $zipPath, "$zipPath.sig" -Force -ErrorAction SilentlyContinue
+            Compress-Archive -LiteralPath $file.FullName -DestinationPath $zipPath -Force
+
+            if ([string]::IsNullOrWhiteSpace($env:TAURI_KEY_PASSWORD)) {
+              pnpm tauri signer sign -f "tauri-updater.key" "$zipPath"
+            } else {
+              pnpm tauri signer sign -f "tauri-updater.key" -p "$env:TAURI_KEY_PASSWORD" "$zipPath"
+            }
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to sign updater bundle: $zipPath"
+            }
+          }
+
       - name: Detect macOS signing configuration
         id: macos_signing
         if: runner.os == 'macOS'
@@ -1120,7 +1189,7 @@ jobs:
             fi
           done
           if [ "$missing" -eq 1 ]; then
-            echo "::notice::Apple signing/notarization disabled. Will upload unsigned DMG."
+            echo "::notice::Apple signing/notarization disabled. Will upload unsigned macOS updater artifacts."
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=true" >> "$GITHUB_OUTPUT"
@@ -1164,7 +1233,7 @@ jobs:
 
       - name: Create signed DMG from signed app
         id: signed_dmg
-        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true' && env.ENABLE_MACOS_DMG == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -1174,7 +1243,7 @@ jobs:
           echo "signed_dmg=$signed_dmg" >> "$GITHUB_OUTPUT"
 
       - name: Notarize signed DMG (macOS)
-        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true' && env.ENABLE_MACOS_DMG == 'true'
         uses: BloopAI/apple-code-sign-action@main
         with:
           input_path: ${{ steps.signed_dmg.outputs.signed_dmg }}
@@ -1183,18 +1252,61 @@ jobs:
           app_store_connect_api_key_json_file: app_store_key.json
 
       - name: Staple notarization ticket to DMG
-        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true' && env.ENABLE_MACOS_DMG == 'true'
         shell: bash
         run: |
           set -euo pipefail
           xcrun stapler staple '${{ steps.signed_dmg.outputs.signed_dmg }}'
 
+      - name: Build signed macOS updater bundle
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.enabled == 'true'
+        id: signed_macos_updater
+        shell: bash
+        env:
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          case "${{ runner.arch }}" in
+            ARM64) updater_arch="aarch64" ;;
+            X64) updater_arch="x86_64" ;;
+            *)
+              echo "::error::Unsupported macOS runner architecture: ${{ runner.arch }}"
+              exit 1
+              ;;
+          esac
+
+          updater_bundle="src-tauri/target/release/bundle/macos/openteams-${{ needs.bump-version.outputs.new_tag }}-${updater_arch}.app.tar.gz"
+          rm -f "$updater_bundle" "$updater_bundle.sig"
+          tar -czf "$updater_bundle" -C signed openteams.app
+
+          if [ -n "${TAURI_KEY_PASSWORD:-}" ]; then
+            pnpm tauri signer sign -f tauri-updater.key -p "$TAURI_KEY_PASSWORD" "$updater_bundle"
+          else
+            pnpm tauri signer sign -f tauri-updater.key "$updater_bundle"
+          fi
+
+          echo "bundle=$updater_bundle" >> "$GITHUB_OUTPUT"
+
       - name: Upload signed desktop installer artifact (macOS)
-        if: matrix.platform == 'macos' && steps.macos_signing.outputs.enabled == 'true'
+        if: matrix.platform == 'macos' && steps.macos_signing.outputs.enabled == 'true' && env.ENABLE_MACOS_DMG == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.artifact_meta.outputs.name }}
-          path: ${{ steps.signed_dmg.outputs.signed_dmg }}
+          path: |
+            ${{ steps.signed_dmg.outputs.signed_dmg }}
+            ${{ steps.signed_macos_updater.outputs.bundle }}
+            ${{ steps.signed_macos_updater.outputs.bundle }}.sig
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload signed desktop updater artifacts (macOS)
+        if: matrix.platform == 'macos' && steps.macos_signing.outputs.enabled == 'true' && env.ENABLE_MACOS_DMG != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.artifact_meta.outputs.name }}
+          path: |
+            ${{ steps.signed_macos_updater.outputs.bundle }}
+            ${{ steps.signed_macos_updater.outputs.bundle }}.sig
           if-no-files-found: error
           retention-days: 1
 
@@ -1205,6 +1317,8 @@ jobs:
           name: ${{ steps.artifact_meta.outputs.name }}
           path: |
             src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/msi/*.msi.zip
+            src-tauri/target/release/bundle/msi/*.msi.zip.sig
           if-no-files-found: error
           retention-days: 1
 
@@ -1215,16 +1329,32 @@ jobs:
           name: ${{ steps.artifact_meta.outputs.name }}
           path: |
             src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz
+            src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig
           if-no-files-found: error
           retention-days: 1
 
       - name: Upload desktop artifacts (macOS unsigned)
-        if: matrix.platform == 'macos' && steps.macos_signing.outputs.enabled != 'true'
+        if: matrix.platform == 'macos' && steps.macos_signing.outputs.enabled != 'true' && env.ENABLE_MACOS_DMG == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.artifact_meta.outputs.name }}
           path: |
             src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload desktop updater artifacts (macOS unsigned)
+        if: matrix.platform == 'macos' && steps.macos_signing.outputs.enabled != 'true' && env.ENABLE_MACOS_DMG != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.artifact_meta.outputs.name }}
+          path: |
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
           if-no-files-found: error
           retention-days: 1
 
@@ -1235,14 +1365,16 @@ jobs:
           set -euo pipefail
           mkdir -p gh-package/files
 
-          if [[ "${{ matrix.platform }}" == "macos" && "${{ steps.macos_signing.outputs.enabled }}" == "true" ]]; then
+          if [[ "${{ matrix.platform }}" == "macos" && "${{ steps.macos_signing.outputs.enabled }}" == "true" && "${ENABLE_MACOS_DMG}" == "true" ]]; then
             cp src-tauri/target/release/bundle/dmg/openteams-signed.dmg gh-package/files/
+          elif [[ "${{ matrix.platform }}" == "macos" && "${{ steps.macos_signing.outputs.enabled }}" == "true" ]]; then
+            cp "${{ steps.signed_macos_updater.outputs.bundle }}" gh-package/files/
           elif [[ "${{ matrix.platform }}" == "linux" ]]; then
             cp src-tauri/target/release/bundle/deb/*.deb gh-package/files/
           elif [[ "${{ matrix.platform }}" == "windows" ]]; then
             cp src-tauri/target/release/bundle/msi/*.msi gh-package/files/
           else
-            cp src-tauri/target/release/bundle/dmg/*.dmg gh-package/files/
+            cp src-tauri/target/release/bundle/macos/*.app.tar.gz gh-package/files/
           fi
 
           if ! compgen -G "gh-package/files/*" > /dev/null; then
@@ -1297,6 +1429,11 @@ jobs:
         run: |
           Remove-Item -Path "windows-signing-cert.pfx" -Force -ErrorAction SilentlyContinue
 
+      - name: Clean up updater signing key
+        if: always()
+        shell: bash
+        run: rm -f tauri-updater.key
+
   create-prerelease:
     needs: [bump-version, build-frontend, build-desktop-installers, upload-to-r2]
     runs-on: ubuntu-latest
@@ -1333,6 +1470,16 @@ jobs:
 
       - name: Setup Node for npm pack
         uses: ./.github/actions/setup-node
+
+      - name: Generate desktop updater manifest
+        run: |
+          node scripts/desktop/generate-github-updater-json.mjs \
+            --input-dir release-assets/desktop \
+            --output release-assets/desktop/latest.json \
+            --owner openteams-lab \
+            --repo openteams \
+            --tag ${{ needs.bump-version.outputs.new_tag }} \
+            --version ${{ needs.bump-version.outputs.new_tag }}
 
       - name: Resolve storage public URL
         shell: bash
@@ -1735,3 +1882,8 @@ jobs:
             release-assets/desktop/**/*.dmg
             release-assets/desktop/**/*.AppImage
             release-assets/desktop/**/*.deb
+            release-assets/desktop/**/*.msi.zip
+            release-assets/desktop/**/*.app.tar.gz
+            release-assets/desktop/**/*.AppImage.tar.gz
+            release-assets/desktop/**/*.sig
+            release-assets/desktop/latest.json

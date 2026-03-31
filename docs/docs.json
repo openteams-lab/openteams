@@ -38,6 +38,7 @@
               "advanced-usage/create-team",
               "advanced-usage/skills",
               "advanced-usage/custom-provider",
+              "advanced-usage/agent-proxy-config",
               {
                 "group": "Supported Coding Agents",
                 "expanded": false,
@@ -90,6 +91,7 @@
               "zh-Hans/advanced-usage/create-team",
               "zh-Hans/advanced-usage/skills",
               "zh-Hans/advanced-usage/custom-provider",
+              "zh-Hans/advanced-usage/agent-proxy-config",
               {
                 "group": "支持的编程代理",
                 "expanded": false,
@@ -142,6 +144,7 @@
               "zh-Hant/advanced-usage/create-team",
               "zh-Hant/advanced-usage/skills",
               "zh-Hant/advanced-usage/custom-provider",
+              "zh-Hant/advanced-usage/agent-proxy-config",
               {
                 "group": "支援的程式設計代理",
                 "expanded": false,
@@ -194,6 +197,7 @@
               "ja/advanced-usage/create-team",
               "ja/advanced-usage/skills",
               "ja/advanced-usage/custom-provider",
+              "ja/advanced-usage/agent-proxy-config",
               {
                 "group": "サポートエージェント",
                 "expanded": false,
@@ -246,6 +250,7 @@
               "ko/advanced-usage/create-team",
               "ko/advanced-usage/skills",
               "ko/advanced-usage/custom-provider",
+              "ko/advanced-usage/agent-proxy-config",
               {
                 "group": "지원 에이전트",
                 "expanded": false,
@@ -298,6 +303,7 @@
               "fr/advanced-usage/create-team",
               "fr/advanced-usage/skills",
               "fr/advanced-usage/custom-provider",
+              "fr/advanced-usage/agent-proxy-config",
               {
                 "group": "Agents Supportés",
                 "expanded": false,

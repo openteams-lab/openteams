@@ -10,7 +10,10 @@
   },
   "tauri": {
     "allowlist": {
-      "all": false
+      "all": false,
+      "shell": {
+        "open": true
+      }
     },
     "bundle": {
       "active": true,
@@ -18,7 +21,8 @@
         "msi",
         "dmg",
         "appimage",
-        "deb"
+        "deb",
+        "updater"
       ],
       "identifier": "com.openteams.desktop",
       "icon": [
@@ -48,11 +52,11 @@
     },
     "updater": {
       "active": true,
-      "dialog": true,
+      "dialog": false,
       "endpoints": [
-        "https://updates.openteams.com/{{target}}/{{current_version}}"
+        "https://github.com/openteams-lab/openteams/releases/latest/download/latest.json"
       ],
-      "pubkey": ""
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQxQTYzMkEzNTFBQzg4QjEKUldTeGlLeFJvekttMGRJbXJNbVN0c28xbXdhcFROdTd5TlFOZUJFa0l5NVFheTJJTGRsTXRKM2cK"
     },
     "windows": [
       {
@@ -65,7 +69,25 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "dangerousRemoteDomainIpcAccess": [
+        {
+          "scheme": "http",
+          "domain": "127.0.0.1",
+          "windows": [
+            "main"
+          ],
+          "enableTauriAPI": true
+        },
+        {
+          "scheme": "http",
+          "domain": "localhost",
+          "windows": [
+            "main"
+          ],
+          "enableTauriAPI": true
+        }
+      ]
     }
   }
 }
