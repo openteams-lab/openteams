@@ -79,7 +79,10 @@ export function useVersionCheck() {
     }
     return updateNpxMutateAsync();
   }, [runtime, updateNpxMutateAsync]);
-  const restartNow = useCallback(() => restartMutateAsync(), [restartMutateAsync]);
+  const restartNow = useCallback(
+    () => restartMutateAsync(),
+    [restartMutateAsync]
+  );
 
   return {
     runtime,

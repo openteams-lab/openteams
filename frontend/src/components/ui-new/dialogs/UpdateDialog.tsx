@@ -144,7 +144,7 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
       setStatusMessage(t('versionUpdate.status.preparing'));
 
       await installUpdate();
-        setStage('restart');
+      setStage('restart');
     } catch (error) {
       setStage('available');
       resetProgressState();
