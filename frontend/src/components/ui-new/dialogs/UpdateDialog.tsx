@@ -196,6 +196,24 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
     }
   };
 
+  const handleOpenRelease = async () => {
+    if (!releaseUrl) return;
+
+    setActionError(null);
+
+    try {
+      if (isTauri) {
+        const { open } = await import('@tauri-apps/api/shell');
+        await open(releaseUrl);
+        return;
+      }
+
+      window.open(releaseUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      setActionError(getErrorMessage(error));
+    }
+  };
+
   const title =
     stage === 'restart'
       ? t('versionUpdate.restartTitle')
@@ -321,14 +339,13 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
                   {t('versionUpdate.releaseNotes')}
                 </div>
                 {releaseUrl && (
-                  <a
-                    href={releaseUrl}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={handleOpenRelease}
                     className="text-xs font-medium text-[#4A90E2] hover:text-[#2E6FB7]"
                   >
                     {t('versionUpdate.openRelease')}
-                  </a>
+                  </button>
                 )}
               </div>
               <pre className="max-h-[180px] overflow-auto whitespace-pre-wrap break-words text-sm leading-6 text-[#5D6B7E]">
