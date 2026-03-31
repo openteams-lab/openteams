@@ -121,7 +121,8 @@ fn main() {
             });
 
             if let Some(window) = app.get_window("main") {
-                let url = format!("http://127.0.0.1:{}", port);
+                // Tauri 1.x remote IPC access is more reliable with localhost than loopback IPs.
+                let url = format!("http://localhost:{}", port);
                 window.eval(&format!(
                     "window.location.replace('{}')",
                     url.replace('\'', "\\'")

@@ -2,7 +2,7 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
     <!-- Property to track user's choice: 1 = keep core data, 0 = delete all -->
-    <Property Id="KEEPUSERDATA" Value="1" />
+    <Property Id="KEEPUSERDATA" Value="1" Secure="yes" />
 
     <SetProperty
       Id="INSTALLDIR"
@@ -75,19 +75,36 @@
       Return="ignore"
     />
 
+    <!-- Stop installed binaries and remove any locked exe files before MSI file cleanup -->
+    <CustomAction
+      Id="StopInstalledProcesses"
+      Directory="INSTALLDIR"
+      Execute="deferred"
+      Impersonate="no"
+      ExeCommand="powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command &quot;$ErrorActionPreference = 'SilentlyContinue'; $targets = @((Join-Path '[INSTALLDIR]' 'openteams.exe'), (Join-Path '[INSTALLDIR]' 'openteams-cli.exe'), (Join-Path '[INSTALLDIR]' 'server.exe')) | ForEach-Object { try { [System.IO.Path]::GetFullPath($_) } catch { $_ } }; Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and ($targets -contains $_.ExecutablePath) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 750; foreach ($target in $targets) { if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue } }&quot;"
+      Return="ignore"
+    />
+
+    <InstallUISequence>
+      <!-- Prompt before the uninstall execute phase so the choice is visible to the user -->
+      <Custom Action="ShowUninstallDialog" Before="ExecuteAction">
+        REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE
+      </Custom>
+    </InstallUISequence>
+
     <InstallExecuteSequence>
-      <!-- Show dialog before cleanup, only on full uninstall (not during upgrades) -->
-      <Custom Action="ShowUninstallDialog" Before="CleanupCacheOnly">
+      <!-- Stop running binaries first so data cleanup and RemoveFiles can succeed -->
+      <Custom Action="StopInstalledProcesses" Before="RemoveFiles">
         REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE
       </Custom>
 
       <!-- Execute cache-only cleanup when user chooses to keep core data -->
-      <Custom Action="CleanupCacheOnly" Before="RemoveFiles">
+      <Custom Action="CleanupCacheOnly" After="StopInstalledProcesses">
         REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE AND KEEPUSERDATA="1"
       </Custom>
 
       <!-- Execute full cleanup when user chooses to delete all data -->
-      <Custom Action="CleanupAllData" Before="RemoveFiles">
+      <Custom Action="CleanupAllData" After="StopInstalledProcesses">
         REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE AND KEEPUSERDATA="0"
       </Custom>
     </InstallExecuteSequence>

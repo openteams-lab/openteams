@@ -1,30 +1,27 @@
 ---
 title: "快速开始"
-description: "OpenTeams 在 macOS、Linux 和 Windows 上的快速入门指南"
+description: "openteams 在 macOS、Linux 和 Windows 上的快速开始指南"
 sidebarTitle: "快速开始"
 ---
 
 ## 支持的系统
-
-OpenTeams 可在以下平台运行：
-
+- Windows
 - macOS（Intel 和 Apple Silicon）
 - Linux
-- Windows
 
 ## 前提条件
+开始使用 openteams 前，请确保您有大模型的访问权限。您可以参考[模型供应商配置文档](/zh-Hans/custom-providers)来给openteams配置API密钥。
 
-在安装 OpenTeams 之前，请确保您已安装至少一个支持的 AI 代理：
-
+如果您已经在使用或者计划使用其他编程代理，请确保它们已正确安装并认证。目前openteams支持10种[编程代理](/zh-Hans/supported-coding-agents)，以下是常用代理的安装方法：
 | 代理 | 安装命令 |
 |-------|-------------|
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` |
 | [Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` |
-| [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm install -g @qwen-code/qwen-code@latest` |
+| [OpenCode](https://github.com/anomalyco/opencode) | `npm install -g opencode-ai@latest` |
 
 <Tip>
-您可以按照其官方文档安装其他代理。
+您可以参考各编程代理的官方文档进行安装。
 </Tip>
 
 ## 安装
@@ -34,120 +31,123 @@ OpenTeams 可在以下平台运行：
     **方式一：使用 npx**
 
     ```bash
-    npx openteams
+    npx openteams-web
     ```
 
-    **方式二：桌面安装包**
+    **方式二：桌面安装包（推荐）**
 
     下载最新安装程序（`.msi`）：
 
-    <a href="https://github.com/StarterraAI/OpenTeams/releases/latest" target="_blank" rel="noopener noreferrer">
+    <a href="https://github.com/openteams-lab/openteams/releases/latest" target="_blank" rel="noopener noreferrer">
       <img noZoom src="https://img.shields.io/badge/下载-Windows-0078D6?style=for-the-badge&logo=windows" alt="下载 Windows 版" />
     </a>
 
-    安装完成后，从开始菜单启动 **OpenTeams**。
+    安装完成后，直接启动 **openteams**。
   </Tab>
 
   <Tab title="macOS">
-    **方式一：使用 npx**
+    **使用 npx 安装启动**
 
     ```bash
-    npx openteams
+    npx openteams-web
     ```
-
-    **方式二：桌面安装包**
-
-    <a href="https://github.com/StarterraAI/OpenTeams/releases/latest" target="_blank" rel="noopener noreferrer">
-      <img noZoom src="https://img.shields.io/badge/下载-macOS-000000?style=for-the-badge&logo=apple" alt="下载 macOS 版" />
-    </a>
-
-    打开下载的 `.dmg`，将 **OpenTeams** 拖到 `Applications`，然后从 Launchpad/Finder 启动。
   </Tab>
 
   <Tab title="Linux">
-    **方式一：使用 npx**
+    **方式一：使用 npx（推荐）**
 
     ```bash
-    npx openteams
+    npx openteams-web
     ```
 
     **方式二：桌面安装包**
 
     从 Releases 下载 Linux 安装包：
-    <a href="https://github.com/StarterraAI/OpenTeams/releases/latest" target="_blank" rel="noopener noreferrer">
+    <a href="https://github.com/openteams-lab/openteams/releases/latest" target="_blank" rel="noopener noreferrer">
       <img noZoom src="https://img.shields.io/badge/下载-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="下载 Linux 版" />
     </a>
 
-    - `.deb`（Ubuntu/Debian）
-    - `.AppImage`（免安装便携版）
-
-    使用 `.deb` 安装：
+     `.deb` 安装命令：
 
     ```bash
     sudo apt install ./openteams-*.deb
     ```
 
-    使用 `.AppImage` 启动：
-
-    ```bash
-    chmod +x ./openteams-*.AppImage
-    ./openteams-*.AppImage
-    ```
   </Tab>
 </Tabs>
+
+## 快速入门演示
+以下是一个快速视频演示示例，展示了如何在 openteams 中创建会话、导入团队并开始协作：
+
+<iframe
+  src="https://player.bilibili.com/player.html?bvid=BV1Z4NTz1E5W&page=1"
+  width="100%"
+  frameborder="0"
+  allowfullscreen>
+</iframe>
 
 ## 快速入门
 
 <Steps>
-<Step title="安装编程代理">
-  确保您的系统上已安装并认证至少一个[支持的编程代理](/zh-Hans/supported-coding-agents)。
-</Step>
 
-<Step title="启动 OpenTeams">
+<Step title="启动 openteams">
   选择一种启动方式：
+
+  **方式一：通过桌面安装包启动**
+  从应用菜单中打开已安装的 **openteams**。
 
   **方式二：通过 npx 启动**
   ```bash
-  npx openteams
+  npx openteams-web
   ```
-
-  **方式一：通过桌面安装包启动**
-  从系统应用菜单中打开已安装的 **OpenTeams**。
-
-  <Check>
-  应用程序绑定到一个随机空闲端口，并在终端中打印 URL。
-  </Check>
+  <Note>
+  系统会默认使用openteams-cli作为基础代理，为了正常访问模型，您需要在[模型供应商配置](/zh-Hans/custom-providers)中配置API。
+    您也可用使用其他Agent，详情请参考[支持的编程代理](/zh-Hans/supported-coding-agents)，使用前请确保已正确安装并认证。
+  </Note>
 </Step>
 
-<Step title="创建聊天会话">
-  点击"创建会话"开始新的群聊。这是您进行 AI 协作的工作空间。
+<Step title="创建会话">
+  启动后，点击"新建会话"按钮，输入会话名称并选择配置一个默认工作区路径。
+  这不是强制要求，您也可以直接跳过填写，那么会话标题和默认工作区将会保持为默认值。
+
+  ![创建会话](../images/create_session_zh.png)
+  
+  <Note>
+  默认工作区是此会话中所有AI成员的默认工作路径，您可以在团队配置中为每个成员单独设置工作区路径，并且优先级高于会话默认工作区。
+  </Note>
 </Step>
 
-<Step title="添加 AI 成员">
-  在右侧边栏中，点击"添加 AI 成员"将代理添加到您的会话中。为每个成员配置：
-  - 唯一的 @提及名称
-  - 选择代理类型（如 Claude Code、Codex）
-  - 设置系统提示以定义其角色
-  - 指定其工作空间路径
+<Step title="创建团队">
+  点击"立即创建团队"按钮，选择一个适合您任务的预设团队，或者添加预设AI成员和自定义AI成员，组建自己的专属团队。
+  ![创建团队](../images/createteam_zh.png)
+
+  以全栈交付团队为例，团队包含了项目经理、前端开发、后端开发、测试工程师、UI设计师等角色，能够协作完成一个完整的项目交付。
+  您需要为每位成员配置他们的模型、工作路径和技能，当然您同样可以保持默认配置，直接使用他们。
+  ![团队成员配置](../images/team_members_zh.png)
 </Step>
 
 <Step title="开始协作">
-  使用 @提及向您的 AI 团队成员分配任务。他们将自动接收上下文并可以相互沟通！
+  您已经成功召唤了您的AI团队成员，现在让他们开始工作吧！可以直接在输入框中输入消息并通过@发送给团队成员。
+  ![开始协作](../images/start_collabrate_zh.png)
+  例如，您可以@项目经理发送消息来分配任务，或者@前端开发请求他们编写一个登录页面的代码。
+
 </Step>
 </Steps>
 
 <Tip>
-要使用固定端口，请指定 `PORT` 环境变量：`PORT=8080 npx openteams`
+恭喜您已经基本掌握了openteams的使用方法!
+
+您可以根据自己的需求创建不同类型的团队来完成各种任务。更多功能请继续阅读后续章节。
 </Tip>
 
 ## 下一步
 
 <CardGroup cols={2}>
-  <Card title="聊天会话概述" icon="comments" href="/zh-Hans/core-features/chat-session-overview">
-    了解聊天会话及其工作原理
+  <Card title="管理团队" icon="users" href="/zh-Hans/advanced-usage/create-team">
+    管理您的AI团队，制定协作准则
   </Card>
 
-  <Card title="管理 AI 成员" icon="robot" href="/zh-Hans/core-features/ai-members">
-    为您的团队配置 AI 成员
+  <Card title="使用技能" icon="brain" href="/zh-Hans/advanced-usage/skills">
+    为您的AI成员配置强大的技能
   </Card>
 </CardGroup>
