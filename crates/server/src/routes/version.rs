@@ -218,9 +218,12 @@ fn mock_latest_release_from_env() -> Result<Option<GitHubLatestRelease>, String>
     let body = match env::var(MOCK_RELEASE_NOTES_ENV) {
         Ok(notes) if notes.trim().is_empty() => None,
         Ok(notes) => Some(notes),
-        Err(_) => Some("What's Changed \n
+        Err(_) => Some(
+            "What's Changed \n
 Improve session workspace defaults and polish creation dialogs by @monkeyin92 in #23
-improve skill discover and new message notify method by @Caleb196x in #26".to_string()),
+improve skill discover and new message notify method by @Caleb196x in #26"
+                .to_string(),
+        ),
     };
 
     let published_at = match env::var(MOCK_RELEASE_PUBLISHED_AT_ENV) {

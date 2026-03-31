@@ -102,9 +102,8 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
     setStatusMessage(t('versionUpdate.status.checking'));
 
     try {
-      const { checkUpdate, installUpdate, onUpdaterEvent } = await import(
-        '@tauri-apps/api/updater'
-      );
+      const { checkUpdate, installUpdate, onUpdaterEvent } =
+        await import('@tauri-apps/api/updater');
 
       unlistenRef.current?.();
       unlistenRef.current = await onUpdaterEvent(({ error, status }) => {
@@ -145,7 +144,7 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
       setStatusMessage(t('versionUpdate.status.preparing'));
 
       await installUpdate();
-      setStage('restart');
+        setStage('restart');
     } catch (error) {
       setStage('available');
       resetProgressState();
