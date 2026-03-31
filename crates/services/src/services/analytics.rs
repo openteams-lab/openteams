@@ -110,7 +110,7 @@ impl AnalyticsService {
                     }
                 }
                 Err(e) => {
-                    tracing::error!("Error sending event '{}': {}", event_name, e);
+                    tracing::warn!("Error sending event '{}': {}", event_name, e);
                 }
             }
         });

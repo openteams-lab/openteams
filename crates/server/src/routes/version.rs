@@ -18,6 +18,12 @@ const GITHUB_LATEST_RELEASE_URL: &str =
     "https://api.github.com/repos/openteams-lab/openteams/releases/latest";
 const PROCESS_EXIT_DELAY: Duration = Duration::from_millis(500);
 const SKIP_BROWSER_ENV: &str = "OPENTEAMS_SKIP_BROWSER";
+const MOCK_GITHUB_LATEST_RELEASE_ENV: &str = "OPENTEAMS_MOCK_GITHUB_LATEST_RELEASE";
+const MOCK_DEPLOY_MODE_ENV: &str = "OPENTEAMS_MOCK_DEPLOY_MODE";
+const MOCK_RELEASE_TAG_ENV: &str = "OPENTEAMS_MOCK_GITHUB_RELEASE_TAG";
+const MOCK_RELEASE_URL_ENV: &str = "OPENTEAMS_MOCK_GITHUB_RELEASE_URL";
+const MOCK_RELEASE_NOTES_ENV: &str = "OPENTEAMS_MOCK_GITHUB_RELEASE_NOTES";
+const MOCK_RELEASE_PUBLISHED_AT_ENV: &str = "OPENTEAMS_MOCK_GITHUB_RELEASE_PUBLISHED_AT";
 
 pub fn router() -> Router<DeploymentImpl> {
     Router::new()
@@ -119,24 +125,28 @@ pub async fn restart_service()
 }
 
 async fn fetch_latest_version() -> Result<VersionCheckResponse, String> {
-    let release = reqwest::Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()
-        .map_err(|error| format!("Failed to build HTTP client: {error}"))?
-        .get(GITHUB_LATEST_RELEASE_URL)
-        .header(
-            reqwest::header::USER_AGENT,
-            format!("OpenTeams/{}", APP_VERSION),
-        )
-        .header(reqwest::header::ACCEPT, "application/vnd.github+json")
-        .send()
-        .await
-        .map_err(|error| format!("Failed to request latest release from GitHub: {error}"))?
-        .error_for_status()
-        .map_err(|error| format!("GitHub latest release API returned an error: {error}"))?
-        .json::<GitHubLatestRelease>()
-        .await
-        .map_err(|error| format!("Failed to parse GitHub release payload: {error}"))?;
+    let release = if let Some(mock_release) = mock_latest_release_from_env()? {
+        mock_release
+    } else {
+        reqwest::Client::builder()
+            .timeout(Duration::from_secs(15))
+            .build()
+            .map_err(|error| format!("Failed to build HTTP client: {error}"))?
+            .get(GITHUB_LATEST_RELEASE_URL)
+            .header(
+                reqwest::header::USER_AGENT,
+                format!("OpenTeams/{}", APP_VERSION),
+            )
+            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+            .send()
+            .await
+            .map_err(|error| format!("Failed to request latest release from GitHub: {error}"))?
+            .error_for_status()
+            .map_err(|error| format!("GitHub latest release API returned an error: {error}"))?
+            .json::<GitHubLatestRelease>()
+            .await
+            .map_err(|error| format!("Failed to parse GitHub release payload: {error}"))?
+    };
 
     let current_version = normalize_version(APP_VERSION)?;
     let latest_version = normalize_version(&release.tag_name)?;
@@ -145,7 +155,7 @@ async fn fetch_latest_version() -> Result<VersionCheckResponse, String> {
         current_version: current_version.to_string(),
         latest_version: latest_version.to_string(),
         has_update: latest_version > current_version,
-        deploy_mode: detect_deploy_mode().to_string(),
+        deploy_mode: effective_deploy_mode()?.to_string(),
         release_url: release.html_url,
         release_notes: release.body.filter(|body| !body.trim().is_empty()),
         published_at: release.published_at,
@@ -155,6 +165,89 @@ async fn fetch_latest_version() -> Result<VersionCheckResponse, String> {
 fn normalize_version(raw: &str) -> Result<Version, String> {
     Version::parse(raw.trim().trim_start_matches('v'))
         .map_err(|error| format!("Invalid semver version '{raw}': {error}"))
+}
+
+fn effective_deploy_mode() -> Result<&'static str, String> {
+    if let Some(mocked) = mock_deploy_mode_from_env()? {
+        return Ok(mocked);
+    }
+
+    Ok(detect_deploy_mode())
+}
+
+fn mock_deploy_mode_from_env() -> Result<Option<&'static str>, String> {
+    let Some(value) = env::var_os(MOCK_DEPLOY_MODE_ENV) else {
+        return Ok(None);
+    };
+
+    let normalized = value.to_string_lossy().trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "" => Ok(None),
+        "npx" => Ok(Some("npx")),
+        "tauri" => Ok(Some("tauri")),
+        "unknown" => Ok(Some("unknown")),
+        _ => Err(format!(
+            "Invalid {} value '{}'; expected one of: npx, tauri, unknown",
+            MOCK_DEPLOY_MODE_ENV, normalized
+        )),
+    }
+}
+
+fn mock_latest_release_from_env() -> Result<Option<GitHubLatestRelease>, String> {
+    let Some(value) = env::var_os(MOCK_GITHUB_LATEST_RELEASE_ENV) else {
+        return Ok(None);
+    };
+
+    if !is_truthy_env_value(&value.to_string_lossy()) {
+        return Ok(None);
+    }
+
+    let tag_name = match env::var(MOCK_RELEASE_TAG_ENV) {
+        Ok(tag_name) if !tag_name.trim().is_empty() => tag_name,
+        _ => default_mock_release_tag()?,
+    };
+
+    let html_url = match env::var(MOCK_RELEASE_URL_ENV) {
+        Ok(url) if !url.trim().is_empty() => url,
+        _ => format!(
+            "https://github.com/openteams-lab/openteams/releases/tag/{}",
+            tag_name
+        ),
+    };
+
+    let body = match env::var(MOCK_RELEASE_NOTES_ENV) {
+        Ok(notes) if notes.trim().is_empty() => None,
+        Ok(notes) => Some(notes),
+        Err(_) => Some("What's Changed \n
+Improve session workspace defaults and polish creation dialogs by @monkeyin92 in #23
+improve skill discover and new message notify method by @Caleb196x in #26".to_string()),
+    };
+
+    let published_at = match env::var(MOCK_RELEASE_PUBLISHED_AT_ENV) {
+        Ok(value) if value.trim().is_empty() => None,
+        Ok(value) => Some(value),
+        Err(_) => Some("2026-03-29T15:31:06Z".to_string()),
+    };
+
+    Ok(Some(GitHubLatestRelease {
+        tag_name,
+        html_url,
+        body,
+        published_at,
+    }))
+}
+
+fn default_mock_release_tag() -> Result<String, String> {
+    let mut version = normalize_version(APP_VERSION)?;
+    version.patch += 1;
+    Ok(format!("v{}", version))
+}
+
+fn is_truthy_env_value(value: &str) -> bool {
+    !matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "" | "0" | "false" | "off" | "no"
+    )
 }
 
 fn detect_deploy_mode() -> &'static str {
@@ -280,9 +373,21 @@ fn internal_api_error(message: &str) -> (StatusCode, Json<ApiResponse<()>>) {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{
+        path::Path,
+        sync::{Mutex, OnceLock},
+    };
 
-    use super::{detect_deploy_mode_for_path, normalize_version};
+    use super::{
+        MOCK_DEPLOY_MODE_ENV, default_mock_release_tag, detect_deploy_mode_for_path,
+        is_truthy_env_value, mock_deploy_mode_from_env, normalize_version,
+    };
+
+    static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+    fn env_lock() -> &'static Mutex<()> {
+        ENV_LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn normalize_version_supports_v_prefix() {
@@ -294,6 +399,43 @@ mod tests {
     fn normalize_version_rejects_invalid_semver() {
         let error = normalize_version("latest").expect_err("version should fail");
         assert!(error.contains("Invalid semver version"));
+    }
+
+    #[test]
+    fn default_mock_release_tag_bumps_patch_version() {
+        let tag = default_mock_release_tag().expect("mock tag should build");
+        let current = normalize_version(super::APP_VERSION).expect("current version should parse");
+        let mocked = normalize_version(&tag).expect("mock tag should parse");
+
+        assert_eq!(mocked.major, current.major);
+        assert_eq!(mocked.minor, current.minor);
+        assert_eq!(mocked.patch, current.patch + 1);
+    }
+
+    #[test]
+    fn truthy_env_value_treats_zero_and_false_as_disabled() {
+        assert!(!is_truthy_env_value("0"));
+        assert!(!is_truthy_env_value("false"));
+        assert!(is_truthy_env_value("1"));
+        assert!(is_truthy_env_value("yes"));
+    }
+
+    #[test]
+    fn mock_deploy_mode_accepts_supported_values() {
+        let _guard = env_lock().lock().expect("env lock should acquire");
+        unsafe { std::env::set_var(MOCK_DEPLOY_MODE_ENV, "tauri") };
+        let deploy_mode = mock_deploy_mode_from_env().expect("deploy mode should parse");
+        assert_eq!(deploy_mode, Some("tauri"));
+        unsafe { std::env::remove_var(MOCK_DEPLOY_MODE_ENV) };
+    }
+
+    #[test]
+    fn mock_deploy_mode_rejects_invalid_values() {
+        let _guard = env_lock().lock().expect("env lock should acquire");
+        unsafe { std::env::set_var(MOCK_DEPLOY_MODE_ENV, "desktop") };
+        let error = mock_deploy_mode_from_env().expect_err("invalid deploy mode should fail");
+        assert!(error.contains("Invalid OPENTEAMS_MOCK_DEPLOY_MODE value"));
+        unsafe { std::env::remove_var(MOCK_DEPLOY_MODE_ENV) };
     }
 
     #[test]

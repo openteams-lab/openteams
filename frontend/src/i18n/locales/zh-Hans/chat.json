@@ -23,6 +23,7 @@
     "skills": "技能库",
     "archivedSection": "已归档",
     "settingsInSidebar": "设置",
+    "newVersion": "新版本",
     "updateAvailable": "有可用更新",
     "updateAvailableVersion": "有可用更新：{{version}}",
     "searchSessions": "搜索会话",

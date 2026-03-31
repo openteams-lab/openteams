@@ -23,6 +23,7 @@
     "skills": "Skills Library",
     "archivedSection": "Archived",
     "settingsInSidebar": "Settings",
+    "newVersion": "New version",
     "updateAvailable": "Update available",
     "updateAvailableVersion": "Update available: {{version}}",
     "searchSessions": "Search sessions",

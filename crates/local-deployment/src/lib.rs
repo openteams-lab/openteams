@@ -161,7 +161,7 @@ impl Deployment for LocalDeployment {
                     Ok(client)
                 }
                 Err(e) => {
-                    tracing::error!(?e, "failed to create remote client");
+                    tracing::info!(?e, "failed to create remote client");
                     Err(RemoteClientNotConfigured)
                 }
             },

@@ -1168,6 +1168,34 @@
 
   .new-design .chat-session-left-update-btn {
     position: relative;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #eef6ff 0%, #deecff 100%);
+    border-color: #c7ddff;
+    color: #174f95;
+    min-height: 24px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.72),
+      0 1px 2px rgba(23, 79, 149, 0.08);
+    padding-block: 2px;
+    padding-inline: 10px;
+    gap: 7px;
+    margin-bottom: 2px;
+  }
+
+  .new-design .chat-session-left-update-btn:hover,
+  .new-design .chat-session-left-update-btn:focus-visible {
+    background: linear-gradient(180deg, #e0efff 0%, #cfe4ff 100%);
+    border-color: #b7d5ff;
+    color: #103f7b;
+  }
+
+  .new-design .chat-session-left-update-btn.icon-only {
+    padding-inline: 0;
+  }
+
+  .new-design .chat-session-left-update-label {
+    white-space: nowrap;
+    font-weight: 600;
   }
 
   .new-design .chat-session-left-update-icon-wrap {
@@ -1194,8 +1222,15 @@
     line-height: 1.2;
     letter-spacing: 0.01em;
     user-select: none;
-    margin-left: auto;
     text-align: right;
+  }
+
+  .new-design .chat-session-left-version-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    min-width: 0;
   }
 
   .new-design .chat-session-left-version.collapsed {

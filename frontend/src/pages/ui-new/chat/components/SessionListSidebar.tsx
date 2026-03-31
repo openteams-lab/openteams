@@ -109,6 +109,7 @@ export function SessionListSidebar({
       ? latestVersion
       : `v${latestVersion}`
     : null;
+  const newVersionLabel = t('sidebar.newVersion');
   const updateButtonLabel = latestVersionLabel
     ? t('sidebar.updateAvailableVersion', {
         version: latestVersionLabel,
@@ -601,23 +602,6 @@ export function SessionListSidebar({
 
           <div className="chat-session-left-footer">
             <div className="chat-session-left-footer-actions">
-              {hasAvailableUpdate && (
-                <button
-                  type="button"
-                  onClick={onOpenVersionDialog}
-                  className="chat-session-left-settings-btn chat-session-left-update-btn icon-only"
-                  aria-label={updateButtonLabel}
-                  title={updateButtonLabel}
-                >
-                  <span className="chat-session-left-update-icon-wrap">
-                    <ArrowCircleUpIcon className="size-icon-xs" />
-                    <span
-                      className="chat-session-left-update-dot"
-                      aria-hidden="true"
-                    />
-                  </span>
-                </button>
-              )}
               <button
                 type="button"
                 onClick={onOpenSettings}
@@ -633,8 +617,33 @@ export function SessionListSidebar({
                 </span>
               </button>
             </div>
-            <div className="chat-session-left-version" title={appVersionLabel}>
-              {appVersionLabel}
+            <div className="chat-session-left-version-group">
+              {hasAvailableUpdate && (
+                <button
+                  type="button"
+                  onClick={onOpenVersionDialog}
+                  className="chat-session-left-settings-btn chat-session-left-update-btn"
+                  aria-label={updateButtonLabel}
+                  title={updateButtonLabel}
+                >
+                  <span className="chat-session-left-update-icon-wrap">
+                    <ArrowCircleUpIcon className="size-icon-xs" />
+                    <span
+                      className="chat-session-left-update-dot"
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <span className="chat-session-left-update-label">
+                    {newVersionLabel}
+                  </span>
+                </button>
+              )}
+              <div
+                className="chat-session-left-version"
+                title={appVersionLabel}
+              >
+                {appVersionLabel}
+              </div>
             </div>
           </div>
         </>
