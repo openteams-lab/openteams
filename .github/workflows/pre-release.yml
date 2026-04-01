@@ -1164,7 +1164,31 @@ jobs:
           foreach ($file in $msiFiles) {
             $zipPath = "$($file.FullName).zip"
             Remove-Item -Path $zipPath, "$zipPath.sig" -Force -ErrorAction SilentlyContinue
-            Compress-Archive -LiteralPath $file.FullName -DestinationPath $zipPath -Force
+            @'
+import os
+import struct
+import sys
+import zipfile
+
+src, dst = sys.argv[1], sys.argv[2]
+
+with zipfile.ZipFile(dst, 'w', compression=zipfile.ZIP_STORED, allowZip64=True) as archive:
+    archive.write(src, arcname=os.path.basename(src))
+
+with open(dst, 'rb') as handle:
+    if handle.read(4) != b'PK\x03\x04':
+        raise SystemExit(f'Unexpected ZIP header for {dst}')
+
+    version, flags, method, mtime, mdate, crc, csize, usize, name_len, extra_len = struct.unpack(
+        '<HHHHHIIIHH',
+        handle.read(26),
+    )
+
+    if method != 0:
+        raise SystemExit(
+            f'Windows updater bundle must use ZIP_STORED compression, got method {method} for {dst}'
+        )
+'@ | python - "$($file.FullName)" "$zipPath"
 
             if ([string]::IsNullOrWhiteSpace($env:TAURI_KEY_PASSWORD)) {
               pnpm tauri signer sign -f "tauri-updater.key" "$zipPath"
