@@ -18,6 +18,7 @@
     "bundle": {
       "active": true,
       "targets": [
+        "app",
         "msi",
         "dmg",
         "appimage",

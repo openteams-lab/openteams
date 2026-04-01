@@ -343,8 +343,9 @@ export function KanbanIssuePanelContainer() {
       if (kanbanCreateMode || !selectedKanbanIssueId) {
         // For statusId, open the status selection dialog
         if (field === 'statusId') {
-          const { CommandBarDialog } =
-            await import('@/components/ui-new/dialogs/CommandBarDialog');
+          const { CommandBarDialog } = await import(
+            '@/components/ui-new/dialogs/CommandBarDialog'
+          );
           await CommandBarDialog.show({
             pendingStatusSelection: {
               projectId,
@@ -357,8 +358,9 @@ export function KanbanIssuePanelContainer() {
 
         // For priority, open the priority selection dialog
         if (field === 'priority') {
-          const { CommandBarDialog } =
-            await import('@/components/ui-new/dialogs/CommandBarDialog');
+          const { CommandBarDialog } = await import(
+            '@/components/ui-new/dialogs/CommandBarDialog'
+          );
           await CommandBarDialog.show({
             pendingPrioritySelection: {
               projectId,

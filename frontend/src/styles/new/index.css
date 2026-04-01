@@ -534,9 +534,8 @@
     pointer-events: auto;
   }
 
-  .new-design .chat-session-right-drawer-shell.is-open {
-    opacity: 1;
-    pointer-events: auto;
+  .new-design .chat-session-right-drawer-shell.is-resizing {
+    transition: opacity 180ms ease;
   }
 
   .new-design .chat-session-right-collapsed-toggle {

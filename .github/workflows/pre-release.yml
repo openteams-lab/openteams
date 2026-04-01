@@ -1061,7 +1061,7 @@ jobs:
 
       - name: Build desktop bundle (macOS updater only)
         if: matrix.platform == 'macos' && env.ENABLE_MACOS_DMG != 'true'
-        run: pnpm tauri build --bundles updater
+        run: pnpm tauri build --bundles app,updater
         env:
           NODE_OPTIONS: --max-old-space-size=8192
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
@@ -1069,7 +1069,7 @@ jobs:
 
       - name: Build desktop bundle (Linux)
         if: matrix.platform == 'linux'
-        run: pnpm tauri build --bundles deb,appimage
+        run: pnpm tauri build --bundles deb,appimage,updater
         env:
           NODE_OPTIONS: --max-old-space-size=8192
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}

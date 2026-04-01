@@ -149,8 +149,9 @@ export function ActionsProvider({ children }: ActionsProviderProps) {
   // Open status selection in command bar (uses dynamic import to avoid circular deps)
   const openStatusSelection = useCallback(
     async (projectId: string, issueIds: string[]) => {
-      const { CommandBarDialog } =
-        await import('@/components/ui-new/dialogs/CommandBarDialog');
+      const { CommandBarDialog } = await import(
+        '@/components/ui-new/dialogs/CommandBarDialog'
+      );
       await CommandBarDialog.show({
         pendingStatusSelection: { projectId, issueIds },
       });
@@ -161,8 +162,9 @@ export function ActionsProvider({ children }: ActionsProviderProps) {
   // Open priority selection in command bar (uses dynamic import to avoid circular deps)
   const openPrioritySelection = useCallback(
     async (projectId: string, issueIds: string[]) => {
-      const { CommandBarDialog } =
-        await import('@/components/ui-new/dialogs/CommandBarDialog');
+      const { CommandBarDialog } = await import(
+        '@/components/ui-new/dialogs/CommandBarDialog'
+      );
       await CommandBarDialog.show({
         pendingPrioritySelection: { projectId, issueIds },
       });
@@ -173,8 +175,9 @@ export function ActionsProvider({ children }: ActionsProviderProps) {
   // Open assignee selection dialog (uses dynamic import to avoid circular deps)
   const openAssigneeSelection = useCallback(
     async (projectId: string, issueIds: string[], isCreateMode = false) => {
-      const { AssigneeSelectionDialog } =
-        await import('@/components/ui-new/dialogs/AssigneeSelectionDialog');
+      const { AssigneeSelectionDialog } = await import(
+        '@/components/ui-new/dialogs/AssigneeSelectionDialog'
+      );
       await AssigneeSelectionDialog.show({ projectId, issueIds, isCreateMode });
     },
     []
@@ -187,8 +190,9 @@ export function ActionsProvider({ children }: ActionsProviderProps) {
       parentIssueId: string,
       mode: 'addChild' | 'setParent' = 'addChild'
     ) => {
-      const { CommandBarDialog } =
-        await import('@/components/ui-new/dialogs/CommandBarDialog');
+      const { CommandBarDialog } = await import(
+        '@/components/ui-new/dialogs/CommandBarDialog'
+      );
       await CommandBarDialog.show({
         pendingSubIssueSelection: { projectId, parentIssueId, mode },
       });
@@ -199,8 +203,9 @@ export function ActionsProvider({ children }: ActionsProviderProps) {
   // Open workspace selection dialog (uses dynamic import to avoid circular deps)
   const openWorkspaceSelection = useCallback(
     async (projectId: string, issueId: string) => {
-      const { WorkspaceSelectionDialog } =
-        await import('@/components/ui-new/dialogs/WorkspaceSelectionDialog');
+      const { WorkspaceSelectionDialog } = await import(
+        '@/components/ui-new/dialogs/WorkspaceSelectionDialog'
+      );
       await WorkspaceSelectionDialog.show({ projectId, issueId });
     },
     []
