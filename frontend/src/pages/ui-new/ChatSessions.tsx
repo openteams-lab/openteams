@@ -4143,7 +4143,8 @@ export function ChatSessions() {
         <div
           className={cn(
             'chat-session-right-drawer-shell shrink-0 min-h-0 overflow-hidden',
-            isRightSidebarOpen && 'is-open'
+            isRightSidebarOpen && 'is-open',
+            isResizing === 'right' && 'is-resizing'
           )}
           style={{ width: isRightSidebarOpen ? rightSidebarWidth : 0 }}
         >

@@ -103,10 +103,11 @@ pub async fn restart_service()
     command.envs(env::vars_os());
     command.env(SKIP_BROWSER_ENV, "1");
 
-    if env::var_os("BACKEND_PORT").is_none() && env::var_os("PORT").is_none() {
-        if let Some(port) = current_backend_port().await {
-            command.env("BACKEND_PORT", port.to_string());
-        }
+    if env::var_os("BACKEND_PORT").is_none()
+        && env::var_os("PORT").is_none()
+        && let Some(port) = current_backend_port().await
+    {
+        command.env("BACKEND_PORT", port.to_string());
     }
 
     spawn_detached(&mut command)

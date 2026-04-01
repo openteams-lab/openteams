@@ -58,7 +58,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
   const selectedExecutorProfile = profiles?.[profile.executor];
   const hasExplicitDefaultVariant = Boolean(
     selectedExecutorProfile &&
-    Object.prototype.hasOwnProperty.call(selectedExecutorProfile, 'DEFAULT')
+      Object.prototype.hasOwnProperty.call(selectedExecutorProfile, 'DEFAULT')
   );
 
   const variantOptions = useMemo(() => {
