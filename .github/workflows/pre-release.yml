@@ -1072,7 +1072,9 @@ jobs:
 
       - name: Build desktop bundle (Linux)
         if: matrix.platform == 'linux'
-        run: pnpm tauri build --bundles deb,appimage,updater
+        # AppImage bundling is intentionally disabled in CI due to recurring
+        # appimage.sh failures on GitHub runners.
+        run: pnpm tauri build --bundles deb
         env:
           NODE_OPTIONS: --max-old-space-size=8192
           APPIMAGE_EXTRACT_AND_RUN: "1"
@@ -1333,9 +1335,6 @@ jobs:
           name: ${{ steps.artifact_meta.outputs.name }}
           path: |
             src-tauri/target/release/bundle/deb/*.deb
-            src-tauri/target/release/bundle/appimage/*.AppImage
-            src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz
-            src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig
           if-no-files-found: error
           retention-days: 1
 
@@ -1884,10 +1883,8 @@ jobs:
             openteams-cli-npx/openteams-cli-*.tgz
             release-assets/desktop/**/*.msi
             release-assets/desktop/**/*.dmg
-            release-assets/desktop/**/*.AppImage
             release-assets/desktop/**/*.deb
             release-assets/desktop/**/*.msi.zip
             release-assets/desktop/**/*.app.tar.gz
-            release-assets/desktop/**/*.AppImage.tar.gz
             release-assets/desktop/**/*.sig
             release-assets/desktop/latest.json
