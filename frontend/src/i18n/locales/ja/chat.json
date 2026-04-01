@@ -22,6 +22,8 @@
     "archivedSection": "アーカイブ",
     "settingsInSidebar": "設定",
     "newVersion": "新バージョン",
+    "updateAvailable": "更新があります",
+    "updateAvailableVersion": "更新があります: {{version}}",
     "searchSessions": "セッションを検索",
     "searchSessionsPlaceholder": "セッション名を検索...",
     "clearSessionSearch": "セッション検索をクリア",
@@ -656,6 +658,40 @@
       "fullErrorLog": "完全なエラーログ",
       "workspaceTrail": "ワークスペース",
       "workspacePath": "ワークスペースパス"
+    }
+  },
+  "versionUpdate": {
+    "title": "更新があります: {{version}}",
+    "message": "以下のリリース詳細を確認して、準備ができたら更新を開始してください。",
+    "restartTitle": "更新を完了するために再起動しますか？",
+    "restartMessage": "新しいバージョンの準備ができました。適用するには今すぐ{{runtime}}を再起動してください。",
+    "currentVersion": "現在のバージョン",
+    "latestVersion": "最新バージョン",
+    "unknownVersion": "不明",
+    "publishedAt": "{{date}} 公開",
+    "noUpdate": "現在、これより新しいバージョンはありません。",
+    "unsupported": "このデプロイモードではアプリ内更新をサポートしていません。",
+    "releaseNotes": "リリースノート",
+    "openRelease": "リリースを開く",
+    "restartLater": "後で",
+    "restartNow": "今すぐ再起動",
+    "runtime": {
+      "desktop": "デスクトップアプリ",
+      "service": "サービス"
+    },
+    "actions": {
+      "desktop": "ダウンロードして更新",
+      "npx": "今すぐ更新",
+      "unavailable": "更新できません"
+    },
+    "status": {
+      "checking": "デスクトップ更新を確認しています...",
+      "downloading": "更新をダウンロードしてインストールしています...",
+      "ready": "更新がインストールされました。完了するには再起動してください。",
+      "upToDate": "すでに最新バージョンです。",
+      "error": "デスクトップ更新に失敗しました。",
+      "preparing": "デスクトップ更新パッケージを準備しています...",
+      "packageUpdating": "バックグラウンドで npx パッケージを更新しています..."
     }
   },
   "workspacePreview": {

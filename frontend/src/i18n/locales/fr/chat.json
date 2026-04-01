@@ -22,6 +22,8 @@
     "archivedSection": "Archivées",
     "settingsInSidebar": "Paramètres",
     "newVersion": "Nouvelle version",
+    "updateAvailable": "Mise à jour disponible",
+    "updateAvailableVersion": "Mise à jour disponible : {{version}}",
     "searchSessions": "Rechercher des sessions",
     "searchSessionsPlaceholder": "Rechercher des noms de session...",
     "clearSessionSearch": "Effacer la recherche de sessions",
@@ -656,6 +658,40 @@
       "fullErrorLog": "Journal d'erreur complet",
       "workspaceTrail": "Espace de travail",
       "workspacePath": "Chemin de l'espace de travail"
+    }
+  },
+  "versionUpdate": {
+    "title": "Mise à jour disponible : {{version}}",
+    "message": "Consultez les détails de la version ci-dessous, puis lancez la mise à jour quand vous êtes prêt.",
+    "restartTitle": "Redémarrer pour terminer la mise à jour ?",
+    "restartMessage": "La nouvelle version est prête. Redémarrez le {{runtime}} maintenant pour l'appliquer.",
+    "currentVersion": "Version actuelle",
+    "latestVersion": "Dernière version",
+    "unknownVersion": "Inconnue",
+    "publishedAt": "Publiée le {{date}}",
+    "noUpdate": "Aucune version plus récente n'est disponible pour le moment.",
+    "unsupported": "Ce mode de déploiement ne prend pas en charge les mises à jour intégrées.",
+    "releaseNotes": "Notes de version",
+    "openRelease": "Ouvrir la version",
+    "restartLater": "Plus tard",
+    "restartNow": "Redémarrer maintenant",
+    "runtime": {
+      "desktop": "application de bureau",
+      "service": "service"
+    },
+    "actions": {
+      "desktop": "Télécharger et mettre à jour",
+      "npx": "Mettre à jour maintenant",
+      "unavailable": "Mise à jour indisponible"
+    },
+    "status": {
+      "checking": "Vérification du programme de mise à jour du bureau...",
+      "downloading": "Téléchargement et installation de la mise à jour...",
+      "ready": "Mise à jour installée. Redémarrez pour terminer.",
+      "upToDate": "Vous utilisez déjà la dernière version.",
+      "error": "La mise à jour du bureau a échoué.",
+      "preparing": "Préparation du paquet de mise à jour du bureau...",
+      "packageUpdating": "Mise à jour du paquet npx en arrière-plan..."
     }
   },
   "workspacePreview": {

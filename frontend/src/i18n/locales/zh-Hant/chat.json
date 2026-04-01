@@ -22,6 +22,8 @@
     "archivedSection": "已歸檔",
     "settingsInSidebar": "設定",
     "newVersion": "新版本",
+    "updateAvailable": "有可用更新",
+    "updateAvailableVersion": "有可用更新：{{version}}",
     "searchSessions": "搜尋會話",
     "searchSessionsPlaceholder": "搜尋會話名稱...",
     "clearSessionSearch": "清除會話搜尋",
@@ -656,6 +658,40 @@
       "fullErrorLog": "完整錯誤日誌",
       "workspaceTrail": "工作區",
       "workspacePath": "工作區路徑"
+    }
+  },
+  "versionUpdate": {
+    "title": "有可用更新：{{version}}",
+    "message": "請先查看下方的版本詳情，準備好後再開始更新。",
+    "restartTitle": "要重新啟動以完成更新嗎？",
+    "restartMessage": "新版本已準備就緒。立即重新啟動{{runtime}}以套用更新。",
+    "currentVersion": "目前版本",
+    "latestVersion": "最新版本",
+    "unknownVersion": "未知",
+    "publishedAt": "發佈於 {{date}}",
+    "noUpdate": "目前沒有可用的新版本。",
+    "unsupported": "此部署模式不支援應用程式內更新。",
+    "releaseNotes": "版本說明",
+    "openRelease": "開啟版本頁",
+    "restartLater": "稍後",
+    "restartNow": "立即重新啟動",
+    "runtime": {
+      "desktop": "桌面應用程式",
+      "service": "服務"
+    },
+    "actions": {
+      "desktop": "下載並更新",
+      "npx": "立即更新",
+      "unavailable": "無法更新"
+    },
+    "status": {
+      "checking": "正在檢查桌面更新程式...",
+      "downloading": "正在下載並安裝更新...",
+      "ready": "更新已安裝。請重新啟動以完成。",
+      "upToDate": "你已經是最新版本。",
+      "error": "桌面更新失敗。",
+      "preparing": "正在準備桌面更新套件...",
+      "packageUpdating": "正在背景更新 npx 套件..."
     }
   },
   "workspacePreview": {

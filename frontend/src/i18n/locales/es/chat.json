@@ -22,6 +22,8 @@
     "archivedSection": "Archivadas",
     "settingsInSidebar": "Configuración",
     "newVersion": "Nueva versión",
+    "updateAvailable": "Actualización disponible",
+    "updateAvailableVersion": "Actualización disponible: {{version}}",
     "searchSessions": "Buscar sesiones",
     "searchSessionsPlaceholder": "Buscar nombres de sesiones...",
     "clearSessionSearch": "Borrar b?squeda de sesiones",
@@ -656,6 +658,40 @@
       "fullErrorLog": "Registro de errores completo",
       "workspaceTrail": "Espacio de trabajo",
       "workspacePath": "Ruta del espacio de trabajo"
+    }
+  },
+  "versionUpdate": {
+    "title": "Actualización disponible: {{version}}",
+    "message": "Revisa los detalles de la versión abajo y empieza la actualización cuando quieras.",
+    "restartTitle": "¿Reiniciar para completar la actualización?",
+    "restartMessage": "La nueva versión está lista. Reinicia ahora la {{runtime}} para aplicarla.",
+    "currentVersion": "Versión actual",
+    "latestVersion": "Última versión",
+    "unknownVersion": "Desconocida",
+    "publishedAt": "Publicado el {{date}}",
+    "noUpdate": "No hay una versión más reciente disponible en este momento.",
+    "unsupported": "Este modo de despliegue no admite actualizaciones dentro de la aplicación.",
+    "releaseNotes": "Notas de la versión",
+    "openRelease": "Abrir versión",
+    "restartLater": "Más tarde",
+    "restartNow": "Reiniciar ahora",
+    "runtime": {
+      "desktop": "aplicación de escritorio",
+      "service": "servicio"
+    },
+    "actions": {
+      "desktop": "Descargar y actualizar",
+      "npx": "Actualizar ahora",
+      "unavailable": "Actualización no disponible"
+    },
+    "status": {
+      "checking": "Comprobando actualizador de escritorio...",
+      "downloading": "Descargando e instalando actualización...",
+      "ready": "Actualización instalada. Reinicia para completar.",
+      "upToDate": "Ya estás en la última versión.",
+      "error": "La actualización de escritorio falló.",
+      "preparing": "Preparando paquete de actualización de escritorio...",
+      "packageUpdating": "Actualizando el paquete npx en segundo plano..."
     }
   },
   "workspacePreview": {
