@@ -20,7 +20,7 @@ icon: /logos/droid-light.svg
   </Tab>
   </Tabs>
 
-  有關最新安裝說明和平台特定指南，請造訪 [Factory AI CLI 文檔](https://factory.ai/product/cli)。
+  有關最新安裝說明和平台特定指南，請造訪 [Factory AI CLI 文件](https://factory.ai/product/cli)。
 </Step>
 
 <Step title="使用 Factory AI 進行認證">
@@ -35,30 +35,17 @@ icon: /logos/droid-light.svg
   export FACTORY_API_KEY=fk-...
   ```
 
-  有關詳細的認證說明，請參閱 [Factory AI 文檔](https://docs.factory.ai/factory-cli/getting-started/overview)。
+  有關詳細的認證說明，請參閱 [Factory AI 文件](https://docs.factory.ai/factory-cli/getting-started/overview)。
 </Step>
 
-<Step title="啟動 openteams">
-  認證完成後，啟動 openteams：
-
-  **方式一：透過 npx 啟動**
-  ```bash
-  npx openteams
-  ```
-
-  **方式二：透過桌面安裝包啟動**
-  直接啟動已安裝的桌面應用。安裝步驟請參閱[快速入門](/zh-Hant/getting-started)。
-
-  現在您可以在建立任務嘗試時選擇 Factory Droid。
-</Step>
 </Steps>
 
-## 配置選項
+## 設定選項
 
-Droid 在 openteams 中支援多個配置選項：
+Droid 在 openteams 中支援多個設定選項：
 
 - **自主級別**：控制檔案和系統操作的權限級別
-  - `normal`：唯讀模式 - 安全地檢視計畫的變更而不執行
+  - `normal`：唯讀模式 - 安全地查看計畫的變更而不執行
   - `low`：基本檔案建立/編輯，同時阻止系統變更
   - `medium`：具有可恢復副作用的開發操作
   - `high`：具有安全影響或重大副作用的生產操作
@@ -72,4 +59,4 @@ Droid 在 openteams 中支援多個配置選項：
   - `medium`：平衡推理
   - `high`：用於複雜任務的深度推理
 
-這些選項可以在 openteams 中建立代理配置時進行配置。
+這些選項可以在 openteams 中建立代理設定時進行設定。

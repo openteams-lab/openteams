@@ -1,5 +1,47 @@
 ---
 title: "管理團隊"
-description: "網站大綱占位頁。"
+description: "在 openteams 中，您可以建立和管理 AI 團隊，制定團隊成員的協作準則，設定 AI 成員的專屬技能，以發揮團隊的最大協作效率。"
 sidebarTitle: "管理團隊"
 ---
+
+## 內建 AI 成員
+openteams 不認為 AI 只是一個工具，而是將 AI 作為團隊成員來管理，AI 成員是 openteams 的基本組成單元。
+
+我們相信隨著 AI 能力的提升，AI 能獨立完成更多工作，因此在 openteams 中，每個 AI 成員都應該有自己的角色職責、專屬技能和工作區，您可以為他們設定適合其職責的模型，
+讓他們可以更好地在團隊協作中完成任務。
+![內建 AI 成員](../../images/zh/member_list_zh.png)
+我們為 openteams 預設了 160 個內建 AI 成員，涵蓋了開發、內容創作、行銷、營運、資料分析等多個領域的常見角色職責，
+您可以直接使用這些內建成員來組建團隊，也可以在此基礎上進行修改，或者新增自訂 AI 成員來滿足您的需求。
+
+當前 openteams 內建的 AI 成員來自於開源專案 [Agency-Agents](https://github.com/msitarzewski/agency-agents)，我們對這些成員進行了重新設計和設定，以更好地適應 openteams 的團隊協作模式，
+並且我們會持續優化和增加更多實用的內建 AI 成員，敬請期待。
+
+您可以在預設 AI 成員列表中將最合適您當前使用場景的 AI 成員新增到會話中。
+<video src="../../images/zh/member_import.mp4" autoPlay loop muted playsInline />
+
+## 新增自訂 AI 成員
+您可以在會話中直接建立自訂 AI 成員，您需要填寫成員名稱、選擇使用的 Agent 和模型，設定成員職責，填寫工作區路徑，設定專屬技能。
+<video src="../../images/zh/custom_member_zh.mp4" autoPlay loop muted playsInline />
+
+如果您的自訂 AI 成員需要在多個會話群中使用，我們推薦您新增全域自訂 AI 成員，這樣您就可以在不同會話中直接匯入使用，無需重複建立。
+<video src="../../images/zh/create_preset_ai_member.mp4" autoPlay loop muted playsInline />
+
+## 制定團隊準則
+團隊準則用於限定成員在團隊中的協作方式，例如您可以要求只允許一個 AI 和您進行對話，其餘 AI 成員只能執行任務禁止發訊息；或者
+您也可以禁止 AI 成員之間互相交流，只能回覆使用者訊息，這完全取決於您對團隊協作方式的設定。
+![制定團隊準則](../../images/zh/team_protocol.png)
+
+<Note>
+請注意，團隊準則是一個弱約束，現在並沒有在系統層面保證準則一定生效，而是依靠 AI 成員的自我約束來執行。
+</Note>
+
+## 建立自訂團隊
+AI 團隊是 openteams 的核心功能，我們支援您在軟體中建立自己的 AI 團隊完成工作任務。
+操作十分簡單，您需要為團隊命名，設定團隊準則，新增 AI 成員，最後儲存您的團隊設定，以便在需要時直接匯入使用。
+<video src="../../images/zh/create_custom_teams.mp4" autoPlay loop muted playsInline />
+
+如何建立有效的團隊是提高 Agent 協作效率的關鍵問題，我們目前提供了 8 個直接使用的 AI 團隊，我們將持續研究並新增更多好用的預設團隊。
+
+## 使用自訂團隊
+建立完自訂團隊後可以直接匯入整個團隊到會話中，您現在就可以開始協作。
+![匯入自訂團隊](../../images/zh/use_custom_teams.png)

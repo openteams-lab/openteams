@@ -1,5 +1,67 @@
 ---
-title: "Configuration du fournisseur de modeles"
-description: "Page d'espace reserve pour la structure du site."
-sidebarTitle: "Configuration du fournisseur de modeles"
+title: "Configuration des fournisseurs de modeles"
+description: "openteams prend en charge plusieurs fournisseurs de modeles. Vous pouvez configurer ici leurs API."
+sidebarTitle: "Fournisseurs de modeles"
 ---
+
+## Page de configuration
+
+Ouvrez `Parametres -> Fournisseurs de service`, puis accedez a la section **Fournisseurs de service**.
+
+## Configurer un fournisseur de modeles
+
+<Tabs>
+
+  <Tab title="Creer un fournisseur personnalise">
+    <video src="../../images/zh/config_provider.mp4" autoPlay loop muted playsInline />
+
+    <Steps>
+      <Step title="Creer un fournisseur">
+        Dans l'angle superieur droit de la page des fournisseurs, cliquez sur **Ajouter un fournisseur**, puis renseignez l'identifiant du fournisseur, son nom, le `Base URL`, la cle API et le SDK d'acces.
+
+        ![](../../images/zh/create_provider.png)
+      </Step>
+
+      <Step title="Configurer les modeles et enregistrer">
+        Cliquez sur **Ajouter un modele**, puis renseignez l'identifiant du modele, son nom d'affichage, la limite de contexte, la limite de sortie ainsi que les modalites d'entree et de sortie, puis enregistrez.
+
+        ![](../../images/zh/add_model.png)
+
+        Pour les valeurs precises, reportez-vous a la documentation du fournisseur du modele. Les limites de contexte et de sortie sont facultatives ; si vous ne les indiquez pas, les valeurs par defaut seront utilisees.
+
+        **Nous vous recommandons de suivre les valeurs conseillees par le fournisseur afin d'eviter toute degradation des performances du modele.**
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Fournisseurs pris en charge">
+    Vous devez renseigner la cle API du fournisseur correspondant, puis selectionner le modele souhaite. Une fois la configuration enregistree, vous pourrez choisir ce modele dans les parametres d'un membre.
+
+    <CardGroup cols={2}>
+      <Card title="OpenAI" icon="/logos/openai-logo.svg">
+        Prend en charge la gamme de modeles GPT. Une fois la cle API configuree, vous pouvez l'utiliser directement.
+      </Card>
+
+      <Card title="Anthropic" icon="/logos/claude.svg">
+        Prend en charge les modeles Claude. Convient bien aux contextes longs et aux raisonnements complexes.
+      </Card>
+
+      <Card title="Google" icon="/logos/gemini-logo.svg">
+        Prend en charge les modeles Gemini dans l'ecosysteme Google AI / Vertex.
+      </Card>
+
+      <Card title="Ollama" icon="/logos/openai-logo.svg">
+        Permet de connecter un service de modeles via une adresse de deploiement Ollama.
+      </Card>
+
+      <Card title="OpenRouter" icon="globe">
+        Permet d'acceder a plusieurs fournisseurs de modeles via une seule interface et de changer de routage selon le modele.
+      </Card>
+
+      <Card title="MiniMax" icon="/logos/minimax-color.svg">
+        Prend en charge toute la gamme des modeles MiniMax et convient particulierement aux utilisateurs en Chine.
+      </Card>
+    </CardGroup>
+  </Tab>
+
+</Tabs>

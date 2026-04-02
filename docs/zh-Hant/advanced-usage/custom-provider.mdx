@@ -1,5 +1,61 @@
 ---
-title: "模型供應商配置"
-description: "網站大綱占位頁。"
-sidebarTitle: "模型供應商配置"
+title: "模型供應商設定"
+description: "openteams 支援多種模型供應商，您可以在這裡設定這些供應商的 API。"
+sidebarTitle: "模型供應商設定"
 ---
+
+## 設定頁面
+
+在 `設定 -> 服務提供商` 中進入**服務提供商**設定區
+
+## 設定模型供應商
+
+<Tabs>
+
+  <Tab title="建立自訂供應商">
+  <video src="../../images/zh/config_provider.mp4" autoPlay loop muted playsInline />
+    <Steps>
+      <Step title="新建供應商">
+        在服務供應商設定頁面的右上角區域點擊**新增供應商**按鈕，填寫供應商 ID、名稱與 Base URL、API Key 和存取 SDK。
+        ![](../../images/zh/create_provider.png)
+      </Step>
+
+      <Step title="設定模型並儲存">
+        點擊**新增模型**按鈕，填寫模型 ID、顯示名稱、上下文限制、輸出限制、輸入輸出模態等資訊後儲存。
+         ![](../../images/zh/add_model.png)
+         具體的設定資訊可以參考模型廠商提供的文件進行設定，上下文和輸出限制為選填，如果不填則為預設值。
+         ***建議按照模型推薦數值進行填寫，否則會影響模型效能。***
+
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="支援的供應商">
+  您需要填入對應模型廠商的 API Key，並選擇對應的模型，儲存後即可在成員設定中選擇使用。
+    <CardGroup cols={2}>
+      <Card title="OpenAI" icon="/logos/openai-logo.svg">
+        支援 GPT 系列模型。設定 API Key 後即可直接使用。
+      </Card>
+
+      <Card title="Anthropic" icon="/logos/claude.svg">
+        支援 Claude 系列模型。適合長上下文與複雜推理場景。
+      </Card>
+
+      <Card title="Google" icon="/logos/gemini-logo.svg">
+        支援 Gemini 模型（Google AI / Vertex 生態）。
+      </Card>
+
+      <Card title="Ollama" icon="/logos/openai-logo.svg">
+        支援透過 Ollama 部署位址接入模型服務。
+      </Card>
+
+      <Card title="OpenRouter" icon="globe">
+        可統一接入多家模型供應商，並按模型靈活切換路由。
+      </Card>
+
+      <Card title="MiniMax" icon="/logos/minimax-color.svg">
+        支援 Minimax 全系列模型，適合國內使用者使用。
+      </Card>
+    </CardGroup>
+  </Tab>
+
+</Tabs>

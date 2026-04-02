@@ -1,5 +1,61 @@
 ---
 title: "모델 공급자 구성"
-description: "사이트 구조용 플레이스홀더 페이지입니다."
+description: "openteams은 다양한 모델 공급자를 지원하며, 여기서 이 공급자들의 API를 구성할 수 있습니다."
 sidebarTitle: "모델 공급자 구성"
 ---
+
+## 구성 페이지
+
+`설정 -> 서비스 공급자`에서 **서비스 공급자** 구성 영역으로 이동합니다.
+
+## 모델 공급자 구성
+
+<Tabs>
+
+  <Tab title="사용자 정의 공급자 만들기">
+  <video src="../../images/zh/config_provider.mp4" autoPlay loop muted playsInline />
+    <Steps>
+      <Step title="새 공급자 추가">
+        서비스 공급자 설정 페이지 우측 상단에서 **공급자 추가** 버튼을 클릭하고, 공급자 ID, 이름, Base URL, API Key, 접근 SDK를 입력합니다.
+        ![](../../images/zh/create_provider.png)
+      </Step>
+
+      <Step title="모델 구성 및 저장">
+        **모델 추가** 버튼을 클릭하고 모델 ID, 표시 이름, 컨텍스트 제한, 출력 제한, 입출력 모달 등의 정보를 입력한 후 저장합니다.
+         ![](../../images/zh/add_model.png)
+         구체적인 구성 정보는 모델 제공사의 문서를 참고하여 설정하세요. 컨텍스트 및 출력 제한은 선택 사항이며, 미입력 시 기본값이 사용됩니다.
+         ***모델 권장 값에 따라 입력하는 것을 권장합니다. 그렇지 않으면 모델 성능에 영향을 줄 수 있습니다.***
+
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="지원되는 공급자">
+  해당 모델 제공사의 API Key를 입력하고 해당 모델을 선택한 후 저장하면 멤버 구성에서 선택하여 사용할 수 있습니다.
+    <CardGroup cols={2}>
+      <Card title="OpenAI" icon="/logos/openai-logo.svg">
+        GPT 시리즈 모델을 지원합니다. API Key 구성 후 바로 사용할 수 있습니다.
+      </Card>
+
+      <Card title="Anthropic" icon="/logos/claude.svg">
+        Claude 시리즈 모델을 지원합니다. 긴 컨텍스트와 복잡한 추론 시나리오에 적합합니다.
+      </Card>
+
+      <Card title="Google" icon="/logos/gemini-logo.svg">
+        Gemini 모델을 지원합니다 (Google AI / Vertex 생태계).
+      </Card>
+
+      <Card title="Ollama" icon="/logos/openai-logo.svg">
+        Ollama 배포 주소를 통해 모델 서비스에 접속하는 것을 지원합니다.
+      </Card>
+
+      <Card title="OpenRouter" icon="globe">
+        여러 모델 공급자를 통합하여 접속하고 모델별로 유연하게 라우팅을 전환할 수 있습니다.
+      </Card>
+
+      <Card title="MiniMax" icon="/logos/minimax-color.svg">
+        Minimax 전체 시리즈 모델을 지원하며, 국내 사용자에게 적합합니다.
+      </Card>
+    </CardGroup>
+  </Tab>
+
+</Tabs>

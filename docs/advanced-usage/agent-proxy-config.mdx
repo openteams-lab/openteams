@@ -1,6 +1,6 @@
 ---
 title: "Agent Proxy Configuration"
-description: "Placeholder page for the site outline."
+description: "Configure different models for your agents when the built-in model options do not cover your setup."
 sidebarTitle: "Agent Proxy Configuration"
 ---
 
@@ -53,3 +53,35 @@ sidebarTitle: "Agent Proxy Configuration"
     window.location.replace(target);
   }
 })();`}</script>
+
+## Add an agent configuration
+
+If your agent supports a new model, or the model you want to use is not available in the built-in configuration, you can add a new model configuration at the agent level.
+
+(openteams CLI model settings are automatically synced from the configured provider models, so you do not need to enter those manually.)
+
+<Steps>
+<Step>
+Open `Settings -> Agents`.
+
+![Open agent settings](../images/zh/agent_setting.png)
+</Step>
+
+<Step>
+Select the agent you want to configure, then click the `+` button to add a configuration.
+
+![Add an agent configuration](../images/zh/add_agent_config.png)
+</Step>
+
+<Step>
+Create a new configuration and enter a configuration name.
+
+![Create a new configuration](../images/zh/new_config.png)
+</Step>
+
+<Step>
+Fill in the configuration details. The most important field is the **model name**. It must be correct, otherwise the agent will not be able to access the model.
+
+![Fill in the configuration](../images/zh/fill_config.png)
+</Step>
+</Steps>

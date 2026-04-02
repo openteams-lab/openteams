@@ -1,90 +1,34 @@
 ---
 title: "Membres IA"
-description: "Ajoutez et configurez des agents de codage IA comme membres d'équipe dans votre session de chat"
+description: "Guide détaillé d'utilisation des membres IA"
 ---
 
-Les Membres IA sont les agents de codage qui travaillent en votre nom dans une session de chat. Chaque membre a un rôle spécifique, un espace de travail et des capacités.
+Les membres IA sont les unités de base d'openteams et le cœur de toute équipe IA. Chaque membre IA dispose de capacités d'agent indépendantes, peut monter des compétences et appeler des outils.
+Voici comment gérer et utiliser les membres IA dans openteams.
 
-## Ajouter un Membre IA
+Dans une session de chat de groupe, vous pouvez ajouter un ou plusieurs membres IA et les diriger pour collaborer sur des tâches. La collaboration peut prendre la forme de tâches parallèles totalement indépendantes ou d'une exécution séquentielle avec retour — tout dépend de votre configuration.
 
-1. Ouvrez votre session de chat
-2. Dans la barre latérale droite, cliquez sur **Ajouter un membre IA**
-3. Remplissez la configuration requise
+> À mesure que les capacités des grands modèles s'améliorent, les membres IA individuels deviendront également plus puissants. Pour obtenir davantage de gains d'efficacité, la collaboration entre plusieurs membres IA est incontournable. La façon dont les membres IA collaborent mieux ensemble est donc une question fondamentale.
+>
+> openteams continuera à explorer cette question jusqu'à trouver sa propre réponse.
 
-### Options de Configuration
+## Ajouter et modifier des membres IA
+La section [Gérer l'équipe](/fr/advanced-usage/create-team) explique comment ajouter des membres IA personnalisés — nous n'y revenons pas ici.
+Nous vous expliquons principalement comment modifier les informations d'un membre IA. Commencez par cliquer sur le bouton **Modifier** dans la carte du membre.
+![Modifier un membre](../../images/zh/edit_member.png)
 
-| Champ | Requis | Description |
-|-------|----------|-------------|
-| Nom | Oui | Le handle @mention pour cet agent (ex: `Codeur`, `Rédacteur`) |
-| Agent de Codage de Base | Oui | L'agent IA sous-jacent à utiliser (doit être installé localement) |
-| Prompt Système | Oui | Instructions qui définissent le rôle et le comportement de l'agent |
-| Chemin de l'Espace de Travail | Oui | Le répertoire où cet agent travaillera |
-| Variante de Modèle | Non | Configuration de modèle spécifique (si disponible) |
-
+Vous pouvez redéfinir le nom, le modèle, les instructions et les compétences utilisées par le membre IA.
 <Note>
-Le **Nom** doit être unique dans la session et ne peut contenir que des lettres, chiffres, underscores et tirets (maximum 10 caractères).
+Le chemin de l'espace de travail ne peut pas être modifié après l'ajout. Vous devez d'abord supprimer le membre IA puis le ré-ajouter.
 </Note>
 
-## Agents de Codage Supportés
+## Espace de travail du membre IA
+L'espace de travail du membre est un panneau latéral qui comprend actuellement l'historique des messages du membre et les journaux d'exécution. Nous prévoyons de supporter l'ouverture du chemin de l'espace de travail avec des outils comme `VS Code` et `Cursor` dans la version 0.3.12.
+![Tiroir de l'espace de travail](../../images/zh/workspace.png)
 
-Choisissez parmi n'importe quel agent de codage installé localement :
+Vous pouvez consulter les journaux d'erreurs d'exécution dans l'espace de travail pour faciliter le diagnostic des erreurs d'agent.
 
-- **Claude Code** - L'assistant de codage d'Anthropic
-- **Codex** - L'agent de codage d'OpenAI
-- **Gemini** - L'assistant IA de Google
-- **Qwen Code** - Le modèle de codage d'Alibaba
-- **Amp** - L'agent de Sourcegraph
-- **Cursor Agent** - L'assistant IA de Cursor
-- **GitHub Copilot** - Le compagnon de codage de GitHub
-- Et plus...
-
-<Tip>
-Seuls les agents installés sur votre système apparaîtront comme options disponibles.
-</Tip>
-
-## Rédiger des Prompts Système Efficaces
-
-Le prompt système définit ce que fait votre membre IA. Gardez-le clair et ciblé :
-
-**Bons exemples :**
-- "Tu es un rédacteur de documentation. Concentre-toi sur un contenu clair et convivial."
-- "Tu es un réviseur de code. Vérifie les bugs, les problèmes de performance et les bonnes pratiques."
-- "Tu es un ingénieur backend. Implémente les fonctionnalités en suivant les patterns existants du projet."
-
-**Conseils :**
-- Soyez spécifique sur le rôle et les responsabilités
-- Mentionnez les contraintes ou préférences
-- Gardez-le concis - les agents fonctionnent mieux avec des directives claires
-
-## Gestion des Membres IA
-
-### Modifier un Membre
-
-Cliquez sur un membre existant dans la barre latérale pour modifier sa configuration.
-
-<Warning>
-Le chemin de l'espace de travail ne peut pas être modifié après la création. Si vous avez besoin d'un espace de travail différent, créez un nouveau membre IA.
-</Warning>
-
-### Supprimer un Membre
-
-1. Cliquez sur le membre dans la barre latérale
-2. Cliquez sur **Supprimer**
-3. Confirmez la suppression
-
-## États des Membres
-
-Chaque membre IA affiche un indicateur de statut :
-
-| État | Signification |
-|-------|---------|
-| Inactif | Prêt à recevoir des tâches |
-| En cours | Travaille actuellement sur une tâche |
-| Terminé | A terminé la dernière tâche |
-| Échoué | A rencontré une erreur |
-
-## Prochaines Étapes
-
-<Card title="Collaboration sur les Tâches" icon="comments" href="/fr/core-features/task-collaboration">
-  Apprenez à assigner des tâches et collaborer avec votre équipe IA
-</Card>
+## Ajouter un membre IA prédéfini
+Si vous souhaitez sauvegarder de manière permanente un membre IA utilisé dans une session pour l'utiliser dans d'autres sessions, vous pouvez l'ajouter ici, l'enregistrer comme préréglage et l'importer directement lors des prochaines utilisations.
+La configuration est identique à celle d'un membre IA personnalisé — vous pouvez copier-coller directement.
+![Ajouter un membre IA](../../images/zh/add_memeber.png)

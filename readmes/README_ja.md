@@ -1,5 +1,9 @@
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 40px; margin-bottom: 20px;">
+  <img src="../frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="200">
+</div>
+
+<div align="center">
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 10px; margin-bottom: 10px;">
 
   <p><strong>チームとしてエージェントを実行し、AI時代に効率を倍増させる。</strong></p>
 
@@ -8,12 +12,12 @@
     <a href="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml/badge.svg" /></a>
     <a href="../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
     <a href="https://discord.gg/MbgNFJeWDc"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
-    <a href="https://docs.openteams.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
+    <a href="https://doc.openteams-lab.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
   </p>
 
   <p>
     <a href="#クイックスタート">クイックスタート</a> |
-    <a href="https://docs.openteams.com">ドキュメント</a>
+    <a href="https://doc.openteams-lab.com">ドキュメント</a>
   </p>
 
   <p align="center">
@@ -29,7 +33,7 @@
 
 ---
 
-![OpenTeams Demo](../images/demo.gif)
+![OpenTeams Demo](images/demo.gif)
 
 **1分間クイックスタートガイド**
 
@@ -40,14 +44,20 @@
 ---
 
 ## 🔥 *ニュース:*
-- **2025.03.24 (v0.3.7)**:
-  - 組み込みの OpenTeams-CLI エージェントを追加し、ローカルインストールされたエージェントへの厳格な依存を削除。
+### *主要アップデート*
+- **2026.04.02 (v0.3.10)**:
+  - アプリ内バージョン更新に対応
+  - ドキュメントサイトを正式公開
+- **2026.03.24 (v0.3.7)**:
+  - 組み込みの openteams-cli エージェントを追加し、ローカルインストールされたエージェントへの厳格な依存を削除。
   - エグゼキュータのメモリリーク問題を修正。
 ---
 
 ## クイックスタート
 
 ### オプション A: npxで実行
+
+**このインストール方法は Mac と Linux に推奨されます。**
 
 ```bash
 # web
@@ -62,7 +72,9 @@ npx openteams-web
 
 ### 要件
 
-**少なくとも1つのAIエージェントをインストールする必要があります：**
+**v0.3.7 以降、openteams-cli が組み込まれているため、AI Agent のインストールは必須ではありません。「設定 -> サービスプロバイダー」ページで API を設定できます。**
+
+また、対応エージェント一覧から任意の Agent を選んで利用できます：
 
 | Agent | インストール |
 |-------|---------|
@@ -72,7 +84,7 @@ npx openteams-web
 | [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code` |
 | [OpenCode](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g opencode-ai` |
 
-📚 [その他のエージェントインストールガイド](https://docs.openteams.com/getting-started)
+📚 [その他のエージェントインストールガイド](https://doc.openteams-lab.com/getting-started)
 
 ---
 
@@ -94,31 +106,31 @@ npx openteams-web
 
 *同じ共有コンテキストで複数のエージェントを実行し、並列実行でデリバリーを加速。*
 
-![OpenTeams parallel](../images/parallel.gif)
+![OpenTeams parallel](images/parallel.gif)
 
 ### 自律的エージェントコラボレーション
 
 *OpenTeamsはエージェントが固定されたワークフローを強制せずに直接メッセージを送り合うことを可能にします。より構造が必要な場合は、チームガイドラインを追加してコミュニケーションを制御し、リードエージェントを任命するか、全員が自由にコラボレーションできるようにします。コミュニケーションパターンは完全にユースケース次第です。*
 
-![OpenTeams collaborate](../images/collaborate.gif)
+![OpenTeams collaborate](images/collaborate.gif)
 
 ### AIメンバー
 
 *OpenTeamsには、エンジニアリング、マーケティング、ライティング、コンテンツ制作など、160以上の内蔵AIメンバーが含まれています。異なるチームに組み合わせ、カスタマイズし、あなたの働き方に合った役割の組み合わせを構築できます。ロスターを継続的に拡張・改善していきます。*
 
-![OpenTeams members](../images/members.gif)
+![OpenTeams members](images/members.gif)
 
 ### AIチーム
 
 *OpenTeamsには一般的なワークフロー用の8つの内蔵チームプリセットが付属しており、すぐに始められます。チームを作成する際にチームガイドラインを定義することをお勧めします。これにより、グループの運営方法とコラボレーションが一致します。*
 
-![OpenTeams team](../images/team.gif)
+![OpenTeams team](images/team.gif)
 
 ### スキルライブラリ
 
 *OpenTeamsには1000以上の内蔵スキルが含まれており、異なるAIメンバーに組み合わせて割り当てることができます。自分で作成したスキルをインポートしてエージェントに直接適用することもできます。実際の本番環境で機能する能力に焦点を当ててスキルライブラリを拡張し続けます。*
 
-![OpenTeams skills](../images/skills.gif)
+![OpenTeams skills](images/skills.gif)
 
 ---
 

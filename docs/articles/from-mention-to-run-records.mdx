@@ -1,0 +1,128 @@
+---
+title: "What exactly gets recorded after an @mention?"
+description: "Follow the path from a message to a run record to see how openteams turns each agent execution into a traceable collaboration asset."
+---
+
+What makes teams comfortable using AI is often not generation quality alone. It is traceability.
+
+In openteams, an `@mention` does not just trigger a short-lived execution. It becomes part of the message history, drives the session flow, creates run records, and turns into reusable context for later collaboration. In other words, the system does not just preserve what AI said. It preserves how the collaboration actually happened.
+
+## From one message to one run
+
+The path through openteams is clear. A message enters the session, the runner parses the mention list, and the relevant members are dispatched. The frontend subscribes to the session WebSocket stream, so the user can watch new messages, work items, and status changes appear in real time.
+
+```text
+Message created
+     |
+     v
+mentions parsed
+     |
+     v
+run agent for mention
+     |
+     +--> mention status: received
+     +--> agent state: running
+     +--> run directory created
+     +--> output / diff / log streamed back
+     +--> mention status: completed or failed
+```
+
+From the user's point of view, that flow shows up through a few visible signals.
+
+- A mentioned member first enters `received`
+- Once execution starts, the state changes to `running`
+- When the task finishes, it becomes `completed`, or `failed` if the run does not succeed
+- If the member is already busy, the new task is queued instead of silently disappearing
+
+<Tip>
+Those explicit states matter because they turn "Did the model actually start working?" from a guess into a clear, visible answer.
+</Tip>
+
+## Run assets are not abstract. They are real files.
+
+openteams writes execution traces into `.openteams/` inside the workspace. For a working team, that is very close to the minimum infrastructure needed for auditable AI collaboration.
+
+```text
+<workspace>/
+`-- .openteams/
+    +-- context/<session_id>/
+    |   +-- messages.jsonl
+    |   +-- shared_blackboard.jsonl
+    |   `-- work_records.jsonl
+    `-- runs/<session_id>/run_records/
+        `-- session_agent_<id>_run_0001/
+            +-- input.md
+            +-- output.md
+            +-- raw.log
+            `-- diff.patch
+```
+
+Each file serves a different role.
+
+### `messages.jsonl`
+
+This stores the message history of the session. It is the most complete raw record of what happened in the collaboration.
+
+### `shared_blackboard.jsonl`
+
+This stores long-lived shared facts. It is a good place for reusable conclusions, definitions, constraints, and scope boundaries rather than short-lived status updates.
+
+### `work_records.jsonl`
+
+This stores artifact paths and per-round conclusions. It is closer to recording what the work produced.
+
+### `input.md`, `output.md`, `raw.log`, and `diff.patch`
+
+These files form the evidence chain for a specific run: what input was given, what output came back, what the underlying execution printed, and what code changed.
+
+## Context updates do not block the current run
+
+This is one of the more interesting design choices in openteams.
+
+When a new run starts, the system first syncs the full context into the workspace so the current task can begin immediately. After that, it compacts longer history in the background into a smaller form for future runs.
+
+```text
+current run starts now
+        |
+        +--> write full messages.jsonl
+        |
+        `--> compact history in background for future runs
+```
+
+That approach resolves a common tension in multi-agent systems.
+
+- If every run waits for context cleanup to finish first, response time gets worse
+- If context is never compacted, the history becomes heavier and heavier
+
+openteams separates the two concerns: **let the current run start immediately, and optimise the history asynchronously afterward**. That is a very product-minded engineering tradeoff.
+
+## Why this directly affects user trust
+
+When you open the diff viewer, the workspace drawer, or the run log inside a session, you are effectively consuming those lower-level records. Because the records exist, openteams can support stronger review and accountability.
+
+- You can see which member changed a piece of code and in which run
+- You can inspect why a task failed instead of seeing only a generic failure message
+- You can carry facts, artifacts, and conclusions forward as the team hands work off
+- You can preserve the entire process after archiving and resume later from the same context
+
+<Note>
+openteams does not bolt transparency on afterward. It builds transparency into the collaboration flow itself.
+</Note>
+
+## What this means for product teams
+
+If you want AI to become part of production work instead of staying at the "individual experiment" stage, the ability to review, explain, and hand work off is close to mandatory. openteams already connects that chain in the repository: session flow, state flow, run flow, context files, and code diffs all link together.
+
+That is also why it feels more like a collaboration system than a chat wrapper. Every `@mention` can leave behind an asset.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Chat Session Overview" icon="users" href="/core-features/chat-session-overview">
+    Understand the relationship between sessions, members, and collaboration space.
+  </Card>
+
+  <Card title="Code Review" icon="code" href="/core-features/code-review">
+    Explore diffs, logs, run history, and context management in more detail.
+  </Card>
+</CardGroup>

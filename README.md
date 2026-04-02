@@ -12,12 +12,12 @@
     <a href="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml/badge.svg" /></a>
     <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
     <a href="https://discord.gg/MbgNFJeWDc"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
-    <a href="https://docs.openteams.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
+    <a href="https://doc.openteams-lab.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
   </p>
 
   <p>
     <a href="#quick-start">Quick Start</a> |
-    <a href="https://docs.openteams.com">Docs</a>
+    <a href="https://doc.openteams-lab.com">Docs</a> 
   </p>
 
   <p align="center">
@@ -33,18 +33,22 @@
 
 ---
 
-![OpenTeams Demo](images/demo.gif)
+![OpenTeams Demo](./readmes/images/demo.gif)
 
 **One-Minute Getting Started Guide**
 
 1. Import a preset team and choose the base agent for each member.
 2. Set up workspaces for each member in the team.
-3. Message a specific member with `@mentions`.
+3. Message a specific member with `@member`.
 
 ---
 ## 🔥 *News:*
-- **2025.03.24 (v0.3.7)**: 
-  - Added the built-in OpenTeams-CLI agent, removing the dependency on a locally installed agent.
+### *Major updates*
+- **2026.04.02 (v0.3.10)**
+  - Implement in-app version update
+  - The documentation website is now live.
+- **2026.03.24 (v0.3.7)**: 
+  - Added the built-in openteams-CLI agent, removing the dependency on a locally installed agent.
   - Fixed a memory leak issue in the executor.
 ---
 
@@ -77,7 +81,7 @@ And You can choose any agent from the list of supported agents.:
 | [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code` |
 | [OpenCode](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g opencode-ai` |
 
-📚 [More agent installation guides](https://docs.openteams.com/getting-started)
+📚 [More agent installation guides](https://doc.openteams-lab.com/getting-started)
 
 ---
 
@@ -99,31 +103,31 @@ And You can choose any agent from the list of supported agents.:
 
 *Run multiple agents in the same shared context and let them execute in parallel to speed up delivery.*
 
-![OpenTeams parallel](images/parallel.gif)
+![OpenTeams parallel](./readmes/images/parallel.gif)
 
 ### Autonomous Agent Collaboration
 
 *openteams lets agents message each other directly without forcing a fixed workflow. If you want more structure, add team guidelines to control communication, appoint a lead agent, or let everyone collaborate freely. The communication pattern is entirely up to your use case.*
 
-![OpenTeams collaborate](images/collaborate.gif)
+![OpenTeams collaborate](./readmes/images/collaborate.gif)
 
 ### AI Members
 
 *openteams includes 160+ built-in AI members across engineering, marketing, writing, content production, and more. Mix and match them into different teams, customize them, and build role combinations that fit the way you work. We will continue expanding and improving the roster.*
 
-![OpenTeams members](images/members.gif)
+![OpenTeams members](./readmes/images/members.gif)
 
 ### AI Teams
 
 *openteams ships with 8 built-in team presets for common workflows, so you can get started immediately. We recommend defining team guidelines when you create a team so collaboration stays aligned with how you want the group to operate.*
 
-![OpenTeams team](images/team.gif)
+![OpenTeams team](./readmes/images/team.gif)
 
 ### Skill Library
 
 *openteams includes 1000+ built-in skills that you can combine and assign to different AI members. You can also import skills you create yourself and apply them directly to your agents. We will keep expanding the skill library with a focus on capabilities that hold up in real production environments.*
 
-![OpenTeams skills](images/skills.gif)
+![OpenTeams skills](./readmes/images/skills.gif)
 
 ---
 

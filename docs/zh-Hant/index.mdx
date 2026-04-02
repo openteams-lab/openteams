@@ -1,52 +1,53 @@
 ---
-title: "OpenTeams 文檔"
-description: "透過群聊協作管理您的 AI 團隊。讓多個 AI 代理像真正的團隊一樣協同工作，共享上下文並透過 @提及進行溝通。"
+title: "openteams 官方文件"
+description: "openteams 能帶來的不僅是效率的提升，還是全新的工作方式。"
 sidebarTitle: "首頁"
 ---
 
-## 什麼是 OpenTeams？
+![](../images/zh/openteams_page.png)
 
-**OpenTeams** 創新性地引入了**工作群聊**模式，讓多個 AI 代理像真正的團隊成員一樣高效協作。
+## 什麼是 openteams
+openteams 是一個開源通用多智能體協作應用，以群聊為核心互動形態，支援使用者建立和指揮自己的 AI 團隊來完成各類任務。
 
-- 一個專案 = 一個群聊
-- 新增任意數量不同角色的 AI 成員
-- 在同一對話上下文中指揮所有代理
-- 代理之間自動協作和溝通
-- 您作為專案負責人，統籌您的 AI 團隊
+openteams 內建 openteams-cli Agent，也支援多種本地 Agent，如 Claude Code、Codex、OpenCode 等；
+支援建立 AI 成員，為 AI 成員設定不同的模型和技能，組建起一支 AI 小隊，以滿足複雜任務的執行需求。
 
-<Frame>
-  <img src="/images/preview.png"  />
-</Frame>
-
-## 為什麼選擇 OpenTeams？
+## 為什麼選擇 openteams
 
 <CardGroup cols={2}>
   <Card title="上下文共享" icon="link">
     所有代理在同一對話空間工作，自動共享專案背景、討論歷史和程式碼變更。
   </Card>
 
-  <Card title="@提及機制" icon="at">
-    代理之間可以相互 @提及以觸發自動任務交接，形成流暢的協作鏈條。
+  <Card title="@溝通機制" icon="at">
+    代理之間可以相互 @傳送訊息以觸發任務交接，自動形成流暢的協作鏈條。
   </Card>
 
-  <Card title="一人即團隊" icon="users">
+  <Card title="一人團隊" icon="users">
     一個人指揮一個完整的 AI 開發團隊：設計師、程式設計師、審查員、測試員，以及您定義的更多角色。
   </Card>
 
   <Card title="效率倍增" icon="bolt">
-    並行處理、零溝通成本、專業分工，本地執行確保資料隱私。
+    並行處理、任務自動投遞、專業分工，無雲端伺服器，確保資料隱私安全。
+  </Card>
+
+  <Card title="模式切換" icon="gear">
+    討論模式與工作模式無縫切換，讓所有想法都能真正落地。
+  </Card>
+
+  <Card title="開箱即用" icon="plug">
+    內建各類 AI 成員與預設團隊，並提供大量技能庫，支援任意組合使用。
   </Card>
 </CardGroup>
 
-
-## 需要幫助？
+## 開始使用
 
 <CardGroup cols={2}>
-  <Card title="使用者指南" icon="book" href="/zh-Hant/core-features/chat-session-overview">
-    建立會話、管理 AI 成員和任務協作的完整指南
+  <Card title="快速開始" icon="book" href="/zh-Hant/getting-started">
+    建立會話、管理 AI 成員、開始任務協作的完整指南
   </Card>
 
-  <Card title="支援的代理" icon="robot" href="/zh-Hant/supported-coding-agents">
-    配置和使用 Claude Code、Gemini CLI、Codex 等代理
+  <Card title="設定代理模型" icon="robot" href="/zh-Hant/supported-coding-agents">
+    設定和使用 openteams CLI、Claude Code、Gemini CLI、Codex 等代理
   </Card>
 </CardGroup>

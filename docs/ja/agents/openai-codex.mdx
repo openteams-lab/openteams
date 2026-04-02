@@ -12,29 +12,16 @@ icon: /logos/openai-logo.svg
 </Step>
 
 <Step title="ログイン手順に従う">
-  プロンプトに従って認証フローを完了します。[OpenAIヘルプセンター](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan)の認証手順に従ってChatGPTプランでCodexを使用してください。
+  プロンプトに従って認証フローを完了します。[OpenAI ヘルプセンター](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan)の認証手順に従い、ChatGPTプランでCodexを使用してください。
 
-  または、`OPENAI_API_KEY`環境変数を設定してOpenAI API経由でCodexを使用できます。詳細は[OpenAIドキュメント](https://developers.openai.com/codex/pricing/#use-an-openai-api-key)を参照してください。
+  または、`OPENAI_API_KEY` 環境変数を設定してOpenAI API経由でCodexを使用できます。詳細は [OpenAI ドキュメント](https://developers.openai.com/codex/pricing/#use-an-openai-api-key) を参照してください。
 </Step>
 
-<Step title="openteamsを起動">
-  認証完了後、openteamsを起動：
-
-  **方法1：npxで起動**
-  ```bash
-  npx openteams
-  ```
-
-  **方法2：Desktop Installerで起動**
-  インストール済みのデスクトップアプリを直接起動できます。インストーラー手順は[はじめに](/ja/getting-started)を参照してください。
-
-  タスク試行を作成する際にOpenAI Codexを選択できるようになりました。
-</Step>
 </Steps>
 
 ## カスタム設定ディレクトリ
 
-デフォルトでは、Codexは設定とセッションデータを`~/.codex`に保存します。`CODEX_HOME`環境変数でカスタムの場所を設定している場合、openteamsは自動的にその場所を検出して使用します。
+デフォルトでは、Codexは設定とセッションデータを `~/.codex` に保存します。`CODEX_HOME` 環境変数でカスタムの場所を設定している場合、openteamsは自動的にその場所を検出して使用します。
 
 ```bash
 # 例：プロジェクト固有のCodex設定を使用

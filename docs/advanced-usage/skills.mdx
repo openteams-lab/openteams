@@ -1,6 +1,6 @@
 ---
 title: "Skills"
-description: "Placeholder page for the site outline."
+description: "Skills define what AI members can do in openteams and let you assign specialised capabilities to different roles."
 sidebarTitle: "Skills"
 ---
 
@@ -54,3 +54,30 @@ sidebarTitle: "Skills"
   }
 })();`}</script>
 
+## What is a skill?
+
+Each skill packages a concrete capability, such as code generation, information retrieval, data processing, file operations, or calling an external API.
+Skills usually include clear input and output definitions, execution logic, and a way to interact with the environment so agents can reuse that capability reliably across different scenarios.
+
+By assigning different skills to different agents, you can define both what they can do and how they do it.
+Multiple skills can also be combined into more complex workflows that support multi-step problem solving.
+
+## Install skills
+
+openteams includes a skill library. You can install skills for your agent directly inside the app, and the app also reads the list of skills already installed for that agent.
+
+Search the marketplace for the skill you want, choose the agent that should receive it, and click install.
+
+<video src="../images/zh/install_skill.mp4" autoPlay loop muted playsInline />
+
+## Enable skills at the agent level
+
+Enable installed skills for an agent from the installed skill list. Some agents do not support skill toggles, such as Claude Code.
+
+![](../images/zh/install_skill.png)
+
+## Assign skills to AI members
+
+An AI member can only use a skill after that skill has been assigned to the member. You can do this from the skill list in the member configuration panel.
+
+![Assign skills to AI members](../images/zh/config_member_skill.png)

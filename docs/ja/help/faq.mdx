@@ -1,5 +1,62 @@
 ---
-title: "FAQ"
-description: "サイト構成用のプレースホルダーページです。"
-sidebarTitle: "FAQ"
+title: "よくある質問"
+description: ""
+sidebarTitle: "よくある質問"
 ---
+
+## AIメンバーからメッセージが返ってこない場合は？
+
+メッセージが返ってこない原因はいくつか考えられます。
+
+- `@メンバー` に赤い点が付いている場合、その Agent はメッセージ処理に失敗しています。`Workspace` でエラー内容を確認できます。
+- Agent に実行過程はあるのに最終メッセージがない場合は、Agent が自発的に投稿しなかった可能性があります。生の出力は `.openteams/runs/<session>/run_records/<session>_<runid>/output.md` で確認できます。
+- 実行中にも最終的にも出力がない場合は、モデル内部でエラーが発生したか、設定したモデル ID が誤っている可能性があります。実行ログを確認してください。
+
+上記に当てはまらない場合は、[GitHub](https://github.com/openteams-lab/openteams/issues) に issue を作成してください。できるだけ早く対応します。
+
+## AIメンバーのエラーログはどこで確認できますか？
+
+AIメンバーのワークスペース配下にある `.openteams/runs/<session>/run_records/<session>_<runid>/raw.log` です。
+
+## ソフトウェアをアンインストールするには？
+
+Windows デスクトップ版では、インストールディレクトリを開き、`Uninstall openteams` をダブルクリックしてください。
+
+`npx` 版を使用している場合は、`npx uninstall openteams-web` を実行してください。
+
+## データベースをクリアするには？
+
+回復不能なエラーが発生し、openteamsのデータベースを完全にクリアする必要がある場合は、OSに対応するアプリケーションデータディレクトリを削除してください。
+
+<Warning>
+この操作は元に戻せません。すべてのセッション記録と設定が失われます。続行する前に、重要な情報をすべてバックアップしてください。
+</Warning>
+
+**お使いのOSに応じて以下のディレクトリを削除してください：**
+
+<Tabs>
+<Tab title="macOS">
+```bash
+~/Library/Application Support/ai.openteams-lab.openteams/
+```
+</Tab>
+
+<Tab title="Linux">
+```bash
+~/.local/share/openteams/
+```
+</Tab>
+
+<Tab title="Windows">
+```
+%APPDATA%\openteams-lab\openteams\
+```
+
+通常は `C:\Users\<ユーザー名>\AppData\Roaming\openteams-lab\openteams\` です。
+</Tab>
+</Tabs>
+
+アプリケーションデータディレクトリを削除した後、openteamsを再起動すると、空のデータベースとデフォルト設定でリセットされます。
+<Note>
+このディレクトリにはシステムログも保存されています。logsディレクトリでopenteamsのシステムログを確認できます。
+</Note>

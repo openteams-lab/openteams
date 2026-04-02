@@ -1,0 +1,116 @@
+---
+title: "Why agent collaboration tools always come back to shared context and execution traceability"
+description: "From shared context and run records to local workspaces and archived sessions, openteams treats visible execution as a core product capability rather than a nice extra."
+---
+
+Plenty of AI tools can give you an answer. Once they enter a team workflow, though, the question people really care about is not "Was the answer good?" but "What actually happened?" Who changed what, where the work got stuck, which member picked it up, why one run succeeded and another did not. Without that process being visible, AI collaboration is hard to trust as part of real work.
+
+## Without a visible process, teams struggle to trust the system
+
+When you use AI on your own, the result may be enough. Once the work spans product, engineering, content, and review, the process matters just as much. Teams need to know things like:
+
+- What context was used in this collaboration
+- Who picked the task up and who completed it
+- Whether the work failed, looped, or changed files along the way
+- Whether the execution pattern is worth reusing next time
+
+If none of that is recorded, AI behaves more like a black-box assistant than a collaboration system a team can safely build around.
+
+## openteams makes the execution process part of the product
+
+One of the most interesting things about openteams is that it does not treat transparency as a side feature. It builds transparency directly into the session and run model. The public repository already shows a clear chain: a message enters a session, a mention triggers execution, a run produces logs and diffs, and artifacts plus conclusions are written into the workspace under `.openteams/`.
+
+```text
+             From black-box results to a reviewable execution chain
+
+   Traditional setup                     openteams
+
+ [Multiple chat windows]           [One session / shared context]
+        |                                   |
+     Separate outputs                   @mention handoff
+        |                                   |
+     Manual stitching                 run / log / diff / artifacts
+        |                                   |
+      Results visible                 Process and results visible
+```
+
+That structure maps to product capabilities you can verify directly.
+
+### Shared context instead of manual retelling
+
+The README and repository layout make it clear that openteams writes session context into `.openteams/context/<session_id>/` in the workspace. That directory includes:
+
+- `messages.jsonl`: the message history of the session
+- `shared_blackboard.jsonl`: long-lived shared facts
+- `work_records.jsonl`: deliverables and per-round conclusions
+
+That means when multiple members hand work off to each other, the system passes structured context rather than relying on a person's imperfect memory of the last step.
+
+### Traceable run records instead of only a final answer
+
+openteams supports viewing logs, diffs, and untracked files by `run_id`. For teams, the value is straightforward. You do not just see what got delivered in the end. You can also see how the run was completed, where changes happened, and where things went wrong.
+
+```text
+<workspace>/
+`-- .openteams/
+    +-- context/<session_id>/
+    |   +-- messages.jsonl
+    |   +-- shared_blackboard.jsonl
+    |   `-- work_records.jsonl
+    `-- runs/<session_id>/run_records/
+        `-- session_agent_<id>_run_0001/
+            +-- input.md
+            +-- output.md
+            +-- raw.log
+            `-- diff.patch
+```
+
+### Sessions can be archived and restored
+
+When work stretches across days or multiple rounds, execution traceability becomes even more valuable. openteams supports archiving and restoring sessions, which means it treats collaboration as an ongoing project space instead of a disposable chat. That matters for teams that need review, handoff, and durable knowledge capture.
+
+<Note>
+Once a platform can preserve sessions, runs, artifacts, and conclusions, teams no longer see only what AI produced. They can also see how the collaboration itself was organised.
+</Note>
+
+## What visible execution actually solves
+
+Keeping logs, diffs, artifacts, and context is not just about presentation. It solves at least three practical team problems.
+
+### 1. Progress explanation
+
+Managers no longer have to ask only, "Is it done yet?" When run state, logs, and intermediate artifacts are visible, the team can explain exactly where the work stands, what is finished, and who should take over next.
+
+### 2. Result review and reuse
+
+If a run works well, the team needs to know which context, division of labour, and collaboration pattern is worth repeating. If it works poorly, the team needs to know whether the issue came from research, writing, execution, or handoff. None of that becomes reusable knowledge when the process stays hidden.
+
+### 3. Trust in collaboration
+
+Many teams are not opposed to AI. They are opposed to handing critical work to a black box. openteams turns some of that uncertainty into inspectable evidence through local workspaces, run records, and session history. For a team, that transparency is part of the productivity gain.
+
+## Why local execution and workspace isolation matter too
+
+openteams does not stop at preserving traceability. It also emphasises local execution and workspace isolation. The README states that agents run in the local workspace and that runtime artifacts are stored under `.openteams/` within that workspace. The benefit is not only that files are easier to inspect. It also means:
+
+- Clearer data boundaries
+- Easier auditability of execution assets
+- A smoother fit with existing engineering and content workflows
+
+When a collaboration system preserves the process and stores that process inside an explicit workspace boundary, it becomes much easier for it to move from demo territory into real use.
+
+## Final thought
+
+The next generation of multi-agent platforms is not really about plugging in one more model. It is about building the collaboration chain properly. From shared context to run records, and from diffs and logs to archive and restore, openteams points in a clear direction: teams should not just receive a result, they should also be able to see how that result was produced. For organisations trying to upgrade AI from a personal tool to a team system, that kind of visible execution is often more valuable than a few more chat windows.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Code Review" icon="code" href="/core-features/code-review">
+    See how logs, diffs, run history, and session controls are surfaced.
+  </Card>
+
+  <Card title="Chat Session Overview" icon="users" href="/core-features/chat-session-overview">
+    Understand how sessions, members, and collaboration containers fit together.
+  </Card>
+</CardGroup>

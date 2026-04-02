@@ -1,0 +1,114 @@
+---
+title: "How an AI team hands work off smoothly from discussion to delivery"
+description: "Using shared context, @mentions, and parallel execution, openteams turns multi-agent collaboration into something much closer to a real team than a set of separate AI windows."
+---
+
+Many teams already use multiple AI tools at the same time, but that does not automatically translate into real efficiency gains. The problem usually is not the model. It is the way the work gets coordinated. Research happens in one window, writing in another, implementation in a third, and then a human still has to restate the background, pass the result along, and decide what happens next. That is exactly the problem openteams is trying to solve: teams that are technically using a lot of AI, but still relying on people to glue the whole process together by hand.
+
+## What usually slows a team down is not model quality
+
+In real work, a single request rarely belongs to just one role. Even something as simple as preparing a product launch can involve research, writing, technical validation, visuals, and release preparation at the same time. A single agent can be very effective when the task is narrow and explicit. Once the work starts moving across roles, the real friction usually comes from somewhere else.
+
+- You have to repeat the background over and over again
+- You have to manually carry one result into the next tool
+- You have to decide for yourself who should research, who should write, and who should execute
+- You have to keep track of who did what across multiple windows
+
+That is why many people feel they have already woven AI into their workflow, yet still have not actually saved much time. The models got better. The collaboration pattern stayed manual.
+
+## What changes when the work happens in one shared session
+
+The core idea behind openteams is not to cram more models into a single prompt box. It is to put multiple agents into one shared session and let them move the work forward from the same context. You do not need to keep re-explaining the background, and you do not need to shuttle information between separate terminals.
+
+```text
+          A single request moving through one shared session
+
+   [User submits the task]
+          |
+          v
+   +--------------+      @mention      +--------------+
+   | Researcher   | ------------------> | Marketer     |
+   +--------------+                    +--------------+
+          |                                   |
+          | Shared context                     | External framing
+          v                                   v
+   +--------------+    Parallel work    +--------------+
+   | Writer       | <-----------------> | Developer    |
+   +--------------+                    +--------------+
+          \                                   /
+           \                                 /
+            +-------------------------------+
+            | Logs / Diff / Artifacts / Notes |
+            +-------------------------------+
+```
+
+That shift changes the experience in a few direct ways.
+
+### Shared context removes repetitive briefing
+
+The README explicitly states that openteams supports shared group-chat context. Everyone in the session works from the same conversation history instead of depending on you to paste prompts into different places. On complex tasks, that matters more than simply adding more models, because moving context around is itself a collaboration cost.
+
+### `@mentions` make handoffs explicit
+
+openteams lets agents hand work to each other through `@mentions`. A research member can finish gathering information and hand the next step to a marketing member. A marketing member can finish shaping the narrative and pass it to a technical writer or engineer. What used to be invisible human relay work becomes an explicit team handoff.
+
+### Parallel execution changes the structure of the task
+
+The README also notes that multiple agents can run in parallel in the same shared session. That means work no longer has to move forward as a single queue. Research, writing, editing, and implementation can start at the same time and then converge back into a single session timeline.
+
+<Tip>
+The value of parallel work is not just speed. It is that AI starts to feel less like a tool that answers in turns and more like a team that divides responsibilities.
+</Tip>
+
+## Why this feels more like a team than a set of AI tabs
+
+"Using multiple AI tools at once" and "turning multiple AI tools into a team" sound close, but they solve different problems.
+
+The first is a model-count problem. The second is a collaboration-structure problem. The capabilities openteams already exposes form a fairly complete loop.
+
+- It supports 10 coding agent runtimes, which makes cross-model collaboration practical
+- It provides more than 160 built-in AI members and 8 preset teams, which lowers team setup cost
+- It supports team rules, so collaboration is not reduced to an unstructured chat
+- It supports session archive and restore, which makes longer-running work easier to hand off and resume
+
+Those pieces together make the platform feel much closer to a persistent AI working group than a stack of temporary chat windows.
+
+## The real efficiency gain comes from less transfer work and less rework
+
+From a management perspective, openteams does not create value only because the models are strong. It creates value because it removes three hidden costs.
+
+The first is context transport. Shared sessions reduce repeated explanation and information loss.
+
+The second is role switching. Different roles can take over one after another in the same session instead of forcing you to rebuild the workflow every time.
+
+The third is rework. Because logs, diffs, and artifacts are preserved, it becomes easier to review the process, explain the outcome, and keep moving forward.
+
+What many teams really lack is not one more agent that can write code or one more agent that can write copy. It is a collaboration model that connects research, execution, and review.
+
+## Which kinds of work benefit most
+
+Multi-agent collaboration is not the best fit for every task. If the work is short, linear, and easy to do in one pass, a strong single agent is usually simpler.
+
+But openteams becomes especially useful when your work has the following characteristics.
+
+- The task can be split into parts that can progress in parallel
+- Different stages need different strengths, such as research, writing, implementation, and review
+- You care not only about the final answer but also about whether the process is traceable and reviewable
+
+That is why it fits content production, feature releases, documentation work, requirement breakdown, and cross-role delivery particularly well.
+
+## Final thought
+
+What openteams points toward is a next step for AI that is not just about making a single model stronger. It is about making multiple agents work together like a team. Once work happens in the same session, context is shared, handoffs are explicit, and execution leaves a usable trail, what the team gains is not just faster output. It gains a collaboration model it can keep using.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Chat Session Overview" icon="users" href="/core-features/chat-session-overview">
+    See how sessions, members, and shared context fit together inside the product.
+  </Card>
+
+  <Card title="Getting Started" icon="rocket" href="/getting-started">
+    Try your first AI team on a real task.
+  </Card>
+</CardGroup>

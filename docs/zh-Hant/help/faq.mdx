@@ -1,5 +1,62 @@
 ---
-title: "FAQ"
-description: "網站大綱占位頁。"
-sidebarTitle: "FAQ"
+title: "常見問題"
+description: ""
+sidebarTitle: "常見問題"
 ---
+
+## AI 成員沒有回傳訊息？
+
+沒有回傳訊息可能有幾種原因：
+
+- 如果 `@成員` 上有紅色小點，代表 Agent 在處理訊息時失敗，您可以在 `工作區` 中查看錯誤訊息。
+- 如果 Agent 有執行過程，但最終沒有送出訊息，那通常是 Agent 主動選擇不發送。若要查看原始輸出，可以到 `.openteams/runs/<session>/run_records/<session>_<runid>/output.md` 查看。
+- 如果 Agent 執行過程中沒有任何輸出，最後也沒有輸出，那通常是模型內部發生錯誤，或您的模型 ID 設定有誤。您可以查看執行日誌取得錯誤資訊。
+
+若不屬於以上情況，請前往 [GitHub](https://github.com/openteams-lab/openteams/issues) 提交 issue，我們會盡快協助處理。
+
+## AI 成員回傳錯誤日誌在哪？
+
+位於 AI 成員工作區路徑下的 `.openteams/runs/<session>/run_records/<session>_<runid>/raw.log`
+
+## 怎麼解除安裝軟體？
+
+Windows 桌面端請前往安裝目錄，找到 `Uninstall openteams`，雙擊即可解除安裝。
+
+若您使用 `npx` 安裝，執行 `npx uninstall openteams-web` 即可解除安裝。
+
+## 怎麼清除資料庫？
+
+如果您遇到不可恢復的錯誤並需要完全清除 openteams 資料庫，可以刪除作業系統對應的應用程式資料目錄。
+
+<Warning>
+此操作不可逆，將導致所有會話記錄和設定遺失。在繼續之前，請確保備份所有重要資訊。
+</Warning>
+
+**根據您的作業系統刪除以下目錄：**
+
+<Tabs>
+<Tab title="macOS">
+```bash
+~/Library/Application Support/ai.openteams-lab.openteams/
+```
+</Tab>
+
+<Tab title="Linux">
+```bash
+~/.local/share/openteams/
+```
+</Tab>
+
+<Tab title="Windows">
+```
+%APPDATA%\openteams-lab\openteams\
+```
+
+通常為：`C:\Users\<使用者名稱>\AppData\Roaming\openteams-lab\openteams\`
+</Tab>
+</Tabs>
+
+刪除應用程式資料目錄後，重啟 openteams 即可使用空資料庫和預設設定重置。
+<Note>
+在這個目錄下還儲存有系統日誌，您可以在 logs 目錄下查看 openteams 的系統日誌
+</Note>

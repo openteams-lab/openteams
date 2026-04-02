@@ -1,5 +1,56 @@
 ---
-title: "FAQ"
-description: "网站大纲占位页。"
-sidebarTitle: "FAQ"
+title: "常见问题"
+description: ""
+sidebarTitle: "常见问题"
 ---
+
+## AI成员没有返回消息？
+没有返回消息有多种原因：
+- `@成员`中有红色小点，说明Agent处理消息失败，可以在`工作区`中查看错误消息
+- Agent有执行过程，但是最终没有消息，那么就是Agent主动选择了不发送消息，如果要查看原始消息可以到`.openteams/runs/<session>/run_records/<session>_<runid>/output.md`文件中查看当前消息的输出
+- Agent执行过程中没有输出，最终也没有输出，那么就是大模型内部发生了错误，可能是您的模型ID配置错误，您可以查看运行日志来获取错误信息。
+其他未提及的情况请前往[github](https://github.com/openteams-lab/openteams/issues)上提交issue，我们将第一时间为您解决。
+
+## AI成员返回错误日志在哪？
+位于AI成员工作区路径下的`.openteams/runs/<session>/run_records/<session>_<runid>/raw.log`
+
+## 怎么卸载软件？
+Windwos桌面端前往安装目录，找到`Uninstall openteams`，双击卸载。
+npx使用`npx uninstall openteams-web`即卸载。
+
+## 怎么清除数据库？
+
+如果您遇到不可恢复的错误并需要完全清除 openteams 数据库，可以删除操作系统对应的应用数据目录。
+
+<Warning>
+此操作不可逆，将导致所有会话记录和设置丢失。在继续之前，请确保备份所有重要信息。
+</Warning>
+
+**根据您的操作系统删除以下目录：**
+
+<Tabs>
+<Tab title="macOS">
+```bash
+~/Library/Application Support/ai.openteams-lab.openteams/
+```
+</Tab>
+
+<Tab title="Linux">
+```bash
+~/.local/share/openteams/
+```
+</Tab>
+
+<Tab title="Windows">
+```
+%APPDATA%\openteams-lab\openteams\
+```
+
+通常为：`C:\Users\<用户名>\AppData\Roaming\openteams-lab\openteams\`
+</Tab>
+</Tabs>
+
+删除应用数据目录后，重启 openteams 即可使用空数据库和默认设置重置。
+<Note>
+在这个目录下还保存有系统日志，你可以在logs目录下查看openteams的系统日志
+</Note>

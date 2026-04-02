@@ -1,0 +1,114 @@
+---
+title: "Turning AI from a solo tool into a collaborative team"
+description: "From sessions and members to run records and team presets, openteams turns multi-agent work into a manageable product workflow rather than a loose collection of model calls."
+---
+
+AI coding products have already shown that a single agent can be very capable. Once work spans product, engineering, testing, documentation, and review, though, the real drag on the team is often no longer model quality. It is the cost of collaboration.
+
+openteams does not try to solve that by squeezing more models into one prompt box. It treats **collaboration itself** as a first-class product concept. Sessions, members, messages, run records, skills, and work items all have explicit structures and interaction paths. That changes AI from something that merely answers into something that can be organised, delegated, and tracked like a team.
+
+## More than just multiple agents on screen
+
+In openteams, a chat session is not a temporary conversation window. It is a full collaboration container.
+
+- **ChatSession** carries a complete task lifecycle
+- **ChatAgent** defines a reusable agent role
+- **ChatSessionAgent** places an agent inside a concrete session and records its state, workspace, and allowed skills
+- **ChatMessage** stores user, agent, and system messages
+- **ChatRun** records a specific execution
+- **ChatWorkItem** organises deliverables and stage outputs into a timeline
+
+That structure looks roughly like this:
+
+```text
+User
+  |
+  v
+ChatSession
+  +-- ChatMessage ----------> mentions @AgentA / @AgentB
+  |
+  +-- ChatSessionAgent -----> state / workspace / allowed skills
+  |         |
+  |         +-------------> ChatRun (one execution at a time, repeatable)
+  |
+  +-- ChatWorkItem ---------> artifact / conclusion / deliverable trace
+```
+
+The value of that design is that the system no longer depends on the user remembering who did what. The product itself knows who is in the session, who was mentioned, who is running, and what each member produced.
+
+## One message can drive a whole team
+
+openteams treats `@mentions` as a collaboration trigger. Once you send a message, the mentioned members enter a visible execution flow. The frontend receives live state updates through the session WebSocket stream, so the user can see work being received, executed, and completed.
+
+```text
+You send a message
+   |
+   v
+@frontend   @backend   @reviewer
+   |            |           |
+received -> running -> completed/failed
+   |            |           |
+   +------ all state rolls back into one shared timeline ------+
+```
+
+That means openteams is not doing multi-agent work by lining up multiple terminal windows. It is doing it by collapsing parallel work into one shared timeline. From the user's point of view, three changes matter most.
+
+### 1. Clear division of labour instead of mixed context
+
+One session can include multiple role-specific members such as `architect`, `backend`, `qa`, and `tech_writer`. The repository includes member presets and team presets, including combinations like Content Studio Team and Full-stack Delivery Team, so users can assemble a working AI team in seconds.
+
+### 2. Parallel work without losing control
+
+The system keeps separate state for each session member. If a member is already running, the next task goes into that member's queue and waits for the current run to finish instead of scattering context into a new temporary window.
+
+<Note>
+openteams also limits chained trigger depth so members do not end up endlessly `@mentioning` each other in a loop.
+</Note>
+
+### 3. Team work accumulates instead of disappearing after the run
+
+Sessions can be archived and restored. Once archived, a session becomes read-only, but members, messages, and historical outputs remain available. Once restored, work can continue from the original context. That makes openteams feel more like a project space than a disposable chat log.
+
+## What gets shared is not mysterious memory. It is inspectable context.
+
+Many multi-agent products talk about "shared memory". openteams takes a more concrete path. It syncs context into `.openteams/context/<session_id>/` in the workspace, where the key files are:
+
+- `messages.jsonl`: session message history
+- `shared_blackboard.jsonl`: long-lived shared facts
+- `work_records.jsonl`: deliverables and round summaries
+
+That matters because collaboration stops depending on a black-box notion of memory and starts depending on **explicit, readable, auditable context files**. When agents hand work off to one another, the system passes structured records instead of unverifiable hidden state.
+
+## Why this looks like a product, not just a demo
+
+The repository already shows that openteams has connected the key pieces of multi-agent collaboration into a usable loop.
+
+- The frontend has dedicated chat session pages, member sidebars, skill panels, diff viewers, and workspace drawers
+- The backend exposes `/chat/sessions`, `/chat/agents`, `/chat/skills`, and run endpoints for logs, diffs, and untracked files
+- The execution layer writes input, output, logs, and diffs for each run
+- The skill system supports remote registries, local discovery, and per-agent installation
+
+That means openteams is not mainly solving "How do we plug in one more model?" It is solving "How do we make multiple models work together in a real workflow?" The first is a feature. The second is product capability.
+
+## What kinds of teams this fits best
+
+This design is especially compelling if your work often looks like this:
+
+- Product work breaks the requirement down, then engineering implements it
+- Reviewers or QA need to pick things up after implementation
+- Documentation, code, research, and release notes need to move forward together
+- You want to keep the process of AI participation, not just the final answer
+
+Put differently, openteams is not competing on who can produce the smartest single answer. It is competing on who feels more like a real team when the task gets complex.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="AI Members" icon="bot" href="/core-features/ai-members">
+    See how openteams manages role-based team members.
+  </Card>
+
+  <Card title="Code Review" icon="code" href="/core-features/code-review">
+    Explore diffs, logs, run history, and context management.
+  </Card>
+</CardGroup>

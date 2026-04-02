@@ -1,5 +1,62 @@
 ---
-title: "FAQ"
-description: "사이트 구조용 플레이스홀더 페이지입니다."
-sidebarTitle: "FAQ"
+title: "자주 묻는 질문"
+description: ""
+sidebarTitle: "자주 묻는 질문"
 ---
+
+## AI 멤버가 메시지를 반환하지 않는다면?
+
+메시지가 반환되지 않는 데에는 몇 가지 일반적인 이유가 있습니다.
+
+- `@멤버` 항목에 빨간 점이 보이면, 해당 Agent가 메시지 처리 중 실패한 것입니다. `작업공간`에서 오류 메시지를 확인할 수 있습니다.
+- Agent가 실행은 했지만 최종 메시지를 보내지 않았다면, Agent가 의도적으로 메시지를 게시하지 않은 것일 수 있습니다. 원본 출력은 `.openteams/runs/<session>/run_records/<session>_<runid>/output.md` 에서 확인할 수 있습니다.
+- 실행 중에도 최종적으로도 아무 출력이 없다면, 모델 내부 오류가 발생했거나 모델 ID 설정이 잘못되었을 가능성이 큽니다. 실행 로그에서 원인을 확인하세요.
+
+여기에 없는 경우라면 [GitHub](https://github.com/openteams-lab/openteams/issues)에 이슈를 등록해 주세요. 최대한 빨리 확인하겠습니다.
+
+## AI 멤버의 오류 로그는 어디서 확인할 수 있나요?
+
+AI 멤버 워크스페이스 경로 아래의 `.openteams/runs/<session>/run_records/<session>_<runid>/raw.log` 에 있습니다.
+
+## 소프트웨어를 어떻게 제거하나요?
+
+Windows 데스크톱 버전에서는 설치 디렉터리로 이동해 `Uninstall openteams` 를 찾아 더블클릭하면 제거할 수 있습니다.
+
+`npx` 로 설치한 경우에는 `npx uninstall openteams-web` 을 실행하세요.
+
+## 데이터베이스를 어떻게 초기화하나요?
+
+복구 불가능한 오류가 발생하여 openteams 데이터베이스를 완전히 초기화해야 하는 경우, 운영 체제에 해당하는 앱 데이터 디렉토리를 삭제하면 됩니다.
+
+<Warning>
+이 작업은 되돌릴 수 없으며, 모든 세션 기록과 설정이 손실됩니다. 계속하기 전에 모든 중요한 정보를 백업하세요.
+</Warning>
+
+**운영 체제에 따라 다음 디렉토리를 삭제하세요:**
+
+<Tabs>
+<Tab title="macOS">
+```bash
+~/Library/Application Support/ai.openteams-lab.openteams/
+```
+</Tab>
+
+<Tab title="Linux">
+```bash
+~/.local/share/openteams/
+```
+</Tab>
+
+<Tab title="Windows">
+```
+%APPDATA%\openteams-lab\openteams\
+```
+
+일반적으로: `C:\Users\<사용자명>\AppData\Roaming\openteams-lab\openteams\`
+</Tab>
+</Tabs>
+
+앱 데이터 디렉토리를 삭제한 후 openteams을 재시작하면 빈 데이터베이스와 기본 설정으로 초기화됩니다.
+<Note>
+이 디렉토리에는 시스템 로그도 저장되어 있으며, logs 디렉토리에서 openteams의 시스템 로그를 확인할 수 있습니다.
+</Note>

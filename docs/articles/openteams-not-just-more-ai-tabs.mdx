@@ -1,0 +1,172 @@
+---
+title: "Why openteams is not just a bunch of extra AI tabs"
+description: "Once the work needs division of labour, handoffs, and traceability, the real difference is no longer the number of models. It is the collaboration structure."
+---
+
+## Introduction
+
+When people first see a multi-agent product, the reaction is often immediate: is this not just several AI tools open at the same time?
+
+That instinct is understandable, but it only tells half the story. Once the task starts spanning research, writing, coding, review, and delivery, what slows the team down is usually no longer the model itself. It is the way context gets synchronised, the way tasks get handed off, and the way the process gets tracked.
+
+After reading through the openteams repository, the strongest impression is that it is not really trying to help you ask more models at once. It is trying to organise multiple agents into a team that can actually collaborate. That sounds like a wording difference, but it leads to a very different way of working.
+
+```text
+Multiple AI tabs
+
+You
+ |- Window A -> answer A
+ |- Window B -> answer B
+ `- Window C -> answer C
+
+openteams collaboration
+
+You
+  |
+  v
+Shared Session
+  |- Researcher -> facts
+  |- Writer     -> draft
+  |- Reviewer   -> fixes
+  `- Editor     -> final output
+```
+
+## Multiple tabs solve a quantity problem
+
+If what you need is simply to ask the same question to multiple models and compare the answers, opening multiple windows is enough.
+
+- You want to compare different answer styles quickly
+- You want one model to cover another model's blind spots
+- You are dealing with a one-off task rather than something that needs handoff across roles
+
+In that situation, the main variable really is model count. Which model is stronger, faster, or cheaper matters more than collaboration structure.
+
+That is why many people naturally conclude that multi-agent products are just a rebranding of multi-model usage.
+
+The problem with that conclusion is that it assumes the work stays one-shot, linear, and self-contained.
+
+As soon as the work becomes even slightly more complex, the bottleneck shifts from "Who should answer?" to "How should the work be coordinated?"
+
+## What usually blocks the team is collaboration friction, not model power
+
+In real work, the most exhausting parts are usually not the lack of output. They are the following steps.
+
+1. You have to break the work down yourself
+2. You have to copy the previous round's context into the next model yourself
+3. You have to decide who should research, who should write, and who should change the code
+4. You have to record who did what so the work can be reviewed or handed off later
+
+A single agent can be powerful, but once the work crosses roles, the real cost increase is not prompt cost. It is **switching cost, transport cost, and rework cost**.
+
+That is why the key question for a multi-agent system is not whether it is "many". It is whether it can actually function like a team.
+
+## openteams is really solving a collaboration structure problem
+
+From what the repository exposes publicly, openteams gets at least four important things right.
+
+### 1. Shared context instead of manual retelling
+
+The README makes this explicit: multiple participants work from the same shared session history instead of relying on a person to copy prompts between windows. That sounds basic, but it is what determines whether multi-agent collaboration can actually hold together.
+
+As long as context still has to be carried manually, multi-agent work tends to collapse back into "multiple tabs plus one overworked project manager".
+
+### 2. Direct `@mentions` instead of human-only routing
+
+openteams lets members `@mention` each other inside the session. That means task handoff no longer depends entirely on the user manually forwarding work. The handoff can happen within the same collaboration chain.
+
+The value here is not that it feels chat-like. The value is that it reduces the burden on the human as the central routing node. You do not have to restate the context, nominate the next executor, and retell the background at every step.
+
+### 3. Parallel execution instead of serial waiting
+
+The README also mentions that multiple agents can process work in parallel inside the same shared session. For work like content production, requirement analysis, code review, and documentation, that matters because it changes the structure of the work, not just the speed.
+
+Instead of waiting for research, then writing, then editing, then packaging, those steps can move forward together where the task allows it.
+
+### 4. Persistent execution traces instead of disappearing process
+
+openteams does not just preserve chat messages. It also stores execution logs, diffs, context files, and artifact paths under `.openteams/` in the workspace.
+
+That matters because in team collaboration, the process matters almost as much as the final result.
+
+- Who checked which facts
+- Who changed which files
+- Where the work failed
+- Whether the next person can continue from there
+
+Only when the process is visible does collaboration become something teams can review and hand off reliably. Without that, the so-called team is still just a series of isolated one-turn exchanges.
+
+```text
+<workspace>/
+`-- .openteams/
+    +-- context/<session_id>/
+    |   +-- messages.jsonl
+    |   +-- shared_blackboard.jsonl
+    |   `-- work_records.jsonl
+    `-- runs/<session_id>/run_records/
+        `-- session_agent_<id>_run_0001/
+            +-- input.md
+            +-- output.md
+            +-- raw.log
+            `-- diff.patch
+```
+
+## A more realistic example
+
+Imagine you need to prepare a full content release for an open-source product. Not just one promo paragraph, but multiple articles that also need technical accuracy, a distribution angle, example framing, and visual notes.
+
+The traditional way often looks like this:
+
+- Ask one model to identify the key selling points
+- Ask another model to turn that into a technical draft
+- Ask a third model to rewrite it as external-facing copy
+- Stitch the versions together yourself in the end
+
+This can still work, but the biggest bottleneck is often not that the models are not smart enough. It is that **you remain the narrowest part of the pipeline**. All information has to pass through you, and every role switch has to be reorganised by you.
+
+In a system like openteams, the same work can be structured as a small team: one member breaks down the topic, one verifies facts, one writes the technical draft, one handles the distribution version, one adapts it for another channel, and one proposes ASCII diagrams. Everyone shares the same context, members can hand work to each other inside the same session, and an editor can close the loop at the end.
+
+The time saved is not just drafting time. It is also the time usually lost to things people forget to count.
+
+- Repeating the background
+- Copying content across windows
+- Rework caused by broken context
+- Additional checking caused by a lack of visible process
+
+## So what should you look for in a multi-agent product?
+
+There are four questions that increasingly matter when judging whether a multi-agent product is a demo or a real collaboration system.
+
+1. Is the context shared, or is a person still retelling it?
+2. Can the work be divided by role, or does one agent still do everything?
+3. Can tasks be handed off, or does every step still require a human relay?
+4. Is the process traceable, or are you left with only a final answer?
+
+By that standard, openteams has a clear direction. It is not just a model aggregation UI. It is trying to productise team collaboration itself. The repository reflects that through multi-agent group chat, shared context, parallel execution, more than 160 built-in AI members, 8 preset teams, a large skill library, and configurable team rules.
+
+Put more plainly, it is thinking not only about who can do the work, but also about how those roles work together.
+
+## It is not the right fit for every task
+
+That boundary matters too.
+
+Multi-agent collaboration is not automatically better for all work. If the task is short, linear, and barely needs division of labour, a strong single agent is usually the simpler option. Renaming one function, adding a small script, or writing a short SQL statement are obvious examples.
+
+Multi-agent work becomes especially valuable when three conditions are true at the same time.
+
+- The task can be split and progressed in parallel
+- Different stages genuinely need different strengths, such as research, coding, writing, and review
+- You care not only about the result but also about being able to inspect, hand off, and review the process
+
+If those conditions are not present, team-like coordination can create more management cost than value.
+
+## Coming back to the original question
+
+So is openteams just a bunch of extra AI tabs?
+
+The answer is that, on the surface, it certainly does let you use multiple agents at once. But the real problem it is solving is not window count. It is the organisational problem of multi-role collaboration.
+
+Whether that matters depends less on whether multi-model use feels novel, and more on whether your work has reached the point where a single person talking to a single model is no longer the bottleneck. If the real pain now comes from task decomposition, context synchronisation, cross-role handoff, and execution traceability, then the openteams approach is worth paying attention to.
+
+If you are still solving isolated questions, multiple tabs may be enough.
+
+If you are already dealing with collaboration chains, though, openteams points to a more realistic next stage for AI at work. And that is a much more interesting question than simply whether the next model got a bit stronger.

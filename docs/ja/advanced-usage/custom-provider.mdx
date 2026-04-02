@@ -1,5 +1,61 @@
 ---
 title: "モデルプロバイダー設定"
-description: "サイト構成用のプレースホルダーページです。"
+description: "openteamsは複数のモデルプロバイダーをサポートしており、ここでこれらのプロバイダーのAPIを設定できます。"
 sidebarTitle: "モデルプロバイダー設定"
 ---
+
+## 設定ページ
+
+`設定 -> サービスプロバイダー` から**サービスプロバイダー**設定エリアに入ります。
+
+## モデルプロバイダーの設定
+
+<Tabs>
+
+  <Tab title="カスタムプロバイダーを作成">
+  <video src="../../images/zh/config_provider.mp4" autoPlay loop muted playsInline />
+    <Steps>
+      <Step title="新規プロバイダーを作成">
+        サービスプロバイダー設定ページの右上エリアで**プロバイダーを追加**ボタンをクリックし、プロバイダーID・名称・Base URL・APIキー・アクセスSDKを入力します。
+        ![](../../images/zh/create_provider.png)
+      </Step>
+
+      <Step title="モデルを設定して保存">
+        **モデルを追加**ボタンをクリックし、モデルID・表示名・コンテキスト制限・出力制限・入出力モダリティなどの情報を入力して保存します。
+         ![](../../images/zh/add_model.png)
+         具体的な設定情報はモデルメーカーが提供するドキュメントを参考にしてください。コンテキストと出力の制限は任意入力で、入力しない場合はデフォルト値になります。
+         ***モデルの推奨値に従って入力することをお勧めします。そうしないとモデルのパフォーマンスに影響する場合があります。***
+
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="対応プロバイダー">
+  対応するモデルメーカーのAPIキーを入力し、対応するモデルを選択して保存すると、メンバー設定で選択して使用できます。
+    <CardGroup cols={2}>
+      <Card title="OpenAI" icon="/logos/openai-logo.svg">
+        GPTシリーズモデルをサポート。APIキーを設定するだけで直接使用できます。
+      </Card>
+
+      <Card title="Anthropic" icon="/logos/claude.svg">
+        Claudeシリーズモデルをサポート。長コンテキストと複雑な推論シナリオに適しています。
+      </Card>
+
+      <Card title="Google" icon="/logos/gemini-logo.svg">
+        Geminiモデルをサポート（Google AI / Vertexエコシステム）。
+      </Card>
+
+      <Card title="Ollama" icon="/logos/openai-logo.svg">
+        Ollamaのデプロイアドレス経由でモデルサービスに接続することをサポート。
+      </Card>
+
+      <Card title="OpenRouter" icon="globe">
+        複数のモデルプロバイダーに一元的に接続し、モデルに応じて柔軟にルーティングを切り替えられます。
+      </Card>
+
+      <Card title="MiniMax" icon="/logos/minimax-color.svg">
+        Minimaxの全シリーズモデルをサポート。国内ユーザーに適しています。
+      </Card>
+    </CardGroup>
+  </Tab>
+
+</Tabs>

@@ -1,5 +1,33 @@
 ---
 title: "Utiliser les competences"
-description: "Page d'espace reserve pour la structure du site."
+description: "Dans openteams, les competences constituent le coeur des capacites des membres IA. En attribuant des competences differentes, vous definissez leurs responsabilites et leur mode de travail."
 sidebarTitle: "Competences"
 ---
+
+## Qu'est-ce qu'une competence
+
+Chaque competence encapsule une capacite concrete, par exemple la generation de code, la recherche d'informations, le traitement de donnees, la manipulation de fichiers ou l'appel a une API externe.
+
+Une competence inclut generalement des definitions d'entree et de sortie, une logique d'execution claire et une facon d'interagir avec l'environnement, afin que l'agent puisse reutiliser cette capacite de maniere stable dans differents contextes.
+
+En attribuant des competences differentes aux agents, vous pouvez definir avec precision ce qu'ils peuvent faire et comment ils le font. Plusieurs competences peuvent aussi etre combinees pour former des flux de travail plus complexes et resoudre des taches en plusieurs etapes.
+
+## Installer une competence
+
+openteams propose une bibliotheque de competences. Vous pouvez installer des competences pour vos agents directement dans l'application, qui lit egalement la liste des competences deja installees.
+
+Recherchez la competence a installer dans la place de marche, selectionnez l'agent cible, puis cliquez sur **Installer**.
+
+<video src="../../images/zh/install_skill.mp4" autoPlay loop muted playsInline />
+
+## Activer une competence au niveau de l'agent
+
+Activez les competences souhaitees pour l'agent depuis la liste des competences installees. Certains agents ne permettent pas d'activer ou de desactiver les competences, comme Claude Code.
+
+![](../../images/zh/install_skill.png)
+
+## Attribuer des competences a un membre IA
+
+Un membre IA ne peut utiliser une competence que si cette competence lui a ete attribuee. Vous pouvez le faire depuis la liste des competences disponibles dans les parametres du membre.
+
+![Attribuer des competences a un membre IA](../../images/zh/config_member_skill.png)

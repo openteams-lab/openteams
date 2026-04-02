@@ -1,30 +1,28 @@
 ---
-title: "Démarrage Rapide"
-description: "Guide de démarrage rapide pour OpenTeams sur macOS, Linux et Windows"
-sidebarTitle: "Démarrage Rapide"
+title: "Démarrage rapide"
+description: "Guide de démarrage rapide pour openteams sur macOS, Linux et Windows"
+sidebarTitle: "Démarrage rapide"
 ---
 
-## Systèmes Supportés
-
-OpenTeams fonctionne sur les plateformes suivantes :
-
+## Systèmes supportés
+- Windows
 - macOS (Intel et Apple Silicon)
 - Linux
-- Windows
 
 ## Prérequis
+Avant d'utiliser openteams, assurez-vous d'avoir accès à un grand modèle de langage. Vous pouvez vous référer à la [documentation de configuration des fournisseurs de modèles](/fr/custom-providers) pour configurer les clés API dans openteams.
 
-Avant d'installer OpenTeams, assurez-vous d'avoir au moins un agent IA supporté installé :
+Si vous utilisez déjà ou prévoyez d'utiliser d'autres agents de codage, assurez-vous qu'ils sont correctement installés et authentifiés. openteams supporte actuellement 10 types d'[agents de codage](/fr/supported-coding-agents). Voici les méthodes d'installation des agents les plus courants :
 
-| Agent | Installation |
+| Agent | Commande d'installation |
 |-------|-------------|
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` |
 | [Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` |
-| [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm install -g @qwen-code/qwen-code@latest` |
+| [OpenCode](https://github.com/anomalyco/opencode) | `npm install -g opencode-ai@latest` |
 
 <Tip>
-Vous pouvez installer d'autres agents en suivant leur documentation officielle.
+Vous pouvez vous référer à la documentation officielle de chaque agent pour l'installation.
 </Tip>
 
 ## Installation
@@ -34,120 +32,123 @@ Vous pouvez installer d'autres agents en suivant leur documentation officielle.
     **Option 1 : Utiliser npx**
 
     ```bash
-    npx openteams
+    npx openteams-web
     ```
 
-    **Option 2 : Installateur Desktop**
+    **Option 2 : Installateur desktop (recommandé)**
 
     Téléchargez le dernier installateur (`.msi`) :
 
-    <a href="https://github.com/StarterraAI/OpenTeams/releases/latest" target="_blank" rel="noopener noreferrer">
+    <a href="https://github.com/openteams-lab/openteams/releases/latest" target="_blank" rel="noopener noreferrer">
       <img noZoom src="https://img.shields.io/badge/Télécharger-Windows-0078D6?style=for-the-badge&logo=windows" alt="Télécharger pour Windows" />
     </a>
 
-    Après l'installation, lancez **OpenTeams** depuis le menu Démarrer.
+    Une fois l'installation terminée, lancez directement **openteams**.
   </Tab>
 
   <Tab title="macOS">
-    **Option 1 : Utiliser npx**
+    **Lancer avec npx**
 
     ```bash
-    npx openteams
+    npx openteams-web
     ```
-
-    **Option 2 : Installateur Desktop**
-
-    <a href="https://github.com/StarterraAI/OpenTeams/releases/latest" target="_blank" rel="noopener noreferrer">
-      <img noZoom src="https://img.shields.io/badge/Télécharger-macOS-000000?style=for-the-badge&logo=apple" alt="Télécharger pour macOS" />
-    </a>
-
-    Ouvrez le `.dmg` téléchargé, déplacez **OpenTeams** vers `Applications`, puis lancez-le depuis Launchpad/Finder.
   </Tab>
 
   <Tab title="Linux">
-    **Option 1 : Utiliser npx**
+    **Option 1 : Utiliser npx (recommandé)**
 
     ```bash
-    npx openteams
+    npx openteams-web
     ```
 
-    **Option 2 : Installateur Desktop**
+    **Option 2 : Installateur desktop**
 
-    Téléchargez le package Linux depuis Releases :
-    <a href="https://github.com/StarterraAI/OpenTeams/releases/latest" target="_blank" rel="noopener noreferrer">
+    Téléchargez le package Linux depuis les Releases :
+    <a href="https://github.com/openteams-lab/openteams/releases/latest" target="_blank" rel="noopener noreferrer">
       <img noZoom src="https://img.shields.io/badge/Télécharger-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Télécharger pour Linux" />
     </a>
 
-    - `.deb` (Ubuntu/Debian)
-    - `.AppImage` (portable)
-
-    Pour `.deb` :
+     Commande d'installation `.deb` :
 
     ```bash
     sudo apt install ./openteams-*.deb
     ```
 
-    Pour `.AppImage` :
-
-    ```bash
-    chmod +x ./openteams-*.AppImage
-    ./openteams-*.AppImage
-    ```
   </Tab>
 </Tabs>
 
-## Démarrage Rapide
+## Démonstration de démarrage rapide
+Voici un aperçu vidéo rapide montrant comment créer une session, importer une équipe et commencer à collaborer dans openteams :
+
+<iframe
+  src="https://player.bilibili.com/player.html?bvid=BV1Z4NTz1E5W&page=1"
+  width="100%"
+  frameborder="0"
+  allowfullscreen>
+</iframe>
+
+## Guide de démarrage rapide
 
 <Steps>
-<Step title="Installer un agent de codage">
-  Assurez-vous d'avoir au moins un [agent de codage supporté](/fr/supported-coding-agents) installé et authentifié sur votre système.
-</Step>
 
-<Step title="Lancer OpenTeams">
+<Step title="Lancer openteams">
   Choisissez une méthode de lancement :
 
-  **Option 2 : Démarrer avec npx**
+  **Option 1 : Via l'installateur desktop**
+  Ouvrez **openteams** depuis le menu des applications.
+
+  **Option 2 : Via npx**
   ```bash
-  npx openteams
+  npx openteams-web
   ```
-
-  **Option 1 : Utiliser l'installateur Desktop**
-  Ouvrez l'application **OpenTeams** installée depuis le lanceur de votre système.
-
-  <Check>
-  L'application se lie à un port libre aléatoire et affiche l'URL dans le terminal.
-  </Check>
+  <Note>
+  Le système utilisera openteams-cli comme agent de base par défaut. Pour accéder normalement aux modèles, vous devez configurer les API dans la [configuration des fournisseurs de modèles](/fr/custom-providers).
+    Vous pouvez également utiliser d'autres agents — consultez les [agents de codage supportés](/fr/supported-coding-agents) pour les détails. Assurez-vous qu'ils sont correctement installés et authentifiés avant utilisation.
+  </Note>
 </Step>
 
-<Step title="Créer une session de chat">
-  Cliquez sur "Créer une Session" pour démarrer un nouveau groupe de discussion. C'est votre espace de travail pour la collaboration IA.
+<Step title="Créer une session">
+  Après le lancement, cliquez sur le bouton « Nouvelle session », saisissez le nom de la session et sélectionnez un chemin d'espace de travail par défaut.
+  Ce n'est pas obligatoire — vous pouvez passer cette étape, auquel cas le titre de la session et l'espace de travail par défaut conserveront leurs valeurs par défaut.
+
+  ![Créer une session](../images/zh/create_session_zh.png)
+
+  <Note>
+  L'espace de travail par défaut est le chemin de travail par défaut pour tous les membres IA de cette session. Vous pouvez définir un chemin d'espace de travail individuel pour chaque membre dans la configuration d'équipe, et cette configuration est prioritaire sur l'espace de travail par défaut de la session.
+  </Note>
 </Step>
 
-<Step title="Ajouter des membres IA">
-  Dans la barre latérale droite, cliquez sur "Ajouter un membre IA" pour ajouter des agents à votre session. Configurez chaque membre avec :
-  - Un nom @mention unique
-  - Sélectionnez le type d'agent (ex: Claude Code, Codex)
-  - Définissez un prompt système pour définir son rôle
-  - Spécifiez son chemin d'espace de travail
+<Step title="Créer une équipe">
+  Cliquez sur le bouton « Créer une équipe maintenant », sélectionnez une équipe prédéfinie adaptée à votre tâche, ou ajoutez des membres IA prédéfinis et personnalisés pour constituer votre propre équipe dédiée.
+  ![Créer une équipe](../images/zh/createteam_zh.png)
+
+  En prenant l'équipe de livraison full-stack comme exemple, l'équipe comprend des rôles tels que chef de projet, développeur frontend, développeur backend, ingénieur QA, designer UI, etc., capables de collaborer pour livrer un projet complet.
+  Vous devez configurer le modèle, le chemin de travail et les compétences pour chaque membre — ou vous pouvez garder la configuration par défaut et les utiliser directement.
+  ![Configuration des membres d'équipe](../images/zh/team_members_zh.png)
 </Step>
 
 <Step title="Commencer à collaborer">
-  Utilisez @mentions pour assigner des tâches aux membres de votre équipe IA. Ils recevront automatiquement le contexte et pourront communiquer entre eux !
+  Vous avez réussi à convoquer les membres de votre équipe IA — maintenant faites-les travailler ! Vous pouvez saisir directement un message dans la zone de saisie et l'envoyer aux membres de l'équipe via @.
+  ![Commencer à collaborer](../images/zh/start_collabrate_zh.png)
+  Par exemple, vous pouvez @chef de projet pour envoyer un message et assigner des tâches, ou @développeur frontend pour lui demander d'écrire le code d'une page de connexion.
+
 </Step>
 </Steps>
 
 <Tip>
-Pour utiliser un port fixe, spécifiez la variable d'environnement `PORT` : `PORT=8080 npx openteams`
+Félicitations, vous maîtrisez maintenant les bases d'openteams !
+
+Vous pouvez créer différents types d'équipes selon vos besoins pour accomplir diverses tâches. Continuez à lire les chapitres suivants pour découvrir davantage de fonctionnalités.
 </Tip>
 
-## Prochaines Étapes
+## Prochaines étapes
 
 <CardGroup cols={2}>
-  <Card title="Aperçu des Sessions de Chat" icon="comments" href="/fr/core-features/chat-session-overview">
-    Découvrez les sessions de chat et leur fonctionnement
+  <Card title="Gérer l'équipe" icon="users" href="/fr/advanced-usage/create-team">
+    Gérez votre équipe IA pour maximiser l'efficacité collaborative
   </Card>
 
-  <Card title="Gestion des Membres IA" icon="robot" href="/fr/core-features/ai-members">
-    Configurez les membres IA pour votre équipe
+  <Card title="Utiliser les compétences" icon="brain" href="/fr/advanced-usage/skills">
+    Configurez des compétences puissantes pour vos membres IA
   </Card>
 </CardGroup>

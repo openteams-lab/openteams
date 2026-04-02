@@ -12,7 +12,7 @@
 
   <p>
     <a href="https://github.com/openteams-lab/openteams#quick-start">Quick Start</a> |
-    <a href="https://docs.openteams.com">Docs</a> |
+    <a href="https://doc.openteams-lab.com">Docs</a> |
     <a href="https://github.com/openteams-lab/openteams">GitHub</a>
   </p>
 </div>
@@ -56,7 +56,7 @@ npx openteams-web
 | [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex` |
 | [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code` |
 
-📚 [More agent installation guides](https://docs.openteams.com/getting-started)
+📚 [More agent installation guides](https://doc.openteams-lab.com/getting-started)
 
 ---
 

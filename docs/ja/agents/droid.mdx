@@ -20,37 +20,24 @@ icon: /logos/droid-light.svg
   </Tab>
   </Tabs>
 
-  最新のインストール手順とプラットフォーム固有のガイダンスは[Factory AI CLIドキュメント](https://factory.ai/product/cli)を参照してください。
+  最新のインストール手順とプラットフォーム固有のガイダンスは [Factory AI CLI ドキュメント](https://factory.ai/product/cli) を参照してください。
 </Step>
 
 <Step title="Factory AIで認証">
   openteamsでDroidを使用するには、まず認証が必要です：
 
-  1. `droid`を実行してインタラクティブCLIを起動
-  2. Droid内で`/login`コマンドを使用して認証
+  1. `droid` を実行してインタラクティブCLIを起動
+  2. Droid内で `/login` コマンドを使用して認証
 
-  または、[Factory設定](https://app.factory.ai/settings/api-keys)からAPIキーを生成し、環境変数として設定：
+  または、[Factory設定](https://app.factory.ai/settings/api-keys) からAPIキーを生成し、環境変数として設定：
 
   ```bash
   export FACTORY_API_KEY=fk-...
   ```
 
-  詳細な認証手順は[Factory AIドキュメント](https://docs.factory.ai/factory-cli/getting-started/overview)を参照してください。
+  詳細な認証手順は [Factory AI ドキュメント](https://docs.factory.ai/factory-cli/getting-started/overview) を参照してください。
 </Step>
 
-<Step title="openteamsを起動">
-  認証完了後、openteamsを起動：
-
-  **方法1：npxで起動**
-  ```bash
-  npx openteams
-  ```
-
-  **方法2：Desktop Installerで起動**
-  インストール済みのデスクトップアプリを直接起動できます。インストーラー手順は[はじめに](/ja/getting-started)を参照してください。
-
-  タスク試行を作成する際にFactory Droidを選択できるようになりました。
-</Step>
 </Steps>
 
 ## 設定オプション
@@ -72,4 +59,4 @@ Droidはopenteamsでいくつかの設定オプションをサポートしてい
   - `medium`：バランスの取れた推論
   - `high`：複雑なタスク向けの深い推論
 
-これらのオプションはopenteamsでエージェント設定を作成する際に構成できます。
+これらのオプションはopenteamsでエージェント設定を作成する際に設定できます。

@@ -1,6 +1,6 @@
 ---
 title: "Getting Started"
-description: "Quick start guide for OpenTeams on macOS, Linux, and Windows"
+description: "Quick start guide for openteams on macOS, Linux, and Windows"
 sidebarTitle: "Getting Started"
 ---
 
@@ -54,151 +54,155 @@ sidebarTitle: "Getting Started"
   }
 })();`}</script>
 
+## Supported systems
 
-## Supported Systems
-
-OpenTeams runs on the following platforms:
-
+- Windows
 - macOS (Intel and Apple Silicon)
 - Linux
-- Windows
 
 ## Prerequisites
 
-Before installing OpenTeams, ensure you have at least one supported AI agent installed:
+Before you start using openteams, make sure you already have access to at least one model provider. You can follow the [model provider configuration guide](/advanced-usage/custom-provider) to add your API keys.
 
-| Agent | Installation |
+If you already use other coding agents, or plan to use them in openteams, make sure they are installed and authenticated correctly first. openteams currently supports 10 [coding agents](/supported-coding-agents). Here are the installation commands for some commonly used ones:
+
+| Agent | Installation command |
 |-------|-------------|
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` |
 | [Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` |
-| [QWen Coder](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm install -g @qwen-code/qwen-code@latest` |
+| [OpenCode](https://github.com/anomalyco/opencode) | `npm install -g opencode-ai@latest` |
 
 <Tip>
-You can install other agents by following their official documentation.
+You can also follow each agent's official documentation if you want more detailed installation instructions.
 </Tip>
 
 ## Installation
 
 <Tabs>
   <Tab title="Windows">
-    **Option 1: Using npx**
+    **Option 1: Run with npx**
 
     ```bash
-    npx openteams
+    npx openteams-web
     ```
 
-    **Option 2: Desktop Installer**
+    **Option 2: Desktop installer (recommended)**
 
     Download the latest installer (`.msi`):
 
-    <a href="https://github.com/StarterraAI/OpenTeams/releases/latest" target="_blank" rel="noopener noreferrer">
+    <a href="https://github.com/openteams-lab/openteams/releases/latest" target="_blank" rel="noopener noreferrer">
       <img noZoom src="https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows" alt="Download for Windows" />
     </a>
 
-    After installation, launch **OpenTeams** from the Start menu.
+    After installation, launch **openteams** directly.
   </Tab>
 
   <Tab title="macOS">
-    **Option 1: Using npx**
+    **Run with npx**
 
     ```bash
-    npx openteams
+    npx openteams-web
     ```
-
-    **Option 2: Desktop Installer**
-
-    <a href="https://github.com/StarterraAI/OpenTeams/releases/latest" target="_blank" rel="noopener noreferrer">
-      <img noZoom src="https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple" alt="Download for macOS" />
-    </a>
-
-    Open the downloaded `.dmg`, move **OpenTeams** to `Applications`, then launch it from Launchpad/Finder.
   </Tab>
 
   <Tab title="Linux">
-    **Option 1: Using npx**
+    **Option 1: Run with npx (recommended)**
 
     ```bash
-    npx openteams
+    npx openteams-web
     ```
 
-    **Option 2: Desktop Installer**
+    **Option 2: Desktop package**
 
-    <a href="https://github.com/StarterraAI/OpenTeams/releases/latest" target="_blank" rel="noopener noreferrer">
+    Download the latest Linux package from Releases:
+
+    <a href="https://github.com/openteams-lab/openteams/releases/latest" target="_blank" rel="noopener noreferrer">
       <img noZoom src="https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Download for Linux" />
     </a>
 
-    Download the Linux package from Releases:
-    - `.deb` (Ubuntu/Debian)
-    - `.AppImage` (portable)
-
-    For `.deb`:
+    Install the `.deb` package with:
 
     ```bash
     sudo apt install ./openteams-*.deb
     ```
-
-    For `.AppImage`:
-
-    ```bash
-    chmod +x ./openteams-*.AppImage
-    ./openteams-*.AppImage
-    ```
   </Tab>
 </Tabs>
 
-## Quick Start
+## Quick demo
+
+Here is a short demo showing how to create a session, import a team, and start collaborating in openteams:
+
+<iframe
+  src="https://player.bilibili.com/player.html?bvid=BV1Z4NTz1E5W&page=1"
+  width="100%"
+  frameborder="0"
+  allowfullscreen>
+</iframe>
+
+## Quick start
 
 <Steps>
-<Step title="Install a coding agent">
-  Make sure you have at least one [supported coding agent](/supported-coding-agents) installed and authenticated on your system.
-</Step>
 
-<Step title="Launch OpenTeams">
-  Choose one startup method:
+<Step title="Launch openteams">
+  Choose how you want to start openteams:
+
+  **Option 1: Use the desktop app**
+  Open the installed **openteams** app from your system launcher.
 
   **Option 2: Run with npx**
   ```bash
-  npx openteams
+  npx openteams-web
   ```
 
-  **Option 1: Use Desktop Installer**
-  Open the installed **OpenTeams** app from your system launcher.
-
-  <Check>
-  The application binds to a random free port and prints the URL in the terminal.
-  </Check>
+  <Note>
+  openteams uses `openteams-cli` as the default base agent. To access models successfully, configure your API credentials in [model provider configuration](/advanced-usage/custom-provider).
+  You can also use other agents. See [supported coding agents](/supported-coding-agents) for details, and make sure each one is installed and authenticated before use.
+  </Note>
 </Step>
 
-<Step title="Create a chat session">
-  Click "Create Session" to start a new group chat. This is your workspace for AI collaboration.
+<Step title="Create a session">
+  After launch, click `Create Session`, enter a session name, and optionally set a default workspace path.
+  This is not required. You can skip it and keep the default session title and default workspace.
+
+  ![Create a session](../images/zh/create_session_zh.png)
+
+  <Note>
+  The default workspace is the shared default working directory for all AI members in that session. You can still set a separate workspace path for each member in team configuration, and those member-level settings take priority over the session default.
+  </Note>
 </Step>
 
-<Step title="Add AI members">
-  In the right sidebar, click "Add AI member" to add agents to your session. Configure each member with:
-  - A unique @mention name
-  - Select the agent type (e.g., Claude Code, Codex)
-  - Set a system prompt to define their role
-  - Specify their workspace path
+<Step title="Create a team">
+  Click `Create Team Now`, choose a preset team that fits your task, or add preset AI members and custom AI members to build your own team.
+  ![Create a team](../images/zh/createteam_zh.png)
+
+  For example, the Full-stack Delivery Team includes roles such as project manager, frontend developer, backend developer, test engineer, and UI designer, so it can collaborate on a complete project delivery.
+  You will need to configure each member's model, workspace path, and skills. You can also keep the default setup and use the team as-is.
+  ![Team member configuration](../images/zh/team_members_zh.png)
 </Step>
 
 <Step title="Start collaborating">
-  Use @mentions to assign tasks to your AI team members. They will automatically receive context and can communicate with each other!
+  Your AI team is ready. Start the work by typing into the input box and using `@mentions` to assign tasks to team members.
+  ![Start collaborating](../images/zh/start_collabrate_zh.png)
+
+  For example, you can `@mention` the project manager to assign a task, or `@mention` the frontend developer and ask for a login page implementation.
 </Step>
 </Steps>
 
 <Tip>
-To use a fixed port, specify the `PORT` environment variable: `PORT=8080 npx openteams`
+You now have the basics of openteams in place.
+
+From here, you can build different kinds of teams for different kinds of work. Continue with the rest of the documentation to explore more features.
 </Tip>
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Chat Session Overview" icon="comments" href="/core-features/chat-session-overview">
-    Learn about chat sessions and how they work
+  <Card title="Manage Teams" icon="users" href="/advanced-usage/create-team">
+    Organise your AI teams and get more value from collaboration
   </Card>
 
-  <Card title="Managing AI Members" icon="robot" href="/core-features/ai-members">
-    Configure AI members for your team
+  <Card title="Use Skills" icon="brain" href="/advanced-usage/skills">
+    Give your AI members more powerful capabilities
   </Card>
 </CardGroup>

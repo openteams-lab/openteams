@@ -1,5 +1,63 @@
 ---
 title: "FAQ"
-description: "Page d'espace reserve pour la structure du site."
+description: "Reponses aux questions frequentes sur l'execution des membres IA et la reinitialisation locale des donnees openteams."
 sidebarTitle: "FAQ"
 ---
+
+## Pourquoi un membre IA ne renvoie-t-il aucun message ?
+
+Plusieurs raisons sont possibles :
+
+- Si `@membre` affiche un point rouge, cela signifie que l'agent a echoue pendant le traitement du message. Vous pouvez consulter l'erreur dans `Workspace`.
+- Si l'agent a bien execute une tache mais n'a pas publie de message final, il a probablement choisi de ne pas en envoyer. Vous pouvez consulter la sortie brute dans `.openteams/runs/<session>/run_records/<session>_<runid>/output.md`.
+- S'il n'y a eu aucune sortie pendant l'execution ni a la fin, il s'agit generalement d'une erreur interne du modele ou d'un identifiant de modele incorrect. Consultez le journal d'execution pour plus de details.
+
+Si votre cas n'est pas couvert ici, ouvrez une issue sur [GitHub](https://github.com/openteams-lab/openteams/issues) et nous vous aiderons au plus vite.
+
+## Ou trouver les journaux d'erreur d'un membre IA ?
+
+Le journal d'erreur se trouve dans `.openteams/runs/<session>/run_records/<session>_<runid>/raw.log` sous le chemin de l'espace de travail du membre IA.
+
+## Comment desinstaller le logiciel ?
+
+Sur l'application de bureau Windows, ouvrez le repertoire d'installation, trouvez `Uninstall openteams`, puis double-cliquez dessus.
+
+Si vous utilisez l'installation via `npx`, executez `npx uninstall openteams-web`.
+
+## Comment effacer la base de donnees ?
+
+Si vous rencontrez une erreur irrecoverable et devez effacer completement la base de donnees d'openteams, vous pouvez supprimer le repertoire de donnees de l'application correspondant a votre systeme d'exploitation.
+
+<Warning>
+Cette operation est irreversible et supprimera l'ensemble des sessions et des parametres. Sauvegardez toutes les informations importantes avant de continuer.
+</Warning>
+
+**Supprimez le repertoire suivant selon votre systeme d'exploitation :**
+
+<Tabs>
+<Tab title="macOS">
+```bash
+~/Library/Application Support/ai.openteams-lab.openteams/
+```
+</Tab>
+
+<Tab title="Linux">
+```bash
+~/.local/share/openteams/
+```
+</Tab>
+
+<Tab title="Windows">
+```
+%APPDATA%\openteams-lab\openteams\
+```
+
+En general : `C:\Users\<nom_utilisateur>\AppData\Roaming\openteams-lab\openteams\`
+</Tab>
+</Tabs>
+
+Une fois le repertoire de donnees supprime, redemarrez openteams pour repartir avec une base vide et la configuration par defaut.
+
+<Note>
+Ce repertoire contient egalement les journaux systeme. Vous pouvez consulter les logs d'openteams dans le dossier `logs`.
+</Note>
