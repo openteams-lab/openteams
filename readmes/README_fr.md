@@ -1,5 +1,9 @@
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 40px; margin-bottom: 20px;">
+  <img src="../frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="200">
+</div>
+
+<div align="center">
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 10px; margin-bottom: 10px;">
 
   <p><strong>Exécutez les agents comme une équipe, multipliez votre efficacité à l'ère de l'IA.</strong></p>
 
@@ -8,12 +12,12 @@
     <a href="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml/badge.svg" /></a>
     <a href="../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
     <a href="https://discord.gg/MbgNFJeWDc"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
-    <a href="https://docs.openteams.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
+    <a href="https://doc.openteams-lab.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
   </p>
 
   <p>
     <a href="#démarrage-rapide">Démarrage rapide</a> |
-    <a href="https://docs.openteams.com">Documentation</a>
+    <a href="https://doc.openteams-lab.com">Documentation</a>
   </p>
 
   <p align="center">
@@ -29,7 +33,7 @@
 
 ---
 
-![OpenTeams Demo](../images/demo.gif)
+![OpenTeams Demo](images/demo.gif)
 
 **Guide de démarrage en une minute**
 
@@ -40,14 +44,20 @@
 ---
 
 ## 🔥 *Nouvelles:*
-- **2025.03.24 (v0.3.7)**:
-  - Ajout de l'agent OpenTeams-CLI intégré, supprimant la dépendance stricte à un agent installé localement.
+### *Mises a jour majeures*
+- **2026.04.02 (v0.3.10)**:
+  - Prise en charge des mises a jour de version dans l'application
+  - Le site de documentation est maintenant en ligne
+- **2026.03.24 (v0.3.7)**:
+  - Ajout de l'agent openteams-cli integre, supprimant la dependance stricte a un agent installe localement.
   - Correction d'un problème de fuite de mémoire dans l'exécuteur.
 ---
 
 ## Démarrage rapide
 
 ### Option A: Exécuter avec npx
+
+**Cette methode d'installation est recommandee pour Mac et Linux.**
 
 ```bash
 # web
@@ -62,7 +72,9 @@ npx openteams-web
 
 ### Prérequis
 
-**Vous aurez besoin d'au moins un agent IA installé:**
+**A partir de la v0.3.7, openteams-cli est integre, donc l'installation d'un agent IA n'est plus obligatoire. Vous pouvez configurer votre API dans la page « Parametres -> Fournisseurs de service ».**
+
+Vous pouvez aussi choisir n'importe quel Agent dans la liste des agents pris en charge :
 
 | Agent | Installation |
 |-------|---------|
@@ -72,7 +84,7 @@ npx openteams-web
 | [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code` |
 | [OpenCode](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g opencode-ai` |
 
-📚 [Plus de guides d'installation d'agents](https://docs.openteams.com/getting-started)
+📚 [Plus de guides d'installation d'agents](https://doc.openteams-lab.com/getting-started)
 
 ---
 
@@ -94,31 +106,31 @@ npx openteams-web
 
 *Exécutez plusieurs agents dans le même contexte partagé et laissez-les s'exécuter en parallèle pour accélérer la livraison.*
 
-![OpenTeams parallel](../images/parallel.gif)
+![OpenTeams parallel](images/parallel.gif)
 
 ### Collaboration autonome d'agents
 
 *OpenTeams permet aux agents de s'envoyer des messages directement sans imposer un workflow fixe. Si vous voulez plus de structure, ajoutez des directives d'équipe pour contrôler la communication, nommez un agent principal, ou laissez tout le monde collaborer librement. Le modèle de communication dépend entièrement de votre cas d'usage.*
 
-![OpenTeams collaborate](../images/collaborate.gif)
+![OpenTeams collaborate](images/collaborate.gif)
 
 ### Membres IA
 
 *OpenTeams inclut plus de 160 membres IA intégrés dans l'ingénierie, le marketing, la rédaction, la production de contenu, et plus. Combinez-les dans différentes équipes, personnalisez-les, et créez des combinaisons de rôles adaptées à votre façon de travailler. Nous continuerons à développer et améliorer la gamme.*
 
-![OpenTeams members](../images/members.gif)
+![OpenTeams members](images/members.gif)
 
 ### Équipes IA
 
 *OpenTeams est livré avec 8 préréglages d'équipe intégrés pour les workflows courants, afin que vous puissiez commencer immédiatement. Nous recommandons de définir des directives d'équipe lors de la création pour que la collaboration reste alignée sur la façon dont vous voulez que le groupe fonctionne.*
 
-![OpenTeams team](../images/team.gif)
+![OpenTeams team](images/team.gif)
 
 ### Bibliothèque de compétences
 
 *OpenTeams inclut plus de 1000 compétences intégrées que vous pouvez combiner et attribuer à différents membres IA. Vous pouvez également importer vos propres compétences et les appliquer directement à vos agents. Nous continuerons à développer la bibliothèque en nous concentrant sur les capacités qui tiennent la route dans les environnements de production réels.*
 
-![OpenTeams skills](../images/skills.gif)
+![OpenTeams skills](images/skills.gif)
 
 ---
 

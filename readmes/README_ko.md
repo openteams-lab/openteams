@@ -1,5 +1,9 @@
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 40px; margin-bottom: 20px;">
+  <img src="../frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="200">
+</div>
+
+<div align="center">
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 10px; margin-bottom: 10px;">
 
   <p><strong>팀으로 에이전트를 실행하고, AI 시대에 효율을 배가하세요.</strong></p>
 
@@ -8,12 +12,12 @@
     <a href="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml/badge.svg" /></a>
     <a href="../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
     <a href="https://discord.gg/MbgNFJeWDc"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
-    <a href="https://docs.openteams.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
+    <a href="https://doc.openteams-lab.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
   </p>
 
   <p>
     <a href="#빠른-시작">빠른 시작</a> |
-    <a href="https://docs.openteams.com">문서</a>
+    <a href="https://doc.openteams-lab.com">문서</a>
   </p>
 
   <p align="center">
@@ -29,7 +33,7 @@
 
 ---
 
-![OpenTeams Demo](../images/demo.gif)
+![OpenTeams Demo](images/demo.gif)
 
 **1분 퀵스타트 가이드**
 
@@ -40,14 +44,20 @@
 ---
 
 ## 🔥 *뉴스:*
-- **2025.03.24 (v0.3.7)**:
-  - 내장 OpenTeams-CLI 에이전트를 추가하여 로컬에 설치된 에이전트에 대한 엄격한 의존성을 제거했습니다.
+### *주요 업데이트*
+- **2026.04.02 (v0.3.10)**:
+  - 앱 내 버전 업데이트 지원
+  - 문서 사이트 정식 공개
+- **2026.03.24 (v0.3.7)**:
+  - 내장 openteams-cli 에이전트를 추가하여 로컬에 설치된 에이전트에 대한 엄격한 의존성을 제거했습니다.
   - 실행기의 메모리 누수 문제를 수정했습니다.
 ---
 
 ## 빠른 시작
 
 ### 옵션 A: npx로 실행
+
+**Mac 및 Linux에서는 이 설치 방식을 권장합니다.**
 
 ```bash
 # web
@@ -62,7 +72,9 @@ npx openteams-web
 
 ### 요구사항
 
-**최소 하나의 AI 에이전트가 설치되어 있어야 합니다:**
+**v0.3.7부터 openteams-cli가 내장되어 있으므로 AI Agent 설치는 더 이상 필수가 아닙니다. `설정 -> 서비스 공급자` 페이지에서 API를 구성할 수 있습니다.**
+
+또한 지원되는 Agent 목록에서 원하는 Agent를 선택해 사용할 수 있습니다:
 
 | Agent | 설치 |
 |-------|---------|
@@ -72,7 +84,7 @@ npx openteams-web
 | [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code` |
 | [OpenCode](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g opencode-ai` |
 
-📚 [더 많은 에이전트 설치 가이드](https://docs.openteams.com/getting-started)
+📚 [더 많은 에이전트 설치 가이드](https://doc.openteams-lab.com/getting-started)
 
 ---
 
@@ -94,31 +106,31 @@ npx openteams-web
 
 *동일한 공유 컨텍스트에서 여러 에이전트를 실행하고 병렬로 실행하여 전달 속도를 높입니다.*
 
-![OpenTeams parallel](../images/parallel.gif)
+![OpenTeams parallel](images/parallel.gif)
 
 ### 자율적 에이전트 협업
 
 *OpenTeams는 에이전트가 고정된 워크플로우를 강제하지 않고 직접 메시지를 주고받을 수 있게 합니다. 더 많은 구조가 필요하면 팀 가이드라인을 추가하여 통신을 제어하고, 리드 에이전트를 지정하거나, 모두가 자유롭게 협업할 수 있게 합니다. 통신 패턴은 전적으로 사용 사례에 달려 있습니다.*
 
-![OpenTeams collaborate](../images/collaborate.gif)
+![OpenTeams collaborate](images/collaborate.gif)
 
 ### AI 멤버
 
 *OpenTeams는 엔지니어링, 마케팅, 작문, 콘텐츠 제작 등 160개 이상의 내장 AI 멤버를 포함합니다. 다른 팀으로 조합하고, 사용자 정의하고, 작업 방식에 맞는 역할 조합을 구축하세요. 계속해서 라인업을 확장하고 개선할 것입니다.*
 
-![OpenTeams members](../images/members.gif)
+![OpenTeams members](images/members.gif)
 
 ### AI 팀
 
 *OpenTeams는 일반적인 워크플로우를 위한 8개의 내장 팀 프리셋과 함께 제공되어 즉시 시작할 수 있습니다. 팀을 만들 때 팀 가이드라인을 정의하여 그룹이 운영되길 원하는 방식과 협업이 일치하도록 하는 것을 권장합니다.*
 
-![OpenTeams team](../images/team.gif)
+![OpenTeams team](images/team.gif)
 
 ### 스킬 라이브러리
 
 *OpenTeams는 1000개 이상의 내장 스킬을 포함하여 다른 AI 멤버에게 조합하여 할당할 수 있습니다. 직접 만든 스킬을 가져와서 에이전트에 직접 적용할 수도 있습니다. 실제 프로덕션 환경에서 작동하는 기능에 초점을 맞춰 스킬 라이브러리를 계속 확장할 것입니다.*
 
-![OpenTeams skills](../images/skills.gif)
+![OpenTeams skills](images/skills.gif)
 
 ---
 

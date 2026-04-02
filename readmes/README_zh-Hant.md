@@ -1,5 +1,9 @@
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 40px; margin-bottom: 20px;">
+  <img src="../frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="200">
+</div>
+
+<div align="center">
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 10px; margin-bottom: 10px;">
 
   <p><strong>以團隊方式運行 Agent，讓效率在 AI 時代成倍提升。</strong></p>
 
@@ -8,12 +12,12 @@
     <a href="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml/badge.svg" /></a>
     <a href="../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
     <a href="https://discord.gg/MbgNFJeWDc"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
-    <a href="https://docs.openteams.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
+    <a href="https://doc.openteams-lab.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
   </p>
 
   <p>
     <a href="#快速開始">快速開始</a> |
-    <a href="https://docs.openteams.com">文檔</a>
+    <a href="https://doc.openteams-lab.com">文檔</a>
   </p>
 
   <p align="center">
@@ -29,7 +33,7 @@
 
 ---
 
-![OpenTeams Demo](../images/demo.gif)
+![OpenTeams Demo](images/demo.gif)
 
 **一分鐘快速入門指南**
 
@@ -40,14 +44,20 @@
 ---
 
 ## 🔥 *新聞:*
-- **2025.03.24 (v0.3.7)**:
-  - 添加內置 OpenTeams-CLI Agent，移除對本地安裝 Agent 的強制依賴。
+### *重大更新*
+- **2026.04.02 (v0.3.10)**:
+  - 支援應用內版本更新
+  - 文檔網站已正式上線
+- **2026.03.24 (v0.3.7)**:
+  - 添加內置 openteams-cli Agent，移除對本地安裝 Agent 的強制依賴。
   - 修復執行器中的內存洩漏問題。
 ---
 
 ## 快速開始
 
 ### 方案 A：使用 npx 運行
+
+**推薦 Mac 和 Linux 使用者優先採用此安裝方式。**
 
 ```bash
 # web
@@ -62,7 +72,9 @@ npx openteams-web
 
 ### 系統要求
 
-**你至少需要安裝一個 AI Agent：**
+**從 v0.3.7 開始，我們已內置 openteams-cli，因此不再強制要求安裝 AI Agent。你可以前往「設定 -> 服務提供商」頁面配置 API。**
+
+你也可以從支援的 Agent 清單中任選一個使用：
 
 | Agent | 安裝命令 |
 |-------|---------|
@@ -72,7 +84,7 @@ npx openteams-web
 | [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code` |
 | [OpenCode](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g opencode-ai` |
 
-📚 [更多 Agent 安裝指南](https://docs.openteams.com/getting-started)
+📚 [更多 Agent 安裝指南](https://doc.openteams-lab.com/getting-started)
 
 ---
 
@@ -94,31 +106,31 @@ npx openteams-web
 
 *在相同的共享上下文中運行多個 Agent，讓它們並行執行以加快交付速度。*
 
-![OpenTeams parallel](../images/parallel.gif)
+![OpenTeams parallel](images/parallel.gif)
 
 ### 自主 Agent 協作
 
 *OpenTeams 允許 Agent 直接互相發送消息，無需強制固定的工作流程。如果你想要更多結構，可以添加團隊準則來控制溝通、指定領導 Agent，或讓所有人自由協作。溝通模式完全取決於你的使用場景。*
 
-![OpenTeams collaborate](../images/collaborate.gif)
+![OpenTeams collaborate](images/collaborate.gif)
 
 ### AI 成員
 
 *OpenTeams 包含 160+ 內置 AI 成員，覆蓋工程、營銷、寫作、內容生產等領域。將它們組合成不同的團隊，自定義配置，構建適合你工作方式的角色組合。我們將持續擴展和改進這個陣容。*
 
-![OpenTeams members](../images/members.gif)
+![OpenTeams members](images/members.gif)
 
 ### AI 團隊
 
 *OpenTeams 內置 8 個團隊預設，適用於常見工作流程，讓你可以立即開始。我們建議在創建團隊時定義團隊準則，以確保協作符合你希望團隊運作的方式。*
 
-![OpenTeams team](../images/team.gif)
+![OpenTeams team](images/team.gif)
 
 ### 技能庫
 
 *OpenTeams 包含 1000+ 內置技能，你可以組合並分配給不同的 AI 成員。你也可以導入自己創建的技能，直接應用到你的 Agent。我們將繼續擴展技能庫，專注於在真實生產環境中可靠的能力。*
 
-![OpenTeams skills](../images/skills.gif)
+![OpenTeams skills](images/skills.gif)
 
 ---
 
