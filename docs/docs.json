@@ -63,8 +63,7 @@
             "group": "Core Features",
             "pages": [
               "core-features/chat-session-overview",
-              "core-features/ai-members",
-              "core-features/task-collaboration"
+              "core-features/ai-members"
             ]
           },
           {
@@ -116,8 +115,7 @@
             "group": "核心功能",
             "pages": [
               "zh-Hans/core-features/chat-session-overview",
-              "zh-Hans/core-features/ai-members",
-              "zh-Hans/core-features/task-collaboration"
+              "zh-Hans/core-features/ai-members"
             ]
           },
           {
@@ -169,8 +167,7 @@
             "group": "核心功能",
             "pages": [
               "zh-Hant/core-features/chat-session-overview",
-              "zh-Hant/core-features/ai-members",
-              "zh-Hant/core-features/task-collaboration"
+              "zh-Hant/core-features/ai-members"
             ]
           },
           {
@@ -222,8 +219,7 @@
             "group": "コア機能",
             "pages": [
               "ja/core-features/chat-session-overview",
-              "ja/core-features/ai-members",
-              "ja/core-features/task-collaboration"
+              "ja/core-features/ai-members"
             ]
           },
           {
@@ -275,8 +271,7 @@
             "group": "핵심 기능",
             "pages": [
               "ko/core-features/chat-session-overview",
-              "ko/core-features/ai-members",
-              "ko/core-features/task-collaboration"
+              "ko/core-features/ai-members"
             ]
           },
           {
@@ -328,8 +323,7 @@
             "group": "Fonctionnalités",
             "pages": [
               "fr/core-features/chat-session-overview",
-              "fr/core-features/ai-members",
-              "fr/core-features/task-collaboration"
+              "fr/core-features/ai-members"
             ]
           },
           {

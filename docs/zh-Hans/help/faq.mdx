@@ -1,5 +1,48 @@
 ---
-title: "FAQ"
-description: "网站大纲占位页。"
-sidebarTitle: "FAQ"
+title: "常见问题"
+description: ""
+sidebarTitle: "常见问题"
 ---
+
+## AI成员没有返回消息？
+
+## AI成员返回错误日志在哪？
+
+## 怎么查看AI成员的原始输入输出？
+
+## 怎么清除数据库？
+
+如果您遇到不可恢复的错误并需要完全清除 openteams 数据库，可以删除操作系统对应的应用数据目录。
+
+<Warning>
+此操作不可逆，将导致所有会话记录和设置丢失。在继续之前，请确保备份所有重要信息。
+</Warning>
+
+**根据您的操作系统删除以下目录：**
+
+<Tabs>
+<Tab title="macOS">
+```bash
+~/Library/Application Support/ai.openteams-lab.openteams/
+```
+</Tab>
+
+<Tab title="Linux">
+```bash
+~/.local/share/openteams/
+```
+</Tab>
+
+<Tab title="Windows">
+```
+%APPDATA%\openteams-lab\openteams\
+```
+
+通常为：`C:\Users\<用户名>\AppData\Roaming\openteams-lab\openteams\`
+</Tab>
+</Tabs>
+
+删除应用数据目录后，重启 openteams 即可使用空数据库和默认设置重置。
+<Note>
+在这个目录下还保存有系统日志，你可以在logs目录下查看openteams的系统日志
+</Note>
