@@ -616,7 +616,8 @@ export function ChatSessions() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const promptFileInputRef = useRef<HTMLInputElement | null>(null);
   const { config, profiles, loginStatus, homeDirectory } = useUserSystem();
-  const { canSelfUpdate, hasUpdate, latestVersion } = useVersionCheck();
+  const { canSelfUpdate, currentVersion, hasUpdate, latestVersion } =
+    useVersionCheck();
   const appLanguage = resolveAppLanguageCode(
     config?.language,
     i18n.resolvedLanguage || i18n.language,
@@ -3617,6 +3618,7 @@ export function ChatSessions() {
           setIsSkillsPanelOpen(false);
           UpdateDialog.show();
         }}
+        currentVersion={currentVersion}
         hasAvailableUpdate={canSelfUpdate && hasUpdate}
         latestVersion={canSelfUpdate ? latestVersion : null}
         isAiTeamActive={isAiTeamPresetsOpen}

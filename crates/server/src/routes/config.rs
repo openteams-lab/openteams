@@ -28,11 +28,11 @@ use executors::{
 };
 use jsonc_parser::ParseOptions;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use services::services::{
     cli_config::{
-        CliConfig, CustomProviderEntry, OpenTeamsCliConfig, OpenTeamsCliProviderConfig,
-        OpenTeamsCliProviderOptions,
+        CliConfig, CustomProviderEntry, OllamaConfig, OpenTeamsCliConfig,
+        OpenTeamsCliProviderConfig, OpenTeamsCliProviderOptions, ProviderCredentials,
     },
     config::{
         Config, ConfigError, SoundFile,
@@ -616,7 +616,41 @@ fn sync_requested_provider_to_cli_config(
         return;
     }
 
+    let cli_providers = cli_config.provider.get_or_insert_with(HashMap::new);
+
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "anthropic",
+        build_builtin_provider_config(app_config.provider.anthropic.as_ref()),
+    );
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "openai",
+        build_builtin_provider_config(app_config.provider.openai.as_ref()),
+    );
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "google",
+        build_builtin_provider_config(app_config.provider.google.as_ref()),
+    );
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "openrouter",
+        build_builtin_provider_config(app_config.provider.openrouter.as_ref()),
+    );
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "minimax",
+        build_builtin_provider_config(app_config.provider.minimax.as_ref()),
+    );
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "ollama",
+        build_ollama_provider_config(app_config.provider.ollama.as_ref()),
+    );
+
     if app_config.provider.default.trim() != "custom" {
+        cli_providers.remove("custom");
         return;
     }
 
@@ -637,11 +671,72 @@ fn sync_requested_provider_to_cli_config(
             whitelist: None,
             blacklist: None,
         };
-        cli_config
-            .provider
-            .get_or_insert_with(HashMap::new)
-            .insert(provider_id, provider_config);
+        cli_providers.insert(provider_id, provider_config);
+    } else {
+        cli_providers.remove("custom");
     }
+}
+
+fn sync_builtin_provider_to_cli_config(
+    cli_providers: &mut HashMap<String, OpenTeamsCliProviderConfig>,
+    provider_id: &str,
+    provider_config: Option<OpenTeamsCliProviderConfig>,
+) {
+    if let Some(provider_config) = provider_config {
+        cli_providers.insert(provider_id.to_string(), provider_config);
+    } else {
+        cli_providers.remove(provider_id);
+    }
+}
+
+fn build_builtin_provider_config(
+    credentials: Option<&ProviderCredentials>,
+) -> Option<OpenTeamsCliProviderConfig> {
+    let credentials = credentials?;
+    if credentials.api_key.is_none() && credentials.endpoint.is_none() {
+        return None;
+    }
+
+    Some(OpenTeamsCliProviderConfig {
+        npm: None,
+        name: None,
+        options: Some(OpenTeamsCliProviderOptions {
+            api_key: credentials.api_key.clone(),
+            base_url: credentials.endpoint.clone(),
+            timeout: None,
+            chunk_timeout: None,
+            enterprise_url: None,
+            set_cache_key: None,
+        }),
+        models: None,
+        whitelist: None,
+        blacklist: None,
+    })
+}
+
+fn build_ollama_provider_config(
+    config: Option<&OllamaConfig>,
+) -> Option<OpenTeamsCliProviderConfig> {
+    let config = config?;
+    if config.endpoint.is_none() {
+        return None;
+    }
+
+    Some(OpenTeamsCliProviderConfig {
+        npm: None,
+        name: None,
+        options: Some(OpenTeamsCliProviderOptions {
+            api_key: None,
+            base_url: config.endpoint.clone(),
+            timeout: None,
+            chunk_timeout: None,
+            enterprise_url: None,
+            set_cache_key: None,
+        }),
+        models: None,
+        whitelist: None,
+        blacklist: None,
+    })
 }
 
 fn sync_managed_custom_providers_to_cli_config(
@@ -1077,20 +1172,20 @@ async fn list_cli_providers(
                 .unwrap_or(false),
         },
         ProviderInfo {
+            id: "minimax".into(),
+            name: "MiniMax".into(),
+            configured: config
+                .provider
+                .minimax
+                .as_ref()
+                .and_then(|p| p.api_key.as_ref())
+                .map(|k| !k.is_empty())
+                .unwrap_or(false),
+        },
+        ProviderInfo {
             id: "ollama".into(),
             name: "Ollama".into(),
             configured: config.provider.ollama.is_some(),
-        },
-        ProviderInfo {
-            id: "custom".into(),
-            name: "Custom Provider".into(),
-            configured: config
-                .provider
-                .custom
-                .as_ref()
-                .and_then(|p| p.endpoint.as_ref())
-                .map(|e| !e.is_empty())
-                .unwrap_or(false),
         },
     ];
     ResponseJson(ApiResponse::success(providers))
@@ -1171,6 +1266,28 @@ async fn list_provider_models(
                 name: "Gemini 2.5 Pro (via OpenRouter)".into(),
             },
         ],
+        "minimax" => vec![
+            ModelInfo {
+                id: "MiniMax-M2.7".into(),
+                name: "MiniMax M2.7".into(),
+            },
+            ModelInfo {
+                id: "MiniMax-M2.5".into(),
+                name: "MiniMax M2.5".into(),
+            },
+            ModelInfo {
+                id: "MiniMax-M2-her".into(),
+                name: "MiniMax M2 Her".into(),
+            },
+            ModelInfo {
+                id: "MiniMax-M2.1".into(),
+                name: "MiniMax M2.1".into(),
+            },
+            ModelInfo {
+                id: "MiniMax-01".into(),
+                name: "MiniMax 01".into(),
+            },
+        ],
         "ollama" => vec![
             ModelInfo {
                 id: "llama3.3".into(),
@@ -1209,15 +1326,18 @@ const DEFAULT_ANTHROPIC_ENDPOINT: &str = "https://api.anthropic.com/";
 const DEFAULT_OPENAI_ENDPOINT: &str = "https://api.openai.com/v1/";
 const DEFAULT_GOOGLE_ENDPOINT: &str = "https://generativelanguage.googleapis.com/";
 const DEFAULT_OPENROUTER_ENDPOINT: &str = "https://openrouter.ai/api/v1/";
+const DEFAULT_MINIMAX_ENDPOINT: &str = "https://api.minimaxi.com/anthropic/v1/";
 const DEFAULT_OLLAMA_ENDPOINT: &str = "http://localhost:11434/";
 const DEFAULT_CUSTOM_PROVIDER_NPM: &str = "@ai-sdk/anthropic";
 const LEGACY_CUSTOM_PROVIDER_NPM: &str = "@ai-sdk/anthropic";
 const AUTO_MODEL_VARIANT_PREFIX: &str = "AUTO_MODEL_";
 
 struct ValidationRequestSpec {
+    method: http::Method,
     url: Url,
     auth_header: Option<(&'static str, String)>,
     dns_override: Option<(String, Vec<SocketAddr>)>,
+    json_body: Option<Value>,
 }
 
 fn validation_result(
@@ -1243,6 +1363,7 @@ fn saved_provider_api_key(config: &CliConfig, provider: &str) -> Option<String> 
         "openai" => config.provider.openai.as_ref()?.api_key.clone(),
         "google" => config.provider.google.as_ref()?.api_key.clone(),
         "openrouter" => config.provider.openrouter.as_ref()?.api_key.clone(),
+        "minimax" => config.provider.minimax.as_ref()?.api_key.clone(),
         "custom" => config.provider.custom.as_ref()?.api_key.clone(),
         other => config
             .provider
@@ -1361,9 +1482,26 @@ async fn validation_request_spec(
 ) -> Result<ValidationRequestSpec, String> {
     let dns_override = resolve_validation_host(&url).await?;
     Ok(ValidationRequestSpec {
+        method: http::Method::GET,
         url,
         auth_header,
         dns_override,
+        json_body: None,
+    })
+}
+
+async fn validation_post_request_spec(
+    url: Url,
+    auth_header: Option<(&'static str, String)>,
+    json_body: Value,
+) -> Result<ValidationRequestSpec, String> {
+    let dns_override = resolve_validation_host(&url).await?;
+    Ok(ValidationRequestSpec {
+        method: http::Method::POST,
+        url,
+        auth_header,
+        dns_override,
+        json_body: Some(json_body),
     })
 }
 
@@ -1431,6 +1569,31 @@ async fn build_validation_request(
             )?;
             validation_request_spec(url, Some(("Authorization", format!("Bearer {api_key}")))).await
         }
+        "minimax" => {
+            let url = join_validation_url(
+                validate_known_https_endpoint(
+                    req.endpoint
+                        .as_deref()
+                        .filter(|endpoint| !endpoint.is_empty())
+                        .unwrap_or(DEFAULT_MINIMAX_ENDPOINT),
+                    &["api.minimaxi.com"],
+                )?,
+                "messages",
+            )?;
+            validation_post_request_spec(
+                url,
+                Some(("Authorization", format!("Bearer {api_key}"))),
+                json!({
+                    "model": "MiniMax-M2.5",
+                    "max_tokens": 1,
+                    "messages": [{
+                        "role": "user",
+                        "content": "ping"
+                    }]
+                }),
+            )
+            .await
+        }
         "ollama" => {
             let url = join_validation_url(
                 validate_ollama_endpoint(
@@ -1488,7 +1651,7 @@ async fn validate_provider(
     // Providers that require an API key
     let requires_api_key = matches!(
         provider.as_str(),
-        "anthropic" | "openai" | "google" | "openrouter"
+        "anthropic" | "openai" | "google" | "openrouter" | "minimax"
     );
     if requires_api_key && api_key.is_empty() {
         return validation_result(false, "API key is required");
@@ -1512,9 +1675,14 @@ async fn validate_provider(
         }
     };
 
-    let mut request = client.get(spec.url.clone()).timeout(VALIDATION_TIMEOUT);
+    let mut request = client
+        .request(spec.method.clone(), spec.url.clone())
+        .timeout(VALIDATION_TIMEOUT);
     if let Some((header_name, header_value)) = spec.auth_header {
         request = request.header(header_name, header_value);
+    }
+    if let Some(json_body) = spec.json_body {
+        request = request.json(&json_body);
     }
 
     match request.send().await {
@@ -1721,6 +1889,9 @@ fn mask_api_keys(mut config: CliConfig) -> CliConfig {
     if let Some(p) = config.provider.openrouter.as_mut() {
         mask_provider_key(&mut p.api_key);
     }
+    if let Some(p) = config.provider.minimax.as_mut() {
+        mask_provider_key(&mut p.api_key);
+    }
     if let Some(p) = config.provider.custom.as_mut() {
         mask_provider_key(&mut p.api_key);
     }
@@ -1763,6 +1934,12 @@ fn merge_masked_keys(new_config: &mut CliConfig, old_config: &CliConfig) {
     if let (Some(np), Some(op)) = (
         new_config.provider.openrouter.as_mut(),
         old_config.provider.openrouter.as_ref(),
+    ) {
+        keep_old_if_masked(&mut np.api_key, &op.api_key);
+    }
+    if let (Some(np), Some(op)) = (
+        new_config.provider.minimax.as_mut(),
+        old_config.provider.minimax.as_ref(),
     ) {
         keep_old_if_masked(&mut np.api_key, &op.api_key);
     }
@@ -1816,6 +1993,39 @@ mod tests {
             Some(("x-goog-api-key", "secret-key".to_string()))
         );
         assert!(spec.url.query().is_none());
+    }
+
+    #[tokio::test]
+    async fn minimax_validation_request_uses_messages_endpoint() {
+        let req = ValidateProviderRequest {
+            api_key: Some("secret-key".into()),
+            endpoint: None,
+        };
+
+        let spec = build_validation_request("minimax", &req, "secret-key")
+            .await
+            .expect("expected validation request");
+
+        assert_eq!(spec.method, http::Method::POST);
+        assert_eq!(
+            spec.url.as_str(),
+            "https://api.minimaxi.com/anthropic/v1/messages"
+        );
+        assert_eq!(
+            spec.auth_header,
+            Some(("Authorization", "Bearer secret-key".to_string()))
+        );
+        assert_eq!(
+            spec.json_body,
+            Some(json!({
+                "model": "MiniMax-M2.5",
+                "max_tokens": 1,
+                "messages": [{
+                    "role": "user",
+                    "content": "ping"
+                }]
+            }))
+        );
     }
 
     #[tokio::test]
@@ -1900,6 +2110,20 @@ mod tests {
     }
 
     #[test]
+    fn saved_provider_api_key_reads_minimax_credentials() {
+        let mut config = CliConfig::default_config();
+        config.provider.minimax = Some(services::services::cli_config::ProviderCredentials {
+            api_key: Some("mini-secret".into()),
+            endpoint: Some(DEFAULT_MINIMAX_ENDPOINT.into()),
+        });
+
+        assert_eq!(
+            saved_provider_api_key(&config, "minimax").as_deref(),
+            Some("mini-secret")
+        );
+    }
+
+    #[test]
     fn normalize_custom_provider_entries_fixes_legacy_litellm_npm() {
         let mut config = CliConfig::default_config();
         config.provider.custom_providers = Some(HashMap::from([(
@@ -1962,10 +2186,14 @@ mod tests {
     }
 
     #[test]
-    fn sync_requested_provider_to_cli_config_skips_legacy_custom_when_default_is_builtin() {
+    fn sync_requested_provider_to_cli_config_writes_builtin_provider_when_default_is_builtin() {
         let mut cli_config = OpenTeamsCliConfig::default();
         let mut app_config = CliConfig::default_config();
         app_config.provider.default = "anthropic".into();
+        app_config.provider.anthropic = Some(services::services::cli_config::ProviderCredentials {
+            api_key: Some("live-secret".into()),
+            endpoint: Some(DEFAULT_ANTHROPIC_ENDPOINT.into()),
+        });
         app_config.provider.custom = Some(services::services::cli_config::CustomProviderConfig {
             name: Some("Legacy Custom".into()),
             endpoint: Some("https://custom.example.com/v1".into()),
@@ -1974,7 +2202,29 @@ mod tests {
 
         sync_requested_provider_to_cli_config(&mut cli_config, &app_config, None);
 
-        assert!(cli_config.provider.is_none());
+        let providers = cli_config
+            .provider
+            .expect("builtin provider should be synced");
+        let anthropic = providers
+            .get("anthropic")
+            .expect("anthropic provider should exist");
+        assert_eq!(anthropic.npm, None);
+        assert_eq!(anthropic.name, None);
+        assert_eq!(
+            anthropic
+                .options
+                .as_ref()
+                .and_then(|options| options.api_key.as_deref()),
+            Some("live-secret")
+        );
+        assert_eq!(
+            anthropic
+                .options
+                .as_ref()
+                .and_then(|options| options.base_url.as_deref()),
+            Some(DEFAULT_ANTHROPIC_ENDPOINT)
+        );
+        assert!(!providers.contains_key("custom"));
     }
 
     fn build_test_openteams_cli_config(
