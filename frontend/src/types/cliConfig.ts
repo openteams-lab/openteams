@@ -50,6 +50,7 @@ export const CLI_PROVIDER_IDS = [
   'openai',
   'google',
   'openrouter',
+  'minimax',
   'ollama',
   'custom',
 ] as const;

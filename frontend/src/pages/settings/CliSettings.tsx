@@ -48,8 +48,8 @@ const DEFAULT_PROVIDER_OPTIONS: CliProviderInfo[] = [
   { id: 'openai', name: 'OpenAI', configured: false },
   { id: 'google', name: 'Google', configured: false },
   { id: 'openrouter', name: 'OpenRouter', configured: false },
+  { id: 'minimax', name: 'MiniMax', configured: false },
   { id: 'ollama', name: 'Ollama', configured: false },
-  { id: 'custom', name: 'Custom Provider', configured: false },
 ];
 
 const VALIDATABLE_PROVIDERS = new Set<CliProviderId>([
@@ -57,6 +57,7 @@ const VALIDATABLE_PROVIDERS = new Set<CliProviderId>([
   'openai',
   'google',
   'openrouter',
+  'minimax',
   'ollama',
   'custom',
 ]);
@@ -66,6 +67,7 @@ const API_KEY_VALIDATION_REQUIRED_PROVIDERS = new Set<CliProviderId>([
   'openai',
   'google',
   'openrouter',
+  'minimax',
 ]);
 
 const SETTINGS_INLINE_PANEL_CLASS = cn(settingsMutedPanelClassName, 'p-4');
@@ -102,6 +104,7 @@ const REMOTE_MODEL_PROVIDERS = new Set<CliProviderId>([
   'openai',
   'google',
   'openrouter',
+  'minimax',
   'ollama',
 ]);
 
@@ -145,33 +148,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-const CLI_RESTART_WARNING =
-  'Warning: OPENTEAMS_SERVER_PASSWORD is not set; server is unsecured.';
-
-function getCliRestartErrorMessage(error: unknown, fallback: string): string {
-  if (!(error instanceof Error)) {
-    return fallback;
-  }
-
-  const message = error.message.trim();
-  if (!message) {
-    return fallback;
-  }
-
-  const filteredMessage = message
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && line !== CLI_RESTART_WARNING)
-    .join('\n')
-    .trim();
-
-  if (!filteredMessage || filteredMessage !== message) {
-    return fallback;
-  }
-
-  return filteredMessage;
-}
-
 function getProviderApiKey(config: CliConfig, provider: CliProviderId): string {
   switch (provider) {
     case 'anthropic':
@@ -182,6 +158,8 @@ function getProviderApiKey(config: CliConfig, provider: CliProviderId): string {
       return config.provider.google?.api_key ?? '';
     case 'openrouter':
       return config.provider.openrouter?.api_key ?? '';
+    case 'minimax':
+      return config.provider.minimax?.api_key ?? '';
     case 'custom':
       return config.provider.custom?.api_key ?? '';
     case 'ollama':
@@ -204,6 +182,8 @@ function getProviderEndpoint(
       return config.provider.google?.endpoint ?? '';
     case 'openrouter':
       return config.provider.openrouter?.endpoint ?? '';
+    case 'minimax':
+      return config.provider.minimax?.endpoint ?? '';
     case 'ollama':
       return config.provider.ollama?.endpoint ?? '';
     case 'custom':
@@ -229,6 +209,7 @@ function getScopedModelDefault(
     case 'google':
       return config.model.google?.default ?? null;
     case 'openrouter':
+    case 'minimax':
     case 'ollama':
     case 'custom':
       return null;
@@ -250,6 +231,9 @@ function ensureProviderConfig(config: CliConfig, provider: CliProviderId) {
       break;
     case 'openrouter':
       config.provider.openrouter ??= emptyProviderCredentials();
+      break;
+    case 'minimax':
+      config.provider.minimax ??= emptyProviderCredentials();
       break;
     case 'ollama':
       config.provider.ollama ??= emptyOllamaConfig();
@@ -293,6 +277,12 @@ function setProviderApiKey(
         api_key: normalized,
       };
       break;
+    case 'minimax':
+      config.provider.minimax = {
+        ...(config.provider.minimax ?? emptyProviderCredentials()),
+        api_key: normalized,
+      };
+      break;
     case 'custom':
       config.provider.custom = {
         ...(config.provider.custom ?? emptyCustomProviderConfig()),
@@ -333,6 +323,12 @@ function setProviderEndpoint(
     case 'openrouter':
       config.provider.openrouter = {
         ...(config.provider.openrouter ?? emptyProviderCredentials()),
+        endpoint: normalized,
+      };
+      break;
+    case 'minimax':
+      config.provider.minimax = {
+        ...(config.provider.minimax ?? emptyProviderCredentials()),
         endpoint: normalized,
       };
       break;
@@ -454,6 +450,7 @@ function sanitizeCliConfig(config: CliConfig): CliConfig {
   next.provider.openrouter = sanitizeProviderCredentials(
     next.provider.openrouter
   );
+  next.provider.minimax = sanitizeProviderCredentials(next.provider.minimax);
   next.provider.ollama = sanitizeOllamaConfig(next.provider.ollama);
   next.provider.custom = sanitizeCustomProviderConfig(next.provider.custom);
   next.model.anthropic = sanitizeProviderModelConfig(next.model.anthropic);
@@ -488,9 +485,6 @@ export function CliSettings() {
     save,
     isSaving,
     syncToCli,
-    isSyncing,
-    restartCliService,
-    isRestarting,
   } = useCliConfig();
   const {
     data: providersData,
@@ -563,8 +557,11 @@ export function CliSettings() {
         ? providersData
         : DEFAULT_PROVIDER_OPTIONS;
     const seen = new Set(baseProviders.map((provider) => provider.id));
+    const visibleBaseProviders = baseProviders.filter(
+      (provider) => provider.id !== 'custom'
+    );
     return [
-      ...baseProviders,
+      ...visibleBaseProviders,
       ...customProviderOptions.filter((provider) => !seen.has(provider.id)),
     ];
   }, [customProviderOptions, providersData]);
@@ -662,7 +659,7 @@ export function CliSettings() {
     availableModelOptions.some((model) => model.id === draft.model.default)
       ? draft.model.default
       : undefined;
-  const isSaveBusy = isSaving || isSyncing || isRestarting;
+  const isSaveBusy = isSaving;
   const deletingProviderId = deleteCustomProvider.isPending
     ? (deleteCustomProvider.variables ?? null)
     : null;
@@ -725,28 +722,25 @@ export function CliSettings() {
     }
 
     try {
-      const restartErrorMessage = t('settings.cli.save.restartError');
       const saved = await save(sanitizedDraft);
       setDraft(cloneDeep(withCustomProviders(saved, customProvidersRecord)));
       setSaveSuccessMessage(t('settings.cli.save.success'));
       setTimeout(() => setSaveSuccessMessage(null), 3000);
-
-      try {
-        await syncToCli(
-          selectedManagedCustomProvider
-            ? { custom_provider_id: selectedManagedCustomProvider.id }
-            : undefined
-        );
-        await restartCliService();
-      } catch (syncOrRestartErr) {
-        console.error(
-          'Failed to sync or restart openteams-cli after saving CLI config:',
-          syncOrRestartErr
-        );
-        setSaveError(
-          getCliRestartErrorMessage(syncOrRestartErr, restartErrorMessage)
-        );
-      }
+      void (async () => {
+        try {
+          await syncToCli(
+            selectedManagedCustomProvider
+              ? { custom_provider_id: selectedManagedCustomProvider.id }
+              : undefined
+          );
+        } catch (syncErr) {
+          console.error(
+            'Failed to sync openteams-cli after saving CLI config:',
+            syncErr
+          );
+          setSaveError(getErrorMessage(syncErr, t('settings.cli.save.error')));
+        }
+      })();
     } catch (saveErr) {
       console.error('Failed to save CLI config:', saveErr);
       setSaveError(t('settings.cli.save.error'));
@@ -782,7 +776,6 @@ export function CliSettings() {
   const handleSubmitCustomProvider = async (provider: CustomProviderEntry) => {
     setCustomProviderMessage(null);
     setCustomProviderStatusError(null);
-    const restartErrorMessage = t('settings.cli.save.restartError');
     const successMessage = editingCustomProvider
       ? t('settings.cli.customProviders.feedback.updated')
       : t('settings.cli.customProviders.feedback.created');
@@ -797,14 +790,6 @@ export function CliSettings() {
     }
 
     setCustomProviderMessage(successMessage);
-    try {
-      await restartCliService();
-    } catch (restartErr) {
-      setCustomProviderStatusError(
-        getCliRestartErrorMessage(restartErr, restartErrorMessage)
-      );
-    }
-
     setEditingCustomProvider(null);
   };
 
@@ -824,7 +809,6 @@ export function CliSettings() {
     }
 
     try {
-      const restartErrorMessage = t('settings.cli.save.restartError');
       setCustomProviderMessage(null);
       setCustomProviderStatusError(null);
       await deleteCustomProvider.mutateAsync(provider.id);
@@ -856,13 +840,6 @@ export function CliSettings() {
       setCustomProviderMessage(
         t('settings.cli.customProviders.feedback.deleted')
       );
-      try {
-        await restartCliService();
-      } catch (restartErr) {
-        setCustomProviderStatusError(
-          getCliRestartErrorMessage(restartErr, restartErrorMessage)
-        );
-      }
     } catch (deleteErr) {
       setCustomProviderStatusError(
         getErrorMessage(
@@ -1282,9 +1259,7 @@ export function CliSettings() {
       <CustomProviderForm
         initialProvider={editingCustomProvider}
         isSubmitting={
-          createCustomProvider.isPending ||
-          updateCustomProvider.isPending ||
-          isRestarting
+          createCustomProvider.isPending || updateCustomProvider.isPending
         }
         onOpenChange={(open) => {
           setIsCustomProviderDialogOpen(open);

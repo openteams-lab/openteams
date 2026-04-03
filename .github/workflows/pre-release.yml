@@ -118,7 +118,7 @@ jobs:
           if [[ "${{ github.event.inputs.version_type }}" == "no-update-version" ]]; then
             # Rebuild from the current checked-in version without incrementing it.
             new_version="$current_repo_version"
-            new_tag="v${new_version}-build-${timestamp}"
+            new_tag="v${new_version}-${timestamp}"
           elif [[ "${{ github.event.inputs.version_type }}" == "prerelease" ]]; then
             # For prerelease, align to stable release_base_version and keep
             # the same major.minor.patch without bumping.

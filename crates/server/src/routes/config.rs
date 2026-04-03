@@ -28,11 +28,11 @@ use executors::{
 };
 use jsonc_parser::ParseOptions;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use services::services::{
     cli_config::{
-        CliConfig, CustomProviderEntry, OpenTeamsCliConfig, OpenTeamsCliProviderConfig,
-        OpenTeamsCliProviderOptions,
+        CliConfig, CustomProviderEntry, OllamaConfig, OpenTeamsCliConfig,
+        OpenTeamsCliProviderConfig, OpenTeamsCliProviderOptions, ProviderCredentials,
     },
     config::{
         Config, ConfigError, SoundFile,
@@ -616,7 +616,41 @@ fn sync_requested_provider_to_cli_config(
         return;
     }
 
+    let cli_providers = cli_config.provider.get_or_insert_with(HashMap::new);
+
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "anthropic",
+        build_builtin_provider_config(app_config.provider.anthropic.as_ref()),
+    );
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "openai",
+        build_builtin_provider_config(app_config.provider.openai.as_ref()),
+    );
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "google",
+        build_builtin_provider_config(app_config.provider.google.as_ref()),
+    );
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "openrouter",
+        build_builtin_provider_config(app_config.provider.openrouter.as_ref()),
+    );
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "minimax",
+        build_builtin_provider_config(app_config.provider.minimax.as_ref()),
+    );
+    sync_builtin_provider_to_cli_config(
+        cli_providers,
+        "ollama",
+        build_ollama_provider_config(app_config.provider.ollama.as_ref()),
+    );
+
     if app_config.provider.default.trim() != "custom" {
+        cli_providers.remove("custom");
         return;
     }
 
@@ -637,11 +671,70 @@ fn sync_requested_provider_to_cli_config(
             whitelist: None,
             blacklist: None,
         };
-        cli_config
-            .provider
-            .get_or_insert_with(HashMap::new)
-            .insert(provider_id, provider_config);
+        cli_providers.insert(provider_id, provider_config);
+    } else {
+        cli_providers.remove("custom");
     }
+}
+
+fn sync_builtin_provider_to_cli_config(
+    cli_providers: &mut HashMap<String, OpenTeamsCliProviderConfig>,
+    provider_id: &str,
+    provider_config: Option<OpenTeamsCliProviderConfig>,
+) {
+    if let Some(provider_config) = provider_config {
+        cli_providers.insert(provider_id.to_string(), provider_config);
+    } else {
+        cli_providers.remove(provider_id);
+    }
+}
+
+fn build_builtin_provider_config(
+    credentials: Option<&ProviderCredentials>,
+) -> Option<OpenTeamsCliProviderConfig> {
+    let credentials = credentials?;
+    if credentials.api_key.is_none() && credentials.endpoint.is_none() {
+        return None;
+    }
+
+    Some(OpenTeamsCliProviderConfig {
+        npm: None,
+        name: None,
+        options: Some(OpenTeamsCliProviderOptions {
+            api_key: credentials.api_key.clone(),
+            base_url: credentials.endpoint.clone(),
+            timeout: None,
+            chunk_timeout: None,
+            enterprise_url: None,
+            set_cache_key: None,
+        }),
+        models: None,
+        whitelist: None,
+        blacklist: None,
+    })
+}
+
+fn build_ollama_provider_config(
+    config: Option<&OllamaConfig>,
+) -> Option<OpenTeamsCliProviderConfig> {
+    let config = config?;
+    config.endpoint.as_ref()?;
+
+    Some(OpenTeamsCliProviderConfig {
+        npm: None,
+        name: None,
+        options: Some(OpenTeamsCliProviderOptions {
+            api_key: None,
+            base_url: config.endpoint.clone(),
+            timeout: None,
+            chunk_timeout: None,
+            enterprise_url: None,
+            set_cache_key: None,
+        }),
+        models: None,
+        whitelist: None,
+        blacklist: None,
+    })
 }
 
 fn sync_managed_custom_providers_to_cli_config(
@@ -1077,20 +1170,20 @@ async fn list_cli_providers(
                 .unwrap_or(false),
         },
         ProviderInfo {
+            id: "minimax".into(),
+            name: "MiniMax".into(),
+            configured: config
+                .provider
+                .minimax
+                .as_ref()
+                .and_then(|p| p.api_key.as_ref())
+                .map(|k| !k.is_empty())
+                .unwrap_or(false),
+        },
+        ProviderInfo {
             id: "ollama".into(),
             name: "Ollama".into(),
             configured: config.provider.ollama.is_some(),
-        },
-        ProviderInfo {
-            id: "custom".into(),
-            name: "Custom Provider".into(),
-            configured: config
-                .provider
-                .custom
-                .as_ref()
-                .and_then(|p| p.endpoint.as_ref())
-                .map(|e| !e.is_empty())
-                .unwrap_or(false),
         },
     ];
     ResponseJson(ApiResponse::success(providers))
@@ -1102,11 +1195,8 @@ pub struct ModelInfo {
     pub name: String,
 }
 
-/// List models for a specific provider
-async fn list_provider_models(
-    Path(provider): Path<String>,
-) -> ResponseJson<ApiResponse<Vec<ModelInfo>>> {
-    let models = match provider.as_str() {
+fn fallback_provider_models(provider: &str) -> Vec<ModelInfo> {
+    match provider {
         "anthropic" => vec![
             ModelInfo {
                 id: "claude-opus-4-20250514".into(),
@@ -1121,18 +1211,26 @@ async fn list_provider_models(
                 name: "Claude Haiku 4".into(),
             },
             ModelInfo {
-                id: "claude-3-5-sonnet-20241022".into(),
-                name: "Claude 3.5 Sonnet".into(),
+                id: "claude-3-7-sonnet-20250219".into(),
+                name: "Claude 3.7 Sonnet".into(),
             },
         ],
         "openai" => vec![
             ModelInfo {
-                id: "gpt-4o".into(),
-                name: "GPT-4o".into(),
+                id: "gpt-5.4".into(),
+                name: "GPT-5.4".into(),
             },
             ModelInfo {
-                id: "gpt-4o-mini".into(),
-                name: "GPT-4o Mini".into(),
+                id: "gpt-5.4-mini".into(),
+                name: "GPT-5.4 Mini".into(),
+            },
+            ModelInfo {
+                id: "gpt-5".into(),
+                name: "GPT-5".into(),
+            },
+            ModelInfo {
+                id: "gpt-5-mini".into(),
+                name: "GPT-5 Mini".into(),
             },
             ModelInfo {
                 id: "o3".into(),
@@ -1159,16 +1257,38 @@ async fn list_provider_models(
         ],
         "openrouter" => vec![
             ModelInfo {
+                id: "openai/gpt-5.4".into(),
+                name: "GPT-5.4 (via OpenRouter)".into(),
+            },
+            ModelInfo {
                 id: "anthropic/claude-sonnet-4-20250514".into(),
                 name: "Claude Sonnet 4 (via OpenRouter)".into(),
             },
             ModelInfo {
-                id: "openai/gpt-4o".into(),
-                name: "GPT-4o (via OpenRouter)".into(),
-            },
-            ModelInfo {
                 id: "google/gemini-2.5-pro".into(),
                 name: "Gemini 2.5 Pro (via OpenRouter)".into(),
+            },
+        ],
+        "minimax" => vec![
+            ModelInfo {
+                id: "MiniMax-M2.7".into(),
+                name: "MiniMax M2.7".into(),
+            },
+            ModelInfo {
+                id: "MiniMax-M2.5".into(),
+                name: "MiniMax M2.5".into(),
+            },
+            ModelInfo {
+                id: "MiniMax-M2-her".into(),
+                name: "MiniMax M2 Her".into(),
+            },
+            ModelInfo {
+                id: "MiniMax-M2.1".into(),
+                name: "MiniMax M2.1".into(),
+            },
+            ModelInfo {
+                id: "MiniMax-01".into(),
+                name: "MiniMax 01".into(),
             },
         ],
         "ollama" => vec![
@@ -1186,6 +1306,190 @@ async fn list_provider_models(
             },
         ],
         _ => vec![],
+    }
+}
+
+fn dedupe_model_infos(models: Vec<ModelInfo>) -> Vec<ModelInfo> {
+    let mut seen = BTreeSet::new();
+    models
+        .into_iter()
+        .filter(|model| seen.insert(model.id.clone()))
+        .collect()
+}
+
+fn parse_openai_style_models(value: Value) -> Vec<ModelInfo> {
+    value
+        .get("data")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|model| {
+            let id = model.get("id").and_then(Value::as_str)?.trim();
+            if id.is_empty() {
+                return None;
+            }
+            let name = model
+                .get("name")
+                .or_else(|| model.get("display_name"))
+                .or_else(|| model.get("displayName"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .unwrap_or(id);
+            Some(ModelInfo {
+                id: id.to_string(),
+                name: name.to_string(),
+            })
+        })
+        .collect()
+}
+
+fn parse_anthropic_models(value: Value) -> Vec<ModelInfo> {
+    value
+        .get("data")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|model| {
+            let id = model.get("id").and_then(Value::as_str)?.trim();
+            if id.is_empty() {
+                return None;
+            }
+            let name = model
+                .get("display_name")
+                .or_else(|| model.get("name"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .unwrap_or(id);
+            Some(ModelInfo {
+                id: id.to_string(),
+                name: name.to_string(),
+            })
+        })
+        .collect()
+}
+
+fn parse_google_models(value: Value) -> Vec<ModelInfo> {
+    value
+        .get("models")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|model| {
+            let raw_id = model.get("name").and_then(Value::as_str)?.trim();
+            let id = raw_id.strip_prefix("models/").unwrap_or(raw_id).trim();
+            if id.is_empty() {
+                return None;
+            }
+            let name = model
+                .get("displayName")
+                .or_else(|| model.get("display_name"))
+                .or_else(|| model.get("name"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .unwrap_or(id);
+            Some(ModelInfo {
+                id: id.to_string(),
+                name: name.to_string(),
+            })
+        })
+        .collect()
+}
+
+fn parse_ollama_models(value: Value) -> Vec<ModelInfo> {
+    value
+        .get("models")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|model| {
+            let id = model
+                .get("model")
+                .or_else(|| model.get("name"))
+                .and_then(Value::as_str)?
+                .trim();
+            if id.is_empty() {
+                return None;
+            }
+            let name = model
+                .get("name")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .unwrap_or(id);
+            Some(ModelInfo {
+                id: id.to_string(),
+                name: name.to_string(),
+            })
+        })
+        .collect()
+}
+
+fn parse_models_dev_models(value: Value, provider: &str) -> Vec<ModelInfo> {
+    value
+        .get(provider)
+        .and_then(|entry| entry.get("models"))
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|models| models.iter())
+        .map(|(id, model)| {
+            let name = model
+                .get("name")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .unwrap_or(id.as_str());
+            ModelInfo {
+                id: id.clone(),
+                name: name.to_string(),
+            }
+        })
+        .collect()
+}
+
+fn parse_provider_models_response(provider: &str, value: Value) -> Vec<ModelInfo> {
+    match provider {
+        "anthropic" => parse_anthropic_models(value),
+        "google" => parse_google_models(value),
+        "ollama" => parse_ollama_models(value),
+        _ => parse_openai_style_models(value),
+    }
+}
+
+async fn fetch_models_dev_provider_models(provider: &str) -> Result<Vec<ModelInfo>, String> {
+    let value = reqwest::Client::new()
+        .get("https://models.dev/api.json")
+        .timeout(VALIDATION_TIMEOUT)
+        .send()
+        .await
+        .map_err(|err| err.to_string())?
+        .error_for_status()
+        .map_err(|err| err.to_string())?
+        .json::<Value>()
+        .await
+        .map_err(|err| err.to_string())?;
+
+    let models = parse_models_dev_models(value, provider);
+    if models.is_empty() {
+        return Err(format!("No models found for provider {provider}"));
+    }
+
+    Ok(dedupe_model_infos(models))
+}
+
+/// List models for a specific provider
+async fn list_provider_models(
+    Path(provider): Path<String>,
+) -> ResponseJson<ApiResponse<Vec<ModelInfo>>> {
+    let config = read_cli_config_from_disk().await;
+    let models = match fetch_live_provider_models(provider.as_str(), &config).await {
+        Ok(models) => models,
+        Err(_) => match fetch_models_dev_provider_models(provider.as_str()).await {
+            Ok(models) => models,
+            Err(_) => fallback_provider_models(provider.as_str()),
+        },
     };
     ResponseJson(ApiResponse::success(models))
 }
@@ -1209,15 +1513,18 @@ const DEFAULT_ANTHROPIC_ENDPOINT: &str = "https://api.anthropic.com/";
 const DEFAULT_OPENAI_ENDPOINT: &str = "https://api.openai.com/v1/";
 const DEFAULT_GOOGLE_ENDPOINT: &str = "https://generativelanguage.googleapis.com/";
 const DEFAULT_OPENROUTER_ENDPOINT: &str = "https://openrouter.ai/api/v1/";
+const DEFAULT_MINIMAX_ENDPOINT: &str = "https://api.minimaxi.com/anthropic/v1/";
 const DEFAULT_OLLAMA_ENDPOINT: &str = "http://localhost:11434/";
 const DEFAULT_CUSTOM_PROVIDER_NPM: &str = "@ai-sdk/anthropic";
 const LEGACY_CUSTOM_PROVIDER_NPM: &str = "@ai-sdk/anthropic";
 const AUTO_MODEL_VARIANT_PREFIX: &str = "AUTO_MODEL_";
 
 struct ValidationRequestSpec {
+    method: http::Method,
     url: Url,
     auth_header: Option<(&'static str, String)>,
     dns_override: Option<(String, Vec<SocketAddr>)>,
+    json_body: Option<Value>,
 }
 
 fn validation_result(
@@ -1243,6 +1550,7 @@ fn saved_provider_api_key(config: &CliConfig, provider: &str) -> Option<String> 
         "openai" => config.provider.openai.as_ref()?.api_key.clone(),
         "google" => config.provider.google.as_ref()?.api_key.clone(),
         "openrouter" => config.provider.openrouter.as_ref()?.api_key.clone(),
+        "minimax" => config.provider.minimax.as_ref()?.api_key.clone(),
         "custom" => config.provider.custom.as_ref()?.api_key.clone(),
         other => config
             .provider
@@ -1251,6 +1559,151 @@ fn saved_provider_api_key(config: &CliConfig, provider: &str) -> Option<String> 
             .and_then(|p| p.get(other))
             .and_then(|e| e.options.api_key.clone()),
     }
+}
+
+fn saved_provider_endpoint(config: &CliConfig, provider: &str) -> Option<String> {
+    match provider {
+        "anthropic" => config.provider.anthropic.as_ref()?.endpoint.clone(),
+        "openai" => config.provider.openai.as_ref()?.endpoint.clone(),
+        "google" => config.provider.google.as_ref()?.endpoint.clone(),
+        "openrouter" => config.provider.openrouter.as_ref()?.endpoint.clone(),
+        "minimax" => config.provider.minimax.as_ref()?.endpoint.clone(),
+        "ollama" => config.provider.ollama.as_ref()?.endpoint.clone(),
+        "custom" => config.provider.custom.as_ref()?.endpoint.clone(),
+        other => config
+            .provider
+            .custom_providers
+            .as_ref()
+            .and_then(|providers| providers.get(other))
+            .and_then(|provider| provider.options.base_url.clone()),
+    }
+}
+
+fn configured_or_default_endpoint(config: &CliConfig, provider: &str) -> Option<String> {
+    let configured = saved_provider_endpoint(config, provider)
+        .as_deref()
+        .map(str::trim)
+        .filter(|endpoint| !endpoint.is_empty())
+        .map(ToOwned::to_owned);
+
+    configured.or_else(|| match provider {
+        "anthropic" => Some(DEFAULT_ANTHROPIC_ENDPOINT.to_string()),
+        "openai" => Some(DEFAULT_OPENAI_ENDPOINT.to_string()),
+        "google" => Some(DEFAULT_GOOGLE_ENDPOINT.to_string()),
+        "openrouter" => Some(DEFAULT_OPENROUTER_ENDPOINT.to_string()),
+        "minimax" => Some(DEFAULT_MINIMAX_ENDPOINT.to_string()),
+        "ollama" => Some(DEFAULT_OLLAMA_ENDPOINT.to_string()),
+        _ => None,
+    })
+}
+
+async fn build_provider_models_request(
+    provider: &str,
+    config: &CliConfig,
+) -> Result<ValidationRequestSpec, String> {
+    let endpoint = configured_or_default_endpoint(config, provider)
+        .ok_or_else(|| format!("Unknown provider: {provider}"))?;
+    let api_key = saved_provider_api_key(config, provider).unwrap_or_default();
+
+    match provider {
+        "anthropic" => {
+            if api_key.is_empty() {
+                return Err("Anthropic model discovery requires an API key".into());
+            }
+            let url = join_validation_url(
+                validate_known_https_endpoint(&endpoint, &["api.anthropic.com"])?,
+                "v1/models",
+            )?;
+            validation_request_spec(url, Some(("x-api-key", api_key))).await
+        }
+        "openai" => {
+            if api_key.is_empty() {
+                return Err("OpenAI model discovery requires an API key".into());
+            }
+            let url = join_validation_url(
+                validate_known_https_endpoint(&endpoint, &["api.openai.com"])?,
+                "models",
+            )?;
+            validation_request_spec(url, Some(("Authorization", format!("Bearer {api_key}")))).await
+        }
+        "google" => {
+            if api_key.is_empty() {
+                return Err("Google model discovery requires an API key".into());
+            }
+            let url = join_validation_url(
+                validate_known_https_endpoint(&endpoint, &["generativelanguage.googleapis.com"])?,
+                "v1beta/models",
+            )?;
+            validation_request_spec(url, Some(("x-goog-api-key", api_key))).await
+        }
+        "openrouter" => {
+            if api_key.is_empty() {
+                return Err("OpenRouter model discovery requires an API key".into());
+            }
+            let url = join_validation_url(
+                validate_known_https_endpoint(&endpoint, &["openrouter.ai"])?,
+                "models",
+            )?;
+            validation_request_spec(url, Some(("Authorization", format!("Bearer {api_key}")))).await
+        }
+        "ollama" => {
+            let url = join_validation_url(validate_ollama_endpoint(&endpoint)?, "api/tags")?;
+            validation_request_spec(url, None).await
+        }
+        _ => Err(format!(
+            "Live model discovery is not supported for provider {provider}"
+        )),
+    }
+}
+
+async fn fetch_live_provider_models(
+    provider: &str,
+    config: &CliConfig,
+) -> Result<Vec<ModelInfo>, String> {
+    let spec = build_provider_models_request(provider, config).await?;
+    let mut client_builder = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none());
+    if let Some((domain, addrs)) = &spec.dns_override {
+        client_builder = client_builder.resolve_to_addrs(domain, addrs);
+    }
+
+    let client = client_builder.build().map_err(|err| err.to_string())?;
+    let mut request = client
+        .request(spec.method.clone(), spec.url)
+        .timeout(VALIDATION_TIMEOUT);
+    if let Some((header_name, header_value)) = spec.auth_header {
+        request = request.header(header_name, header_value);
+    }
+
+    let value = request
+        .send()
+        .await
+        .map_err(|err| err.to_string())?
+        .error_for_status()
+        .map_err(|err| err.to_string())?
+        .json::<Value>()
+        .await
+        .map_err(|err| err.to_string())?;
+
+    let models = parse_provider_models_response(provider, value);
+    if models.is_empty() {
+        return Err(format!("No live models found for provider {provider}"));
+    }
+
+    Ok(dedupe_model_infos(models))
+}
+
+fn validation_method_not_allowed_is_reachable(
+    req: &ValidateProviderRequest,
+    method: &http::Method,
+    status: http::StatusCode,
+) -> bool {
+    status == http::StatusCode::METHOD_NOT_ALLOWED
+        && method == http::Method::GET
+        && req
+            .endpoint
+            .as_deref()
+            .map(str::trim)
+            .is_some_and(|endpoint| !endpoint.is_empty())
 }
 
 fn ensure_trailing_slash(url: &mut Url) {
@@ -1361,9 +1814,26 @@ async fn validation_request_spec(
 ) -> Result<ValidationRequestSpec, String> {
     let dns_override = resolve_validation_host(&url).await?;
     Ok(ValidationRequestSpec {
+        method: http::Method::GET,
         url,
         auth_header,
         dns_override,
+        json_body: None,
+    })
+}
+
+async fn validation_post_request_spec(
+    url: Url,
+    auth_header: Option<(&'static str, String)>,
+    json_body: Value,
+) -> Result<ValidationRequestSpec, String> {
+    let dns_override = resolve_validation_host(&url).await?;
+    Ok(ValidationRequestSpec {
+        method: http::Method::POST,
+        url,
+        auth_header,
+        dns_override,
+        json_body: Some(json_body),
     })
 }
 
@@ -1431,6 +1901,31 @@ async fn build_validation_request(
             )?;
             validation_request_spec(url, Some(("Authorization", format!("Bearer {api_key}")))).await
         }
+        "minimax" => {
+            let url = join_validation_url(
+                validate_known_https_endpoint(
+                    req.endpoint
+                        .as_deref()
+                        .filter(|endpoint| !endpoint.is_empty())
+                        .unwrap_or(DEFAULT_MINIMAX_ENDPOINT),
+                    &["api.minimaxi.com"],
+                )?,
+                "messages",
+            )?;
+            validation_post_request_spec(
+                url,
+                Some(("Authorization", format!("Bearer {api_key}"))),
+                json!({
+                    "model": "MiniMax-M2.5",
+                    "max_tokens": 1,
+                    "messages": [{
+                        "role": "user",
+                        "content": "ping"
+                    }]
+                }),
+            )
+            .await
+        }
         "ollama" => {
             let url = join_validation_url(
                 validate_ollama_endpoint(
@@ -1488,7 +1983,7 @@ async fn validate_provider(
     // Providers that require an API key
     let requires_api_key = matches!(
         provider.as_str(),
-        "anthropic" | "openai" | "google" | "openrouter"
+        "anthropic" | "openai" | "google" | "openrouter" | "minimax"
     );
     if requires_api_key && api_key.is_empty() {
         return validation_result(false, "API key is required");
@@ -1512,14 +2007,26 @@ async fn validate_provider(
         }
     };
 
-    let mut request = client.get(spec.url.clone()).timeout(VALIDATION_TIMEOUT);
+    let mut request = client
+        .request(spec.method.clone(), spec.url.clone())
+        .timeout(VALIDATION_TIMEOUT);
+    let request_method = spec.method.clone();
     if let Some((header_name, header_value)) = spec.auth_header {
         request = request.header(header_name, header_value);
+    }
+    if let Some(json_body) = spec.json_body {
+        request = request.json(&json_body);
     }
 
     match request.send().await {
         Ok(resp) if resp.status().is_success() => validation_result(true, "Connection successful"),
         Ok(resp) => {
+            if validation_method_not_allowed_is_reachable(&req, &request_method, resp.status()) {
+                return validation_result(
+                    true,
+                    "Endpoint is reachable, but this URL does not expose GET model listing.",
+                );
+            }
             tracing::warn!(
                 provider = %provider,
                 status = %resp.status(),
@@ -1721,6 +2228,9 @@ fn mask_api_keys(mut config: CliConfig) -> CliConfig {
     if let Some(p) = config.provider.openrouter.as_mut() {
         mask_provider_key(&mut p.api_key);
     }
+    if let Some(p) = config.provider.minimax.as_mut() {
+        mask_provider_key(&mut p.api_key);
+    }
     if let Some(p) = config.provider.custom.as_mut() {
         mask_provider_key(&mut p.api_key);
     }
@@ -1763,6 +2273,12 @@ fn merge_masked_keys(new_config: &mut CliConfig, old_config: &CliConfig) {
     if let (Some(np), Some(op)) = (
         new_config.provider.openrouter.as_mut(),
         old_config.provider.openrouter.as_ref(),
+    ) {
+        keep_old_if_masked(&mut np.api_key, &op.api_key);
+    }
+    if let (Some(np), Some(op)) = (
+        new_config.provider.minimax.as_mut(),
+        old_config.provider.minimax.as_ref(),
     ) {
         keep_old_if_masked(&mut np.api_key, &op.api_key);
     }
@@ -1816,6 +2332,39 @@ mod tests {
             Some(("x-goog-api-key", "secret-key".to_string()))
         );
         assert!(spec.url.query().is_none());
+    }
+
+    #[tokio::test]
+    async fn minimax_validation_request_uses_messages_endpoint() {
+        let req = ValidateProviderRequest {
+            api_key: Some("secret-key".into()),
+            endpoint: None,
+        };
+
+        let spec = build_validation_request("minimax", &req, "secret-key")
+            .await
+            .expect("expected validation request");
+
+        assert_eq!(spec.method, http::Method::POST);
+        assert_eq!(
+            spec.url.as_str(),
+            "https://api.minimaxi.com/anthropic/v1/messages"
+        );
+        assert_eq!(
+            spec.auth_header,
+            Some(("Authorization", "Bearer secret-key".to_string()))
+        );
+        assert_eq!(
+            spec.json_body,
+            Some(json!({
+                "model": "MiniMax-M2.5",
+                "max_tokens": 1,
+                "messages": [{
+                    "role": "user",
+                    "content": "ping"
+                }]
+            }))
+        );
     }
 
     #[tokio::test]
@@ -1900,6 +2449,47 @@ mod tests {
     }
 
     #[test]
+    fn saved_provider_api_key_reads_minimax_credentials() {
+        let mut config = CliConfig::default_config();
+        config.provider.minimax = Some(services::services::cli_config::ProviderCredentials {
+            api_key: Some("mini-secret".into()),
+            endpoint: Some(DEFAULT_MINIMAX_ENDPOINT.into()),
+        });
+
+        assert_eq!(
+            saved_provider_api_key(&config, "minimax").as_deref(),
+            Some("mini-secret")
+        );
+    }
+
+    #[test]
+    fn fallback_openai_models_include_gpt_5_4() {
+        let models = fallback_provider_models("openai");
+        assert!(models.iter().any(|model| model.id == "gpt-5.4"));
+    }
+
+    #[test]
+    fn method_not_allowed_on_custom_url_is_treated_as_reachable() {
+        let req = ValidateProviderRequest {
+            api_key: None,
+            endpoint: Some("https://proxy.example.com/v1/".into()),
+        };
+        let spec = ValidationRequestSpec {
+            method: http::Method::GET,
+            url: Url::parse("https://proxy.example.com/v1/models").expect("valid url"),
+            auth_header: None,
+            dns_override: None,
+            json_body: None,
+        };
+
+        assert!(validation_method_not_allowed_is_reachable(
+            &req,
+            &spec.method,
+            http::StatusCode::METHOD_NOT_ALLOWED,
+        ));
+    }
+
+    #[test]
     fn normalize_custom_provider_entries_fixes_legacy_litellm_npm() {
         let mut config = CliConfig::default_config();
         config.provider.custom_providers = Some(HashMap::from([(
@@ -1962,10 +2552,14 @@ mod tests {
     }
 
     #[test]
-    fn sync_requested_provider_to_cli_config_skips_legacy_custom_when_default_is_builtin() {
+    fn sync_requested_provider_to_cli_config_writes_builtin_provider_when_default_is_builtin() {
         let mut cli_config = OpenTeamsCliConfig::default();
         let mut app_config = CliConfig::default_config();
         app_config.provider.default = "anthropic".into();
+        app_config.provider.anthropic = Some(services::services::cli_config::ProviderCredentials {
+            api_key: Some("live-secret".into()),
+            endpoint: Some(DEFAULT_ANTHROPIC_ENDPOINT.into()),
+        });
         app_config.provider.custom = Some(services::services::cli_config::CustomProviderConfig {
             name: Some("Legacy Custom".into()),
             endpoint: Some("https://custom.example.com/v1".into()),
@@ -1974,7 +2568,29 @@ mod tests {
 
         sync_requested_provider_to_cli_config(&mut cli_config, &app_config, None);
 
-        assert!(cli_config.provider.is_none());
+        let providers = cli_config
+            .provider
+            .expect("builtin provider should be synced");
+        let anthropic = providers
+            .get("anthropic")
+            .expect("anthropic provider should exist");
+        assert_eq!(anthropic.npm, None);
+        assert_eq!(anthropic.name, None);
+        assert_eq!(
+            anthropic
+                .options
+                .as_ref()
+                .and_then(|options| options.api_key.as_deref()),
+            Some("live-secret")
+        );
+        assert_eq!(
+            anthropic
+                .options
+                .as_ref()
+                .and_then(|options| options.base_url.as_deref()),
+            Some(DEFAULT_ANTHROPIC_ENDPOINT)
+        );
+        assert!(!providers.contains_key("custom"));
     }
 
     fn build_test_openteams_cli_config(
