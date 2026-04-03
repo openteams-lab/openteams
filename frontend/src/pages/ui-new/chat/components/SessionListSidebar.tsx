@@ -46,6 +46,7 @@ export interface SessionListSidebarProps {
   onOpenSkills: () => void;
   onOpenSettings: () => void;
   onOpenVersionDialog: () => void;
+  currentVersion?: string | null;
   hasAvailableUpdate?: boolean;
   latestVersion?: string | null;
   isAiTeamActive?: boolean;
@@ -76,6 +77,7 @@ export function SessionListSidebar({
   onOpenSkills,
   onOpenSettings,
   onOpenVersionDialog,
+  currentVersion = null,
   hasAvailableUpdate = false,
   latestVersion = null,
   isAiTeamActive = false,
@@ -100,7 +102,7 @@ export function SessionListSidebar({
   const sessionSearchContainerRef = useRef<HTMLDivElement | null>(null);
   const hasNoSessions =
     activeSessions.length === 0 && archivedSessions.length === 0;
-  const appVersion = __APP_VERSION__.trim();
+  const appVersion = (currentVersion ?? __APP_VERSION__).trim();
   const appVersionLabel = appVersion.startsWith('v')
     ? appVersion
     : `v${appVersion}`;

@@ -15,12 +15,13 @@ pub struct CliConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ProviderConfig {
-    /// Default provider name: anthropic, openai, google, openrouter, ollama, custom
+    /// Default provider name: anthropic, openai, google, openrouter, minimax, ollama, custom
     pub default: String,
     pub anthropic: Option<ProviderCredentials>,
     pub openai: Option<ProviderCredentials>,
     pub google: Option<ProviderCredentials>,
     pub openrouter: Option<ProviderCredentials>,
+    pub minimax: Option<ProviderCredentials>,
     pub ollama: Option<OllamaConfig>,
     pub custom: Option<CustomProviderConfig>,
     /// 多自定义 Provider 配置
@@ -126,6 +127,7 @@ impl CliConfig {
                 openai: None,
                 google: None,
                 openrouter: None,
+                minimax: None,
                 ollama: None,
                 custom: None,
                 custom_providers: None,

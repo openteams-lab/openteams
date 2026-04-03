@@ -656,9 +656,9 @@ export type CliConfig = { provider: ProviderConfig, model: ModelConfig, behavior
 
 export type ProviderConfig = { 
 /**
- * Default provider name: anthropic, openai, google, openrouter, ollama, custom
+ * Default provider name: anthropic, openai, google, openrouter, minimax, ollama, custom
  */
-default: string, anthropic: ProviderCredentials | null, openai: ProviderCredentials | null, google: ProviderCredentials | null, openrouter: ProviderCredentials | null, ollama: OllamaConfig | null, custom: CustomProviderConfig | null, 
+default: string, anthropic: ProviderCredentials | null, openai: ProviderCredentials | null, google: ProviderCredentials | null, openrouter: ProviderCredentials | null, minimax: ProviderCredentials | null, ollama: OllamaConfig | null, custom: CustomProviderConfig | null, 
 /**
  * 多自定义 Provider 配置
  */
