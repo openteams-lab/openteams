@@ -70,12 +70,12 @@ function PreviewSection({
   className,
 }: PreviewSectionProps) {
   return (
-      <section
-        className={cn(
-          'team-import-preview-section rounded-[22px] border border-slate-200/70 bg-slate-50/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_12px_32px_rgba(148,163,184,0.08)] dark:border-[#2A3445] dark:bg-[rgba(25,34,51,0.78)] dark:shadow-[inset_0_1px_0_rgba(148,163,184,0.05),0_12px_32px_rgba(0,0,0,0.2)]',
-          className
-        )}
-      >
+    <section
+      className={cn(
+        'team-import-preview-section rounded-[22px] border border-slate-200/70 bg-slate-50/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_12px_32px_rgba(148,163,184,0.08)] dark:border-[#2A3445] dark:bg-[rgba(25,34,51,0.78)] dark:shadow-[inset_0_1px_0_rgba(148,163,184,0.05),0_12px_32px_rgba(0,0,0,0.2)]',
+        className
+      )}
+    >
       <div className="flex items-start gap-3">
         <div className="team-import-preview-step flex size-8 shrink-0 items-center justify-center rounded-2xl bg-white text-[11px] font-semibold tracking-[0.2em] text-[#5094FB] shadow-sm dark:bg-[rgba(94,162,255,0.14)] dark:text-[#CFE3FF] dark:shadow-none">
           {step}
@@ -521,8 +521,8 @@ export function TeamImportPreviewModal({
                           'members.importPreview.sections.promptDescription'
                         )}
                       >
-                          <div className="team-import-preview-prompt-shell overflow-hidden rounded-[20px] border dark:border-[#2A3445] dark:bg-[rgba(25,34,51,0.94)]">
-                           <div className="team-import-preview-prompt-header flex items-start justify-between gap-4 border-b border-[#d7e1ee] px-4 py-3 dark:border-[#2A3445]">
+                        <div className="team-import-preview-prompt-shell overflow-hidden rounded-[20px] border dark:border-[#2A3445] dark:bg-[rgba(25,34,51,0.94)]">
+                          <div className="team-import-preview-prompt-header flex items-start justify-between gap-4 border-b border-[#d7e1ee] px-4 py-3 dark:border-[#2A3445]">
                             <div className="min-w-0">
                               <div className="team-import-preview-protocol-eyebrow text-[11px] font-semibold uppercase tracking-[0.22em] text-[#5094FB]">
                                 {t('members.importPreview.promptBadge')}

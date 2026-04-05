@@ -292,11 +292,11 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   ) : filteredEntries.length === 0 ? (
-                      <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[16px] border border-dashed border-[#DCE4EF] bg-white/70 px-6 text-center dark:border-[#2A3445] dark:bg-[#192233]">
-                        <div className="mb-2 rounded-full bg-[#EEF5FF] p-3 text-[#4A90E2] dark:bg-[rgba(94,162,255,0.14)] dark:text-[#7DB6FF]">
-                          <Search className="h-5 w-5" />
-                        </div>
-                        <p className="text-sm font-medium text-[#334155] dark:text-[#F3F6FB]">
+                    <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[16px] border border-dashed border-[#DCE4EF] bg-white/70 px-6 text-center dark:border-[#2A3445] dark:bg-[#192233]">
+                      <div className="mb-2 rounded-full bg-[#EEF5FF] p-3 text-[#4A90E2] dark:bg-[rgba(94,162,255,0.14)] dark:text-[#7DB6FF]">
+                        <Search className="h-5 w-5" />
+                      </div>
+                      <p className="text-sm font-medium text-[#334155] dark:text-[#F3F6FB]">
                         {searchTerm.trim()
                           ? t(
                               'folderPicker.emptySearchTitle',
@@ -307,7 +307,7 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                               'No folders found'
                             )}
                       </p>
-                        <p className="mt-1 text-sm text-[#7A8699] dark:text-[#7F8AA3]">
+                      <p className="mt-1 text-sm text-[#7A8699] dark:text-[#7F8AA3]">
                         {searchTerm.trim()
                           ? t(
                               'folderPicker.emptySearchHint',
@@ -333,8 +333,8 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                             className={cn(
                               'flex w-full items-center gap-3 rounded-[16px] border px-4 py-3 text-left transition-all duration-150',
                               isDirectory
-                                 ? 'border-[#E6EDF5] bg-white hover:border-[#C9D8EA] hover:bg-[#F7FBFF] hover:shadow-[0_8px_20px_rgba(148,163,184,0.12)] dark:border-[#2A3445] dark:bg-[#192233] dark:hover:border-[#344257] dark:hover:bg-[#1A2433] dark:hover:shadow-[0_8px_20px_rgba(0,0,0,0.22)]'
-                                 : 'cursor-not-allowed border-transparent bg-transparent opacity-55'
+                                ? 'border-[#E6EDF5] bg-white hover:border-[#C9D8EA] hover:bg-[#F7FBFF] hover:shadow-[0_8px_20px_rgba(148,163,184,0.12)] dark:border-[#2A3445] dark:bg-[#192233] dark:hover:border-[#344257] dark:hover:bg-[#1A2433] dark:hover:shadow-[0_8px_20px_rgba(0,0,0,0.22)]'
+                                : 'cursor-not-allowed border-transparent bg-transparent opacity-55'
                             )}
                             title={entry.name}
                           >
@@ -343,10 +343,10 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                                 'flex h-10 w-10 flex-none items-center justify-center rounded-[12px]',
                                 isDirectory
                                   ? entry.is_git_repo
-                                     ? 'bg-[#EEF9F0] text-[#4F9D69] dark:bg-[rgba(34,197,94,0.14)] dark:text-[#86EFAC]'
-                                     : 'bg-[#EEF5FF] text-[#4A90E2] dark:bg-[rgba(94,162,255,0.14)] dark:text-[#7DB6FF]'
-                                   : 'bg-[#F3F4F6] text-[#9CA3AF] dark:bg-[#111926] dark:text-[#7F8AA3]'
-                               )}
+                                    ? 'bg-[#EEF9F0] text-[#4F9D69] dark:bg-[rgba(34,197,94,0.14)] dark:text-[#86EFAC]'
+                                    : 'bg-[#EEF5FF] text-[#4A90E2] dark:bg-[rgba(94,162,255,0.14)] dark:text-[#7DB6FF]'
+                                  : 'bg-[#F3F4F6] text-[#9CA3AF] dark:bg-[#111926] dark:text-[#7F8AA3]'
+                              )}
                             >
                               {isDirectory ? (
                                 entry.is_git_repo ? (
