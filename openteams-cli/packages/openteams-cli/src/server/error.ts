@@ -29,6 +29,25 @@ export const ERRORS = {
       },
     },
   },
+  408: {
+    description: "Request timeout",
+    content: {
+      "application/json": {
+        schema: resolver(
+          z
+            .object({
+              name: z.string(),
+              data: z.object({
+                message: z.string(),
+              }),
+            })
+            .meta({
+              ref: "RequestTimeoutError",
+            }),
+        ),
+      },
+    },
+  },
 } as const
 
 export function errors(...codes: number[]) {
