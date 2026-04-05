@@ -47,7 +47,12 @@
         "theme": {
           "label": "主题",
           "placeholder": "选择主题",
-          "helper": "选择您喜欢的配色方案。"
+          "helper": "选择您喜欢的配色方案。",
+          "options": {
+            "light": "浅色",
+            "dark": "深色",
+            "system": "跟随系统"
+          }
         },
         "language": {
           "label": "语言",
@@ -745,7 +750,7 @@
           "runnerTypePlaceholder": "留空则使用会话默认值",
           "recommendedModel": "推荐模型（可选）",
           "recommendedModelPlaceholder": "留空则使用执行器默认模型",
-          "systemPrompt": "角色设定（必填）",
+          "systemPrompt": "角色设定（选填）",
           "systemPromptPlaceholder": "描述此 AI 成员的角色设定...",
           "workspacePath": "默认工作区路径（可选）",
           "workspacePathPlaceholder": "例如 backend",
@@ -840,7 +845,7 @@
           "descriptionPlaceholder": "例如：用于 API 开发的后端工程师",
           "runnerType": "执行器类型（可选）",
           "runnerTypePlaceholder": "例如：claude_code，留空使用默认",
-          "systemPrompt": "角色设定（必填）",
+          "systemPrompt": "角色设定（选填）",
           "systemPromptPlaceholder": "描述此 AI 成员的角色设定...",
           "workspacePath": "默认工作区路径（可选）",
           "workspacePathPlaceholder": "例如：backend"
