@@ -6,6 +6,7 @@ import { Log } from "../../src/util/log"
 import { Instance } from "../../src/project/instance"
 import { MessageV2 } from "../../src/session/message-v2"
 import { MessageID, PartID } from "../../src/session/schema"
+import { tmpdir } from "../fixture/fixture"
 
 const projectRoot = path.join(__dirname, "../..")
 Log.init({ print: false })
@@ -139,4 +140,63 @@ describe("step-finish token propagation via Bus event", () => {
     },
     { timeout: 30000 },
   )
+})
+
+describe("session.fork queue", () => {
+  test("serializes concurrent fork requests", async () => {
+    await using tmp = await tmpdir({ git: true })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const original = await Session.create({ title: "Queue source" })
+
+        const queue = await Session.Internal.acquireForkQueueLock()
+
+        let settled = false
+        const pending = Session.fork({ sessionID: original.id }).then((result) => {
+          settled = true
+          return result
+        })
+
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        expect(settled).toBe(false)
+
+        queue[Symbol.dispose]()
+
+        const forked = await pending
+        expect(forked.id).not.toBe(original.id)
+        expect(forked.title).toBe("Queue source (fork #1)")
+
+        await Session.remove(forked.id)
+        await Session.remove(original.id)
+      },
+    })
+  })
+
+  test("times out after waiting 60s-configured queue window", async () => {
+    await using tmp = await tmpdir({ git: true })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const original = await Session.create({ title: "Timeout source" })
+
+        Session.Internal.setForkQueueTimeoutForTest(50)
+        try {
+          using queue = await Session.Internal.acquireForkQueueLock()
+
+          await expect(Session.fork({ sessionID: original.id })).rejects.toMatchObject({
+            name: "SessionForkQueueTimeoutError",
+            data: {
+              message: "session fork queue timed out after 50ms",
+            },
+          })
+        } finally {
+          Session.Internal.resetForkQueueTimeoutForTest()
+          await Session.remove(original.id)
+        }
+      },
+    })
+  })
 })
