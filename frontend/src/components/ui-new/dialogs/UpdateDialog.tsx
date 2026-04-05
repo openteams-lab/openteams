@@ -12,6 +12,7 @@ import {
   ConfirmationDialogChrome,
   getConfirmationButtonClasses,
 } from '@/components/dialogs/shared/ConfirmationDialogChrome';
+import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
 import { cn } from '@/lib/utils';
 
 type UpdateDialogStage = 'available' | 'updating' | 'restart';
@@ -245,28 +246,28 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
       bodyExtra={
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-[16px] border border-[#E4EBF3] bg-[#F7FAFD] p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7A8699]">
+            <div className="rounded-[16px] border border-[#E4EBF3] bg-[#F7FAFD] p-4 dark:border-[#2A3445] dark:bg-[#141C28]">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7A8699] dark:text-[#7F8AA3]">
                 {t('versionUpdate.currentVersion')}
               </div>
-              <div className="mt-2 text-[18px] font-semibold text-[#223044]">
+              <div className="mt-2 text-[18px] font-semibold text-[#223044] dark:text-[#F3F6FB]">
                 {normalizedCurrentVersion}
               </div>
             </div>
-            <div className="rounded-[16px] border border-[#DDEFD1] bg-[#F5FBF0] p-4">
+            <div className="rounded-[16px] border border-[#DDEFD1] bg-[#F5FBF0] p-4 dark:border-[rgba(52,211,153,0.24)] dark:bg-[rgba(34,197,94,0.12)]">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6E8A58]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6E8A58] dark:text-[#86EFAC]">
                   {t('versionUpdate.latestVersion')}
                 </div>
-                <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#4A5A70]">
+                <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#4A5A70] dark:bg-[#111926] dark:text-[#BAC4D6]">
                   {isTauri ? 'Tauri' : 'npx'}
                 </span>
               </div>
-              <div className="mt-2 text-[18px] font-semibold text-[#223044]">
+              <div className="mt-2 text-[18px] font-semibold text-[#223044] dark:text-[#F3F6FB]">
                 {normalizedLatestVersion ?? t('versionUpdate.unknownVersion')}
               </div>
               {publishedAtLabel && (
-                <div className="mt-1 text-xs text-[#6B778C]">
+                <div className="mt-1 text-xs text-[#6B778C] dark:text-[#BAC4D6]">
                   {t('versionUpdate.publishedAt', {
                     date: publishedAtLabel,
                   })}
@@ -280,15 +281,15 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
               className={cn(
                 'rounded-[16px] border px-4 py-3',
                 actionError
-                  ? 'border-[#F2D5D8] bg-[#FFF7F8]'
-                  : 'border-[#DCE4EF] bg-[#F8FBFF]'
+                  ? 'border-[#F2D5D8] bg-[#FFF7F8] dark:border-[rgba(248,113,113,0.28)] dark:bg-[rgba(248,113,113,0.12)]'
+                  : 'border-[#DCE4EF] bg-[#F8FBFF] dark:border-[#2A3445] dark:bg-[#141C28]'
               )}
             >
               {statusMessage && (
-                <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[#223044]">
+                <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[#223044] dark:text-[#F3F6FB]">
                   {isUpdating && (
                     <SpinnerIcon
-                      className="h-4 w-4 animate-spin text-[#4A90E2]"
+                      className="h-4 w-4 animate-spin text-[#4A90E2] dark:text-[#7DB6FF]"
                       weight="bold"
                     />
                   )}
@@ -297,19 +298,19 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
               )}
 
               {isUpdating && (
-                <div className="overflow-hidden rounded-full bg-[#E5EDF7]">
-                  <div
-                    className={cn(
-                      'h-2 rounded-full bg-[#4A90E2] transition-[width] duration-300 ease-out',
-                      isNpx && 'animate-pulse'
-                    )}
-                    style={{ width: `${Math.max(progressValue, 14)}%` }}
+                  <div className="overflow-hidden rounded-full bg-[#E5EDF7] dark:bg-[#1A2433]">
+                    <div
+                      className={cn(
+                        'h-2 rounded-full bg-[#4A90E2] transition-[width] duration-300 ease-out dark:bg-[#5EA2FF]',
+                        isNpx && 'animate-pulse'
+                      )}
+                      style={{ width: `${Math.max(progressValue, 14)}%` }}
                   />
                 </div>
               )}
 
               {actionError && (
-                <div className="text-sm leading-6 text-[#C25B63]">
+                <div className="text-sm leading-6 text-[#C25B63] dark:text-[#FCA5A5]">
                   {actionError}
                 </div>
               )}
@@ -317,7 +318,7 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
           )}
 
           {!canSelfUpdate && stage !== 'restart' && !isChecking && (
-            <div className="rounded-[16px] border border-[#DCE4EF] bg-[#F8FBFF] px-4 py-3 text-sm text-[#4A5A70]">
+            <div className="rounded-[16px] border border-[#DCE4EF] bg-[#F8FBFF] px-4 py-3 text-sm text-[#4A5A70] dark:border-[#2A3445] dark:bg-[#141C28] dark:text-[#BAC4D6]">
               {t('versionUpdate.unsupported')}
             </div>
           )}
@@ -326,30 +327,35 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
             canSelfUpdate &&
             stage !== 'restart' &&
             !isChecking && (
-              <div className="rounded-[16px] border border-[#DCE4EF] bg-[#F8FBFF] px-4 py-3 text-sm text-[#4A5A70]">
+              <div className="rounded-[16px] border border-[#DCE4EF] bg-[#F8FBFF] px-4 py-3 text-sm text-[#4A5A70] dark:border-[#2A3445] dark:bg-[#141C28] dark:text-[#BAC4D6]">
                 {t('versionUpdate.noUpdate')}
               </div>
             )}
 
           {releaseNotesPreview && (
-            <div className="rounded-[16px] border border-[#E4EBF3] bg-white p-4">
+            <div className="rounded-[16px] border border-[#E4EBF3] bg-white p-4 dark:border-[#2A3445] dark:bg-[#141C28]">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7A8699]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7A8699] dark:text-[#7F8AA3]">
                   {t('versionUpdate.releaseNotes')}
                 </div>
                 {releaseUrl && (
                   <button
                     type="button"
                     onClick={handleOpenRelease}
-                    className="text-xs font-medium text-[#4A90E2] hover:text-[#2E6FB7]"
+                    className="text-xs font-medium text-[#4A90E2] hover:text-[#2E6FB7] dark:text-[#7DB6FF] dark:hover:text-[#CFE3FF]"
                   >
                     {t('versionUpdate.openRelease')}
                   </button>
                 )}
               </div>
-              <pre className="max-h-[180px] overflow-auto whitespace-pre-wrap break-words text-sm leading-6 text-[#5D6B7E]">
-                {releaseNotesPreview}
-              </pre>
+              <div className="max-h-[180px] overflow-auto rounded-[12px] border border-[#EAF0F6] bg-[#F8FBFF] p-3 dark:border-[#2A3445] dark:bg-[#111926]">
+                <ChatMarkdown
+                  content={releaseNotesPreview}
+                  hideCopyButton
+                  maxWidth="100%"
+                  textClassName="text-sm text-[#5D6B7E] dark:text-[#BAC4D6]"
+                />
+              </div>
             </div>
           )}
         </div>
