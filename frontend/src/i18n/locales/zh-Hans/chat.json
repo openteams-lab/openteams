@@ -185,7 +185,7 @@
     "noInstalledAgents": "此机器上未检测到已安装的代码 Agent。",
     "modelVariant": "模型变体",
     "model": "模型",
-    "systemPrompt": "角色设定（必填）",
+    "systemPrompt": "角色设定（选填）",
     "expand": "展开",
     "collapse": "收起",
     "systemPromptPlaceholder": "描述此 AI 成员的角色设定。",

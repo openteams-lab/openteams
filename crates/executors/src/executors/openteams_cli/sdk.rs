@@ -217,6 +217,8 @@ pub enum ControlEvent {
 /// If OpenTeamsCli keeps retrying the same request (e.g. provider rate-limit) and never
 /// reaches `session.idle`, fail the run instead of waiting forever.
 const SESSION_RETRY_LIMIT_BEFORE_FAIL: u64 = 6;
+const SESSION_CREATE_TRANSIENT_RETRY_ATTEMPTS: usize = 4;
+const SESSION_CREATE_TRANSIENT_RETRY_DELAY_MS: u64 = 250;
 
 pub async fn run_session(
     config: RunConfig,
@@ -538,49 +540,69 @@ pub async fn create_session(
     base_url: &str,
     directory: &str,
 ) -> Result<String, ExecutorError> {
-    tracing::debug!(
-        base_url = %base_url,
-        directory = %directory,
-        "Sending OpenTeamsCli session.create request"
-    );
-    let resp = client
-        .post(format!("{base_url}/session"))
-        .query(&[("directory", directory)])
-        .json(&serde_json::json!({}))
-        .send()
-        .await
-        .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
+    for attempt in 1..=SESSION_CREATE_TRANSIENT_RETRY_ATTEMPTS {
+        tracing::debug!(
+            base_url = %base_url,
+            directory = %directory,
+            attempt,
+            "Sending OpenTeamsCli session.create request"
+        );
+        let resp = client
+            .post(format!("{base_url}/session"))
+            .query(&[("directory", directory)])
+            .json(&serde_json::json!({}))
+            .send()
+            .await
+            .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .unwrap_or_else(|_| "<failed to read response body>".to_string());
-    let body_preview = preview_http_error_body(&body);
+        let status = resp.status();
+        let body = resp
+            .text()
+            .await
+            .unwrap_or_else(|_| "<failed to read response body>".to_string());
+        let body_preview = preview_http_error_body(&body);
 
-    if !status.is_success() {
+        if status.is_success() {
+            let session = serde_json::from_str::<SessionResponse>(&body)
+                .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
+            tracing::debug!(
+                base_url = %base_url,
+                directory = %directory,
+                attempt,
+                session_id = %session.id,
+                "OpenTeamsCli session.create succeeded"
+            );
+            return Ok(session.id);
+        }
+
+        let is_retryable = is_retryable_openteams_cli_db_init_error(status, &body);
         tracing::warn!(
             base_url = %base_url,
             directory = %directory,
             status = %status,
+            attempt,
+            retryable = is_retryable,
             body_len = body.len(),
             body = %body_preview,
             "OpenTeamsCli session.create failed"
         );
+
+        if is_retryable && attempt < SESSION_CREATE_TRANSIENT_RETRY_ATTEMPTS {
+            tokio::time::sleep(Duration::from_millis(
+                SESSION_CREATE_TRANSIENT_RETRY_DELAY_MS,
+            ))
+            .await;
+            continue;
+        }
+
         return Err(ExecutorError::Io(io::Error::other(format!(
             "OpenTeamsCli session.create failed: HTTP {status} {body_preview}"
         ))));
     }
 
-    let session = serde_json::from_str::<SessionResponse>(&body)
-        .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
-    tracing::debug!(
-        base_url = %base_url,
-        directory = %directory,
-        session_id = %session.id,
-        "OpenTeamsCli session.create succeeded"
-    );
-    Ok(session.id)
+    Err(ExecutorError::Io(io::Error::other(
+        "OpenTeamsCli session.create failed after retries",
+    )))
 }
 
 pub(super) async fn resolve_session_id(
@@ -682,6 +704,17 @@ fn preview_http_error_body(body: &str) -> String {
     let mut preview = trimmed.chars().take(MAX_CHARS).collect::<String>();
     preview.push_str(" ...<truncated>");
     preview
+}
+
+fn is_retryable_openteams_cli_db_init_error(status: reqwest::StatusCode, body: &str) -> bool {
+    if !status.is_server_error() {
+        return false;
+    }
+
+    let normalized = body.to_ascii_lowercase();
+    normalized.contains("pragma journal_mode = wal")
+        || normalized.contains("database is locked")
+        || normalized.contains("sqlite_busy")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1794,18 +1827,18 @@ async fn request_permission_approval(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, future};
+    use std::{collections::HashMap, future, sync::Arc};
 
     use axum::{Json, Router, http::StatusCode, routing::post};
     use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
     use reqwest::header::AUTHORIZATION;
     use serde_json::json;
-    use tokio::sync::mpsc;
+    use tokio::sync::{Mutex, mpsc};
 
     use super::{
-        ConfigProvidersResponse, ControlEvent, ProviderInfo, build_default_headers,
-        extract_retry_status, resolve_model_spec_from_config, resolve_session_id,
-        run_request_with_control,
+        ConfigProvidersResponse, ControlEvent, ProviderInfo, build_default_headers, create_session,
+        extract_retry_status, is_retryable_openteams_cli_db_init_error,
+        resolve_model_spec_from_config, resolve_session_id, run_request_with_control,
     };
     use crate::executors::{
         ExecutorError,
@@ -1864,6 +1897,22 @@ mod tests {
                 .and_then(|value| value.to_str().ok()),
             Some(expected_auth.as_str())
         );
+    }
+
+    #[test]
+    fn retryable_db_init_error_matches_known_session_create_failures() {
+        assert!(is_retryable_openteams_cli_db_init_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            r#"{"name":"UnknownError","data":{"message":"DrizzleError: Failed to run the query 'PRAGMA journal_mode = WAL'"}}"#,
+        ));
+        assert!(is_retryable_openteams_cli_db_init_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "SQLITE_BUSY: database is locked",
+        ));
+        assert!(!is_retryable_openteams_cli_db_init_error(
+            StatusCode::BAD_REQUEST,
+            "PRAGMA journal_mode = WAL",
+        ));
     }
 
     #[test]
@@ -1968,6 +2017,54 @@ mod tests {
         .expect("fallback session id");
 
         assert_eq!(session_id, "fresh-session");
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn create_session_retries_transient_db_init_errors() {
+        let attempts = Arc::new(Mutex::new(0usize));
+        let app = Router::new().route(
+            "/session",
+            post({
+                let attempts = attempts.clone();
+                move || {
+                    let attempts = attempts.clone();
+                    async move {
+                        let mut guard = attempts.lock().await;
+                        *guard += 1;
+                        if *guard < 3 {
+                            return (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                Json(json!({
+                                    "name": "UnknownError",
+                                    "data": {
+                                        "message": "DrizzleError: Failed to run the query 'PRAGMA journal_mode = WAL'"
+                                    }
+                                })),
+                            );
+                        }
+
+                        (StatusCode::OK, Json(json!({ "id": "fresh-session" })))
+                    }
+                }
+            }),
+        );
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test listener");
+        let addr = listener.local_addr().expect("listener addr");
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("serve test app");
+        });
+
+        let client = reqwest::Client::new();
+        let session_id = create_session(&client, &format!("http://{addr}"), "C:/workspace/project")
+            .await
+            .expect("session id after retries");
+
+        assert_eq!(session_id, "fresh-session");
+        assert_eq!(*attempts.lock().await, 3);
         server.abort();
     }
 }

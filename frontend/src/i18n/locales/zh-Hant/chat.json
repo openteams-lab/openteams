@@ -180,7 +180,7 @@
     "noInstalledAgents": "此機器上未檢測到已安裝的程式碼 Agent。",
     "modelVariant": "模型變體",
     "model": "模型",
-    "systemPrompt": "角色設定（必填）",
+    "systemPrompt": "角色設定（選填）",
     "expand": "展開",
     "collapse": "收起",
     "systemPromptPlaceholder": "描述此 AI 成員的角色設定。",

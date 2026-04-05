@@ -278,8 +278,8 @@ export function MessageInputArea({
                     'chat-session-mention-option w-full px-base py-half text-left text-sm',
                     'flex items-center justify-between',
                     index === highlightedMentionIndex
-                      ? 'bg-[#A8C9FF] text-normal'
-                      : 'text-normal hover:bg-[#A8C9FF]/40'
+                      ? 'bg-[#A8C9FF] text-normal dark:bg-[rgba(94,162,255,0.18)] dark:text-[#F3F6FB]'
+                      : 'text-normal hover:bg-[#A8C9FF]/40 dark:text-[#BAC4D6] dark:hover:bg-[rgba(94,162,255,0.12)] dark:hover:text-[#F3F6FB]'
                   )}
                 >
                   <span className="flex items-center gap-half min-w-0">

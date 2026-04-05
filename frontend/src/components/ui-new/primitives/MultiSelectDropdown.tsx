@@ -77,8 +77,8 @@ export function MultiSelectDropdown<T extends string = string>({
             key={option.value}
             checked={values.includes(option.value)}
             className={cn(
-              'focus:bg-[#dbe9ff]',
-              'data-[state=checked]:bg-transparent data-[state=checked]:text-[#111827]',
+              'focus:bg-[#dbe9ff] dark:focus:bg-[rgba(94,162,255,0.16)]',
+              'data-[state=checked]:bg-transparent data-[state=checked]:text-[#111827] dark:data-[state=checked]:text-[#F3F6FB]',
               'data-[state=checked]:focus:bg-transparent'
             )}
             onSelect={(event) => event.preventDefault()}
@@ -95,7 +95,7 @@ export function MultiSelectDropdown<T extends string = string>({
               </div>
               {values.includes(option.value) ? (
                 <CheckIcon
-                  className="size-icon-xs shrink-0 text-[#a8c9ff]"
+                  className="size-icon-xs shrink-0 text-[#a8c9ff] dark:text-[#5EA2FF]"
                   weight="bold"
                 />
               ) : null}

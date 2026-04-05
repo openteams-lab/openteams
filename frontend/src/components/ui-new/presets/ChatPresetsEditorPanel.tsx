@@ -174,8 +174,8 @@ function PresetListItem({
       className={cn(
         'w-full rounded-[18px] border px-4 py-3 text-left transition-all duration-200',
         selected
-          ? 'border-[#BFDBFE] bg-[#EFF6FF] text-[#2563EB] shadow-[inset_-3px_0_0_#3B82F6]'
-          : 'border-transparent bg-transparent text-[#475569] hover:border-[#E2E8F0] hover:bg-white',
+          ? 'border-[#BFDBFE] bg-[#EFF6FF] text-[#2563EB] shadow-[inset_-3px_0_0_#3B82F6] dark:border-[#5EA2FF] dark:bg-[rgba(94,162,255,0.16)] dark:text-[#CFE3FF] dark:shadow-[inset_-3px_0_0_#5EA2FF]'
+          : 'border-transparent bg-transparent text-[#475569] hover:border-[#E2E8F0] hover:bg-white dark:text-[#BAC4D6] dark:hover:border-[#2A3445] dark:hover:bg-[#192233]',
         disabled && 'opacity-70'
       )}
     >
@@ -185,7 +185,9 @@ function PresetListItem({
           <div
             className={cn(
               'mt-1 truncate text-[12px]',
-              selected ? 'text-[#3B82F6]/75' : 'text-[#94A3B8]'
+              selected
+                ? 'text-[#3B82F6]/75 dark:text-[#9CC7FF]'
+                : 'text-[#94A3B8] dark:text-[#7F8AA3]'
             )}
           >
             {subtitle || '\u00a0'}
@@ -193,12 +195,12 @@ function PresetListItem({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {isBuiltin ? (
-            <span className="rounded-md bg-[#E2E8F0] px-2 py-[2px] text-[10px] font-medium uppercase tracking-[0.08em] text-[#64748B]">
+            <span className="rounded-md bg-[#E2E8F0] px-2 py-[2px] text-[10px] font-medium uppercase tracking-[0.08em] text-[#64748B] dark:bg-[#1A2433] dark:text-[#BAC4D6]">
               {t('settings.presets.builtin')}
             </span>
           ) : null}
           {disabled ? (
-            <span className="rounded-md bg-[#FEF2F2] px-2 py-[2px] text-[10px] font-medium uppercase tracking-[0.08em] text-[#DC2626]">
+            <span className="rounded-md bg-[#FEF2F2] px-2 py-[2px] text-[10px] font-medium uppercase tracking-[0.08em] text-[#DC2626] dark:bg-[rgba(239,68,68,0.14)] dark:text-[#FCA5A5]">
               {t('settings.presets.disabled')}
             </span>
           ) : null}
@@ -211,7 +213,7 @@ function PresetListItem({
 function EmptyDetailState({ message }: { message: string }) {
   return (
     <div className="flex h-full min-h-[320px] items-center justify-center px-8 py-16">
-      <div className="max-w-sm rounded-[24px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-8 py-10 text-center text-[14px] leading-6 text-[#94A3B8]">
+      <div className="max-w-sm rounded-[24px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-8 py-10 text-center text-[14px] leading-6 text-[#94A3B8] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#7F8AA3]">
         {message}
       </div>
     </div>
@@ -223,29 +225,29 @@ const sidebarTabButtonClassName =
 
 const panelFieldClassName = cn(
   settingsFieldClassName,
-  'rounded-[14px] border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3 text-[14px] text-[#334155] placeholder:text-[#94A3B8] focus:border-[#3B82F6] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]'
+  'rounded-[14px] border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3 text-[14px] text-[#334155] placeholder:text-[#94A3B8] focus:border-[#3B82F6] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] disabled:bg-[#F8FAFC] disabled:text-[#94A3B8] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:placeholder:text-[#7F8AA3] dark:focus:border-[#5EA2FF] dark:focus:bg-[#111926] dark:focus:shadow-[0_0_0_3px_rgba(94,162,255,0.15)] dark:disabled:bg-[#111926] dark:disabled:text-[#7F8AA3]'
 );
 
 const promptEditorClassName =
-  'min-h-[280px] w-full resize-y rounded-[20px] border border-[#D8E2F0] bg-[#EEF3F9] px-5 py-4 font-mono text-[13px] leading-6 text-[#334155] outline-none transition-all duration-200 placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.18)]';
+  'min-h-[280px] w-full resize-y rounded-[20px] border border-[#D8E2F0] bg-[#EEF3F9] px-5 py-4 font-mono text-[13px] leading-6 text-[#334155] outline-none transition-all duration-200 placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.18)] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:placeholder:text-[#7F8AA3] dark:focus:border-[#5EA2FF] dark:focus:shadow-[0_0_0_3px_rgba(94,162,255,0.15)]';
 
 const presetToolbarButtonClassName = cn(
   settingsSecondaryButtonClassName,
-  'rounded-[12px] border-[#E2E8F0] bg-white px-4 py-[9px] text-[13px] font-medium text-[#475569] hover:bg-[#F8FAFC]'
+  'rounded-[12px] border-[#E2E8F0] bg-white px-4 py-[9px] text-[13px] font-medium text-[#475569] hover:bg-[#F8FAFC] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#BAC4D6] dark:hover:bg-[#1A2433]'
 );
 
 const presetInlineActionButtonClassName = cn(
   settingsSecondaryButtonClassName,
-  'rounded-[10px] border-[#E2E8F0] bg-white px-3 py-[5px] text-[11px] font-medium text-[#64748B] hover:bg-[#F8FAFC]'
+  'rounded-[10px] border-[#E2E8F0] bg-white px-3 py-[5px] text-[11px] font-medium text-[#64748B] hover:bg-[#F8FAFC] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#BAC4D6] dark:hover:bg-[#1A2433]'
 );
 
 const presetDestructiveButtonClassName = cn(
   presetToolbarButtonClassName,
-  'border-[#FECACA] bg-[#FFF5F5] text-[#EF4444] hover:bg-[#FEF2F2]'
+  'border-[#FECACA] bg-[#FFF5F5] text-[#EF4444] hover:bg-[#FEF2F2] dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(239,68,68,0.12)] dark:text-[#FCA5A5] dark:hover:bg-[rgba(239,68,68,0.18)]'
 );
 
 const presetMemberSelectTriggerClassName =
-  'preset-member-select-trigger rounded-[14px] border-[#D1D5DB] bg-[#F8FAFC] px-4 py-3 text-[#334155] focus:border-[#3B82F6] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]';
+  'preset-member-select-trigger rounded-[14px] border-[#D1D5DB] bg-[#F8FAFC] px-4 py-3 text-[#334155] focus:border-[#3B82F6] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:focus:border-[#5EA2FF] dark:focus:bg-[#111926] dark:focus:shadow-[0_0_0_3px_rgba(94,162,255,0.15)]';
 
 const presetMemberSelectContentClassName = 'preset-member-select-content';
 
@@ -259,7 +261,7 @@ const modalFooterButtonClassName =
 
 const modalFooterSecondaryButtonClassName = cn(
   modalFooterButtonClassName,
-  'border border-[#E2E8F0] bg-white text-[#64748B] hover:bg-[#F8FAFC]'
+  'border border-[#E2E8F0] bg-white text-[#64748B] hover:bg-[#F8FAFC] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#BAC4D6] dark:hover:bg-[#1A2433]'
 );
 
 const modalFooterPrimaryButtonClassName = cn(
@@ -702,7 +704,7 @@ export function ChatPresetsEditorPanel({
   if (!config) {
     return (
       <div className="py-8">
-        <div className="rounded-[16px] border border-[#FECACA] bg-[#FFF5F5] p-4 text-[13px] text-[#DC2626]">
+        <div className="rounded-[16px] border border-[#FECACA] bg-[#FFF5F5] p-4 text-[13px] text-[#DC2626] dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(239,68,68,0.12)] dark:text-[#FCA5A5]">
           {t('settings.presets.loadError')}
         </div>
       </div>
@@ -711,15 +713,15 @@ export function ChatPresetsEditorPanel({
 
   const memberDetail = selectedMember ? (
     <>
-      <div className="border-b border-[#F1F5F9] px-8 py-6">
+      <div className="border-b border-[#F1F5F9] px-8 py-6 dark:border-[#2A3445] dark:bg-[#141C28]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 max-w-[calc(100%-240px)] flex-1">
-            <h3 className="truncate text-[22px] font-semibold text-[#0F172A]">
+            <h3 className="truncate text-[22px] font-semibold text-[#0F172A] dark:text-[#F3F6FB]">
               @{getLocalizedMemberName(selectedMember)}
             </h3>
             {selectedMember.description ? (
               <Tooltip content={selectedMember.description} side="bottom">
-                <p className="mt-1 truncate text-[13px] text-[#94A3B8]">
+                <p className="mt-1 truncate text-[13px] text-[#94A3B8] dark:text-[#7F8AA3]">
                   {selectedMember.description}
                 </p>
               </Tooltip>
@@ -767,7 +769,7 @@ export function ChatPresetsEditorPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-white dark:bg-[#141C28]">
         <div className="mx-auto flex w-full max-w-[920px] flex-col gap-6 px-8 py-8">
           <div className="grid gap-6 xl:grid-cols-2">
             <SettingsField label={t('settings.presets.members.fields.name')}>
@@ -876,7 +878,7 @@ export function ChatPresetsEditorPanel({
           </SettingsField>
 
           <SettingsField label={t('settings.presets.members.fields.skills')}>
-            <div className="rounded-[18px] border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+            <div className="rounded-[18px] border border-[#E2E8F0] bg-[#F8FAFC] p-3 dark:border-[#2A3445] dark:bg-[#192233]">
               <AgentSkillsSection
                 agentId={null}
                 runnerType={
@@ -934,15 +936,15 @@ export function ChatPresetsEditorPanel({
 
   const teamDetail = selectedTeam ? (
     <>
-      <div className="border-b border-[#F1F5F9] px-8 py-6">
+      <div className="border-b border-[#F1F5F9] px-8 py-6 dark:border-[#2A3445] dark:bg-[#141C28]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 max-w-[calc(100%-240px)] flex-1">
-            <h3 className="truncate text-[22px] font-semibold text-[#0F172A]">
+            <h3 className="truncate text-[22px] font-semibold text-[#0F172A] dark:text-[#F3F6FB]">
               {getLocalizedTeamName(selectedTeam)}
             </h3>
             {selectedTeam.description ? (
               <Tooltip content={selectedTeam.description} side="bottom">
-                <p className="mt-1 truncate text-[13px] text-[#94A3B8]">
+                <p className="mt-1 truncate text-[13px] text-[#94A3B8] dark:text-[#7F8AA3]">
                   {selectedTeam.description}
                 </p>
               </Tooltip>
@@ -990,7 +992,7 @@ export function ChatPresetsEditorPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-white dark:bg-[#141C28]">
         <div className="mx-auto flex w-full max-w-[980px] flex-col gap-6 px-8 py-8">
           <div className="grid gap-6 xl:grid-cols-2">
             <SettingsField label={t('settings.presets.teams.fields.name')}>
@@ -1061,32 +1063,32 @@ export function ChatPresetsEditorPanel({
             label={
               <div className="flex items-center justify-between gap-3">
                 <span>{t('settings.presets.teams.fields.members')}</span>
-                <span className="text-[12px] font-normal text-[#94A3B8]">
+                <span className="text-[12px] font-normal text-[#94A3B8] dark:text-[#7F8AA3]">
                   {selectedTeam.member_ids.length} / {draft.members.length}
                 </span>
               </div>
             }
           >
             {draft.members.length === 0 ? (
-              <div className="rounded-[20px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-5 py-6 text-[13px] text-[#94A3B8]">
+              <div className="rounded-[20px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-5 py-6 text-[13px] text-[#94A3B8] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#7F8AA3]">
                 {t('settings.presets.teams.noMemberPresets')}
               </div>
             ) : (
               <div className="space-y-3">
                 {/* Search input for team members */}
                 <div className="relative">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8] dark:text-[#7F8AA3]" />
                   <input
                     type="text"
                     value={teamMemberSearch}
                     onChange={(e) => setTeamMemberSearch(e.target.value)}
                     placeholder={t('settings.presets.searchMembersPlaceholder')}
-                    className="w-full rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] py-2.5 pl-10 pr-8 text-[13px] text-[#334155] placeholder:text-[#94A3B8] focus:border-[#3B82F6] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#3B82F6]"
+                    className="w-full rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] py-2.5 pl-10 pr-8 text-[13px] text-[#334155] placeholder:text-[#94A3B8] focus:border-[#3B82F6] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#3B82F6] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:placeholder:text-[#7F8AA3] dark:focus:border-[#5EA2FF] dark:focus:bg-[#111926] dark:focus:ring-[#5EA2FF]"
                   />
                   {teamMemberSearch && (
                     <button
                       type="button"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#94A3B8] hover:bg-[#E2E8F0] hover:text-[#64748B]"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#94A3B8] hover:bg-[#E2E8F0] hover:text-[#64748B] dark:text-[#7F8AA3] dark:hover:bg-[#1A2433] dark:hover:text-[#BAC4D6]"
                       onClick={() => setTeamMemberSearch('')}
                     >
                       <XIcon className="h-3.5 w-3.5" weight="bold" />
@@ -1095,7 +1097,7 @@ export function ChatPresetsEditorPanel({
                 </div>
                 {/* Members grid */}
                 {filteredTeamMembers.length === 0 ? (
-                  <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-5 py-6 text-center text-[13px] text-[#94A3B8]">
+                  <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-5 py-6 text-center text-[13px] text-[#94A3B8] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#7F8AA3]">
                     {t('settings.presets.noSearchResults')}
                   </div>
                 ) : (
@@ -1124,16 +1126,16 @@ export function ChatPresetsEditorPanel({
                           className={cn(
                             'group flex items-start gap-3 rounded-[18px] border px-4 py-3 text-left transition-all duration-200',
                             checked
-                              ? 'border-[#3B82F6] bg-[#F0F7FF] shadow-[0_8px_20px_rgba(59,130,246,0.08)]'
-                              : 'border-[#E2E8F0] bg-white hover:border-[#CBD5E1] hover:bg-[#F8FAFC]'
+                              ? 'border-[#3B82F6] bg-[#F0F7FF] shadow-[0_8px_20px_rgba(59,130,246,0.08)] dark:border-[#5EA2FF] dark:bg-[rgba(94,162,255,0.16)] dark:shadow-[0_8px_20px_rgba(94,162,255,0.12)]'
+                              : 'border-[#E2E8F0] bg-white hover:border-[#CBD5E1] hover:bg-[#F8FAFC] dark:border-[#2A3445] dark:bg-[#192233] dark:hover:border-[#344257] dark:hover:bg-[#1A2433]'
                           )}
                         >
                           <span
                             className={cn(
                               'mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-2 transition-all duration-200',
                               checked
-                                ? 'border-[#3B82F6] bg-[#3B82F6] text-white'
-                                : 'border-[#CBD5E1] bg-white text-transparent group-hover:border-[#94A3B8]'
+                                ? 'border-[#3B82F6] bg-[#3B82F6] text-white dark:border-[#5EA2FF] dark:bg-[#5EA2FF]'
+                                : 'border-[#CBD5E1] bg-white text-transparent group-hover:border-[#94A3B8] dark:border-[#344257] dark:bg-[#111926] dark:group-hover:border-[#5EA2FF]'
                             )}
                           >
                             <CheckIcon className="h-3 w-3" weight="bold" />
@@ -1142,12 +1144,14 @@ export function ChatPresetsEditorPanel({
                             <span
                               className={cn(
                                 'block truncate text-[14px] font-medium',
-                                checked ? 'text-[#0F172A]' : 'text-[#475569]'
+                                checked
+                                  ? 'text-[#0F172A] dark:text-[#F3F6FB]'
+                                  : 'text-[#475569] dark:text-[#BAC4D6]'
                               )}
                             >
                               @{getLocalizedMemberName(member)}
                             </span>
-                            <span className="mt-1 block truncate text-[12px] text-[#94A3B8]">
+                            <span className="mt-1 block truncate text-[12px] text-[#94A3B8] dark:text-[#7F8AA3]">
                               {member.description || member.id}
                             </span>
                           </span>
@@ -1167,7 +1171,7 @@ export function ChatPresetsEditorPanel({
   );
 
   const detailActions = hasUnsavedChanges ? (
-    <div className="shrink-0 border-t border-[#E2E8F0] bg-[#F8FAFC]/80 px-6 py-4 backdrop-blur-sm">
+    <div className="shrink-0 border-t border-[#E2E8F0] bg-[#F8FAFC]/80 px-6 py-4 backdrop-blur-sm dark:border-[#2A3445] dark:bg-[#101722]/90">
       <div className="mx-auto flex w-full max-w-[980px] items-center justify-end gap-3">
         <button
           type="button"
@@ -1194,28 +1198,28 @@ export function ChatPresetsEditorPanel({
     <>
       <div className="flex h-full min-h-0 flex-col">
         {error ? (
-          <div className="mb-4 rounded-[16px] border border-[#FECACA] bg-[#FFF5F5] px-5 py-4 text-[13px] text-[#DC2626]">
+          <div className="mb-4 rounded-[16px] border border-[#FECACA] bg-[#FFF5F5] px-5 py-4 text-[13px] text-[#DC2626] dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(239,68,68,0.12)] dark:text-[#FCA5A5]">
             {error}
           </div>
         ) : null}
         {success ? (
-          <div className="mb-4 rounded-[16px] border border-[#BBF7D0] bg-[#F0FDF4] px-5 py-4 text-[13px] font-medium text-[#15803D]">
+          <div className="mb-4 rounded-[16px] border border-[#BBF7D0] bg-[#F0FDF4] px-5 py-4 text-[13px] font-medium text-[#15803D] dark:border-[rgba(52,211,153,0.24)] dark:bg-[rgba(34,197,94,0.12)] dark:text-[#86EFAC]">
             {t('settings.presets.saveSuccess')}
           </div>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 overflow-hidden rounded-[28px] border border-white/80 bg-[rgba(255,255,255,0.92)] shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-          <aside className="flex w-[292px] min-w-[292px] flex-col border-r border-[#E2E8F0] bg-[#F8FAFC]/95">
-            <div className="border-b border-[#E2E8F0] p-4">
-              <div className="flex gap-2 rounded-[14px] bg-[#EEF2F7] p-1">
+        <div className="flex min-h-0 flex-1 overflow-hidden rounded-[28px] border border-white/80 bg-[rgba(255,255,255,0.92)] shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-[#2A3445] dark:bg-[#141C28] dark:shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
+          <aside className="flex w-[292px] min-w-[292px] flex-col border-r border-[#E2E8F0] bg-[#F8FAFC]/95 dark:border-[#2A3445] dark:bg-[#101722]">
+            <div className="border-b border-[#E2E8F0] p-4 dark:border-[#2A3445]">
+              <div className="flex gap-2 rounded-[14px] bg-[#EEF2F7] p-1 dark:bg-[#1A2433]">
                 <button
                   type="button"
                   className={cn(
                     sidebarTabButtonClassName,
                     'whitespace-nowrap',
                     tab === 'teams'
-                      ? 'border-[#E2E8F0] bg-white text-[#2563EB] shadow-sm'
-                      : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70'
+                      ? 'border-[#E2E8F0] bg-white text-[#2563EB] shadow-sm dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#7DB6FF]'
+                      : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70 dark:text-[#7F8AA3] dark:hover:bg-[#192233]'
                   )}
                   onClick={() => setTab('teams')}
                 >
@@ -1227,8 +1231,8 @@ export function ChatPresetsEditorPanel({
                     sidebarTabButtonClassName,
                     'whitespace-nowrap',
                     tab === 'members'
-                      ? 'border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm'
-                      : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70'
+                      ? 'border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#F3F6FB]'
+                      : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70 dark:text-[#7F8AA3] dark:hover:bg-[#192233]'
                   )}
                   onClick={() => setTab('members')}
                 >
@@ -1240,7 +1244,7 @@ export function ChatPresetsEditorPanel({
             <div className="flex min-h-0 flex-1 flex-col">
               <div className="flex flex-col gap-2 px-5 py-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94A3B8]">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94A3B8] dark:text-[#7F8AA3]">
                     {tab === 'members'
                       ? t('settings.presets.members.listTitle')
                       : t('settings.presets.teams.listTitle')}
@@ -1252,8 +1256,8 @@ export function ChatPresetsEditorPanel({
                         className={cn(
                           'flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-200',
                           showMemberSearch
-                            ? 'bg-[#2563EB] text-white'
-                            : 'text-[#64748B] hover:bg-[#E2E8F0] hover:text-[#475569]'
+                            ? 'bg-[#2563EB] text-white dark:bg-[#5EA2FF]'
+                            : 'text-[#64748B] hover:bg-[#E2E8F0] hover:text-[#475569] dark:text-[#7F8AA3] dark:hover:bg-[#1A2433] dark:hover:text-[#BAC4D6]'
                         )}
                         onClick={() => {
                           setShowMemberSearch(!showMemberSearch);
@@ -1289,19 +1293,19 @@ export function ChatPresetsEditorPanel({
                 </div>
                 {tab === 'members' && showMemberSearch && (
                   <div className="relative">
-                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8] dark:text-[#7F8AA3]" />
                     <input
                       type="text"
                       value={memberSearch}
                       onChange={(e) => setMemberSearch(e.target.value)}
                       placeholder={t('settings.presets.searchPlaceholder')}
-                      className="w-full rounded-[10px] border border-[#E2E8F0] bg-white py-2 pl-9 pr-8 text-[13px] text-[#334155] placeholder:text-[#94A3B8] focus:border-[#3B82F6] focus:outline-none focus:ring-1 focus:ring-[#3B82F6]"
+                      className="w-full rounded-[10px] border border-[#E2E8F0] bg-white py-2 pl-9 pr-8 text-[13px] text-[#334155] placeholder:text-[#94A3B8] focus:border-[#3B82F6] focus:outline-none focus:ring-1 focus:ring-[#3B82F6] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:placeholder:text-[#7F8AA3] dark:focus:border-[#5EA2FF] dark:focus:ring-[#5EA2FF]"
                       autoFocus
                     />
                     {memberSearch && (
                       <button
                         type="button"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#94A3B8] hover:bg-[#F1F5F9] hover:text-[#64748B]"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#94A3B8] hover:bg-[#F1F5F9] hover:text-[#64748B] dark:text-[#7F8AA3] dark:hover:bg-[#1A2433] dark:hover:text-[#BAC4D6]"
                         onClick={() => setMemberSearch('')}
                       >
                         <XIcon className="h-3.5 w-3.5" weight="bold" />
@@ -1315,11 +1319,11 @@ export function ChatPresetsEditorPanel({
                 <div className="space-y-2">
                   {tab === 'members' ? (
                     draft.members.length === 0 ? (
-                      <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-white px-4 py-6 text-[13px] text-[#94A3B8]">
+                      <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-white px-4 py-6 text-[13px] text-[#94A3B8] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#7F8AA3]">
                         {t('settings.presets.members.empty')}
                       </div>
                     ) : filteredSidebarMembers.length === 0 ? (
-                      <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-white px-4 py-6 text-center text-[13px] text-[#94A3B8]">
+                      <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-white px-4 py-6 text-center text-[13px] text-[#94A3B8] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#7F8AA3]">
                         {t('settings.presets.noSearchResults')}
                       </div>
                     ) : (
@@ -1336,7 +1340,7 @@ export function ChatPresetsEditorPanel({
                       ))
                     )
                   ) : draft.teams.length === 0 ? (
-                    <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-white px-4 py-6 text-[13px] text-[#94A3B8]">
+                    <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-white px-4 py-6 text-[13px] text-[#94A3B8] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#7F8AA3]">
                       {t('settings.presets.teams.empty')}
                     </div>
                   ) : (
@@ -1357,7 +1361,7 @@ export function ChatPresetsEditorPanel({
             </div>
           </aside>
 
-          <section className="flex min-w-0 flex-1 flex-col bg-white">
+          <section className="flex min-w-0 flex-1 flex-col bg-white dark:bg-[#141C28]">
             {tab === 'members' ? memberDetail : teamDetail}
             {detailActions}
           </section>

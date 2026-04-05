@@ -132,7 +132,7 @@ export enum ChatSenderType { user = "user", agent = "agent", system = "system" }
 
 export type ChatSessionAgent = { id: string, session_id: string, agent_id: string, state: ChatSessionAgentState, workspace_path: string | null, pty_session_key: string | null, agent_session_id: string | null, agent_message_id: string | null, allowed_skill_ids: string[], created_at: string, updated_at: string, };
 
-export enum ChatSessionAgentState { idle = "idle", running = "running", waitingapproval = "waitingapproval", dead = "dead" }
+export enum ChatSessionAgentState { idle = "idle", running = "running", stopping = "stopping", waitingapproval = "waitingapproval", dead = "dead" }
 
 export type ChatPermission = { id: string, session_id: string, session_agent_id: string, capability: string, scope: JsonValue, ttl_type: ChatPermissionTtlType, expires_at: string | null, granted_by: string | null, created_at: string, };
 

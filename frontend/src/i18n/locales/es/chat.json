@@ -180,7 +180,7 @@
     "noInstalledAgents": "No se detectaron agentes de código instalados en esta máquina.",
     "modelVariant": "Variante del modelo",
     "model": "Modelo",
-    "systemPrompt": "Configuración del rol (obligatorio)",
+    "systemPrompt": "Configuración del rol (opcional)",
     "expand": "Expandir",
     "collapse": "Contraer",
     "systemPromptPlaceholder": "Describe la configuración del rol de este miembro IA.",

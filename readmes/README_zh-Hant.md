@@ -4,8 +4,8 @@
 
 <div align="center">
   <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 10px; margin-bottom: 10px;">
-
-  <p><strong>以團隊方式運行 Agent，讓效率在 AI 時代成倍提升。</strong></p>
+  
+  <p><strong>讓 Agent 以一個團隊的方式運行，在 AI 時代成倍提升你的效率。</strong></p>
 
   <p>
     <a href="https://www.npmjs.com/package/openteams-web"><img alt="npm" src="https://img.shields.io/npm/v/openteams-web?style=flat-square" /></a>
@@ -17,7 +17,7 @@
 
   <p>
     <a href="#快速開始">快速開始</a> |
-    <a href="https://doc.openteams-lab.com">文檔</a>
+    <a href="https://doc.openteams-lab.com">文件</a> 
   </p>
 
   <p align="center">
@@ -35,29 +35,30 @@
 
 ![OpenTeams Demo](images/demo.gif)
 
-**一分鐘快速入門指南**
+**一分鐘快速上手指南**
 
-1. 導入預設團隊並為每個成員選擇基礎 Agent。
-2. 為團隊中的每個成員設置工作空間。
-3. 使用 `@mentions` 向特定成員發送消息。
+1. 匯入一個預設團隊，並為每位成員選擇基礎 Agent。
+2. 為團隊中的每位成員設定工作區。
+3. 使用 `@member` 向指定成員發送訊息。
 
 ---
-
-## 🔥 *新聞:*
-### *重大更新*
-- **2026.04.02 (v0.3.10)**:
-  - 支援應用內版本更新
-  - 文檔網站已正式上線
-- **2026.03.24 (v0.3.7)**:
-  - 添加內置 openteams-cli Agent，移除對本地安裝 Agent 的強制依賴。
-  - 修復執行器中的內存洩漏問題。
+## 🔥 *最新動態：*
+### *重要更新*
+- **2026.04.02 (v0.3.11)**
+  - 啟用深色 UI 模式
+  - 修復 openteams-cli 並發問題
+- **2026.04.02 (v0.3.10)**
+  - 實作應用內版本更新
+  - 文件網站現已上線。
+- **2026.03.24 (v0.3.7)**: 
+  - 新增內建的 openteams-CLI Agent，不再依賴本地安裝 Agent。
+  - 修復執行器中的記憶體洩漏問題。
 ---
 
 ## 快速開始
 
-### 方案 A：使用 npx 運行
-
-**推薦 Mac 和 Linux 使用者優先採用此安裝方式。**
+### 方案 A：使用 npx 執行
+**推薦 Mac 和 Linux 使用這種安裝方式。**
 
 ```bash
 # web
@@ -67,16 +68,15 @@ npx openteams-web
 ### 方案 B：下載桌面應用
 
 [![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/openteams-lab/openteams/releases/latest)
-[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/openteams-lab/openteams/releases/latest)
 [![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest)
 
-### 系統要求
+### 環境要求
 
-**從 v0.3.7 開始，我們已內置 openteams-cli，因此不再強制要求安裝 AI Agent。你可以前往「設定 -> 服務提供商」頁面配置 API。**
+**從 v0.3.7 開始，我們已內建 openteams-cli，因此不再需要安裝 AI Agent。你可以前往「Settings -> Service Providers」頁面設定你的 API。**
 
-你也可以從支援的 Agent 清單中任選一個使用：
+你也可以從支援的 Agent 清單中任選一個：
 
-| Agent | 安裝命令 |
+| Agent | 安裝方式 |
 |-------|---------|
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm i -g @anthropic-ai/claude-code` |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @google/gemini-cli` |
@@ -90,63 +90,63 @@ npx openteams-web
 
 ## 功能特性
 
-| 功能 | 你將獲得 |
+| 功能 | 你將獲得什麼 |
 |--|--|
-| **支持的 Agent** | 支持 10 種編程 Agent 運行時，包括 `Claude Code`、`Gemini CLI`、`Codex`、`Qwen Code`、`Amp`、`Cursor Agent`、`Copilot`、`Droid`、`Kimi Code` 和 `OpenCode`，目前正在集成更多 Agent。|
-| **共享群聊上下文** | 所有參與者都在同一對話歷史中工作，無需在不同窗口之間複製粘貼提示詞。 |
-| **並行執行** | 多個 Agent 可以在同一個共享會話中同時處理同一任務，不同的 Agent 處理它們最擅長的任務。 |
-| **自主協作** | Agent 可以互相 `@mention`，交接工作，直接在聊天中協調。 |
-| **內置 AI 成員** | 開箱即用 160+ 內置 AI 成員，覆蓋工程、營銷、寫作、研究和內容生產領域。 |
-| **內置 AI 團隊預設** | 提供 8 個開箱即用的團隊預設，適用於常見工作流程。 |
-| **團隊準則** | 定義誰領導、誰可以與誰交流、以及協作應該如何進行，自定義你的 AI 團隊和團隊準則。 |
-| **技能庫** | 為 Agent 配備 1000+ 內置技能，並可在需要時導入自己的技能。 |
-| **完全本地執行** | Agent 在本地工作空間運行，運行時產物保存在該工作空間的 `.openteams/` 目錄下，無需擔心數據隱私問題。 |
+| **支援的 Agent** | 支援 10 種程式設計 Agent 執行時，包括 `Claude Code`、`Gemini CLI`、`Codex`、`Qwen Code`、`Amp`、`Cursor Agent`、`Copilot`、`Droid`、`Kimi Code` 和 `OpenCode`。目前也正在整合更多 Agent。|
+| **共享群聊上下文** | 每位參與者都基於同一份對話歷史工作，不必在多個視窗之間反覆複製貼上提示詞。 |
+| **並行執行** | 多個 Agent 可以在同一個共享工作階段中同時處理同一項任務，不同 Agent 負責各自最擅長的部分。 |
+| **自主協作** | Agent 可以彼此 `@mention`、交接工作，並直接在聊天中協作。 |
+| **內建 AI 成員** | 開箱即用提供 160+ 內建 AI 成員，涵蓋工程、行銷、寫作、研究與內容製作。 |
+| **內建 AI 團隊預設** | 提供 8 個開箱即用的團隊預設，適用於常見工作流程。 |
+| **團隊協作準則** | 你可以定義誰負責主導、誰可以與誰溝通，以及協作應如何進行。依照你的需求自訂 AI 團隊與團隊準則。 |
+| **技能庫** | 為 Agent 配備 1000+ 內建技能，並在需要時匯入你自己的技能。 |
+| **完全本地執行** | Agent 直接在你的本地工作區執行，執行產物保存在該工作區內的 `.openteams/` 目錄下，因此無須擔心資料隱私。 |
 
 ### 並行 Agent 執行
 
-*在相同的共享上下文中運行多個 Agent，讓它們並行執行以加快交付速度。*
+*讓多個 Agent 在同一個共享上下文中並行執行，以加快交付速度。*
 
 ![OpenTeams parallel](images/parallel.gif)
 
 ### 自主 Agent 協作
 
-*OpenTeams 允許 Agent 直接互相發送消息，無需強制固定的工作流程。如果你想要更多結構，可以添加團隊準則來控制溝通、指定領導 Agent，或讓所有人自由協作。溝通模式完全取決於你的使用場景。*
+*OpenTeams 允許 Agent 直接互相傳送訊息，而不強制固定工作流程。如果你希望有更多結構，可以透過團隊準則控制溝通方式、指定主導 Agent，或者讓所有成員自由協作。溝通模式完全取決於你的使用情境。*
 
 ![OpenTeams collaborate](images/collaborate.gif)
 
 ### AI 成員
 
-*OpenTeams 包含 160+ 內置 AI 成員，覆蓋工程、營銷、寫作、內容生產等領域。將它們組合成不同的團隊，自定義配置，構建適合你工作方式的角色組合。我們將持續擴展和改進這個陣容。*
+*OpenTeams 內建 160+ AI 成員，涵蓋工程、行銷、寫作、內容製作等多個領域。你可以自由組合成不同團隊、依需求自訂，並建立符合你工作方式的角色搭配。我們也會持續擴充並優化這個成員庫。*
 
 ![OpenTeams members](images/members.gif)
 
 ### AI 團隊
 
-*OpenTeams 內置 8 個團隊預設，適用於常見工作流程，讓你可以立即開始。我們建議在創建團隊時定義團隊準則，以確保協作符合你希望團隊運作的方式。*
+*OpenTeams 內建 8 個適用於常見工作流程的團隊預設，讓你可以立即開始使用。我們建議你在建立團隊時定義團隊準則，以便讓協作方式始終符合你的目標。*
 
 ![OpenTeams team](images/team.gif)
 
 ### 技能庫
 
-*OpenTeams 包含 1000+ 內置技能，你可以組合並分配給不同的 AI 成員。你也可以導入自己創建的技能，直接應用到你的 Agent。我們將繼續擴展技能庫，專注於在真實生產環境中可靠的能力。*
+*OpenTeams 內建 1000+ 技能，你可以將它們組合後分配給不同的 AI 成員。你也可以匯入自己建立的技能，並直接套用到 Agent 身上。我們會持續擴充技能庫，重點投入那些能夠在真實生產環境中穩定發揮作用的能力。*
 
 ![OpenTeams skills](images/skills.gif)
 
 ---
 
-## 為什麼我們更好
+## 為什麼我們更強
 
-圖例：✅ 全支持 | 🟡 部分支持 | ❌ 不支持
+圖例：✅ 完整支援 | 🟡 部分支援 | ❌ 不支援
 
-| **能力** | 傳統單 Agent | 多窗口工作流 | Claude Code Agent Team | OpenTeams |
+| **能力** | 傳統單一 Agent | 多視窗工作流程 | Claude Code Agent Team | openteams |
 |--|--|--|--|--|
-| **並行能力**| ❌ 否，串行 | 🟡 部分，手動 | ✅ 是，Claude 子代理 | ✅ 是，自動 |
-| **共享上下文** | ❌ 否 | ❌ 否，複製粘貼 | 🟡 部分，子代理上下文分裂 | ✅ 是，始終同步 |
-| **多模型協作** | ❌ 否 | 🟡 部分，手動切換 | ❌ 否，僅 Claude | ✅ 是，Claude + Gemini + Codex + 更多 |
-| **Agent 交接** | ❌ 否 | ❌ 否，你手動編排 | 🟡 部分，僅在 Claude 內委派 | ✅ 是，直接 `@mentions` |
-| **預定義 AI 成員** | ❌ 否 | ❌ 否 | ❌ 否 | ✅ 是，160+ 成員 |
-| **團隊管理器** | ❌ 否 | ❌ 否 | ❌ 否 | ✅ 是，自定義團隊準則 |
-| **你的投入** | 🔴 高 | 🔴 很高 | 🟠 中等 | 🟢 低 |
+| **並行能力**| ❌ 不支援，只能串行 | 🟡 部分支援，需手動操作 | ✅ 支援，Claude 子代理 | ✅ 支援，自動完成 |
+| **共享上下文** | ❌ 不支援 | ❌ 不支援，需要複製貼上 | 🟡 部分支援，子代理上下文彼此分離 | ✅ 支援，始終同步 |
+| **多模型協作** | ❌ 不支援 | 🟡 部分支援，需手動切換 | ❌ 不支援，僅限 Claude | ✅ 支援，Claude + Gemini + Codex + 更多 |
+| **Agent 交接** | ❌ 不支援 | ❌ 不支援，需要你自行編排 | 🟡 部分支援，在 Claude 內部委派 | ✅ 支援，直接 `@mentions` |
+| **預先定義 AI 成員** | ❌ 不支援 | ❌ 不支援 | ❌ 不支援 | ✅ 支援，160+ 成員 |
+| **團隊管理** | ❌ 不支援 | ❌ 不支援 | ❌ 不支援 | ✅ 支援，自訂團隊準則 |
+| **你的投入** | 🔴 高 | 🔴 非常高 | 🟠 中等 | 🟢 低 |
 
 ---
 
@@ -163,39 +163,39 @@ npx openteams-web
 #### Mac/Linux
 
 ```bash
-# 1. 克隆倉庫
+# 1. 複製倉庫
 git clone https://github.com/openteams-lab/openteams.git
 cd openteams
 
 # 2. 安裝依賴
 pnpm i
 
-# 3. 啟動開發服務器（同時啟動 Rust 後端 + React 前端）
+# 3. 啟動開發伺服器（執行 Rust 後端 + React 前端）
 pnpm run dev
 
-# 4. 構建前端
+# 4. 建置前端
 pnpm --filter frontend build
 
-# 5. 構建桌面應用
+# 5. 建置桌面應用
 pnpm desktop:build
 ```
 
-#### Windows (PowerShell)：前後端分開啟動
+#### Windows（PowerShell）：分別啟動後端與前端
 
-`pnpm run dev` 無法在 Windows PowerShell 中運行。請使用下面的命令分別啟動後端和前端。
+`pnpm run dev` 無法在 Windows PowerShell 中執行。請使用以下命令分別啟動後端與前端。
 
 ```bash
-# 1. 克隆倉庫
+# 1. 複製倉庫
 git clone https://github.com/openteams-lab/openteams.git
 cd openteams
 
 # 2. 安裝依賴
 pnpm i
 
-# 3. 生成 TypeScript 類型
+# 3. 產生 TypeScript 型別
 pnpm run generate-types
 
-# 4. 執行數據庫遷移
+# 4. 執行資料庫遷移
 pnpm run prepare-db
 ```
 
@@ -211,65 +211,93 @@ cargo run --bin server
 **終端 B（前端）**
 
 ```powershell
-$env:FRONTEND_PORT = <終端 A 生成的 frontend 端口>
-$env:BACKEND_PORT = <終端 A 生成的 backend 端口>
+$env:FRONTEND_PORT = <終端 A 產生的 frontend 連接埠>
+$env:BACKEND_PORT = <終端 A 產生的 backend 連接埠>
 cd frontend
 pnpm dev -- --port $env:FRONTEND_PORT --host
 ```
 
-打開前端頁面：`http://localhost:<FRONTEND_PORT>`（例如：`http://localhost:3001`）。
+在 `http://localhost:<FRONTEND_PORT>` 開啟前端頁面（例如：`http://localhost:3001`）。
 
-## 發布說明與路線圖
+#### 在本地建置 `openteams-cli`
+
+如果你需要編譯本地的 `openteams-cli` 二進位，而不是使用內建版本或已發佈的建置，請使用以下命令。
+建置產物會放在 binaries 目錄中。
+
+```bash
+# 在倉庫根目錄執行
+bun run ./scripts/build-openteams-cli.ts
+```
+
+## 發佈說明與路線圖
 
 ### V0.2
 
-- ~~[x] 多 Agent 群聊與共享上下文~~
-- ~~[x] 並行 Agent 執行~~
-- ~~[x] Agent @mention 與自主協作~~
-- ~~[x] 支持 10 種編程 Agent 運行時（Claude Code、Gemini CLI、Codex、Qwen Code、Amp、Cursor Agent、Copilot、Droid、Kimi Code、OpenCode）~~
-- ~~[x] 桌面應用（Windows、macOS、Linux）~~
-- ~~[x] 通過 npx 運行的 Web 應用~~
-- ~~[x] 多語言支持（EN、ZH、JA、KO、FR、ES）~~
+- [x] 支援共享上下文的多 Agent 群聊
+- [x] 並行 Agent 執行
+- [x] Agent `@mention` 與自主協作
+- [x] 支援 10 種程式設計 Agent 執行時（Claude Code、Gemini CLI、Codex、Qwen Code、Amp、Cursor Agent、Copilot、Droid、Kimi Code、OpenCode）
+- [x] 桌面應用（Windows、macOS、Linux）
+- [x] 可透過 npx 執行的 Web 應用
+- [x] 多語言支援（EN、ZH、JA、KO、FR、ES）
 
 ### V0.3
-
-- ~~[x] 前端界面全面改版~~
-- ~~[x] 160+ 內置 AI 成員~~
-- ~~[x] 8 個內置 AI 團隊預設~~
-- ~~[x] 團隊規則配置~~
-- ~~[x] 1000+ 內置技能~~
-- ~~[x] 完全本地執行與工作空間隔離~~
-- ~~[x] 重新定義輸入協議~~
+- [x] 前端介面已完成全面重構。
+- [x] 160+ 內建 AI 成員
+- [x] 8 個內建 AI 團隊預設
+- [x] 團隊規則設定
+- [x] 1000+ 內建技能
+- [x] 完全本地執行與工作區隔離
+- [x] 重新定義輸入協議
 
 ### 路線圖
-
-- [x] 針對OpenTeams用例優化的Code Agent後端 —— v0.3.4
-- [ ] 建立高效的團隊協作框架
-- [ ] 更多 Agent 集成（Kilo Code, OpenClaw 等）
-- [ ] 添加更強大的開箱即用AI團隊
-- [ ] 添加更強大的技能
-- [ ] 開發多種前端配色方案
-- [ ] 提供高度優化的定制版本
+- [x] 為 OpenTeams 使用場景優化 Code Agent 後端 —— v0.3.7
+- [x] 開發多套前端配色方案 —— v0.3.11
+- [ ] 建立高效率團隊協作框架
+- [ ] 整合更多 Agent（Kilo Code、OpenClaw 等）
+- [ ] 提供更多強大的開箱即用 AI 團隊
+- [ ] 增加更強大的技能
+- [ ] 提供高度優化的客製版本
 
 
 ## 貢獻
 
-歡迎貢獻！你可以在 [Issues](https://github.com/openteams-lab/openteams/issues) 查看待辦，或在 [Discussion](https://github.com/openteams-lab/openteams/discussions) 發起討論。
+歡迎貢獻！你可以在 [Issues](https://github.com/StarterraAI/OpenTeams/issues) 查看目前需要的內容，或發起 [Discussion](https://github.com/StarterraAI/OpenTeams/discussions)。
 
-1. Fork -> 創建 feature 分支 -> 提交 PR
-2. 大改動請先開 issue 溝通
+1. Fork -> 建立 feature 分支 -> 提交 PR
+2. 大型改動請先開 issue 溝通
 3. 請遵守我們的 [Code of Conduct](../CODE_OF_CONDUCT.md)
 
-## 社區
+### 程式碼格式化
+
+提交 PR 前，請確保程式碼已正確格式化：
+
+```bash
+# 同時格式化前端與後端
+pnpm run format
+
+# 檢查格式但不修改檔案
+pnpm run format:check
+
+# 僅格式化前端
+pnpm run frontend:format
+
+# 僅格式化後端（Rust）
+pnpm run backend:format
+```
+
+**注意：** 如果程式碼格式不正確，CI 會失敗。推送前請務必執行 `pnpm run format:check`。
+
+## 社群
 
 | | |
 |--|--|
-| **問題反饋** | [GitHub Issues](https://github.com/openteams-lab/openteams/issues) |
+| **Bug 回報** | [GitHub Issues](https://github.com/openteams-lab/openteams/issues) |
 | **討論交流** | [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions) |
-| **社區聊天** | [Discord](https://discord.gg/MbgNFJeWDc) |
+| **社群聊天** | [Discord](https://discord.gg/MbgNFJeWDc) |
 
 ## 致謝
 
-本項目基於 [Vibe Kanban](https://www.vibekanban.com/) 構建，感謝其團隊提供優秀的開源基礎。
+本專案構建於 [Vibe Kanban](https://www.vibekanban.com/) 之上，感謝他們的團隊提供了優秀的開源基礎。
 
-同時也感謝 [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) 幫助塑造內置技能生態系統，以及 [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) 為 Agent 角色設計和團隊組成提供的靈感。
+同時也感謝 [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) 協助塑造內建技能生態，以及 [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) 在 Agent 角色設計與團隊組合方面帶來的啟發。

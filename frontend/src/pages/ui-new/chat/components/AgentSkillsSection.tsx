@@ -429,7 +429,8 @@ export function AgentSkillsSection({
                             className={cn(
                               'inline-flex size-4 shrink-0 items-center justify-center rounded-full',
                               'text-[#4338CA] transition-colors hover:bg-[#E0E7FF] hover:text-[#312E81]',
-                              'focus:outline-none focus-visible:ring-1 focus-visible:ring-[#4338CA]/30',
+                              'dark:text-[#7DB6FF] dark:hover:bg-[rgba(94,162,255,0.18)] dark:hover:text-[#DCEBFF]',
+                              'focus:outline-none focus-visible:ring-1 focus-visible:ring-[#4338CA]/30 dark:focus-visible:ring-[#5EA2FF]/30',
                               isSyncing && 'cursor-not-allowed'
                             )}
                           >
@@ -448,7 +449,8 @@ export function AgentSkillsSection({
                   <span
                     className={cn(
                       'inline-flex items-center rounded-full border border-[#C7D2FE]/80',
-                      'justify-self-start bg-[rgb(238,242,255)] px-2 py-1 text-[13px] font-medium leading-4 text-[#3730A3]'
+                      'justify-self-start bg-[rgb(238,242,255)] px-2 py-1 text-[13px] font-medium leading-4 text-[#3730A3]',
+                      'dark:border-[rgba(94,162,255,0.24)] dark:bg-[rgba(94,162,255,0.16)] dark:text-[#DCEBFF]'
                     )}
                     title={selectedSkills
                       .slice(3)
@@ -477,13 +479,14 @@ export function AgentSkillsSection({
           <div
             className={cn(
               'rounded-xl border border-[#E5E7EB] bg-white p-2.5',
-              'shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1)]'
+              'shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1)]',
+              'dark:border-[#2A3445] dark:bg-[#192233] dark:shadow-[0_10px_20px_rgba(0,0,0,0.28)]'
             )}
           >
             <div className="relative px-1 pb-2">
               <MagnifyingGlassIcon
                 size={11}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9CA3AF] dark:text-[#7F8AA3]"
               />
               <input
                 ref={searchInputRef}
@@ -572,11 +575,13 @@ export function AgentSkillsSection({
                       className={cn(
                         'group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
                         allowDetailModal &&
-                          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]/30 cursor-pointer',
+                          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]/30 dark:focus-visible:ring-[#5EA2FF]/30 cursor-pointer',
                         isSelected
-                          ? 'bg-[rgb(238,242,255)]'
-                          : 'hover:bg-[rgb(238,242,255)]',
-                        isDetailOpen && !isSelected && 'bg-[rgb(238,242,255)]'
+                          ? 'bg-[rgb(238,242,255)] dark:bg-[rgba(94,162,255,0.16)]'
+                          : 'hover:bg-[rgb(238,242,255)] dark:hover:bg-[rgba(94,162,255,0.12)]',
+                        isDetailOpen &&
+                          !isSelected &&
+                          'bg-[rgb(238,242,255)] dark:bg-[rgba(94,162,255,0.12)]'
                       )}
                     >
                       <button
@@ -611,11 +616,11 @@ export function AgentSkillsSection({
                           className={cn(
                             'inline-flex size-4 items-center justify-center rounded-[4px] border transition-colors',
                             isSelected
-                              ? 'border-[#C7D2FE]/80 bg-[rgb(238,242,255)] text-black'
-                              : 'border-[#CBD5E1] bg-white text-transparent',
+                              ? 'border-[#C7D2FE]/80 bg-[rgb(238,242,255)] text-black dark:border-[rgba(94,162,255,0.28)] dark:bg-[rgba(94,162,255,0.16)] dark:text-[#DCEBFF]'
+                              : 'border-[#CBD5E1] bg-white text-transparent dark:border-[#2A3445] dark:bg-[#111926]',
                             !readOnly &&
                               !isSyncing &&
-                              'group-hover:border-[#A78BFA]',
+                              'group-hover:border-[#A78BFA] dark:group-hover:border-[#5EA2FF]',
                             (readOnly || isSyncing) && 'opacity-60'
                           )}
                         >
@@ -628,8 +633,8 @@ export function AgentSkillsSection({
                           className={cn(
                             'truncate text-sm transition-colors',
                             isSelected
-                              ? 'font-semibold text-black'
-                              : 'text-normal group-hover:text-black'
+                              ? 'font-semibold text-black dark:text-[#F3F6FB]'
+                              : 'text-normal group-hover:text-black dark:text-[#BAC4D6] dark:group-hover:text-[#F3F6FB]'
                           )}
                         >
                           {skill.name}

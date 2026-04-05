@@ -7,6 +7,8 @@ import { hashKey } from './utils';
 type AvatarTone = {
   bg: string;
   border: string;
+  darkBg: string;
+  darkBorder: string;
 };
 
 function hexToRgbChannels(hex: string): string {
@@ -27,14 +29,54 @@ function hexToRgbChannels(hex: string): string {
 }
 
 const avatarPalette: AvatarTone[] = [
-  { bg: '#fef4f0', border: '#f6d8cb' },
-  { bg: '#fdf8ed', border: '#f2e1bf' },
-  { bg: '#f5faef', border: '#d9e9bf' },
-  { bg: '#eefaf6', border: '#c5e9db' },
-  { bg: '#eef8ff', border: '#c9e1f6' },
-  { bg: '#f2f5ff', border: '#d1daf5' },
-  { bg: '#f7f3ff', border: '#ddd2f7' },
-  { bg: '#fdf2fb', border: '#efd0ea' },
+  {
+    bg: '#fef4f0',
+    border: '#f6d8cb',
+    darkBg: '#2A1E22',
+    darkBorder: '#4A2D36',
+  },
+  {
+    bg: '#fdf8ed',
+    border: '#f2e1bf',
+    darkBg: '#2B2418',
+    darkBorder: '#4A3C22',
+  },
+  {
+    bg: '#f5faef',
+    border: '#d9e9bf',
+    darkBg: '#1D281C',
+    darkBorder: '#314533',
+  },
+  {
+    bg: '#eefaf6',
+    border: '#c5e9db',
+    darkBg: '#162725',
+    darkBorder: '#29443F',
+  },
+  {
+    bg: '#eef8ff',
+    border: '#c9e1f6',
+    darkBg: '#162431',
+    darkBorder: '#28465F',
+  },
+  {
+    bg: '#f2f5ff',
+    border: '#d1daf5',
+    darkBg: '#1A2234',
+    darkBorder: '#334867',
+  },
+  {
+    bg: '#f7f3ff',
+    border: '#ddd2f7',
+    darkBg: '#241F35',
+    darkBorder: '#443867',
+  },
+  {
+    bg: '#fdf2fb',
+    border: '#efd0ea',
+    darkBg: '#2A1C2A',
+    darkBorder: '#4D3151',
+  },
 ];
 
 const knownBaseCodingAgents = new Set<string>(Object.values(BaseCodingAgent));
@@ -54,6 +96,8 @@ export function getAgentAvatarStyle(seed: string): CSSProperties {
     '--chat-agent-avatar-bg': tone.bg,
     '--chat-agent-avatar-bg-rgb': hexToRgbChannels(tone.bg),
     '--chat-agent-avatar-border': tone.border,
+    '--chat-agent-avatar-dark-bg': tone.darkBg,
+    '--chat-agent-avatar-dark-border': tone.darkBorder,
   } as CSSProperties;
 }
 

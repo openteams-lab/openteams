@@ -47,7 +47,12 @@
         "theme": {
           "label": "Theme",
           "placeholder": "Select theme",
-          "helper": "Choose your preferred color scheme."
+          "helper": "Choose your preferred color scheme.",
+          "options": {
+            "light": "Light",
+            "dark": "Dark",
+            "system": "System"
+          }
         },
         "language": {
           "label": "Language",
@@ -745,7 +750,7 @@
           "runnerTypePlaceholder": "Leave empty to use session default",
           "recommendedModel": "Recommended Model (optional)",
           "recommendedModelPlaceholder": "Leave empty to use executor default",
-          "systemPrompt": "Role settings (required)",
+          "systemPrompt": "Role settings (optional)",
           "systemPromptPlaceholder": "Describe this AI member's role settings...",
           "workspacePath": "Default Workspace Path (optional)",
           "workspacePathPlaceholder": "e.g. backend",
@@ -840,7 +845,7 @@
           "descriptionPlaceholder": "e.g., Backend Engineer for API development",
           "runnerType": "Runner Type (optional)",
           "runnerTypePlaceholder": "e.g., claude_code, leave empty for default",
-          "systemPrompt": "Role settings (required)",
+          "systemPrompt": "Role settings (optional)",
           "systemPromptPlaceholder": "Describe this AI member's role settings...",
           "workspacePath": "Default Workspace Path (optional)",
           "workspacePathPlaceholder": "e.g., backend"

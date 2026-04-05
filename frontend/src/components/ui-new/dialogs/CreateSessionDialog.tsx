@@ -26,7 +26,7 @@ export type CreateSessionResult = {
 };
 
 const fieldClassName =
-  'h-11 rounded-[14px] border border-[#DCE4EF] bg-[#F9FBFF] px-4 text-[14px] text-[#223044] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] placeholder:text-[#94A0B2] focus-visible:border-[#4A90E2] focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-[#4A90E2]/12';
+  'h-11 rounded-[14px] border border-[#DCE4EF] bg-[#F9FBFF] px-4 text-[14px] text-[#223044] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] placeholder:text-[#94A0B2] focus-visible:border-[#4A90E2] focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-[#4A90E2]/12 dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:placeholder:text-[#7F8AA3] dark:shadow-none dark:focus-visible:border-[#5EA2FF] dark:focus-visible:bg-[#111926] dark:focus-visible:ring-[#5EA2FF]/15';
 
 const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
   ({ existingSessions }) => {
@@ -116,18 +116,18 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
         )}
         tone="info"
         closeLabel={t('buttons.close', 'Close')}
-        className="!max-w-[560px] !border-[#DCE4EF] !bg-[linear-gradient(180deg,#FFFFFF_0%,#F6F9FC_100%)] !shadow-[0_24px_64px_rgba(15,23,42,0.14)]"
+        className="!max-w-[560px] !border-[#DCE4EF] !bg-[linear-gradient(180deg,#FFFFFF_0%,#F6F9FC_100%)] !shadow-[0_24px_64px_rgba(15,23,42,0.14)] dark:!border-[#2A3445] dark:!bg-[linear-gradient(180deg,#192233_0%,#101722_100%)] dark:!shadow-[0_24px_64px_rgba(0,0,0,0.42)]"
         bodyExtra={
           <div className="space-y-4">
-            <div className="rounded-[18px] border border-white/70 bg-[rgba(247,250,252,0.9)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+            <div className="rounded-[18px] border border-white/70 bg-[rgba(247,250,252,0.9)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:border-[#2A3445] dark:bg-[#192233] dark:shadow-none">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <Label
                   htmlFor="create-session-title"
-                  className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#7A8699]"
+                  className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#7A8699] dark:text-[#7F8AA3]"
                 >
                   {t('session.title', 'Title')}
                 </Label>
-                <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#A0A9B8]">
+                <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#A0A9B8] dark:text-[#7F8AA3]">
                   {t('session.optional', 'Optional')}
                 </span>
               </div>
@@ -141,15 +141,15 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
               />
             </div>
 
-            <div className="rounded-[18px] border border-[#E4EBF3] bg-white/90 p-4 shadow-[0_10px_30px_rgba(148,163,184,0.08)]">
+            <div className="rounded-[18px] border border-[#E4EBF3] bg-white/90 p-4 shadow-[0_10px_30px_rgba(148,163,184,0.08)] dark:border-[#2A3445] dark:bg-[#192233] dark:shadow-[0_10px_30px_rgba(0,0,0,0.2)]">
               <div className="mb-2 space-y-1">
                 <Label
                   htmlFor="create-session-workspace"
-                  className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#7A8699]"
+                  className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#7A8699] dark:text-[#7F8AA3]"
                 >
                   {t('session.workspacePath', 'Default Workspace')}
                 </Label>
-                <p className="text-sm leading-6 text-[#6B778C]">
+                <p className="text-sm leading-6 text-[#6B778C] dark:text-[#BAC4D6]">
                   {t(
                     'session.workspacePathHelp',
                     'Set a starting folder so the team opens with the right project context.'
@@ -179,7 +179,7 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
                     ))}
                   </datalist>
                   {isValidating && (
-                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[#7A8699]">
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[#7A8699] dark:text-[#7F8AA3]">
                       <SpinnerIcon className="h-4 w-4 animate-spin" />
                     </span>
                   )}
@@ -190,7 +190,7 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
                   variant="outline"
                   size="icon"
                   onClick={handleBrowse}
-                  className="h-11 w-11 rounded-[14px] border-[#DCE4EF] bg-white text-[#4A5A70] hover:bg-[#F2F6FB] hover:text-[#223044]"
+                  className="h-11 w-11 rounded-[14px] border-[#DCE4EF] bg-white text-[#4A5A70] hover:bg-[#F2F6FB] hover:text-[#223044] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#BAC4D6] dark:hover:bg-[#1A2433] dark:hover:text-[#F3F6FB]"
                   title={t('session.browse', 'Browse')}
                 >
                   <FolderSimpleIcon className="h-4 w-4" weight="fill" />
@@ -201,7 +201,7 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
             {validationError && (
               <Alert
                 variant="destructive"
-                className="rounded-[16px] border border-[#F2D5D8] bg-[#FFF7F8] px-4 py-3 text-[#C25B63] [&>svg]:hidden [&>svg~*]:pl-0"
+                className="rounded-[16px] border border-[#F2D5D8] bg-[#FFF7F8] px-4 py-3 text-[#C25B63] [&>svg]:hidden [&>svg~*]:pl-0 dark:border-[rgba(248,113,113,0.28)] dark:bg-[rgba(248,113,113,0.12)] dark:text-[#FCA5A5]"
               >
                 <AlertDescription>{validationError}</AlertDescription>
               </Alert>

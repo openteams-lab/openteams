@@ -1402,11 +1402,6 @@ export function ChatSessions() {
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
   }, [workItems]);
-  const visibleWorkItemGroups = useMemo(
-    () => workItemGroups.filter((group) => messageIdsByRunId.has(group.runId)),
-    [messageIdsByRunId, workItemGroups]
-  );
-
   const timelineEntries = useMemo<TimelineEntry[]>(
     () =>
       [
@@ -1416,20 +1411,18 @@ export function ChatSessions() {
           createdAtMs: new Date(message.created_at).getTime(),
           message,
         })),
-        ...visibleWorkItemGroups.map((group) => ({
+        ...workItemGroups.map((group) => ({
           kind: 'work_item' as const,
           key: getWorkItemEntryKey(group.runId),
           createdAtMs: new Date(group.createdAt).getTime(),
           group,
         })),
       ].sort((a, b) => a.createdAtMs - b.createdAtMs),
-    [messageList, visibleWorkItemGroups]
+    [messageList, workItemGroups]
   );
   const latestWorkItemEntryKey =
-    visibleWorkItemGroups.length > 0
-      ? getWorkItemEntryKey(
-          visibleWorkItemGroups[visibleWorkItemGroups.length - 1].runId
-        )
+    workItemGroups.length > 0
+      ? getWorkItemEntryKey(workItemGroups[workItemGroups.length - 1].runId)
       : null;
   const lastTimelineEntryKey =
     timelineEntries.length > 0
@@ -1438,12 +1431,9 @@ export function ChatSessions() {
   const workItemGroupByKey = useMemo(
     () =>
       new Map(
-        visibleWorkItemGroups.map((group) => [
-          getWorkItemEntryKey(group.runId),
-          group,
-        ])
+        workItemGroups.map((group) => [getWorkItemEntryKey(group.runId), group])
       ),
-    [visibleWorkItemGroups]
+    [workItemGroups]
   );
   const selectedCleanupMessageIds = useMemo(() => {
     const messageIds = new Set<string>();
@@ -1602,6 +1592,7 @@ export function ChatSessions() {
         const state = agentStates[member.agent.id] ?? member.sessionAgent.state;
         return (
           state === ChatSessionAgentState.running ||
+          state === ChatSessionAgentState.stopping ||
           streamingRunAgentIds.has(member.agent.id)
         );
       }),
@@ -1735,7 +1726,10 @@ export function ChatSessions() {
     const runningAgentIds = new Set<string>();
     for (const member of sessionMembers) {
       const state = agentStates[member.agent.id] ?? member.sessionAgent.state;
-      if (state === ChatSessionAgentState.running) {
+      if (
+        state === ChatSessionAgentState.running ||
+        state === ChatSessionAgentState.stopping
+      ) {
         runningAgentIds.add(member.agent.id);
       }
     }
@@ -1864,7 +1858,8 @@ export function ChatSessions() {
       for (const sessionAgent of sessionAgents) {
         const existing = next[sessionAgent.agent_id];
         const shouldSetStartedAt =
-          sessionAgent.state === ChatSessionAgentState.running &&
+          (sessionAgent.state === ChatSessionAgentState.running ||
+            sessionAgent.state === ChatSessionAgentState.stopping) &&
           !existing?.startedAt;
         const shouldUpdateState =
           !existing || existing.state !== sessionAgent.state;
@@ -1872,7 +1867,8 @@ export function ChatSessions() {
           next[sessionAgent.agent_id] = {
             state: sessionAgent.state,
             startedAt:
-              sessionAgent.state === ChatSessionAgentState.running
+              sessionAgent.state === ChatSessionAgentState.running ||
+              sessionAgent.state === ChatSessionAgentState.stopping
                 ? (existing?.startedAt ?? sessionAgent.updated_at)
                 : null,
           };
@@ -3119,7 +3115,7 @@ export function ChatSessions() {
 
     const name = newMemberName.trim();
     const runnerType = newMemberRunnerType.trim();
-    const prompt = newMemberPrompt.trim();
+    const prompt = newMemberPrompt.trim().length > 0 ? newMemberPrompt : ' ';
     const workspacePathVal = newMemberWorkspace.trim();
     const selectedVariant = newMemberVariant.trim() || 'DEFAULT';
     const normalizedSelectedSkillIds =
@@ -3187,11 +3183,6 @@ export function ChatSessions() {
           'addMemberErrors'
         )
       );
-      return;
-    }
-
-    if (!prompt) {
-      setMemberError(t('members.roleSettingsRequired'));
       return;
     }
 
@@ -3491,7 +3482,6 @@ export function ChatSessions() {
         await chatApi.stopSessionAgent(activeSessionId, sessionAgentId);
       } catch (error) {
         console.warn('Failed to stop agent', error);
-      } finally {
         setStoppingAgents((prev) => {
           const next = new Set(prev);
           next.delete(agentId);
@@ -3501,6 +3491,28 @@ export function ChatSessions() {
     },
     [activeSessionId]
   );
+
+  useEffect(() => {
+    setStoppingAgents((prev) => {
+      if (prev.size === 0) return prev;
+
+      let changed = false;
+      const next = new Set(prev);
+
+      for (const agentId of prev) {
+        const state = agentStateInfos[agentId]?.state ?? agentStates[agentId];
+        if (
+          state !== ChatSessionAgentState.running &&
+          state !== ChatSessionAgentState.stopping
+        ) {
+          next.delete(agentId);
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [agentStateInfos, agentStates]);
 
   // Resize handlers
   const handleResizeStart = useCallback(
@@ -4017,7 +4029,11 @@ export function ChatSessions() {
                         tone={getMessageTone(member.agent.id, false)}
                         stateInfo={agentStateInfos[member.agent.id]}
                         clock={clock}
-                        isStopping={stoppingAgents.has(member.agent.id)}
+                        isStopping={
+                          stoppingAgents.has(member.agent.id) ||
+                          agentStateInfos[member.agent.id]?.state ===
+                            ChatSessionAgentState.stopping
+                        }
                         onStop={handleStopAgent}
                       />
                     ))}

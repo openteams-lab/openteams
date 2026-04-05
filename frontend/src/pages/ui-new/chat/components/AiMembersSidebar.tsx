@@ -171,14 +171,18 @@ const presetCategorySelectTriggerClassName = cn(
   'hover:border-[#A8C9FF] hover:bg-[rgba(168,201,255,0.12)] hover:text-[#4084EB]',
   'focus:border-[#A8C9FF] focus:bg-[rgba(168,201,255,0.12)] focus:text-[#4084EB] focus:ring-0 focus:ring-offset-0 focus:shadow-none',
   'data-[state=open]:border-[#A8C9FF] data-[state=open]:bg-[rgba(168,201,255,0.12)] data-[state=open]:text-[#4084EB]',
-  'data-[placeholder]:text-[#64748B]'
+  'data-[placeholder]:text-[#64748B]',
+  'dark:border-[#2A3445] dark:text-[#BAC4D6] dark:hover:border-[#5EA2FF] dark:hover:bg-[rgba(94,162,255,0.14)] dark:hover:text-[#7DB6FF]',
+  'dark:focus:border-[#5EA2FF] dark:focus:bg-[rgba(94,162,255,0.14)] dark:focus:text-[#7DB6FF]',
+  'dark:data-[state=open]:border-[#5EA2FF] dark:data-[state=open]:bg-[rgba(94,162,255,0.14)] dark:data-[state=open]:text-[#7DB6FF]',
+  'dark:data-[placeholder]:text-[#7F8AA3]'
 );
 
 const presetCategorySelectContentClassName =
-  'rounded-[14px] border border-[#A8C9FF] bg-white p-1';
+  'rounded-[14px] border border-[#A8C9FF] bg-white p-1 dark:border-[#2A3445] dark:bg-[#192233]';
 
 const presetCategorySelectItemClassName =
-  'rounded-[10px] border border-transparent px-3 py-1.5 text-[10px] font-semibold tracking-[0.04em] text-[#64748B] focus:border-[#A8C9FF] focus:bg-[rgba(168,201,255,0.18)] focus:text-[#0F172A] data-[highlighted]:border-[#A8C9FF] data-[highlighted]:bg-[rgba(168,201,255,0.18)] data-[highlighted]:text-[#0F172A] data-[state=checked]:border-[#A8C9FF] data-[state=checked]:bg-[rgba(168,201,255,0.22)] data-[state=checked]:text-[#0F172A]';
+  'rounded-[10px] border border-transparent px-3 py-1.5 text-[10px] font-semibold tracking-[0.04em] text-[#64748B] focus:border-[#A8C9FF] focus:bg-[rgba(168,201,255,0.18)] focus:text-[#0F172A] data-[highlighted]:border-[#A8C9FF] data-[highlighted]:bg-[rgba(168,201,255,0.18)] data-[highlighted]:text-[#0F172A] data-[state=checked]:border-[#A8C9FF] data-[state=checked]:bg-[rgba(168,201,255,0.22)] data-[state=checked]:text-[#0F172A] dark:text-[#BAC4D6] dark:focus:border-[#5EA2FF] dark:focus:bg-[rgba(94,162,255,0.16)] dark:focus:text-[#F3F6FB] dark:data-[highlighted]:border-[#5EA2FF] dark:data-[highlighted]:bg-[rgba(94,162,255,0.16)] dark:data-[highlighted]:text-[#F3F6FB] dark:data-[state=checked]:border-[#5EA2FF] dark:data-[state=checked]:bg-[rgba(94,162,255,0.22)] dark:data-[state=checked]:text-[#F3F6FB]';
 
 function getPresetCategory(preset: ChatMemberPreset) {
   const metadata = preset.tools_enabled as
@@ -1001,7 +1005,7 @@ export function AiMembersSidebar({
         />
       </div>
       <div className="space-y-half">
-        <label className="text-xs text-[#5094FB]">
+        <label className="text-xs text-[#5094FB] dark:text-[#5EA2FF]">
           {t('members.workspacePath')}
         </label>
         <input
@@ -1102,10 +1106,10 @@ export function AiMembersSidebar({
         </div>
         <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto px-base pb-base pt-half space-y-base">
           {activeSessionId && (
-            <section className="mb-5 overflow-hidden rounded-[12px] border border-[#dce6f2] bg-[#fbfdff] shadow-[0_8px_18px_rgba(148,163,184,0.08)]">
+            <section className="mb-5 overflow-hidden rounded-[12px] border border-[#dce6f2] bg-[#fbfdff] shadow-[0_8px_18px_rgba(148,163,184,0.08)] dark:border-[#2A3445] dark:bg-[rgba(18,24,35,0.84)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
               <button
                 type="button"
-                className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[#f3f8ff]"
+                className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[#f3f8ff] dark:hover:bg-[rgba(94,162,255,0.08)]"
                 onClick={() =>
                   setIsTeamBulletinExpanded((expanded) => !expanded)
                 }
@@ -1122,16 +1126,16 @@ export function AiMembersSidebar({
                 }
               >
                 <span className="flex items-center gap-2">
-                  <span className="flex size-6 items-center justify-center rounded-[8px] bg-[#edf4ff] text-[#4a90e2]">
+                  <span className="flex size-6 items-center justify-center rounded-[8px] bg-[#edf4ff] text-[#4a90e2] dark:bg-[rgba(94,162,255,0.14)] dark:text-[#5EA2FF]">
                     <MegaphoneIcon className="size-3.5" weight="fill" />
                   </span>
-                  <span className="text-[13px] font-medium text-normal">
+                  <span className="text-[13px] font-medium text-normal dark:text-[#F3F6FB]">
                     {teamBulletinTitle}
                   </span>
                 </span>
                 <CaretDownIcon
                   className={cn(
-                    'size-3.5 text-[#94a3b8] transition-transform duration-200',
+                    'size-3.5 text-[#94a3b8] dark:text-[#7F8AA3] transition-transform duration-200',
                     isTeamBulletinExpanded && 'rotate-180'
                   )}
                   weight="bold"
@@ -1147,11 +1151,11 @@ export function AiMembersSidebar({
                 )}
               >
                 <div className="overflow-hidden">
-                  <div className="flex items-center gap-2 text-xs leading-6 text-low">
+                  <div className="flex items-center gap-2 text-xs leading-6 text-low dark:text-[#BAC4D6]">
                     <span>{t('members.teamProtocol.guidelineLabel')}</span>
                     <button
                       type="button"
-                      className="text-xs font-medium text-[#4a90e2] transition-colors hover:text-[#357ABD]"
+                      className="text-xs font-medium text-[#4a90e2] transition-colors hover:text-[#357ABD] dark:text-[#5EA2FF] dark:hover:text-[#7DB6FF]"
                       disabled={isTeamProtocolLoading}
                       title={teamProtocolLoadError ?? undefined}
                       aria-busy={isTeamProtocolLoading}
@@ -1204,7 +1208,8 @@ export function AiMembersSidebar({
                       className={cn(
                         'size-2 rounded-full',
                         agentStateDotClass[state],
-                        state === ChatSessionAgentState.running &&
+                        (state === ChatSessionAgentState.running ||
+                          state === ChatSessionAgentState.stopping) &&
                           'chat-session-status-breathe'
                       )}
                     />

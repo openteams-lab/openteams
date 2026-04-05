@@ -117,7 +117,7 @@ export function SkillDetailModal({
           aria-modal="true"
           aria-label={name}
           className={cn(
-            'skill-detail-modal-surface flex flex-col overflow-hidden rounded-2xl p-4',
+            'skill-detail-modal-surface flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-primary p-4 text-normal',
             'shadow-xl animate-in fade-in-0 slide-in-from-bottom-4 duration-200'
           )}
           style={{
@@ -126,7 +126,6 @@ export function SkillDetailModal({
             minHeight: '320px',
             maxHeight: '82vh',
             maxWidth: '92vw',
-            backgroundColor: '#f7f8fc',
           }}
           onClick={(event) => event.stopPropagation()}
         >
@@ -170,13 +169,7 @@ export function SkillDetailModal({
               : description || t('members.skills.detail.emptyDescription')}
           </div>
 
-          <div
-            className="mt-4 min-h-0 min-w-0 flex-1 overflow-auto rounded-[14px] p-3"
-            style={{
-              backgroundColor: '#e7ebf5',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55)',
-            }}
-          >
+          <div className="mt-4 min-h-0 min-w-0 flex-1 overflow-auto rounded-[14px] border border-border/60 bg-secondary p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
             {isLoading ? (
               <div className="text-sm text-low">
                 {t('members.skills.detail.loadingContent')}
@@ -213,10 +206,10 @@ export function SkillDetailModal({
                   onClick={primaryAction.onClick}
                   disabled={primaryAction.disabled}
                   className={cn(
-                    'inline-flex h-10 min-w-[136px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-black px-6 text-base font-medium text-white',
+                    'inline-flex h-10 min-w-[136px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-[hsl(var(--brand))] px-6 text-base font-medium text-on-brand',
                     primaryAction.disabled
                       ? 'cursor-not-allowed opacity-60'
-                      : 'hover:bg-black/85',
+                      : 'hover:bg-[hsl(var(--brand-hover))]',
                     primaryAction.className
                   )}
                 >

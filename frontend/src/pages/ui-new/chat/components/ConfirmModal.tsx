@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ConfirmationDialogChrome,
@@ -36,6 +37,23 @@ export function ConfirmModal({
     ? t('modals.confirm.processing')
     : (confirmText ?? (isAlert ? t('common:ok') : t('modals.confirm.confirm')));
   const resolvedCancelText = cancelText ?? t('modals.confirm.cancel');
+
+  useEffect(() => {
+    if (!isOpen || isLoading) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || event.isComposing) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      onConfirm();
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [isLoading, isOpen, onConfirm]);
 
   return (
     <ConfirmationDialogChrome

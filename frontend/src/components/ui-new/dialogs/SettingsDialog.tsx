@@ -14,6 +14,7 @@ import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal } from '@/lib/modals';
 import { usePortalContainer } from '@/contexts/PortalContainerContext';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/components/ThemeProvider';
 import { SettingsSection } from './settings/SettingsSection';
 import type { SettingsSectionType } from './settings/SettingsSection';
 import {
@@ -46,6 +47,7 @@ function SettingsDialogContent({
   onClose,
 }: SettingsDialogContentProps) {
   const { t } = useTranslation('settings');
+  const { resolvedTheme } = useTheme();
   const { isDirty } = useSettingsDirty();
   const [activeSection, setActiveSection] = useState<SettingsSectionType>(
     initialSection || 'general'
@@ -88,6 +90,38 @@ function SettingsDialogContent({
   const handleMobileBack = () => {
     setMobileShowContent(false);
   };
+  const isDark = resolvedTheme === 'dark';
+  const palette = isDark
+    ? {
+        overlay: 'rgba(5, 10, 17, 0.72)',
+        shellBorder: '#2A3445',
+        shellShadow: '0 24px 56px rgba(0, 0, 0, 0.42)',
+        navBg: '#101722',
+        mainBg: '#141C28',
+        title: '#F3F6FB',
+        close: '#7F8AA3',
+        inactive: '#BAC4D6',
+        inactiveHover: '#F3F6FB',
+        inactiveHoverBg: 'rgba(148, 163, 184, 0.08)',
+        activeBg: 'rgba(94, 162, 255, 0.14)',
+        activeText: '#CFE3FF',
+        mobileBorder: '#202938',
+      }
+    : {
+        overlay: 'rgba(0, 0, 0, 0.05)',
+        shellBorder: '#E8EEF5',
+        shellShadow: '0 20px 60px rgba(0,0,0,0.1)',
+        navBg: '#F9FBFF',
+        mainBg: '#FFFFFF',
+        title: '#333333',
+        close: '#cccccc',
+        inactive: '#8C8C8C',
+        inactiveHover: '#333333',
+        inactiveHoverBg: 'rgba(0, 0, 0, 0.03)',
+        activeBg: 'rgba(74, 144, 226, 0.08)',
+        activeText: '#4A90E2',
+        mobileBorder: '#E8EEF5',
+      };
 
   // Handle ESC key
   useEffect(() => {
@@ -104,7 +138,7 @@ function SettingsDialogContent({
     <>
       <div
         className="fixed inset-0 z-[9998] animate-in fade-in-0 duration-200"
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)' }}
+        style={{ backgroundColor: palette.overlay }}
         onClick={handleCloseWithConfirmation}
       />
       <div
@@ -119,11 +153,14 @@ function SettingsDialogContent({
             'settings-dialog-shell chat-settings-theme h-full w-full flex overflow-hidden bg-white',
             'animate-in fade-in-0 slide-in-from-bottom-4 duration-200',
             'rounded-none border-0',
-            'md:h-[800px] md:w-[966px] md:rounded-[16px] md:border md:border-[#E8EEF5] md:shadow-[0_20px_60px_rgba(0,0,0,0.1)]'
+            'md:h-[800px] md:w-[966px] md:rounded-[16px] md:border'
           )}
           style={{
             fontFamily:
               '-apple-system, "PingFang SC", "Helvetica Neue", sans-serif',
+            background: palette.navBg,
+            borderColor: palette.shellBorder,
+            boxShadow: palette.shellShadow,
           }}
         >
           <div
@@ -133,7 +170,7 @@ function SettingsDialogContent({
               mobileShowContent && 'hidden',
               'md:block md:w-[266px]'
             )}
-            style={{ padding: '24px 12px' }}
+            style={{ padding: '24px 12px', background: palette.navBg }}
           >
             <div className="mb-6 flex items-center justify-between px-3">
               <h2
@@ -141,7 +178,7 @@ function SettingsDialogContent({
                 style={{
                   fontSize: '18px',
                   fontWeight: 600,
-                  color: '#333333',
+                  color: palette.title,
                 }}
               >
                 {t('settings.layout.nav.title')}
@@ -152,7 +189,7 @@ function SettingsDialogContent({
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#cccccc',
+                  color: palette.close,
                   cursor: 'pointer',
                 }}
               >
@@ -169,22 +206,20 @@ function SettingsDialogContent({
                     onClick={() => handleSectionSelect(section.id)}
                     className="flex w-full items-center gap-[10px] rounded-[10px] border-none px-4 py-[10px] text-left text-[14px] font-medium transition-all duration-200"
                     style={{
-                      background: isActive
-                        ? 'rgba(74, 144, 226, 0.08)'
-                        : 'transparent',
-                      color: isActive ? '#4A90E2' : '#8C8C8C',
+                      background: isActive ? palette.activeBg : 'transparent',
+                      color: isActive ? palette.activeText : palette.inactive,
                     }}
                     onMouseEnter={(event) => {
                       if (!isActive) {
                         event.currentTarget.style.background =
-                          'rgba(0, 0, 0, 0.03)';
-                        event.currentTarget.style.color = '#333333';
+                          palette.inactiveHoverBg;
+                        event.currentTarget.style.color = palette.inactiveHover;
                       }
                     }}
                     onMouseLeave={(event) => {
                       if (!isActive) {
                         event.currentTarget.style.background = 'transparent';
-                        event.currentTarget.style.color = '#8C8C8C';
+                        event.currentTarget.style.color = palette.inactive;
                       }
                     }}
                   >
@@ -203,25 +238,40 @@ function SettingsDialogContent({
               !mobileShowContent && 'hidden',
               'md:flex'
             )}
+            style={{ background: palette.mainBg }}
           >
-            <div className="flex items-center gap-2 border-b border-[#E8EEF5] p-3 md:hidden">
+            <div
+              className="flex items-center gap-2 border-b border-[#E8EEF5] p-3 md:hidden"
+              style={{
+                borderColor: palette.mobileBorder,
+                background: palette.mainBg,
+              }}
+            >
               <button
                 onClick={handleMobileBack}
-                className="rounded-[10px] border-none bg-transparent p-1 text-[#8C8C8C]"
+                className="rounded-[10px] border-none bg-transparent p-1"
+                style={{ color: palette.inactive }}
               >
                 <CaretLeftIcon className="size-icon-sm" weight="bold" />
               </button>
-              <span className="text-sm font-medium text-[#333333]">
+              <span
+                className="text-sm font-medium"
+                style={{ color: palette.title }}
+              >
                 {t(`settings.layout.nav.${activeSection}`)}
               </span>
               <button
                 onClick={handleCloseWithConfirmation}
-                className="ml-auto rounded-[10px] border-none bg-transparent p-1 text-[#cccccc]"
+                className="ml-auto rounded-[10px] border-none bg-transparent p-1"
+                style={{ color: palette.close }}
               >
                 <XIcon className="size-icon-sm" weight="bold" />
               </button>
             </div>
-            <div className="settings-dialog-content flex-1 overflow-hidden bg-white">
+            <div
+              className="settings-dialog-content flex-1 overflow-hidden bg-white"
+              style={{ background: palette.mainBg }}
+            >
               <SettingsSection
                 type={activeSection}
                 onClose={handleCloseWithConfirmation}

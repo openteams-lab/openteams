@@ -185,7 +185,7 @@
     "noInstalledAgents": "No installed code agents detected on this machine.",
     "modelVariant": "Model variant",
     "model": "Model",
-    "systemPrompt": "Role settings (required)",
+    "systemPrompt": "Role settings (optional)",
     "expand": "Expand",
     "collapse": "Collapse",
     "systemPromptPlaceholder": "Describe this AI member's role settings.",
