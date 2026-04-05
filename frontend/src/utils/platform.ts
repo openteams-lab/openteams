@@ -36,7 +36,7 @@ export function isMac(): boolean {
 export function getWorkspacePathExample(): string {
   return detectClientPlatform() === 'windows'
     ? 'E:\\workspace\\MyProject'
-    : '~/workspace/MyProject';
+    : '/home/user/MyProject';
 }
 
 export function getModifierKey(): string {

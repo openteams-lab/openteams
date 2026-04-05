@@ -63,6 +63,7 @@ export namespace Server {
         if (err instanceof NamedError) {
           let status: ContentfulStatusCode
           if (err instanceof NotFoundError) status = 404
+          else if (err.name === "SessionForkQueueTimeoutError") status = 408
           else if (err instanceof Provider.ModelNotFoundError) status = 400
           else if (err.name === "ProviderAuthValidationFailed") status = 400
           else if (err.name.startsWith("Worktree")) status = 400

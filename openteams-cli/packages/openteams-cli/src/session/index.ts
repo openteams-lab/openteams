@@ -1,4 +1,5 @@
 import { Slug } from "@openteams/util/slug"
+import { NamedError } from "@openteams/util/error"
 import path from "path"
 import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
@@ -32,15 +33,48 @@ import { PermissionNext } from "@/permission"
 import { Global } from "@/global"
 import type { LanguageModelV2Usage } from "@ai-sdk/provider"
 import { iife } from "@/util/iife"
+import { Lock } from "@/util/lock"
 
 export namespace Session {
   const log = Log.create({ service: "session" })
 
   const parentTitlePrefix = "New session - "
   const childTitlePrefix = "Child session - "
+  const FORK_QUEUE_KEY = "session:fork"
+  let forkQueueTimeoutMs = 60_000
+
+  export const ForkQueueTimeoutError = NamedError.create(
+    "SessionForkQueueTimeoutError",
+    z.object({
+      message: z.string(),
+    }),
+  )
 
   function createDefaultTitle(isChild = false) {
     return (isChild ? childTitlePrefix : parentTitlePrefix) + new Date().toISOString()
+  }
+
+  async function acquireForkQueueLock() {
+    try {
+      return await Lock.write(FORK_QUEUE_KEY, { timeout: forkQueueTimeoutMs })
+    } catch (error) {
+      if (error instanceof Error && error.message === `Lock timed out after ${forkQueueTimeoutMs}ms`) {
+        throw new ForkQueueTimeoutError({
+          message: `session fork queue timed out after ${forkQueueTimeoutMs}ms`,
+        })
+      }
+      throw error
+    }
+  }
+
+  export const Internal = {
+    acquireForkQueueLock,
+    setForkQueueTimeoutForTest(ms: number) {
+      forkQueueTimeoutMs = ms
+    },
+    resetForkQueueTimeoutForTest() {
+      forkQueueTimeoutMs = 60_000
+    },
   }
 
   export function isDefaultTitle(title: string) {
@@ -242,8 +276,9 @@ export namespace Session {
       messageID: MessageID.zod.optional(),
     }),
     async (input) => {
+      using _queue = await acquireForkQueueLock()
       const original = await get(input.sessionID)
-      if (!original) throw new Error("session not found")
+      if (!original) throw new NotFoundError({ message: `Session not found: ${input.sessionID}` })
       const title = getForkedTitle(original.title)
       const session = await createNext({
         directory: Instance.directory,

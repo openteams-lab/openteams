@@ -145,10 +145,10 @@ function ToggleSwitch({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'relative h-5 w-9 shrink-0 rounded-full border appearance-none transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338CA]/40',
+        'relative h-5 w-9 shrink-0 rounded-full border appearance-none transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338CA]/40 dark:focus-visible:ring-[#5EA2FF]/40',
         checked
-          ? 'bg-[#A8C9FF] border-[#A8C9FF]'
-          : 'bg-[#e5e5e8] border-[#e5e5e8]'
+          ? 'bg-[#A8C9FF] border-[#A8C9FF] dark:bg-[#5EA2FF] dark:border-[#5EA2FF]'
+          : 'bg-[#e5e5e8] border-[#e5e5e8] dark:bg-[#222C3D] dark:border-[#2A3445]'
       )}
     >
       <span
@@ -156,7 +156,7 @@ function ToggleSwitch({
           'absolute top-[0.5px] size-4 rounded-full border border-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.2)] transition-all duration-200',
           checked
             ? 'left-[18px] bg-white border-white'
-            : 'left-0.5 bg-[#f3f3f5]'
+            : 'left-0.5 bg-[#f3f3f5] dark:bg-[#BAC4D6]'
         )}
       />
     </button>
@@ -861,7 +861,7 @@ export function SkillsPanel({
 
   return (
     <div
-      className="absolute inset-y-0 right-0 z-40 bg-[var(--chat-session-bg-primary,#ffffff)]"
+      className="absolute inset-y-0 right-0 z-40 bg-[var(--chat-session-bg-primary,#ffffff)] dark:bg-[#0B1017]"
       style={{ left: `${leftOffset}px` }}
     >
       <div className="h-full overflow-y-auto">
@@ -894,7 +894,7 @@ export function SkillsPanel({
                   setCustomSkillPath('');
                   setIsCreateModalOpen(true);
                 }}
-                className="inline-flex h-10 items-center gap-1 rounded-xl bg-black px-4 text-sm font-semibold text-white hover:bg-black/85"
+                className="inline-flex h-10 items-center gap-1 rounded-xl bg-black px-4 text-sm font-semibold text-white hover:bg-black/85 dark:bg-[#5EA2FF] dark:hover:bg-[#7DB6FF]"
               >
                 <PlusIcon size={14} />
                 {t('skillLibrary.actions.newSkill')}
@@ -930,7 +930,7 @@ export function SkillsPanel({
             </div>
 
             {installedToggleUnsupported && (
-              <div className="mb-4 rounded-2xl border border-border/70 bg-secondary/40 px-4 py-3 text-sm text-low">
+              <div className="mb-4 rounded-2xl border border-border/70 bg-secondary/40 px-4 py-3 text-sm text-low dark:bg-[#192233]">
                 {t('skillLibrary.installed.toggleUnsupported', {
                   runnerType: selectedRunnerLabel || selectedRunnerKey,
                 })}
@@ -951,7 +951,7 @@ export function SkillsPanel({
               )}
 
               {!isLoadingInstalled && displayedInstalledSkills.length === 0 && (
-                <div className="col-span-full rounded-2xl border border-border bg-secondary/30 px-4 py-6 text-sm text-low">
+                <div className="col-span-full rounded-2xl border border-border bg-secondary/30 px-4 py-6 text-sm text-low dark:bg-[#192233]">
                   {selectedRunnerLabel
                     ? t('members.skills.noneInstalledForRunner', {
                         runnerType: selectedRunnerLabel,
@@ -980,7 +980,7 @@ export function SkillsPanel({
                           openDetail({ kind: 'installed', skill: item });
                         }
                       }}
-                      className="rounded-2xl border border-border/80 bg-[var(--chat-session-bg-primary,#ffffff)] px-3 py-2 cursor-pointer"
+                      className="rounded-2xl border border-border/80 bg-[var(--chat-session-bg-primary,#ffffff)] px-3 py-2 cursor-pointer dark:bg-[#121823]"
                     >
                       <div className="flex items-center gap-2.5">
                         <SkillTileIcon name={skill.name} compact />
@@ -1051,7 +1051,7 @@ export function SkillsPanel({
                 )}
 
                 {!isLoadingMarket && displayedMarketSkills.length === 0 && (
-                  <div className="col-span-full rounded-2xl border border-border bg-secondary/30 px-4 py-6 text-sm text-low">
+                  <div className="col-span-full rounded-2xl border border-border bg-secondary/30 px-4 py-6 text-sm text-low dark:bg-[#192233]">
                     {t('skillLibrary.market.empty')}
                   </div>
                 )}
@@ -1074,7 +1074,7 @@ export function SkillsPanel({
                             openDetail({ kind: 'market', skill });
                           }
                         }}
-                        className="rounded-2xl border border-border/80 bg-[var(--chat-session-bg-primary,#ffffff)] px-3 py-2 cursor-pointer"
+                        className="rounded-2xl border border-border/80 bg-[var(--chat-session-bg-primary,#ffffff)] px-3 py-2 cursor-pointer dark:bg-[#121823]"
                       >
                         <div className="flex items-center gap-2.5">
                           <SkillTileIcon name={skill.name} compact />

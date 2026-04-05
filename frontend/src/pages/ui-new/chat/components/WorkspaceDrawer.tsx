@@ -148,7 +148,7 @@ export function WorkspaceDrawer({
       >
         <div className="chat-session-workspace-drawer-header px-base py-base border-b border-border shrink-0 flex items-center justify-between">
           <div className="min-w-0">
-            <div className="chat-session-workspace-drawer-eyebrow text-[#5094FB]">
+            <div className="chat-session-workspace-drawer-eyebrow">
               {t('modals.workspaceDrawer.workspaceTrail')}
             </div>
             <div className="text-sm text-normal font-medium truncate">
@@ -175,7 +175,7 @@ export function WorkspaceDrawer({
                 className="chat-session-workspace-path-card"
                 title={workspacePath}
               >
-                <div className="chat-session-workspace-path-label text-[#5094FB]">
+                <div className="chat-session-workspace-path-label">
                   <FolderNotchOpenIcon className="size-icon-xs" />
                   <span>{t('modals.workspaceDrawer.workspacePath')}</span>
                 </div>
@@ -191,7 +191,7 @@ export function WorkspaceDrawer({
             <div className="space-y-half">
               <button
                 type="button"
-                className="flex w-full items-center justify-between text-sm font-medium text-normal hover:text-[#4084EB] transition-colors"
+                className="chat-session-workspace-link flex w-full items-center justify-between text-sm font-medium text-normal transition-colors"
                 onClick={() =>
                   setIsFailedMessagesExpanded((expanded) => !expanded)
                 }
@@ -224,15 +224,15 @@ export function WorkspaceDrawer({
                   {failedMessages.map((failedMsg) => (
                     <div
                       key={failedMsg.message.id}
-                      className="rounded-sm p-base space-y-half bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)]"
+                      className="chat-session-workspace-error-card rounded-sm border p-base space-y-half"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <XCircleIcon
-                            className="size-icon-xs text-[#EF4444] flex-shrink-0"
+                            className="size-icon-xs flex-shrink-0 text-error"
                             weight="fill"
                           />
-                          <span className="text-xs text-[#EF4444] font-medium truncate">
+                          <span className="text-xs font-medium truncate text-error">
                             {failedMsg.errorSummary}
                           </span>
                         </div>
@@ -243,7 +243,7 @@ export function WorkspaceDrawer({
                         </span>
                       </div>
                       {failedMsg.errorDetail && (
-                        <div className="text-xs text-low font-mono bg-[rgba(239,68,68,0.04)] rounded px-2 py-1 break-all max-h-[60px] overflow-y-auto">
+                        <div className="chat-session-workspace-error-detail max-h-[60px] overflow-y-auto rounded px-2 py-1 break-all font-mono text-xs text-low">
                           {failedMsg.errorDetail.slice(0, 200)}
                           {failedMsg.errorDetail.length > 200 && '...'}
                         </div>
@@ -251,7 +251,7 @@ export function WorkspaceDrawer({
                       <div className="flex items-center gap-2 text-xs">
                         <button
                           type="button"
-                          className="text-[#5094FB] hover:text-[#4084EB]"
+                          className="chat-session-workspace-link"
                           onClick={() => setExpandedError(failedMsg)}
                         >
                           {t('modals.workspaceDrawer.viewDetails', {
@@ -281,7 +281,7 @@ export function WorkspaceDrawer({
                 className={cn(
                   'chat-session-workspace-run-card rounded-sm p-base space-y-half',
                   run.hasError
-                    ? 'bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)]'
+                    ? 'chat-session-workspace-error-card border'
                     : 'bg-[#e5e9f3]'
                 )}
               >
@@ -289,7 +289,7 @@ export function WorkspaceDrawer({
                   <span className="flex items-center gap-1.5">
                     {run.hasError && (
                       <XCircleIcon
-                        className="size-icon-xs text-[#EF4444]"
+                        className="size-icon-xs text-error"
                         weight="fill"
                       />
                     )}
@@ -302,11 +302,11 @@ export function WorkspaceDrawer({
                 {run.hasError && run.errorSummary && (
                   <div className="space-y-1">
                     <div className="flex items-start gap-2">
-                      <div className="text-xs text-[#EF4444] font-medium flex-1 truncate">
+                      <div className="flex-1 truncate text-xs font-medium text-error">
                         {run.errorSummary}
                       </div>
                       {run.errorType?.type && (
-                        <span className="shrink-0 rounded bg-[rgba(239,68,68,0.15)] px-1.5 py-0.5 text-[10px] font-medium text-[#EF4444]">
+                        <span className="chat-session-workspace-error-badge shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium">
                           {run.errorType.type.replace(/_/g, ' ')}
                         </span>
                       )}
@@ -314,12 +314,12 @@ export function WorkspaceDrawer({
                     {run.errorContent &&
                       run.errorContent !== run.errorSummary && (
                         <details className="text-xs">
-                          <summary className="cursor-pointer text-[#EF4444] hover:underline">
+                          <summary className="cursor-pointer text-error hover:underline">
                             {t('modals.workspaceDrawer.viewDetails', {
                               defaultValue: 'View Details',
                             })}
                           </summary>
-                          <pre className="mt-1 max-h-[100px] overflow-auto rounded bg-[rgba(239,68,68,0.04)] p-2 text-[10px] font-mono text-low whitespace-pre-wrap break-all select-text">
+                          <pre className="chat-session-workspace-error-detail mt-1 max-h-[100px] overflow-auto rounded p-2 font-mono text-[10px] text-low whitespace-pre-wrap break-all select-text">
                             {run.errorContent}
                           </pre>
                         </details>
@@ -335,14 +335,14 @@ export function WorkspaceDrawer({
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      className="text-[#5094FB] hover:text-[#4084EB]"
+                      className="chat-session-workspace-link"
                       onClick={() => onLoadLog(run.runId)}
                     >
                       {t('modals.workspaceDrawer.viewLog')}
                     </button>
                     <button
                       type="button"
-                      className="text-[#5094FB] hover:text-[#4084EB]"
+                      className="chat-session-workspace-link"
                       onClick={() => setExpandedRun(run)}
                     >
                       {t('members.expand')}
@@ -368,14 +368,14 @@ export function WorkspaceDrawer({
               </div>
             )}
             {logRunId && (
-              <div className="chat-session-workspace-log-card rounded-sm bg-[#ecedf1] p-base">
+              <div className="chat-session-workspace-log-card rounded-sm p-base">
                 <div className="flex items-center justify-between text-xs text-low pb-half">
                   <span>
                     {t('modals.workspaceDrawer.run')} {logRunId.slice(0, 8)}
                   </span>
                   <button
                     type="button"
-                    className="text-[#5094FB] hover:text-[#4084EB]"
+                    className="chat-session-workspace-link"
                     onClick={() => onLoadLog(logRunId)}
                     disabled={logLoading}
                   >
@@ -391,7 +391,7 @@ export function WorkspaceDrawer({
                   <div className="text-xs text-error">{logError}</div>
                 )}
                 {!logLoading && !logError && (
-                  <div className="chat-session-workspace-log-body min-h-[320px] max-h-[420px] overflow-y-auto border-t border-[#d8dce6] bg-[#ecedf1] pt-base select-text">
+                  <div className="chat-session-workspace-log-body min-h-[320px] max-h-[420px] overflow-y-auto border-t pt-base select-text">
                     {logContent ? (
                       <RawLogText
                         content={logContent}
@@ -421,7 +421,7 @@ export function WorkspaceDrawer({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {expandedRun?.hasError && (
-              <XCircleIcon className="size-5 text-[#EF4444]" weight="fill" />
+              <XCircleIcon className="size-5 text-error" weight="fill" />
             )}
             <span>
               {expandedRun
@@ -429,7 +429,7 @@ export function WorkspaceDrawer({
                 : t('modals.workspaceDrawer.run')}
             </span>
             {expandedRun?.errorType?.type && (
-              <span className="ml-2 rounded bg-[rgba(239,68,68,0.15)] px-2 py-0.5 text-xs font-medium text-[#EF4444]">
+              <span className="chat-session-workspace-error-badge ml-2 rounded px-2 py-0.5 text-xs font-medium">
                 {expandedRun.errorType.type.replace(/_/g, ' ')}
               </span>
             )}
@@ -439,13 +439,13 @@ export function WorkspaceDrawer({
           <div className="space-y-4">
             {/* Error section */}
             {expandedRun?.hasError && expandedRun.errorSummary && (
-              <div className="rounded-sm bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] p-base">
+              <div className="chat-session-workspace-error-panel rounded-sm border p-base">
                 <div className="text-xs text-low mb-1">
                   {t('modals.workspaceDrawer.errorSummary', {
                     defaultValue: 'Error Summary',
                   })}
                 </div>
-                <div className="text-sm text-[#EF4444] font-medium">
+                <div className="text-sm font-medium text-error">
                   {expandedRun.errorSummary}
                 </div>
                 {expandedRun.errorContent &&
@@ -456,7 +456,7 @@ export function WorkspaceDrawer({
                           defaultValue: 'Full Error Log',
                         })}
                       </div>
-                      <pre className="max-h-[200px] overflow-auto rounded bg-[rgba(239,68,68,0.04)] p-2 text-xs font-mono text-low whitespace-pre-wrap break-all select-text">
+                      <pre className="chat-session-workspace-error-detail max-h-[200px] overflow-auto rounded p-2 text-xs font-mono text-low whitespace-pre-wrap break-all select-text">
                         {expandedRun.errorContent}
                       </pre>
                     </div>
@@ -464,7 +464,7 @@ export function WorkspaceDrawer({
               </div>
             )}
             {/* Content section */}
-            <div className="max-h-[50vh] overflow-y-auto rounded-sm bg-[#ecedf1] p-base select-text">
+            <div className="chat-session-workspace-content-panel max-h-[50vh] overflow-y-auto rounded-sm p-base select-text">
               <div className="text-xs text-normal font-mono whitespace-pre-wrap break-all select-text">
                 {expandedRun?.content ?? ''}
               </div>
@@ -485,7 +485,7 @@ export function WorkspaceDrawer({
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <XCircleIcon className="size-5 text-[#EF4444]" weight="fill" />
+            <XCircleIcon className="size-5 text-error" weight="fill" />
             <span>
               {t('modals.workspaceDrawer.errorDetails', {
                 defaultValue: 'Error Details',
@@ -496,13 +496,13 @@ export function WorkspaceDrawer({
         <DialogContent className="select-text">
           <div className="space-y-4">
             {/* Error Summary */}
-            <div className="rounded-sm bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] p-base">
+            <div className="chat-session-workspace-error-panel rounded-sm border p-base">
               <div className="text-xs text-low mb-1">
                 {t('modals.workspaceDrawer.errorSummary', {
                   defaultValue: 'Error Summary',
                 })}
               </div>
-              <div className="text-sm text-[#EF4444] font-medium">
+              <div className="text-sm font-medium text-error">
                 {expandedError?.errorSummary}
               </div>
               {expandedError?.errorDetail && (
@@ -530,7 +530,7 @@ export function WorkspaceDrawer({
                   defaultValue: 'Message Content',
                 })}
               </div>
-              <div className="max-h-[50vh] overflow-y-auto rounded-sm bg-[#ecedf1] p-base select-text">
+              <div className="chat-session-workspace-content-panel max-h-[50vh] overflow-y-auto rounded-sm p-base select-text">
                 <div className="text-xs text-normal font-mono whitespace-pre-wrap break-all select-text">
                   {expandedError?.message?.content ?? ''}
                 </div>

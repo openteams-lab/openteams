@@ -44,6 +44,9 @@
 ---
 ## 🔥 *News:*
 ### *Major updates*
+- **2026.04.02 (v0.3.11)**
+  - Enable dark ui mode
+  - fix openteams-cli concurrency issues
 - **2026.04.02 (v0.3.10)**
   - Implement in-app version update
   - The documentation website is now live.
@@ -216,6 +219,16 @@ pnpm dev -- --port $env:FRONTEND_PORT --host
 
 Open the frontend page at `http://localhost:<FRONTEND_PORT>` (example: `http://localhost:3001`).
 
+#### Build `openteams-cli` locally
+
+Use the following commands if you need to compile the local `openteams-cli` binary instead of using the bundled or published build.
+the build artifacts will be placed in the binaries directory.
+
+```bash
+# From the repository root
+bun run ./scripts/build-openteams-cli.ts
+```
+
 ## Release Notes & Roadmap
 
 ### V0.2
@@ -239,7 +252,7 @@ Open the frontend page at `http://localhost:<FRONTEND_PORT>` (example: `http://l
 
 ### Roadmap
 - [x] Backend for Code Agent optimized for OpenTeams use cases —— v0.3.7
-- [ ] Develop multiple frontend color schemes
+- [x] Develop multiple frontend color schemes  —— v0.3.11
 - [ ] Establish a high-efficiency team collaboration framework
 - [ ] More agent integrations (Kilo Code, OpenClaw, etc.)
 - [ ] Add more powerful, ready-to-use AI teams

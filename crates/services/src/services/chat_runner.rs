@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicU8, Ordering},
     },
 };
 
@@ -360,6 +360,35 @@ enum LifecycleEvent {
     ProcessExited(std::io::Result<std::process::ExitStatus>),
     ExitSignal(executors::executors::ExecutorExitResult),
     StopRequested,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RunCompletionStatus {
+    Succeeded,
+    Failed,
+    Stopped,
+}
+
+impl RunCompletionStatus {
+    fn as_u8(self) -> u8 {
+        match self {
+            Self::Succeeded => 0,
+            Self::Failed => 1,
+            Self::Stopped => 2,
+        }
+    }
+
+    fn from_atomic(value: &AtomicU8) -> Self {
+        match value.load(Ordering::Relaxed) {
+            1 => Self::Failed,
+            2 => Self::Stopped,
+            _ => Self::Succeeded,
+        }
+    }
+
+    fn store(self, value: &AtomicU8) {
+        value.store(self.as_u8(), Ordering::Relaxed);
+    }
 }
 
 #[derive(Clone)]
@@ -872,13 +901,17 @@ impl ChatRunner {
             return Ok(());
         }
 
-        if session_agent.state == ChatSessionAgentState::Running {
+        if matches!(
+            session_agent.state,
+            ChatSessionAgentState::Running | ChatSessionAgentState::Stopping
+        ) {
             // Queue the message for later processing instead of skipping
             tracing::debug!(
                 session_agent_id = %session_agent.id,
                 agent_id = %agent.id,
                 message_id = %source_message.id,
-                "chat session agent already running; queueing message for later"
+                state = ?session_agent.state,
+                "chat session agent already active; queueing message for later"
             );
 
             let pending = PendingMessage {
@@ -1112,7 +1145,7 @@ impl ChatRunner {
             self.spawn_log_forwarders(&mut spawned.child, msg_store.clone(), raw_log_file);
             executor.normalize_logs(msg_store.clone(), PathBuf::from(&workspace_path).as_path());
 
-            let failed_flag = Arc::new(AtomicBool::new(false));
+            let completion_status = Arc::new(AtomicU8::new(RunCompletionStatus::Succeeded.as_u8()));
 
             self.spawn_stream_bridge(
                 msg_store.clone(),
@@ -1124,7 +1157,7 @@ impl ChatRunner {
                 meta_path,
                 PathBuf::from(&workspace_path),
                 run_dir,
-                failed_flag.clone(),
+                completion_status.clone(),
                 chain_depth,
                 context_snapshot.context_compacted,
                 context_snapshot.compression_warning.clone(),
@@ -1139,7 +1172,7 @@ impl ChatRunner {
                 spawned.cancel,
                 spawned.exit_signal,
                 msg_store,
-                failed_flag,
+                completion_status,
                 session_agent_id,
             );
 
@@ -4336,7 +4369,7 @@ impl ChatRunner {
         meta_path: PathBuf,
         _workspace_path: PathBuf,
         run_dir: PathBuf,
-        failed_flag: Arc<AtomicBool>,
+        completion_status: Arc<AtomicU8>,
         chain_depth: u32,
         context_compacted: bool,
         compression_warning: Option<chat::CompressionWarning>,
@@ -4511,9 +4544,14 @@ impl ChatRunner {
                         //     ChatRunner::capture_git_diff(&workspace_path, &run_dir).await;
                         // let untracked_files =
                         //     ChatRunner::capture_untracked_files(&workspace_path, &run_dir).await;
-                        let failed = failed_flag.load(Ordering::Relaxed);
+                        let completion_status =
+                            RunCompletionStatus::from_atomic(&completion_status);
+                        let should_clear_agent_session = matches!(
+                            completion_status,
+                            RunCompletionStatus::Failed | RunCompletionStatus::Stopped
+                        );
 
-                        if failed {
+                        if should_clear_agent_session {
                             agent_session_id = None;
                             agent_message_id = None;
                             let _ = ChatSessionAgent::update_agent_session_id(
@@ -4691,10 +4729,11 @@ impl ChatRunner {
                             is_final: true,
                         });
 
-                        let final_state = if failed {
-                            ChatSessionAgentState::Dead
-                        } else {
-                            ChatSessionAgentState::Idle
+                        let final_state = match completion_status {
+                            RunCompletionStatus::Failed => ChatSessionAgentState::Dead,
+                            RunCompletionStatus::Succeeded | RunCompletionStatus::Stopped => {
+                                ChatSessionAgentState::Idle
+                            }
                         };
 
                         let _ = ChatSessionAgent::update_state(
@@ -4712,10 +4751,11 @@ impl ChatRunner {
                         });
 
                         // Emit MentionAcknowledged completed/failed event
-                        let mention_status = if final_state == ChatSessionAgentState::Dead {
-                            MentionStatus::Failed
-                        } else {
-                            MentionStatus::Completed
+                        let mention_status = match completion_status {
+                            RunCompletionStatus::Failed => MentionStatus::Failed,
+                            RunCompletionStatus::Succeeded | RunCompletionStatus::Stopped => {
+                                MentionStatus::Completed
+                            }
                         };
                         tracing::debug!(
                             mention_status = ?mention_status,
@@ -4784,7 +4824,7 @@ impl ChatRunner {
         executor_cancel: Option<CancellationToken>,
         exit_signal: Option<ExecutorExitSignal>,
         msg_store: Arc<MsgStore>,
-        failed_flag: Arc<AtomicBool>,
+        completion_status: Arc<AtomicU8>,
         session_agent_id: Uuid,
     ) {
         let stop = CancellationToken::new();
@@ -4799,7 +4839,7 @@ impl ChatRunner {
                 executor_cancel,
                 exit_signal,
                 msg_store,
-                failed_flag,
+                completion_status,
                 session_agent_id,
             )
             .await;
@@ -4813,7 +4853,7 @@ impl ChatRunner {
         executor_cancel: Option<CancellationToken>,
         exit_signal: Option<ExecutorExitSignal>,
         msg_store: Arc<MsgStore>,
-        failed_flag: Arc<AtomicBool>,
+        completion_status: Arc<AtomicU8>,
         session_agent_id: Uuid,
     ) {
         Self::watch_executor_lifecycle_with_timeout(
@@ -4822,7 +4862,7 @@ impl ChatRunner {
             executor_cancel,
             exit_signal,
             msg_store,
-            failed_flag,
+            completion_status,
             session_agent_id,
             EXECUTOR_GRACEFUL_STOP_TIMEOUT,
         )
@@ -4836,7 +4876,7 @@ impl ChatRunner {
         executor_cancel: Option<CancellationToken>,
         mut exit_signal: Option<ExecutorExitSignal>,
         msg_store: Arc<MsgStore>,
-        failed_flag: Arc<AtomicBool>,
+        completion_status: Arc<AtomicU8>,
         session_agent_id: Uuid,
         graceful_timeout: std::time::Duration,
     ) {
@@ -4849,7 +4889,7 @@ impl ChatRunner {
         )
         .await;
 
-        let mut failed = false;
+        let mut completion = RunCompletionStatus::Succeeded;
         match event {
             LifecycleEvent::ProcessExited(Ok(status)) => {
                 tracing::debug!(
@@ -4858,12 +4898,12 @@ impl ChatRunner {
                     "[chat_runner] Executor process exited"
                 );
                 if !status.success() {
-                    failed = true;
+                    completion = RunCompletionStatus::Failed;
                 }
             }
             LifecycleEvent::ProcessExited(Err(err)) => {
                 msg_store.push(LogMsg::Stderr(format!("process wait error: {err}")));
-                failed = true;
+                completion = RunCompletionStatus::Failed;
             }
             LifecycleEvent::ExitSignal(exit_result) => {
                 let signaled_failure = matches!(
@@ -4871,7 +4911,7 @@ impl ChatRunner {
                     executors::executors::ExecutorExitResult::Failure
                 );
                 if signaled_failure {
-                    failed = true;
+                    completion = RunCompletionStatus::Failed;
                 }
 
                 match process::terminate_process_group(&mut child, graceful_timeout).await {
@@ -4890,13 +4930,13 @@ impl ChatRunner {
                             && !cleanup.exit_status.success()
                             && !cleanup.forced_kill
                         {
-                            failed = true;
+                            completion = RunCompletionStatus::Failed;
                         }
                     }
                     Err(err) => {
                         msg_store.push(LogMsg::Stderr(format!("process cleanup error: {err}")));
                         if signaled_failure {
-                            failed = true;
+                            completion = RunCompletionStatus::Failed;
                         }
                     }
                 }
@@ -4919,11 +4959,11 @@ impl ChatRunner {
                         msg_store.push(LogMsg::Stderr(format!("process cleanup error: {err}")));
                     }
                 }
-                failed = true;
+                completion = RunCompletionStatus::Stopped;
             }
         }
 
-        failed_flag.store(failed, Ordering::Relaxed);
+        completion.store(&completion_status);
         msg_store.push_finished();
     }
 
@@ -4966,7 +5006,7 @@ impl ChatRunner {
     /// Stop a running agent by requesting centralized lifecycle cleanup.
     pub async fn stop_agent(
         &self,
-        _session_id: Uuid,
+        session_id: Uuid,
         session_agent_id: Uuid,
     ) -> Result<(), ChatRunnerError> {
         tracing::info!(
@@ -4974,8 +5014,52 @@ impl ChatRunner {
             session_agent_id
         );
 
+        let Some(session_agent) =
+            ChatSessionAgent::find_by_id(&self.db.pool, session_agent_id).await?
+        else {
+            tracing::warn!(
+                session_id = %session_id,
+                session_agent_id = %session_agent_id,
+                "stop_agent requested for missing session agent"
+            );
+            return Ok(());
+        };
+
+        if !matches!(
+            session_agent.state,
+            ChatSessionAgentState::Running | ChatSessionAgentState::Stopping
+        ) {
+            tracing::info!(
+                session_id = %session_id,
+                session_agent_id = %session_agent_id,
+                state = ?session_agent.state,
+                "stop_agent ignored because agent is not active"
+            );
+            return Ok(());
+        }
+
         let control_found = self.run_controls.contains_key(&session_agent_id);
         tracing::info!("Run control found: {}", control_found);
+
+        if control_found && session_agent.state != ChatSessionAgentState::Stopping {
+            let running_started_at = session_agent.updated_at;
+            let updated = ChatSessionAgent::update_state(
+                &self.db.pool,
+                session_agent_id,
+                ChatSessionAgentState::Stopping,
+            )
+            .await?;
+
+            self.emit(
+                session_id,
+                ChatStreamEvent::AgentState {
+                    session_agent_id,
+                    agent_id: updated.agent_id,
+                    state: ChatSessionAgentState::Stopping,
+                    started_at: Some(running_started_at),
+                },
+            );
+        }
 
         if let Some(control) = self.run_controls.get(&session_agent_id) {
             tracing::info!("Requesting stop for session_agent_id: {}", session_agent_id);
@@ -4995,10 +5079,7 @@ impl ChatRunner {
 mod tests {
     use std::{
         path::Path,
-        sync::{
-            Arc,
-            atomic::{AtomicBool, Ordering},
-        },
+        sync::{Arc, atomic::AtomicU8},
     };
 
     use chrono::Utc;
@@ -5018,7 +5099,8 @@ mod tests {
     use super::{
         AgentProtocolError, AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner,
         MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON, MessageAttachmentContext, ReferenceAttachment,
-        ReferenceContext, ResolvedPromptLanguage, SessionAgentSummary, TokenUsageInfo,
+        ReferenceContext, ResolvedPromptLanguage, RunCompletionStatus, SessionAgentSummary,
+        TokenUsageInfo,
     };
     use crate::services::config::UiLanguage;
 
@@ -5249,7 +5331,7 @@ mod tests {
         let child = sleep_command(1).group_spawn().expect("spawn child");
         let stop = CancellationToken::new();
         let msg_store = Arc::new(MsgStore::new());
-        let failed_flag = Arc::new(AtomicBool::new(false));
+        let completion_status = Arc::new(AtomicU8::new(RunCompletionStatus::Succeeded.as_u8()));
         let (exit_tx, exit_rx) = oneshot::channel();
         exit_tx
             .send(executors::executors::ExecutorExitResult::Success)
@@ -5261,7 +5343,7 @@ mod tests {
             None,
             Some(exit_rx),
             msg_store.clone(),
-            failed_flag.clone(),
+            completion_status.clone(),
             Uuid::new_v4(),
             std::time::Duration::from_secs(3),
         ));
@@ -5272,7 +5354,10 @@ mod tests {
         watcher.await.expect("watcher complete");
 
         assert_eq!(finished_count(&msg_store), 1);
-        assert!(!failed_flag.load(Ordering::Relaxed));
+        assert_eq!(
+            RunCompletionStatus::from_atomic(&completion_status),
+            RunCompletionStatus::Succeeded
+        );
     }
 
     #[tokio::test]
@@ -5281,7 +5366,7 @@ mod tests {
         let stop = CancellationToken::new();
         let executor_cancel = CancellationToken::new();
         let msg_store = Arc::new(MsgStore::new());
-        let failed_flag = Arc::new(AtomicBool::new(false));
+        let completion_status = Arc::new(AtomicU8::new(RunCompletionStatus::Succeeded.as_u8()));
 
         let watcher = tokio::spawn(ChatRunner::watch_executor_lifecycle_with_timeout(
             child,
@@ -5289,7 +5374,7 @@ mod tests {
             Some(executor_cancel.clone()),
             None,
             msg_store.clone(),
-            failed_flag.clone(),
+            completion_status.clone(),
             Uuid::new_v4(),
             std::time::Duration::from_millis(100),
         ));
@@ -5301,7 +5386,10 @@ mod tests {
         watcher.await.expect("watcher complete");
 
         assert!(executor_cancel.is_cancelled());
-        assert!(failed_flag.load(Ordering::Relaxed));
+        assert_eq!(
+            RunCompletionStatus::from_atomic(&completion_status),
+            RunCompletionStatus::Stopped
+        );
         assert_eq!(finished_count(&msg_store), 1);
     }
 

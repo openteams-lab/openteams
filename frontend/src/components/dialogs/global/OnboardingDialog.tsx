@@ -181,10 +181,10 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
         hideCloseButton
         className="!my-0 !w-auto !max-w-none !gap-0 !rounded-none !border-0 !bg-transparent !p-0 !shadow-none"
         containerClassName="items-center"
-        overlayClassName="!bg-[rgba(240,244,248,0.42)] backdrop-blur-[2px]"
+        overlayClassName="!bg-[rgba(240,244,248,0.42)] backdrop-blur-[2px] dark:!bg-[rgba(5,10,17,0.72)]"
       >
         <DialogContent
-          className="!w-[520px] !max-w-[calc(100vw-32px)] self-center !gap-0 !rounded-[20px] !border-0 !bg-white !p-12 !text-center !shadow-[0_10px_40px_rgba(0,0,0,0.05)]"
+          className="!w-[520px] !max-w-[calc(100vw-32px)] self-center !gap-0 !rounded-[20px] !border-0 !bg-white !p-12 !text-center !shadow-[0_10px_40px_rgba(0,0,0,0.05)] dark:!border dark:!border-[#2A3445] dark:!bg-[#192233] dark:!shadow-[0_24px_56px_rgba(0,0,0,0.42)]"
           style={{ animation: 'onboarding-welcome-slide-up 0.5s ease-out' }}
         >
           <div className="mb-12">
@@ -193,16 +193,16 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
               alt="OpenTeams"
               className="mx-auto mb-6 h-10 w-auto"
             />
-            <h1 className="m-0 mb-3 text-2xl font-semibold text-[#333333]">
+            <h1 className="m-0 mb-3 text-2xl font-semibold text-[#333333] dark:text-[#F3F6FB]">
               {t('onboardingDialog.title')}
             </h1>
-            <p className="m-0 text-sm leading-[1.5] text-[#8C8C8C]">
+            <p className="m-0 text-sm leading-[1.5] text-[#8C8C8C] dark:text-[#BAC4D6]">
               {t('onboardingDialog.description')}
             </p>
           </div>
 
           <div className="mb-12 text-left">
-            <div className="mb-5 flex items-center gap-2 text-[15px] font-semibold text-[#333333]">
+            <div className="mb-5 flex items-center gap-2 text-[15px] font-semibold text-[#333333] dark:text-[#F3F6FB]">
               <span className="text-[#52C41A]">{'✓'}</span>
               <span>{t('onboardingDialog.agentSectionTitle')}</span>
             </div>
@@ -211,7 +211,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
               <select
                 value={profile.executor}
                 onChange={(event) => handleExecutorChange(event.target.value)}
-                className="h-11 min-w-0 flex-[2] appearance-none rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-sm text-[#333333] outline-none transition-all duration-300 ease-in-out focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)]"
+                className="h-11 min-w-0 flex-[2] appearance-none rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-sm text-[#333333] outline-none transition-all duration-300 ease-in-out focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:focus:border-[#5EA2FF] dark:focus:bg-[#111926] dark:focus:shadow-[0_0_0_4px_rgba(94,162,255,0.12)]"
                 style={selectBackgroundStyle}
               >
                 {agentOptions.map((agent) => (
@@ -224,7 +224,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
               <select
                 value={variantValue}
                 onChange={(event) => handleVariantChange(event.target.value)}
-                className="h-11 min-w-0 flex-1 appearance-none rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-sm text-[#333333] outline-none transition-all duration-300 ease-in-out focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)] disabled:cursor-not-allowed disabled:opacity-80"
+                className="h-11 min-w-0 flex-1 appearance-none rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-sm text-[#333333] outline-none transition-all duration-300 ease-in-out focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)] disabled:cursor-not-allowed disabled:opacity-80 dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:focus:border-[#5EA2FF] dark:focus:bg-[#111926] dark:focus:shadow-[0_0_0_4px_rgba(94,162,255,0.12)]"
                 style={selectBackgroundStyle}
                 disabled={
                   variantOptions.length <= 1 && variantOptions[0] === 'DEFAULT'
@@ -243,7 +243,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
             </div>
 
             <div
-              className={`flex items-start gap-2 rounded-lg border px-3 py-3 ${statusMeta.container}`}
+              className={`flex items-start gap-2 rounded-lg border px-3 py-3 ${statusMeta.container} dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#BAC4D6] dark:fill-[#7DB6FF]`}
             >
               {statusMeta.icon}
               <span className="text-[13px] leading-[1.4]">
@@ -255,7 +255,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
           <button
             type="button"
             onClick={handleComplete}
-            className="h-12 w-full rounded-[24px] border-0 bg-[#4A90E2] text-[15px] font-medium text-white shadow-[0_4px_14px_rgba(74,144,226,0.25)] transition-all duration-300 ease-in-out hover:-translate-y-px hover:bg-[#357ABD] hover:shadow-[0_6px_20px_rgba(74,144,226,0.35)] active:translate-y-0"
+            className="h-12 w-full rounded-[24px] border-0 bg-[#4A90E2] text-[15px] font-medium text-white shadow-[0_4px_14px_rgba(74,144,226,0.25)] transition-all duration-300 ease-in-out hover:-translate-y-px hover:bg-[#357ABD] hover:shadow-[0_6px_20px_rgba(74,144,226,0.35)] active:translate-y-0 dark:bg-[#5EA2FF] dark:shadow-[0_8px_20px_rgba(94,162,255,0.24)] dark:hover:bg-[#7DB6FF] dark:hover:shadow-[0_10px_24px_rgba(94,162,255,0.32)]"
           >
             {t('buttons.continue')}
           </button>

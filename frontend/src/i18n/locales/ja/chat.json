@@ -180,7 +180,7 @@
     "noInstalledAgents": "このマシンにインストールされたコードエージェントが検出されません。",
     "modelVariant": "モデルバリアント",
     "model": "モデル",
-    "systemPrompt": "役割設定（必須）",
+    "systemPrompt": "役割設定（任意）",
     "expand": "展開",
     "collapse": "折りたたむ",
     "systemPromptPlaceholder": "このAIメンバーの役割設定を記述してください。",

@@ -18,6 +18,5 @@ export function getActualTheme(
       : 'light';
   }
 
-  // ThemeMode.DARK is deprecated; keep explicit dark value on light mode.
-  return 'light';
+  return 'dark';
 }

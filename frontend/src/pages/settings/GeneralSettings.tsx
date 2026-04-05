@@ -40,6 +40,24 @@ import { TagManager } from '@/components/TagManager';
 export function GeneralSettings() {
   const { t } = useTranslation(['settings', 'common']);
 
+  const themeOptions = useMemo(
+    () => [
+      {
+        value: ThemeMode.LIGHT,
+        label: t('settings.general.appearance.theme.options.light'),
+      },
+      {
+        value: ThemeMode.DARK,
+        label: t('settings.general.appearance.theme.options.dark'),
+      },
+      {
+        value: ThemeMode.SYSTEM,
+        label: t('settings.general.appearance.theme.options.system'),
+      },
+    ],
+    [t]
+  );
+
   // Get language options with proper display names
   const languageOptions = getLanguageOptions(
     t('language.browserDefault', {
@@ -141,14 +159,8 @@ export function GeneralSettings() {
     setSuccess(false);
 
     try {
-      const normalizedTheme =
-        draft.theme === ThemeMode.DARK ? ThemeMode.LIGHT : draft.theme;
-      const nextConfig =
-        normalizedTheme === draft.theme
-          ? draft
-          : { ...draft, theme: normalizedTheme };
-      await updateAndSaveConfig(nextConfig); // Atomically apply + persist
-      setTheme(normalizedTheme);
+      await updateAndSaveConfig(draft);
+      setTheme(draft.theme);
       setDirty(false);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -230,8 +242,10 @@ export function GeneralSettings() {
               {t('settings.general.appearance.theme.label')}
             </Label>
             <Select
-              value={ThemeMode.LIGHT}
-              onValueChange={() => updateDraft({ theme: ThemeMode.LIGHT })}
+              value={draft?.theme ?? ThemeMode.LIGHT}
+              onValueChange={(value) =>
+                updateDraft({ theme: value as ThemeMode })
+              }
             >
               <SelectTrigger id="theme">
                 <SelectValue
@@ -241,9 +255,11 @@ export function GeneralSettings() {
                 />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem key={ThemeMode.LIGHT} value={ThemeMode.LIGHT}>
-                  {toPrettyCase(ThemeMode.LIGHT)}
-                </SelectItem>
+                {themeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground">

@@ -116,7 +116,7 @@ export function RunningAgentPlaceholder({
             </div>
 
             {hasThinking && (
-              <div className="rounded-lg border border-border/50 bg-[#f9fafb] p-3">
+              <div className="rounded-lg border border-border/50 bg-[#f9fafb] p-3 dark:border-[#2A3445] dark:bg-[#192233]">
                 <div className="mb-2.5 flex items-center justify-between text-xs font-medium text-low uppercase tracking-wide">
                   <span>{t('agent.thinking')}</span>
                   <button
@@ -140,8 +140,8 @@ export function RunningAgentPlaceholder({
                   </button>
                 </div>
                 {thinkingExpanded && (
-                  <div className="rounded-[4px_8px_8px_4px] border-l-[3px] border-l-[#5094FB] bg-white px-4 py-3 shadow-sm">
-                    <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-ibm-plex-mono text-xs leading-relaxed text-low">
+                  <div className="rounded-[4px_8px_8px_4px] border-l-[3px] border-l-[#5094FB] bg-white px-4 py-3 shadow-sm dark:bg-[#111926] dark:shadow-none">
+                    <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-ibm-plex-mono text-xs leading-relaxed text-low dark:text-[#BAC4D6]">
                       {displayUnifiedContent}
                     </pre>
                   </div>
@@ -150,12 +150,12 @@ export function RunningAgentPlaceholder({
             )}
 
             {hasError && (
-              <div className="rounded-lg border border-error/50 bg-error/5 p-3">
-                <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[#EF4444] uppercase tracking-wide">
+              <div className="rounded-lg border border-error/50 bg-error/5 p-3 dark:border-[rgba(248,113,113,0.28)] dark:bg-[rgba(248,113,113,0.12)]">
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[#EF4444] uppercase tracking-wide dark:text-[#FCA5A5]">
                   <WarningCircleIcon className="size-3.5" weight="fill" />
                   <span>{t('agent.error', { defaultValue: 'Error' })}</span>
                 </div>
-                <div className="rounded-[4px_8px_8px_4px] border-l-[3px] border-l-error/70 bg-white px-4 py-3 shadow-sm">
+                <div className="rounded-[4px_8px_8px_4px] border-l-[3px] border-l-error/70 bg-white px-4 py-3 shadow-sm dark:bg-[#111926] dark:shadow-none">
                   <ChatErrorMessage
                     content={run?.errorContent ?? ''}
                     expanded

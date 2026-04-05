@@ -103,3 +103,5 @@ openteams-cloud/
 **/.openteams/
 .main_page/
 website/
+.playwright-mcp/
+qa_test/

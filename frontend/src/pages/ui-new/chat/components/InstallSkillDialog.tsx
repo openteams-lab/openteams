@@ -77,17 +77,17 @@ export function InstallSkillDialog({
       bodyExtra={
         <div className="space-y-3">
           <div>
-            <div className="text-sm font-medium text-[#333333]">
+            <div className="text-sm font-medium text-[#333333] dark:text-[#F3F6FB]">
               {skillName}
             </div>
             {skillDescription && (
-              <div className="mt-1 text-xs text-[#8C8C8C] line-clamp-2">
+              <div className="mt-1 text-xs text-[#8C8C8C] line-clamp-2 dark:text-[#7F8AA3]">
                 {skillDescription}
               </div>
             )}
           </div>
           <div>
-            <div className="mb-2 text-xs font-medium text-[#8C8C8C]">
+            <div className="mb-2 text-xs font-medium text-[#8C8C8C] dark:text-[#7F8AA3]">
               {t('skillLibrary.installDialog.selectAgents')}
             </div>
             <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
@@ -99,8 +99,8 @@ export function InstallSkillDialog({
                     className={cn(
                       'flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-colors',
                       isSelected
-                        ? 'bg-[#EEF5FF] border border-[#D7E7FB]'
-                        : 'bg-[#F8F9FA] border border-transparent hover:bg-[#F0F2F5]'
+                        ? 'bg-[#EEF5FF] border border-[#D7E7FB] dark:bg-[rgba(94,162,255,0.16)] dark:border-[rgba(94,162,255,0.24)]'
+                        : 'bg-[#F8F9FA] border border-transparent hover:bg-[#F0F2F5] dark:bg-[#192233] dark:hover:bg-[#222C3D]'
                     )}
                   >
                     <input
@@ -113,13 +113,15 @@ export function InstallSkillDialog({
                       className={cn(
                         'flex size-4 shrink-0 items-center justify-center rounded-[4px] border text-[10px]',
                         isSelected
-                          ? 'bg-[#4A90E2] border-[#4A90E2] text-white'
-                          : 'border-[#D9D9D9] bg-white'
+                          ? 'bg-[#4A90E2] border-[#4A90E2] text-white dark:bg-[#5EA2FF] dark:border-[#5EA2FF]'
+                          : 'border-[#D9D9D9] bg-white dark:border-[#2A3445] dark:bg-[#111926]'
                       )}
                     >
                       {isSelected && '✓'}
                     </span>
-                    <span className="text-sm text-[#333333]">{agent.name}</span>
+                    <span className="text-sm text-[#333333] dark:text-[#F3F6FB]">
+                      {agent.name}
+                    </span>
                   </label>
                 );
               })}

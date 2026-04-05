@@ -47,7 +47,12 @@
         "theme": {
           "label": "テーマ",
           "placeholder": "テーマを選択",
-          "helper": "お好みの色スキームを選択してください。"
+          "helper": "お好みの色スキームを選択してください。",
+          "options": {
+            "light": "ライト",
+            "dark": "ダーク",
+            "system": "システム"
+          }
         },
         "language": {
           "label": "言語",
@@ -745,7 +750,7 @@
           "runnerTypePlaceholder": "空欄の場合はセッションのデフォルトを使用",
           "recommendedModel": "推奨モデル（任意）",
           "recommendedModelPlaceholder": "空欄の場合はエグゼキュータのデフォルトモデルを使用",
-          "systemPrompt": "役割設定（必須）",
+          "systemPrompt": "役割設定（任意）",
           "systemPromptPlaceholder": "このAIメンバーの役割設定を記述してください...",
           "workspacePath": "既定のワークスペースパス（任意）",
           "workspacePathPlaceholder": "例: backend",
@@ -840,7 +845,7 @@
           "descriptionPlaceholder": "例: API開発向けバックエンドエンジニア",
           "runnerType": "ランナー種別（任意）",
           "runnerTypePlaceholder": "例: claude_code。空欄の場合はデフォルトを使用",
-          "systemPrompt": "役割設定（必須）",
+          "systemPrompt": "役割設定（任意）",
           "systemPromptPlaceholder": "このAIメンバーの役割設定を記述してください...",
           "workspacePath": "既定のワークスペースパス（任意）",
           "workspacePathPlaceholder": "例: backend"
