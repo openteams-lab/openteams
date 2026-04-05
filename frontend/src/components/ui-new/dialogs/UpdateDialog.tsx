@@ -298,13 +298,13 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
               )}
 
               {isUpdating && (
-                  <div className="overflow-hidden rounded-full bg-[#E5EDF7] dark:bg-[#1A2433]">
-                    <div
-                      className={cn(
-                        'h-2 rounded-full bg-[#4A90E2] transition-[width] duration-300 ease-out dark:bg-[#5EA2FF]',
-                        isNpx && 'animate-pulse'
-                      )}
-                      style={{ width: `${Math.max(progressValue, 14)}%` }}
+                <div className="overflow-hidden rounded-full bg-[#E5EDF7] dark:bg-[#1A2433]">
+                  <div
+                    className={cn(
+                      'h-2 rounded-full bg-[#4A90E2] transition-[width] duration-300 ease-out dark:bg-[#5EA2FF]',
+                      isNpx && 'animate-pulse'
+                    )}
+                    style={{ width: `${Math.max(progressValue, 14)}%` }}
                   />
                 </div>
               )}
