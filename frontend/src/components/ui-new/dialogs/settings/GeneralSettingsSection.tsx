@@ -198,23 +198,20 @@ export function GeneralSettingsSection() {
     );
   }
 
-  const themeOptions = useMemo(
-    () => [
-      {
-        value: ThemeMode.LIGHT,
-        label: t('settings.general.appearance.theme.options.light'),
-      },
-      {
-        value: ThemeMode.DARK,
-        label: t('settings.general.appearance.theme.options.dark'),
-      },
-      {
-        value: ThemeMode.SYSTEM,
-        label: t('settings.general.appearance.theme.options.system'),
-      },
-    ],
-    [t]
-  );
+  const themeOptions = [
+    {
+      value: ThemeMode.LIGHT,
+      label: t('settings.general.appearance.theme.options.light'),
+    },
+    {
+      value: ThemeMode.DARK,
+      label: t('settings.general.appearance.theme.options.dark'),
+    },
+    {
+      value: ThemeMode.SYSTEM,
+      label: t('settings.general.appearance.theme.options.system'),
+    },
+  ];
 
   const soundOptions = Object.values(SoundFile).map((sound) => ({
     value: sound,
