@@ -180,7 +180,7 @@
     "noInstalledAgents": "Aucun agent de code installé détecté sur cette machine.",
     "modelVariant": "Variante du modèle",
     "model": "Modèle",
-    "systemPrompt": "Paramètres du rôle (obligatoire)",
+    "systemPrompt": "Paramètres du rôle (facultatif)",
     "expand": "Développer",
     "collapse": "Réduire",
     "systemPromptPlaceholder": "Décrivez les paramètres du rôle de ce membre IA.",

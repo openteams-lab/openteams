@@ -47,7 +47,12 @@
         "theme": {
           "label": "Thème",
           "placeholder": "Sélectionner un thème",
-          "helper": "Choisissez votre palette de couleurs préférée."
+          "helper": "Choisissez votre palette de couleurs préférée.",
+          "options": {
+            "light": "Clair",
+            "dark": "Sombre",
+            "system": "Système"
+          }
         },
         "language": {
           "label": "Langue",
@@ -745,7 +750,7 @@
           "runnerTypePlaceholder": "Laissez vide pour utiliser la valeur par défaut de la session",
           "recommendedModel": "Modèle recommandé (optionnel)",
           "recommendedModelPlaceholder": "Laissez vide pour utiliser le modèle par défaut de l'exécuteur",
-          "systemPrompt": "Paramètres du rôle (obligatoire)",
+          "systemPrompt": "Paramètres du rôle (facultatif)",
           "systemPromptPlaceholder": "Décrivez les paramètres du rôle de ce membre IA...",
           "workspacePath": "Chemin de workspace par défaut (optionnel)",
           "workspacePathPlaceholder": "ex. backend",
@@ -840,7 +845,7 @@
           "descriptionPlaceholder": "ex. Ingénieur backend pour le développement d’API",
           "runnerType": "Type de runner (optionnel)",
           "runnerTypePlaceholder": "ex. claude_code, laissez vide pour la valeur par défaut",
-          "systemPrompt": "Paramètres du rôle (obligatoire)",
+          "systemPrompt": "Paramètres du rôle (facultatif)",
           "systemPromptPlaceholder": "Décrivez les paramètres du rôle de ce membre IA...",
           "workspacePath": "Chemin de workspace par défaut (optionnel)",
           "workspacePathPlaceholder": "ex. backend"
