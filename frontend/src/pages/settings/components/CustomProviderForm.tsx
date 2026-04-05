@@ -777,12 +777,12 @@ export function CustomProviderForm({
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                      <h4 className="text-[14px] font-semibold text-[#333333] dark:text-[#F3F6FB]">
-                        {t('settings.cli.customProviders.form.modelsTitle')}
-                      </h4>
-                      <p className="mt-2 text-[12px] leading-5 text-[#8C8C8C] dark:text-[#7F8AA3]">
-                        {t('settings.cli.customProviders.form.modelsDescription')}
-                      </p>
+                    <h4 className="text-[14px] font-semibold text-[#333333] dark:text-[#F3F6FB]">
+                      {t('settings.cli.customProviders.form.modelsTitle')}
+                    </h4>
+                    <p className="mt-2 text-[12px] leading-5 text-[#8C8C8C] dark:text-[#7F8AA3]">
+                      {t('settings.cli.customProviders.form.modelsDescription')}
+                    </p>
                   </div>
                   <button
                     type="button"
