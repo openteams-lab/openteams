@@ -15,7 +15,7 @@ interface TwoColumnPickerProps {
 
 export function TwoColumnPicker({ children }: TwoColumnPickerProps) {
   return (
-    <div className="mb-6 grid overflow-hidden rounded-[10px] border border-[#E8EEF5] bg-[#E8EEF5] md:grid-cols-2 md:gap-px">
+    <div className="settings-two-column-picker mb-6 grid overflow-hidden rounded-[10px] border border-[#E8EEF5] dark:border-[#2B3648] bg-[#E8EEF5] dark:bg-[#2B3648] md:grid-cols-2 md:gap-px">
       {children}
     </div>
   );
@@ -37,15 +37,20 @@ export function TwoColumnPickerColumn({
   return (
     <div
       className={cn(
-        'flex-1 bg-white',
-        isFirst && 'border-b border-[#E8EEF5] md:border-b-0'
+        'flex-1 bg-white dark:bg-[#111926]',
+        isFirst &&
+          'border-b border-[#E8EEF5] dark:border-[#2B3648] md:border-b-0'
       )}
     >
-      <div className="flex items-center justify-between border-b border-[#E8EEF5] bg-[#fafafa] px-3 py-2">
-        <span className="text-[12px] text-[#8C8C8C]">{label}</span>
+      <div className="settings-two-column-header flex items-center justify-between border-b border-[#E8EEF5] dark:border-[#2B3648] bg-[#fafafa] dark:bg-[#1A2433] px-3 py-2">
+        <span className="text-[12px] text-[#8C8C8C] dark:text-[#7F8AA3]">
+          {label}
+        </span>
         {headerAction}
       </div>
-      <div className="h-[180px] overflow-y-auto bg-white">{children}</div>
+      <div className="settings-two-column-body h-[180px] overflow-y-auto bg-white dark:bg-[#111926]">
+        {children}
+      </div>
     </div>
   );
 }
@@ -68,26 +73,17 @@ export function TwoColumnPickerItem({
   return (
     <button
       type="button"
-      className="group flex w-full items-center gap-2 border-none bg-transparent px-3 py-2 text-left transition-colors duration-200"
-      style={{
-        background: selected ? 'rgba(74, 144, 226, 0.06)' : 'transparent',
-        color: selected ? '#4A90E2' : '#333333',
-        fontWeight: selected ? 500 : 400,
-      }}
+      className={cn(
+        'settings-two-column-item group flex w-full items-center gap-2 border-none bg-transparent px-3 py-2 text-left text-[#333333] transition-colors duration-200 dark:text-[#F3F6FB]',
+        selected &&
+          'settings-two-column-item-selected font-medium text-[#4A90E2] dark:text-[#CFE3FF]'
+      )}
       onClick={onClick}
-      onMouseEnter={(event) => {
-        if (!selected) {
-          event.currentTarget.style.background = '#F9FBFF';
-        }
-      }}
-      onMouseLeave={(event) => {
-        if (!selected) {
-          event.currentTarget.style.background = 'transparent';
-        }
-      }}
     >
       {leading}
-      <span className="flex-1 truncate text-[13px]">{children}</span>
+      <span className="settings-two-column-item-label flex-1 truncate text-[13px]">
+        {children}
+      </span>
       {trailing}
     </button>
   );
@@ -104,12 +100,12 @@ export function TwoColumnPickerBadge({
 }: TwoColumnPickerBadgeProps) {
   return (
     <span
-      className="shrink-0 rounded-full px-2 py-[2px] text-[11px] font-medium"
-      style={{
-        background:
-          variant === 'brand' ? 'rgba(74, 144, 226, 0.08)' : '#F3F6FA',
-        color: variant === 'brand' ? '#4A90E2' : '#8C8C8C',
-      }}
+      className={cn(
+        'shrink-0 rounded-full px-2 py-[2px] text-[11px] font-medium',
+        variant === 'brand'
+          ? 'settings-two-column-badge-brand bg-[rgba(74,144,226,0.08)] text-[#4A90E2]'
+          : 'settings-two-column-badge-default bg-[#F3F6FA] text-[#8C8C8C]'
+      )}
     >
       {children}
     </span>
@@ -122,29 +118,29 @@ interface TwoColumnPickerEmptyProps {
 
 export function TwoColumnPickerEmpty({ children }: TwoColumnPickerEmptyProps) {
   return (
-    <div className="px-3 py-5 text-center text-[13px] text-[#8C8C8C]">
+    <div className="px-3 py-5 text-center text-[13px] text-[#8C8C8C] dark:text-[#7F8AA3]">
       {children}
     </div>
   );
 }
 
 export const settingsFieldClassName =
-  'w-full rounded-[10px] border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] py-[10px] text-[14px] text-[#333333] outline-none transition-all duration-200 placeholder:text-[#8C8C8C] focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_3px_rgba(74,144,226,0.08)] disabled:cursor-not-allowed disabled:opacity-50';
+  'settings-input w-full rounded-[10px] border border-[#E8EEF5] dark:border-[#2B3648] bg-[#F9FBFF] dark:bg-[#0F1724] px-[14px] py-[10px] text-[14px] text-[#333333] dark:text-[#F3F6FB] outline-none transition-all duration-200 placeholder:text-[#8C8C8C] dark:placeholder:text-[#7F8AA3] focus:border-[#4A90E2] dark:focus:border-[#5EA2FF] focus:bg-white dark:focus:bg-[#111926] focus:shadow-[0_0_0_3px_rgba(74,144,226,0.08)] dark:focus:shadow-[0_0_0_3px_rgba(94,162,255,0.15)] disabled:cursor-not-allowed disabled:opacity-50';
 
 export const settingsPanelClassName =
-  'rounded-[10px] border border-[#E8EEF5] bg-white';
+  'settings-card rounded-[10px] border border-[#E8EEF5] dark:border-[#2B3648] bg-white dark:bg-[#141C28]';
 
 export const settingsMutedPanelClassName =
-  'rounded-[10px] border border-[#E8EEF5] bg-[#F9FBFF]';
+  'settings-inline-panel rounded-[10px] border border-[#E8EEF5] dark:border-[#2B3648] bg-[#F9FBFF] dark:bg-[#1A2433]';
 
 export const settingsSecondaryButtonClassName =
-  'inline-flex items-center justify-center gap-2 rounded-[10px] border border-[#E8EEF5] bg-[#F3F5F8] px-4 py-[10px] text-[14px] text-[#333333] transition-colors duration-200 hover:bg-[#eceff3] disabled:cursor-not-allowed disabled:opacity-50';
+  'primary-button-secondary inline-flex items-center justify-center gap-2 rounded-[10px] border border-[#E8EEF5] dark:border-[#2B3648] bg-[#F3F5F8] dark:bg-[#222C3D] px-4 py-[10px] text-[14px] text-[#333333] dark:text-[#BAC4D6] transition-colors duration-200 hover:bg-[#eceff3] dark:hover:bg-[#2d3a50] disabled:cursor-not-allowed disabled:opacity-50';
 
 export const settingsPrimaryButtonClassName =
-  'inline-flex items-center justify-center gap-2 rounded-[10px] border-none bg-[#4A90E2] px-4 py-[10px] text-[14px] text-white transition-all duration-200 hover:-translate-y-px hover:bg-[#357ABD] disabled:cursor-not-allowed disabled:opacity-50';
+  'primary-button-default inline-flex items-center justify-center gap-2 rounded-[10px] border-none px-4 py-[10px] text-[14px] text-white transition-all duration-200 hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-50';
 
 export const settingsIconButtonClassName =
-  'inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E8EEF5] bg-[#F3F5F8] text-[#8C8C8C] transition-colors duration-200 hover:bg-[#eceff3] hover:text-[#333333] disabled:cursor-not-allowed disabled:opacity-50';
+  'icon-button inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E8EEF5] dark:border-[#2B3648] bg-[#F3F5F8] dark:bg-[#222C3D] text-[#8C8C8C] dark:text-[#7F8AA3] transition-colors duration-200 hover:bg-[#eceff3] dark:hover:bg-[#2d3a50] hover:text-[#333333] dark:hover:text-[#F3F6FB] disabled:cursor-not-allowed disabled:opacity-50';
 
 export function SettingsCard({
   title,
@@ -161,11 +157,11 @@ export function SettingsCard({
     <section className="mb-8 last:mb-0">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h3 className="m-0 text-[14px] font-semibold text-[#333333]">
+          <h3 className="m-0 text-[14px] font-semibold text-[#333333] dark:text-[#F3F6FB]">
             {title}
           </h3>
           {description ? (
-            <p className="mt-2 text-[12px] leading-5 text-[#8C8C8C]">
+            <p className="mt-2 text-[12px] leading-5 text-[#8C8C8C] dark:text-[#7F8AA3]">
               {description}
             </p>
           ) : null}
@@ -191,13 +187,17 @@ export function SettingsField({
   return (
     <div className="mb-5 last:mb-0">
       {label ? (
-        <div className="mb-2 text-[12px] text-[#8C8C8C]">{label}</div>
+        <div className="mb-2 text-[12px] text-[#8C8C8C] dark:text-[#7F8AA3]">
+          {label}
+        </div>
       ) : null}
       {children}
       {error ? (
-        <p className="mt-2 text-[12px] text-[#d14343]">{error}</p>
+        <p className="mt-2 text-[12px] text-[#d14343] dark:text-[#F87171]">
+          {error}
+        </p>
       ) : description ? (
-        <div className="mt-2 text-[12px] leading-5 text-[#8C8C8C]">
+        <div className="mt-2 text-[12px] leading-5 text-[#8C8C8C] dark:text-[#7F8AA3]">
           {description}
         </div>
       ) : null}
@@ -234,20 +234,22 @@ export function SettingsCheckbox({
       )}
     >
       <span
-        className="mt-[1px] flex h-[18px] w-[18px] items-center justify-center rounded-[4px] border-2 transition-colors duration-200"
-        style={{
-          borderColor: checked ? '#4A90E2' : '#E8EEF5',
-          background: checked ? '#4A90E2' : '#FFFFFF',
-        }}
+        className={cn(
+          'settings-checkbox-input mt-[1px] flex h-[18px] w-[18px] items-center justify-center rounded-[4px] border-2 border-[#E8EEF5] bg-white transition-colors duration-200 dark:border-[#2B3648] dark:bg-[#111926]',
+          checked &&
+            'border-[#4A90E2] bg-[#4A90E2] dark:border-[#5EA2FF] dark:bg-[#5EA2FF]'
+        )}
       >
         {checked ? (
           <CheckIcon className="h-3 w-3 text-white" weight="bold" />
         ) : null}
       </span>
       <span className="flex flex-col gap-1">
-        <span className="text-[14px] text-[#333333]">{label}</span>
+        <span className="text-[14px] text-[#333333] dark:text-[#F3F6FB]">
+          {label}
+        </span>
         {description ? (
-          <span className="text-[12px] leading-5 text-[#8C8C8C]">
+          <span className="text-[12px] leading-5 text-[#8C8C8C] dark:text-[#7F8AA3]">
             {description}
           </span>
         ) : null}
@@ -287,7 +289,7 @@ export function SettingsSelect<T extends string>({
           disabled={disabled}
           className={cn(
             settingsFieldClassName,
-            'flex items-center justify-between text-left',
+            'settings-select-trigger flex items-center justify-between text-left',
             className
           )}
         >
@@ -295,14 +297,14 @@ export function SettingsSelect<T extends string>({
             {selectedOption?.label || placeholder || ''}
           </span>
           <CaretDownIcon
-            className="size-icon-xs text-[#8C8C8C]"
+            className="size-icon-xs text-[#8C8C8C] dark:text-[#7F8AA3]"
             weight="fill"
           />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         className={cn(
-          'w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)]',
+          'settings-select-dropdown w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)] dark:border-[#2B3648] dark:bg-[#192233] dark:shadow-[0_12px_30px_rgba(0,0,0,0.4)]',
           contentClassName
         )}
       >
@@ -314,7 +316,7 @@ export function SettingsSelect<T extends string>({
               key={option.value}
               data-selected={isSelected ? 'true' : undefined}
               className={cn(
-                'mx-0 rounded-[8px] px-3 py-2 text-[14px] text-[#333333] focus:bg-[#F9FBFF]',
+                'mx-0 rounded-[8px] px-3 py-2 text-[14px] text-[#333333] focus:bg-[#F9FBFF] dark:text-[#F3F6FB] dark:focus:bg-[#222C3D]',
                 itemClassName,
                 isSelected && selectedItemClassName
               )}
@@ -351,6 +353,7 @@ export function SettingsInput({
       disabled={disabled}
       className={cn(
         settingsFieldClassName,
+        'settings-input',
         error &&
           'border-[#d14343] focus:border-[#d14343] focus:shadow-[0_0_0_3px_rgba(209,67,67,0.08)]'
       )}
@@ -389,6 +392,7 @@ export function SettingsNumberInput({
       disabled={disabled}
       className={cn(
         settingsFieldClassName,
+        'settings-input',
         '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
         error &&
           'border-[#d14343] focus:border-[#d14343] focus:shadow-[0_0_0_3px_rgba(209,67,67,0.08)]'
@@ -424,7 +428,7 @@ export function SettingsTextarea({
       rows={rows}
       className={cn(
         settingsFieldClassName,
-        'resize-y px-3 py-3',
+        'settings-textarea resize-y px-3 py-3',
         monospace && 'font-mono text-[13px]'
       )}
     />
@@ -454,10 +458,10 @@ export function SettingsSaveBar({
 
   const wrapperClassName =
     layout === 'panel'
-      ? 'mt-6 -mx-4 border-t border-[#f5f5f5] bg-white px-4 pt-4'
+      ? 'mt-6 -mx-4 border-t border-[#f5f5f5] bg-white px-4 pt-4 dark:border-[#2A3445] dark:bg-[#101722]'
       : layout === 'floating-panel'
-        ? 'rounded-[14px] border border-[#E8EEF5] bg-white/95 p-3 shadow-[0_18px_40px_rgba(15,23,42,0.12)] backdrop-blur-sm'
-        : 'mt-8 -mx-8 sticky bottom-0 border-t border-[#f5f5f5] bg-white px-8 py-4';
+        ? 'rounded-[14px] border border-[#E8EEF5] bg-white/95 p-3 shadow-[0_18px_40px_rgba(15,23,42,0.12)] backdrop-blur-sm dark:border-[#2A3445] dark:bg-[#101722]/95 dark:shadow-[0_18px_40px_rgba(0,0,0,0.28)]'
+        : 'mt-8 -mx-8 sticky bottom-0 border-t border-[#f5f5f5] bg-white px-8 py-4 dark:border-[#2A3445] dark:bg-[#101722]';
   const innerClassName =
     layout === 'floating-panel'
       ? 'flex-col gap-3 sm:flex-row sm:items-center'
@@ -466,7 +470,7 @@ export function SettingsSaveBar({
         : '';
 
   return (
-    <div className={wrapperClassName}>
+    <div className={cn('settings-savebar', wrapperClassName)}>
       <div
         className={cn(
           'flex items-center',
@@ -475,7 +479,7 @@ export function SettingsSaveBar({
         )}
       >
         {onDiscard ? (
-          <span className="text-[12px] text-[#8C8C8C]">
+          <span className="text-[12px] text-[#8C8C8C] dark:text-[#7F8AA3]">
             {unsavedMessage ?? t('settings.common.unsavedChanges')}
           </span>
         ) : null}

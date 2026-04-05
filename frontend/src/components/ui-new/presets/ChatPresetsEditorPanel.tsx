@@ -876,7 +876,7 @@ export function ChatPresetsEditorPanel({
           </SettingsField>
 
           <SettingsField label={t('settings.presets.members.fields.skills')}>
-            <div className="rounded-[18px] border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+            <div className="rounded-[18px] border border-[#E2E8F0] bg-[#F8FAFC] p-3 dark:border-[#2A3445] dark:bg-[#192233]">
               <AgentSkillsSection
                 agentId={null}
                 runnerType={
@@ -1061,32 +1061,32 @@ export function ChatPresetsEditorPanel({
             label={
               <div className="flex items-center justify-between gap-3">
                 <span>{t('settings.presets.teams.fields.members')}</span>
-                <span className="text-[12px] font-normal text-[#94A3B8]">
+                <span className="text-[12px] font-normal text-[#94A3B8] dark:text-[#7F8AA3]">
                   {selectedTeam.member_ids.length} / {draft.members.length}
                 </span>
               </div>
             }
           >
             {draft.members.length === 0 ? (
-              <div className="rounded-[20px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-5 py-6 text-[13px] text-[#94A3B8]">
+              <div className="rounded-[20px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-5 py-6 text-[13px] text-[#94A3B8] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#7F8AA3]">
                 {t('settings.presets.teams.noMemberPresets')}
               </div>
             ) : (
               <div className="space-y-3">
                 {/* Search input for team members */}
                 <div className="relative">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8] dark:text-[#7F8AA3]" />
                   <input
                     type="text"
                     value={teamMemberSearch}
                     onChange={(e) => setTeamMemberSearch(e.target.value)}
                     placeholder={t('settings.presets.searchMembersPlaceholder')}
-                    className="w-full rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] py-2.5 pl-10 pr-8 text-[13px] text-[#334155] placeholder:text-[#94A3B8] focus:border-[#3B82F6] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#3B82F6]"
+                    className="w-full rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] py-2.5 pl-10 pr-8 text-[13px] text-[#334155] placeholder:text-[#94A3B8] focus:border-[#3B82F6] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#3B82F6] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:placeholder:text-[#7F8AA3] dark:focus:border-[#5EA2FF] dark:focus:bg-[#111926] dark:focus:ring-[#5EA2FF]"
                   />
                   {teamMemberSearch && (
                     <button
                       type="button"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#94A3B8] hover:bg-[#E2E8F0] hover:text-[#64748B]"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#94A3B8] hover:bg-[#E2E8F0] hover:text-[#64748B] dark:text-[#7F8AA3] dark:hover:bg-[#1A2433] dark:hover:text-[#BAC4D6]"
                       onClick={() => setTeamMemberSearch('')}
                     >
                       <XIcon className="h-3.5 w-3.5" weight="bold" />
@@ -1095,7 +1095,7 @@ export function ChatPresetsEditorPanel({
                 </div>
                 {/* Members grid */}
                 {filteredTeamMembers.length === 0 ? (
-                  <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-5 py-6 text-center text-[13px] text-[#94A3B8]">
+                  <div className="rounded-[18px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-5 py-6 text-center text-[13px] text-[#94A3B8] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#7F8AA3]">
                     {t('settings.presets.noSearchResults')}
                   </div>
                 ) : (
@@ -1124,16 +1124,16 @@ export function ChatPresetsEditorPanel({
                           className={cn(
                             'group flex items-start gap-3 rounded-[18px] border px-4 py-3 text-left transition-all duration-200',
                             checked
-                              ? 'border-[#3B82F6] bg-[#F0F7FF] shadow-[0_8px_20px_rgba(59,130,246,0.08)]'
-                              : 'border-[#E2E8F0] bg-white hover:border-[#CBD5E1] hover:bg-[#F8FAFC]'
+                              ? 'border-[#3B82F6] bg-[#F0F7FF] shadow-[0_8px_20px_rgba(59,130,246,0.08)] dark:border-[#5EA2FF] dark:bg-[rgba(94,162,255,0.16)] dark:shadow-[0_8px_20px_rgba(94,162,255,0.12)]'
+                              : 'border-[#E2E8F0] bg-white hover:border-[#CBD5E1] hover:bg-[#F8FAFC] dark:border-[#2A3445] dark:bg-[#192233] dark:hover:border-[#344257] dark:hover:bg-[#1A2433]'
                           )}
                         >
                           <span
                             className={cn(
                               'mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-2 transition-all duration-200',
                               checked
-                                ? 'border-[#3B82F6] bg-[#3B82F6] text-white'
-                                : 'border-[#CBD5E1] bg-white text-transparent group-hover:border-[#94A3B8]'
+                                ? 'border-[#3B82F6] bg-[#3B82F6] text-white dark:border-[#5EA2FF] dark:bg-[#5EA2FF]'
+                                : 'border-[#CBD5E1] bg-white text-transparent group-hover:border-[#94A3B8] dark:border-[#344257] dark:bg-[#111926] dark:group-hover:border-[#5EA2FF]'
                             )}
                           >
                             <CheckIcon className="h-3 w-3" weight="bold" />
@@ -1142,12 +1142,14 @@ export function ChatPresetsEditorPanel({
                             <span
                               className={cn(
                                 'block truncate text-[14px] font-medium',
-                                checked ? 'text-[#0F172A]' : 'text-[#475569]'
+                                checked
+                                  ? 'text-[#0F172A] dark:text-[#F3F6FB]'
+                                  : 'text-[#475569] dark:text-[#BAC4D6]'
                               )}
                             >
                               @{getLocalizedMemberName(member)}
                             </span>
-                            <span className="mt-1 block truncate text-[12px] text-[#94A3B8]">
+                            <span className="mt-1 block truncate text-[12px] text-[#94A3B8] dark:text-[#7F8AA3]">
                               {member.description || member.id}
                             </span>
                           </span>
@@ -1167,7 +1169,7 @@ export function ChatPresetsEditorPanel({
   );
 
   const detailActions = hasUnsavedChanges ? (
-    <div className="shrink-0 border-t border-[#E2E8F0] bg-[#F8FAFC]/80 px-6 py-4 backdrop-blur-sm">
+    <div className="shrink-0 border-t border-[#E2E8F0] bg-[#F8FAFC]/80 px-6 py-4 backdrop-blur-sm dark:border-[#2A3445] dark:bg-[#101722]/90">
       <div className="mx-auto flex w-full max-w-[980px] items-center justify-end gap-3">
         <button
           type="button"
@@ -1204,18 +1206,18 @@ export function ChatPresetsEditorPanel({
           </div>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 overflow-hidden rounded-[28px] border border-white/80 bg-[rgba(255,255,255,0.92)] shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-          <aside className="flex w-[292px] min-w-[292px] flex-col border-r border-[#E2E8F0] bg-[#F8FAFC]/95">
-            <div className="border-b border-[#E2E8F0] p-4">
-              <div className="flex gap-2 rounded-[14px] bg-[#EEF2F7] p-1">
+        <div className="flex min-h-0 flex-1 overflow-hidden rounded-[28px] border border-white/80 bg-[rgba(255,255,255,0.92)] shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-[#2A3445] dark:bg-[#141C28] dark:shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
+          <aside className="flex w-[292px] min-w-[292px] flex-col border-r border-[#E2E8F0] bg-[#F8FAFC]/95 dark:border-[#2A3445] dark:bg-[#101722]">
+            <div className="border-b border-[#E2E8F0] p-4 dark:border-[#2A3445]">
+              <div className="flex gap-2 rounded-[14px] bg-[#EEF2F7] p-1 dark:bg-[#1A2433]">
                 <button
                   type="button"
                   className={cn(
                     sidebarTabButtonClassName,
                     'whitespace-nowrap',
                     tab === 'teams'
-                      ? 'border-[#E2E8F0] bg-white text-[#2563EB] shadow-sm'
-                      : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70'
+                      ? 'border-[#E2E8F0] bg-white text-[#2563EB] shadow-sm dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#7DB6FF]'
+                      : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70 dark:text-[#7F8AA3] dark:hover:bg-[#192233]'
                   )}
                   onClick={() => setTab('teams')}
                 >
@@ -1227,8 +1229,8 @@ export function ChatPresetsEditorPanel({
                     sidebarTabButtonClassName,
                     'whitespace-nowrap',
                     tab === 'members'
-                      ? 'border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm'
-                      : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70'
+                      ? 'border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#F3F6FB]'
+                      : 'border-transparent bg-transparent text-[#64748B] hover:bg-white/70 dark:text-[#7F8AA3] dark:hover:bg-[#192233]'
                   )}
                   onClick={() => setTab('members')}
                 >

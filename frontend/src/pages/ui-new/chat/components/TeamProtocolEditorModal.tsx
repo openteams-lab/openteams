@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '@/components/ThemeProvider';
 
 const promptFieldBackground = '#EEF3F9';
 
@@ -29,9 +30,11 @@ export function TeamProtocolEditorModal({
 }: TeamProtocolEditorModalProps) {
   const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
+  const { resolvedTheme } = useTheme();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [draft, setDraft] = useState(initialValue);
   const [enabled, setEnabled] = useState(initialEnabled);
+  const isDark = resolvedTheme === 'dark';
 
   useEffect(() => {
     if (!isOpen) return;
@@ -73,11 +76,63 @@ export function TeamProtocolEditorModal({
 
   if (!isOpen) return null;
 
+  const palette = isDark
+    ? {
+        overlay: 'rgba(5, 10, 17, 0.72)',
+        shell: '#192233',
+        shellBorder: '#2A3445',
+        shellShadow: '0 24px 56px rgba(0, 0, 0, 0.42)',
+        title: '#F3F6FB',
+        copy: '#7F8AA3',
+        close: '#7F8AA3',
+        toggleBg: '#111926',
+        toggleBorder: '#2B3648',
+        toggleText: '#F3F6FB',
+        accent: '#5EA2FF',
+        fieldBg: '#111926',
+        fieldBorder: '#2B3648',
+        fieldText: '#F3F6FB',
+        errorBg: 'rgba(248, 113, 113, 0.12)',
+        errorBorder: 'rgba(248, 113, 113, 0.28)',
+        errorText: '#FCA5A5',
+        footerBorder: '#202938',
+        cancelBg: '#1A2433',
+        cancelText: '#BAC4D6',
+        primaryBg: '#5EA2FF',
+        primaryText: '#FFFFFF',
+        primaryShadow: '0 4px 10px rgba(94, 162, 255, 0.24)',
+      }
+    : {
+        overlay: 'rgba(0, 0, 0, 0.05)',
+        shell: '#FFFFFF',
+        shellBorder: '#E8EEF5',
+        shellShadow: '0 20px 40px rgba(0, 0, 0, 0.08)',
+        title: '#333333',
+        copy: '#8C8C8C',
+        close: '#cccccc',
+        toggleBg: promptFieldBackground,
+        toggleBorder: '#E8EEF5',
+        toggleText: '#333333',
+        accent: '#4A90E2',
+        fieldBg: promptFieldBackground,
+        fieldBorder: '#E8EEF5',
+        fieldText: '#444444',
+        errorBg: '#fff7f7',
+        errorBorder: '#f3d7d7',
+        errorText: '#d14343',
+        footerBorder: '#f5f5f5',
+        cancelBg: '#f5f5f5',
+        cancelText: '#8C8C8C',
+        primaryBg: '#4A90E2',
+        primaryText: '#FFFFFF',
+        primaryShadow: '0 4px 10px rgba(74, 144, 226, 0.2)',
+      };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+        backgroundColor: palette.overlay,
         fontFamily: '-apple-system, "PingFang SC", sans-serif',
       }}
       onClick={() => {
@@ -87,10 +142,10 @@ export function TeamProtocolEditorModal({
       <div
         className="flex w-[760px] max-w-[calc(100vw-32px)] flex-col overflow-hidden"
         style={{
-          background: '#FFFFFF',
+          background: palette.shell,
           borderRadius: '16px',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.08)',
-          border: '1px solid #E8EEF5',
+          boxShadow: palette.shellShadow,
+          border: `1px solid ${palette.shellBorder}`,
         }}
         onClick={(event) => event.stopPropagation()}
       >
@@ -104,7 +159,7 @@ export function TeamProtocolEditorModal({
               style={{
                 fontSize: '16px',
                 fontWeight: 600,
-                color: '#333333',
+                color: palette.title,
               }}
             >
               {t('members.teamProtocol.modal.title')}
@@ -114,7 +169,7 @@ export function TeamProtocolEditorModal({
               style={{
                 marginTop: '4px',
                 fontSize: '13px',
-                color: '#8C8C8C',
+                color: palette.copy,
               }}
             >
               {t('members.teamProtocol.modal.description')}
@@ -127,7 +182,7 @@ export function TeamProtocolEditorModal({
             disabled={isSaving}
             style={{
               cursor: isSaving ? 'default' : 'pointer',
-              color: '#cccccc',
+              color: palette.close,
               fontSize: '20px',
               background: 'transparent',
               border: 'none',
@@ -142,14 +197,19 @@ export function TeamProtocolEditorModal({
         <div className="space-y-4" style={{ padding: '0 24px 20px 24px' }}>
           <label
             className="flex items-center gap-3 rounded-[12px] border border-[#E8EEF5] px-4 py-3 text-[13px] text-[#333333]"
-            style={{ background: promptFieldBackground }}
+            style={{
+              background: palette.toggleBg,
+              borderColor: palette.toggleBorder,
+              color: palette.toggleText,
+            }}
           >
             <input
               type="checkbox"
               checked={enabled}
               onChange={(event) => setEnabled(event.target.checked)}
               disabled={isSaving}
-              className="h-4 w-4 rounded-[4px] border border-[#D7E3F4] accent-[#4A90E2]"
+              className="h-4 w-4 rounded-[4px] border border-[#D7E3F4]"
+              style={{ accentColor: palette.accent }}
             />
             <span>{t('members.teamProtocol.modal.enable')}</span>
           </label>
@@ -165,22 +225,29 @@ export function TeamProtocolEditorModal({
               height: '360px',
               maxHeight: 'calc(100vh - 320px)',
               minHeight: '220px',
-              background: promptFieldBackground,
-              border: '1px solid #E8EEF5',
+              background: palette.fieldBg,
+              border: `1px solid ${palette.fieldBorder}`,
               borderRadius: '12px',
               padding: '16px',
               boxSizing: 'border-box',
               fontFamily: '"SF Mono", "Monaco", "Consolas", monospace',
               fontSize: '14px',
               lineHeight: 1.6,
-              color: '#444444',
+              color: palette.fieldText,
               resize: 'none',
               outline: 'none',
             }}
           />
 
           {error ? (
-            <div className="rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] px-3 py-2 text-[12px] text-[#d14343]">
+            <div
+              className="rounded-[10px] px-3 py-2 text-[12px]"
+              style={{
+                border: `1px solid ${palette.errorBorder}`,
+                background: palette.errorBg,
+                color: palette.errorText,
+              }}
+            >
               {error}
             </div>
           ) : null}
@@ -190,7 +257,7 @@ export function TeamProtocolEditorModal({
           className="flex justify-end"
           style={{
             padding: '16px 24px',
-            borderTop: '1px solid #f5f5f5',
+            borderTop: `1px solid ${palette.footerBorder}`,
             gap: '12px',
           }}
         >
@@ -204,8 +271,8 @@ export function TeamProtocolEditorModal({
               fontSize: '14px',
               cursor: isSaving ? 'default' : 'pointer',
               border: 'none',
-              background: '#f5f5f5',
-              color: '#8C8C8C',
+              background: palette.cancelBg,
+              color: palette.cancelText,
             }}
           >
             {tCommon('buttons.cancel')}
@@ -220,9 +287,9 @@ export function TeamProtocolEditorModal({
               fontSize: '14px',
               cursor: isSaving ? 'default' : 'pointer',
               border: 'none',
-              background: '#4A90E2',
-              color: '#FFFFFF',
-              boxShadow: '0 4px 10px rgba(74, 144, 226, 0.2)',
+              background: palette.primaryBg,
+              color: palette.primaryText,
+              boxShadow: palette.primaryShadow,
             }}
           >
             {isSaving ? tCommon('states.saving') : tCommon('buttons.save')}

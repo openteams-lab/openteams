@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { XIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '@/components/ThemeProvider';
 import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import { ChatPresetsEditorPanel } from '@/components/ui-new/presets/ChatPresetsEditorPanel';
 import {
@@ -15,6 +16,7 @@ interface AiTeamPresetsModalProps {
 
 function AiTeamPresetsModalContent({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation(['chat', 'settings', 'common']);
+  const { resolvedTheme } = useTheme();
   const { isDirty } = useSettingsDirty();
   const isConfirmingRef = useRef(false);
 
@@ -57,31 +59,37 @@ function AiTeamPresetsModalContent({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleCloseWithConfirmation]);
 
+  const isDark = resolvedTheme === 'dark';
+
   return (
     <>
       <div
         className="fixed inset-0 z-[9998] animate-in fade-in-0 duration-200"
-        style={{ background: 'rgba(15, 23, 42, 0.14)' }}
+        style={{
+          background: isDark
+            ? 'rgba(5, 10, 17, 0.72)'
+            : 'rgba(15, 23, 42, 0.14)',
+        }}
         onClick={() => {
           void handleCloseWithConfirmation();
         }}
       />
       <div className="fixed inset-0 z-[9999]">
         <div
-          className="chat-settings-theme settings-dialog-shell flex h-full w-full flex-col overflow-hidden bg-[rgba(255,255,255,0.96)] animate-in fade-in-0 slide-in-from-bottom-4 duration-200 rounded-none border-0 md:mx-auto md:my-[5vh] md:h-[85vh] md:max-w-[1220px] md:rounded-[28px] md:border md:border-white/70 md:shadow-[0_30px_80px_rgba(15,23,42,0.18)] md:backdrop-blur-xl"
+          className="chat-settings-theme settings-dialog-shell flex h-full w-full flex-col overflow-hidden bg-[rgba(255,255,255,0.96)] animate-in fade-in-0 slide-in-from-bottom-4 duration-200 rounded-none border-0 dark:bg-[rgba(16,23,34,0.98)] md:mx-auto md:my-[5vh] md:h-[85vh] md:max-w-[1220px] md:rounded-[28px] md:border md:border-white/70 md:shadow-[0_30px_80px_rgba(15,23,42,0.18)] md:backdrop-blur-xl md:dark:border-[#2A3445] md:dark:shadow-[0_30px_80px_rgba(0,0,0,0.42)]"
           style={{
             fontFamily: '"Inter", "PingFang SC", "Helvetica Neue", sans-serif',
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="settings-section-header flex items-center justify-between border-b border-[#F1F5F9] px-8 py-5">
+          <div className="settings-section-header flex items-center justify-between border-b border-[#F1F5F9] px-8 py-5 dark:border-[#2A3445]">
             <div>
-              <h2 className="m-0 text-[20px] font-semibold text-[#0F172A]">
+              <h2 className="m-0 text-[20px] font-semibold text-[#0F172A] dark:text-[#F3F6FB]">
                 {t('aiTeamPresets.title', {
                   defaultValue: 'AI Team Presets',
                 })}
               </h2>
-              <p className="mt-1 text-[12px] leading-5 text-[#94A3B8]">
+              <p className="mt-1 text-[12px] leading-5 text-[#94A3B8] dark:text-[#7F8AA3]">
                 {t('aiTeamPresets.description', {
                   defaultValue:
                     'Manage member presets and team presets in one place.',
@@ -93,7 +101,7 @@ function AiTeamPresetsModalContent({ onClose }: { onClose: () => void }) {
               onClick={() => {
                 void handleCloseWithConfirmation();
               }}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-[#94A3B8] transition-colors duration-200 hover:border-[#E2E8F0] hover:bg-white hover:text-[#0F172A]"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-[#94A3B8] transition-colors duration-200 hover:border-[#E2E8F0] hover:bg-white hover:text-[#0F172A] dark:text-[#7F8AA3] dark:hover:border-[#2A3445] dark:hover:bg-[#192233] dark:hover:text-[#F3F6FB]"
               aria-label={t('aiTeamPresets.close', {
                 defaultValue: 'Close AI Team presets',
               })}

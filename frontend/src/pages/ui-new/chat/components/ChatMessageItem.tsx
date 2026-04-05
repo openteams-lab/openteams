@@ -478,7 +478,8 @@ export function ChatMessageItem({
                 <div
                   className="chat-session-reference-card mb-half border rounded-sm px-base py-half text-xs text-low"
                   style={{
-                    backgroundColor: '#ecedf1',
+                    backgroundColor:
+                      'var(--chat-session-reference-bg, #ecedf1)',
                     borderColor: 'var(--chat-session-message-self-bg, #e8f4fd)',
                   }}
                 >
@@ -491,7 +492,9 @@ export function ChatMessageItem({
                     <button
                       type="button"
                       className="hover:opacity-80"
-                      style={{ color: '#5094FB' }}
+                      style={{
+                        color: 'var(--chat-session-reference-action, #5094FB)',
+                      }}
                       onClick={() => {
                         if (referenceMessage) {
                           const element = document.getElementById(

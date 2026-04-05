@@ -35,10 +35,10 @@ const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
         hideCloseButton
         className="!my-0 !w-auto !max-w-none !gap-0 !rounded-none !border-0 !bg-transparent !p-0 !shadow-none"
         containerClassName="items-center"
-        overlayClassName="!bg-[rgba(0,0,0,0.05)]"
+        overlayClassName="!bg-[rgba(0,0,0,0.05)] dark:!bg-[rgba(5,10,17,0.72)]"
       >
         <DialogContent
-          className="!w-[560px] !max-w-[calc(100vw-32px)] self-center !gap-0 !rounded-[20px] !border !border-[#E8EEF5] !bg-white !p-10 !shadow-[0_20px_50px_rgba(0,0,0,0.1)]"
+          className="!w-[560px] !max-w-[calc(100vw-32px)] self-center !gap-0 !rounded-[20px] !border !border-[#E8EEF5] !bg-white !p-10 !shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:!border-[#2A3445] dark:!bg-[#192233] dark:!shadow-[0_24px_56px_rgba(0,0,0,0.42)]"
           style={{
             animation:
               'disclaimer-modal-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1)',
@@ -46,21 +46,21 @@ const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
         >
           <div className="mb-6 flex items-center gap-3">
             <AlertTriangle className="h-6 w-6 text-[#E6A23C]" />
-            <h2 className="m-0 text-[20px] font-semibold text-[#333333]">
+            <h2 className="m-0 text-[20px] font-semibold text-[#333333] dark:text-[#F3F6FB]">
               {t('disclaimerDialog.title')}
             </h2>
           </div>
 
-          <div className="text-sm leading-[1.7] text-[#8C8C8C]">
+          <div className="text-sm leading-[1.7] text-[#8C8C8C] dark:text-[#BAC4D6]">
             <p className="m-0">{t('disclaimerDialog.intro')}</p>
 
-            <div className="my-5 rounded-[8px] border-l-4 border-[#E6A23C] bg-[#FCF6ED] px-4 py-4 font-mono text-[13px] text-[#8A6D3B]">
+            <div className="my-5 rounded-[8px] border-l-4 border-[#E6A23C] bg-[#FCF6ED] px-4 py-4 font-mono text-[13px] text-[#8A6D3B] dark:bg-[rgba(230,162,60,0.14)] dark:text-[#F7D08A]">
               --dangerously-skip-permissions / --yolo
             </div>
 
             <p className="m-0">{t('disclaimerDialog.body')}</p>
 
-            <span className="mt-6 block font-semibold text-[#333333]">
+            <span className="mt-6 block font-semibold text-[#333333] dark:text-[#F3F6FB]">
               {t('disclaimerDialog.importantTitle')}
             </span>
             <p className="m-0 mt-2">{t('disclaimerDialog.importantBody')}</p>
@@ -71,7 +71,7 @@ const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
                 href={SAFETY_DOCS_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-medium text-[#4A90E2] no-underline transition-all hover:underline"
+                className="font-medium text-[#4A90E2] no-underline transition-all hover:underline dark:text-[#7DB6FF]"
               >
                 {t('disclaimerDialog.docsLinkText')}
               </a>
@@ -82,7 +82,7 @@ const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
             <button
               type="button"
               onClick={handleAccept}
-              className="rounded-[24px] border-[1.5px] border-[#333333] bg-white px-8 py-3 text-sm font-semibold text-[#333333] transition-all duration-300 ease-in-out hover:-translate-y-px hover:bg-[#333333] hover:text-white hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] active:translate-y-0"
+              className="rounded-[24px] border-[1.5px] border-[#333333] bg-white px-8 py-3 text-sm font-semibold text-[#333333] transition-all duration-300 ease-in-out hover:-translate-y-px hover:bg-[#333333] hover:text-white hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] active:translate-y-0 dark:border-[#5EA2FF] dark:bg-[#111926] dark:text-[#CFE3FF] dark:hover:bg-[#5EA2FF] dark:hover:text-white dark:hover:shadow-[0_8px_20px_rgba(94,162,255,0.22)]"
             >
               {t('disclaimerDialog.action')}
             </button>

@@ -24,7 +24,7 @@ const TONE_STYLES: Record<
   default: {
     dot: 'bg-[#4A90E2]',
     confirm: {
-      base: 'border-[#D7E7FB] bg-[#EEF5FF] text-[#4A90E2] hover:border-[#4A90E2] hover:bg-[#4A90E2] hover:text-white hover:shadow-[0_4px_12px_rgba(74,144,226,0.18)] focus-visible:ring-[#4A90E2]/20',
+      base: 'border-[#D7E7FB] bg-[#EEF5FF] text-[#4A90E2] hover:border-[#4A90E2] hover:bg-[#4A90E2] hover:text-white hover:shadow-[0_4px_12px_rgba(74,144,226,0.18)] focus-visible:ring-[#4A90E2]/20 dark:border-[rgba(94,162,255,0.24)] dark:bg-[rgba(94,162,255,0.14)] dark:text-[#CFE3FF] dark:hover:border-[#5EA2FF] dark:hover:bg-[#5EA2FF] dark:hover:text-white dark:hover:shadow-[0_8px_20px_rgba(94,162,255,0.2)] dark:focus-visible:ring-[#5EA2FF]/20',
       disabledHover:
         'disabled:hover:border-[#D7E7FB] disabled:hover:bg-[#EEF5FF] disabled:hover:text-[#4A90E2]',
     },
@@ -32,7 +32,7 @@ const TONE_STYLES: Record<
   info: {
     dot: 'bg-[#4A90E2]',
     confirm: {
-      base: 'border-[#D7E7FB] bg-[#EEF5FF] text-[#4A90E2] hover:border-[#4A90E2] hover:bg-[#4A90E2] hover:text-white hover:shadow-[0_4px_12px_rgba(74,144,226,0.18)] focus-visible:ring-[#4A90E2]/20',
+      base: 'border-[#D7E7FB] bg-[#EEF5FF] text-[#4A90E2] hover:border-[#4A90E2] hover:bg-[#4A90E2] hover:text-white hover:shadow-[0_4px_12px_rgba(74,144,226,0.18)] focus-visible:ring-[#4A90E2]/20 dark:border-[rgba(94,162,255,0.24)] dark:bg-[rgba(94,162,255,0.14)] dark:text-[#CFE3FF] dark:hover:border-[#5EA2FF] dark:hover:bg-[#5EA2FF] dark:hover:text-white dark:hover:shadow-[0_8px_20px_rgba(94,162,255,0.2)] dark:focus-visible:ring-[#5EA2FF]/20',
       disabledHover:
         'disabled:hover:border-[#D7E7FB] disabled:hover:bg-[#EEF5FF] disabled:hover:text-[#4A90E2]',
     },
@@ -40,7 +40,7 @@ const TONE_STYLES: Record<
   success: {
     dot: 'bg-[#67C23A]',
     confirm: {
-      base: 'border-[#DDEFD1] bg-[#F2FAEC] text-[#67C23A] hover:border-[#67C23A] hover:bg-[#67C23A] hover:text-white hover:shadow-[0_4px_12px_rgba(103,194,58,0.2)] focus-visible:ring-[#67C23A]/20',
+      base: 'border-[#DDEFD1] bg-[#F2FAEC] text-[#67C23A] hover:border-[#67C23A] hover:bg-[#67C23A] hover:text-white hover:shadow-[0_4px_12px_rgba(103,194,58,0.2)] focus-visible:ring-[#67C23A]/20 dark:border-[rgba(52,211,153,0.24)] dark:bg-[rgba(52,211,153,0.14)] dark:text-[#9AE6B4] dark:hover:border-[#34D399] dark:hover:bg-[#34D399] dark:hover:text-[#0B1017] dark:hover:shadow-[0_8px_20px_rgba(52,211,153,0.18)] dark:focus-visible:ring-[#34D399]/20',
       disabledHover:
         'disabled:hover:border-[#DDEFD1] disabled:hover:bg-[#F2FAEC] disabled:hover:text-[#67C23A]',
     },
@@ -48,7 +48,7 @@ const TONE_STYLES: Record<
   destructive: {
     dot: 'bg-[#F56C6C]',
     confirm: {
-      base: 'border-[#F7D9D9] bg-[#FFF5F5] text-[#F56C6C] hover:border-[#F56C6C] hover:bg-[#F56C6C] hover:text-white hover:shadow-[0_4px_12px_rgba(245,108,108,0.2)] focus-visible:ring-[#F56C6C]/20',
+      base: 'border-[#F7D9D9] bg-[#FFF5F5] text-[#F56C6C] hover:border-[#F56C6C] hover:bg-[#F56C6C] hover:text-white hover:shadow-[0_4px_12px_rgba(245,108,108,0.2)] focus-visible:ring-[#F56C6C]/20 dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(248,113,113,0.14)] dark:text-[#FCA5A5] dark:hover:border-[#F87171] dark:hover:bg-[#F87171] dark:hover:text-white dark:hover:shadow-[0_8px_20px_rgba(248,113,113,0.2)] dark:focus-visible:ring-[#F87171]/20',
       disabledHover:
         'disabled:hover:border-[#F7D9D9] disabled:hover:bg-[#FFF5F5] disabled:hover:text-[#F56C6C]',
     },
@@ -60,7 +60,7 @@ const BASE_BUTTON_CLASS =
 
 const CANCEL_BUTTON_CLASS = cn(
   BASE_BUTTON_CLASS,
-  'border-transparent bg-transparent text-[#8C8C8C] hover:bg-[#F5F7FA] hover:text-[#333333] focus-visible:ring-[#E8EEF5]'
+  'border-transparent bg-transparent text-[#8C8C8C] hover:bg-[#F5F7FA] hover:text-[#333333] focus-visible:ring-[#E8EEF5] dark:text-[#7F8AA3] dark:hover:bg-[#1A2433] dark:hover:text-[#F3F6FB] dark:focus-visible:ring-[#2A3445]'
 );
 
 const HIGHLIGHTED_TEXT_PATTERN = /(".*?"|“.*?”|'[^']*'|‘.*?’|「.*?」|『.*?』)/g;
@@ -84,7 +84,7 @@ function renderHighlightedMessage(message: string) {
           return (
             <span
               key={`${segment}-${segmentIndex}`}
-              className="rounded px-1 py-[1px] font-medium text-[#333333] bg-[#F8F9FA]"
+              className="rounded px-1 py-[1px] font-medium text-[#333333] bg-[#F8F9FA] dark:bg-[#1A2433] dark:text-[#F3F6FB]"
             >
               {segment}
             </span>
@@ -123,7 +123,12 @@ export function ConfirmationDialogMessage({
   className,
 }: ConfirmationDialogMessageProps) {
   return (
-    <p className={cn('m-0 text-sm leading-6 text-[#8C8C8C]', className)}>
+    <p
+      className={cn(
+        'm-0 text-sm leading-6 text-[#8C8C8C] dark:text-[#7F8AA3]',
+        className
+      )}
+    >
       {renderHighlightedMessage(message)}
     </p>
   );
@@ -164,7 +169,7 @@ export function ConfirmationDialogChrome({
       onOpenChange={onOpenChange}
       hideCloseButton
       className={cn(
-        '!max-w-[440px] !gap-0 !overflow-hidden !rounded-[16px] !border !border-[#E8EEF5] !bg-white !p-0 !shadow-[0_15px_40px_rgba(0,0,0,0.08)]',
+        '!max-w-[440px] !gap-0 !overflow-hidden !rounded-[16px] !border !border-[#E8EEF5] !bg-white !p-0 !shadow-[0_15px_40px_rgba(0,0,0,0.08)] dark:!border-[#2A3445] dark:!bg-[#192233] dark:!shadow-[0_24px_56px_rgba(0,0,0,0.42)]',
         className
       )}
     >
@@ -179,14 +184,14 @@ export function ConfirmationDialogChrome({
                 )}
               />
             )}
-            <DialogTitle className="truncate text-[17px] font-semibold text-[#333333]">
+            <DialogTitle className="truncate text-[17px] font-semibold text-[#333333] dark:text-[#F3F6FB]">
               {title}
             </DialogTitle>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#CCCCCC] transition-colors hover:text-[#333333] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E8EEF5]"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#CCCCCC] transition-colors hover:text-[#333333] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E8EEF5] dark:text-[#7F8AA3] dark:hover:bg-[#1A2433] dark:hover:text-[#F3F6FB] dark:focus-visible:ring-[#2A3445]"
             aria-label={closeLabel}
             title={closeLabel}
           >

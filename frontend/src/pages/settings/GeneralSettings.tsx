@@ -141,14 +141,8 @@ export function GeneralSettings() {
     setSuccess(false);
 
     try {
-      const normalizedTheme =
-        draft.theme === ThemeMode.DARK ? ThemeMode.LIGHT : draft.theme;
-      const nextConfig =
-        normalizedTheme === draft.theme
-          ? draft
-          : { ...draft, theme: normalizedTheme };
-      await updateAndSaveConfig(nextConfig); // Atomically apply + persist
-      setTheme(normalizedTheme);
+      await updateAndSaveConfig(draft);
+      setTheme(draft.theme);
       setDirty(false);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -230,8 +224,10 @@ export function GeneralSettings() {
               {t('settings.general.appearance.theme.label')}
             </Label>
             <Select
-              value={ThemeMode.LIGHT}
-              onValueChange={() => updateDraft({ theme: ThemeMode.LIGHT })}
+              value={draft?.theme ?? ThemeMode.LIGHT}
+              onValueChange={(value) =>
+                updateDraft({ theme: value as ThemeMode })
+              }
             >
               <SelectTrigger id="theme">
                 <SelectValue
@@ -243,6 +239,12 @@ export function GeneralSettings() {
               <SelectContent>
                 <SelectItem key={ThemeMode.LIGHT} value={ThemeMode.LIGHT}>
                   {toPrettyCase(ThemeMode.LIGHT)}
+                </SelectItem>
+                <SelectItem key={ThemeMode.DARK} value={ThemeMode.DARK}>
+                  {toPrettyCase(ThemeMode.DARK)}
+                </SelectItem>
+                <SelectItem key={ThemeMode.SYSTEM} value={ThemeMode.SYSTEM}>
+                  {toPrettyCase(ThemeMode.SYSTEM)}
                 </SelectItem>
               </SelectContent>
             </Select>

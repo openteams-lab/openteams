@@ -1402,11 +1402,6 @@ export function ChatSessions() {
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
   }, [workItems]);
-  const visibleWorkItemGroups = useMemo(
-    () => workItemGroups.filter((group) => messageIdsByRunId.has(group.runId)),
-    [messageIdsByRunId, workItemGroups]
-  );
-
   const timelineEntries = useMemo<TimelineEntry[]>(
     () =>
       [
@@ -1416,20 +1411,18 @@ export function ChatSessions() {
           createdAtMs: new Date(message.created_at).getTime(),
           message,
         })),
-        ...visibleWorkItemGroups.map((group) => ({
+        ...workItemGroups.map((group) => ({
           kind: 'work_item' as const,
           key: getWorkItemEntryKey(group.runId),
           createdAtMs: new Date(group.createdAt).getTime(),
           group,
         })),
       ].sort((a, b) => a.createdAtMs - b.createdAtMs),
-    [messageList, visibleWorkItemGroups]
+    [messageList, workItemGroups]
   );
   const latestWorkItemEntryKey =
-    visibleWorkItemGroups.length > 0
-      ? getWorkItemEntryKey(
-          visibleWorkItemGroups[visibleWorkItemGroups.length - 1].runId
-        )
+    workItemGroups.length > 0
+      ? getWorkItemEntryKey(workItemGroups[workItemGroups.length - 1].runId)
       : null;
   const lastTimelineEntryKey =
     timelineEntries.length > 0
@@ -1438,12 +1431,9 @@ export function ChatSessions() {
   const workItemGroupByKey = useMemo(
     () =>
       new Map(
-        visibleWorkItemGroups.map((group) => [
-          getWorkItemEntryKey(group.runId),
-          group,
-        ])
+        workItemGroups.map((group) => [getWorkItemEntryKey(group.runId), group])
       ),
-    [visibleWorkItemGroups]
+    [workItemGroups]
   );
   const selectedCleanupMessageIds = useMemo(() => {
     const messageIds = new Set<string>();

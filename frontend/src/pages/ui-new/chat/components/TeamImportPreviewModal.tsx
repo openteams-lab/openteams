@@ -72,17 +72,19 @@ function PreviewSection({
   return (
     <section
       className={cn(
-        'rounded-[22px] border border-slate-200/70 bg-slate-50/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_12px_32px_rgba(148,163,184,0.08)]',
+        'team-import-preview-section rounded-[22px] border border-slate-200/70 bg-slate-50/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_12px_32px_rgba(148,163,184,0.08)]',
         className
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-2xl bg-white text-[11px] font-semibold tracking-[0.2em] text-[#5094FB] shadow-sm">
+        <div className="team-import-preview-step flex size-8 shrink-0 items-center justify-center rounded-2xl bg-white text-[11px] font-semibold tracking-[0.2em] text-[#5094FB] shadow-sm">
           {step}
         </div>
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-900">{title}</div>
-          <div className="mt-1 text-xs leading-5 text-slate-500">
+          <div className="team-import-preview-section-title text-sm font-semibold text-slate-900">
+            {title}
+          </div>
+          <div className="team-import-preview-section-description mt-1 text-xs leading-5 text-slate-500">
             {description}
           </div>
         </div>
@@ -274,7 +276,7 @@ export function TeamImportPreviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-5 backdrop-blur-sm">
+    <div className="team-import-preview-backdrop fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-5 backdrop-blur-sm">
       <div
         className={cn(
           'team-import-preview-modal chat-session-modal-surface flex flex-col overflow-hidden rounded-[28px] border border-white/60 bg-white/72 shadow-[0_28px_90px_rgba(15,23,42,0.24)] backdrop-blur-[24px]',
@@ -285,13 +287,13 @@ export function TeamImportPreviewModal({
       >
         <div className="flex items-start justify-between gap-6 px-6 pb-3 pt-5">
           <div className="min-w-0 flex-1">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[#5094FB]">
+            <div className="team-import-preview-eyebrow text-[11px] font-semibold uppercase tracking-[0.26em] text-[#5094FB]">
               {t('members.importPreview.previewEyebrow')}
             </div>
-            <div className="mt-3 text-[30px] font-semibold leading-none text-slate-950">
+            <div className="team-import-preview-title mt-3 text-[30px] font-semibold leading-none text-slate-950">
               {importName ?? t('members.importPreview.confirmImport')}
             </div>
-            <div className="mt-3 max-w-[560px] text-sm leading-6 text-slate-500">
+            <div className="team-import-preview-copy mt-3 max-w-[560px] text-sm leading-6 text-slate-500">
               {t('members.importPreview.description')}
             </div>
           </div>
@@ -300,7 +302,7 @@ export function TeamImportPreviewModal({
             onClick={onCancel}
             disabled={isImportingTeam}
             className={cn(
-              'inline-flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/70 text-slate-500 shadow-sm backdrop-blur-md transition-colors hover:bg-white hover:text-slate-900',
+              'team-import-preview-close-btn inline-flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/70 text-slate-500 shadow-sm backdrop-blur-md transition-colors hover:bg-white hover:text-slate-900',
               isImportingTeam && 'cursor-not-allowed opacity-50'
             )}
             aria-label={t('members.importPreview.cancel')}
@@ -309,12 +311,12 @@ export function TeamImportPreviewModal({
           </button>
         </div>
         {teamImportProtocol ? (
-          <div className="mx-6 mb-4 rounded-[18px] border border-[#dbe7f5] bg-[#f8fbff] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#5094FB]">
+          <div className="team-import-preview-protocol-card mx-6 mb-4 rounded-[18px] border border-[#dbe7f5] bg-[#f8fbff] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+            <div className="team-import-preview-protocol-eyebrow text-[11px] font-semibold uppercase tracking-[0.2em] text-[#5094FB]">
               {t('members.teamProtocol.title')}
             </div>
             <Tooltip content={teamImportProtocol} side="bottom">
-              <div className="mt-2 truncate text-sm leading-6 text-slate-600">
+              <div className="team-import-preview-protocol-copy mt-2 truncate text-sm leading-6 text-slate-600">
                 {teamImportProtocol}
               </div>
             </Tooltip>
@@ -328,7 +330,7 @@ export function TeamImportPreviewModal({
                 key={`${currentPlan.presetId}-${activeCardIndex}`}
                 className="chat-session-member-import-card flex h-full min-w-0 flex-col overflow-hidden rounded-[24px] border border-white/75 bg-white/78 shadow-[0_18px_44px_rgba(148,163,184,0.14)] animate-in fade-in-0 duration-200"
               >
-                <div className="rounded-[22px] bg-[radial-gradient(circle_at_top_left,_rgba(80,148,251,0.18),_rgba(255,255,255,0)_42%),linear-gradient(180deg,_rgba(255,255,255,0.88)_0%,_rgba(241,245,249,0.72)_100%)] px-5 py-4">
+                <div className="team-import-preview-hero rounded-[22px] bg-[radial-gradient(circle_at_top_left,_rgba(80,148,251,0.18),_rgba(255,255,255,0)_42%),linear-gradient(180deg,_rgba(255,255,255,0.88)_0%,_rgba(241,245,249,0.72)_100%)] px-5 py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
@@ -337,7 +339,7 @@ export function TeamImportPreviewModal({
                           total: importPlan.length,
                         })}
                       </div>
-                      <div className="mt-3 truncate text-[26px] font-semibold text-slate-950">
+                      <div className="team-import-preview-member-title mt-3 truncate text-[26px] font-semibold text-slate-950">
                         {currentMemberName}
                       </div>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -350,11 +352,11 @@ export function TeamImportPreviewModal({
                           {currentActionLabel}
                         </span>
                         {currentPlan.runnerType && (
-                          <span className="inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80">
+                          <span className="inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80 dark:bg-[#1A2433] dark:text-[#BAC4D6] dark:ring-[#2A3445]">
                             {toPrettyCase(currentPlan.runnerType)}
                           </span>
                         )}
-                        <span className="truncate text-sm text-slate-500">
+                        <span className="team-import-preview-member-handle truncate text-sm text-slate-500">
                           @{currentPlan.finalName}
                         </span>
                       </div>
@@ -377,7 +379,7 @@ export function TeamImportPreviewModal({
                       >
                         <div className="space-y-3">
                           <div className="space-y-1">
-                            <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            <label className="team-import-preview-field-label text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                               {t('members.memberNameLabel')}
                             </label>
                             <input
@@ -395,7 +397,7 @@ export function TeamImportPreviewModal({
 
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="space-y-1">
-                              <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              <label className="team-import-preview-field-label text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                 {t('members.baseCodingAgent')}
                               </label>
                               <select
@@ -434,7 +436,7 @@ export function TeamImportPreviewModal({
 
                             {currentPlanVariantOptions.length > 0 && (
                               <div className="space-y-1">
-                                <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                <label className="team-import-preview-field-label text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                   {variantFieldLabel}
                                 </label>
                                 <select
@@ -473,7 +475,7 @@ export function TeamImportPreviewModal({
                       >
                         <div className="space-y-3">
                           <div className="space-y-1">
-                            <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5094FB]">
+                            <label className="team-import-preview-field-label team-import-preview-field-label-brand text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5094FB]">
                               {t('members.workspacePath')}
                             </label>
                             <input
@@ -489,7 +491,7 @@ export function TeamImportPreviewModal({
                             />
                           </div>
 
-                          <div className="rounded-[18px] border border-white/70 bg-white/72 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
+                          <div className="team-import-preview-skills-card rounded-[18px] border border-white/70 bg-white/72 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
                             <AgentSkillsSection
                               agentId={
                                 currentPlan.action === 'reuse'
@@ -520,18 +522,18 @@ export function TeamImportPreviewModal({
                         )}
                       >
                         <div className="team-import-preview-prompt-shell overflow-hidden rounded-[20px] border">
-                          <div className="flex items-start justify-between gap-4 border-b border-[#d7e1ee] px-4 py-3">
+                          <div className="team-import-preview-prompt-header flex items-start justify-between gap-4 border-b border-[#d7e1ee] px-4 py-3">
                             <div className="min-w-0">
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#5094FB]">
+                              <div className="team-import-preview-protocol-eyebrow text-[11px] font-semibold uppercase tracking-[0.22em] text-[#5094FB]">
                                 {t('members.importPreview.promptBadge')}
                               </div>
-                              <div className="mt-2 text-sm leading-6 text-slate-600">
+                              <div className="team-import-preview-protocol-copy mt-2 text-sm leading-6 text-slate-600">
                                 {t('members.importPreview.promptHint')}
                               </div>
                             </div>
                             <button
                               type="button"
-                              className="chat-session-member-expand-btn shrink-0 rounded-full border border-[#d7e1ee] bg-white/78 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                              className="chat-session-member-expand-btn shrink-0 rounded-full border border-[#d7e1ee] bg-white/78 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#BAC4D6] dark:hover:bg-[#222C3D] dark:hover:text-[#F3F6FB]"
                               onClick={() =>
                                 onExpandPromptEditor(activeCardIndex)
                               }
@@ -542,7 +544,7 @@ export function TeamImportPreviewModal({
                           </div>
 
                           <div className="team-import-preview-prompt-body flex min-h-[220px]">
-                            <div className="flex w-11 shrink-0 select-none flex-col items-end gap-1 border-r border-[#d7e1ee] bg-[#e3eaf4] px-2 py-4 text-[11px] font-medium text-slate-400">
+                            <div className="team-import-preview-prompt-gutter flex w-11 shrink-0 select-none flex-col items-end gap-1 border-r border-[#d7e1ee] bg-[#e3eaf4] px-2 py-4 text-[11px] font-medium text-slate-400">
                               <span>01</span>
                               <span>02</span>
                               <span>03</span>
@@ -571,7 +573,7 @@ export function TeamImportPreviewModal({
                       title={t('members.importPreview.sections.environment')}
                       description={currentActionLabel}
                     >
-                      <div className="rounded-[20px] border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm leading-6 text-slate-500">
+                      <div className="team-import-preview-skip-card rounded-[20px] border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm leading-6 text-slate-500">
                         @{currentPlan.finalName}
                       </div>
                     </PreviewSection>
@@ -581,12 +583,12 @@ export function TeamImportPreviewModal({
             </div>
 
             {importPlan.length > 1 && (
-              <aside className="flex w-[196px] shrink-0 flex-col rounded-[24px] border border-white/70 bg-white/65 p-3 shadow-[0_18px_36px_rgba(148,163,184,0.12)] backdrop-blur-xl">
+              <aside className="team-import-preview-sidebar flex w-[196px] shrink-0 flex-col rounded-[24px] border border-white/70 bg-white/65 p-3 shadow-[0_18px_36px_rgba(148,163,184,0.12)] backdrop-blur-xl">
                 <div className="border-b border-slate-200/70 px-2 pb-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                  <div className="team-import-preview-sidebar-eyebrow text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
                     {t('members.importPreview.membersLabel')}
                   </div>
-                  <div className="mt-2 text-sm leading-6 text-slate-500">
+                  <div className="team-import-preview-sidebar-copy mt-2 text-sm leading-6 text-slate-500">
                     {t('members.importPreview.switchHint')}
                   </div>
                 </div>
@@ -619,27 +621,27 @@ export function TeamImportPreviewModal({
                           index === activeCardIndex ? 'step' : undefined
                         }
                         className={cn(
-                          'flex w-full items-start gap-3 rounded-[20px] border px-3 py-3 text-left transition-all duration-200',
+                          'team-import-preview-sidebar-item flex w-full items-start gap-3 rounded-[20px] border px-3 py-3 text-left transition-all duration-200',
                           index === activeCardIndex
-                            ? 'border-indigo-200 bg-indigo-50/95 shadow-[0_14px_28px_rgba(99,102,241,0.12)]'
-                            : 'border-white/70 bg-white/60 hover:bg-white/90'
+                            ? 'team-import-preview-sidebar-item-active border-indigo-200 bg-indigo-50/95 shadow-[0_14px_28px_rgba(99,102,241,0.12)]'
+                            : 'border-white/70 bg-white/60 hover:bg-white/90 dark:border-[#2A3445] dark:bg-[rgba(25,34,51,0.72)] dark:hover:bg-[rgba(34,44,61,0.92)]'
                         )}
                       >
                         <span
                           className={cn(
                             'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-2xl text-[11px] font-semibold',
                             index === activeCardIndex
-                              ? 'bg-white text-[#5094FB] shadow-sm'
+                              ? 'team-import-preview-step-active bg-white text-[#5094FB] shadow-sm'
                               : actionTone.step
                           )}
                         >
                           {String(index + 1).padStart(2, '0')}
                         </span>
                         <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-slate-900">
+                          <span className="team-import-preview-sidebar-item-title block truncate text-sm font-semibold text-slate-900">
                             {planName}
                           </span>
-                          <span className="mt-1 block truncate text-xs leading-5 text-slate-500">
+                          <span className="team-import-preview-sidebar-item-copy mt-1 block truncate text-xs leading-5 text-slate-500">
                             {actionLabel}
                           </span>
                         </span>
