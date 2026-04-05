@@ -198,11 +198,23 @@ export function GeneralSettingsSection() {
     );
   }
 
-  const themeOptions = [
-    { value: ThemeMode.LIGHT, label: toPrettyCase(ThemeMode.LIGHT) },
-    { value: ThemeMode.DARK, label: toPrettyCase(ThemeMode.DARK) },
-    { value: ThemeMode.SYSTEM, label: toPrettyCase(ThemeMode.SYSTEM) },
-  ];
+  const themeOptions = useMemo(
+    () => [
+      {
+        value: ThemeMode.LIGHT,
+        label: t('settings.general.appearance.theme.options.light'),
+      },
+      {
+        value: ThemeMode.DARK,
+        label: t('settings.general.appearance.theme.options.dark'),
+      },
+      {
+        value: ThemeMode.SYSTEM,
+        label: t('settings.general.appearance.theme.options.system'),
+      },
+    ],
+    [t]
+  );
 
   const soundOptions = Object.values(SoundFile).map((sound) => ({
     value: sound,

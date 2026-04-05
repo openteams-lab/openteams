@@ -761,7 +761,8 @@ fn summary_agent_priority(state: ChatSessionAgentState) -> u8 {
         ChatSessionAgentState::Idle => 0,
         ChatSessionAgentState::WaitingApproval => 1,
         ChatSessionAgentState::Dead => 2,
-        ChatSessionAgentState::Running => 3,
+        ChatSessionAgentState::Stopping => 3,
+        ChatSessionAgentState::Running => 4,
     }
 }
 

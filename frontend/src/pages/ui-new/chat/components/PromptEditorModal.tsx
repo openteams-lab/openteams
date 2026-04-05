@@ -161,7 +161,6 @@ export function PromptEditorModal({
         backgroundColor: palette.overlay,
         fontFamily: '-apple-system, "PingFang SC", sans-serif',
       }}
-      onClick={handleSubmit}
     >
       <div
         className="flex max-w-[calc(100vw-32px)] flex-col overflow-hidden"

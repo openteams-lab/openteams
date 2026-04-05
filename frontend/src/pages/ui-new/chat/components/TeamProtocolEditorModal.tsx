@@ -135,9 +135,6 @@ export function TeamProtocolEditorModal({
         backgroundColor: palette.overlay,
         fontFamily: '-apple-system, "PingFang SC", sans-serif',
       }}
-      onClick={() => {
-        if (!isSaving) onClose();
-      }}
     >
       <div
         className="flex w-[760px] max-w-[calc(100vw-32px)] flex-col overflow-hidden"

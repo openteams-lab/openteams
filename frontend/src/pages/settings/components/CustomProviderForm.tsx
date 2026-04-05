@@ -287,8 +287,8 @@ function renderStatusMessage(status: StatusState) {
 
   const toneClassName =
     status.tone === 'success'
-      ? 'border-[#d8ead8] bg-[#f7fcf7] text-[#2f7d32]'
-      : 'border-[#f3d7d7] bg-[#fff7f7] text-[#d14343]';
+      ? 'border-[#d8ead8] bg-[#f7fcf7] text-[#2f7d32] dark:border-[rgba(74,222,128,0.2)] dark:bg-[rgba(34,197,94,0.12)] dark:text-[#86EFAC]'
+      : 'border-[#f3d7d7] bg-[#fff7f7] text-[#d14343] dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(239,68,68,0.12)] dark:text-[#FCA5A5]';
 
   return (
     <div
@@ -550,18 +550,18 @@ export function CustomProviderForm({
       onOpenChange={onOpenChange}
       open={open}
       hideCloseButton
-      overlayClassName="bg-black/5"
+      overlayClassName="bg-black/5 dark:bg-black/55"
       containerClassName="items-center p-4 md:p-6"
-      className="my-0 w-full max-w-[720px] max-h-[min(640px,calc(100vh-48px))] gap-0 overflow-hidden rounded-[16px] border border-[#E8EEF5] bg-white p-0 shadow-[0_20px_60px_rgba(0,0,0,0.1)]"
+      className="my-0 w-full max-w-[720px] max-h-[min(640px,calc(100vh-48px))] gap-0 overflow-hidden rounded-[16px] border border-[#E8EEF5] bg-white p-0 shadow-[0_20px_60px_rgba(0,0,0,0.1)] dark:border-[#2B3648] dark:bg-[#111926] dark:shadow-[0_24px_72px_rgba(0,0,0,0.45)]"
     >
       <DialogContent className="min-h-0 gap-0">
-        <DialogHeader className="border-b border-[#E8EEF5] px-6 py-5 text-left">
+        <DialogHeader className="border-b border-[#E8EEF5] px-6 py-5 text-left dark:border-[#2B3648] dark:bg-[#111926]">
           <div className="flex items-start gap-4">
             <div className="flex-1">
-              <DialogTitle className="text-[18px] font-semibold text-[#333333]">
+              <DialogTitle className="text-[18px] font-semibold text-[#333333] dark:text-[#F3F6FB]">
                 {dialogCopy.title}
               </DialogTitle>
-              <DialogDescription className="mt-2 text-[13px] leading-6 text-[#8C8C8C]">
+              <DialogDescription className="mt-2 text-[13px] leading-6 text-[#8C8C8C] dark:text-[#7F8AA3]">
                 {dialogCopy.description}
               </DialogDescription>
             </div>
@@ -577,7 +577,7 @@ export function CustomProviderForm({
         </DialogHeader>
 
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-white px-6 py-6 dark:bg-[#111926]">
             {error
               ? renderStatusMessage({
                   message: error,
@@ -777,12 +777,12 @@ export function CustomProviderForm({
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h4 className="text-[14px] font-semibold text-[#333333]">
-                      {t('settings.cli.customProviders.form.modelsTitle')}
-                    </h4>
-                    <p className="mt-2 text-[12px] leading-5 text-[#8C8C8C]">
-                      {t('settings.cli.customProviders.form.modelsDescription')}
-                    </p>
+                      <h4 className="text-[14px] font-semibold text-[#333333] dark:text-[#F3F6FB]">
+                        {t('settings.cli.customProviders.form.modelsTitle')}
+                      </h4>
+                      <p className="mt-2 text-[12px] leading-5 text-[#8C8C8C] dark:text-[#7F8AA3]">
+                        {t('settings.cli.customProviders.form.modelsDescription')}
+                      </p>
                   </div>
                   <button
                     type="button"
@@ -824,7 +824,7 @@ export function CustomProviderForm({
                         </p>
                         <button
                           type="button"
-                          className="inline-flex items-center justify-center gap-2 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] px-3 py-[9px] text-[13px] text-[#d14343] transition-colors duration-200 hover:bg-[#fdeeee]"
+                          className="inline-flex items-center justify-center gap-2 rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] px-3 py-[9px] text-[13px] text-[#d14343] transition-colors duration-200 hover:bg-[#fdeeee] dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(239,68,68,0.12)] dark:text-[#FCA5A5] dark:hover:bg-[rgba(239,68,68,0.18)]"
                           onClick={() =>
                             updateFormState((current) => ({
                               ...current,
@@ -904,9 +904,9 @@ export function CustomProviderForm({
                               )}
                               triggerClassName={cn(
                                 settingsFieldClassName,
-                                'w-full justify-between gap-2 rounded-[10px] bg-[#F9FBFF] px-[14px] py-[10px] text-[14px] text-[#333333] hover:bg-white'
+                                'w-full justify-between gap-2 rounded-[10px] bg-[#F9FBFF] px-[14px] py-[10px] text-[14px] text-[#333333] hover:bg-white dark:bg-[#0F1724] dark:text-[#F3F6FB] dark:hover:bg-[#111926]'
                               )}
-                              menuContentClassName="w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+                              menuContentClassName="w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)] dark:border-[#2B3648] dark:bg-[#192233] dark:shadow-[0_12px_30px_rgba(0,0,0,0.4)]"
                               onChange={(values) =>
                                 updateModelDraft(model.key, (draft) => ({
                                   ...draft,
@@ -937,9 +937,9 @@ export function CustomProviderForm({
                               )}
                               triggerClassName={cn(
                                 settingsFieldClassName,
-                                'w-full justify-between gap-2 rounded-[10px] bg-[#F9FBFF] px-[14px] py-[10px] text-[14px] text-[#333333] hover:bg-white'
+                                'w-full justify-between gap-2 rounded-[10px] bg-[#F9FBFF] px-[14px] py-[10px] text-[14px] text-[#333333] hover:bg-white dark:bg-[#0F1724] dark:text-[#F3F6FB] dark:hover:bg-[#111926]'
                               )}
-                              menuContentClassName="w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+                              menuContentClassName="w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)] dark:border-[#2B3648] dark:bg-[#192233] dark:shadow-[0_12px_30px_rgba(0,0,0,0.4)]"
                               onChange={(values) =>
                                 updateModelDraft(model.key, (draft) => ({
                                   ...draft,
@@ -992,7 +992,7 @@ export function CustomProviderForm({
                           </SettingsField>
                         </div>
 
-                        <div className="rounded-[10px] border border-[#E8EEF5] bg-white/80 p-4">
+                        <div className="rounded-[10px] border border-[#E8EEF5] bg-white/80 p-4 dark:border-[#2B3648] dark:bg-[rgba(17,25,38,0.82)]">
                           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px] md:items-start">
                             <div className="min-w-0">
                               <SettingsCheckbox
@@ -1048,7 +1048,7 @@ export function CustomProviderForm({
             </div>
           </div>
 
-          <div className="flex flex-col-reverse gap-3 border-t border-[#E8EEF5] px-6 py-4 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-3 border-t border-[#E8EEF5] bg-white px-6 py-4 dark:border-[#2B3648] dark:bg-[#111926] sm:flex-row sm:justify-end">
             <button
               type="button"
               className={settingsSecondaryButtonClassName}

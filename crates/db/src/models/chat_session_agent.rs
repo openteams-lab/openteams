@@ -26,6 +26,7 @@ const CHAT_SESSION_AGENT_SELECT: &str = r#"
 pub enum ChatSessionAgentState {
     Idle,
     Running,
+    Stopping,
     WaitingApproval,
     Dead,
 }

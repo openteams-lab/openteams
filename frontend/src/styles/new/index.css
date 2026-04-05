@@ -6953,7 +6953,7 @@
       180deg,
       rgba(25, 34, 51, 0.96) 0%,
       rgba(18, 24, 35, 1) 100%
-    );
+    ) !important;
     box-shadow:
       inset 0 1px 0 rgba(148, 163, 184, 0.04),
       0 6px 14px rgba(0, 0, 0, 0.12);
@@ -6966,7 +6966,7 @@
       180deg,
       rgba(94, 162, 255, 0.08) 0%,
       rgba(18, 24, 35, 1) 100%
-    );
+    ) !important;
   }
 
   .new-design.dark .chat-session-member-preset-card:hover:not(:disabled),
@@ -7060,7 +7060,7 @@
       135deg,
       rgba(25, 34, 51, 0.98) 0%,
       rgba(22, 49, 79, 0.42) 100%
-    );
+    ) !important;
     box-shadow:
       inset 0 1px 0 rgba(148, 163, 184, 0.05),
       0 12px 28px rgba(0, 0, 0, 0.22);

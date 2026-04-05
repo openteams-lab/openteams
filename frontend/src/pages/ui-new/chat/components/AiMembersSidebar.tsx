@@ -1208,7 +1208,8 @@ export function AiMembersSidebar({
                       className={cn(
                         'size-2 rounded-full',
                         agentStateDotClass[state],
-                        state === ChatSessionAgentState.running &&
+                        (state === ChatSessionAgentState.running ||
+                          state === ChatSessionAgentState.stopping) &&
                           'chat-session-status-breathe'
                       )}
                     />

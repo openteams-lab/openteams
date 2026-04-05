@@ -40,6 +40,24 @@ import { TagManager } from '@/components/TagManager';
 export function GeneralSettings() {
   const { t } = useTranslation(['settings', 'common']);
 
+  const themeOptions = useMemo(
+    () => [
+      {
+        value: ThemeMode.LIGHT,
+        label: t('settings.general.appearance.theme.options.light'),
+      },
+      {
+        value: ThemeMode.DARK,
+        label: t('settings.general.appearance.theme.options.dark'),
+      },
+      {
+        value: ThemeMode.SYSTEM,
+        label: t('settings.general.appearance.theme.options.system'),
+      },
+    ],
+    [t]
+  );
+
   // Get language options with proper display names
   const languageOptions = getLanguageOptions(
     t('language.browserDefault', {
@@ -237,15 +255,11 @@ export function GeneralSettings() {
                 />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem key={ThemeMode.LIGHT} value={ThemeMode.LIGHT}>
-                  {toPrettyCase(ThemeMode.LIGHT)}
-                </SelectItem>
-                <SelectItem key={ThemeMode.DARK} value={ThemeMode.DARK}>
-                  {toPrettyCase(ThemeMode.DARK)}
-                </SelectItem>
-                <SelectItem key={ThemeMode.SYSTEM} value={ThemeMode.SYSTEM}>
-                  {toPrettyCase(ThemeMode.SYSTEM)}
-                </SelectItem>
+                {themeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground">

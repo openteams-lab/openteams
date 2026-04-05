@@ -40,6 +40,7 @@ export const fallbackRunnerTypes = [
 export const agentStateLabels: Record<ChatSessionAgentState, string> = {
   idle: 'Idle',
   running: 'Running',
+  stopping: 'Stopping',
   waitingapproval: 'Waiting approval',
   dead: 'Dead',
 };
@@ -47,6 +48,7 @@ export const agentStateLabels: Record<ChatSessionAgentState, string> = {
 export const agentStateDotClass: Record<ChatSessionAgentState, string> = {
   idle: 'bg-low',
   running: 'chat-session-agent-state-dot-running',
+  stopping: 'bg-brand-secondary',
   waitingapproval: 'bg-brand-secondary',
   dead: 'bg-error',
 };
