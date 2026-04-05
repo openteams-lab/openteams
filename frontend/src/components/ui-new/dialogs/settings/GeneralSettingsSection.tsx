@@ -139,14 +139,8 @@ export function GeneralSettingsSection() {
     setSuccess(false);
 
     try {
-      const normalizedTheme =
-        draft.theme === ThemeMode.DARK ? ThemeMode.LIGHT : draft.theme;
-      const nextConfig =
-        normalizedTheme === draft.theme
-          ? draft
-          : { ...draft, theme: normalizedTheme };
-      await updateAndSaveConfig(nextConfig);
-      setTheme(normalizedTheme);
+      await updateAndSaveConfig(draft);
+      setTheme(draft.theme);
       setDirty(false);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -206,6 +200,8 @@ export function GeneralSettingsSection() {
 
   const themeOptions = [
     { value: ThemeMode.LIGHT, label: toPrettyCase(ThemeMode.LIGHT) },
+    { value: ThemeMode.DARK, label: toPrettyCase(ThemeMode.DARK) },
+    { value: ThemeMode.SYSTEM, label: toPrettyCase(ThemeMode.SYSTEM) },
   ];
 
   const soundOptions = Object.values(SoundFile).map((sound) => ({
@@ -238,9 +234,9 @@ export function GeneralSettingsSection() {
           description={t('settings.general.appearance.theme.helper')}
         >
           <SettingsSelect
-            value={ThemeMode.LIGHT}
+            value={draft?.theme}
             options={themeOptions}
-            onChange={() => updateDraft({ theme: ThemeMode.LIGHT })}
+            onChange={(value: ThemeMode) => updateDraft({ theme: value })}
             placeholder={t('settings.general.appearance.theme.placeholder')}
           />
         </SettingsField>
