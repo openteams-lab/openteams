@@ -44,7 +44,7 @@
 ---
 ## 🔥 *Nouveautés :*
 ### *Mises à jour majeures*
-- **2026.04.02 (v0.3.11)**
+- **2026.04.06 (v0.3.12)**
   - Activation du mode interface sombre
   - Correction des problèmes de concurrence d'openteams-cli
 - **2026.04.02 (v0.3.10)**

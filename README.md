@@ -44,7 +44,7 @@
 ---
 ## 🔥 *News:*
 ### *Major updates*
-- **2026.04.02 (v0.3.11)**
+- **2026.04.06 (v0.3.12)**
   - Enable dark ui mode
   - fix openteams-cli concurrency issues
 - **2026.04.02 (v0.3.10)**
