@@ -84,7 +84,7 @@ export const ObjectFieldTemplate = (props: ObjectFieldTemplateProps) => {
   const { properties } = props;
 
   return (
-    <div className="settings-rjsf-object divide-y divide-[#f5f5f5]">
+    <div className="settings-rjsf-object divide-y divide-[#f5f5f5] dark:divide-[#2A3445]">
       {properties.map((element) => (
         <div key={element.name}>{element.content}</div>
       ))}

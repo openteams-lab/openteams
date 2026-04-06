@@ -470,7 +470,7 @@ export function AgentsSettingsSection() {
 
             {/* Config form */}
             {selectedExecutorType && selectedConfiguration && (
-              <div className="mt-2 border-t border-[#f5f5f5] pt-6">
+              <div className="mt-2 border-t border-[#f5f5f5] pt-6 dark:border-[#2A3445]">
                 <div className={cn(settingsPanelClassName, 'p-4')}>
                   <ExecutorConfigForm
                     key={`${selectedExecutorType}-${selectedConfiguration}`}

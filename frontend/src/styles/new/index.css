@@ -5164,6 +5164,18 @@
     accent-color: var(--chat-session-send-blue, #5a66ff);
   }
 
+  .new-design
+    .chat-settings-theme
+    [aria-checked='true']
+    .settings-checkbox-input,
+  .new-design
+    .chat-settings-theme
+    .settings-checkbox-input[data-checked='true'] {
+    background: #4a90e2 !important;
+    border-color: #4a90e2 !important;
+    color: #ffffff !important;
+  }
+
   .new-design .chat-settings-theme .dropdown-menu-content,
   .new-design .chat-settings-theme .ui-select-content {
     background: #ffffff !important;
@@ -5375,6 +5387,27 @@
   .new-design.dark .chat-settings-theme .settings-checkbox-input,
   .dark .new-design .chat-settings-theme .settings-checkbox-input {
     background: #111926 !important;
+  }
+
+  .new-design.dark
+    .chat-settings-theme
+    [aria-checked='true']
+    .settings-checkbox-input,
+  .dark
+    .new-design
+    .chat-settings-theme
+    [aria-checked='true']
+    .settings-checkbox-input,
+  .new-design.dark
+    .chat-settings-theme
+    .settings-checkbox-input[data-checked='true'],
+  .dark
+    .new-design
+    .chat-settings-theme
+    .settings-checkbox-input[data-checked='true'] {
+    background: #5ea2ff !important;
+    border-color: #5ea2ff !important;
+    color: #ffffff !important;
   }
 
   .new-design.dark .chat-settings-theme .dropdown-menu-content,
