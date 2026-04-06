@@ -74,6 +74,8 @@ npx openteams-web
 
 **Desde la v0.3.7, openteams-cli viene integrado, así que ya no hace falta instalar un AI Agent por separado. Puedes configurar tu API en la página `Settings -> Service Providers`.**
 
+⚙️ [Consulta la documentación de configuración de proveedores.](https://doc.openteams-lab.com/advanced-usage/custom-provider)
+
 También puedes elegir cualquier Agent de la lista de Agents compatibles.
 
 | Agent | Instalación |

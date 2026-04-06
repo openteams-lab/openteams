@@ -74,6 +74,8 @@ npx openteams-web
 
 **从 v0.3.7 开始，我们已内置 openteams-cli，因此不再需要安装 AI Agent。你可以前往“Settings -> Service Providers”页面配置你的 API。**
 
+⚙️ [查看模型供应商配置文档。](https://doc.openteams-lab.com/zh-Hans/advanced-usage/custom-provider)
+
 你也可以从支持的 Agent 列表中任选一个：
 
 | Agent | 安装方式 |
