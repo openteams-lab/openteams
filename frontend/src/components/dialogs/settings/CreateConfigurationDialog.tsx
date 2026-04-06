@@ -4,6 +4,7 @@ import { XIcon } from '@phosphor-icons/react';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal } from '@/lib/modals';
 import { getCreateConfigurationDialogCopy } from '@/lib/agentConfigLocalization';
+import { cn } from '@/lib/utils';
 import { toPrettyCase } from '@/utils/string';
 import {
   settingsFieldClassName,
@@ -99,31 +100,31 @@ const CreateConfigurationDialogImpl =
 
       return (
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          className="chat-settings-theme fixed inset-0 z-[9999] flex items-center justify-center"
           style={{
-            backgroundColor: 'rgba(0, 0, 0, 0.05)',
+            backgroundColor: 'rgba(0, 0, 0, 0.18)',
             fontFamily:
               '-apple-system, "PingFang SC", "Helvetica Neue", sans-serif',
           }}
           onClick={handleCancel}
         >
           <div
-            className="w-[560px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[16px] border border-[#E8EEF5] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.1)]"
+            className="w-[560px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[16px] border border-[#E8EEF5] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.1)] dark:border-[#2B3648] dark:bg-[#111926] dark:shadow-[0_24px_72px_rgba(0,0,0,0.42)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between px-6 py-5">
               <div>
-                <h2 className="m-0 text-[16px] font-semibold text-[#333333]">
+                <h2 className="m-0 text-[16px] font-semibold text-[#333333] dark:text-[#F3F6FB]">
                   {copy.title}
                 </h2>
-                <p className="mt-1 text-[13px] text-[#8C8C8C]">
+                <p className="mt-1 text-[13px] text-[#8C8C8C] dark:text-[#7F8AA3]">
                   {copy.description(resolvedExecutorType)}
                 </p>
               </div>
               <button
                 type="button"
                 aria-label={copy.closeAriaLabel}
-                className="border-none bg-transparent p-0 text-[#cccccc] transition-colors duration-200 hover:text-[#333333]"
+                className="border-none bg-transparent p-0 text-[#cccccc] transition-colors duration-200 hover:text-[#333333] dark:text-[#7F8AA3] dark:hover:text-[#F3F6FB]"
                 onClick={handleCancel}
               >
                 <XIcon className="h-5 w-5" weight="bold" />
@@ -134,7 +135,7 @@ const CreateConfigurationDialogImpl =
               <div className="space-y-2">
                 <label
                   htmlFor="config-name"
-                  className="block text-[12px] text-[#8C8C8C]"
+                  className="block text-[12px] text-[#8C8C8C] dark:text-[#7F8AA3]"
                 >
                   {copy.nameLabel}
                 </label>
@@ -153,7 +154,7 @@ const CreateConfigurationDialogImpl =
               </div>
 
               <div className="space-y-2">
-                <label className="block text-[12px] text-[#8C8C8C]">
+                <label className="block text-[12px] text-[#8C8C8C] dark:text-[#7F8AA3]">
                   {copy.cloneLabel}
                 </label>
                 <SettingsSelect
@@ -176,13 +177,13 @@ const CreateConfigurationDialogImpl =
               </div>
 
               {error ? (
-                <div className="rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343]">
+                <div className="rounded-[10px] border border-[#f3d7d7] bg-[#fff7f7] p-4 text-[13px] text-[#d14343] dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(239,68,68,0.12)] dark:text-[#FCA5A5]">
                   {error}
                 </div>
               ) : null}
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-[#f5f5f5] px-6 py-4">
+            <div className="flex justify-end gap-3 border-t border-[#f5f5f5] px-6 py-4 dark:border-[#2A3445]">
               <button
                 type="button"
                 onClick={handleCancel}
@@ -194,7 +195,10 @@ const CreateConfigurationDialogImpl =
                 type="button"
                 onClick={handleCreate}
                 disabled={!configName.trim()}
-                className={settingsPrimaryButtonClassName}
+                className={cn(
+                  settingsPrimaryButtonClassName,
+                  'bg-[#5A66FF] hover:bg-[#4B57F2] dark:bg-[#5EA2FF] dark:hover:bg-[#4996F7]'
+                )}
               >
                 {copy.createButton}
               </button>

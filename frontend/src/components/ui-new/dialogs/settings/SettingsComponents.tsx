@@ -71,21 +71,30 @@ export function TwoColumnPickerItem({
   children,
 }: TwoColumnPickerItemProps) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className={cn(
         'settings-two-column-item group flex w-full items-center gap-2 border-none bg-transparent px-3 py-2 text-left text-[#333333] transition-colors duration-200 dark:text-[#F3F6FB]',
+        'cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-[#4A90E2] dark:focus-visible:ring-[#5EA2FF]',
         selected &&
           'settings-two-column-item-selected font-medium text-[#4A90E2] dark:text-[#CFE3FF]'
       )}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (!onClick) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      }}
     >
       {leading}
       <span className="settings-two-column-item-label flex-1 truncate text-[13px]">
         {children}
       </span>
       {trailing}
-    </button>
+    </div>
   );
 }
 
@@ -234,6 +243,7 @@ export function SettingsCheckbox({
       )}
     >
       <span
+        data-checked={checked ? 'true' : 'false'}
         className={cn(
           'settings-checkbox-input mt-[1px] flex h-[18px] w-[18px] items-center justify-center rounded-[4px] border-2 border-[#E8EEF5] bg-white transition-colors duration-200 dark:border-[#2B3648] dark:bg-[#111926]',
           checked &&
