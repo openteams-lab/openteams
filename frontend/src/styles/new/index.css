@@ -5168,7 +5168,9 @@
     .chat-settings-theme
     [aria-checked='true']
     .settings-checkbox-input,
-  .new-design .chat-settings-theme .settings-checkbox-input[data-checked='true'] {
+  .new-design
+    .chat-settings-theme
+    .settings-checkbox-input[data-checked='true'] {
     background: #4a90e2 !important;
     border-color: #4a90e2 !important;
     color: #ffffff !important;
