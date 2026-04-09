@@ -1194,12 +1194,14 @@ impl ChatRunner {
             );
 
             self.spawn_exit_watcher(
-                spawned.child,
-                stop,
-                spawned.cancel,
-                spawned.exit_signal,
-                msg_store,
-                completion_status,
+                runtime::ExitWatcherArgs {
+                    child: spawned.child,
+                    stop,
+                    executor_cancel: spawned.cancel,
+                    exit_signal: spawned.exit_signal,
+                    msg_store,
+                    completion_status,
+                },
                 session_agent_id,
             );
 

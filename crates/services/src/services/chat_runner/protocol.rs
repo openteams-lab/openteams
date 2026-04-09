@@ -1,28 +1,32 @@
 use super::*;
 
+pub(super) struct ProtocolNoticeArgs<'a> {
+    session_id: Uuid,
+    session_agent_id: Uuid,
+    agent_id: Uuid,
+    run_id: Uuid,
+    agent_name: &'a str,
+    output_is_empty: bool,
+}
+
 impl ChatRunner {
     pub(super) fn emit_protocol_notice(
         &self,
-        session_id: Uuid,
-        session_agent_id: Uuid,
-        agent_id: Uuid,
-        run_id: Uuid,
-        agent_name: &str,
+        notice: ProtocolNoticeArgs<'_>,
         error: &AgentProtocolError,
-        output_is_empty: bool,
     ) {
         self.emit(
-            session_id,
+            notice.session_id,
             ChatStreamEvent::ProtocolNotice {
-                session_id,
-                session_agent_id,
-                agent_id,
-                run_id,
-                agent_name: agent_name.to_string(),
+                session_id: notice.session_id,
+                session_agent_id: notice.session_agent_id,
+                agent_id: notice.agent_id,
+                run_id: notice.run_id,
+                agent_name: notice.agent_name.to_string(),
                 code: error.code.clone(),
                 target: error.target.clone(),
                 detail: error.detail.clone(),
-                output_is_empty,
+                output_is_empty: notice.output_is_empty,
             },
         );
     }
@@ -330,13 +334,15 @@ impl ChatRunner {
         );
 
         self.emit_protocol_notice(
-            session_id,
-            session_agent_id,
-            agent_id,
-            run_id,
-            agent_name,
+            ProtocolNoticeArgs {
+                session_id,
+                session_agent_id,
+                agent_id,
+                run_id,
+                agent_name,
+                output_is_empty,
+            },
             error,
-            output_is_empty,
         );
         self.persist_protocol_error_message(
             session_id,

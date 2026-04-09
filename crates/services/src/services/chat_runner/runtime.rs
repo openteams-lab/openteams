@@ -1,5 +1,14 @@
 use super::*;
 
+pub(super) struct ExitWatcherArgs {
+    pub(super) child: command_group::AsyncGroupChild,
+    pub(super) stop: CancellationToken,
+    pub(super) executor_cancel: Option<CancellationToken>,
+    pub(super) exit_signal: Option<ExecutorExitSignal>,
+    pub(super) msg_store: Arc<MsgStore>,
+    pub(super) completion_status: Arc<AtomicU8>,
+}
+
 impl ChatRunner {
     pub(super) fn register_run_control(&self, session_agent_id: Uuid) -> CancellationToken {
         let stop = CancellationToken::new();
@@ -790,23 +799,18 @@ impl ChatRunner {
 
     pub(super) fn spawn_exit_watcher(
         &self,
-        child: command_group::AsyncGroupChild,
-        stop: CancellationToken,
-        executor_cancel: Option<CancellationToken>,
-        exit_signal: Option<ExecutorExitSignal>,
-        msg_store: Arc<MsgStore>,
-        completion_status: Arc<AtomicU8>,
+        args: ExitWatcherArgs,
         session_agent_id: Uuid,
     ) {
         let run_controls = self.run_controls.clone();
         tokio::spawn(async move {
             Self::watch_executor_lifecycle(
-                child,
-                stop,
-                executor_cancel,
-                exit_signal,
-                msg_store,
-                completion_status,
+                args.child,
+                args.stop,
+                args.executor_cancel,
+                args.exit_signal,
+                args.msg_store,
+                args.completion_status,
                 session_agent_id,
             )
             .await;
