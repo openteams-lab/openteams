@@ -16,8 +16,7 @@ export function NewDesignScope({ children }: NewDesignScopeProps) {
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const hasTracked = useRef(false);
   const { resolvedTheme } = useTheme();
-  const isTauriRuntime =
-    typeof window !== 'undefined' && '__TAURI__' in window;
+  const isTauriRuntime = typeof window !== 'undefined' && '__TAURI__' in window;
 
   useEffect(() => {
     if (!hasTracked.current) {
