@@ -797,11 +797,7 @@ impl ChatRunner {
         });
     }
 
-    pub(super) fn spawn_exit_watcher(
-        &self,
-        args: ExitWatcherArgs,
-        session_agent_id: Uuid,
-    ) {
+    pub(super) fn spawn_exit_watcher(&self, args: ExitWatcherArgs, session_agent_id: Uuid) {
         let run_controls = self.run_controls.clone();
         tokio::spawn(async move {
             Self::watch_executor_lifecycle(
