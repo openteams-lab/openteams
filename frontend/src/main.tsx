@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
-// CSS is now imported by design scope components (LegacyDesignScope, NewDesignScope)
+// CSS is imported by design scope components.
 import { ClickToComponent } from 'click-to-react-component';
 import {
   QueryClient,
@@ -45,14 +45,14 @@ if (
   posthog.init(import.meta.env.VITE_POSTHOG_API_KEY, {
     api_host: import.meta.env.VITE_POSTHOG_API_ENDPOINT,
     capture_pageview: false,
-    capture_pageleave: true,
-    capture_performance: true,
+    capture_pageleave: false,
+    capture_performance: false,
     autocapture: false,
     opt_out_capturing_by_default: true,
   });
 } else {
   console.warn(
-    'PostHog API key or endpoint not set. Analytics will be disabled.'
+    'PostHog API key or endpoint not set. Survey features disabled.'
   );
 }
 

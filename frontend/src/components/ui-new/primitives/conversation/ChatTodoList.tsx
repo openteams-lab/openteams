@@ -22,7 +22,7 @@ function getStatusIcon(status?: string) {
 }
 
 export function ChatTodoList({ todos, expanded, onToggle }: ChatTodoListProps) {
-  const { t } = useTranslation('tasks');
+  const { t } = useTranslation('common');
 
   return (
     <div className="text-sm">

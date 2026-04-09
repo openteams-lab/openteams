@@ -4,19 +4,19 @@ description: "openteams supports multiple model providers. You can configure the
 sidebarTitle: "Model Provider Configuration"
 ---
 
-<script id="openteams-browser-language-redirect">{`(function(){
-  if (typeof window === 'undefined') return;
+{(() => {
+  if (typeof window === 'undefined') return null;
   var path = window.location.pathname.replace(/\/+$/, '') || '/';
   var basePath = path === '/docs' || path.startsWith('/docs/') ? '/docs' : '';
   var relativePath = basePath ? (path.slice(basePath.length) || '/') : path;
   var localePrefixes = ['zh-Hans', 'zh-Hant', 'ja', 'ko', 'fr'];
   if (localePrefixes.some(function(prefix) {
     return relativePath === '/' + prefix || relativePath.startsWith('/' + prefix + '/');
-  })) return;
+  })) return null;
   try {
     if (document.referrer) {
       var referrerUrl = new URL(document.referrer);
-      if (referrerUrl.origin === window.location.origin) return;
+      if (referrerUrl.origin === window.location.origin) return null;
     }
   } catch (error) {}
   var candidates = Array.isArray(navigator.languages) && navigator.languages.length
@@ -46,13 +46,14 @@ sidebarTitle: "Model Provider Configuration"
       break;
     }
   }
-  if (matched === 'en') return;
+  if (matched === 'en') return null;
   var targetRelativePath = relativePath === '/' ? '/' + matched : '/' + matched + relativePath;
   var target = basePath + targetRelativePath + window.location.search + window.location.hash;
   if (target !== window.location.pathname + window.location.search + window.location.hash) {
     window.location.replace(target);
   }
-})();`}</script>
+  return null;
+})()}
 
 ## Configuration page
 

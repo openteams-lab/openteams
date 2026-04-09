@@ -600,46 +600,6 @@
         "unsavedChanges": "• Tienes cambios sin guardar"
       }
     },
-    "projects": {
-      "title": "Configuración de Proyectos",
-      "description": "Configura scripts y ajustes específicos del proyecto.",
-      "loading": "Cargando proyectos...",
-      "loadError": "Error al cargar proyectos.",
-      "selector": {
-        "label": "Seleccionar Proyecto",
-        "placeholder": "Elige un proyecto para configurar",
-        "helper": "Selecciona un proyecto para ver y editar su configuración.",
-        "noProjects": "No hay proyectos disponibles"
-      },
-      "general": {
-        "title": "Configuración General",
-        "description": "Configura la información básica del proyecto.",
-        "name": {
-          "label": "Nombre del Proyecto",
-          "placeholder": "Ingresa el nombre del proyecto",
-          "helper": "Un nombre para mostrar para este proyecto."
-        },
-        "repoPath": {
-          "label": "Ruta del Repositorio Git",
-          "placeholder": "/ruta/a/tu/repositorio/existente",
-          "helper": "La ruta absoluta a tu repositorio git en disco."
-        }
-      },
-      "save": {
-        "button": "Guardar Configuración del Proyecto",
-        "success": "✓ ¡Configuración del proyecto guardada exitosamente!",
-        "error": "Error al guardar la configuración del proyecto",
-        "unsavedChanges": "• Tienes cambios sin guardar",
-        "discard": "Descartar",
-        "confirmSwitch": "Tienes cambios sin guardar. ¿Estás seguro de que quieres cambiar de proyecto? Tus cambios se perderán."
-      },
-      "repositories": {
-        "title": "Repositorios",
-        "description": "Administra los repositorios git en este proyecto",
-        "noRepositories": "No hay repositorios configurados",
-        "addRepository": "Agregar Repositorio"
-      }
-    },
     "repos": {
       "title": "Configuración del Repositorio",
       "description": "Configura los scripts que se ejecutan cuando este repositorio se usa en workspaces.",

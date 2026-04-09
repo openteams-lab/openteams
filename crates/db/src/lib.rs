@@ -137,3 +137,78 @@ impl DBService {
         Ok(pool)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use sqlx::SqlitePool;
+    use uuid::Uuid;
+
+    use super::run_migrations;
+    use crate::models::{
+        chat_agent::{ChatAgent, CreateChatAgent},
+        chat_session::{ChatSession, CreateChatSession},
+        chat_session_agent::{ChatSessionAgent, ChatSessionAgentState, CreateChatSessionAgent},
+    };
+
+    #[tokio::test]
+    async fn migrations_allow_stopping_and_waitingapproval_chat_agent_states() {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("create sqlite memory pool");
+        run_migrations(&pool).await.expect("run migrations");
+
+        let session = ChatSession::create(
+            &pool,
+            &CreateChatSession {
+                title: Some("test".to_string()),
+                workspace_path: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create chat session");
+        let agent = ChatAgent::create(
+            &pool,
+            &CreateChatAgent {
+                name: "tester".to_string(),
+                runner_type: "codex".to_string(),
+                system_prompt: Some(String::new()),
+                tools_enabled: Some(serde_json::json!({})),
+                model_name: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create chat agent");
+        let session_agent = ChatSessionAgent::create(
+            &pool,
+            &CreateChatSessionAgent {
+                session_id: session.id,
+                agent_id: agent.id,
+                workspace_path: None,
+                allowed_skill_ids: Vec::new(),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create session agent");
+
+        let stopping = ChatSessionAgent::update_state(
+            &pool,
+            session_agent.id,
+            ChatSessionAgentState::Stopping,
+        )
+        .await
+        .expect("set stopping");
+        assert_eq!(stopping.state, ChatSessionAgentState::Stopping);
+
+        let waiting = ChatSessionAgent::update_state(
+            &pool,
+            session_agent.id,
+            ChatSessionAgentState::WaitingApproval,
+        )
+        .await
+        .expect("set waiting approval");
+        assert_eq!(waiting.state, ChatSessionAgentState::WaitingApproval);
+    }
+}

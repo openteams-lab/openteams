@@ -46,6 +46,7 @@ import { UpdateDialog } from '@/components/ui-new/dialogs/UpdateDialog';
 import { useVersionCheck } from '@/hooks/useVersionCheck';
 
 import {
+  type AgentStateInfo,
   type SessionMember,
   type RunHistoryItem,
   type MentionStatus,
@@ -1586,17 +1587,67 @@ export function ChatSessions() {
     return next;
   }, [streamingRuns]);
 
+  const effectiveAgentStateInfos = useMemo(() => {
+    const next: Record<string, AgentStateInfo> = {};
+
+    for (const member of sessionMembers) {
+      const agentId = member.agent.id;
+      const baseInfo = agentStateInfos[agentId];
+      const baseState =
+        baseInfo?.state ?? agentStates[agentId] ?? member.sessionAgent.state;
+      const shouldHoldStoppingState =
+        stoppingAgents.has(agentId) &&
+        (streamingRunAgentIds.has(agentId) ||
+          baseState === ChatSessionAgentState.running ||
+          baseState === ChatSessionAgentState.stopping);
+      const state = shouldHoldStoppingState
+        ? ChatSessionAgentState.stopping
+        : baseState;
+
+      next[agentId] = {
+        state,
+        startedAt:
+          state === ChatSessionAgentState.running ||
+          state === ChatSessionAgentState.stopping
+            ? (baseInfo?.startedAt ?? member.sessionAgent.updated_at)
+            : null,
+      };
+    }
+
+    return next;
+  }, [
+    agentStateInfos,
+    agentStates,
+    sessionMembers,
+    stoppingAgents,
+    streamingRunAgentIds,
+  ]);
+
+  const effectiveAgentStates = useMemo(
+    () => ({
+      ...agentStates,
+      ...Object.fromEntries(
+        Object.entries(effectiveAgentStateInfos).map(([agentId, info]) => [
+          agentId,
+          info.state,
+        ])
+      ),
+    }),
+    [agentStates, effectiveAgentStateInfos]
+  );
+
   const placeholderAgents = useMemo(
     () =>
       sessionMembers.filter((member) => {
-        const state = agentStates[member.agent.id] ?? member.sessionAgent.state;
+        const state =
+          effectiveAgentStates[member.agent.id] ?? member.sessionAgent.state;
         return (
           state === ChatSessionAgentState.running ||
           state === ChatSessionAgentState.stopping ||
           streamingRunAgentIds.has(member.agent.id)
         );
       }),
-    [agentStates, sessionMembers, streamingRunAgentIds]
+    [effectiveAgentStates, sessionMembers, streamingRunAgentIds]
   );
 
   const activeWorkspaceAgent = workspaceAgentId
@@ -1725,7 +1776,8 @@ export function ChatSessions() {
 
     const runningAgentIds = new Set<string>();
     for (const member of sessionMembers) {
-      const state = agentStates[member.agent.id] ?? member.sessionAgent.state;
+      const state =
+        effectiveAgentStates[member.agent.id] ?? member.sessionAgent.state;
       if (
         state === ChatSessionAgentState.running ||
         state === ChatSessionAgentState.stopping
@@ -1741,7 +1793,7 @@ export function ChatSessions() {
     );
   }, [
     activeSessionId,
-    agentStates,
+    effectiveAgentStates,
     visibleMessagesData,
     visibleWorkItemsData,
     pruneStreamingRunsForSession,
@@ -2467,7 +2519,10 @@ export function ChatSessions() {
     const runningMentionedAgents: string[] = [];
     allMentions.forEach((name) => {
       const agentId = agentIdByName.get(name);
-      if (agentId && agentStates[agentId] === ChatSessionAgentState.running) {
+      if (
+        agentId &&
+        effectiveAgentStates[agentId] === ChatSessionAgentState.running
+      ) {
         runningMentionedAgents.push(name);
       }
     });
@@ -3500,10 +3555,12 @@ export function ChatSessions() {
       const next = new Set(prev);
 
       for (const agentId of prev) {
-        const state = agentStateInfos[agentId]?.state ?? agentStates[agentId];
+        const state =
+          agentStateInfos[agentId]?.state ?? effectiveAgentStates[agentId];
         if (
           state !== ChatSessionAgentState.running &&
-          state !== ChatSessionAgentState.stopping
+          state !== ChatSessionAgentState.stopping &&
+          !streamingRunAgentIds.has(agentId)
         ) {
           next.delete(agentId);
           changed = true;
@@ -3512,7 +3569,7 @@ export function ChatSessions() {
 
       return changed ? next : prev;
     });
-  }, [agentStateInfos, agentStates]);
+  }, [agentStateInfos, effectiveAgentStates, streamingRunAgentIds]);
 
   // Resize handlers
   const handleResizeStart = useCallback(
@@ -3957,7 +4014,7 @@ export function ChatSessions() {
                           mentionList={mentionList}
                           mentionStatusMap={mentionStatusMap}
                           mentionErrors={mentionErrors.get(message.id)}
-                          agentStates={agentStates}
+                          agentStates={effectiveAgentStates}
                           agentIdByName={agentIdByName}
                           attachments={attachments}
                           activeSessionId={activeSessionId}
@@ -4027,11 +4084,11 @@ export function ChatSessions() {
                         member={member}
                         run={runByAgentId.get(member.agent.id)}
                         tone={getMessageTone(member.agent.id, false)}
-                        stateInfo={agentStateInfos[member.agent.id]}
+                        stateInfo={effectiveAgentStateInfos[member.agent.id]}
                         clock={clock}
                         isStopping={
                           stoppingAgents.has(member.agent.id) ||
-                          agentStateInfos[member.agent.id]?.state ===
+                          effectiveAgentStateInfos[member.agent.id]?.state ===
                             ChatSessionAgentState.stopping
                         }
                         onStop={handleStopAgent}
@@ -4168,7 +4225,7 @@ export function ChatSessions() {
         >
           <AiMembersSidebar
             sessionMembers={sessionMembers}
-            agentStates={agentStates}
+            agentStates={effectiveAgentStates}
             activeSessionId={activeSessionId}
             isArchived={isArchived}
             width={rightSidebarWidth}

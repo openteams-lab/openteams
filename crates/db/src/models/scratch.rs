@@ -81,15 +81,6 @@ pub struct UiPreferencesData {
     pub workspace_panel_states: std::collections::HashMap<String, WorkspacePanelStateData>,
 }
 
-/// Linked issue data for draft workspace scratch
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-pub struct DraftWorkspaceLinkedIssue {
-    pub issue_id: String,
-    pub simple_id: String,
-    pub title: String,
-    pub remote_project_id: String,
-}
-
 /// Data for a draft workspace scratch (new workspace creation)
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct DraftWorkspaceData {
@@ -100,8 +91,6 @@ pub struct DraftWorkspaceData {
     pub repos: Vec<DraftWorkspaceRepo>,
     #[serde(default)]
     pub selected_profile: Option<ExecutorProfileId>,
-    #[serde(default)]
-    pub linked_issue: Option<DraftWorkspaceLinkedIssue>,
 }
 
 /// Repository entry in a draft workspace

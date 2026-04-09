@@ -18,7 +18,7 @@ export interface ConfirmDialogProps {
 }
 
 const ConfirmDialogImpl = NiceModal.create<ConfirmDialogProps>((props) => {
-  const { t } = useTranslation(['tasks', 'common']);
+  const { t } = useTranslation('common');
   const modal = useModal();
   const {
     title,

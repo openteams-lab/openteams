@@ -600,46 +600,6 @@
         "unsavedChanges": "• 저장되지 않은 변경 사항이 있습니다"
       }
     },
-    "projects": {
-      "title": "프로젝트 구성",
-      "description": "프로젝트별 스크립트 및 설정을 구성하세요.",
-      "loading": "프로젝트 로딩 중...",
-      "loadError": "프로젝트를 불러오지 못했습니다.",
-      "selector": {
-        "label": "프로젝트 선택",
-        "placeholder": "구성할 프로젝트를 선택하세요",
-        "helper": "프로젝트를 선택하여 구성을 보고 편집하세요.",
-        "noProjects": "사용 가능한 프로젝트가 없습니다"
-      },
-      "general": {
-        "title": "일반 설정",
-        "description": "기본 프로젝트 정보를 구성하세요.",
-        "name": {
-          "label": "프로젝트 이름",
-          "placeholder": "프로젝트 이름 입력",
-          "helper": "이 프로젝트의 표시 이름입니다."
-        },
-        "repoPath": {
-          "label": "Git 저장소 경로",
-          "placeholder": "/기존/저장소/경로",
-          "helper": "디스크에 있는 git 저장소의 절대 경로입니다."
-        }
-      },
-      "save": {
-        "button": "프로젝트 설정 저장",
-        "success": "✓ 프로젝트 설정이 성공적으로 저장되었습니다!",
-        "error": "프로젝트 설정을 저장하지 못했습니다",
-        "unsavedChanges": "• 저장되지 않은 변경사항이 있습니다",
-        "discard": "취소",
-        "confirmSwitch": "저장되지 않은 변경사항이 있습니다. 정말 프로젝트를 전환하시겠습니까? 변경사항이 손실됩니다."
-      },
-      "repositories": {
-        "title": "저장소",
-        "description": "이 프로젝트의 Git 저장소 관리",
-        "noRepositories": "구성된 저장소가 없습니다",
-        "addRepository": "저장소 추가"
-      }
-    },
     "repos": {
       "title": "저장소 구성",
       "description": "이 저장소가 워크스페이스에서 사용될 때 실행되는 스크립트를 구성합니다.",

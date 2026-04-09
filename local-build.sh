@@ -42,9 +42,11 @@ fi
 echo "📍 Detected platform: $PLATFORM"
 echo "📂 Using target directory: $CARGO_TARGET_DIR"
 
+NPX_PACKAGE_DIR="npx/openteams-npx"
+
 echo "🧹 Cleaning previous builds..."
-rm -rf openteams-npx/dist
-mkdir -p openteams-npx/dist/$PLATFORM
+rm -rf "$NPX_PACKAGE_DIR/dist"
+mkdir -p "$NPX_PACKAGE_DIR/dist/$PLATFORM"
 
 echo "🏗️ Building frontend..."
 (cd frontend && npm run build)
@@ -59,27 +61,26 @@ echo "📦 Creating distribution package..."
 cp ${CARGO_TARGET_DIR}/release/server openteams
 zip -q openteams.zip openteams
 rm -f openteams 
-mv openteams.zip openteams-npx/dist/$PLATFORM/openteams.zip
+mv openteams.zip "$NPX_PACKAGE_DIR/dist/$PLATFORM/openteams.zip"
 
 # Copy the MCP binary
 cp ${CARGO_TARGET_DIR}/release/mcp_task_server openteams-mcp
 zip -q openteams-mcp.zip openteams-mcp
 rm -f openteams-mcp
-mv openteams-mcp.zip openteams-npx/dist/$PLATFORM/openteams-mcp.zip
+mv openteams-mcp.zip "$NPX_PACKAGE_DIR/dist/$PLATFORM/openteams-mcp.zip"
 
 # Copy the Review CLI binary
 cp ${CARGO_TARGET_DIR}/release/review openteams-review
 zip -q openteams-review.zip openteams-review
 rm -f openteams-review
-mv openteams-review.zip openteams-npx/dist/$PLATFORM/openteams-review.zip
+mv openteams-review.zip "$NPX_PACKAGE_DIR/dist/$PLATFORM/openteams-review.zip"
 
 echo "✅ Build complete!"
 echo "📋 Files created:"
-echo "   - openteams-npx/dist/$PLATFORM/openteams.zip"
-echo "   - openteams-npx/dist/$PLATFORM/openteams-mcp.zip"
-echo "   - openteams-npx/dist/$PLATFORM/openteams-review.zip"
+echo "   - $NPX_PACKAGE_DIR/dist/$PLATFORM/openteams.zip"
+echo "   - $NPX_PACKAGE_DIR/dist/$PLATFORM/openteams-mcp.zip"
+echo "   - $NPX_PACKAGE_DIR/dist/$PLATFORM/openteams-review.zip"
 echo ""
 echo "🚀 To test locally, run:"
-echo "   cd openteams-npx && node bin/cli.js"
-
+echo "   cd $NPX_PACKAGE_DIR && node bin/cli.js"
 

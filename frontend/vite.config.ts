@@ -189,7 +189,7 @@ export default {
     ],
   },
   optimizeDeps: {
-    exclude: ['wa-sqlite'],
+    exclude: [],
   },
   build: { sourcemap: true },
 };

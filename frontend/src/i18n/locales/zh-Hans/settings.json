@@ -15,20 +15,12 @@
         "title": "设置",
         "general": "常规",
         "generalDesc": "主题、通知和偏好设置",
-        "projects": "项目",
-        "projectsDesc": "项目仓库和配置",
-        "repos": "仓库",
-        "reposDesc": "仓库脚本和配置",
         "agents": "代理",
         "agentsDesc": "编码代理配置",
         "cli": "服务提供商",
         "cliDesc": "提供商、模型与行为设置",
         "mcp": "MCP 服务器",
-        "mcpDesc": "模型上下文协议服务器",
-        "organizations": "组织设置",
-        "organizationsDesc": "管理组织成员和权限",
-        "remote-projects": "项目",
-        "remote-projectsDesc": "管理项目"
+        "mcpDesc": "模型上下文协议服务器"
       }
     },
     "general": {
@@ -598,46 +590,6 @@
         "successMessage": "✓ MCP 配置保存成功！",
         "loading": "加载当前 MCP 服务器配置...",
         "unsavedChanges": "• 您有未保存的更改"
-      }
-    },
-    "projects": {
-      "title": "项目配置",
-      "description": "配置特定于项目的脚本和设置。",
-      "loading": "加载项目中...",
-      "loadError": "加载项目失败。",
-      "selector": {
-        "label": "选择项目",
-        "placeholder": "选择要配置的项目",
-        "helper": "选择项目以查看和编辑其配置。",
-        "noProjects": "没有可用的项目"
-      },
-      "general": {
-        "title": "常规设置",
-        "description": "配置基本项目信息。",
-        "name": {
-          "label": "项目名称",
-          "placeholder": "输入项目名称",
-          "helper": "此项目的显示名称。"
-        },
-        "repoPath": {
-          "label": "Git 仓库路径",
-          "placeholder": "/path/to/your/existing/repo",
-          "helper": "磁盘上 git 仓库的绝对路径。"
-        }
-      },
-      "save": {
-        "button": "保存项目设置",
-        "success": "✓ 项目设置保存成功！",
-        "error": "保存项目设置失败",
-        "unsavedChanges": "• 您有未保存的更改",
-        "discard": "放弃",
-        "confirmSwitch": "您有未保存的更改。您确定要切换项目吗？您的更改将丢失。"
-      },
-      "repositories": {
-        "title": "仓库",
-        "description": "管理此项目中的 Git 仓库",
-        "noRepositories": "未配置仓库",
-        "addRepository": "添加仓库"
       }
     },
     "repos": {

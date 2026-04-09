@@ -134,9 +134,6 @@ async fn main() -> Result<(), OpenTeamsError> {
         .backfill_repo_names()
         .await
         .map_err(DeploymentError::from)?;
-    deployment
-        .track_if_analytics_allowed("session_start", serde_json::json!({}))
-        .await;
     // Keep executor profiles in sync with agent model listings.
     let model_refresh_dir = std::env::current_dir().unwrap_or_else(|_| asset_dir());
     let model_refresh_env = ExecutionEnv::new(RepoContext::default(), false, String::new());

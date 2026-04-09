@@ -120,8 +120,8 @@ jobs:
               }
             });
 
-            fs.mkdirSync('openteams-npx', { recursive: true });
-            const filePath = path.join('openteams-npx', tgzAsset.name);
+            fs.mkdirSync('npx/openteams-npx', { recursive: true });
+            const filePath = path.join('npx/openteams-npx', tgzAsset.name);
             fs.writeFileSync(filePath, Buffer.from(response.data));
 
             console.log(`Downloaded ${tgzAsset.name} to ${filePath}`);
@@ -132,7 +132,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd openteams-npx
+          cd npx/openteams-npx
 
           ls -la *.tgz
           npm pack --dry-run || echo 'Dry-run pack check reported differences (non-blocking).'
@@ -144,7 +144,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd openteams-npx
+          cd npx/openteams-npx
 
           PACKAGE_FILE='${{ steps.verify.outputs.package-file }}'
           echo "Publishing $PACKAGE_FILE to npm..."

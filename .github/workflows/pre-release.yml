@@ -153,12 +153,12 @@ jobs:
           fi
 
           # Update openteams-npx package.json to match
-          cd openteams-npx
+          cd npx/openteams-npx
           npm version $new_version --no-git-tag-version --allow-same-version
-          cd ..
+          cd ../..
 
           # Update openteams-web-npx package.json to match
-          cd openteams-web-npx
+          cd npx/openteams-web-npx
           npm version $new_version --no-git-tag-version --allow-same-version
           # Update dependency version to match
           node -e "
@@ -167,7 +167,7 @@ jobs:
             pkg.dependencies['@openteams-lab/openteams-web'] = '^' + '$new_version';
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
-          cd ..
+          cd ../..
 
           # Update frontend package.json to match
           cd frontend
@@ -218,7 +218,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add package.json pnpm-lock.yaml openteams-npx/package.json openteams-web-npx/package.json frontend/package.json src-tauri/tauri.conf.json Cargo.lock
+          git add package.json pnpm-lock.yaml npx/openteams-npx/package.json npx/openteams-web-npx/package.json frontend/package.json src-tauri/tauri.conf.json Cargo.lock
           git add $(find . -name Cargo.toml)
           [ -f crates/remote/Cargo.lock ] && git add crates/remote/Cargo.lock || true
           if git diff --cached --quiet; then
@@ -252,6 +252,20 @@ jobs:
 
       - name: Type check frontend
         run: cd frontend && npx tsc --noEmit
+
+      - name: Validate frontend PostHog build secrets
+        shell: bash
+        env:
+          VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          VITE_POSTHOG_API_ENDPOINT: ${{ secrets.POSTHOG_API_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          for key in VITE_POSTHOG_API_KEY VITE_POSTHOG_API_ENDPOINT; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing GitHub Secret-backed frontend build env: $key"
+              exit 1
+            fi
+          done
 
       - name: Build frontend
         run: cd frontend && npm run build
@@ -391,6 +405,20 @@ jobs:
         with:
           name: frontend-dist
           path: frontend/dist/
+
+      - name: Validate backend PostHog build secrets
+        shell: bash
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_API_ENDPOINT: ${{ secrets.POSTHOG_API_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          for key in POSTHOG_API_KEY POSTHOG_API_ENDPOINT; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing GitHub Secret-backed backend build env: $key"
+              exit 1
+            fi
+          done
 
       - name: Build backend (Linux)
         if: runner.os == 'Linux' && !contains(matrix.target, 'windows')
@@ -699,7 +727,7 @@ jobs:
       - name: Create platform package
         if: matrix.name != 'macos-arm64' && matrix.name != 'macos-x64'
         run: |
-          mkdir -p openteams-npx/dist/${{ matrix.name }}
+          mkdir -p npx/openteams-npx/dist/${{ matrix.name }}
           mkdir openteams-${{ matrix.name }}
           mkdir openteams-mcp-${{ matrix.name }}
           mkdir openteams-review-${{ matrix.name }}
@@ -708,32 +736,32 @@ jobs:
           cp dist/openteams-mcp-${{ matrix.name }}* openteams-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
           cp dist/openteams-review-${{ matrix.name }}* openteams-review-${{ matrix.name }}/${{ matrix.review_binary }}
 
-          zip -j openteams-npx/dist/${{ matrix.name }}/openteams.zip openteams-${{ matrix.name }}/${{ matrix.binary }}
-          zip -j openteams-npx/dist/${{ matrix.name }}/openteams-mcp.zip openteams-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
-          zip -j openteams-npx/dist/${{ matrix.name }}/openteams-review.zip openteams-review-${{ matrix.name }}/${{ matrix.review_binary }}
+          zip -j npx/openteams-npx/dist/${{ matrix.name }}/openteams.zip openteams-${{ matrix.name }}/${{ matrix.binary }}
+          zip -j npx/openteams-npx/dist/${{ matrix.name }}/openteams-mcp.zip openteams-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
+          zip -j npx/openteams-npx/dist/${{ matrix.name }}/openteams-review.zip openteams-review-${{ matrix.name }}/${{ matrix.review_binary }}
 
           # Include CLI binary if it was built
           if [ -f "dist/${{ matrix.cli_binary }}" ]; then
             mkdir openteams-cli-${{ matrix.name }}
             cp dist/${{ matrix.cli_binary }} openteams-cli-${{ matrix.name }}/
-            zip -j openteams-npx/dist/${{ matrix.name }}/openteams-cli.zip openteams-cli-${{ matrix.name }}/${{ matrix.cli_binary }}
+            zip -j npx/openteams-npx/dist/${{ matrix.name }}/openteams-cli.zip openteams-cli-${{ matrix.name }}/${{ matrix.cli_binary }}
             echo "Packaged CLI binary"
           fi
 
       - name: Create platform package (macOS)
         if: matrix.name == 'macos-arm64' || matrix.name == 'macos-x64'
         run: |
-          mkdir -p openteams-npx/dist/${{ matrix.name }}
+          mkdir -p npx/openteams-npx/dist/${{ matrix.name }}
           mkdir openteams-${{ matrix.name }}
-          cp dist/openteams-${{ matrix.name }}* openteams-npx/dist/${{ matrix.name }}/openteams.zip
-          cp dist/openteams-mcp-${{ matrix.name }}* openteams-npx/dist/${{ matrix.name }}/openteams-mcp.zip
-          cp dist/openteams-review-${{ matrix.name }}* openteams-npx/dist/${{ matrix.name }}/openteams-review.zip
+          cp dist/openteams-${{ matrix.name }}* npx/openteams-npx/dist/${{ matrix.name }}/openteams.zip
+          cp dist/openteams-mcp-${{ matrix.name }}* npx/openteams-npx/dist/${{ matrix.name }}/openteams-mcp.zip
+          cp dist/openteams-review-${{ matrix.name }}* npx/openteams-npx/dist/${{ matrix.name }}/openteams-review.zip
 
           # Include CLI binary if it was built
           if [ -f "dist/${{ matrix.cli_binary }}" ]; then
             mkdir openteams-cli-${{ matrix.name }}
             cp dist/${{ matrix.cli_binary }} openteams-cli-${{ matrix.name }}/
-            zip -j openteams-npx/dist/${{ matrix.name }}/openteams-cli.zip openteams-cli-${{ matrix.name }}/${{ matrix.cli_binary }}
+            zip -j npx/openteams-npx/dist/${{ matrix.name }}/openteams-cli.zip openteams-cli-${{ matrix.name }}/${{ matrix.cli_binary }}
             echo "Packaged CLI binary"
           fi
 
@@ -741,7 +769,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: npx-platform-${{ matrix.name }}
-          path: openteams-npx/dist/
+          path: npx/openteams-npx/dist/
           retention-days: 1
 
   upload-to-r2:
@@ -950,6 +978,9 @@ jobs:
     needs: [bump-version]
     name: Build desktop ${{ matrix.platform }}
     runs-on: ${{ matrix.platform == 'macos' && 'macos-latest' || matrix.platform == 'windows' && 'windows-latest' || 'ubuntu-22.04' }}
+    env:
+      VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+      VITE_POSTHOG_API_ENDPOINT: ${{ secrets.POSTHOG_API_ENDPOINT }}
     strategy:
       fail-fast: false
       matrix:
@@ -979,6 +1010,17 @@ jobs:
               exit 1
               ;;
           esac
+
+      - name: Validate desktop PostHog build secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in VITE_POSTHOG_API_KEY VITE_POSTHOG_API_ENDPOINT; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing GitHub Secret-backed desktop build env: $key"
+              exit 1
+            fi
+          done
 
       - name: Setup Node
         uses: ./.github/actions/setup-node
@@ -1619,7 +1661,7 @@ jobs:
           STORAGE_PUBLIC_URL: ${{ env.STORAGE_PUBLIC_URL_RESOLVED }}
         run: |
           set -euo pipefail
-          cd openteams-npx
+          cd npx/openteams-npx
           if [ -f bin/download.js ]; then
             if [ -n "${STORAGE_PUBLIC_URL:-}" ] && [ "${STORAGE_PROVIDER}" = "oss" ]; then
               echo "Injecting OSS URL into bin/download.js"
@@ -1653,7 +1695,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd openteams-web-npx
+          cd npx/openteams-web-npx
           # Update dependency version to match the main package version
           node -e "
             const fs = require('fs');
@@ -1672,7 +1714,7 @@ jobs:
           STORAGE_PUBLIC_URL: ${{ env.STORAGE_PUBLIC_URL_RESOLVED }}
         run: |
           set -euo pipefail
-          cd openteams-cli-npx
+          cd npx/openteams-cli-npx
           
           # Update version to match
           VERSION="${{ needs.bump-version.outputs.new_version }}"
@@ -1725,42 +1767,42 @@ jobs:
           fi
 
           # Publish main package (@openteams-lab/openteams-web)
-          cd openteams-npx
+          cd npx/openteams-npx
           tarball=$(ls -1t openteams-*.tgz 2>/dev/null | head -n 1)
           if [ -z "${tarball:-}" ]; then
-            echo "::error::No npm tarball found in openteams-npx"
+            echo "::error::No npm tarball found in npx/openteams-npx"
             exit 1
           fi
           echo "Publishing main package: $tarball"
           npm publish "$tarball" --access public
-          cd ..
+          cd ../..
 
           # Wait for npm registry to propagate the main package
           echo "Waiting for npm registry propagation..."
           sleep 10
 
           # Publish alias package (openteams-web)
-          cd openteams-web-npx
+          cd npx/openteams-web-npx
           tarball_alias=$(ls -1t openteams-web-*.tgz 2>/dev/null | head -n 1)
           if [ -z "${tarball_alias:-}" ]; then
-            echo "::error::No npm tarball found in openteams-web-npx"
+            echo "::error::No npm tarball found in npx/openteams-web-npx"
             exit 1
           fi
           echo "Publishing alias package: $tarball_alias"
           npm publish "$tarball_alias" --access public
-          cd ..
+          cd ../..
 
           # Publish openteams-cli package
-          if [ -d "openteams-cli-npx" ]; then
-            cd openteams-cli-npx
+          if [ -d "npx/openteams-cli-npx" ]; then
+            cd npx/openteams-cli-npx
             tarball_cli=$(ls -1t openteams-cli-*.tgz 2>/dev/null | head -n 1)
             if [ -n "${tarball_cli:-}" ]; then
               echo "Publishing CLI package: $tarball_cli"
               npm publish "$tarball_cli" --access public
             else
-              echo "::warning::No npm tarball found in openteams-cli-npx"
+              echo "::warning::No npm tarball found in npx/openteams-cli-npx"
             fi
-            cd ..
+            cd ../..
           fi
 
       - name: Generate simple changelog summary
@@ -1907,9 +1949,9 @@ jobs:
           body: ${{ steps.changelog.outputs.body }}
           files: |
             openteams-${{ needs.bump-version.outputs.new_tag }}.zip
-            openteams-npx/openteams-*.tgz
-            openteams-web-npx/openteams-web-*.tgz
-            openteams-cli-npx/openteams-cli-*.tgz
+            npx/openteams-npx/openteams-*.tgz
+            npx/openteams-web-npx/openteams-web-*.tgz
+            npx/openteams-cli-npx/openteams-cli-*.tgz
             release-assets/desktop/**/*.msi
             release-assets/desktop/**/*.dmg
             release-assets/desktop/**/*.deb

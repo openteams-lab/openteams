@@ -29,8 +29,6 @@ import {
   type LocalImageMetadata,
 } from './wysiwyg/context/task-attempt-context';
 import { TypeaheadOpenProvider } from './wysiwyg/context/typeahead-open-context';
-import { FileTagTypeaheadPlugin } from './wysiwyg/plugins/file-tag-typeahead-plugin';
-import { SlashCommandTypeaheadPlugin } from './wysiwyg/plugins/slash-command-typeahead-plugin';
 import { KeyboardCommandsPlugin } from './wysiwyg/plugins/keyboard-commands-plugin';
 import { ImageKeyboardPlugin } from './wysiwyg/plugins/image-keyboard-plugin';
 import { ReadOnlyLinkPlugin } from './wysiwyg/plugins/read-only-link-plugin';
@@ -142,15 +140,11 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
       disabled = false,
       onPasteFiles,
       className,
-      repoIds,
-      projectId,
-      executor = null,
       onCmdEnter,
       onShiftCmdEnter,
       sendShortcut,
       taskAttemptId,
       taskId,
-      repoId,
       localImages,
       onEdit,
       onDelete,
@@ -393,16 +387,6 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
                     />
                     <PasteMarkdownPlugin transformers={extendedTransformers} />
                     <TypeaheadOpenProvider>
-                      <FileTagTypeaheadPlugin
-                        repoIds={repoIds}
-                        projectId={projectId}
-                      />
-                      {executor && (
-                        <SlashCommandTypeaheadPlugin
-                          agent={executor}
-                          repoId={repoId}
-                        />
-                      )}
                       <KeyboardCommandsPlugin
                         onCmdEnter={onCmdEnter}
                         onShiftCmdEnter={onShiftCmdEnter}

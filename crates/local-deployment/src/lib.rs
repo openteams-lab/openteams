@@ -21,7 +21,6 @@ use services::services::{
     filesystem::FilesystemService,
     image::ImageService,
     oauth_credentials::OAuthCredentials,
-    pr_monitor::PrMonitorService,
     project::ProjectService,
     queued_message::QueuedMessageService,
     remote_client::{RemoteClient, RemoteClientError},
@@ -34,7 +33,6 @@ use utils::{
     assets::{config_path, credentials_path},
     msg_store::MsgStore,
 };
-use uuid::Uuid;
 
 use crate::{container::LocalContainerService, pty::PtyService};
 mod command;
@@ -61,15 +59,8 @@ pub struct LocalDeployment {
     queued_message_service: QueuedMessageService,
     remote_client: Result<RemoteClient, RemoteClientNotConfigured>,
     auth_context: AuthContext,
-    oauth_handoffs: Arc<RwLock<HashMap<Uuid, PendingHandoff>>>,
     pty: PtyService,
     cli_manager: Arc<OnceLock<CliManager>>,
-}
-
-#[derive(Debug, Clone)]
-struct PendingHandoff {
-    provider: String,
-    app_verifier: String,
 }
 
 #[async_trait]
@@ -141,6 +132,16 @@ impl Deployment for LocalDeployment {
         let approvals = Approvals::new(msg_stores.clone());
         let queued_message_service = QueuedMessageService::new();
         let chat_runner = ChatRunner::new(db.clone());
+        let recovered_orphaned_agents = chat_runner
+            .recover_orphaned_session_agents()
+            .await
+            .map_err(|err| DeploymentError::Other(err.into()))?;
+        if recovered_orphaned_agents > 0 {
+            tracing::warn!(
+                recovered_orphaned_agents,
+                "Recovered orphaned chat session agents during startup"
+            );
+        }
 
         let oauth_credentials = Arc::new(OAuthCredentials::new(credentials_path()));
         if let Err(e) = oauth_credentials.load().await {
@@ -171,8 +172,6 @@ impl Deployment for LocalDeployment {
             }
         };
 
-        let oauth_handoffs = Arc::new(RwLock::new(HashMap::new()));
-
         // We need to make analytics accessible to the ContainerService
         // TODO: Handle this more gracefully
         let analytics_ctx = analytics.as_ref().map(|s| AnalyticsContext {
@@ -188,7 +187,6 @@ impl Deployment for LocalDeployment {
             analytics_ctx,
             approvals.clone(),
             queued_message_service.clone(),
-            remote_client.clone().ok(),
         )
         .await;
 
@@ -197,17 +195,6 @@ impl Deployment for LocalDeployment {
         let file_search_cache = Arc::new(FileSearchCache::new());
 
         let pty = PtyService::new();
-        {
-            let db = db.clone();
-            let analytics = analytics.as_ref().map(|s| AnalyticsContext {
-                user_id: user_id.clone(),
-                analytics_service: s.clone(),
-            });
-            let container = container.clone();
-            let rc = remote_client.clone().ok();
-            PrMonitorService::spawn(db, analytics, container, rc).await;
-        }
-
         let deployment = Self {
             config,
             user_id,
@@ -226,7 +213,6 @@ impl Deployment for LocalDeployment {
             queued_message_service,
             remote_client,
             auth_context,
-            oauth_handoffs,
             pty,
             cli_manager: Arc::new(OnceLock::new()),
         };
@@ -293,10 +279,6 @@ impl Deployment for LocalDeployment {
     fn queued_message_service(&self) -> &QueuedMessageService {
         &self.queued_message_service
     }
-
-    fn auth_context(&self) -> &AuthContext {
-        &self.auth_context
-    }
 }
 
 impl LocalDeployment {
@@ -332,29 +314,6 @@ impl LocalDeployment {
             }
             Err(_) => LoginStatus::LoggedOut,
         }
-    }
-
-    pub async fn store_oauth_handoff(
-        &self,
-        handoff_id: Uuid,
-        provider: String,
-        app_verifier: String,
-    ) {
-        self.oauth_handoffs.write().await.insert(
-            handoff_id,
-            PendingHandoff {
-                provider,
-                app_verifier,
-            },
-        );
-    }
-
-    pub async fn take_oauth_handoff(&self, handoff_id: &Uuid) -> Option<(String, String)> {
-        self.oauth_handoffs
-            .write()
-            .await
-            .remove(handoff_id)
-            .map(|state| (state.provider, state.app_verifier))
     }
 
     pub fn pty(&self) -> &PtyService {

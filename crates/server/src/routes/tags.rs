@@ -39,17 +39,6 @@ pub async fn create_tag(
     Json(payload): Json<CreateTag>,
 ) -> Result<ResponseJson<ApiResponse<Tag>>, ApiError> {
     let tag = Tag::create(&deployment.db().pool, &payload).await?;
-
-    deployment
-        .track_if_analytics_allowed(
-            "tag_created",
-            serde_json::json!({
-                "tag_id": tag.id.to_string(),
-                "tag_name": tag.tag_name,
-            }),
-        )
-        .await;
-
     Ok(ResponseJson(ApiResponse::success(tag)))
 }
 
@@ -59,17 +48,6 @@ pub async fn update_tag(
     Json(payload): Json<UpdateTag>,
 ) -> Result<ResponseJson<ApiResponse<Tag>>, ApiError> {
     let updated_tag = Tag::update(&deployment.db().pool, tag.id, &payload).await?;
-
-    deployment
-        .track_if_analytics_allowed(
-            "tag_updated",
-            serde_json::json!({
-                "tag_id": tag.id.to_string(),
-                "tag_name": updated_tag.tag_name,
-            }),
-        )
-        .await;
-
     Ok(ResponseJson(ApiResponse::success(updated_tag)))
 }
 

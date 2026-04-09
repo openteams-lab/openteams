@@ -3,11 +3,11 @@
   "version": "0.3.12",
   "private": true,
   "bin": {
-    "openteams": "npx-cli/bin/cli.js"
+    "openteams": "npx/openteams-npx/bin/cli.js"
   },
   "files": [
-    "npx-cli/bin/cli.js",
-    "npx-cli/dist/**"
+    "npx/openteams-npx/bin/cli.js",
+    "npx/openteams-npx/dist/**"
   ],
   "scripts": {
     "lint": "pnpm run frontend:lint && pnpm run backend:lint",
@@ -25,15 +25,13 @@
     "backend:dev": "BACKEND_PORT=$(node scripts/setup-dev-environment.js backend) pnpm run backend:dev:watch",
     "backend:check": "cargo check",
     "backend:dev:watch": "DISABLE_WORKTREE_CLEANUP=1 RUST_LOG=debug cargo watch -w crates -x 'run --bin server'",
-    "dev:qa": "export FRONTEND_PORT=$(node scripts/setup-dev-environment.js frontend) && export BACKEND_PORT=$(node scripts/setup-dev-environment.js backend) && export VK_ALLOWED_ORIGINS=\"http://localhost:${FRONTEND_PORT}\" && export VITE_VK_SHARED_API_BASE=${VK_SHARED_API_BASE:-} && concurrently \"pnpm run backend:dev:watch:qa\" \"pnpm run frontend:dev\"",
+    "dev:qa": "export FRONTEND_PORT=$(node scripts/setup-dev-environment.js frontend) && export BACKEND_PORT=$(node scripts/setup-dev-environment.js backend) && export VK_ALLOWED_ORIGINS=\"http://localhost:${FRONTEND_PORT}\" && concurrently \"pnpm run backend:dev:watch:qa\" \"pnpm run frontend:dev\"",
     "generate-types": "cargo run --bin generate_types",
     "generate-types:check": "cargo run --bin generate_types -- --check",
-    "remote:generate-types": "cargo run --manifest-path crates/remote/Cargo.toml --bin remote-generate-types",
-    "remote:generate-types:check": "cargo run --manifest-path crates/remote/Cargo.toml --bin remote-generate-types -- --check",
     "prepare-db": "node scripts/prepare-db.js",
     "prepare-db:check": "node scripts/prepare-db.js --check",
     "build:npx": "bash ./local-build.sh",
-    "build:npx:alias": "cd openteams-web-npx && pnpm pack",
+    "build:npx:alias": "cd npx/openteams-web-npx && pnpm pack",
     "prepack": "pnpm run build:npx",
     "desktop:dev": "pnpm -C frontend build && node scripts/desktop/prepare-sidecar.js --debug --skip-cli && pnpm tauri dev --config src-tauri/tauri.dev.conf.json",
     "desktop:build": "pnpm tauri build",

@@ -65,7 +65,7 @@
     - `legacy/index.css` + `tailwind.legacy.config.js` (scoped to `.legacy-design`)
 - `remote-frontend/`: Lightweight remote deployment frontend
 - `shared/`: Generated TypeScript types from Rust (`shared/types.ts` - auto-generated)
-- `openteams-npx/`: NPM CLI package (`openteams`) for cross-platform installer
+- `npx/openteams-npx/`: NPM CLI package (`openteams`) for cross-platform installer
 - `scripts/`: Development helpers (port management, DB preparation, desktop packaging)
 - `docs/`: Documentation (Mintlify setup)
 - `src-tauri/`: Tauri desktop application configuration
@@ -176,7 +176,7 @@ Do not manually edit shared/types.ts, instead edit crates/server/src/bin/generat
 - Prepare SQLx (offline): `pnpm run prepare-db`
 - Prepare SQLx (check only): `pnpm run prepare-db:check`
 - Prepare SQLx (remote package, postgres): `pnpm run remote:prepare-db`
-- Local NPX build: `pnpm run build:npx` then `pnpm pack` in `openteams-npx/`
+- Local NPX build: `pnpm run build:npx` then `pnpm pack` in `npx/openteams-npx/`
 - Desktop dev: `pnpm run desktop:dev`
 - Desktop build: `pnpm run desktop:build`
 

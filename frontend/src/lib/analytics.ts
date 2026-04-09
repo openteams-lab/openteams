@@ -1,158 +1,464 @@
 /**
- * Analytics Service for tracking user events
- * Provides batch event sending and offline queue support
+ * Unified frontend analytics client.
+ *
+ * Preferred write path:
+ *   POST /api/analytics/collect/batch
+ *
+ * Temporary fallback before B1 lands:
+ *   POST /api/analytics/events/batch
  */
 
-// Event types supported by the analytics system
 export type EventCategory = 'user_action' | 'system' | 'conversion';
+export type AnalyticsSource = 'frontend';
+export type AnalyticsPlatform = 'desktop' | 'mobile' | 'web' | 'unknown';
 
-export interface TrackEventRequest {
+type AnalyticsTransportMode = 'auto' | 'collect' | 'legacy';
+type PropertyValue = string | number | boolean;
+
+type PropertySanitizer = (value: unknown) => PropertyValue | undefined;
+
+interface EventDefinition {
+  category: EventCategory;
+  version: number;
+  legacyType?: string;
+  properties: Record<string, PropertySanitizer>;
+}
+
+const stringProperty =
+  (maxLength = 128, allowedValues?: readonly string[]): PropertySanitizer =>
+  (value) => {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    const normalized = value.trim();
+    if (!normalized) {
+      return undefined;
+    }
+
+    if (allowedValues && !allowedValues.includes(normalized)) {
+      return undefined;
+    }
+
+    return normalized.slice(0, maxLength);
+  };
+
+const integerProperty =
+  (min = 0, max = Number.MAX_SAFE_INTEGER): PropertySanitizer =>
+  (value) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return undefined;
+    }
+
+    const normalized = Math.trunc(value);
+    if (normalized < min || normalized > max) {
+      return undefined;
+    }
+
+    return normalized;
+  };
+
+const numberProperty =
+  (min = 0, max = Number.MAX_SAFE_INTEGER): PropertySanitizer =>
+  (value) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return undefined;
+    }
+
+    if (value < min || value > max) {
+      return undefined;
+    }
+
+    return value;
+  };
+
+const booleanProperty: PropertySanitizer = (value) =>
+  typeof value === 'boolean' ? value : undefined;
+
+const idProperty = stringProperty(128);
+const enumProperty = (values: readonly string[]): PropertySanitizer =>
+  stringProperty(64, values);
+
+const EVENT_DEFINITIONS = {
+  ui_new_accessed: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      surface: enumProperty(['new_design']),
+    },
+  },
+  preview_navigated: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      trigger: enumProperty(['button', 'keyboard']),
+      direction: enumProperty(['forward', 'backward']),
+      project_id: idProperty,
+      task_id: idProperty,
+      attempt_id: idProperty,
+    },
+  },
+  diffs_navigated: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      trigger: enumProperty(['button', 'keyboard']),
+      direction: enumProperty(['forward', 'backward']),
+      project_id: idProperty,
+      task_id: idProperty,
+      attempt_id: idProperty,
+    },
+  },
+  view_closed: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      trigger: enumProperty(['button']),
+      from_view: enumProperty(['attempt', 'preview', 'diffs']),
+      project_id: idProperty,
+      task_id: idProperty,
+      attempt_id: idProperty,
+    },
+  },
+  session_create: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      title_length: integerProperty(),
+    },
+  },
+  session_archive: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      duration_seconds: integerProperty(),
+      message_count: integerProperty(),
+      agent_count: integerProperty(),
+    },
+  },
+  session_restore: {
+    category: 'user_action',
+    version: 1,
+    properties: {},
+  },
+  session_delete: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      had_messages: booleanProperty,
+    },
+  },
+  message_send: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      message_length: integerProperty(),
+      mention_count: integerProperty(),
+      has_attachment: booleanProperty,
+      attachment_count: integerProperty(),
+    },
+  },
+  agent_add: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      agent_id: idProperty,
+      runner_type: stringProperty(64),
+      has_workspace: booleanProperty,
+    },
+  },
+  agent_remove: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      agent_id: idProperty,
+      session_duration_seconds: integerProperty(),
+    },
+  },
+  agent_run_start: {
+    category: 'system',
+    version: 1,
+    properties: {
+      agent_id: idProperty,
+      run_id: idProperty,
+      executor_profile: stringProperty(64),
+    },
+  },
+  agent_run_complete: {
+    category: 'system',
+    version: 1,
+    properties: {
+      agent_id: idProperty,
+      run_id: idProperty,
+      duration_ms: integerProperty(),
+      success: booleanProperty,
+      token_count: integerProperty(),
+    },
+  },
+  agent_run_error: {
+    category: 'system',
+    version: 1,
+    properties: {
+      agent_id: idProperty,
+      run_id: idProperty,
+      error_type: stringProperty(64),
+    },
+  },
+  skill_install: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      skill_id: idProperty,
+      source: enumProperty(['builtin', 'registry']),
+    },
+  },
+  skill_assign: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      skill_id: idProperty,
+      agent_id: idProperty,
+    },
+  },
+  skill_enable: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      skill_id: idProperty,
+      agent_id: idProperty,
+    },
+  },
+  skill_disable: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      skill_id: idProperty,
+      agent_id: idProperty,
+    },
+  },
+  skill_invoke: {
+    category: 'system',
+    version: 1,
+    properties: {
+      skill_id: idProperty,
+      agent_id: idProperty,
+    },
+  },
+  first_session: {
+    category: 'conversion',
+    version: 1,
+    properties: {},
+  },
+  returning_user: {
+    category: 'conversion',
+    version: 1,
+    properties: {
+      days_since_last_visit: numberProperty(),
+    },
+  },
+} as const satisfies Record<string, EventDefinition>;
+
+export type AnalyticsEventName = keyof typeof EVENT_DEFINITIONS;
+
+export interface CollectorEventRequest {
+  event_id: string;
+  event_name: AnalyticsEventName;
+  event_version: number;
+  occurred_at: string;
+  source: AnalyticsSource;
+  platform: AnalyticsPlatform;
+  app_version: string;
+  session_id?: string;
+  trace_id: string;
+  properties: Record<string, PropertyValue>;
+}
+
+export interface CollectorBatchRequest {
+  events: CollectorEventRequest[];
+}
+
+export interface LegacyTrackEventRequest {
   event_type: string;
   event_category: EventCategory;
   user_id?: string;
   session_id?: string;
-  properties: Record<string, unknown>;
-  platform?: string;
+  properties: Record<string, PropertyValue>;
+  platform?: AnalyticsPlatform;
   app_version?: string;
   os?: string;
   device_id?: string;
 }
 
-export interface TrackEventsBatchRequest {
-  events: TrackEventRequest[];
+export interface LegacyTrackEventsBatchRequest {
+  events: LegacyTrackEventRequest[];
 }
 
-// Event type to category mapping
-const EVENT_CATEGORIES: Record<string, EventCategory> = {
-  // User actions
-  session_create: 'user_action',
-  session_archive: 'user_action',
-  session_restore: 'user_action',
-  session_delete: 'user_action',
-  message_send: 'user_action',
-  agent_add: 'user_action',
-  agent_remove: 'user_action',
-  skill_install: 'user_action',
-  skill_assign: 'user_action',
-  skill_enable: 'user_action',
-  skill_disable: 'user_action',
+interface QueuedAnalyticsEvent {
+  event: CollectorEventRequest;
+  legacy_event_type: string;
+  event_category: EventCategory;
+  attempts: number;
+}
 
-  // System events
-  agent_run_start: 'system',
-  agent_run_complete: 'system',
-  agent_run_error: 'system',
-  agent_stop: 'system',
-  context_compression: 'system',
-  token_usage: 'system',
-  skill_invoke: 'system',
+interface AnalyticsClientConfig {
+  enabled?: boolean;
+  userId?: string;
+}
 
-  // Conversion events
-  first_session: 'conversion',
-  returning_user: 'conversion',
-  first_agent_added: 'conversion',
-  first_message_sent: 'conversion',
-  first_skill_used: 'conversion',
-};
+interface TrackOptions {
+  sessionId?: string;
+  traceId?: string;
+}
+
+interface ViewTrackingContext {
+  trigger: 'button' | 'keyboard';
+  direction?: 'forward' | 'backward';
+  fromView?: 'attempt' | 'preview' | 'diffs';
+  projectId?: string;
+  taskId?: string;
+  attemptId?: string | null;
+}
+
+const DEVICE_ID_STORAGE_KEY = 'analytics_device_id';
+const OUTBOX_STORAGE_KEY = 'analytics_outbox_v2';
+const COLLECT_BATCH_ENDPOINT = '/api/analytics/collect/batch';
+const LEGACY_BATCH_ENDPOINT = '/api/analytics/events/batch';
+const COLLECT_FALLBACK_STATUSES = new Set([404, 405, 410, 501]);
 
 class AnalyticsService {
-  private deviceId: string;
+  private readonly deviceId: string;
   private userId?: string;
-  private queue: TrackEventRequest[] = [];
-  private flushInterval = 5000; // 5 seconds
-  private maxQueueSize = 50;
+  private enabled = false;
+  private hasConfigured = false;
+  private queue: QueuedAnalyticsEvent[] = [];
+  private flushIntervalMs = 5000;
+  private maxQueueSize = 200;
+  private maxBatchSize = 50;
   private isFlushing = false;
+  private consecutiveFailures = 0;
+  private nextRetryAt = 0;
+  private transportMode: AnalyticsTransportMode = 'auto';
 
   constructor() {
     this.deviceId = this.getOrCreateDeviceId();
+    this.queue = this.loadQueue();
     this.startFlushTimer();
     this.setupUnloadHandler();
   }
 
-  // Get or create a persistent device ID
-  private getOrCreateDeviceId(): string {
-    const STORAGE_KEY = 'analytics_device_id';
-    let deviceId = localStorage.getItem(STORAGE_KEY);
+  configure(config: AnalyticsClientConfig): void {
+    this.hasConfigured = true;
 
-    if (!deviceId) {
-      deviceId = this.generateUUID();
-      localStorage.setItem(STORAGE_KEY, deviceId);
+    if (typeof config.enabled === 'boolean') {
+      this.enabled = config.enabled;
     }
 
-    return deviceId;
-  }
-
-  // Generate a UUID
-  private generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-  }
-
-  // Infer event category from event type
-  private inferCategory(eventType: string): EventCategory {
-    return EVENT_CATEGORIES[eventType] || 'user_action';
-  }
-
-  // Get platform information
-  private getPlatform(): string {
-    if (typeof window !== 'undefined') {
-      const ua = navigator.userAgent;
-      if (/electron/i.test(ua)) return 'desktop';
-      if (/mobile/i.test(ua)) return 'mobile';
-      return 'web';
+    if (config.userId !== undefined) {
+      this.userId = config.userId;
     }
-    return 'unknown';
-  }
 
-  // Get OS information
-  private getOS(): string {
-    if (typeof window !== 'undefined') {
-      const ua = navigator.userAgent;
-      if (/windows/i.test(ua)) return 'Windows';
-      if (/mac/i.test(ua)) return 'macOS';
-      if (/linux/i.test(ua)) return 'Linux';
-      if (/android/i.test(ua)) return 'Android';
-      if (/ios|iphone|ipad/i.test(ua)) return 'iOS';
+    if (!this.enabled) {
+      this.clearQueue();
+      return;
     }
-    return 'unknown';
+
+    if (this.queue.length > 0) {
+      void this.flush();
+    }
   }
 
-  // Set user ID
   setUserId(userId: string | undefined) {
     this.userId = userId;
   }
 
-  // Track a single event
   track(
-    eventType: string,
+    eventName: AnalyticsEventName,
     properties: Record<string, unknown> = {},
-    sessionId?: string
+    options: TrackOptions = {}
   ) {
-    const event: TrackEventRequest = {
-      event_type: eventType,
-      event_category: this.inferCategory(eventType),
-      user_id: this.userId,
-      session_id: sessionId,
-      properties,
+    if (this.hasConfigured && !this.enabled) {
+      return;
+    }
+
+    const definition: EventDefinition = EVENT_DEFINITIONS[eventName];
+    const sanitizedProperties = this.sanitizeProperties(
+      definition.properties,
+      properties
+    );
+    const occurredAt = new Date().toISOString();
+    const sanitizedSessionIdValue = idProperty(options.sessionId);
+    const sanitizedSessionId =
+      typeof sanitizedSessionIdValue === 'string'
+        ? sanitizedSessionIdValue
+        : undefined;
+    const legacyEventType = definition.legacyType;
+    const event: CollectorEventRequest = {
+      event_id: this.generateEventId(),
+      event_name: eventName,
+      event_version: definition.version,
+      occurred_at: occurredAt,
+      source: 'frontend',
       platform: this.getPlatform(),
       app_version: __APP_VERSION__,
-      os: this.getOS(),
-      device_id: this.deviceId,
+      session_id: sanitizedSessionId,
+      trace_id: options.traceId ?? this.generateEventId(),
+      properties: sanitizedProperties,
     };
 
-    this.queue.push(event);
+    this.queue.push({
+      event,
+      legacy_event_type: legacyEventType ?? eventName,
+      event_category: definition.category,
+      attempts: 0,
+    });
 
-    // Flush if queue is full
-    if (this.queue.length >= this.maxQueueSize) {
-      this.flush();
+    if (this.queue.length > this.maxQueueSize) {
+      this.queue = this.queue.slice(-this.maxQueueSize);
+    }
+
+    this.persistQueue();
+
+    if (this.queue.length >= this.maxBatchSize) {
+      void this.flush();
     }
   }
 
-  // Session events
+  trackUiNewAccessed() {
+    this.track('ui_new_accessed', { surface: 'new_design' });
+  }
+
+  trackPreviewNavigated(context: ViewTrackingContext) {
+    this.track('preview_navigated', {
+      trigger: context.trigger,
+      direction: context.direction,
+      project_id: context.projectId,
+      task_id: context.taskId,
+      attempt_id: context.attemptId ?? undefined,
+    });
+  }
+
+  trackDiffsNavigated(context: ViewTrackingContext) {
+    this.track('diffs_navigated', {
+      trigger: context.trigger,
+      direction: context.direction,
+      project_id: context.projectId,
+      task_id: context.taskId,
+      attempt_id: context.attemptId ?? undefined,
+    });
+  }
+
+  trackViewClosed(context: ViewTrackingContext) {
+    this.track('view_closed', {
+      trigger: context.trigger,
+      from_view: context.fromView,
+      project_id: context.projectId,
+      task_id: context.taskId,
+      attempt_id: context.attemptId ?? undefined,
+    });
+  }
+
   trackSessionCreate(sessionId: string, titleLength: number) {
-    this.track('session_create', { title_length: titleLength }, sessionId);
+    this.track('session_create', { title_length: titleLength }, { sessionId });
   }
 
   trackSessionArchive(
@@ -168,19 +474,18 @@ class AnalyticsService {
         message_count: messageCount,
         agent_count: agentCount,
       },
-      sessionId
+      { sessionId }
     );
   }
 
   trackSessionRestore(sessionId: string) {
-    this.track('session_restore', {}, sessionId);
+    this.track('session_restore', {}, { sessionId });
   }
 
   trackSessionDelete(sessionId: string, hadMessages: boolean) {
-    this.track('session_delete', { had_messages: hadMessages }, sessionId);
+    this.track('session_delete', { had_messages: hadMessages }, { sessionId });
   }
 
-  // Message events
   trackMessageSend(
     sessionId: string,
     messageLength: number,
@@ -192,19 +497,18 @@ class AnalyticsService {
       'message_send',
       {
         message_length: messageLength,
-        mentions,
+        mention_count: mentions.length,
         has_attachment: hasAttachment,
         attachment_count: attachmentCount,
       },
-      sessionId
+      { sessionId }
     );
   }
 
-  // Agent events
   trackAgentAdd(
     sessionId: string,
     agentId: string,
-    agentName: string,
+    _agentName: string,
     runnerType: string,
     hasWorkspace: boolean
   ) {
@@ -212,11 +516,10 @@ class AnalyticsService {
       'agent_add',
       {
         agent_id: agentId,
-        agent_name: agentName,
         runner_type: runnerType,
         has_workspace: hasWorkspace,
       },
-      sessionId
+      { sessionId }
     );
   }
 
@@ -231,7 +534,7 @@ class AnalyticsService {
         agent_id: agentId,
         session_duration_seconds: sessionDurationSeconds,
       },
-      sessionId
+      { sessionId }
     );
   }
 
@@ -248,7 +551,7 @@ class AnalyticsService {
         run_id: runId,
         executor_profile: executorProfile,
       },
-      sessionId
+      { sessionId }
     );
   }
 
@@ -269,7 +572,7 @@ class AnalyticsService {
         success,
         token_count: tokenCount,
       },
-      sessionId
+      { sessionId }
     );
   }
 
@@ -277,8 +580,7 @@ class AnalyticsService {
     sessionId: string,
     agentId: string,
     runId: string,
-    errorType: string,
-    errorMessage: string
+    errorType: string
   ) {
     this.track(
       'agent_run_error',
@@ -286,21 +588,18 @@ class AnalyticsService {
         agent_id: agentId,
         run_id: runId,
         error_type: errorType,
-        error_message: errorMessage,
       },
-      sessionId
+      { sessionId }
     );
   }
 
-  // Skill events
   trackSkillInstall(
     skillId: string,
-    skillName: string,
+    _skillName: string,
     source: 'builtin' | 'registry'
   ) {
     this.track('skill_install', {
       skill_id: skillId,
-      skill_name: skillName,
       source,
     });
   }
@@ -333,97 +632,317 @@ class AnalyticsService {
         skill_id: skillId,
         agent_id: agentId,
       },
-      sessionId
+      { sessionId }
     );
   }
 
-  // Conversion events
-  trackFirstSession(userId: string, sessionId: string) {
-    this.track('first_session', { user_id: userId }, sessionId);
+  trackFirstSession(_userId: string, sessionId: string) {
+    this.track('first_session', {}, { sessionId });
   }
 
-  trackReturningUser(userId: string, daysSinceLastVisit: number) {
+  trackReturningUser(_userId: string, daysSinceLastVisit: number) {
     this.track('returning_user', {
-      user_id: userId,
       days_since_last_visit: daysSinceLastVisit,
     });
   }
 
-  // Start the flush timer
-  private startFlushTimer() {
-    if (typeof window !== 'undefined') {
-      setInterval(() => {
-        this.flush();
-      }, this.flushInterval);
-    }
-  }
-
-  // Setup unload handler to flush remaining events
-  private setupUnloadHandler() {
-    if (typeof window !== 'undefined') {
-      window.addEventListener('beforeunload', () => {
-        this.flush();
-      });
-
-      // Also flush on visibility change (mobile)
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-          this.flush();
-        }
-      });
-    }
-  }
-
-  // Flush events to server
   async flush(): Promise<void> {
-    if (this.queue.length === 0 || this.isFlushing) {
+    if (!this.enabled || this.queue.length === 0 || this.isFlushing) {
+      return;
+    }
+
+    if (Date.now() < this.nextRetryAt) {
       return;
     }
 
     this.isFlushing = true;
-    const events = [...this.queue];
-    this.queue = [];
 
     try {
-      const response = await fetch('/api/analytics/events/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ events } as TrackEventsBatchRequest),
-      });
+      while (this.queue.length > 0) {
+        const batch = this.queue.slice(0, this.maxBatchSize);
+        const sent = await this.sendBatch(batch);
 
-      if (!response.ok) {
-        // Re-queue events on failure (up to max queue size)
-        const remainingSpace = this.maxQueueSize - this.queue.length;
-        this.queue = [...events.slice(-remainingSpace), ...this.queue];
+        if (!sent) {
+          batch.forEach((_, index) => {
+            if (this.queue[index]) {
+              this.queue[index] = {
+                ...this.queue[index],
+                attempts: this.queue[index].attempts + 1,
+              };
+            }
+          });
+          this.registerFailure();
+          this.persistQueue();
+          return;
+        }
+
+        this.queue = this.queue.slice(batch.length);
+        this.registerSuccess();
+        this.persistQueue();
       }
-    } catch (error) {
-      // Re-queue events on network error
-      const remainingSpace = this.maxQueueSize - this.queue.length;
-      this.queue = [...events.slice(-remainingSpace), ...this.queue];
-      console.warn('Analytics flush failed:', error);
     } finally {
       this.isFlushing = false;
     }
   }
 
-  // Manually flush (useful for testing or critical events)
   async forceFlush(): Promise<void> {
     await this.flush();
   }
 
-  // Clear the queue
   clearQueue(): void {
     this.queue = [];
+    this.consecutiveFailures = 0;
+    this.nextRetryAt = 0;
+    this.persistQueue();
   }
 
-  // Get current queue size (for debugging)
   getQueueSize(): number {
     return this.queue.length;
   }
+
+  private sanitizeProperties(
+    schema: Record<string, PropertySanitizer>,
+    properties: Record<string, unknown>
+  ): Record<string, PropertyValue> {
+    const sanitizedEntries = Object.entries(schema)
+      .map(([key, sanitizer]) => {
+        const sanitizedValue = sanitizer(properties[key]);
+        return sanitizedValue === undefined ? null : [key, sanitizedValue];
+      })
+      .filter((entry): entry is [string, PropertyValue] => entry !== null);
+
+    return Object.fromEntries(sanitizedEntries);
+  }
+
+  private async sendBatch(batch: QueuedAnalyticsEvent[]): Promise<boolean> {
+    if (this.transportMode !== 'legacy') {
+      const collectResult = await this.sendCollectorBatch(batch);
+      if (collectResult === 'success') {
+        this.transportMode = 'collect';
+        return true;
+      }
+      if (collectResult === 'fallback') {
+        this.transportMode = 'legacy';
+      } else {
+        return false;
+      }
+    }
+
+    return this.sendLegacyBatch(batch);
+  }
+
+  private async sendCollectorBatch(
+    batch: QueuedAnalyticsEvent[]
+  ): Promise<'success' | 'fallback' | 'failure'> {
+    try {
+      const response = await fetch(COLLECT_BATCH_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          events: batch.map((item) => item.event),
+        } as CollectorBatchRequest),
+        keepalive: true,
+      });
+
+      if (response.ok) {
+        return 'success';
+      }
+
+      if (COLLECT_FALLBACK_STATUSES.has(response.status)) {
+        return 'fallback';
+      }
+
+      return 'failure';
+    } catch (error) {
+      console.warn('Analytics collector flush failed:', error);
+      return 'failure';
+    }
+  }
+
+  private async sendLegacyBatch(
+    batch: QueuedAnalyticsEvent[]
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(LEGACY_BATCH_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          events: batch.map((item) => ({
+            event_type: item.legacy_event_type,
+            event_category: item.event_category,
+            user_id: this.userId,
+            session_id: item.event.session_id,
+            properties: item.event.properties,
+            platform: item.event.platform,
+            app_version: item.event.app_version,
+            os: this.getOS(),
+            device_id: this.deviceId,
+          })),
+        } as LegacyTrackEventsBatchRequest),
+        keepalive: true,
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.warn('Legacy analytics flush failed:', error);
+      return false;
+    }
+  }
+
+  private registerSuccess() {
+    this.consecutiveFailures = 0;
+    this.nextRetryAt = 0;
+  }
+
+  private registerFailure() {
+    this.consecutiveFailures = Math.min(this.consecutiveFailures + 1, 6);
+    const delayMs =
+      Math.min(1000 * 2 ** (this.consecutiveFailures - 1), 30000) +
+      Math.floor(Math.random() * 250);
+    this.nextRetryAt = Date.now() + delayMs;
+  }
+
+  private startFlushTimer() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.setInterval(() => {
+      void this.flush();
+    }, this.flushIntervalMs);
+  }
+
+  private setupUnloadHandler() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.addEventListener('beforeunload', () => {
+      void this.flush();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        void this.flush();
+      }
+    });
+  }
+
+  private getOrCreateDeviceId(): string {
+    if (typeof window === 'undefined') {
+      return this.generateEventId();
+    }
+
+    const persistedId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (persistedId) {
+      return persistedId;
+    }
+
+    const nextId = this.generateEventId();
+    localStorage.setItem(DEVICE_ID_STORAGE_KEY, nextId);
+    return nextId;
+  }
+
+  private loadQueue(): QueuedAnalyticsEvent[] {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    try {
+      const raw = localStorage.getItem(OUTBOX_STORAGE_KEY);
+      if (!raw) {
+        return [];
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed
+        .filter(this.isQueuedAnalyticsEvent)
+        .slice(-this.maxQueueSize);
+    } catch (error) {
+      console.warn('Failed to restore analytics outbox:', error);
+      return [];
+    }
+  }
+
+  private persistQueue() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      if (this.queue.length === 0) {
+        localStorage.removeItem(OUTBOX_STORAGE_KEY);
+        return;
+      }
+
+      localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(this.queue));
+    } catch (error) {
+      console.warn('Failed to persist analytics outbox:', error);
+    }
+  }
+
+  private isQueuedAnalyticsEvent = (
+    value: unknown
+  ): value is QueuedAnalyticsEvent => {
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
+
+    const candidate = value as Partial<QueuedAnalyticsEvent>;
+    return (
+      typeof candidate.attempts === 'number' &&
+      typeof candidate.legacy_event_type === 'string' &&
+      typeof candidate.event_category === 'string' &&
+      !!candidate.event &&
+      typeof candidate.event.event_id === 'string' &&
+      typeof candidate.event.event_name === 'string' &&
+      typeof candidate.event.trace_id === 'string' &&
+      typeof candidate.event.occurred_at === 'string' &&
+      candidate.event.properties !== undefined
+    );
+  };
+
+  private generateEventId(): string {
+    if (
+      typeof crypto !== 'undefined' &&
+      typeof crypto.randomUUID === 'function'
+    ) {
+      return crypto.randomUUID();
+    }
+
+    return `evt-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+  }
+
+  private getPlatform(): AnalyticsPlatform {
+    if (typeof window === 'undefined') {
+      return 'unknown';
+    }
+
+    const ua = navigator.userAgent;
+    if (/electron/i.test(ua)) return 'desktop';
+    if (/mobile/i.test(ua)) return 'mobile';
+    return 'web';
+  }
+
+  private getOS(): string {
+    if (typeof window === 'undefined') {
+      return 'unknown';
+    }
+
+    const ua = navigator.userAgent;
+    if (/windows/i.test(ua)) return 'Windows';
+    if (/mac/i.test(ua)) return 'macOS';
+    if (/linux/i.test(ua)) return 'Linux';
+    if (/android/i.test(ua)) return 'Android';
+    if (/ios|iphone|ipad/i.test(ua)) return 'iOS';
+    return 'unknown';
+  }
 }
 
-// Create singleton instance
 export const analytics = new AnalyticsService();
 
-// Export class for testing
 export { AnalyticsService };

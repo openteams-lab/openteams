@@ -3,6 +3,14 @@ use std::{fs, path::Path};
 fn main() {
     dotenv::dotenv().ok();
 
+    for key in [
+        "POSTHOG_API_KEY",
+        "POSTHOG_API_ENDPOINT",
+        "VK_SHARED_API_BASE",
+    ] {
+        println!("cargo:rerun-if-env-changed={key}");
+    }
+
     if let Ok(api_key) = std::env::var("POSTHOG_API_KEY") {
         println!("cargo:rustc-env=POSTHOG_API_KEY={}", api_key);
     }

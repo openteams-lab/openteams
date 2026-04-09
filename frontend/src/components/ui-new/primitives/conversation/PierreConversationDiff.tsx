@@ -344,7 +344,7 @@ export function DiffViewBody({
   wrapText?: boolean;
   modeOverride?: 'split' | 'unified';
 }) {
-  const { t } = useTranslation('tasks');
+  const { t } = useTranslation('common');
   const globalMode = useDiffViewMode();
   const mode = modeOverride ?? globalMode;
 

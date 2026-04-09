@@ -39,7 +39,6 @@ use executors::{
 };
 use futures::{FutureExt, TryStreamExt, stream::select};
 use git::GitService;
-use serde_json::json;
 use services::services::{
     analytics::AnalyticsContext,
     approvals::{Approvals, executor_approvals::ExecutorApprovalBridge},
@@ -49,8 +48,6 @@ use services::services::{
     image::ImageService,
     notification::NotificationService,
     queued_message::QueuedMessageService,
-    remote_client::RemoteClient,
-    remote_sync,
     workspace_manager::{RepoWorkspaceInput, WorkspaceManager},
 };
 use tokio::{sync::RwLock, task::JoinHandle};
@@ -77,11 +74,10 @@ pub struct LocalContainerService {
     config: Arc<RwLock<Config>>,
     git: GitService,
     image_service: ImageService,
-    analytics: Option<AnalyticsContext>,
+    _analytics: Option<AnalyticsContext>,
     approvals: Approvals,
     queued_message_service: QueuedMessageService,
     notification_service: NotificationService,
-    remote_client: Option<RemoteClient>,
 }
 
 impl LocalContainerService {
@@ -95,7 +91,6 @@ impl LocalContainerService {
         analytics: Option<AnalyticsContext>,
         approvals: Approvals,
         queued_message_service: QueuedMessageService,
-        remote_client: Option<RemoteClient>,
     ) -> Self {
         let child_store = Arc::new(RwLock::new(HashMap::new()));
         let cancellation_tokens = Arc::new(RwLock::new(HashMap::new()));
@@ -113,11 +108,10 @@ impl LocalContainerService {
             config,
             git,
             image_service,
-            analytics,
+            _analytics: analytics,
             approvals,
             queued_message_service,
             notification_service,
-            remote_client,
         };
 
         container.spawn_workspace_cleanup();
@@ -414,9 +408,7 @@ impl LocalContainerService {
         let child_store = self.child_store.clone();
         let msg_stores = self.msg_stores.clone();
         let db = self.db.clone();
-        let config = self.config.clone();
         let container = self.clone();
-        let analytics = self.analytics.clone();
 
         let mut process_exit_rx = self.spawn_os_exit_watcher(exec_id);
 
@@ -586,51 +578,6 @@ impl LocalContainerService {
                     } else {
                         container.finalize_task(&ctx).await;
                     }
-                }
-
-                // Fire analytics event when CodingAgent execution has finished
-                if config.read().await.analytics_enabled
-                    && matches!(
-                        &ctx.execution_process.run_reason,
-                        ExecutionProcessRunReason::CodingAgent
-                    )
-                    && let Some(analytics) = &analytics
-                {
-                    analytics.analytics_service.track_event(&analytics.user_id, "task_attempt_finished", Some(json!({
-                        "task_id": ctx.task.id.to_string(),
-                        "project_id": ctx.task.project_id.to_string(),
-                        "workspace_id": ctx.workspace.id.to_string(),
-                        "session_id": ctx.session.id.to_string(),
-                        "execution_success": matches!(ctx.execution_process.status, ExecutionProcessStatus::Completed),
-                        "exit_code": ctx.execution_process.exit_code,
-                    })));
-                }
-
-                // Sync workspace to remote after CodingAgent execution
-                if matches!(
-                    &ctx.execution_process.run_reason,
-                    ExecutionProcessRunReason::CodingAgent
-                ) && let Some(client) = &container.remote_client
-                {
-                    let stats = diff_stream::compute_diff_stats(
-                        &container.db.pool,
-                        &container.git,
-                        &ctx.workspace,
-                    )
-                    .await;
-                    let client = client.clone();
-                    let workspace_id = ctx.workspace.id;
-                    let archived = ctx.workspace.archived;
-                    tokio::spawn(async move {
-                        remote_sync::sync_workspace_to_remote(
-                            &client,
-                            workspace_id,
-                            None,
-                            Some(archived),
-                            stats.as_ref(),
-                        )
-                        .await;
-                    });
                 }
             }
 

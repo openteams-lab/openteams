@@ -80,9 +80,10 @@ remote-frontend/dist
 
 build-npm-package-codesign.sh
 
-npx-cli/dist
-npx-cli/openteams-*
 openteams-*.tgz
+openteams-web-*.tgz
+openteams-cli-*.tgz
+npx/*/*.tgz
 
 # Development ports file
 .dev-ports.json

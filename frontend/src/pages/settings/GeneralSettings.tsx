@@ -31,11 +31,8 @@ import {
 import { getLanguageOptions } from '@/i18n/languages';
 
 import { toPrettyCase } from '@/utils/string';
-import { useEditorAvailability } from '@/hooks/useEditorAvailability';
-import { EditorAvailabilityIndicator } from '@/components/EditorAvailabilityIndicator';
 import { useTheme } from '@/components/ThemeProvider';
 import { useUserSystem } from '@/components/ConfigProvider';
-import { TagManager } from '@/components/TagManager';
 
 export function GeneralSettings() {
   const { t } = useTranslation(['settings', 'common']);
@@ -78,9 +75,6 @@ export function GeneralSettings() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const { setTheme } = useTheme();
-
-  // Check editor availability when draft editor changes
-  const editorAvailability = useEditorAvailability(draft?.editor.editor_type);
 
   // When config loads or changes externally, update draft only if not dirty
   useEffect(() => {
@@ -332,11 +326,6 @@ export function GeneralSettings() {
                 ))}
               </SelectContent>
             </Select>
-
-            {/* Editor availability status indicator */}
-            {draft?.editor.editor_type !== EditorType.CUSTOM && (
-              <EditorAvailabilityIndicator availability={editorAvailability} />
-            )}
 
             <p className="text-sm text-muted-foreground">
               {t('settings.general.editor.type.helper')}
@@ -657,18 +646,6 @@ export function GeneralSettings() {
               </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('settings.general.taskTemplates.title')}</CardTitle>
-          <CardDescription>
-            {t('settings.general.taskTemplates.description')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <TagManager />
         </CardContent>
       </Card>
 

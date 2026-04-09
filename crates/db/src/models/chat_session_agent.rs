@@ -91,6 +91,14 @@ impl ChatSessionAgent {
         .await
     }
 
+    pub async fn find_all_active(pool: &SqlitePool) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as::<_, ChatSessionAgent>(&format!(
+            "{CHAT_SESSION_AGENT_SELECT}\nWHERE state IN ('running', 'stopping')\nORDER BY created_at ASC"
+        ))
+        .fetch_all(pool)
+        .await
+    }
+
     pub async fn create(
         pool: &SqlitePool,
         data: &CreateChatSessionAgent,
@@ -275,6 +283,39 @@ impl ChatSessionAgent {
         )
         .bind(id)
         .bind(agent_message_id)
+        .fetch_one(pool)
+        .await
+    }
+
+    pub async fn reset_runtime_state(
+        pool: &SqlitePool,
+        id: Uuid,
+        state: ChatSessionAgentState,
+    ) -> Result<Self, sqlx::Error> {
+        sqlx::query_as::<_, ChatSessionAgent>(
+            r#"
+            UPDATE chat_session_agents
+            SET state = ?2,
+                pty_session_key = NULL,
+                agent_session_id = NULL,
+                agent_message_id = NULL,
+                updated_at = datetime('now', 'subsec')
+            WHERE id = ?1
+            RETURNING id,
+                      session_id,
+                      agent_id,
+                      state,
+                      workspace_path,
+                      pty_session_key,
+                      agent_session_id,
+                      agent_message_id,
+                      allowed_skill_ids,
+                      created_at,
+                      updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(state)
         .fetch_one(pool)
         .await
     }

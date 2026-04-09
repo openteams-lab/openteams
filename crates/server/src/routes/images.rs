@@ -106,18 +106,6 @@ pub(crate) async fn process_image_upload(
                 .await?;
             }
 
-            deployment
-                .track_if_analytics_allowed(
-                    "image_uploaded",
-                    serde_json::json!({
-                        "image_id": image.id.to_string(),
-                        "size_bytes": image.size_bytes,
-                        "mime_type": image.mime_type,
-                        "task_id": link_task_id.map(|id| id.to_string()),
-                    }),
-                )
-                .await;
-
             return Ok(ImageResponse::from_image(image));
         }
     }

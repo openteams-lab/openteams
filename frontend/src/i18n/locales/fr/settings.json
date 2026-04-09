@@ -600,46 +600,6 @@
         "unsavedChanges": "• Vous avez des modifications non enregistrées"
       }
     },
-    "projects": {
-      "title": "Configuration du projet",
-      "description": "Configurez les scripts et paramètres spécifiques au projet.",
-      "loading": "Chargement des projets...",
-      "loadError": "Échec du chargement des projets.",
-      "selector": {
-        "label": "Sélectionner un projet",
-        "placeholder": "Choisir un projet à configurer",
-        "helper": "Sélectionnez un projet pour voir et modifier sa configuration.",
-        "noProjects": "Aucun projet disponible"
-      },
-      "general": {
-        "title": "Paramètres généraux",
-        "description": "Configurez les informations de base du projet.",
-        "name": {
-          "label": "Nom du projet",
-          "placeholder": "Saisir le nom du projet",
-          "helper": "Un nom d'affichage pour ce projet."
-        },
-        "repoPath": {
-          "label": "Chemin du dépôt Git",
-          "placeholder": "/chemin/vers/votre/depot/existant",
-          "helper": "Le chemin absolu vers votre dépôt git sur le disque."
-        }
-      },
-      "save": {
-        "button": "Enregistrer les paramètres du projet",
-        "success": "✓ Paramètres du projet enregistrés avec succès !",
-        "error": "Échec de l'enregistrement des paramètres du projet",
-        "unsavedChanges": "• Vous avez des modifications non enregistrées",
-        "discard": "Abandonner",
-        "confirmSwitch": "Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir changer de projet ? Vos modifications seront perdues."
-      },
-      "repositories": {
-        "title": "Dépôts",
-        "description": "Gérer les dépôts git dans ce projet",
-        "noRepositories": "Aucun dépôt configuré",
-        "addRepository": "Ajouter un dépôt"
-      }
-    },
     "repos": {
       "title": "Configuration du dépôt",
       "description": "Configurez les scripts qui s'exécutent lorsque ce dépôt est utilisé dans les espaces de travail.",

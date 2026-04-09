@@ -17,6 +17,7 @@ use serde_json::Value;
 use tokio::{
     io::{AsyncWrite, AsyncWriteExt, BufWriter},
     sync::{Mutex as AsyncMutex, mpsc},
+    time::Instant,
 };
 use tokio_util::sync::CancellationToken;
 use workspace_utils::approvals::ApprovalStatus;
@@ -208,6 +209,7 @@ struct TextPartInput {
 
 #[derive(Debug, Clone)]
 pub enum ControlEvent {
+    Activity,
     Idle,
     AuthRequired { message: String },
     SessionError { message: String },
@@ -217,6 +219,10 @@ pub enum ControlEvent {
 /// If OpenTeamsCli keeps retrying the same request (e.g. provider rate-limit) and never
 /// reaches `session.idle`, fail the run instead of waiting forever.
 const SESSION_RETRY_LIMIT_BEFORE_FAIL: u64 = 6;
+
+/// If the local executor server stops emitting any session activity while a request is still
+/// pending, fail the run so the session agent state does not stay stuck on `running` forever.
+const REQUEST_ACTIVITY_TIMEOUT: Duration = Duration::from_secs(3600);
 const SESSION_CREATE_TRANSIENT_RETRY_ATTEMPTS: usize = 4;
 const SESSION_CREATE_TRANSIENT_RETRY_DELAY_MS: u64 = 250;
 
@@ -415,13 +421,43 @@ pub async fn run_request_with_control<F>(
 where
     F: Future<Output = Result<(), ExecutorError>> + Unpin,
 {
+    run_request_with_control_timeout(
+        &mut request_fut,
+        control_rx,
+        cancel,
+        REQUEST_ACTIVITY_TIMEOUT,
+    )
+    .await
+}
+
+async fn run_request_with_control_timeout<F>(
+    request_fut: &mut F,
+    control_rx: &mut mpsc::UnboundedReceiver<ControlEvent>,
+    cancel: CancellationToken,
+    activity_timeout: Duration,
+) -> Result<(), ExecutorError>
+where
+    F: Future<Output = Result<(), ExecutorError>> + Unpin,
+{
     let mut idle_seen = false;
+    let activity_error = || {
+        ExecutorError::Io(io::Error::other(format!(
+            "OpenTeamsCli request timed out after {}s without session activity",
+            activity_timeout.as_secs()
+        )))
+    };
+    let activity_deadline = tokio::time::sleep(activity_timeout);
+    tokio::pin!(activity_deadline);
 
     let request_result = loop {
         tokio::select! {
             _ = cancel.cancelled() => return Ok(()),
-            res = &mut request_fut => break res,
+            _ = &mut activity_deadline => return Err(activity_error()),
+            res = &mut *request_fut => break res,
             event = control_rx.recv() => match event {
+                Some(ControlEvent::Activity) => {
+                    activity_deadline.as_mut().reset(Instant::now() + activity_timeout);
+                }
                 Some(ControlEvent::AuthRequired { message }) => return Err(ExecutorError::AuthRequired(message)),
                 Some(ControlEvent::SessionError { message }) => {
                     return Err(ExecutorError::Io(io::Error::other(message)));
@@ -430,7 +466,10 @@ where
                     return Err(ExecutorError::Io(io::Error::other("OpenTeamsCli event stream disconnected while request was running")));
                 }
                 Some(ControlEvent::Disconnected) => return Ok(()),
-                Some(ControlEvent::Idle) => idle_seen = true,
+                Some(ControlEvent::Idle) => {
+                    idle_seen = true;
+                    break Ok(());
+                }
                 None => {}
             }
         }
@@ -448,7 +487,11 @@ where
         // tail updates reliably (e.g. final tool completion events).
         tokio::select! {
             _ = cancel.cancelled() => return Ok(()),
+            _ = &mut activity_deadline => return Err(activity_error()),
             event = control_rx.recv() => match event {
+                Some(ControlEvent::Activity) => {
+                    activity_deadline.as_mut().reset(Instant::now() + activity_timeout);
+                }
                 Some(ControlEvent::Idle) | None => {}
                 Some(ControlEvent::AuthRequired { message }) => return Err(ExecutorError::AuthRequired(message)),
                 Some(ControlEvent::SessionError { message }) => {
@@ -1606,6 +1649,7 @@ async fn process_event_stream(
                 event: data.clone(),
             })
             .await;
+        let _ = ctx.control_tx.send(ControlEvent::Activity);
 
         match event_type {
             "message.updated" => {
@@ -1827,7 +1871,7 @@ async fn request_permission_approval(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, future, sync::Arc};
+    use std::{collections::HashMap, future, sync::Arc, time::Duration};
 
     use axum::{Json, Router, http::StatusCode, routing::post};
     use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
@@ -1839,6 +1883,7 @@ mod tests {
         ConfigProvidersResponse, ControlEvent, ProviderInfo, build_default_headers, create_session,
         extract_retry_status, is_retryable_openteams_cli_db_init_error,
         resolve_model_spec_from_config, resolve_session_id, run_request_with_control,
+        run_request_with_control_timeout,
     };
     use crate::executors::{
         ExecutorError,
@@ -1984,6 +2029,58 @@ mod tests {
             panic!("expected io error");
         };
         assert!(err.to_string().contains("retry limit reached"));
+    }
+
+    #[tokio::test]
+    async fn run_request_with_control_returns_on_idle_even_if_request_is_still_pending() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tx.send(ControlEvent::Idle).expect("send control event");
+
+        let result = run_request_with_control(
+            future::pending::<Result<(), ExecutorError>>(),
+            &mut rx,
+            tokio_util::sync::CancellationToken::new(),
+        )
+        .await;
+
+        assert!(result.is_ok(), "idle should end the request wait");
+    }
+
+    #[tokio::test]
+    async fn run_request_with_control_times_out_when_activity_stops() {
+        let (_tx, mut rx) = mpsc::unbounded_channel();
+
+        let result = run_request_with_control_timeout(
+            &mut future::pending::<Result<(), ExecutorError>>(),
+            &mut rx,
+            tokio_util::sync::CancellationToken::new(),
+            Duration::from_millis(25),
+        )
+        .await;
+
+        let err = result.expect_err("missing activity should fail request");
+        assert!(err.to_string().contains("without session activity"));
+    }
+
+    #[tokio::test]
+    async fn run_request_with_control_resets_timeout_on_activity() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(15)).await;
+            tx.send(ControlEvent::Activity).expect("send activity");
+            tokio::time::sleep(Duration::from_millis(15)).await;
+            tx.send(ControlEvent::Idle).expect("send idle");
+        });
+
+        let result = run_request_with_control_timeout(
+            &mut future::pending::<Result<(), ExecutorError>>(),
+            &mut rx,
+            tokio_util::sync::CancellationToken::new(),
+            Duration::from_millis(40),
+        )
+        .await;
+
+        assert!(result.is_ok(), "activity should extend the wait until idle");
     }
 
     #[tokio::test]

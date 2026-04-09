@@ -600,46 +600,6 @@
         "unsavedChanges": "• 未保存の変更があります"
       }
     },
-    "projects": {
-      "title": "プロジェクト設定",
-      "description": "プロジェクト固有のスクリプトと設定を構成します。",
-      "loading": "プロジェクトを読み込み中...",
-      "loadError": "プロジェクトの読み込みに失敗しました。",
-      "selector": {
-        "label": "プロジェクトを選択",
-        "placeholder": "設定するプロジェクトを選択",
-        "helper": "プロジェクトを選択して、その設定を表示および編集します。",
-        "noProjects": "利用可能なプロジェクトがありません"
-      },
-      "general": {
-        "title": "一般設定",
-        "description": "プロジェクトの基本情報を設定します。",
-        "name": {
-          "label": "プロジェクト名",
-          "placeholder": "プロジェクト名を入力",
-          "helper": "このプロジェクトの表示名。"
-        },
-        "repoPath": {
-          "label": "Gitリポジトリパス",
-          "placeholder": "/既存の/リポジトリ/へのパス",
-          "helper": "ディスク上のgitリポジトリへの絶対パス。"
-        }
-      },
-      "save": {
-        "button": "プロジェクト設定を保存",
-        "success": "✓ プロジェクト設定が正常に保存されました！",
-        "error": "プロジェクト設定の保存に失敗しました",
-        "unsavedChanges": "• 未保存の変更があります",
-        "discard": "破棄",
-        "confirmSwitch": "未保存の変更があります。本当にプロジェクトを切り替えますか？変更は失われます。"
-      },
-      "repositories": {
-        "title": "リポジトリ",
-        "description": "このプロジェクトのGitリポジトリを管理",
-        "noRepositories": "リポジトリが設定されていません",
-        "addRepository": "リポジトリを追加"
-      }
-    },
     "repos": {
       "title": "リポジトリ設定",
       "description": "このリポジトリがワークスペースで使用されるときに実行されるスクリプトを設定します。",

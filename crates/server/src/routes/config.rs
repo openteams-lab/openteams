@@ -199,36 +199,7 @@ async fn update_config(
 }
 
 /// Track config events when fields transition from false → true
-async fn track_config_events(deployment: &DeploymentImpl, old: &Config, new: &Config) {
-    let events = [
-        (
-            !old.disclaimer_acknowledged && new.disclaimer_acknowledged,
-            "onboarding_disclaimer_accepted",
-            serde_json::json!({}),
-        ),
-        (
-            !old.onboarding_acknowledged && new.onboarding_acknowledged,
-            "onboarding_completed",
-            serde_json::json!({
-                "profile": new.executor_profile,
-                "editor": new.editor
-            }),
-        ),
-        (
-            !old.analytics_enabled && new.analytics_enabled,
-            "analytics_session_start",
-            serde_json::json!({}),
-        ),
-    ];
-
-    for (should_track, event_name, properties) in events {
-        if should_track {
-            deployment
-                .track_if_analytics_allowed(event_name, properties)
-                .await;
-        }
-    }
-}
+async fn track_config_events(_deployment: &DeploymentImpl, _old: &Config, _new: &Config) {}
 
 async fn handle_config_events(deployment: &DeploymentImpl, old: &Config, new: &Config) {
     track_config_events(deployment, old, new).await;

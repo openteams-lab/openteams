@@ -39,8 +39,6 @@ pub enum ProjectServiceError {
     RepositoryNotFound,
     #[error("Git operation failed: {0}")]
     GitError(String),
-    #[error("Remote client error: {0}")]
-    RemoteClient(String),
 }
 
 pub type Result<T> = std::result::Result<T, ProjectServiceError>;

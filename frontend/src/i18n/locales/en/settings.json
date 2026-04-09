@@ -600,46 +600,6 @@
         "unsavedChanges": "• You have unsaved changes"
       }
     },
-    "projects": {
-      "title": "Project Configuration",
-      "description": "Configure project-specific scripts and settings.",
-      "loading": "Loading projects...",
-      "loadError": "Failed to load projects.",
-      "selector": {
-        "label": "Select Project",
-        "placeholder": "Choose a project to configure",
-        "helper": "Select a project to view and edit its configuration.",
-        "noProjects": "No projects available"
-      },
-      "general": {
-        "title": "General Settings",
-        "description": "Configure basic project information.",
-        "name": {
-          "label": "Project Name",
-          "placeholder": "Enter project name",
-          "helper": "A display name for this project."
-        },
-        "repoPath": {
-          "label": "Git Repository Path",
-          "placeholder": "/path/to/your/existing/repo",
-          "helper": "The absolute path to your git repository on disk."
-        }
-      },
-      "save": {
-        "button": "Save Project Settings",
-        "success": "✓ Project settings saved successfully!",
-        "error": "Failed to save project settings",
-        "unsavedChanges": "• You have unsaved changes",
-        "discard": "Discard",
-        "confirmSwitch": "You have unsaved changes. Are you sure you want to switch projects? Your changes will be lost."
-      },
-      "repositories": {
-        "title": "Repositories",
-        "description": "Manage the git repositories in this project",
-        "noRepositories": "No repositories configured",
-        "addRepository": "Add Repository"
-      }
-    },
     "repos": {
       "title": "Repository Configuration",
       "description": "Configure scripts that run when this repository is used in workspaces.",

@@ -600,46 +600,6 @@
         "unsavedChanges": "• 您有未儲存的變更"
       }
     },
-    "projects": {
-      "title": "專案設定",
-      "description": "設定專案專屬的腳本與選項。",
-      "loading": "載入專案中...",
-      "loadError": "載入專案失敗。",
-      "selector": {
-        "label": "選擇專案",
-        "placeholder": "選擇要設定的專案",
-        "helper": "選擇專案以查看與編輯其設定。",
-        "noProjects": "沒有可用的專案"
-      },
-      "general": {
-        "title": "一般設定",
-        "description": "設定基本專案資訊。",
-        "name": {
-          "label": "專案名稱",
-          "placeholder": "輸入專案名稱",
-          "helper": "此專案的顯示名稱。"
-        },
-        "repoPath": {
-          "label": "Git 儲存庫路徑",
-          "placeholder": "/path/to/your/existing/repo",
-          "helper": "磁碟上的 Git 儲存庫絕對路徑。"
-        }
-      },
-      "save": {
-        "button": "儲存專案設定",
-        "success": "✓ 專案設定儲存成功！",
-        "error": "儲存專案設定失敗",
-        "unsavedChanges": "• 您有未儲存的變更",
-        "discard": "放棄",
-        "confirmSwitch": "您有未儲存的變更。確定要切換專案嗎？您的變更將會遺失。"
-      },
-      "repositories": {
-        "title": "儲存庫",
-        "description": "管理此專案中的 Git 儲存庫",
-        "noRepositories": "未設定儲存庫",
-        "addRepository": "新增儲存庫"
-      }
-    },
     "repos": {
       "title": "儲存庫設定",
       "description": "設定此儲存庫在工作區中使用時執行的腳本。",

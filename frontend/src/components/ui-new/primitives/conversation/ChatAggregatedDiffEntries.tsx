@@ -172,7 +172,7 @@ export function ChatAggregatedDiffEntries({
   onOpenInChanges,
   className,
 }: ChatAggregatedDiffEntriesProps) {
-  const { t } = useTranslation('tasks');
+  const { t } = useTranslation('common');
   const { theme } = useTheme();
   const actualTheme = getActualTheme(theme);
   const FileIcon = getFileIcon(filePath, actualTheme);

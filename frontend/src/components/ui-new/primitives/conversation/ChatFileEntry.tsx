@@ -38,7 +38,7 @@ export function ChatFileEntry({
   diffContent,
   onOpenInChanges,
 }: ChatFileEntryProps) {
-  const { t } = useTranslation('tasks');
+  const { t } = useTranslation('common');
   const { theme } = useTheme();
   const actualTheme = getActualTheme(theme);
   const hasStats = additions !== undefined || deletions !== undefined;

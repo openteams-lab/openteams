@@ -22,7 +22,7 @@ export function ChatUserMessage({
   onEdit,
   isGreyed,
 }: ChatUserMessageProps) {
-  const { t } = useTranslation('tasks');
+  const { t } = useTranslation('common');
 
   return (
     <ChatEntryContainer
