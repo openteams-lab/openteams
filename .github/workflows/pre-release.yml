@@ -404,7 +404,7 @@ jobs:
       - name: Build backend (Linux)
         if: runner.os == 'Linux' && !contains(matrix.target, 'windows')
         run: |
-          cargo zigbuild --release --target ${{ matrix.target }} -p server -p review --bin server --bin mcp_task_server --bin review
+          cargo zigbuild --release --target ${{ matrix.target }} -p server -p review --bin server --bin review
         env:
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
           POSTHOG_API_ENDPOINT: ${{ secrets.POSTHOG_API_ENDPOINT }}
@@ -418,7 +418,7 @@ jobs:
           elif [[ "${{ matrix.target }}" == "aarch64-apple-darwin" ]]; then
             export MACOSX_DEPLOYMENT_TARGET=11.0
           fi
-          cargo build --release --target ${{ matrix.target }} -p server -p review --bin server --bin mcp_task_server --bin review
+          cargo build --release --target ${{ matrix.target }} -p server -p review --bin server --bin review
         env:
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
           POSTHOG_API_ENDPOINT: ${{ secrets.POSTHOG_API_ENDPOINT }}
@@ -438,7 +438,7 @@ jobs:
           export AWS_LC_SYS_TARGET_CXX_x86_64_unknown_linux_gnu=clang++
           export CC_x86_64_unknown_linux_gnu=clang
           export CXX_x86_64_unknown_linux_gnu=clang++
-          cargo xwin build --cross-compiler clang-cl --release --target ${{ matrix.target }} -p server -p review --bin server --bin mcp_task_server --bin review
+          cargo xwin build --cross-compiler clang-cl --release --target ${{ matrix.target }} -p server -p review --bin server --bin review
         env:
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
           POSTHOG_API_ENDPOINT: ${{ secrets.POSTHOG_API_ENDPOINT }}
@@ -462,11 +462,9 @@ jobs:
           mkdir -p dist
           if [[ "${{ matrix.name }}" == *"windows"* ]]; then
             cp target/${{ matrix.target }}/release/server.exe dist/openteams-${{ matrix.name }}.exe
-            cp target/${{ matrix.target }}/release/mcp_task_server.exe dist/openteams-mcp-${{ matrix.name }}.exe
             cp target/${{ matrix.target }}/release/review.exe dist/openteams-review-${{ matrix.name }}.exe
           else
             cp target/${{ matrix.target }}/release/server dist/openteams-${{ matrix.name }}
-            cp target/${{ matrix.target }}/release/mcp_task_server dist/openteams-mcp-${{ matrix.name }}
             cp target/${{ matrix.target }}/release/review dist/openteams-review-${{ matrix.name }}
           fi
 
@@ -532,21 +530,6 @@ jobs:
         if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
         run: zip openteams.zip openteams
 
-      - name: Sign MCP binary (macOS)
-        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
-        uses: BloopAI/apple-code-sign-action@v1
-        with:
-          input_path: target/${{ matrix.target }}/release/mcp_task_server
-          output_path: openteams-mcp
-          p12_file: certificate.p12
-          p12_password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          sign: true
-          sign_args: "--code-signature-flags=runtime"
-
-      - name: Package MCP binary (macOS)
-        if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
-        run: zip openteams-mcp.zip openteams-mcp
-
       - name: Sign Review binary (macOS)
         if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled == 'true'
         uses: BloopAI/apple-code-sign-action@v1
@@ -566,11 +549,9 @@ jobs:
         if: runner.os == 'macOS' && steps.macos_backend_signing.outputs.sign_enabled != 'true'
         run: |
           cp target/${{ matrix.target }}/release/server openteams
-          cp target/${{ matrix.target }}/release/mcp_task_server openteams-mcp
           cp target/${{ matrix.target }}/release/review openteams-review
-          chmod +x openteams openteams-mcp openteams-review
+          chmod +x openteams openteams-review
           zip openteams.zip openteams
-          zip openteams-mcp.zip openteams-mcp
           zip openteams-review.zip openteams-review
 
       - name: Notarize signed binaries (macOS)
@@ -580,7 +561,6 @@ jobs:
         with:
           input_path: |
             openteams.zip
-            openteams-mcp.zip
             openteams-review.zip
           sign: false
           notarize: true
@@ -591,7 +571,6 @@ jobs:
         run: |
           mkdir -p dist
           cp openteams.zip dist/openteams-${{ matrix.name }}.zip
-          cp openteams-mcp.zip dist/openteams-mcp-${{ matrix.name }}.zip
           cp openteams-review.zip dist/openteams-review-${{ matrix.name }}.zip
 
       - name: Clean up certificates (macOS)
@@ -626,7 +605,6 @@ jobs:
           - target: x86_64-unknown-linux-musl
             name: linux-x64
             binary: openteams
-            mcp_binary: openteams-mcp
             review_binary: openteams-review
             cli_target: linux-x64
             cli_build_output: openteams-cli-linux-x64
@@ -634,7 +612,6 @@ jobs:
           - target: x86_64-pc-windows-msvc
             name: windows-x64
             binary: openteams.exe
-            mcp_binary: openteams-mcp.exe
             review_binary: openteams-review.exe
             cli_target: windows-x64
             cli_build_output: openteams-cli-windows-x64.exe
@@ -642,7 +619,6 @@ jobs:
           - target: x86_64-apple-darwin
             name: macos-x64
             binary: openteams
-            mcp_binary: openteams-mcp
             review_binary: openteams-review
             cli_target: darwin-x64
             cli_build_output: openteams-cli-darwin-x64
@@ -650,7 +626,6 @@ jobs:
           - target: aarch64-apple-darwin
             name: macos-arm64
             binary: openteams
-            mcp_binary: openteams-mcp
             review_binary: openteams-review
             cli_target: darwin-arm64
             cli_build_output: openteams-cli-darwin-arm64
@@ -658,7 +633,6 @@ jobs:
           - target: aarch64-unknown-linux-musl
             name: linux-arm64
             binary: openteams
-            mcp_binary: openteams-mcp
             review_binary: openteams-review
             cli_target: linux-arm64
             cli_build_output: openteams-cli-linux-arm64
@@ -710,15 +684,12 @@ jobs:
         run: |
           mkdir -p npx/openteams-npx/dist/${{ matrix.name }}
           mkdir openteams-${{ matrix.name }}
-          mkdir openteams-mcp-${{ matrix.name }}
           mkdir openteams-review-${{ matrix.name }}
 
           cp dist/openteams-${{ matrix.name }}* openteams-${{ matrix.name }}/${{ matrix.binary }}
-          cp dist/openteams-mcp-${{ matrix.name }}* openteams-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
           cp dist/openteams-review-${{ matrix.name }}* openteams-review-${{ matrix.name }}/${{ matrix.review_binary }}
 
           zip -j npx/openteams-npx/dist/${{ matrix.name }}/openteams.zip openteams-${{ matrix.name }}/${{ matrix.binary }}
-          zip -j npx/openteams-npx/dist/${{ matrix.name }}/openteams-mcp.zip openteams-mcp-${{ matrix.name }}/${{ matrix.mcp_binary }}
           zip -j npx/openteams-npx/dist/${{ matrix.name }}/openteams-review.zip openteams-review-${{ matrix.name }}/${{ matrix.review_binary }}
 
           # Include CLI binary if it was built
@@ -735,7 +706,6 @@ jobs:
           mkdir -p npx/openteams-npx/dist/${{ matrix.name }}
           mkdir openteams-${{ matrix.name }}
           cp dist/openteams-${{ matrix.name }}* npx/openteams-npx/dist/${{ matrix.name }}/openteams.zip
-          cp dist/openteams-mcp-${{ matrix.name }}* npx/openteams-npx/dist/${{ matrix.name }}/openteams-mcp.zip
           cp dist/openteams-review-${{ matrix.name }}* npx/openteams-npx/dist/${{ matrix.name }}/openteams-review.zip
 
           # Include CLI binary if it was built
@@ -884,7 +854,7 @@ jobs:
             const crypto = require('crypto');
             const manifest = { version: '$TAG', platforms: {} };
             const platforms = ['linux-x64', 'linux-arm64', 'windows-x64', 'macos-x64', 'macos-arm64'];
-            const binaries = ['openteams', 'openteams-mcp', 'openteams-review', 'openteams-cli'];
+            const binaries = ['openteams', 'openteams-review', 'openteams-cli'];
 
             for (const platform of platforms) {
               manifest.platforms[platform] = {};
@@ -906,7 +876,7 @@ jobs:
 
           # Upload binaries (use full tag for path, allows multiple pre-releases to coexist)
           for platform in linux-x64 linux-arm64 windows-x64 macos-x64 macos-arm64; do
-            for binary in openteams openteams-mcp openteams-review openteams-cli; do
+            for binary in openteams openteams-review openteams-cli; do
               if [ -f "binaries/$platform/$binary.zip" ]; then
                 echo "Uploading binaries/$platform/$binary.zip..."
                 aws s3 cp "binaries/$platform/$binary.zip" \
@@ -1609,7 +1579,7 @@ jobs:
             const fs = require("fs");
             const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
             const requiredPlatforms = ["linux-x64", "linux-arm64", "windows-x64", "macos-x64", "macos-arm64"];
-            const requiredBinaries = ["openteams", "openteams-mcp", "openteams-review"];
+            const requiredBinaries = ["openteams", "openteams-review"];
             // CLI is optional for now during transition
             const optionalBinaries = ["openteams-cli"];
 
@@ -1628,7 +1598,7 @@ jobs:
           '
 
           for platform in linux-x64 linux-arm64 windows-x64 macos-x64 macos-arm64; do
-            for binary in openteams openteams-mcp openteams-review; do
+            for binary in openteams openteams-review; do
               url="$BASE/binaries/$TAG/$platform/$binary.zip"
               echo "Checking $url"
               curl -fsI "$url" >/dev/null
