@@ -2143,9 +2143,7 @@ impl ChatRunner {
         normalized_protocol.to_string()
     }
 
-    pub(super) fn resolve_session_team_protocol(
-        session: Option<&ChatSession>,
-    ) -> Option<&str> {
+    pub(super) fn resolve_session_team_protocol(session: Option<&ChatSession>) -> Option<&str> {
         let session = session?;
         if !session.team_protocol_enabled {
             return None;
