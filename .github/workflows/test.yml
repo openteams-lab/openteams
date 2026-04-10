@@ -72,13 +72,6 @@ jobs:
           shared-key: "shared"
           cache-all-crates: true
 
-      - name: Setup SSH Agent for private dependencies
-        id: ssh-setup
-        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
-
       - name: Install sqlx-cli
         uses: taiki-e/cache-cargo-install-action@v3
         with:
@@ -93,11 +86,6 @@ jobs:
           pnpm run prepare-db:check
           cargo test --workspace
           pnpm run backend:lint
-
-      - name: Remote crate checks
-        if: ${{ steps.ssh-setup.outcome == 'success' }}
-        run: |
-          pnpm run remote:generate-types:check
 
   test:
     if: ${{ always() }}

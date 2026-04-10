@@ -53,7 +53,6 @@ echo "🏗️ Building frontend..."
 
 echo "🏗️ Building Rust binaries..."
 cargo build --release --manifest-path Cargo.toml
-cargo build --release --bin mcp_task_server --manifest-path Cargo.toml
 
 echo "📦 Creating distribution package..."
 
@@ -62,12 +61,6 @@ cp ${CARGO_TARGET_DIR}/release/server openteams
 zip -q openteams.zip openteams
 rm -f openteams 
 mv openteams.zip "$NPX_PACKAGE_DIR/dist/$PLATFORM/openteams.zip"
-
-# Copy the MCP binary
-cp ${CARGO_TARGET_DIR}/release/mcp_task_server openteams-mcp
-zip -q openteams-mcp.zip openteams-mcp
-rm -f openteams-mcp
-mv openteams-mcp.zip "$NPX_PACKAGE_DIR/dist/$PLATFORM/openteams-mcp.zip"
 
 # Copy the Review CLI binary
 cp ${CARGO_TARGET_DIR}/release/review openteams-review
@@ -78,9 +71,7 @@ mv openteams-review.zip "$NPX_PACKAGE_DIR/dist/$PLATFORM/openteams-review.zip"
 echo "✅ Build complete!"
 echo "📋 Files created:"
 echo "   - $NPX_PACKAGE_DIR/dist/$PLATFORM/openteams.zip"
-echo "   - $NPX_PACKAGE_DIR/dist/$PLATFORM/openteams-mcp.zip"
 echo "   - $NPX_PACKAGE_DIR/dist/$PLATFORM/openteams-review.zip"
 echo ""
 echo "🚀 To test locally, run:"
 echo "   cd $NPX_PACKAGE_DIR && node bin/cli.js"
-
