@@ -378,6 +378,7 @@ export function SettingsNumberInput({
   min,
   max,
   step,
+  showStepper = false,
   error,
   disabled,
 }: {
@@ -387,6 +388,7 @@ export function SettingsNumberInput({
   min?: number;
   max?: number;
   step?: number;
+  showStepper?: boolean;
   error?: boolean;
   disabled?: boolean;
 }) {
@@ -403,7 +405,8 @@ export function SettingsNumberInput({
       className={cn(
         settingsFieldClassName,
         'settings-input',
-        '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
+        !showStepper &&
+          '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
         error &&
           'border-[#d14343] focus:border-[#d14343] focus:shadow-[0_0_0_3px_rgba(209,67,67,0.08)]'
       )}

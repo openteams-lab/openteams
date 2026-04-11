@@ -303,7 +303,7 @@
       },
       "agentChaining": {
         "title": "代理链式调用",
-        "description": "控制一次链路中代理之间可自动接力的最大次数。",
+        "description": "",
         "maxDepth": {
           "label": "最大链路深度",
           "helper": "用于限制自动 @提及，避免代理循环触发。默认值为 8；达到上限后，后续代理提及将不再自动执行。"

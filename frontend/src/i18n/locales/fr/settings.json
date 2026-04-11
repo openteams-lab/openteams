@@ -303,7 +303,7 @@
       },
       "agentChaining": {
         "title": "Chaînage des agents",
-        "description": "Contrôle le nombre de relais automatiques entre agents autorisés dans une même chaîne.",
+        "description": "",
         "maxDepth": {
           "label": "Profondeur maximale de la chaîne",
           "helper": "Limite les mentions @ automatiques pour éviter les boucles. La valeur par défaut est 8. Une fois la limite atteinte, les mentions suivantes d'agents ne se lancent plus automatiquement."

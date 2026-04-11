@@ -347,6 +347,7 @@ export function GeneralSettingsSection() {
             onChange={updateMaxAgentChainDepth}
             min={1}
             step={1}
+            showStepper
           />
         </SettingsField>
       </SettingsCard>

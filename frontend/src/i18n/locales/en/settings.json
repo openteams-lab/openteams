@@ -303,7 +303,7 @@
       },
       "agentChaining": {
         "title": "Agent Chaining",
-        "description": "Control how many automatic agent-to-agent handoffs can happen in one chain.",
+        "description": "",
         "maxDepth": {
           "label": "Maximum chain depth",
           "helper": "Limits automatic @mentions to prevent loops. Default: 8. When the limit is reached, further agent mentions stop running automatically."
