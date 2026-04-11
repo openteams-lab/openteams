@@ -282,7 +282,7 @@
   @media (min-width: 1200px) {
     @supports (zoom: 1) {
       .new-design.new-design--browser-scale {
-        --new-design-ui-scale: 0.8;
+        --new-design-ui-scale: 0.88;
         zoom: var(--new-design-ui-scale);
         overflow: hidden;
       }
