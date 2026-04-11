@@ -9,16 +9,16 @@ use axum::{
     response::{IntoResponse, Json as ResponseJson},
 };
 use db::models::{
-    analytics::{
-        AnalyticsSessionStats, track_session_archive, track_session_create, track_session_delete,
-        track_session_restore,
-    },
+    analytics::AnalyticsSessionStats,
     chat_agent::ChatAgent,
     chat_session::{ChatSession, ChatSessionStatus, CreateChatSession, UpdateChatSession},
     chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
+use services::services::analytics_events::{
+    AnalyticsProjector, DomainEvent, extract_executor_profile_variant,
+};
 use ts_rs::TS;
 use utils::{assets::asset_dir, response::ApiResponse};
 use uuid::Uuid;
@@ -50,9 +50,16 @@ pub async fn create_session(
 ) -> Result<ResponseJson<ApiResponse<ChatSession>>, ApiError> {
     let session = ChatSession::create(&deployment.db().pool, &payload, Uuid::new_v4()).await?;
 
-    // Track analytics: session_create
+    let analytics_projector =
+        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
     let title_length = payload.title.as_ref().map(|t| t.len()).unwrap_or(0);
-    let _ = track_session_create(&deployment.db().pool, session.id, None, title_length).await;
+    analytics_projector
+        .project_or_warn(DomainEvent::SessionCreated {
+            session_id: session.id,
+            actor_user_id: deployment.user_id().to_string(),
+            title_length,
+        })
+        .await;
 
     // Initialize session stats
     let _ = AnalyticsSessionStats::upsert(&deployment.db().pool, session.id, None).await;
@@ -86,8 +93,15 @@ pub async fn delete_session(
         return Err(ApiError::Database(sqlx::Error::RowNotFound));
     }
 
-    // Track analytics: session_delete
-    let _ = track_session_delete(&deployment.db().pool, session.id, None, had_messages).await;
+    let analytics_projector =
+        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    analytics_projector
+        .project_or_warn(DomainEvent::SessionDeleted {
+            session_id: session.id,
+            actor_user_id: deployment.user_id().to_string(),
+            had_messages,
+        })
+        .await;
 
     Ok(ResponseJson(ApiResponse::success(())))
 }
@@ -373,6 +387,20 @@ pub async fn create_session_agent(
         Uuid::new_v4(),
     )
     .await?;
+
+    let analytics_projector =
+        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    analytics_projector
+        .project_or_warn(DomainEvent::AgentAdded {
+            session_id: session.id,
+            actor_user_id: deployment.user_id().to_string(),
+            agent_id: agent.id,
+            agent_name: agent.name.clone(),
+            runner_type: agent.runner_type.clone(),
+            executor_profile_variant: extract_executor_profile_variant(&agent.tools_enabled.0),
+            has_workspace: created.workspace_path.is_some(),
+        })
+        .await;
     Ok(ResponseJson(ApiResponse::success(created)))
 }
 
@@ -504,18 +532,19 @@ pub async fn archive_session(
     )
     .await?;
 
-    // Track analytics: session_archive
     if let Some(stats) = session_stats {
+        let analytics_projector =
+            AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
         let duration_seconds = (chrono::Utc::now() - session.created_at).num_seconds();
-        let _ = track_session_archive(
-            &deployment.db().pool,
-            session.id,
-            None,
-            duration_seconds,
-            stats.message_count,
-            stats.agent_count,
-        )
-        .await;
+        analytics_projector
+            .project_or_warn(DomainEvent::SessionArchived {
+                session_id: session.id,
+                actor_user_id: deployment.user_id().to_string(),
+                duration_seconds,
+                message_count: stats.message_count,
+                agent_count: stats.agent_count,
+            })
+            .await;
     }
 
     Ok(ResponseJson(ApiResponse::success(updated)))
@@ -545,8 +574,14 @@ pub async fn restore_session(
     )
     .await?;
 
-    // Track analytics: session_restore
-    let _ = track_session_restore(&deployment.db().pool, session.id, None).await;
+    let analytics_projector =
+        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    analytics_projector
+        .project_or_warn(DomainEvent::SessionRestored {
+            session_id: session.id,
+            actor_user_id: deployment.user_id().to_string(),
+        })
+        .await;
 
     Ok(ResponseJson(ApiResponse::success(updated)))
 }

@@ -131,7 +131,7 @@ impl Deployment for LocalDeployment {
 
         let approvals = Approvals::new(msg_stores.clone());
         let queued_message_service = QueuedMessageService::new();
-        let chat_runner = ChatRunner::new(db.clone());
+        let chat_runner = ChatRunner::with_analytics(db.clone(), analytics.clone());
         let recovered_orphaned_agents = chat_runner
             .recover_orphaned_session_agents()
             .await

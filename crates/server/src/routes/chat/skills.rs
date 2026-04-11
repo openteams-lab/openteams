@@ -2,7 +2,6 @@ use std::str::FromStr;
 
 use axum::{Json, extract::State, response::Json as ResponseJson};
 use db::models::{
-    analytics::{track_skill_assign, track_skill_disable, track_skill_enable, track_skill_install},
     chat_agent_skill::{AssignSkillToAgent, ChatAgentSkill, UpdateAgentSkill},
     chat_skill::{ChatSkill, CreateChatSkill, UpdateChatSkill},
 };
@@ -10,6 +9,7 @@ use deployment::Deployment;
 use executors::executors::BaseCodingAgent;
 use serde::Deserialize;
 use services::services::{
+    analytics_events::{AnalyticsProjector, DomainEvent, SkillInstallSource},
     native_skills::{
         InstalledNativeSkill, NativeSkillError, list_native_skills_for_runner,
         update_native_skill_enabled_for_runner,
@@ -170,14 +170,15 @@ pub async fn assign_skill_to_agent(
     let assignment =
         ChatAgentSkill::assign(&deployment.db().pool, &payload, Uuid::new_v4()).await?;
 
-    // Track analytics: skill_assign
-    let _ = track_skill_assign(
-        &deployment.db().pool,
-        None,
-        payload.skill_id,
-        payload.agent_id,
-    )
-    .await;
+    let analytics_projector =
+        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    analytics_projector
+        .project_or_warn(DomainEvent::SkillAssigned {
+            actor_user_id: deployment.user_id().to_string(),
+            skill_id: payload.skill_id,
+            agent_id: payload.agent_id,
+        })
+        .await;
 
     Ok(ResponseJson(ApiResponse::success(assignment)))
 }
@@ -190,24 +191,25 @@ pub async fn update_agent_skill(
 ) -> Result<ResponseJson<ApiResponse<ChatAgentSkill>>, ApiError> {
     let assignment = ChatAgentSkill::update(&deployment.db().pool, assignment_id, &payload).await?;
 
-    // Track analytics: skill_enable or skill_disable
+    let analytics_projector =
+        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
     if let Some(enabled) = payload.enabled {
         if enabled {
-            let _ = track_skill_enable(
-                &deployment.db().pool,
-                None,
-                assignment.skill_id,
-                assignment.agent_id,
-            )
-            .await;
+            analytics_projector
+                .project_or_warn(DomainEvent::SkillEnabled {
+                    actor_user_id: deployment.user_id().to_string(),
+                    skill_id: assignment.skill_id,
+                    agent_id: assignment.agent_id,
+                })
+                .await;
         } else {
-            let _ = track_skill_disable(
-                &deployment.db().pool,
-                None,
-                assignment.skill_id,
-                assignment.agent_id,
-            )
-            .await;
+            analytics_projector
+                .project_or_warn(DomainEvent::SkillDisabled {
+                    actor_user_id: deployment.user_id().to_string(),
+                    skill_id: assignment.skill_id,
+                    agent_id: assignment.agent_id,
+                })
+                .await;
         }
     }
 
@@ -289,15 +291,16 @@ pub async fn install_registry_skill(
     .await
     .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
 
-    // Track analytics: skill_install
-    let _ = track_skill_install(
-        &deployment.db().pool,
-        None,
-        installed.id,
-        &installed.name,
-        "registry",
-    )
-    .await;
+    let analytics_projector =
+        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    analytics_projector
+        .project_or_warn(DomainEvent::SkillInstalled {
+            actor_user_id: deployment.user_id().to_string(),
+            skill_id: installed.id,
+            skill_name: installed.name.clone(),
+            source: SkillInstallSource::Registry,
+        })
+        .await;
 
     Ok(ResponseJson(ApiResponse::success(installed)))
 }
@@ -379,15 +382,16 @@ pub async fn install_builtin_skill_api(
             .await
             .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
 
-    // Track analytics: skill_install
-    let _ = track_skill_install(
-        &deployment.db().pool,
-        None,
-        installed.id,
-        &installed.name,
-        "builtin",
-    )
-    .await;
+    let analytics_projector =
+        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    analytics_projector
+        .project_or_warn(DomainEvent::SkillInstalled {
+            actor_user_id: deployment.user_id().to_string(),
+            skill_id: installed.id,
+            skill_name: installed.name.clone(),
+            source: SkillInstallSource::Builtin,
+        })
+        .await;
 
     Ok(ResponseJson(ApiResponse::success(installed)))
 }

@@ -57,6 +57,8 @@ use utils::{
 use uuid::Uuid;
 
 use crate::services::{
+    analytics::AnalyticsService,
+    analytics_events::{AnalyticsProjector, DomainEvent},
     chat::{self, ChatServiceError},
     config::{self, UiLanguage, preset_loader::PresetLoader},
     native_skills::{NativeSkillError, list_native_skills_for_runner},
@@ -394,6 +396,7 @@ impl RunCompletionStatus {
 #[derive(Clone)]
 pub struct ChatRunner {
     db: DBService,
+    analytics: Option<AnalyticsService>,
     streams: Arc<DashMap<Uuid, broadcast::Sender<ChatStreamEvent>>>,
     // Store per-run lifecycle controls, key = session_agent_id
     run_controls: Arc<DashMap<Uuid, RunLifecycleControl>>,
@@ -407,13 +410,22 @@ pub struct ChatRunner {
 
 impl ChatRunner {
     pub fn new(db: DBService) -> Self {
+        Self::with_analytics(db, None)
+    }
+
+    pub fn with_analytics(db: DBService, analytics: Option<AnalyticsService>) -> Self {
         Self {
             db,
+            analytics,
             streams: Arc::new(DashMap::new()),
             run_controls: Arc::new(DashMap::new()),
             pending_messages: Arc::new(DashMap::new()),
             background_compaction_inflight: Arc::new(DashMap::new()),
         }
+    }
+
+    fn analytics_projector(&self) -> AnalyticsProjector<'_> {
+        AnalyticsProjector::new(&self.db.pool, self.analytics.as_ref())
     }
 
     pub async fn recover_orphaned_session_agents(&self) -> Result<usize, ChatRunnerError> {
@@ -981,6 +993,7 @@ impl ChatRunner {
 
         let session_agent_id = session_agent.id;
         let agent_id = agent.id;
+        let run_started_at = session_agent.updated_at;
         // Register the stop control before broadcasting the running state so an
         // immediate user stop request cannot miss the active run.
         let stop = self.register_run_control(session_agent_id);
@@ -1013,6 +1026,7 @@ impl ChatRunner {
 
         let chain_depth = self.extract_chain_depth(&source_message.meta);
 
+        let run_id = Uuid::new_v4();
         let result = async {
             let workspace_path = self
                 .resolve_workspace_path_for_agent(
@@ -1035,7 +1049,6 @@ impl ChatRunner {
             );
 
             let run_index = ChatRun::next_run_index(&self.db.pool, session_agent_id).await?;
-            let run_id = Uuid::new_v4();
             let run_dir =
                 run_records_dir.join(Self::run_records_prefix(session_agent_id, run_index));
             fs::create_dir_all(&run_dir).await?;
@@ -1169,6 +1182,15 @@ impl ChatRunner {
             let msg_store = Arc::new(MsgStore::new());
             let raw_log_file = Arc::new(Mutex::new(fs::File::create(&raw_log_path).await?));
 
+            self.analytics_projector()
+                .project_or_warn(DomainEvent::AgentRunStarted {
+                    session_id,
+                    agent_id,
+                    run_id,
+                    executor_profile: Some(executor_profile_id.to_string()),
+                })
+                .await;
+
             self.spawn_log_forwarders(&mut spawned.child, msg_store.clone(), raw_log_file);
             executor.normalize_logs(msg_store.clone(), PathBuf::from(&workspace_path).as_path());
 
@@ -1192,6 +1214,7 @@ impl ChatRunner {
                 source_message.id,
                 agent.name.clone(),
                 prompt_language,
+                run_started_at,
             );
 
             self.spawn_exit_watcher(
@@ -1213,6 +1236,15 @@ impl ChatRunner {
         if result.is_err() {
             self.run_controls.remove(&session_agent_id);
             if let Err(err) = &result {
+                self.analytics_projector()
+                    .project_or_warn(DomainEvent::AgentRunErrored {
+                        session_id,
+                        agent_id,
+                        run_id,
+                        error_type: "startup_failure".to_string(),
+                        error_message: err.to_string(),
+                    })
+                    .await;
                 self.report_mention_failure(
                     session_id,
                     source_message.id,

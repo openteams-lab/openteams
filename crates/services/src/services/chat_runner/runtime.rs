@@ -10,6 +10,20 @@ pub(super) struct ExitWatcherArgs {
 }
 
 impl ChatRunner {
+    fn normalized_entry_error_name(error: Option<&NormalizedEntryError>) -> String {
+        match error {
+            Some(NormalizedEntryError::SetupRequired) => "setup_required",
+            Some(NormalizedEntryError::QuotaExceeded { .. }) => "quota_exceeded",
+            Some(NormalizedEntryError::RateLimitExceeded { .. }) => "rate_limit_exceeded",
+            Some(NormalizedEntryError::ServerOverloaded { .. }) => "server_overloaded",
+            Some(NormalizedEntryError::AuthenticationFailed { .. }) => "authentication_failed",
+            Some(NormalizedEntryError::ContextLimitExceeded { .. }) => "context_limit_exceeded",
+            Some(NormalizedEntryError::Other) => "other",
+            None => "unknown",
+        }
+        .to_string()
+    }
+
     pub(super) fn register_run_control(&self, session_agent_id: Uuid) -> CancellationToken {
         let stop = CancellationToken::new();
         self.run_controls
@@ -356,6 +370,7 @@ impl ChatRunner {
         source_message_id: Uuid,
         agent_name: String,
         prompt_language: ResolvedPromptLanguage,
+        run_started_at: chrono::DateTime<Utc>,
     ) {
         let db = self.db.clone();
         let sender = self.sender_for(session_id);
@@ -547,6 +562,9 @@ impl ChatRunner {
                             .await;
                         }
 
+                        let finished_at = Utc::now();
+                        let duration_ms = (finished_at - run_started_at).num_milliseconds().max(0);
+
                         let mut meta = serde_json::json!({
                             "run_id": run_id,
                             "session_id": session_id,
@@ -554,7 +572,7 @@ impl ChatRunner {
                             "agent_id": agent_id,
                             "agent_session_id": agent_session_id,
                             "agent_message_id": agent_message_id,
-                            "finished_at": Utc::now().to_rfc3339(),
+                            "finished_at": finished_at.to_rfc3339(),
                             "chain_depth": chain_depth + 1,
                         });
 
@@ -695,6 +713,40 @@ impl ChatRunner {
                                     "failed to persist agent error message"
                                 );
                             }
+                        }
+
+                        runner
+                            .analytics_projector()
+                            .project_or_warn(DomainEvent::AgentRunCompleted {
+                                session_id,
+                                agent_id,
+                                run_id,
+                                duration_ms,
+                                success: matches!(
+                                    completion_status,
+                                    RunCompletionStatus::Succeeded
+                                ),
+                            })
+                            .await;
+
+                        if matches!(completion_status, RunCompletionStatus::Failed) {
+                            let error_message = if error_content.trim().is_empty() {
+                                "Agent run failed".to_string()
+                            } else {
+                                error_content.clone()
+                            };
+                            runner
+                                .analytics_projector()
+                                .project_or_warn(DomainEvent::AgentRunErrored {
+                                    session_id,
+                                    agent_id,
+                                    run_id,
+                                    error_type: Self::normalized_entry_error_name(
+                                        error_type.as_ref(),
+                                    ),
+                                    error_message,
+                                })
+                                .await;
                         }
 
                         let _ = sender.send(ChatStreamEvent::AgentDelta {
