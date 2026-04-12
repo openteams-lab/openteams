@@ -1543,12 +1543,6 @@ impl ChatRunner {
             .filter(|run| Self::run_belongs_to_workspace(run, workspace_path))
             .collect();
 
-        tracing::debug!(
-            workspace_path = %workspace_path.display(),
-            run_count = runs.len(),
-            "Running retention janitor for workspace"
-        );
-
         if runs.is_empty() {
             return Ok(());
         }
@@ -1562,15 +1556,15 @@ impl ChatRunner {
             }
         }
 
+        if total_size <= RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE {
+            return Ok(());
+        }
+        
         tracing::debug!(
             workspace_path = %workspace_path.display(),
             total_size_bytes = total_size,
             "Calculated total size of runs for workspace"
         );
-
-        if total_size <= RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE {
-            return Ok(());
-        }
 
         runs.sort_by_key(|run| run.created_at);
         let pruned_at = Utc::now();

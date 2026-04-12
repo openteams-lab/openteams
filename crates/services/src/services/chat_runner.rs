@@ -103,8 +103,8 @@ const LIVE_LOG_MAX_BYTES_PER_RUN: u64 = 8 * 1024 * 1024;
 const LIVE_LOG_BUDGET_BYTES_PER_WORKSPACE: u64 = 64 * 1024 * 1024;
 const PERSISTED_LOG_TAIL_BYTES_SUCCESS: u64 = 256 * 1024;
 const PERSISTED_LOG_TAIL_BYTES_FAILURE: u64 = 1024 * 1024;
-const RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE: u64 = 500 * 1024;
-const RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE: u64 = 200 * 1024;
+const RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE: u64 = 500 * 1024 * 1024;
+const RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE: u64 = 200 * 1024 * 1024;
 const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
   {"type": "send", "to": "you", "intent": "request", "content": "I have finished the front implementation"},
   {"type": "send", "to": "architect", "intent": "confirm", "content": "The UI is ready. Please confirm the API contract before I continue."},
