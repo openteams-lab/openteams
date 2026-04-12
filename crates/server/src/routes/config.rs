@@ -123,6 +123,7 @@ impl Environment {
 pub struct UserSystemInfo {
     pub config: Config,
     pub analytics_user_id: String,
+    pub deploy_mode: String,
     pub login_status: LoginStatus,
     pub home_directory: String,
     #[serde(flatten)]
@@ -148,6 +149,7 @@ async fn get_user_system_info(
     let user_system_info = UserSystemInfo {
         config: config.clone(),
         analytics_user_id: deployment.user_id().to_string(),
+        deploy_mode: super::version::detect_deploy_mode().to_string(),
         login_status,
         home_directory: home_directory().to_string_lossy().to_string(),
         profiles: ExecutorConfigs::get_cached(),
@@ -188,6 +190,7 @@ async fn update_config(
             let mut config = deployment.config().write().await;
             *config = new_config.clone();
             drop(config);
+            deployment.set_analytics_enabled(new_config.analytics_enabled);
 
             // Track config events when fields transition from false → true and run side effects
             handle_config_events(&deployment, &old_config, &new_config).await;

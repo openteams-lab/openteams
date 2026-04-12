@@ -244,7 +244,7 @@ export type ProviderProfile = { provider: string, username: string | null, displ
 
 export type TagSearchParams = { search: string | null, };
 
-export type UserSystemInfo = { config: Config, analytics_user_id: string, login_status: LoginStatus, home_directory: string, environment: Environment, 
+export type UserSystemInfo = { config: Config, analytics_user_id: string, deploy_mode: string, login_status: LoginStatus, home_directory: string, environment: Environment, 
 /**
  * Capabilities supported per executor (e.g., { "CLAUDE_CODE": ["SESSION_FORK"] })
  */

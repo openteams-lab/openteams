@@ -170,8 +170,11 @@ pub async fn assign_skill_to_agent(
     let assignment =
         ChatAgentSkill::assign(&deployment.db().pool, &payload, Uuid::new_v4()).await?;
 
-    let analytics_projector =
-        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    let analytics_projector = AnalyticsProjector::new(
+        &deployment.db().pool,
+        deployment.analytics().as_ref(),
+        deployment.analytics_enabled(),
+    );
     analytics_projector
         .project_or_warn(DomainEvent::SkillAssigned {
             actor_user_id: deployment.user_id().to_string(),
@@ -191,8 +194,11 @@ pub async fn update_agent_skill(
 ) -> Result<ResponseJson<ApiResponse<ChatAgentSkill>>, ApiError> {
     let assignment = ChatAgentSkill::update(&deployment.db().pool, assignment_id, &payload).await?;
 
-    let analytics_projector =
-        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    let analytics_projector = AnalyticsProjector::new(
+        &deployment.db().pool,
+        deployment.analytics().as_ref(),
+        deployment.analytics_enabled(),
+    );
     if let Some(enabled) = payload.enabled {
         if enabled {
             analytics_projector
@@ -291,8 +297,11 @@ pub async fn install_registry_skill(
     .await
     .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
 
-    let analytics_projector =
-        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    let analytics_projector = AnalyticsProjector::new(
+        &deployment.db().pool,
+        deployment.analytics().as_ref(),
+        deployment.analytics_enabled(),
+    );
     analytics_projector
         .project_or_warn(DomainEvent::SkillInstalled {
             actor_user_id: deployment.user_id().to_string(),
@@ -382,8 +391,11 @@ pub async fn install_builtin_skill_api(
             .await
             .map_err(|e| ApiError::BadRequest(format!("Failed to install skill: {}", e)))?;
 
-    let analytics_projector =
-        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    let analytics_projector = AnalyticsProjector::new(
+        &deployment.db().pool,
+        deployment.analytics().as_ref(),
+        deployment.analytics_enabled(),
+    );
     analytics_projector
         .project_or_warn(DomainEvent::SkillInstalled {
             actor_user_id: deployment.user_id().to_string(),

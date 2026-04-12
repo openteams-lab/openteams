@@ -138,8 +138,11 @@ pub async fn create_message(
 
     if message.sender_type == ChatSenderType::User {
         let attachments = extract_attachments(&message.meta.0);
-        let analytics_projector =
-            AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+        let analytics_projector = AnalyticsProjector::new(
+            &deployment.db().pool,
+            deployment.analytics().as_ref(),
+            deployment.analytics_enabled(),
+        );
         analytics_projector
             .project_or_warn(DomainEvent::MessageSent {
                 session_id: session.id,
@@ -278,8 +281,11 @@ pub async fn upload_message_attachments(
     .await?;
 
     let attachments = extract_attachments(&message.meta.0);
-    let analytics_projector =
-        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    let analytics_projector = AnalyticsProjector::new(
+        &deployment.db().pool,
+        deployment.analytics().as_ref(),
+        deployment.analytics_enabled(),
+    );
     analytics_projector
         .project_or_warn(DomainEvent::MessageSent {
             session_id: session.id,

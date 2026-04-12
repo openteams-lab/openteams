@@ -24,6 +24,7 @@ interface UserSystemState {
   profiles: Record<string, ExecutorConfig> | null;
   capabilities: Record<string, BaseAgentCapability[]> | null;
   analyticsUserId: string | null;
+  deployMode: 'tauri' | 'npx' | 'unknown' | null;
   loginStatus: LoginStatus | null;
   homeDirectory: string | null;
 }
@@ -43,6 +44,7 @@ interface UserSystemContextType {
   profiles: Record<string, ExecutorConfig> | null;
   capabilities: Record<string, BaseAgentCapability[]> | null;
   analyticsUserId: string | null;
+  deployMode: 'tauri' | 'npx' | 'unknown' | null;
   loginStatus: LoginStatus | null;
   homeDirectory: string | null;
   setEnvironment: (env: Environment | null) => void;
@@ -76,6 +78,12 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
   const config = userSystemInfo?.config || null;
   const environment = userSystemInfo?.environment || null;
   const analyticsUserId = userSystemInfo?.analytics_user_id || null;
+  const deployMode =
+    userSystemInfo?.deploy_mode === 'tauri' ||
+    userSystemInfo?.deploy_mode === 'npx' ||
+    userSystemInfo?.deploy_mode === 'unknown'
+      ? userSystemInfo.deploy_mode
+      : null;
   const loginStatus = userSystemInfo?.login_status || null;
   const homeDirectory = userSystemInfo?.home_directory || null;
   const profiles =
@@ -190,6 +198,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
         profiles,
         capabilities,
         analyticsUserId,
+        deployMode,
         loginStatus,
         homeDirectory,
       },
@@ -198,6 +207,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
       profiles,
       capabilities,
       analyticsUserId,
+      deployMode,
       loginStatus,
       homeDirectory,
       updateConfig,
@@ -215,6 +225,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
       profiles,
       capabilities,
       analyticsUserId,
+      deployMode,
       loginStatus,
       homeDirectory,
       updateConfig,

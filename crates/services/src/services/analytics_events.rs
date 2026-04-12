@@ -393,14 +393,27 @@ impl AnalyticsProjection {
 pub struct AnalyticsProjector<'a> {
     pool: &'a SqlitePool,
     analytics: Option<&'a AnalyticsService>,
+    capture_enabled: bool,
 }
 
 impl<'a> AnalyticsProjector<'a> {
-    pub fn new(pool: &'a SqlitePool, analytics: Option<&'a AnalyticsService>) -> Self {
-        Self { pool, analytics }
+    pub fn new(
+        pool: &'a SqlitePool,
+        analytics: Option<&'a AnalyticsService>,
+        capture_enabled: bool,
+    ) -> Self {
+        Self {
+            pool,
+            analytics,
+            capture_enabled,
+        }
     }
 
-    pub async fn project(&self, event: DomainEvent) -> Result<AnalyticsEvent, sqlx::Error> {
+    pub async fn project(&self, event: DomainEvent) -> Result<Option<AnalyticsEvent>, sqlx::Error> {
+        if !self.capture_enabled {
+            return Ok(None);
+        }
+
         let projection = event.into_projection();
         let ingest_path = projection.ingest_path;
         let analytics_event =
@@ -408,7 +421,7 @@ impl<'a> AnalyticsProjector<'a> {
                 .await?;
 
         forward_analytics_record_to_posthog(self.analytics, &analytics_event, ingest_path);
-        Ok(analytics_event)
+        Ok(Some(analytics_event))
     }
 
     pub async fn project_or_warn(&self, event: DomainEvent) {

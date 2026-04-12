@@ -11,6 +11,7 @@
 export type EventCategory = 'user_action' | 'system' | 'conversion';
 export type AnalyticsSource = 'frontend';
 export type AnalyticsPlatform = 'desktop' | 'mobile' | 'web' | 'unknown';
+export type AnalyticsRuntime = 'tauri' | 'npx' | 'unknown';
 
 type AnalyticsTransportMode = 'auto' | 'collect' | 'legacy';
 type PropertyValue = string | number | boolean;
@@ -85,6 +86,7 @@ const EVENT_DEFINITIONS = {
     version: 1,
     properties: {
       surface: enumProperty(['new_design']),
+      runtime: enumProperty(['tauri', 'npx', 'unknown']),
     },
   },
   preview_navigated: {
@@ -304,6 +306,7 @@ interface QueuedAnalyticsEvent {
 interface AnalyticsClientConfig {
   enabled?: boolean;
   userId?: string;
+  runtime?: AnalyticsRuntime;
 }
 
 interface TrackOptions {
@@ -320,6 +323,7 @@ const COLLECT_FALLBACK_STATUSES = new Set([404, 405, 410, 501]);
 class AnalyticsService {
   private readonly deviceId: string;
   private userId?: string;
+  private runtime: AnalyticsRuntime = 'unknown';
   private enabled = false;
   private hasConfigured = false;
   private queue: QueuedAnalyticsEvent[] = [];
@@ -347,6 +351,10 @@ class AnalyticsService {
 
     if (config.userId !== undefined) {
       this.userId = config.userId;
+    }
+
+    if (config.runtime !== undefined) {
+      this.runtime = config.runtime;
     }
 
     if (!this.enabled) {
@@ -415,8 +423,11 @@ class AnalyticsService {
     }
   }
 
-  trackUiNewAccessed() {
-    this.track('ui_new_accessed', { surface: 'new_design' });
+  trackUiNewAccessed(runtime: AnalyticsRuntime = this.runtime) {
+    this.track('ui_new_accessed', {
+      surface: 'new_design',
+      runtime,
+    });
   }
 
   trackSessionCreate(sessionId: string, titleLength: number) {
@@ -886,7 +897,12 @@ class AnalyticsService {
       return 'unknown';
     }
 
+    if ('__TAURI__' in window || '__TAURI_INTERNALS__' in window) {
+      return 'desktop';
+    }
+
     const ua = navigator.userAgent;
+    if (/tauri/i.test(ua)) return 'desktop';
     if (/electron/i.test(ua)) return 'desktop';
     if (/mobile/i.test(ua)) return 'mobile';
     return 'web';

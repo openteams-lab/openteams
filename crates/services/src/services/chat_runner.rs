@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
     sync::{
         Arc,
-        atomic::{AtomicU8, Ordering},
+        atomic::{AtomicBool, AtomicU8, Ordering},
     },
 };
 
@@ -406,6 +406,7 @@ impl RunCompletionStatus {
 pub struct ChatRunner {
     db: DBService,
     analytics: Option<AnalyticsService>,
+    analytics_enabled: Arc<AtomicBool>,
     streams: Arc<DashMap<Uuid, broadcast::Sender<ChatStreamEvent>>>,
     // Store per-run lifecycle controls, key = session_agent_id
     run_controls: Arc<DashMap<Uuid, RunLifecycleControl>>,
@@ -421,13 +422,18 @@ pub struct ChatRunner {
 
 impl ChatRunner {
     pub fn new(db: DBService) -> Self {
-        Self::with_analytics(db, None)
+        Self::with_analytics(db, None, Arc::new(AtomicBool::new(true)))
     }
 
-    pub fn with_analytics(db: DBService, analytics: Option<AnalyticsService>) -> Self {
+    pub fn with_analytics(
+        db: DBService,
+        analytics: Option<AnalyticsService>,
+        analytics_enabled: Arc<AtomicBool>,
+    ) -> Self {
         Self {
             db,
             analytics,
+            analytics_enabled,
             streams: Arc::new(DashMap::new()),
             run_controls: Arc::new(DashMap::new()),
             pending_messages: Arc::new(DashMap::new()),
@@ -438,7 +444,11 @@ impl ChatRunner {
     }
 
     fn analytics_projector(&self) -> AnalyticsProjector<'_> {
-        AnalyticsProjector::new(&self.db.pool, self.analytics.as_ref())
+        AnalyticsProjector::new(
+            &self.db.pool,
+            self.analytics.as_ref(),
+            self.analytics_enabled.load(Ordering::Relaxed),
+        )
     }
 
     pub async fn recover_orphaned_session_agents(&self) -> Result<usize, ChatRunnerError> {

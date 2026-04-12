@@ -211,6 +211,10 @@ pub async fn track_event(
     State(deployment): State<DeploymentImpl>,
     Json(req): Json<TrackEventRequest>,
 ) -> Result<Json<ApiResponse<String>>, (StatusCode, Json<ApiResponse<String>>)> {
+    if !deployment.analytics_enabled() {
+        return Ok(Json(ApiResponse::success("Analytics disabled".to_string())));
+    }
+
     let pool = &deployment.db().pool;
 
     // Parse event category
@@ -263,6 +267,10 @@ pub async fn track_events_batch(
     State(deployment): State<DeploymentImpl>,
     Json(req): Json<TrackEventsBatchRequest>,
 ) -> Result<Json<ApiResponse<String>>, (StatusCode, Json<ApiResponse<String>>)> {
+    if !deployment.analytics_enabled() {
+        return Ok(Json(ApiResponse::success("Analytics disabled".to_string())));
+    }
+
     let pool = &deployment.db().pool;
 
     let mut events_to_create = Vec::with_capacity(req.events.len());

@@ -50,8 +50,11 @@ pub async fn create_session(
 ) -> Result<ResponseJson<ApiResponse<ChatSession>>, ApiError> {
     let session = ChatSession::create(&deployment.db().pool, &payload, Uuid::new_v4()).await?;
 
-    let analytics_projector =
-        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    let analytics_projector = AnalyticsProjector::new(
+        &deployment.db().pool,
+        deployment.analytics().as_ref(),
+        deployment.analytics_enabled(),
+    );
     let title_length = payload.title.as_ref().map(|t| t.len()).unwrap_or(0);
     analytics_projector
         .project_or_warn(DomainEvent::SessionCreated {
@@ -93,8 +96,11 @@ pub async fn delete_session(
         return Err(ApiError::Database(sqlx::Error::RowNotFound));
     }
 
-    let analytics_projector =
-        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    let analytics_projector = AnalyticsProjector::new(
+        &deployment.db().pool,
+        deployment.analytics().as_ref(),
+        deployment.analytics_enabled(),
+    );
     analytics_projector
         .project_or_warn(DomainEvent::SessionDeleted {
             session_id: session.id,
@@ -388,8 +394,11 @@ pub async fn create_session_agent(
     )
     .await?;
 
-    let analytics_projector =
-        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    let analytics_projector = AnalyticsProjector::new(
+        &deployment.db().pool,
+        deployment.analytics().as_ref(),
+        deployment.analytics_enabled(),
+    );
     analytics_projector
         .project_or_warn(DomainEvent::AgentAdded {
             session_id: session.id,
@@ -533,8 +542,11 @@ pub async fn archive_session(
     .await?;
 
     if let Some(stats) = session_stats {
-        let analytics_projector =
-            AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+        let analytics_projector = AnalyticsProjector::new(
+            &deployment.db().pool,
+            deployment.analytics().as_ref(),
+            deployment.analytics_enabled(),
+        );
         let duration_seconds = (chrono::Utc::now() - session.created_at).num_seconds();
         analytics_projector
             .project_or_warn(DomainEvent::SessionArchived {
@@ -574,8 +586,11 @@ pub async fn restore_session(
     )
     .await?;
 
-    let analytics_projector =
-        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    let analytics_projector = AnalyticsProjector::new(
+        &deployment.db().pool,
+        deployment.analytics().as_ref(),
+        deployment.analytics_enabled(),
+    );
     analytics_projector
         .project_or_warn(DomainEvent::SessionRestored {
             session_id: session.id,

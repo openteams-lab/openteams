@@ -930,6 +930,8 @@ jobs:
     name: Build desktop ${{ matrix.platform }}
     runs-on: ${{ matrix.platform == 'macos' && 'macos-latest' || matrix.platform == 'windows' && 'windows-latest' || 'ubuntu-22.04' }}
     env:
+      POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+      POSTHOG_API_ENDPOINT: ${{ secrets.POSTHOG_API_ENDPOINT }}
       VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
       VITE_POSTHOG_API_ENDPOINT: ${{ secrets.POSTHOG_API_ENDPOINT }}
     strategy:
@@ -966,7 +968,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for key in VITE_POSTHOG_API_KEY VITE_POSTHOG_API_ENDPOINT; do
+          for key in POSTHOG_API_KEY POSTHOG_API_ENDPOINT VITE_POSTHOG_API_KEY VITE_POSTHOG_API_ENDPOINT; do
             if [ -z "${!key:-}" ]; then
               echo "::error::Missing GitHub Secret-backed desktop build env: $key"
               exit 1
