@@ -74,6 +74,16 @@ pub struct CreateChatRun {
     pub meta_path: Option<String>,
 }
 
+#[derive(Debug)]
+pub struct MarkArtifactStubbedUpdate {
+    pub input_path: Option<String>,
+    pub output_path: Option<String>,
+    pub meta_path: Option<String>,
+    pub pruned_at: DateTime<Utc>,
+    pub prune_reason: Option<String>,
+    pub retention_summary_json: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct ChatRunRetentionInfo {
     pub run_id: Uuid,
@@ -418,12 +428,7 @@ impl ChatRun {
     pub async fn mark_artifact_stubbed(
         pool: &SqlitePool,
         id: Uuid,
-        input_path: Option<String>,
-        output_path: Option<String>,
-        meta_path: Option<String>,
-        pruned_at: DateTime<Utc>,
-        prune_reason: Option<String>,
-        retention_summary_json: Option<String>,
+        update: MarkArtifactStubbedUpdate,
     ) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"UPDATE chat_runs
@@ -436,12 +441,12 @@ impl ChatRun {
                    retention_summary_json = COALESCE($7, retention_summary_json)
                WHERE id = $1"#,
             id,
-            input_path,
-            output_path,
-            meta_path,
-            pruned_at,
-            prune_reason,
-            retention_summary_json,
+            update.input_path,
+            update.output_path,
+            update.meta_path,
+            update.pruned_at,
+            update.prune_reason,
+            update.retention_summary_json,
         )
         .execute(pool)
         .await?;

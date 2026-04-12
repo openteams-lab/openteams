@@ -1463,12 +1463,14 @@ impl ChatRunner {
         ChatRun::mark_artifact_stubbed(
             &self.db.pool,
             run.id,
-            None,
-            None,
-            None,
-            pruned_at,
-            Some(prune_reason.to_string()),
-            retention_summary_json,
+            db::models::chat_run::MarkArtifactStubbedUpdate {
+                input_path: None,
+                output_path: None,
+                meta_path: None,
+                pruned_at,
+                prune_reason: Some(prune_reason.to_string()),
+                retention_summary_json,
+            },
         )
         .await?;
 
