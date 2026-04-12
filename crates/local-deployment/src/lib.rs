@@ -142,6 +142,10 @@ impl Deployment for LocalDeployment {
                 "Recovered orphaned chat session agents during startup"
             );
         }
+        chat_runner
+            .run_startup_retention_janitor()
+            .await
+            .map_err(|err| DeploymentError::Other(err.into()))?;
 
         let oauth_credentials = Arc::new(OAuthCredentials::new(credentials_path()));
         if let Err(e) = oauth_credentials.load().await {

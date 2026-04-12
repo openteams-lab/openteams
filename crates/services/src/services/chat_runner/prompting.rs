@@ -54,6 +54,17 @@ impl ChatRunner {
         Self::workspace_runs_dir(workspace_path, session_id).join(RUN_RECORDS_DIR_NAME)
     }
 
+    pub(super) fn workspace_live_spool_dir(workspace_path: &Path) -> PathBuf {
+        workspace_path
+            .join(OPENTEAMS_WORKSPACE_DIR)
+            .join("tmp")
+            .join(RUNS_DIR_NAME)
+    }
+
+    pub(super) fn workspace_live_spool_path(workspace_path: &Path, run_id: Uuid) -> PathBuf {
+        Self::workspace_live_spool_dir(workspace_path).join(format!("{run_id}.log"))
+    }
+
     pub(super) fn run_records_prefix(session_agent_id: Uuid, run_index: i64) -> String {
         format!("session_agent_{session_agent_id}_run_{run_index:04}")
     }
@@ -1665,7 +1676,19 @@ impl ChatRunner {
         match Self::parse_agent_protocol_messages_from_json(&normalized_json) {
             Ok(messages) => Ok(messages),
             Err(err) if err.code != ChatProtocolNoticeCode::InvalidJson => Err(err),
-            Err(_) => Err(strict_error),
+            Err(_) => {
+                let repaired_json =
+                    Self::repair_relaxed_protocol_json_string_quotes(&normalized_json);
+                if repaired_json == normalized_json {
+                    return Err(strict_error);
+                }
+
+                match Self::parse_agent_protocol_messages_from_json(&repaired_json) {
+                    Ok(messages) => Ok(messages),
+                    Err(err) if err.code != ChatProtocolNoticeCode::InvalidJson => Err(err),
+                    Err(_) => Err(strict_error),
+                }
+            }
         }
     }
 
@@ -1871,6 +1894,156 @@ impl ChatRunner {
         normalized
     }
 
+    pub(super) fn repair_relaxed_protocol_json_string_quotes(content: &str) -> String {
+        #[derive(Clone, Copy)]
+        enum Scope {
+            Array,
+            Object { phase: ObjectPhase },
+        }
+
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum ObjectPhase {
+            ExpectKeyOrEnd,
+            AfterKey,
+            ExpectValue,
+            AfterValue,
+        }
+
+        #[derive(Clone, Copy)]
+        enum StringRole {
+            Key,
+            Value,
+        }
+
+        let mut repaired = String::with_capacity(content.len() + 16);
+        let mut scopes = Vec::new();
+        let mut index = 0usize;
+        let mut in_string: Option<StringRole> = None;
+        let mut escaped = false;
+
+        while index < content.len() {
+            let Some(ch) = content[index..].chars().next() else {
+                break;
+            };
+            let next = index + ch.len_utf8();
+
+            if let Some(role) = in_string {
+                if escaped {
+                    repaired.push(ch);
+                    escaped = false;
+                    index = next;
+                    continue;
+                }
+
+                match ch {
+                    '\\' => {
+                        repaired.push(ch);
+                        escaped = true;
+                    }
+                    '"' => {
+                        let next_non_ws = Self::next_non_whitespace_char(content, next);
+                        let closes_string = match role {
+                            StringRole::Key => next_non_ws == Some(':'),
+                            StringRole::Value => {
+                                matches!(next_non_ws, Some(',' | '}' | ']'))
+                                    || next_non_ws.is_none()
+                            }
+                        };
+
+                        if closes_string {
+                            repaired.push(ch);
+                            if let Some(Scope::Object { phase }) = scopes.last_mut() {
+                                match role {
+                                    StringRole::Key if *phase == ObjectPhase::ExpectKeyOrEnd => {
+                                        *phase = ObjectPhase::AfterKey;
+                                    }
+                                    StringRole::Value if *phase == ObjectPhase::ExpectValue => {
+                                        *phase = ObjectPhase::AfterValue;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            in_string = None;
+                        } else {
+                            repaired.push('\\');
+                            repaired.push('"');
+                        }
+                    }
+                    _ => repaired.push(ch),
+                }
+
+                index = next;
+                continue;
+            }
+
+            match ch {
+                '{' => {
+                    if let Some(Scope::Object { phase }) = scopes.last_mut()
+                        && *phase == ObjectPhase::ExpectValue
+                    {
+                        *phase = ObjectPhase::AfterValue;
+                    }
+                    repaired.push(ch);
+                    scopes.push(Scope::Object {
+                        phase: ObjectPhase::ExpectKeyOrEnd,
+                    });
+                }
+                '[' => {
+                    if let Some(Scope::Object { phase }) = scopes.last_mut()
+                        && *phase == ObjectPhase::ExpectValue
+                    {
+                        *phase = ObjectPhase::AfterValue;
+                    }
+                    repaired.push(ch);
+                    scopes.push(Scope::Array);
+                }
+                '}' | ']' => {
+                    repaired.push(ch);
+                    scopes.pop();
+                }
+                '"' => {
+                    let role = match scopes.last() {
+                        Some(Scope::Object {
+                            phase: ObjectPhase::ExpectKeyOrEnd,
+                        }) => StringRole::Key,
+                        _ => StringRole::Value,
+                    };
+                    repaired.push(ch);
+                    in_string = Some(role);
+                }
+                ':' => {
+                    repaired.push(ch);
+                    if let Some(Scope::Object { phase }) = scopes.last_mut()
+                        && *phase == ObjectPhase::AfterKey
+                    {
+                        *phase = ObjectPhase::ExpectValue;
+                    }
+                }
+                ',' => {
+                    repaired.push(ch);
+                    if let Some(Scope::Object { phase }) = scopes.last_mut()
+                        && *phase == ObjectPhase::AfterValue
+                    {
+                        *phase = ObjectPhase::ExpectKeyOrEnd;
+                    }
+                }
+                _ => {
+                    repaired.push(ch);
+                    if !ch.is_whitespace()
+                        && let Some(Scope::Object { phase }) = scopes.last_mut()
+                        && *phase == ObjectPhase::ExpectValue
+                    {
+                        *phase = ObjectPhase::AfterValue;
+                    }
+                }
+            }
+
+            index = next;
+        }
+
+        repaired
+    }
+
     pub(super) fn find_json_string_end(content: &str, start: usize) -> Option<usize> {
         let mut escaped = false;
         let mut index = start + 1;
@@ -1909,6 +2082,11 @@ impl ChatRunner {
             index += ch.len_utf8();
         }
         index
+    }
+
+    pub(super) fn next_non_whitespace_char(content: &str, start: usize) -> Option<char> {
+        let index = Self::skip_json_whitespace(content, start);
+        content[index..].chars().next()
     }
 
     pub(super) fn canonical_protocol_message_type_name(value: &str) -> Option<&'static str> {

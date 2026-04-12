@@ -1,3 +1,8 @@
+use tokio::{
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom},
+    task::JoinHandle,
+};
+
 use super::*;
 
 pub(super) struct ExitWatcherArgs {
@@ -7,6 +12,317 @@ pub(super) struct ExitWatcherArgs {
     pub(super) exit_signal: Option<ExecutorExitSignal>,
     pub(super) msg_store: Arc<MsgStore>,
     pub(super) completion_status: Arc<AtomicU8>,
+    pub(super) log_forwarders: RunLogForwarders,
+}
+
+pub(super) struct RunLogForwarders {
+    pub(super) stdout: JoinHandle<()>,
+    pub(super) stderr: JoinHandle<()>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct RunLogSpoolSnapshot {
+    pub(super) total_bytes: u64,
+    pub(super) persisted_bytes: u64,
+    pub(super) dropped_bytes: u64,
+    pub(super) log_truncated: bool,
+    pub(super) log_capture_degraded: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct RunLogPersistResult {
+    pub(super) snapshot: RunLogSpoolSnapshot,
+    pub(super) log_path: PathBuf,
+    pub(super) log_state: ChatRunLogState,
+    pub(super) persist_error: Option<String>,
+}
+
+pub(super) struct RunLogSpool {
+    path: PathBuf,
+    file: Option<fs::File>,
+    run_id: Uuid,
+    db_pool: sqlx::SqlitePool,
+    workspace_key: String,
+    workspace_live_log_bytes: Arc<DashMap<String, u64>>,
+    current_bytes: u64,
+    total_bytes: u64,
+    dropped_bytes: u64,
+    log_truncated: bool,
+    log_capture_degraded: bool,
+    last_synced_log_truncated: bool,
+    last_synced_log_capture_degraded: bool,
+}
+
+impl RunLogSpool {
+    pub(super) async fn new(
+        path: PathBuf,
+        run_id: Uuid,
+        db_pool: sqlx::SqlitePool,
+        workspace_key: String,
+        workspace_live_log_bytes: Arc<DashMap<String, u64>>,
+    ) -> Result<Self, std::io::Error> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+
+        let file = fs::File::create(&path).await?;
+        Ok(Self {
+            path,
+            file: Some(file),
+            run_id,
+            db_pool,
+            workspace_key,
+            workspace_live_log_bytes,
+            current_bytes: 0,
+            total_bytes: 0,
+            dropped_bytes: 0,
+            log_truncated: false,
+            log_capture_degraded: false,
+            last_synced_log_truncated: false,
+            last_synced_log_capture_degraded: false,
+        })
+    }
+
+    fn workspace_total_without_self(&self) -> u64 {
+        self.workspace_live_log_bytes
+            .get(&self.workspace_key)
+            .map(|entry| entry.value().saturating_sub(self.current_bytes))
+            .unwrap_or(0)
+    }
+
+    fn effective_cap(&self) -> u64 {
+        let workspace_available =
+            LIVE_LOG_BUDGET_BYTES_PER_WORKSPACE.saturating_sub(self.workspace_total_without_self());
+        LIVE_LOG_MAX_BYTES_PER_RUN.min(workspace_available)
+    }
+
+    fn update_workspace_bytes(&self, new_current_bytes: u64) {
+        let delta_positive = new_current_bytes.saturating_sub(self.current_bytes);
+        let delta_negative = self.current_bytes.saturating_sub(new_current_bytes);
+
+        let mut entry = self
+            .workspace_live_log_bytes
+            .entry(self.workspace_key.clone())
+            .or_insert(0);
+        *entry = entry
+            .saturating_add(delta_positive)
+            .saturating_sub(delta_negative);
+    }
+
+    async fn read_tail_bytes(&mut self, bytes_to_keep: u64) -> Result<Vec<u8>, std::io::Error> {
+        let Some(file) = self.file.as_mut() else {
+            return Ok(Vec::new());
+        };
+
+        if bytes_to_keep == 0 || self.current_bytes == 0 {
+            return Ok(Vec::new());
+        }
+
+        let start = self.current_bytes.saturating_sub(bytes_to_keep);
+        file.seek(SeekFrom::Start(start)).await?;
+        let mut buffer = vec![0; bytes_to_keep as usize];
+        file.read_exact(&mut buffer).await?;
+        Ok(buffer)
+    }
+
+    async fn rewrite_with_bytes(&mut self, bytes: &[u8]) -> Result<(), std::io::Error> {
+        {
+            let Some(file) = self.file.as_mut() else {
+                return Ok(());
+            };
+
+            file.set_len(0).await?;
+            file.seek(SeekFrom::Start(0)).await?;
+            if !bytes.is_empty() {
+                file.write_all(bytes).await?;
+            }
+            file.flush().await?;
+            file.seek(SeekFrom::End(0)).await?;
+        }
+
+        self.update_workspace_bytes(bytes.len() as u64);
+        self.current_bytes = bytes.len() as u64;
+        Ok(())
+    }
+
+    async fn sync_live_retention_flags_if_needed(&mut self) {
+        if self.log_truncated == self.last_synced_log_truncated
+            && self.log_capture_degraded == self.last_synced_log_capture_degraded
+        {
+            return;
+        }
+
+        match ChatRun::update_live_retention_flags(
+            &self.db_pool,
+            self.run_id,
+            self.log_truncated,
+            self.log_capture_degraded,
+        )
+        .await
+        {
+            Ok(()) => {
+                self.last_synced_log_truncated = self.log_truncated;
+                self.last_synced_log_capture_degraded = self.log_capture_degraded;
+            }
+            Err(err) => {
+                tracing::warn!(
+                    run_id = %self.run_id,
+                    error = %err,
+                    "failed to sync live retention flags"
+                );
+            }
+        }
+    }
+
+    pub(super) async fn write_text(&mut self, text: &str) -> Result<(), std::io::Error> {
+        let incoming = text.as_bytes();
+        if incoming.is_empty() {
+            return Ok(());
+        }
+
+        self.total_bytes = self.total_bytes.saturating_add(incoming.len() as u64);
+
+        let cap = self.effective_cap();
+        if cap == 0 {
+            self.dropped_bytes = self.dropped_bytes.saturating_add(incoming.len() as u64);
+            self.log_truncated = true;
+            self.log_capture_degraded = true;
+            self.rewrite_with_bytes(&[]).await?;
+            self.sync_live_retention_flags_if_needed().await;
+            return Ok(());
+        }
+
+        if cap < LIVE_LOG_MAX_BYTES_PER_RUN {
+            self.log_capture_degraded = true;
+        }
+
+        if (incoming.len() as u64) >= cap {
+            self.dropped_bytes = self
+                .dropped_bytes
+                .saturating_add(self.current_bytes)
+                .saturating_add(incoming.len() as u64 - cap);
+            self.log_truncated = true;
+            let start = incoming.len() - cap as usize;
+            self.rewrite_with_bytes(&incoming[start..]).await?;
+            self.sync_live_retention_flags_if_needed().await;
+            return Ok(());
+        }
+
+        let next_size = self.current_bytes.saturating_add(incoming.len() as u64);
+        if next_size <= cap {
+            if let Some(file) = self.file.as_mut() {
+                file.seek(SeekFrom::End(0)).await?;
+                file.write_all(incoming).await?;
+                file.flush().await?;
+                self.update_workspace_bytes(next_size);
+                self.current_bytes = next_size;
+            }
+            self.sync_live_retention_flags_if_needed().await;
+            return Ok(());
+        }
+
+        let bytes_to_keep = cap.saturating_sub(incoming.len() as u64);
+        let mut retained = self.read_tail_bytes(bytes_to_keep).await?;
+        retained.extend_from_slice(incoming);
+        self.dropped_bytes = self
+            .dropped_bytes
+            .saturating_add(self.current_bytes.saturating_sub(bytes_to_keep));
+        self.log_truncated = true;
+        self.rewrite_with_bytes(&retained).await?;
+        self.sync_live_retention_flags_if_needed().await;
+        Ok(())
+    }
+
+    pub(super) async fn persist_tail_to(
+        &mut self,
+        tail_path: &Path,
+        tail_limit: u64,
+    ) -> RunLogPersistResult {
+        let persist_error = if let Some(file) = self.file.as_mut() {
+            file.flush().await.err().map(|err| err.to_string())
+        } else {
+            Some("live spool file missing before tail persistence".to_string())
+        };
+
+        let persisted = if persist_error.is_some() {
+            Vec::new()
+        } else if tail_limit == 0 {
+            Vec::new()
+        } else {
+            let keep = self.current_bytes.min(tail_limit);
+            match self.read_tail_bytes(keep).await {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    return self.release_to_live_fallback(Some(err.to_string())).await;
+                }
+            }
+        };
+
+        if let Some(err) = persist_error {
+            return self.release_to_live_fallback(Some(err)).await;
+        }
+
+        let snapshot = RunLogSpoolSnapshot {
+            total_bytes: self.total_bytes,
+            persisted_bytes: persisted.len() as u64,
+            dropped_bytes: self.dropped_bytes,
+            log_truncated: self.log_truncated,
+            log_capture_degraded: self.log_capture_degraded,
+        };
+
+        self.file = None;
+        self.update_workspace_bytes(0);
+        self.current_bytes = 0;
+
+        let persist_result = async {
+            if let Some(parent) = tail_path.parent() {
+                fs::create_dir_all(parent).await?;
+            }
+            fs::write(tail_path, &persisted).await?;
+            let _ = fs::remove_file(&self.path).await;
+            Ok::<(), std::io::Error>(())
+        }
+        .await;
+
+        match persist_result {
+            Ok(()) => RunLogPersistResult {
+                snapshot,
+                log_path: tail_path.to_path_buf(),
+                log_state: ChatRunLogState::Tail,
+                persist_error: None,
+            },
+            Err(err) => RunLogPersistResult {
+                snapshot,
+                log_path: self.path.clone(),
+                log_state: ChatRunLogState::Live,
+                persist_error: Some(err.to_string()),
+            },
+        }
+    }
+
+    async fn release_to_live_fallback(
+        &mut self,
+        persist_error: Option<String>,
+    ) -> RunLogPersistResult {
+        let snapshot = RunLogSpoolSnapshot {
+            total_bytes: self.total_bytes,
+            persisted_bytes: self.current_bytes,
+            dropped_bytes: self.dropped_bytes,
+            log_truncated: self.log_truncated,
+            log_capture_degraded: self.log_capture_degraded,
+        };
+
+        self.file = None;
+        self.update_workspace_bytes(0);
+        self.current_bytes = 0;
+
+        RunLogPersistResult {
+            snapshot,
+            log_path: self.path.clone(),
+            log_state: ChatRunLogState::Live,
+            persist_error,
+        }
+    }
 }
 
 impl ChatRunner {
@@ -35,8 +351,8 @@ impl ChatRunner {
         &self,
         child: &mut command_group::AsyncGroupChild,
         msg_store: Arc<MsgStore>,
-        raw_log_file: Arc<Mutex<fs::File>>,
-    ) {
+        raw_log_spool: Arc<Mutex<RunLogSpool>>,
+    ) -> RunLogForwarders {
         let stdout = child
             .inner()
             .stdout
@@ -49,8 +365,8 @@ impl ChatRunner {
             .expect("chat runner missing stderr");
 
         let stdout_store = msg_store.clone();
-        let stdout_log = raw_log_file.clone();
-        tokio::spawn(async move {
+        let stdout_log = raw_log_spool.clone();
+        let stdout = tokio::spawn(async move {
             tracing::debug!("[chat_runner] Starting stdout forwarder");
             let mut stream = ReaderStream::new(stdout);
             let mut decoder = Utf8LossyDecoder::new();
@@ -60,8 +376,8 @@ impl ChatRunner {
                         let text = decoder.decode_chunk(&bytes);
                         if !text.is_empty() {
                             stdout_store.push(LogMsg::Stdout(text.clone()));
-                            let mut file = stdout_log.lock().await;
-                            let _ = file.write_all(text.as_bytes()).await;
+                            let mut spool = stdout_log.lock().await;
+                            let _ = spool.write_text(&text).await;
                         }
                     }
                     Err(err) => {
@@ -74,15 +390,15 @@ impl ChatRunner {
             let tail = decoder.finish();
             if !tail.is_empty() {
                 stdout_store.push(LogMsg::Stdout(tail.clone()));
-                let mut file = stdout_log.lock().await;
-                let _ = file.write_all(tail.as_bytes()).await;
+                let mut spool = stdout_log.lock().await;
+                let _ = spool.write_text(&tail).await;
             }
             tracing::debug!("[chat_runner] stdout forwarder ended");
         });
 
         let stderr_store = msg_store.clone();
-        let stderr_log = raw_log_file.clone();
-        tokio::spawn(async move {
+        let stderr_log = raw_log_spool.clone();
+        let stderr = tokio::spawn(async move {
             tracing::debug!("[chat_runner] Starting stderr forwarder");
             let mut stream = ReaderStream::new(stderr);
             let mut decoder = Utf8LossyDecoder::new();
@@ -96,8 +412,8 @@ impl ChatRunner {
                                 "[chat_runner] Received stderr chunk"
                             );
                             stderr_store.push(LogMsg::Stderr(text.clone()));
-                            let mut file = stderr_log.lock().await;
-                            let _ = file.write_all(text.as_bytes()).await;
+                            let mut spool = stderr_log.lock().await;
+                            let _ = spool.write_text(&text).await;
                         }
                     }
                     Err(err) => {
@@ -114,11 +430,13 @@ impl ChatRunner {
                     "[chat_runner] stderr forwarder ending with tail"
                 );
                 stderr_store.push(LogMsg::Stderr(tail.clone()));
-                let mut file = stderr_log.lock().await;
-                let _ = file.write_all(tail.as_bytes()).await;
+                let mut spool = stderr_log.lock().await;
+                let _ = spool.write_text(&tail).await;
             }
             tracing::debug!("[chat_runner] stderr forwarder ended");
         });
+
+        RunLogForwarders { stdout, stderr }
     }
 
     pub(super) fn parse_token_usage_from_stdout_line(line: &str) -> Option<TokenUsageInfo> {
@@ -360,8 +678,10 @@ impl ChatRunner {
         run_id: Uuid,
         output_path: PathBuf,
         meta_path: PathBuf,
-        _workspace_path: PathBuf,
+        workspace_path: PathBuf,
         run_dir: PathBuf,
+        tail_log_path: PathBuf,
+        raw_log_spool: Arc<Mutex<RunLogSpool>>,
         completion_status: Arc<AtomicU8>,
         chain_depth: u32,
         context_compacted: bool,
@@ -565,17 +885,6 @@ impl ChatRunner {
                         let finished_at = Utc::now();
                         let duration_ms = (finished_at - run_started_at).num_milliseconds().max(0);
 
-                        let mut meta = serde_json::json!({
-                            "run_id": run_id,
-                            "session_id": session_id,
-                            "session_agent_id": session_agent_id,
-                            "agent_id": agent_id,
-                            "agent_session_id": agent_session_id,
-                            "agent_message_id": agent_message_id,
-                            "finished_at": finished_at.to_rfc3339(),
-                            "chain_depth": chain_depth + 1,
-                        });
-
                         // If the runner did not emit token usage, estimate it from the prompt and final output.
                         let token_usage = if let Some(ref usage) = last_token_usage {
                             usage.clone()
@@ -598,6 +907,46 @@ impl ChatRunner {
                                 is_estimated: true,
                             }
                         };
+
+                        let tail_limit = if matches!(completion_status, RunCompletionStatus::Failed)
+                        {
+                            PERSISTED_LOG_TAIL_BYTES_FAILURE
+                        } else {
+                            PERSISTED_LOG_TAIL_BYTES_SUCCESS
+                        };
+                        let spool_persist = {
+                            let mut spool = raw_log_spool.lock().await;
+                            spool.persist_tail_to(&tail_log_path, tail_limit).await
+                        };
+                        if let Some(ref err) = spool_persist.persist_error {
+                            tracing::warn!(
+                                session_id = %session_id,
+                                run_id = %run_id,
+                                error = %err,
+                                fallback_log_path = %spool_persist.log_path.display(),
+                                "failed to persist raw tail log; keeping live spool path"
+                            );
+                        }
+                        let spool_snapshot = spool_persist.snapshot.clone();
+                        let final_log_state = spool_persist.log_state.clone();
+                        let final_log_path = spool_persist.log_path.clone();
+
+                        let mut meta = serde_json::json!({
+                            "run_id": run_id,
+                            "session_id": session_id,
+                            "session_agent_id": session_agent_id,
+                            "agent_id": agent_id,
+                            "agent_session_id": agent_session_id,
+                            "agent_message_id": agent_message_id,
+                            "finished_at": finished_at.to_rfc3339(),
+                            "chain_depth": chain_depth + 1,
+                            "log_state": final_log_state,
+                            "log_bytes_total": spool_snapshot.total_bytes,
+                            "log_bytes_persisted": spool_snapshot.persisted_bytes,
+                            "live_bytes_dropped": spool_snapshot.dropped_bytes,
+                            "log_truncated": spool_snapshot.log_truncated,
+                            "log_capture_degraded": spool_snapshot.log_capture_degraded,
+                        });
 
                         meta["token_usage"] = serde_json::json!({
                             "total_tokens": token_usage.total_tokens,
@@ -642,9 +991,54 @@ impl ChatRunner {
                                 "split_file_path": warning.split_file_path,
                             });
                         }
+                        if let Some(ref err) = spool_persist.persist_error {
+                            meta["log_persist_error"] = serde_json::json!(err);
+                        }
 
                         let _ = fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap())
                             .await;
+
+                        let error_summary = if error_content.is_empty() {
+                            None
+                        } else {
+                            Some(error_content.chars().take(200).collect::<String>())
+                        };
+                        let retention_summary = ChatRunRetentionSummary {
+                            kind: Some(if error_summary.is_some() {
+                                "failure_stub".to_string()
+                            } else {
+                                "success_stub".to_string()
+                            }),
+                            finished_at: Some(finished_at.to_rfc3339()),
+                            error_summary,
+                            error_type: error_type
+                                .as_ref()
+                                .map(|entry| Self::normalized_entry_error_name(Some(entry))),
+                            assistant_excerpt: if latest_assistant.is_empty() {
+                                None
+                            } else {
+                                Some(latest_assistant.chars().take(2048).collect())
+                            },
+                            total_tokens: Some(token_usage.total_tokens),
+                            log_bytes_total: Some(spool_snapshot.total_bytes),
+                            log_bytes_persisted: Some(spool_snapshot.persisted_bytes),
+                            live_bytes_dropped: Some(spool_snapshot.dropped_bytes),
+                            log_truncated: Some(spool_snapshot.log_truncated),
+                            log_capture_degraded: Some(spool_snapshot.log_capture_degraded),
+                            pruned_at: None,
+                            prune_reason: None,
+                        };
+                        let retention_summary_json = serde_json::to_string(&retention_summary).ok();
+                        let _ = ChatRun::update_after_run_completion(
+                            &db.pool,
+                            run_id,
+                            Some(final_log_path.to_string_lossy().to_string()),
+                            final_log_state,
+                            spool_snapshot.log_truncated,
+                            spool_snapshot.log_capture_degraded,
+                            retention_summary_json,
+                        )
+                        .await;
 
                         let error_content_opt = if error_content.is_empty() {
                             None
@@ -828,6 +1222,19 @@ impl ChatRunner {
                                 ChatMessage::update_meta(&db.pool, source_message_id, meta).await;
                         }
 
+                        if let Err(err) = runner
+                            .run_retention_janitor_for_workspace(&workspace_path)
+                            .await
+                        {
+                            tracing::warn!(
+                                session_id = %session_id,
+                                run_id = %run_id,
+                                workspace_path = %workspace_path.display(),
+                                error = %err,
+                                "workspace retention janitor failed"
+                            );
+                        }
+
                         // Process any pending messages in the queue for this agent
                         // Only process if the agent completed successfully (not failed/dead)
                         if final_state == ChatSessionAgentState::Idle {
@@ -859,11 +1266,419 @@ impl ChatRunner {
                 args.exit_signal,
                 args.msg_store,
                 args.completion_status,
+                args.log_forwarders,
                 session_agent_id,
             )
             .await;
             run_controls.remove(&session_agent_id);
         });
+    }
+
+    async fn wait_for_log_forwarders(log_forwarders: RunLogForwarders, msg_store: &MsgStore) {
+        if let Err(err) = log_forwarders.stdout.await {
+            msg_store.push(LogMsg::Stderr(format!(
+                "stdout forwarder join error: {err}"
+            )));
+        }
+
+        if let Err(err) = log_forwarders.stderr.await {
+            msg_store.push(LogMsg::Stderr(format!(
+                "stderr forwarder join error: {err}"
+            )));
+        }
+    }
+
+    fn janitor_lock_for_workspace(&self, workspace_key: &str) -> Arc<Mutex<()>> {
+        self.workspace_janitor_locks
+            .entry(workspace_key.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(())))
+            .clone()
+    }
+
+    fn run_belongs_to_workspace(run: &ChatRun, workspace_path: &Path) -> bool {
+        Path::new(&run.run_dir).starts_with(workspace_path)
+    }
+
+    async fn file_size_if_exists(path: &Path) -> u64 {
+        match fs::metadata(path).await {
+            Ok(metadata) => metadata.len(),
+            Err(_) => 0,
+        }
+    }
+
+    async fn dir_size(path: &Path) -> u64 {
+        let mut total = 0_u64;
+        let mut stack = vec![path.to_path_buf()];
+
+        while let Some(current) = stack.pop() {
+            let Ok(mut entries) = fs::read_dir(&current).await else {
+                continue;
+            };
+
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                let Ok(metadata) = entry.metadata().await else {
+                    continue;
+                };
+
+                if metadata.is_dir() {
+                    stack.push(entry.path());
+                } else {
+                    total = total.saturating_add(metadata.len());
+                }
+            }
+        }
+
+        total
+    }
+
+    fn parse_retention_summary(run: &ChatRun) -> Option<ChatRunRetentionSummary> {
+        run.retention_summary_json
+            .as_deref()
+            .and_then(|raw| serde_json::from_str(raw).ok())
+    }
+
+    async fn build_retention_summary_from_run(
+        run: &ChatRun,
+    ) -> Result<ChatRunRetentionSummary, ChatRunnerError> {
+        if let Some(summary) = Self::parse_retention_summary(run) {
+            return Ok(summary);
+        }
+
+        let meta_value = if let Some(meta_path) = run.meta_path.as_deref() {
+            match fs::read_to_string(meta_path).await {
+                Ok(content) => serde_json::from_str::<serde_json::Value>(&content).ok(),
+                Err(_) => None,
+            }
+        } else {
+            None
+        };
+
+        let output_content = if let Some(output_path) = run.output_path.as_deref() {
+            fs::read_to_string(output_path).await.ok()
+        } else {
+            None
+        };
+
+        let error_summary = meta_value
+            .as_ref()
+            .and_then(|meta| meta.get("error"))
+            .and_then(|error| error.get("summary"))
+            .and_then(|value| value.as_str())
+            .map(str::to_string);
+        let error_type = meta_value
+            .as_ref()
+            .and_then(|meta| meta.get("error"))
+            .and_then(|error| error.get("error_type"))
+            .and_then(|value| {
+                value
+                    .get("type")
+                    .and_then(|inner| inner.as_str())
+                    .or_else(|| value.as_str())
+            })
+            .map(str::to_string);
+        let total_tokens = meta_value
+            .as_ref()
+            .and_then(|meta| meta.get("token_usage"))
+            .and_then(|token_usage| token_usage.get("total_tokens"))
+            .and_then(|value| value.as_u64())
+            .and_then(|value| u32::try_from(value).ok());
+        let finished_at = meta_value
+            .as_ref()
+            .and_then(|meta| meta.get("finished_at"))
+            .and_then(|value| value.as_str())
+            .map(str::to_string);
+        let log_bytes_total = meta_value
+            .as_ref()
+            .and_then(|meta| meta.get("log_bytes_total"))
+            .and_then(|value| value.as_u64());
+        let log_bytes_persisted = meta_value
+            .as_ref()
+            .and_then(|meta| meta.get("log_bytes_persisted"))
+            .and_then(|value| value.as_u64());
+        let live_bytes_dropped = meta_value
+            .as_ref()
+            .and_then(|meta| meta.get("live_bytes_dropped"))
+            .and_then(|value| value.as_u64());
+        let log_truncated = meta_value
+            .as_ref()
+            .and_then(|meta| meta.get("log_truncated"))
+            .and_then(|value| value.as_bool())
+            .or(Some(run.log_truncated));
+        let log_capture_degraded = meta_value
+            .as_ref()
+            .and_then(|meta| meta.get("log_capture_degraded"))
+            .and_then(|value| value.as_bool())
+            .or(Some(run.log_capture_degraded));
+
+        Ok(ChatRunRetentionSummary {
+            kind: Some(if error_summary.is_some() {
+                "failure_stub".to_string()
+            } else {
+                "success_stub".to_string()
+            }),
+            finished_at,
+            error_summary,
+            error_type,
+            assistant_excerpt: output_content.map(|content| content.chars().take(2048).collect()),
+            total_tokens,
+            log_bytes_total,
+            log_bytes_persisted,
+            live_bytes_dropped,
+            log_truncated,
+            log_capture_degraded,
+            pruned_at: run.pruned_at.map(|value| value.to_rfc3339()),
+            prune_reason: run.prune_reason.clone(),
+        })
+    }
+
+    fn summary_indicates_failure(summary: &ChatRunRetentionSummary) -> bool {
+        matches!(summary.kind.as_deref(), Some("failure_stub")) || summary.error_summary.is_some()
+    }
+
+    async fn stub_run_artifacts(
+        &self,
+        run: &ChatRun,
+        prune_reason: &str,
+        pruned_at: chrono::DateTime<Utc>,
+    ) -> Result<u64, ChatRunnerError> {
+        let mut reclaimed = 0_u64;
+        let mut summary = Self::build_retention_summary_from_run(run).await?;
+        summary.pruned_at = Some(pruned_at.to_rfc3339());
+        summary.prune_reason = Some(prune_reason.to_string());
+        let retention_summary_json = Some(serde_json::to_string(&summary)?);
+
+        for path in [
+            run.input_path.as_deref(),
+            run.output_path.as_deref(),
+            run.meta_path.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            let file_path = Path::new(path);
+            reclaimed = reclaimed.saturating_add(Self::file_size_if_exists(file_path).await);
+            let _ = fs::remove_file(file_path).await;
+        }
+
+        ChatRun::mark_artifact_stubbed(
+            &self.db.pool,
+            run.id,
+            None,
+            None,
+            None,
+            pruned_at,
+            Some(prune_reason.to_string()),
+            retention_summary_json,
+        )
+        .await?;
+
+        Ok(reclaimed)
+    }
+
+    async fn cleanup_workspace_orphan_live_spools(
+        &self,
+        workspace_path: &Path,
+    ) -> Result<(), ChatRunnerError> {
+        let spool_dir = Self::workspace_live_spool_dir(workspace_path);
+        if fs::metadata(&spool_dir).await.is_err() {
+            return Ok(());
+        }
+
+        let mut entries = match fs::read_dir(&spool_dir).await {
+            Ok(entries) => entries,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(err) => return Err(err.into()),
+        };
+
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            let Ok(metadata) = entry.metadata().await else {
+                continue;
+            };
+
+            if metadata.is_dir() {
+                let _ = fs::remove_dir_all(&path).await;
+            } else {
+                let _ = fs::remove_file(&path).await;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn run_startup_retention_janitor(&self) -> Result<(), ChatRunnerError> {
+        let runs = ChatRun::list_all(&self.db.pool).await?;
+        let mut workspaces = HashSet::new();
+        for run in runs {
+            if let Some(path) = Path::new(&run.run_dir).ancestors().nth(5) {
+                workspaces.insert(path.to_path_buf());
+            }
+        }
+
+        tracing::debug!(
+            workspace_count = workspaces.len(),
+            "Running startup retention janitor for workspaces with existing runs"
+        );
+
+        for workspace in workspaces {
+            self.cleanup_workspace_orphan_live_spools(&workspace)
+                .await?;
+            self.run_retention_janitor_for_workspace(&workspace).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn run_retention_janitor_for_workspace(
+        &self,
+        workspace_path: &Path,
+    ) -> Result<(), ChatRunnerError> {
+        let workspace_key = workspace_path.to_string_lossy().to_string();
+        let lock = self.janitor_lock_for_workspace(&workspace_key);
+        let _guard = lock.lock().await;
+
+        let all_runs = ChatRun::list_all(&self.db.pool).await?;
+        let mut runs: Vec<ChatRun> = all_runs
+            .into_iter()
+            .filter(|run| Self::run_belongs_to_workspace(run, workspace_path))
+            .collect();
+
+        tracing::debug!(
+            workspace_path = %workspace_path.display(),
+            run_count = runs.len(),
+            "Running retention janitor for workspace"
+        );
+
+        if runs.is_empty() {
+            return Ok(());
+        }
+
+        let mut unique_dirs = HashSet::new();
+        let mut total_size = 0_u64;
+        for run in &runs {
+            if unique_dirs.insert(run.run_dir.clone()) {
+                total_size =
+                    total_size.saturating_add(Self::dir_size(Path::new(&run.run_dir)).await);
+            }
+        }
+
+        tracing::debug!(
+            workspace_path = %workspace_path.display(),
+            total_size_bytes = total_size,
+            "Calculated total size of runs for workspace"
+        );
+
+        if total_size <= RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE {
+            return Ok(());
+        }
+
+        runs.sort_by_key(|run| run.created_at);
+        let pruned_at = Utc::now();
+        let prune_reason = "workspace_budget";
+
+        for run in &runs {
+            if total_size <= RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE {
+                break;
+            }
+            if run.log_state == ChatRunLogState::Live {
+                continue;
+            }
+            let Some(raw_log_path) = run.raw_log_path.as_deref() else {
+                continue;
+            };
+
+            let raw_log_file = Path::new(raw_log_path);
+            let reclaimed = Self::file_size_if_exists(raw_log_file).await;
+            let _ = fs::remove_file(raw_log_file).await;
+
+            let mut summary = Self::build_retention_summary_from_run(run).await?;
+            summary.pruned_at = Some(pruned_at.to_rfc3339());
+            summary.prune_reason = Some(prune_reason.to_string());
+            ChatRun::mark_log_pruned(
+                &self.db.pool,
+                run.id,
+                pruned_at,
+                Some(prune_reason.to_string()),
+                Some(serde_json::to_string(&summary)?),
+            )
+            .await?;
+            total_size = total_size.saturating_sub(reclaimed);
+        }
+
+        for run in &runs {
+            if total_size <= RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE {
+                break;
+            }
+            if run.log_state == ChatRunLogState::Live {
+                continue;
+            }
+            if run.artifact_state != ChatRunArtifactState::Full {
+                continue;
+            }
+
+            let summary = Self::build_retention_summary_from_run(run).await?;
+            if Self::summary_indicates_failure(&summary) {
+                continue;
+            }
+
+            total_size = total_size.saturating_sub(
+                self.stub_run_artifacts(run, prune_reason, pruned_at)
+                    .await?,
+            );
+        }
+
+        for run in &runs {
+            if total_size <= RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE {
+                break;
+            }
+            if run.log_state == ChatRunLogState::Live {
+                continue;
+            }
+            if run.artifact_state != ChatRunArtifactState::Full {
+                continue;
+            }
+
+            let summary = Self::build_retention_summary_from_run(run).await?;
+            if !Self::summary_indicates_failure(&summary) {
+                continue;
+            }
+
+            total_size = total_size.saturating_sub(
+                self.stub_run_artifacts(run, prune_reason, pruned_at)
+                    .await?,
+            );
+        }
+
+        for run in &runs {
+            if total_size <= RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE {
+                break;
+            }
+            if run.log_state == ChatRunLogState::Live {
+                continue;
+            }
+
+            let run_dir = Path::new(&run.run_dir);
+            let reclaimed = Self::dir_size(run_dir).await;
+            if reclaimed == 0 {
+                continue;
+            }
+
+            let _ = fs::remove_dir_all(run_dir).await;
+            let mut summary = Self::build_retention_summary_from_run(run).await?;
+            summary.pruned_at = Some(pruned_at.to_rfc3339());
+            summary.prune_reason = Some(prune_reason.to_string());
+            ChatRun::mark_run_dir_pruned(
+                &self.db.pool,
+                run.id,
+                pruned_at,
+                Some(prune_reason.to_string()),
+                Some(serde_json::to_string(&summary)?),
+            )
+            .await?;
+            total_size = total_size.saturating_sub(reclaimed);
+        }
+
+        Ok(())
     }
 
     pub(super) async fn watch_executor_lifecycle(
@@ -873,6 +1688,7 @@ impl ChatRunner {
         exit_signal: Option<ExecutorExitSignal>,
         msg_store: Arc<MsgStore>,
         completion_status: Arc<AtomicU8>,
+        log_forwarders: RunLogForwarders,
         session_agent_id: Uuid,
     ) {
         Self::watch_executor_lifecycle_with_timeout(
@@ -882,6 +1698,7 @@ impl ChatRunner {
             exit_signal,
             msg_store,
             completion_status,
+            log_forwarders,
             session_agent_id,
             EXECUTOR_GRACEFUL_STOP_TIMEOUT,
         )
@@ -896,6 +1713,7 @@ impl ChatRunner {
         mut exit_signal: Option<ExecutorExitSignal>,
         msg_store: Arc<MsgStore>,
         completion_status: Arc<AtomicU8>,
+        log_forwarders: RunLogForwarders,
         session_agent_id: Uuid,
         graceful_timeout: std::time::Duration,
     ) {
@@ -991,6 +1809,7 @@ impl ChatRunner {
         }
 
         completion.store(&completion_status);
+        Self::wait_for_log_forwarders(log_forwarders, &msg_store).await;
         msg_store.push_finished();
     }
 

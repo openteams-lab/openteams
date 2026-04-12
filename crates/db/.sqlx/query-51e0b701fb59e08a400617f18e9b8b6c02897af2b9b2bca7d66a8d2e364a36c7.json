@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE chat_runs\n               SET input_path = $2,\n                   output_path = $3,\n                   meta_path = $4,\n                   artifact_state = 'stub',\n                   pruned_at = $5,\n                   prune_reason = $6,\n                   retention_summary_json = COALESCE($7, retention_summary_json)\n               WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "51e0b701fb59e08a400617f18e9b8b6c02897af2b9b2bca7d66a8d2e364a36c7"
+}

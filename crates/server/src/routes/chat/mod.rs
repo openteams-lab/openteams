@@ -55,6 +55,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             "/messages/{message_id}/resend",
             axum::routing::post(messages::resend_message),
         )
+        .route("/runs/retention", get(runs::get_session_runs_retention))
         .route(
             "/messages/{message_id}/attachments/{attachment_id}",
             get(messages::serve_message_attachment),

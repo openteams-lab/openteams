@@ -1,4 +1,22 @@
-import type { ChatAgent, ChatSessionAgent, ChatWorkItem } from 'shared/types';
+import type {
+  ChatAgent,
+  ChatSessionAgent,
+  ChatWorkItem,
+  ChatRunLogState,
+  ChatRunArtifactState,
+  ChatRunRetentionSummary,
+} from 'shared/types';
+
+export type RunRetentionState = {
+  runId: string;
+  logState: ChatRunLogState;
+  artifactState: ChatRunArtifactState;
+  logTruncated: boolean;
+  logCaptureDegraded: boolean;
+  prunedAt: string | null;
+  pruneReason: string | null;
+  retentionSummary: ChatRunRetentionSummary | null;
+};
 
 export type StreamRun = {
   agentId: string;
@@ -32,6 +50,7 @@ export type RunHistoryItem = {
   errorContent?: string;
   errorType?: ErrorTypeInfo;
   hasError?: boolean;
+  retention?: RunRetentionState;
 };
 
 export type ErrorTypeInfo = {

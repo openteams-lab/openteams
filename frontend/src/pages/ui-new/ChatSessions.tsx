@@ -56,6 +56,7 @@ import {
   type StreamRun,
   useChatData,
   useRunHistory,
+  useRunRetention,
   useChatMutations,
   useChatWebSocket,
   useMessageInput,
@@ -1673,6 +1674,16 @@ export function ChatSessions() {
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         ),
     [runHistory, workspaceAgentId]
+  );
+
+  const activeWorkspaceRunIds = useMemo(
+    () => activeWorkspaceRuns.map((r) => r.runId),
+    [activeWorkspaceRuns]
+  );
+
+  const retentionByRunId = useRunRetention(
+    workspaceDrawerOpen ? activeSessionId : null,
+    workspaceDrawerOpen ? activeWorkspaceRunIds : []
   );
   const formatProtocolNoticeContent = useCallback(
     (notice: ChatProtocolNotice) => {
@@ -3500,8 +3511,12 @@ export function ChatSessions() {
       const content = await chatApi.getRunLog(runId);
       setLogContent(content);
     } catch (error) {
-      console.warn('Failed to load run log', error);
-      setLogError('Unable to load run log.');
+      if (error instanceof ApiError && error.status === 410) {
+        setLogError(error.message || 'Chat run log expired');
+      } else {
+        console.warn('Failed to load run log', error);
+        setLogError('Unable to load run log.');
+      }
       setLogContent('');
     } finally {
       setLogLoading(false);
@@ -4316,6 +4331,7 @@ export function ChatSessions() {
         workspacePath={workspacePath}
         runs={activeWorkspaceRuns}
         messages={messagesData}
+        retentionByRunId={retentionByRunId}
         logRunId={logRunId}
         logContent={logContent}
         logLoading={logLoading}

@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { RunHistoryItem } from '../types';
+import type { RunHistoryItem, RunRetentionState } from '../types';
 import {
   detectApiError,
   extractErrorFromMeta,
@@ -39,6 +39,7 @@ export interface WorkspaceDrawerProps {
   workspacePath: string | null;
   runs: RunHistoryItem[];
   messages: ChatMessage[];
+  retentionByRunId?: Map<string, RunRetentionState>;
   logRunId: string | null;
   logContent: string;
   logLoading: boolean;
@@ -53,6 +54,7 @@ export function WorkspaceDrawer({
   workspacePath,
   runs,
   messages,
+  retentionByRunId,
   logRunId,
   logContent,
   logLoading,
@@ -331,29 +333,81 @@ export function WorkspaceDrawer({
                     {run.content}
                   </div>
                 )}
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      className="chat-session-workspace-link"
-                      onClick={() => onLoadLog(run.runId)}
-                    >
-                      {t('modals.workspaceDrawer.viewLog')}
-                    </button>
-                    <button
-                      type="button"
-                      className="chat-session-workspace-link"
-                      onClick={() => setExpandedRun(run)}
-                    >
-                      {t('members.expand')}
-                    </button>
-                  </div>
-                  {logRunId === run.runId && (
-                    <span className="text-low">
-                      {t('modals.workspaceDrawer.selected')}
-                    </span>
-                  )}
-                </div>
+                {(() => {
+                  const retention = retentionByRunId?.get(run.runId);
+                  const isPruned = retention?.logState === 'pruned';
+                  const isTail = retention?.logState === 'tail';
+                  const isTruncated = retention?.logTruncated;
+                  const isDegraded = retention?.logCaptureDegraded;
+                  const isArtifactStub = retention?.artifactState === 'stub';
+                  const isArtifactPruned = retention?.artifactState === 'pruned';
+                  return (
+                    <>
+                      {(isTruncated || isDegraded || isArtifactStub || isArtifactPruned) && (
+                        <div className="flex flex-wrap gap-1 mb-1">
+                          {isTruncated && (
+                            <span className="chat-session-workspace-error-badge rounded px-1.5 py-0.5 text-[10px]">
+                              {t('modals.workspaceDrawer.logTruncated', { defaultValue: '日志已截断' })}
+                            </span>
+                          )}
+                          {isDegraded && (
+                            <span className="chat-session-workspace-error-badge rounded px-1.5 py-0.5 text-[10px]">
+                              {t('modals.workspaceDrawer.logCaptureDegraded', { defaultValue: '采集降级' })}
+                            </span>
+                          )}
+                          {isArtifactStub && (
+                            <span className="rounded px-1.5 py-0.5 text-[10px] bg-[#e5e9f3] text-low">
+                              {t('modals.workspaceDrawer.artifactStub', { defaultValue: '仅摘要' })}
+                            </span>
+                          )}
+                          {isArtifactPruned && (
+                            <span className="rounded px-1.5 py-0.5 text-[10px] bg-[#e5e9f3] text-low">
+                              {t('modals.workspaceDrawer.artifactPruned', { defaultValue: '已清理' })}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-3">
+                          {isPruned ? (
+                            <span
+                              className="text-low cursor-default"
+                              title={retention?.pruneReason ?? t('modals.workspaceDrawer.logPruned', { defaultValue: '日志已清理' })}
+                            >
+                              {t('modals.workspaceDrawer.logPruned', { defaultValue: '日志已清理' })}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="chat-session-workspace-link"
+                              onClick={() => onLoadLog(run.runId)}
+                              title={isTail ? t('modals.workspaceDrawer.logTailOnly', { defaultValue: '仅保留尾部日志' }) : undefined}
+                            >
+                              {t('modals.workspaceDrawer.viewLog')}
+                              {isTail && (
+                                <span className="ml-1 text-[10px] text-low">
+                                  ({t('modals.workspaceDrawer.tail', { defaultValue: '尾部' })})
+                                </span>
+                              )}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="chat-session-workspace-link"
+                            onClick={() => setExpandedRun(run)}
+                          >
+                            {t('members.expand')}
+                          </button>
+                        </div>
+                        {logRunId === run.runId && (
+                          <span className="text-low">
+                            {t('modals.workspaceDrawer.selected')}
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             ))}
           </div>

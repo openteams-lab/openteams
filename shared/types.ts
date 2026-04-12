@@ -118,7 +118,15 @@ export enum ChatPermissionTtlType { once = "once", time = "time", session = "ses
 
 export type ChatArtifact = { id: string, session_id: string, name: string, path: string, type: string, created_by: string | null, pinned: boolean, created_at: string, };
 
-export type ChatRun = { id: string, session_id: string, session_agent_id: string, run_index: bigint, run_dir: string, input_path: string | null, output_path: string | null, raw_log_path: string | null, meta_path: string | null, created_at: string, };
+export type ChatRun = { id: string, session_id: string, session_agent_id: string, run_index: bigint, run_dir: string, input_path: string | null, output_path: string | null, raw_log_path: string | null, meta_path: string | null, log_state: ChatRunLogState, artifact_state: ChatRunArtifactState, log_truncated: boolean, log_capture_degraded: boolean, pruned_at: string | null, prune_reason: string | null, retention_summary_json: string | null, created_at: string, };
+
+export enum ChatRunLogState { live = "live", tail = "tail", pruned = "pruned" }
+
+export enum ChatRunArtifactState { full = "full", stub = "stub", pruned = "pruned" }
+
+export type ChatRunRetentionSummary = { kind: string | null, finished_at: string | null, error_summary: string | null, error_type: string | null, assistant_excerpt: string | null, total_tokens: number | null, log_bytes_total: bigint | null, log_bytes_persisted: bigint | null, live_bytes_dropped: bigint | null, log_truncated: boolean | null, log_capture_degraded: boolean | null, pruned_at: string | null, prune_reason: string | null, };
+
+export type ChatRunRetentionInfo = { run_id: string, session_agent_id: string, created_at: string, log_state: ChatRunLogState, artifact_state: ChatRunArtifactState, log_truncated: boolean, log_capture_degraded: boolean, pruned_at: string | null, prune_reason: string | null, retention_summary: ChatRunRetentionSummary | null, };
 
 export type ChatWorkItem = { id: string, session_id: string, run_id: string, session_agent_id: string, agent_id: string, item_type: ChatWorkItemType, content: string, created_at: string, };
 
@@ -269,6 +277,10 @@ export type ChatSessionListQuery = { status: ChatSessionStatus | null, };
 export type CreateChatSessionAgentRequest = { agent_id: string, workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
 
 export type UpdateChatSessionAgentRequest = { workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
+
+export type ChatRunRetentionListQuery = { run_ids: string | null, limit: number | null, };
+
+export type ChatRunRetentionListResponse = { runs: Array<ChatRunRetentionInfo>, };
 
 export type UpdateNativeSkillRequest = { enabled: boolean, };
 
