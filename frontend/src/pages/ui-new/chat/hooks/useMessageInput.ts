@@ -33,7 +33,20 @@ export interface UseMessageInputResult {
   handleMentionKeyDown: (event: React.KeyboardEvent) => boolean;
 }
 
+interface SessionMessageInputState {
+  draft: string;
+  selectedMentions: string[];
+  replyToMessage: ChatMessage | null;
+}
+
+const createEmptySessionMessageInputState = (): SessionMessageInputState => ({
+  draft: '',
+  selectedMentions: [],
+  replyToMessage: null,
+});
+
 export function useMessageInput(
+  activeSessionId: string | null,
   mentionAgents: ChatAgent[]
 ): UseMessageInputResult {
   const inputRef = useRef<HTMLTextAreaElement>(null!);
@@ -44,6 +57,59 @@ export function useMessageInput(
     null
   );
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
+  // Preserve unsent composer state per session when switching between chats.
+  const sessionInputStateRef = useRef<Record<string, SessionMessageInputState>>(
+    {}
+  );
+  const previousSessionIdRef = useRef<string | null>(activeSessionId);
+  const latestStateRef = useRef<SessionMessageInputState>(
+    createEmptySessionMessageInputState()
+  );
+  latestStateRef.current = {
+    draft,
+    selectedMentions,
+    replyToMessage,
+  };
+
+  useEffect(() => {
+    const previousSessionId = previousSessionIdRef.current;
+    if (previousSessionId) {
+      sessionInputStateRef.current[previousSessionId] = {
+        draft: latestStateRef.current.draft,
+        selectedMentions: [...latestStateRef.current.selectedMentions],
+        replyToMessage: latestStateRef.current.replyToMessage,
+      };
+    }
+
+    previousSessionIdRef.current = activeSessionId;
+
+    const nextState = activeSessionId
+      ? sessionInputStateRef.current[activeSessionId]
+      : null;
+
+    setDraft(nextState?.draft ?? '');
+    setSelectedMentions(nextState ? [...nextState.selectedMentions] : []);
+    setMentionQuery(null);
+    setReplyToMessage(nextState?.replyToMessage ?? null);
+    setHighlightedMentionIndex(0);
+
+    const frame = requestAnimationFrame(() => {
+      const textarea = inputRef.current;
+      if (!textarea) return;
+
+      const nextDraft = nextState?.draft ?? '';
+      if (!nextDraft) {
+        textarea.style.height = '44px';
+        return;
+      }
+
+      textarea.style.height = 'auto';
+      const nextHeight = Math.min(textarea.scrollHeight, 200);
+      textarea.style.height = `${Math.max(44, nextHeight)}px`;
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [activeSessionId]);
 
   const getActiveMentionMatch = useCallback(
     (value: string, cursorPosition?: number | null) => {
@@ -259,6 +325,10 @@ export function useMessageInput(
   }, [mentionAgents]);
 
   const resetInput = useCallback(() => {
+    if (activeSessionId) {
+      sessionInputStateRef.current[activeSessionId] =
+        createEmptySessionMessageInputState();
+    }
     setDraft('');
     setSelectedMentions([]);
     setMentionQuery(null);
@@ -267,7 +337,7 @@ export function useMessageInput(
     if (inputRef.current) {
       inputRef.current.style.height = '44px';
     }
-  }, []);
+  }, [activeSessionId]);
 
   return {
     draft,

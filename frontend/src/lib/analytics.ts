@@ -271,6 +271,7 @@ export interface CollectorEventRequest {
   source: AnalyticsSource;
   platform: AnalyticsPlatform;
   app_version: string;
+  user_id?: string;
   session_id?: string;
   trace_id: string;
   properties: Record<string, PropertyValue>;
@@ -400,6 +401,7 @@ class AnalyticsService {
       source: 'frontend',
       platform: this.getPlatform(),
       app_version: __APP_VERSION__,
+      user_id: this.userId,
       session_id: sanitizedSessionId,
       trace_id: options.traceId ?? this.generateEventId(),
       properties: sanitizedProperties,

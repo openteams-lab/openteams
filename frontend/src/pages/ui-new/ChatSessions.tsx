@@ -918,7 +918,7 @@ export function ChatSessions() {
     resetInput,
     highlightedMentionIndex,
     handleMentionKeyDown,
-  } = useMessageInput(mentionAgents);
+  } = useMessageInput(activeSessionId, mentionAgents);
 
   const agentOptionsWithAll = useMemo(
     () => [
@@ -1132,9 +1132,7 @@ export function ChatSessions() {
 
   // Reset state on session change
   useEffect(() => {
-    resetInput();
     resetDiffViewer();
-    setReplyToMessage(null);
     setIsUploadingAttachments(false);
     setAttachmentError(null);
     setWorkspaceDrawerOpen(false);
@@ -1163,7 +1161,7 @@ export function ChatSessions() {
     setPromptFileLoading(false);
     setTeamImportPlan(null);
     setTeamImportName(null);
-  }, [activeSessionId, resetInput, resetDiffViewer, setReplyToMessage]);
+  }, [activeSessionId, resetDiffViewer]);
 
   useEffect(() => {
     if (isSessionsLoading) return;
