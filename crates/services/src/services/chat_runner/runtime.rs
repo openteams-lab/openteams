@@ -1559,7 +1559,7 @@ impl ChatRunner {
         if total_size <= RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE {
             return Ok(());
         }
-        
+
         tracing::debug!(
             workspace_path = %workspace_path.display(),
             total_size_bytes = total_size,
