@@ -914,7 +914,9 @@ export const chatApi = {
     const response = await makeRequest(
       `/api/chat/sessions/${sessionId}/runs/retention${query ? `?${query}` : ''}`
     );
-    const data = await handleApiResponse<{ runs: ChatRunRetentionInfo[] }>(response);
+    const data = await handleApiResponse<{ runs: ChatRunRetentionInfo[] }>(
+      response
+    );
     return data?.runs ?? [];
   },
 
