@@ -58,6 +58,19 @@
           "label": "語言",
           "placeholder": "選擇語言",
           "helper": "選擇您偏好的語言。瀏覽器預設將跟隨系統語言。"
+        },
+        "chatBubbleFontSize": {
+          "label": "聊天氣泡字體大小",
+          "placeholder": "選擇字體大小",
+          "helper": "選擇整個應用程式中聊天氣泡預設使用的字體大小。",
+          "options": {
+            "px12": "12 px",
+            "px13": "13 px",
+            "px14": "14 px",
+            "px15": "15 px",
+            "px16": "16 px",
+            "px18": "18 px"
+          }
         }
       },
       "taskExecution": {

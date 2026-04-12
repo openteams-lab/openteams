@@ -58,6 +58,19 @@
           "label": "Langue",
           "placeholder": "Sélectionner une langue",
           "helper": "Choisissez votre langue préférée. Par défaut du navigateur suit la langue de votre système."
+        },
+        "chatBubbleFontSize": {
+          "label": "Taille de police des bulles de chat",
+          "placeholder": "Sélectionner la taille de police",
+          "helper": "Choisissez la taille de police par défaut utilisée dans les bulles de chat de l'application.",
+          "options": {
+            "px12": "12 px",
+            "px13": "13 px",
+            "px14": "14 px",
+            "px15": "15 px",
+            "px16": "16 px",
+            "px18": "18 px"
+          }
         }
       },
       "taskExecution": {

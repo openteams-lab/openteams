@@ -29,7 +29,10 @@
     "clearSessionSearch": "세션 검색 지우기",
     "noSearchResults": "\"{{query}}\"와 일치하는 세션이 없습니다.",
     "generatedSessionTitle": "{{date}} 시작",
-    "aiTeam": "AI 팀"
+    "aiTeam": "AI 팀",
+    "menu": "메뉴",
+    "help": "도움말",
+    "feedback": "피드백"
   },
   "contextMenu": {
     "editTitle": "이름 편집",

@@ -29,7 +29,10 @@
     "clearSessionSearch": "清除會話搜尋",
     "noSearchResults": "沒有會話符合「{{query}}」。",
     "generatedSessionTitle": "開始於 {{date}}",
-    "aiTeam": "AI 團隊"
+    "aiTeam": "AI 團隊",
+    "menu": "選單",
+    "help": "說明",
+    "feedback": "回饋"
   },
   "contextMenu": {
     "editTitle": "編輯名稱",

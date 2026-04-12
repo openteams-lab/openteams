@@ -29,7 +29,10 @@
     "clearSessionSearch": "Borrar b?squeda de sesiones",
     "noSearchResults": "Ninguna sesi?n coincide con \"{{query}}\".",
     "generatedSessionTitle": "Iniciada {{date}}",
-    "aiTeam": "Equipo de IA"
+    "aiTeam": "Equipo de IA",
+    "menu": "Menú",
+    "help": "Ayuda",
+    "feedback": "Comentarios"
   },
   "contextMenu": {
     "editTitle": "Editar nombre",

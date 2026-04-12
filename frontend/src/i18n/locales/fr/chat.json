@@ -29,7 +29,10 @@
     "clearSessionSearch": "Effacer la recherche de sessions",
     "noSearchResults": "Aucune session ne correspond ? \"{{query}}\".",
     "generatedSessionTitle": "Démarrée {{date}}",
-    "aiTeam": "Équipe IA"
+    "aiTeam": "Équipe IA",
+    "menu": "Menu",
+    "help": "Aide",
+    "feedback": "Commentaires"
   },
   "contextMenu": {
     "editTitle": "Modifier le nom",
