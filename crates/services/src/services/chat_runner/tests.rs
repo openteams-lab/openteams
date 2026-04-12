@@ -161,7 +161,6 @@ fn empty_log_forwarders() -> RunLogForwarders {
 fn run_budget_thresholds_match_latest_policy() {
     assert_eq!(RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE, 500 * 1024 * 1024);
     assert_eq!(RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE, 200 * 1024 * 1024);
-    assert!(RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE < RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE);
 }
 
 #[test]

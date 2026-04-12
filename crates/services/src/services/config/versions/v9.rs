@@ -28,22 +28,17 @@ fn default_max_agent_chain_depth() -> u32 {
     8
 }
 
-#[derive(Clone, Debug, Serialize, TS, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Serialize, TS, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[ts(use_ts_enum)]
 pub enum ChatBubbleFontSize {
     Px12,
     Px13,
+    #[default]
     Px14,
     Px15,
     Px16,
     Px18,
-}
-
-impl Default for ChatBubbleFontSize {
-    fn default() -> Self {
-        Self::Px14
-    }
 }
 
 fn default_chat_bubble_font_size() -> ChatBubbleFontSize {

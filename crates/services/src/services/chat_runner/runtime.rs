@@ -244,9 +244,7 @@ impl RunLogSpool {
             Some("live spool file missing before tail persistence".to_string())
         };
 
-        let persisted = if persist_error.is_some() {
-            Vec::new()
-        } else if tail_limit == 0 {
+        let persisted = if persist_error.is_some() || tail_limit == 0 {
             Vec::new()
         } else {
             let keep = self.current_bytes.min(tail_limit);
@@ -1259,7 +1257,7 @@ impl ChatRunner {
     pub(super) fn spawn_exit_watcher(&self, args: ExitWatcherArgs, session_agent_id: Uuid) {
         let run_controls = self.run_controls.clone();
         tokio::spawn(async move {
-            Self::watch_executor_lifecycle(
+            Self::watch_executor_lifecycle_with_timeout(
                 args.child,
                 args.stop,
                 args.executor_cancel,
@@ -1268,6 +1266,7 @@ impl ChatRunner {
                 args.completion_status,
                 args.log_forwarders,
                 session_agent_id,
+                EXECUTOR_GRACEFUL_STOP_TIMEOUT,
             )
             .await;
             run_controls.remove(&session_agent_id);
@@ -1675,30 +1674,6 @@ impl ChatRunner {
         }
 
         Ok(())
-    }
-
-    pub(super) async fn watch_executor_lifecycle(
-        child: command_group::AsyncGroupChild,
-        stop: CancellationToken,
-        executor_cancel: Option<CancellationToken>,
-        exit_signal: Option<ExecutorExitSignal>,
-        msg_store: Arc<MsgStore>,
-        completion_status: Arc<AtomicU8>,
-        log_forwarders: RunLogForwarders,
-        session_agent_id: Uuid,
-    ) {
-        Self::watch_executor_lifecycle_with_timeout(
-            child,
-            stop,
-            executor_cancel,
-            exit_signal,
-            msg_store,
-            completion_status,
-            log_forwarders,
-            session_agent_id,
-            EXECUTOR_GRACEFUL_STOP_TIMEOUT,
-        )
-        .await;
     }
 
     #[allow(clippy::too_many_arguments)]
