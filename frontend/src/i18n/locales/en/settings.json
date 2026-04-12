@@ -58,6 +58,19 @@
           "label": "Language",
           "placeholder": "Select language",
           "helper": "Choose your preferred language. Browser Default follows your system language."
+        },
+        "chatBubbleFontSize": {
+          "label": "Chat bubble font size",
+          "placeholder": "Select font size",
+          "helper": "Choose the default font size used in chat bubbles across the app.",
+          "options": {
+            "px12": "12 px",
+            "px13": "13 px",
+            "px14": "14 px",
+            "px15": "15 px",
+            "px16": "16 px",
+            "px18": "18 px"
+          }
         }
       },
       "taskExecution": {

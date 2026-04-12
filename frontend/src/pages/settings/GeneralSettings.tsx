@@ -22,6 +22,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Volume2 } from 'lucide-react';
 import {
+  ChatBubbleFontSize,
   DEFAULT_PR_DESCRIPTION_PROMPT,
   EditorType,
   SoundFile,
@@ -33,6 +34,11 @@ import { getLanguageOptions } from '@/i18n/languages';
 import { toPrettyCase } from '@/utils/string';
 import { useTheme } from '@/components/ThemeProvider';
 import { useUserSystem } from '@/components/ConfigProvider';
+import {
+  chatBubbleFontSizeOptions,
+  defaultChatBubbleFontSize,
+  getChatBubbleFontSizeLabel,
+} from '@/lib/chatBubbleFontSize';
 
 export function GeneralSettings() {
   const { t } = useTranslation(['settings', 'common']);
@@ -67,6 +73,20 @@ export function GeneralSettings() {
     loading,
     updateAndSaveConfig, // Use this on Save
   } = useUserSystem();
+
+  const bubbleFontSizeOptions = useMemo(
+    () =>
+      chatBubbleFontSizeOptions.map((size) => ({
+        value: size,
+        label: t(
+          `settings.general.appearance.chatBubbleFontSize.options.${size}`,
+          {
+            defaultValue: getChatBubbleFontSizeLabel(size),
+          }
+        ),
+      })),
+    [t]
+  );
 
   // Draft state management
   const [draft, setDraft] = useState(() => (config ? cloneDeep(config) : null));
@@ -288,6 +308,46 @@ export function GeneralSettings() {
             </Select>
             <p className="text-sm text-muted-foreground">
               {t('settings.general.appearance.language.helper')}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="chat-bubble-font-size">
+              {t('settings.general.appearance.chatBubbleFontSize.label', {
+                defaultValue: 'Chat bubble font size',
+              })}
+            </Label>
+            <Select
+              value={draft?.chat_bubble_font_size ?? defaultChatBubbleFontSize}
+              onValueChange={(value) =>
+                updateDraft({
+                  chat_bubble_font_size: value as ChatBubbleFontSize,
+                })
+              }
+            >
+              <SelectTrigger id="chat-bubble-font-size">
+                <SelectValue
+                  placeholder={t(
+                    'settings.general.appearance.chatBubbleFontSize.placeholder',
+                    {
+                      defaultValue: 'Select font size',
+                    }
+                  )}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {bubbleFontSizeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              {t('settings.general.appearance.chatBubbleFontSize.helper', {
+                defaultValue:
+                  'Choose the default font size used in chat bubbles across the app.',
+              })}
             </p>
           </div>
         </CardContent>

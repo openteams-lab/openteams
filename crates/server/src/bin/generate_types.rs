@@ -135,6 +135,7 @@ fn generate_types_content() -> String {
         services::services::config::UiLanguage::decl(),
         services::services::config::ShowcaseState::decl(),
         services::services::config::SendMessageShortcut::decl(),
+        services::services::config::ChatBubbleFontSize::decl(),
         services::services::config::ChatCompressionConfig::decl(),
         services::services::config::ChatPresetsConfig::decl(),
         services::services::config::ChatMemberPreset::decl(),

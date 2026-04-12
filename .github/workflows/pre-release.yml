@@ -1074,6 +1074,32 @@ jobs:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
+      - name: Normalize Linux artifact names
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          deb_files=(src-tauri/target/release/bundle/deb/*.deb)
+          if [ "${#deb_files[@]}" -eq 0 ]; then
+            echo "::error::No DEB files found to rename."
+            exit 1
+          fi
+
+          for file in "${deb_files[@]}"; do
+            filename=$(basename "$file")
+            stem="${filename%.deb}"
+            if [[ "$stem" =~ (^|[-_])linux($|[-_]) ]]; then
+              echo "DEB already contains platform name: $filename"
+              continue
+            fi
+
+            new_path="$(dirname "$file")/${stem}-linux.deb"
+            mv "$file" "$new_path"
+            echo "Renamed $filename -> $(basename "$new_path")"
+          done
+
       - name: Detect Windows signing configuration
         id: windows_signing
         if: matrix.platform == 'windows'
@@ -1141,6 +1167,26 @@ jobs:
             if ($LASTEXITCODE -ne 0) {
               throw "Signature verification failed for MSI: $($file.FullName)"
             }
+          }
+
+      - name: Normalize Windows artifact names
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $msiFiles = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter *.msi -File
+          if ($msiFiles.Count -eq 0) {
+            throw "No MSI files found to rename."
+          }
+
+          foreach ($file in $msiFiles) {
+            if ($file.BaseName -match '(?i)(^|[-_])windows($|[-_])') {
+              Write-Host "MSI already contains platform name: $($file.Name)"
+              continue
+            }
+
+            $newName = "$($file.BaseName)-windows$($file.Extension)"
+            Rename-Item -LiteralPath $file.FullName -NewName $newName
+            Write-Host "Renamed $($file.Name) -> $newName"
           }
 
       - name: Rebuild Windows updater bundles

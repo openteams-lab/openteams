@@ -27,6 +27,10 @@ import {
 import { ApiError, chatApi, configApi } from '@/lib/api';
 import { resolveAppLanguageCode } from '@/i18n/languages';
 import { cn } from '@/lib/utils';
+import {
+  defaultChatBubbleFontSize,
+  getChatBubbleFontSizeTextClassName,
+} from '@/lib/chatBubbleFontSize';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useTheme } from '@/components/ThemeProvider';
 import { formatDateShortWithTime } from '@/utils/date';
@@ -1488,6 +1492,10 @@ export function ChatSessions() {
   }, [sessionMembers]);
 
   const isArchived = activeSession?.status === ChatSessionStatus.archived;
+  const activeBubbleFontSize =
+    config?.chat_bubble_font_size ?? defaultChatBubbleFontSize;
+  const chatBubbleTextClassName =
+    getChatBubbleFontSizeTextClassName(activeBubbleFontSize);
   const activeSessionTitle = normalizeSessionTitle(activeSession?.title);
   const activeSessionSummary = activeSession?.summary_text?.trim() ?? '';
   const firstUserPromptTitle = useMemo(() => {
@@ -4015,6 +4023,7 @@ export function ChatSessions() {
                               : null
                           }
                           tone={tone}
+                          bubbleTextClassName={chatBubbleTextClassName}
                           referenceMessage={referenceMessage ?? null}
                           referenceSenderLabel={
                             referenceMessage
@@ -4073,6 +4082,7 @@ export function ChatSessions() {
                                 <ChatSystemMessage
                                   content={formatProtocolNoticeContent(notice)}
                                   expanded
+                                  textClassName={chatBubbleTextClassName}
                                   className={
                                     isEmptyMessageNotice
                                       ? 'text-[#6B7280]'

@@ -281,7 +281,7 @@
 
   @media (min-width: 1200px) {
     @supports (zoom: 1) {
-      .new-design.new-design--browser-scale {
+      .new-design .new-design--browser-scale {
         --new-design-ui-scale: 0.88;
         zoom: var(--new-design-ui-scale);
         overflow: hidden;
@@ -1642,9 +1642,12 @@
   }
 
   .new-design .chat-session-left-settings-btn:hover,
-  .new-design .chat-session-left-settings-btn:focus-visible {
+  .new-design .chat-session-left-settings-btn:focus-visible,
+  .new-design .chat-session-left-settings-btn[data-state='open'] {
     background: rgba(0, 0, 0, 0.03);
-    border-color: transparent;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none;
     color: #2c2a29;
   }
 
@@ -1909,6 +1912,30 @@
     font-size: 14px;
     font-weight: 500;
     color: inherit;
+  }
+
+  .new-design .chat-session-left-menu-dropdown {
+    border-radius: 14px !important;
+    padding: 6px !important;
+    box-shadow:
+      0 14px 28px rgba(15, 23, 42, 0.12),
+      0 4px 10px rgba(15, 23, 42, 0.06) !important;
+  }
+
+  .new-design .chat-session-left-menu-dropdown .dropdown-menu-item {
+    min-height: 36px;
+    padding: 0 10px;
+    border-radius: 9px;
+    gap: 8px;
+  }
+
+  .new-design .chat-session-left-menu-dropdown .dropdown-menu-item > svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .new-design .chat-session-left-menu-dropdown .dropdown-menu-item > span {
+    font-size: 13px;
   }
 
   .new-design .chat-session-header-menu-item:focus,

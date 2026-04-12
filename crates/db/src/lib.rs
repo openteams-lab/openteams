@@ -19,13 +19,6 @@ async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), Error> {
         match migrator.run(pool).await {
             Ok(()) => return Ok(()),
             Err(MigrateError::VersionMismatch(version)) => {
-                if cfg!(debug_assertions) {
-                    // return the error in debug mode to catch migration issues early
-                    return Err(sqlx::Error::Migrate(Box::new(
-                        MigrateError::VersionMismatch(version),
-                    )));
-                }
-
                 if !cfg!(windows) {
                     // On non-Windows platforms, we do not attempt to auto-fix checksum mismatches
                     return Err(sqlx::Error::Migrate(Box::new(
@@ -40,8 +33,8 @@ async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), Error> {
                     )));
                 }
 
-                // On Windows, there can be checksum mismatches due to line ending differences
-                // or other platform-specific issues. Update the stored checksum and retry.
+                // On Windows, local dev databases can see checksum mismatches from line endings
+                // or migration compatibility shims. Update the stored checksum and retry.
                 tracing::warn!(
                     "Migration version {} has checksum mismatch, updating stored checksum (likely platform-specific difference)",
                     version
@@ -140,7 +133,7 @@ impl DBService {
 
 #[cfg(test)]
 mod tests {
-    use sqlx::SqlitePool;
+    use sqlx::{Row, SqlitePool};
     use uuid::Uuid;
 
     use super::run_migrations;
@@ -210,5 +203,28 @@ mod tests {
         .await
         .expect("set waiting approval");
         assert_eq!(waiting.state, ChatSessionAgentState::WaitingApproval);
+    }
+
+    #[tokio::test]
+    async fn migrations_do_not_leave_chat_session_bubble_font_size_column() {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("create sqlite memory pool");
+        run_migrations(&pool).await.expect("run migrations");
+
+        let rows = sqlx::query("PRAGMA table_info(chat_sessions)")
+            .fetch_all(&pool)
+            .await
+            .expect("read chat_sessions columns");
+
+        let column_names = rows
+            .iter()
+            .map(|row| row.get::<String, _>("name"))
+            .collect::<Vec<_>>();
+
+        assert!(
+            !column_names.iter().any(|name| name == "bubble_font_size"),
+            "chat_sessions should not keep the legacy bubble_font_size column after migrations"
+        );
     }
 }

@@ -314,6 +314,10 @@ export type Config = { config_version: string, theme: ThemeMode, executor_profil
  */
 chat_presets: ChatPresetsConfig, 
 /**
+ * Global chat bubble font size preference
+ */
+chat_bubble_font_size: ChatBubbleFontSize, 
+/**
  * Chat compression configuration
  */
 chat_compression: ChatCompressionConfig, max_agent_chain_depth: number, };
@@ -337,6 +341,8 @@ export type UiLanguage = "BROWSER" | "EN" | "FR" | "JA" | "ES" | "KO" | "ZH_HANS
 export type ShowcaseState = { seen_features: Array<string>, };
 
 export type SendMessageShortcut = "ModifierEnter" | "Enter";
+
+export enum ChatBubbleFontSize { px12 = "px12", px13 = "px13", px14 = "px14", px15 = "px15", px16 = "px16", px18 = "px18" }
 
 export type ChatCompressionConfig = { 
 /**

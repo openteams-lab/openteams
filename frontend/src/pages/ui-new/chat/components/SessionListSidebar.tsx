@@ -3,6 +3,7 @@ import {
   ArrowCircleUpIcon,
   ArrowCounterClockwiseIcon,
   BoxArrowDownIcon,
+  BugBeetleIcon,
   BroomIcon,
   ChatCircleDotsIcon,
   FileArchiveIcon,
@@ -11,6 +12,7 @@ import {
   MagnifyingGlassIcon,
   PencilSimpleIcon,
   PlusIcon,
+  QuestionIcon,
   SidebarSimpleIcon,
   SquaresFourIcon,
   TrashIcon,
@@ -120,10 +122,27 @@ export function SessionListSidebar({
   const collapseActionLabel = isCollapsed
     ? t('sidebar.expandSidebar')
     : t('sidebar.collapseSidebar');
+  const menuLabel = t('sidebar.menu', { defaultValue: 'Menu' });
+  const helpLabel = t('sidebar.help', { defaultValue: 'Help' });
+  const feedbackLabel = t('sidebar.feedback', { defaultValue: 'Feedback' });
   const trimmedSessionSearchQuery = sessionSearchQuery.trim();
   const normalizedSessionSearchQuery =
     trimmedSessionSearchQuery.toLocaleLowerCase();
   const hasSessionSearchQuery = normalizedSessionSearchQuery.length > 0;
+  const isTauriRuntime = typeof window !== 'undefined' && '__TAURI__' in window;
+
+  const openExternalLink = useCallback(
+    async (url: string) => {
+      if (isTauriRuntime) {
+        const { open } = await import('@tauri-apps/api/shell');
+        await open(url);
+        return;
+      }
+
+      window.open(url, '_blank', 'noopener,noreferrer');
+    },
+    [isTauriRuntime]
+  );
 
   const closeSessionSearch = useCallback(() => {
     setIsSessionSearchOpen(false);
@@ -219,6 +238,60 @@ export function SessionListSidebar({
   const closeContextMenu = () => {
     setContextMenuSession(null);
   };
+
+  const renderSidebarMenu = ({ iconOnly = false }: { iconOnly?: boolean }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            'chat-session-left-settings-btn',
+            iconOnly && 'icon-only'
+          )}
+          aria-label={menuLabel}
+          title={menuLabel}
+        >
+          <ListIcon className={iconOnly ? 'size-icon-xs' : 'size-icon-sm'} />
+          {!iconOnly && <span>{menuLabel}</span>}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        side="top"
+        align={iconOnly ? 'center' : 'start'}
+        sideOffset={2}
+        alignOffset={iconOnly ? 0 : 6}
+        className="chat-session-header-more-menu chat-session-left-menu-dropdown w-[148px]"
+      >
+        <DropdownMenuItem
+          icon={GearSixIcon}
+          className="chat-session-header-menu-item"
+          onSelect={onOpenSettings}
+        >
+          {t('header.settings')}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          icon={QuestionIcon}
+          className="chat-session-header-menu-item"
+          onSelect={() => {
+            void openExternalLink('https://doc.openteams-lab.com');
+          }}
+        >
+          {helpLabel}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          icon={BugBeetleIcon}
+          className="chat-session-header-menu-item"
+          onSelect={() => {
+            void openExternalLink(
+              'https://github.com/openteams-lab/openteams/issues'
+            );
+          }}
+        >
+          {feedbackLabel}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   const renderSessionItem = (session: ChatSession) => {
     const isActive = session.id === activeSessionId;
@@ -400,15 +473,7 @@ export function SessionListSidebar({
                 </span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              className="chat-session-left-settings-btn icon-only"
-              aria-label={t('header.settings')}
-              title={t('header.settings')}
-            >
-              <GearSixIcon className="size-icon-xs" />
-            </button>
+            {renderSidebarMenu({ iconOnly: true })}
             <div
               className="chat-session-left-version collapsed"
               title={appVersionLabel}
@@ -604,20 +669,7 @@ export function SessionListSidebar({
 
           <div className="chat-session-left-footer">
             <div className="chat-session-left-footer-actions">
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                className="chat-session-left-settings-btn"
-                aria-label={t('header.settings')}
-                title={t('header.settings')}
-              >
-                <GearSixIcon className="size-icon-sm" />
-                <span>
-                  {t('sidebar.settingsInSidebar', {
-                    defaultValue: t('header.settings'),
-                  })}
-                </span>
-              </button>
+              {renderSidebarMenu({ iconOnly: false })}
             </div>
             <div className="chat-session-left-version-group">
               {hasAvailableUpdate && (

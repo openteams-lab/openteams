@@ -3,12 +3,18 @@ import { useTranslation } from 'react-i18next';
 import { cloneDeep, isEqual, merge } from 'lodash';
 import { SpeakerHighIcon, SpinnerIcon } from '@phosphor-icons/react';
 import {
+  ChatBubbleFontSize,
   type BaseCodingAgent,
   type ExecutorProfileId,
   SoundFile,
   ThemeMode,
   UiLanguage,
 } from 'shared/types';
+import {
+  chatBubbleFontSizeOptions,
+  defaultChatBubbleFontSize,
+  getChatBubbleFontSizeLabel,
+} from '@/lib/chatBubbleFontSize';
 import { getLanguageOptions } from '@/i18n/languages';
 import { toPrettyCase } from '@/utils/string';
 import { getVariantDisplayLabel } from '@/utils/executor';
@@ -218,6 +224,13 @@ export function GeneralSettingsSection() {
     label: toPrettyCase(sound),
   }));
 
+  const bubbleFontSizeOptions = chatBubbleFontSizeOptions.map((size) => ({
+    value: size,
+    label: t(`settings.general.appearance.chatBubbleFontSize.options.${size}`, {
+      defaultValue: getChatBubbleFontSizeLabel(size),
+    }),
+  }));
+
   return (
     <>
       {/* Status messages */}
@@ -259,6 +272,33 @@ export function GeneralSettingsSection() {
             options={languageOptions}
             onChange={(value: UiLanguage) => updateDraft({ language: value })}
             placeholder={t('settings.general.appearance.language.placeholder')}
+          />
+        </SettingsField>
+
+        <SettingsField
+          label={t('settings.general.appearance.chatBubbleFontSize.label', {
+            defaultValue: 'Chat bubble font size',
+          })}
+          description={t(
+            'settings.general.appearance.chatBubbleFontSize.helper',
+            {
+              defaultValue:
+                'Choose the default font size used in chat bubbles across the app.',
+            }
+          )}
+        >
+          <SettingsSelect
+            value={draft?.chat_bubble_font_size ?? defaultChatBubbleFontSize}
+            options={bubbleFontSizeOptions}
+            onChange={(value: ChatBubbleFontSize) =>
+              updateDraft({ chat_bubble_font_size: value })
+            }
+            placeholder={t(
+              'settings.general.appearance.chatBubbleFontSize.placeholder',
+              {
+                defaultValue: 'Select font size',
+              }
+            )}
           />
         </SettingsField>
       </SettingsCard>

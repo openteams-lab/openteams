@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::Error;
 use executors::{executors::BaseCodingAgent, profile::ExecutorProfileId};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use ts_rs::TS;
 use utils::path::home_directory;
 pub use v8::{
@@ -26,6 +26,61 @@ fn default_commit_reminder_enabled() -> bool {
 
 fn default_max_agent_chain_depth() -> u32 {
     8
+}
+
+#[derive(Clone, Debug, Serialize, TS, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+#[ts(use_ts_enum)]
+pub enum ChatBubbleFontSize {
+    Px12,
+    Px13,
+    Px14,
+    Px15,
+    Px16,
+    Px18,
+}
+
+impl Default for ChatBubbleFontSize {
+    fn default() -> Self {
+        Self::Px14
+    }
+}
+
+fn default_chat_bubble_font_size() -> ChatBubbleFontSize {
+    ChatBubbleFontSize::default()
+}
+
+impl<'de> Deserialize<'de> for ChatBubbleFontSize {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        match value.as_str() {
+            "small" | "px12" | "12px" => Ok(Self::Px12),
+            "px13" | "13px" => Ok(Self::Px13),
+            "medium" | "px14" | "14px" => Ok(Self::Px14),
+            "px15" | "15px" => Ok(Self::Px15),
+            "large" | "px16" | "16px" => Ok(Self::Px16),
+            "px18" | "18px" => Ok(Self::Px18),
+            _ => Err(serde::de::Error::unknown_variant(
+                &value,
+                &[
+                    "small", "medium", "large", "px12", "px13", "px14", "px15", "px16", "px18",
+                    "12px", "13px", "14px", "15px", "16px", "18px",
+                ],
+            )),
+        }
+    }
+}
+
+fn deserialize_chat_bubble_font_size<'de, D>(
+    deserializer: D,
+) -> Result<ChatBubbleFontSize, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    ChatBubbleFontSize::deserialize(deserializer)
 }
 
 /// Chat Member Preset Template
@@ -261,6 +316,12 @@ pub struct Config {
     /// Chat presets configuration (member and team templates)
     #[serde(default = "default_chat_presets")]
     pub chat_presets: ChatPresetsConfig,
+    /// Global chat bubble font size preference
+    #[serde(
+        default = "default_chat_bubble_font_size",
+        deserialize_with = "deserialize_chat_bubble_font_size"
+    )]
+    pub chat_bubble_font_size: ChatBubbleFontSize,
     /// Chat compression configuration
     #[serde(default = "default_chat_compression")]
     pub chat_compression: ChatCompressionConfig,
@@ -299,6 +360,7 @@ impl Config {
             commit_reminder_prompt: old_config.commit_reminder_prompt,
             send_message_shortcut: old_config.send_message_shortcut,
             chat_presets: default_chat_presets(),
+            chat_bubble_font_size: default_chat_bubble_font_size(),
             chat_compression: ChatCompressionConfig::default(),
             max_agent_chain_depth: default_max_agent_chain_depth(),
         }
@@ -358,6 +420,7 @@ impl Default for Config {
             commit_reminder_prompt: None,
             send_message_shortcut: SendMessageShortcut::default(),
             chat_presets: default_chat_presets(),
+            chat_bubble_font_size: default_chat_bubble_font_size(),
             chat_compression: ChatCompressionConfig::default(),
             max_agent_chain_depth: default_max_agent_chain_depth(),
         }
@@ -495,6 +558,55 @@ mod tests {
                 .team_protocol
                 .contains("Only the Planner (Coordinator / PMO) and the UI Designer (UX/UI Designer) may directly `@` the user.")
         );
+    }
+
+    #[test]
+    fn config_defaults_chat_bubble_font_size_to_px14_when_missing() {
+        let mut raw_config =
+            serde_json::to_value(Config::default()).expect("serialize default config");
+        raw_config
+            .as_object_mut()
+            .expect("config should serialize as object")
+            .remove("chat_bubble_font_size");
+
+        let config = Config::from(raw_config.to_string());
+
+        assert_eq!(config.chat_bubble_font_size, ChatBubbleFontSize::Px14);
+    }
+
+    #[test]
+    fn config_deserializes_legacy_chat_bubble_font_size_aliases() {
+        let mut small_raw =
+            serde_json::to_value(Config::default()).expect("serialize default config");
+        small_raw
+            .as_object_mut()
+            .expect("config should serialize as object")
+            .insert("chat_bubble_font_size".to_string(), json!("small"));
+
+        let mut medium_raw =
+            serde_json::to_value(Config::default()).expect("serialize default config");
+        medium_raw
+            .as_object_mut()
+            .expect("config should serialize as object")
+            .insert("chat_bubble_font_size".to_string(), json!("medium"));
+
+        let mut large_raw =
+            serde_json::to_value(Config::default()).expect("serialize default config");
+        large_raw
+            .as_object_mut()
+            .expect("config should serialize as object")
+            .insert("chat_bubble_font_size".to_string(), json!("large"));
+
+        let small: Config = serde_json::from_value(small_raw)
+            .unwrap_or_else(|error| panic!("small alias should deserialize: {error}"));
+        let medium: Config = serde_json::from_value(medium_raw)
+            .unwrap_or_else(|error| panic!("medium alias should deserialize: {error}"));
+        let large: Config = serde_json::from_value(large_raw)
+            .unwrap_or_else(|error| panic!("large alias should deserialize: {error}"));
+
+        assert_eq!(small.chat_bubble_font_size, ChatBubbleFontSize::Px12);
+        assert_eq!(medium.chat_bubble_font_size, ChatBubbleFontSize::Px14);
+        assert_eq!(large.chat_bubble_font_size, ChatBubbleFontSize::Px16);
     }
 
     #[test]
