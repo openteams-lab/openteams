@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE chat_runs\n               SET log_truncated = $2,\n                   log_capture_degraded = $3\n               WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "915870865bb4b7d8d5ba7634df0307f40ce30274dc87263c2c9699b100b80928"
+}

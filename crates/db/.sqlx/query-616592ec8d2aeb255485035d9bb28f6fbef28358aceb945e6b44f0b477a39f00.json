@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE chat_runs\n               SET retention_summary_json = $2\n               WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "616592ec8d2aeb255485035d9bb28f6fbef28358aceb945e6b44f0b477a39f00"
+}

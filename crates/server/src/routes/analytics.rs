@@ -2,6 +2,7 @@ use axum::{Json, extract::State, http::StatusCode};
 use db::models::analytics::{AnalyticsEvent, AnalyticsEventCategory, CreateAnalyticsEvent};
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
+use services::services::analytics::forward_analytics_record_to_posthog;
 use ts_rs::TS;
 use utils::response::ApiResponse;
 use uuid::Uuid;
@@ -187,6 +188,24 @@ pub struct UserProfileQueryParams {
     pub user_id: String,
 }
 
+fn parse_event_category(value: &str) -> Option<AnalyticsEventCategory> {
+    match value {
+        "user_action" => Some(AnalyticsEventCategory::UserAction),
+        "system" => Some(AnalyticsEventCategory::System),
+        "conversion" => Some(AnalyticsEventCategory::Conversion),
+        _ => None,
+    }
+}
+
+fn parse_session_id(value: Option<&str>) -> Result<Option<Uuid>, &'static str> {
+    match value {
+        Some(raw) if !raw.is_empty() => Uuid::parse_str(raw)
+            .map(Some)
+            .map_err(|_| "Invalid session_id format"),
+        _ => Ok(None),
+    }
+}
+
 /// Track a single analytics event
 pub async fn track_event(
     State(deployment): State<DeploymentImpl>,
@@ -195,33 +214,18 @@ pub async fn track_event(
     let pool = &deployment.db().pool;
 
     // Parse event category
-    let event_category = match req.event_category.as_str() {
-        "user_action" => AnalyticsEventCategory::UserAction,
-        "system" => AnalyticsEventCategory::System,
-        "conversion" => AnalyticsEventCategory::Conversion,
-        _ => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                Json(ApiResponse::error(
-                    "Invalid event_category. Must be 'user_action', 'system', or 'conversion'",
-                )),
-            ));
-        }
-    };
+    let event_category = parse_event_category(&req.event_category).ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error(
+                "Invalid event_category. Must be 'user_action', 'system', or 'conversion'",
+            )),
+        )
+    })?;
 
     // Parse session_id if provided
-    let session_id = match req.session_id {
-        Some(ref s) if !s.is_empty() => match Uuid::parse_str(s) {
-            Ok(id) => Some(id),
-            Err(_) => {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    Json(ApiResponse::error("Invalid session_id format")),
-                ));
-            }
-        },
-        _ => None,
-    };
+    let session_id = parse_session_id(req.session_id.as_deref())
+        .map_err(|message| (StatusCode::BAD_REQUEST, Json(ApiResponse::error(message))))?;
 
     let create_event = CreateAnalyticsEvent {
         event_type: req.event_type,
@@ -236,7 +240,14 @@ pub async fn track_event(
     };
 
     match AnalyticsEvent::create(pool, &create_event, Uuid::new_v4()).await {
-        Ok(_) => Ok(Json(ApiResponse::success("Event tracked".to_string()))),
+        Ok(event) => {
+            forward_analytics_record_to_posthog(
+                deployment.analytics().as_ref(),
+                &event,
+                "/analytics/events",
+            );
+            Ok(Json(ApiResponse::success("Event tracked".to_string())))
+        }
         Err(e) => {
             tracing::error!("Failed to track analytics event: {}", e);
             Err((
@@ -257,20 +268,13 @@ pub async fn track_events_batch(
     let mut events_to_create = Vec::with_capacity(req.events.len());
 
     for event_req in req.events {
-        let event_category = match event_req.event_category.as_str() {
-            "user_action" => AnalyticsEventCategory::UserAction,
-            "system" => AnalyticsEventCategory::System,
-            "conversion" => AnalyticsEventCategory::Conversion,
-            _ => continue, // Skip invalid events
+        let Some(event_category) = parse_event_category(&event_req.event_category) else {
+            continue;
         };
 
-        let session_id = event_req.session_id.and_then(|s| {
-            if s.is_empty() {
-                None
-            } else {
-                Uuid::parse_str(&s).ok()
-            }
-        });
+        let session_id = parse_session_id(event_req.session_id.as_deref())
+            .ok()
+            .flatten();
 
         events_to_create.push((
             Uuid::new_v4(),
@@ -289,10 +293,20 @@ pub async fn track_events_batch(
     }
 
     match AnalyticsEvent::create_batch(pool, &events_to_create).await {
-        Ok(events) => Ok(Json(ApiResponse::success(format!(
-            "{} events tracked",
-            events.len()
-        )))),
+        Ok(events) => {
+            for event in &events {
+                forward_analytics_record_to_posthog(
+                    deployment.analytics().as_ref(),
+                    event,
+                    "/analytics/events/batch",
+                );
+            }
+
+            Ok(Json(ApiResponse::success(format!(
+                "{} events tracked",
+                events.len()
+            ))))
+        }
         Err(e) => {
             tracing::error!("Failed to track analytics events batch: {}", e);
             Err((
@@ -985,4 +999,60 @@ pub fn router() -> axum::Router<DeploymentImpl> {
             "/analytics/user-profile",
             axum::routing::get(get_user_profile),
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use services::services::analytics::{
+        analytics_distinct_id_for_record, analytics_posthog_properties_for_record,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_analytics_distinct_id_prefers_user_id() {
+        let event = AnalyticsEvent {
+            id: Uuid::nil(),
+            event_type: "message_send".to_string(),
+            event_category: AnalyticsEventCategory::UserAction,
+            user_id: Some("u-1".to_string()),
+            session_id: Some(Uuid::nil()),
+            properties: sqlx::types::Json(json!({})),
+            timestamp: chrono::Utc::now(),
+            platform: Some("web".to_string()),
+            app_version: Some("1.0.0".to_string()),
+            os: Some("macOS".to_string()),
+            device_id: Some("d-1".to_string()),
+        };
+
+        assert_eq!(analytics_distinct_id_for_record(&event), "user:u-1");
+    }
+
+    #[test]
+    fn test_analytics_posthog_properties_merge_metadata() {
+        let session_id = Uuid::nil();
+        let event = AnalyticsEvent {
+            id: Uuid::nil(),
+            event_type: "message_send".to_string(),
+            event_category: AnalyticsEventCategory::UserAction,
+            user_id: Some("u-1".to_string()),
+            session_id: Some(session_id),
+            properties: sqlx::types::Json(json!({"message_length": 12})),
+            timestamp: chrono::Utc::now(),
+            platform: Some("web".to_string()),
+            app_version: Some("1.0.0".to_string()),
+            os: Some("macOS".to_string()),
+            device_id: Some("d-1".to_string()),
+        };
+
+        let properties = analytics_posthog_properties_for_record(&event, "/analytics/events");
+
+        assert_eq!(properties["message_length"], json!(12));
+        assert_eq!(properties["event_category"], json!("user_action"));
+        assert_eq!(properties["user_id"], json!("u-1"));
+        assert_eq!(properties["session_id"], json!(session_id.to_string()));
+        assert_eq!(properties["device_id"], json!("d-1"));
+        assert_eq!(properties["ingest_path"], json!("/analytics/events"));
+    }
 }

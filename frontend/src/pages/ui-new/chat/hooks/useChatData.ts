@@ -9,7 +9,11 @@ import {
   ChatWorkItem,
 } from 'shared/types';
 import { chatApi } from '@/lib/api';
-import type { RunHistoryItem, SessionMember } from '../types';
+import type {
+  RunHistoryItem,
+  RunRetentionState,
+  SessionMember,
+} from '../types';
 import { extractRunId, extractErrorFromMeta } from '../utils';
 
 export interface UseChatDataResult {
@@ -173,4 +177,37 @@ export function useRunHistory(messages: ChatMessage[]): RunHistoryItem[] {
     }
     return runs;
   }, [messages]);
+}
+
+export function useRunRetention(
+  sessionId: string | null,
+  runIds: string[]
+): Map<string, RunRetentionState> {
+  const { data } = useQuery({
+    queryKey: ['chatRunRetention', sessionId, runIds],
+    queryFn: async () => {
+      if (!sessionId || runIds.length === 0) return [];
+      return chatApi.getSessionRunsRetention(sessionId, runIds);
+    },
+    enabled: !!sessionId && runIds.length > 0,
+    staleTime: 30_000,
+  });
+
+  return useMemo(() => {
+    const map = new Map<string, RunRetentionState>();
+    if (!data) return map;
+    for (const info of data) {
+      map.set(info.run_id, {
+        runId: info.run_id,
+        logState: info.log_state,
+        artifactState: info.artifact_state,
+        logTruncated: info.log_truncated,
+        logCaptureDegraded: info.log_capture_degraded,
+        prunedAt: info.pruned_at,
+        pruneReason: info.prune_reason,
+        retentionSummary: info.retention_summary,
+      });
+    }
+    return map;
+  }, [data]);
 }

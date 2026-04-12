@@ -51,6 +51,7 @@ import {
   RemoteSkillMeta,
   RemoteSkillPackage,
   SkillCategory,
+  ChatRunRetentionInfo,
 } from 'shared/types';
 import type {
   CliConfig,
@@ -630,6 +631,9 @@ export const chatApi = {
         summary_text: null,
         archive_ref: null,
         last_seen_diff_key: diffKey,
+        team_protocol: null,
+        team_protocol_enabled: null,
+        default_workspace_path: null,
       }),
     });
     return handleApiResponse<ChatSession>(response);
@@ -901,6 +905,24 @@ export const chatApi = {
     return response.text();
   },
 
+  getSessionRunsRetention: async (
+    sessionId: string,
+    runIds?: string[]
+  ): Promise<ChatRunRetentionInfo[]> => {
+    const params = new URLSearchParams();
+    if (runIds && runIds.length > 0) {
+      params.set('run_ids', runIds.join(','));
+    }
+    const query = params.toString();
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/runs/retention${query ? `?${query}` : ''}`
+    );
+    const data = await handleApiResponse<{ runs: ChatRunRetentionInfo[] }>(
+      response
+    );
+    return data?.runs ?? [];
+  },
+
   getRunLog: async (
     runId: string,
     options?: { offset?: number; limit?: number; tail?: boolean }
@@ -926,11 +948,16 @@ export const chatApi = {
       `/api/chat/runs/${runId}/log${query ? `?${query}` : ''}`
     );
     if (!response.ok) {
-      throw new ApiError(
-        response.statusText || 'Failed to fetch run log',
-        response.status,
-        response
-      );
+      let errorMessage = response.statusText || 'Failed to fetch run log';
+      try {
+        const errorData = await response.clone().json();
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      } catch {
+        // keep statusText fallback
+      }
+      throw new ApiError(errorMessage, response.status, response);
     }
     return response.text();
   },

@@ -143,14 +143,13 @@ function SettingsDialogContent({
       />
       <div
         className={cn(
-          'fixed z-[9999]',
-          'inset-0',
-          'md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2'
+          'fixed inset-0 z-[9999] flex items-stretch justify-stretch pointer-events-none',
+          'md:items-center md:justify-center'
         )}
       >
         <div
           className={cn(
-            'settings-dialog-shell chat-settings-theme h-full w-full flex overflow-hidden bg-white',
+            'settings-dialog-shell chat-settings-theme pointer-events-auto h-full w-full flex overflow-hidden bg-white',
             'animate-in fade-in-0 slide-in-from-bottom-4 duration-200',
             'rounded-none border-0',
             'md:h-[800px] md:w-[966px] md:rounded-[16px] md:border'

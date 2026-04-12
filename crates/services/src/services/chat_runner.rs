@@ -15,7 +15,9 @@ use db::{
     models::{
         chat_agent::ChatAgent,
         chat_message::{ChatMessage, ChatSenderType},
-        chat_run::{ChatRun, CreateChatRun},
+        chat_run::{
+            ChatRun, ChatRunArtifactState, ChatRunLogState, ChatRunRetentionSummary, CreateChatRun,
+        },
         chat_session::ChatSession,
         chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
         chat_skill::ChatSkill,
@@ -57,6 +59,8 @@ use utils::{
 use uuid::Uuid;
 
 use crate::services::{
+    analytics::AnalyticsService,
+    analytics_events::{AnalyticsProjector, DomainEvent},
     chat::{self, ChatServiceError},
     config::{self, UiLanguage, preset_loader::PresetLoader},
     native_skills::{NativeSkillError, list_native_skills_for_runner},
@@ -95,6 +99,13 @@ const RESERVED_USER_HANDLE: &str = "you";
 const PROTOCOL_SEND_INTENT_VALUES: &[&str] = &["request", "reply", "notify", "blocker", "confirm"];
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
 const EXECUTOR_GRACEFUL_STOP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const LIVE_LOG_MAX_BYTES_PER_RUN: u64 = 8 * 1024 * 1024;
+const LIVE_LOG_BUDGET_BYTES_PER_WORKSPACE: u64 = 64 * 1024 * 1024;
+const PERSISTED_LOG_TAIL_BYTES_SUCCESS: u64 = 256 * 1024;
+const PERSISTED_LOG_TAIL_BYTES_FAILURE: u64 = 1024 * 1024;
+const RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE: u64 = 500 * 1024 * 1024;
+const RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE: u64 = 200 * 1024 * 1024;
+const _: () = assert!(RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE < RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE);
 const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
   {"type": "send", "to": "you", "intent": "request", "content": "I have finished the front implementation"},
   {"type": "send", "to": "architect", "intent": "confirm", "content": "The UI is ready. Please confirm the API contract before I continue."},
@@ -394,6 +405,7 @@ impl RunCompletionStatus {
 #[derive(Clone)]
 pub struct ChatRunner {
     db: DBService,
+    analytics: Option<AnalyticsService>,
     streams: Arc<DashMap<Uuid, broadcast::Sender<ChatStreamEvent>>>,
     // Store per-run lifecycle controls, key = session_agent_id
     run_controls: Arc<DashMap<Uuid, RunLifecycleControl>>,
@@ -403,17 +415,30 @@ pub struct ChatRunner {
     // Session-level background context compaction dedupe.
     // At most one compaction task per session is allowed at a time.
     background_compaction_inflight: Arc<DashMap<Uuid, ()>>,
+    workspace_live_log_bytes: Arc<DashMap<String, u64>>,
+    workspace_janitor_locks: Arc<DashMap<String, Arc<Mutex<()>>>>,
 }
 
 impl ChatRunner {
     pub fn new(db: DBService) -> Self {
+        Self::with_analytics(db, None)
+    }
+
+    pub fn with_analytics(db: DBService, analytics: Option<AnalyticsService>) -> Self {
         Self {
             db,
+            analytics,
             streams: Arc::new(DashMap::new()),
             run_controls: Arc::new(DashMap::new()),
             pending_messages: Arc::new(DashMap::new()),
             background_compaction_inflight: Arc::new(DashMap::new()),
+            workspace_live_log_bytes: Arc::new(DashMap::new()),
+            workspace_janitor_locks: Arc::new(DashMap::new()),
         }
+    }
+
+    fn analytics_projector(&self) -> AnalyticsProjector<'_> {
+        AnalyticsProjector::new(&self.db.pool, self.analytics.as_ref())
     }
 
     pub async fn recover_orphaned_session_agents(&self) -> Result<usize, ChatRunnerError> {
@@ -981,6 +1006,7 @@ impl ChatRunner {
 
         let session_agent_id = session_agent.id;
         let agent_id = agent.id;
+        let run_started_at = session_agent.updated_at;
         // Register the stop control before broadcasting the running state so an
         // immediate user stop request cannot miss the active run.
         let stop = self.register_run_control(session_agent_id);
@@ -1013,6 +1039,7 @@ impl ChatRunner {
 
         let chain_depth = self.extract_chain_depth(&source_message.meta);
 
+        let run_id = Uuid::new_v4();
         let result = async {
             let workspace_path = self
                 .resolve_workspace_path_for_agent(
@@ -1035,7 +1062,6 @@ impl ChatRunner {
             );
 
             let run_index = ChatRun::next_run_index(&self.db.pool, session_agent_id).await?;
-            let run_id = Uuid::new_v4();
             let run_dir =
                 run_records_dir.join(Self::run_records_prefix(session_agent_id, run_index));
             fs::create_dir_all(&run_dir).await?;
@@ -1050,8 +1076,10 @@ impl ChatRunner {
 
             let input_path = run_dir.join("input.md");
             let output_path = run_dir.join("output.md");
-            let raw_log_path = run_dir.join("raw.log");
+            let tail_log_path = run_dir.join("raw.tail.log");
             let meta_path = run_dir.join("meta.json");
+            let live_spool_path =
+                Self::workspace_live_spool_path(PathBuf::from(&workspace_path).as_path(), run_id);
 
             let context_snapshot = self
                 .build_context_snapshot(session_id, &workspace_path)
@@ -1077,6 +1105,7 @@ impl ChatRunner {
                 .build_message_attachment_context(source_message, &context_dir)
                 .await?;
             let session_agents = self.build_session_agent_summaries(session_id).await?;
+            let session = ChatSession::find_by_id(&self.db.pool, session_id).await?;
 
             // Resolve the enabled native skills allowed for this session member.
             let agent_skills = self
@@ -1098,7 +1127,7 @@ impl ChatRunner {
                 reference_context.as_ref(),
                 &agent_skills,
                 prompt_language,
-                ui_config.chat_presets.team_protocol.as_deref(),
+                Self::resolve_session_team_protocol(session.as_ref()),
             );
             fs::write(&input_path, &prompt).await?;
 
@@ -1111,7 +1140,7 @@ impl ChatRunner {
                     run_dir: run_dir.to_string_lossy().to_string(),
                     input_path: Some(input_path.to_string_lossy().to_string()),
                     output_path: Some(output_path.to_string_lossy().to_string()),
-                    raw_log_path: Some(raw_log_path.to_string_lossy().to_string()),
+                    raw_log_path: Some(live_spool_path.to_string_lossy().to_string()),
                     meta_path: Some(meta_path.to_string_lossy().to_string()),
                 },
                 run_id,
@@ -1166,9 +1195,31 @@ impl ChatRunner {
             };
 
             let msg_store = Arc::new(MsgStore::new());
-            let raw_log_file = Arc::new(Mutex::new(fs::File::create(&raw_log_path).await?));
+            let raw_log_spool = Arc::new(Mutex::new(
+                runtime::RunLogSpool::new(
+                    live_spool_path,
+                    run_id,
+                    self.db.pool.clone(),
+                    workspace_path.clone(),
+                    self.workspace_live_log_bytes.clone(),
+                )
+                .await?,
+            ));
 
-            self.spawn_log_forwarders(&mut spawned.child, msg_store.clone(), raw_log_file);
+            self.analytics_projector()
+                .project_or_warn(DomainEvent::AgentRunStarted {
+                    session_id,
+                    agent_id,
+                    run_id,
+                    executor_profile: Some(executor_profile_id.to_string()),
+                })
+                .await;
+
+            let log_forwarders = self.spawn_log_forwarders(
+                &mut spawned.child,
+                msg_store.clone(),
+                raw_log_spool.clone(),
+            );
             executor.normalize_logs(msg_store.clone(), PathBuf::from(&workspace_path).as_path());
 
             let completion_status = Arc::new(AtomicU8::new(RunCompletionStatus::Succeeded.as_u8()));
@@ -1183,6 +1234,8 @@ impl ChatRunner {
                 meta_path,
                 PathBuf::from(&workspace_path),
                 run_dir,
+                tail_log_path,
+                raw_log_spool,
                 completion_status.clone(),
                 chain_depth,
                 context_snapshot.context_compacted,
@@ -1191,6 +1244,7 @@ impl ChatRunner {
                 source_message.id,
                 agent.name.clone(),
                 prompt_language,
+                run_started_at,
             );
 
             self.spawn_exit_watcher(
@@ -1201,6 +1255,7 @@ impl ChatRunner {
                     exit_signal: spawned.exit_signal,
                     msg_store,
                     completion_status,
+                    log_forwarders,
                 },
                 session_agent_id,
             );
@@ -1212,6 +1267,15 @@ impl ChatRunner {
         if result.is_err() {
             self.run_controls.remove(&session_agent_id);
             if let Err(err) = &result {
+                self.analytics_projector()
+                    .project_or_warn(DomainEvent::AgentRunErrored {
+                        session_id,
+                        agent_id,
+                        run_id,
+                        error_type: "startup_failure".to_string(),
+                        error_message: err.to_string(),
+                    })
+                    .await;
                 self.report_mention_failure(
                     session_id,
                     source_message.id,

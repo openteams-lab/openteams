@@ -54,6 +54,17 @@ impl ChatRunner {
         Self::workspace_runs_dir(workspace_path, session_id).join(RUN_RECORDS_DIR_NAME)
     }
 
+    pub(super) fn workspace_live_spool_dir(workspace_path: &Path) -> PathBuf {
+        workspace_path
+            .join(OPENTEAMS_WORKSPACE_DIR)
+            .join("tmp")
+            .join(RUNS_DIR_NAME)
+    }
+
+    pub(super) fn workspace_live_spool_path(workspace_path: &Path, run_id: Uuid) -> PathBuf {
+        Self::workspace_live_spool_dir(workspace_path).join(format!("{run_id}.log"))
+    }
+
     pub(super) fn run_records_prefix(session_agent_id: Uuid, run_index: i64) -> String {
         format!("session_agent_{session_agent_id}_run_{run_index:04}")
     }
@@ -1645,13 +1656,50 @@ impl ChatRunner {
     pub(super) fn parse_agent_protocol_messages(
         content: &str,
     ) -> Result<Vec<AgentProtocolMessage>, AgentProtocolError> {
-        let json_str = Self::extract_json_from_content(content)?;
-        let raw: serde_json::Value =
-            serde_json::from_str(&json_str).map_err(Self::invalid_json_error)?;
+        let strict_error = match Self::extract_json_from_content(content) {
+            Ok(json_str) => match Self::parse_agent_protocol_messages_from_json(&json_str) {
+                Ok(messages) => return Ok(messages),
+                Err(err) => err,
+            },
+            Err(err) => err,
+        };
 
+        if strict_error.code != ChatProtocolNoticeCode::InvalidJson {
+            return Err(strict_error);
+        }
+
+        let Some(relaxed_json) = Self::extract_relaxed_json_from_content(content) else {
+            return Err(strict_error);
+        };
+        let normalized_json = Self::normalize_relaxed_protocol_json(&relaxed_json);
+
+        match Self::parse_agent_protocol_messages_from_json(&normalized_json) {
+            Ok(messages) => Ok(messages),
+            Err(err) if err.code != ChatProtocolNoticeCode::InvalidJson => Err(err),
+            Err(_) => {
+                let repaired_json =
+                    Self::repair_relaxed_protocol_json_string_quotes(&normalized_json);
+                if repaired_json == normalized_json {
+                    return Err(strict_error);
+                }
+
+                match Self::parse_agent_protocol_messages_from_json(&repaired_json) {
+                    Ok(messages) => Ok(messages),
+                    Err(err) if err.code != ChatProtocolNoticeCode::InvalidJson => Err(err),
+                    Err(_) => Err(strict_error),
+                }
+            }
+        }
+    }
+
+    pub(super) fn parse_agent_protocol_messages_from_json(
+        json_str: &str,
+    ) -> Result<Vec<AgentProtocolMessage>, AgentProtocolError> {
+        let raw: serde_json::Value =
+            serde_json::from_str(json_str).map_err(Self::invalid_json_error)?;
         let messages = match &raw {
             serde_json::Value::Array(_) => {
-                serde_json::from_str::<Vec<AgentProtocolMessage>>(&json_str)
+                serde_json::from_str::<Vec<AgentProtocolMessage>>(json_str)
                     .map_err(Self::invalid_json_error)?
             }
             _ => {
@@ -1667,6 +1715,389 @@ impl ChatRunner {
         };
 
         Self::validate_agent_protocol_messages(messages)
+    }
+
+    pub(super) fn extract_relaxed_json_from_content(content: &str) -> Option<String> {
+        let trimmed = content.trim();
+        if matches!(trimmed.chars().next(), Some('[' | '{'))
+            && let Some(candidate) = Self::extract_balanced_json_like_prefix(trimmed)
+        {
+            return Some(candidate);
+        }
+
+        if let Some(start) = trimmed.find("```json") {
+            let json_start = start + 7;
+            let remaining = &trimmed[json_start..];
+            if let Some(candidate) = Self::extract_balanced_json_like_prefix(remaining) {
+                return Some(candidate);
+            }
+        }
+
+        if let Some(start) = trimmed.find("```") {
+            let block_start = start + 3;
+            let remaining = &trimmed[block_start..];
+            if let Some(candidate) = Self::extract_balanced_json_like_prefix(remaining) {
+                return Some(candidate);
+            }
+        }
+
+        for (index, ch) in trimmed.char_indices() {
+            if matches!(ch, '[' | '{')
+                && let Some(candidate) = Self::extract_balanced_json_like_prefix(&trimmed[index..])
+            {
+                return Some(candidate);
+            }
+        }
+
+        None
+    }
+
+    pub(super) fn extract_balanced_json_like_prefix(content: &str) -> Option<String> {
+        let trimmed = content.trim_start();
+        if !matches!(trimmed.chars().next(), Some('[' | '{')) {
+            return None;
+        }
+
+        let mut stack = Vec::new();
+        let mut in_string = false;
+        let mut escaped = false;
+
+        for (index, ch) in trimmed.char_indices() {
+            if in_string {
+                if escaped {
+                    escaped = false;
+                    continue;
+                }
+
+                match ch {
+                    '\\' => escaped = true,
+                    '"' => in_string = false,
+                    _ => {}
+                }
+                continue;
+            }
+
+            match ch {
+                '"' => in_string = true,
+                '[' | '{' => stack.push(ch),
+                ']' => {
+                    if stack.pop() != Some('[') {
+                        return None;
+                    }
+                    if stack.is_empty() {
+                        return Some(trimmed[..index + ch.len_utf8()].to_string());
+                    }
+                }
+                '}' => {
+                    if stack.pop() != Some('{') {
+                        return None;
+                    }
+                    if stack.is_empty() {
+                        return Some(trimmed[..index + ch.len_utf8()].to_string());
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        None
+    }
+
+    pub(super) fn normalize_relaxed_protocol_json(content: &str) -> String {
+        #[derive(Clone, Copy)]
+        enum Scope {
+            Array,
+            Object { expecting_first_member: bool },
+        }
+
+        let mut normalized = String::with_capacity(content.len() + 32);
+        let mut scopes = Vec::new();
+        let mut index = 0usize;
+
+        while index < content.len() {
+            let Some(ch) = content[index..].chars().next() else {
+                break;
+            };
+            let next = index + ch.len_utf8();
+
+            match ch {
+                '{' => {
+                    normalized.push(ch);
+                    scopes.push(Scope::Object {
+                        expecting_first_member: true,
+                    });
+                    index = next;
+                }
+                '[' => {
+                    normalized.push(ch);
+                    scopes.push(Scope::Array);
+                    index = next;
+                }
+                '}' | ']' => {
+                    normalized.push(ch);
+                    scopes.pop();
+                    index = next;
+                }
+                '"' => {
+                    let Some(string_end) = Self::find_json_string_end(content, index) else {
+                        normalized.push_str(&content[index..]);
+                        break;
+                    };
+                    let raw_literal = &content[index..string_end];
+                    let is_first_object_member = matches!(
+                        scopes.last(),
+                        Some(Scope::Object {
+                            expecting_first_member: true
+                        })
+                    );
+
+                    if is_first_object_member
+                        && let Ok(raw_value) = serde_json::from_str::<String>(raw_literal)
+                        && let Some(protocol_type) =
+                            Self::canonical_protocol_message_type_name(&raw_value)
+                    {
+                        let next_token_index = Self::skip_json_whitespace(content, string_end);
+                        if matches!(content[next_token_index..].chars().next(), Some(',')) {
+                            normalized.push_str("\"type\": ");
+                            normalized.push_str(
+                                &serde_json::to_string(protocol_type)
+                                    .expect("protocol type should serialize"),
+                            );
+                            if let Some(Scope::Object {
+                                expecting_first_member,
+                            }) = scopes.last_mut()
+                            {
+                                *expecting_first_member = false;
+                            }
+                            index = string_end;
+                            continue;
+                        }
+                    }
+
+                    normalized.push_str(raw_literal);
+                    if let Some(Scope::Object {
+                        expecting_first_member,
+                    }) = scopes.last_mut()
+                        && *expecting_first_member
+                    {
+                        *expecting_first_member = false;
+                    }
+                    index = string_end;
+                }
+                _ => {
+                    normalized.push_str(&content[index..next]);
+                    index = next;
+                }
+            }
+        }
+
+        normalized
+    }
+
+    pub(super) fn repair_relaxed_protocol_json_string_quotes(content: &str) -> String {
+        #[derive(Clone, Copy)]
+        enum Scope {
+            Array,
+            Object { phase: ObjectPhase },
+        }
+
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum ObjectPhase {
+            ExpectKeyOrEnd,
+            AfterKey,
+            ExpectValue,
+            AfterValue,
+        }
+
+        #[derive(Clone, Copy)]
+        enum StringRole {
+            Key,
+            Value,
+        }
+
+        let mut repaired = String::with_capacity(content.len() + 16);
+        let mut scopes = Vec::new();
+        let mut index = 0usize;
+        let mut in_string: Option<StringRole> = None;
+        let mut escaped = false;
+
+        while index < content.len() {
+            let Some(ch) = content[index..].chars().next() else {
+                break;
+            };
+            let next = index + ch.len_utf8();
+
+            if let Some(role) = in_string {
+                if escaped {
+                    repaired.push(ch);
+                    escaped = false;
+                    index = next;
+                    continue;
+                }
+
+                match ch {
+                    '\\' => {
+                        repaired.push(ch);
+                        escaped = true;
+                    }
+                    '"' => {
+                        let next_non_ws = Self::next_non_whitespace_char(content, next);
+                        let closes_string = match role {
+                            StringRole::Key => next_non_ws == Some(':'),
+                            StringRole::Value => {
+                                matches!(next_non_ws, Some(',' | '}' | ']'))
+                                    || next_non_ws.is_none()
+                            }
+                        };
+
+                        if closes_string {
+                            repaired.push(ch);
+                            if let Some(Scope::Object { phase }) = scopes.last_mut() {
+                                match role {
+                                    StringRole::Key if *phase == ObjectPhase::ExpectKeyOrEnd => {
+                                        *phase = ObjectPhase::AfterKey;
+                                    }
+                                    StringRole::Value if *phase == ObjectPhase::ExpectValue => {
+                                        *phase = ObjectPhase::AfterValue;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            in_string = None;
+                        } else {
+                            repaired.push('\\');
+                            repaired.push('"');
+                        }
+                    }
+                    _ => repaired.push(ch),
+                }
+
+                index = next;
+                continue;
+            }
+
+            match ch {
+                '{' => {
+                    if let Some(Scope::Object { phase }) = scopes.last_mut()
+                        && *phase == ObjectPhase::ExpectValue
+                    {
+                        *phase = ObjectPhase::AfterValue;
+                    }
+                    repaired.push(ch);
+                    scopes.push(Scope::Object {
+                        phase: ObjectPhase::ExpectKeyOrEnd,
+                    });
+                }
+                '[' => {
+                    if let Some(Scope::Object { phase }) = scopes.last_mut()
+                        && *phase == ObjectPhase::ExpectValue
+                    {
+                        *phase = ObjectPhase::AfterValue;
+                    }
+                    repaired.push(ch);
+                    scopes.push(Scope::Array);
+                }
+                '}' | ']' => {
+                    repaired.push(ch);
+                    scopes.pop();
+                }
+                '"' => {
+                    let role = match scopes.last() {
+                        Some(Scope::Object {
+                            phase: ObjectPhase::ExpectKeyOrEnd,
+                        }) => StringRole::Key,
+                        _ => StringRole::Value,
+                    };
+                    repaired.push(ch);
+                    in_string = Some(role);
+                }
+                ':' => {
+                    repaired.push(ch);
+                    if let Some(Scope::Object { phase }) = scopes.last_mut()
+                        && *phase == ObjectPhase::AfterKey
+                    {
+                        *phase = ObjectPhase::ExpectValue;
+                    }
+                }
+                ',' => {
+                    repaired.push(ch);
+                    if let Some(Scope::Object { phase }) = scopes.last_mut()
+                        && *phase == ObjectPhase::AfterValue
+                    {
+                        *phase = ObjectPhase::ExpectKeyOrEnd;
+                    }
+                }
+                _ => {
+                    repaired.push(ch);
+                    if !ch.is_whitespace()
+                        && let Some(Scope::Object { phase }) = scopes.last_mut()
+                        && *phase == ObjectPhase::ExpectValue
+                    {
+                        *phase = ObjectPhase::AfterValue;
+                    }
+                }
+            }
+
+            index = next;
+        }
+
+        repaired
+    }
+
+    pub(super) fn find_json_string_end(content: &str, start: usize) -> Option<usize> {
+        let mut escaped = false;
+        let mut index = start + 1;
+
+        while index < content.len() {
+            let ch = content[index..].chars().next()?;
+            let next = index + ch.len_utf8();
+
+            if escaped {
+                escaped = false;
+                index = next;
+                continue;
+            }
+
+            match ch {
+                '\\' => escaped = true,
+                '"' => return Some(next),
+                _ => {}
+            }
+
+            index = next;
+        }
+
+        None
+    }
+
+    pub(super) fn skip_json_whitespace(content: &str, start: usize) -> usize {
+        let mut index = start;
+        while index < content.len() {
+            let Some(ch) = content[index..].chars().next() else {
+                break;
+            };
+            if !ch.is_whitespace() {
+                break;
+            }
+            index += ch.len_utf8();
+        }
+        index
+    }
+
+    pub(super) fn next_non_whitespace_char(content: &str, start: usize) -> Option<char> {
+        let index = Self::skip_json_whitespace(content, start);
+        content[index..].chars().next()
+    }
+
+    pub(super) fn canonical_protocol_message_type_name(value: &str) -> Option<&'static str> {
+        let normalized = value.trim().to_ascii_lowercase();
+        match normalized.as_str() {
+            "send" => Some("send"),
+            "record" => Some("record"),
+            "artifact" | "artiface" | "artefact" => Some("artifact"),
+            "conclusion" => Some("conclusion"),
+            _ => None,
+        }
     }
 
     pub(super) fn validate_agent_protocol_messages(
@@ -2141,6 +2572,19 @@ impl ChatRunner {
             return PresetLoader::load_team_protocol();
         }
         normalized_protocol.to_string()
+    }
+
+    pub(super) fn resolve_session_team_protocol(session: Option<&ChatSession>) -> Option<&str> {
+        let session = session?;
+        if !session.team_protocol_enabled {
+            return None;
+        }
+
+        session
+            .team_protocol
+            .as_deref()
+            .map(str::trim)
+            .filter(|protocol| !protocol.is_empty())
     }
 
     pub(super) fn strip_embedded_team_protocol_from_system_prompt(system_prompt: &str) -> String {

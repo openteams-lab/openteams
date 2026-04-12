@@ -10,6 +10,7 @@ use db::{
     models::{
         chat_agent::ChatAgent,
         chat_message::{ChatMessage, ChatSenderType},
+        chat_session::{ChatSession, ChatSessionStatus},
         chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
         chat_skill::ChatSkill,
     },
@@ -24,8 +25,9 @@ use uuid::Uuid;
 use super::{
     AgentProtocolError, AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner,
     ChatStreamEvent, MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON, MessageAttachmentContext,
-    ReferenceAttachment, ReferenceContext, ResolvedPromptLanguage, RunCompletionStatus,
-    SessionAgentSummary, TokenUsageInfo,
+    RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE, RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE, ReferenceAttachment,
+    ReferenceContext, ResolvedPromptLanguage, RunCompletionStatus, SessionAgentSummary,
+    TokenUsageInfo, runtime::RunLogForwarders,
 };
 use crate::services::config::UiLanguage;
 
@@ -148,6 +150,19 @@ fn finished_count(msg_store: &MsgStore) -> usize {
         .count()
 }
 
+fn empty_log_forwarders() -> RunLogForwarders {
+    RunLogForwarders {
+        stdout: tokio::spawn(async {}),
+        stderr: tokio::spawn(async {}),
+    }
+}
+
+#[test]
+fn run_budget_thresholds_match_latest_policy() {
+    assert_eq!(RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE, 500 * 1024 * 1024);
+    assert_eq!(RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE, 200 * 1024 * 1024);
+}
+
 #[test]
 fn parse_token_usage_from_codex_token_count_line() {
     let line = r#"{"method":"codex/event/token_count","params":{"msg":{"info":{"last_token_usage":{"total_tokens":53002},"model_context_window":258400}}}}"#;
@@ -251,6 +266,52 @@ fn parse_agent_protocol_messages_json_with_embedded_backticks() {
 }
 
 #[test]
+fn parse_agent_protocol_messages_supports_relaxed_message_type_shorthand() {
+    let content = r#"
+```json
+[
+  {
+    "type": "send",
+    "to": "you",
+    "intent": "reply",
+    "content": "done"
+  },
+  {
+    "record",
+    "content": "hero grid restored to idle"
+  },
+  {
+    "conclusion",
+    "content": "restoration behavior is now configured"
+  }
+]
+```
+"#;
+
+    let messages = ChatRunner::parse_agent_protocol_messages(content).expect("messages");
+    assert_eq!(messages.len(), 3);
+    assert!(matches!(
+        messages[0].message_type,
+        AgentProtocolMessageType::Send
+    ));
+    assert_eq!(messages[0].to.as_deref(), Some("you"));
+    assert_eq!(messages[0].intent.as_deref(), Some("reply"));
+    assert!(matches!(
+        messages[1].message_type,
+        AgentProtocolMessageType::Record
+    ));
+    assert_eq!(messages[1].content, "hero grid restored to idle");
+    assert!(matches!(
+        messages[2].message_type,
+        AgentProtocolMessageType::Conclusion
+    ));
+    assert_eq!(
+        messages[2].content,
+        "restoration behavior is now configured"
+    );
+}
+
+#[test]
 fn parse_agent_protocol_messages_rejects_legacy_object() {
     let content = r#"{
   "send_to_member": { "target": "@architect", "content": "sync API changes" },
@@ -302,6 +363,7 @@ async fn exit_signal_waits_for_cleanup_before_finished() {
         Some(exit_rx),
         msg_store.clone(),
         completion_status.clone(),
+        empty_log_forwarders(),
         Uuid::new_v4(),
         std::time::Duration::from_secs(3),
     ));
@@ -333,6 +395,7 @@ async fn stop_request_uses_same_cleanup_flow() {
         None,
         msg_store.clone(),
         completion_status.clone(),
+        empty_log_forwarders(),
         Uuid::new_v4(),
         std::time::Duration::from_millis(100),
     ));
@@ -367,6 +430,7 @@ async fn stop_request_waits_for_executor_exit_signal_before_finished() {
         Some(exit_rx),
         msg_store.clone(),
         completion_status.clone(),
+        empty_log_forwarders(),
         Uuid::new_v4(),
         std::time::Duration::from_millis(100),
     ));
@@ -587,7 +651,7 @@ fn parse_agent_protocol_messages_reports_json_error_detail() {
     let content = r#"
 ```json
 [
-  {"type":"send","to":"backend","content":"bad "quote""}
+  {"type":"send","to":"backend","content":"missing value","intent": }
 ]
 ```
 "#;
@@ -597,6 +661,91 @@ fn parse_agent_protocol_messages_reports_json_error_detail() {
     let detail = err.detail.expect("detail");
     assert!(detail.contains("line"));
     assert!(detail.contains("column"));
+}
+
+#[test]
+fn parse_agent_protocol_messages_repairs_unescaped_quotes_from_run_0003() {
+    let content = r#"All changes look correct. Now let me write the final implementation notes document and respond to the coordinator.
+
+```json
+[
+  {"type": "artifact", "content": "T6 实现完成，变更文件：`frontend/src/lib/api.ts`（新增 `getSessionRunsRetention`）、`frontend/src/pages/ui-new/chat/types.ts`（新增 `RunRetentionState` 类型，`RunHistoryItem` 增加 `retention?` 字段）、`frontend/src/pages/ui-new/chat/hooks/useChatData.ts`（新增 `useRunRetention` hook）、`frontend/src/pages/ui-new/chat/index.ts`（导出 `useRunRetention`）、`frontend/src/pages/ui-new/chat/components/WorkspaceDrawer.tsx`（新增 `retentionByRunId` prop，View Log 按钮支持 pruned/tail/截断/降级状态展示）、`frontend/src/pages/ui-new/ChatSessions.tsx`（接入 `useRunRetention`，410 错误单独处理，传递 `retentionByRunId` 给 Drawer）。"},
+  {"type": "record", "content": "frontend T6 已落地：run 列表通过 `useRunRetention(sessionId, runIds)` 拉取 `GET /api/chat/sessions/{session_id}/runs/retention`，按 runId map 后传入 WorkspaceDrawer；View Log 按钮在 `log_state=pruned` 时禁用并显示"日志已清理"，在 `log_state=tail` 时附加提示；`log_truncated`/`log_capture_degraded`/`artifact_state` 以 badge 形式展示；`handleLoadLog` 对 HTTP 410 单独提示"日志已按保留策略清理"。"},
+  {"type": "send", "to": "coordinator", "intent": "notify", "content": "T6 实现完成。已接入 retention 接口、新增 `useRunRetention` hook、WorkspaceDrawer 支持 pruned/tail/截断/降级/stub/artifactPruned 状态展示，`handleLoadLog` 对 410 单独处理。共变更 6 个文件，均以 T4 API 契约为准，`/log` 的 410 处理位已预留。"},
+  {"type": "conclusion", "content": "T6 retention 前端实现已全部落地，5 个目标文件加 index.ts 共 6 处改动。`/log` 的 410 处理位已按 T4 契约预留，后续 T5 落地后无需额外适配。"}
+]
+```"#;
+
+    let messages = ChatRunner::parse_agent_protocol_messages(content).expect("messages");
+    assert_eq!(messages.len(), 4);
+    assert!(matches!(
+        messages[0].message_type,
+        AgentProtocolMessageType::Artifact
+    ));
+    assert!(matches!(
+        messages[1].message_type,
+        AgentProtocolMessageType::Record
+    ));
+    assert!(messages[1].content.contains("\"日志已清理\""));
+    assert!(matches!(
+        messages[2].message_type,
+        AgentProtocolMessageType::Send
+    ));
+    assert_eq!(messages[2].to.as_deref(), Some("coordinator"));
+    assert_eq!(messages[2].intent.as_deref(), Some("notify"));
+    assert!(matches!(
+        messages[3].message_type,
+        AgentProtocolMessageType::Conclusion
+    ));
+}
+
+#[test]
+fn parse_agent_protocol_messages_repairs_unescaped_quotes_from_run_0004() {
+    let content = r#"```json
+[
+  {"type": "conclusion", "content": "T6 实现已在上一轮完成，契约已按 T4 文档落地：`getSessionRunsRetention` 使用逗号分隔 `run_ids`，`handleLoadLog` 对 HTTP 410 单独提示"日志已按保留策略清理"，与 `Chat run log expired` 响应对应。无待处理项。"}
+]
+```"#;
+
+    let messages = ChatRunner::parse_agent_protocol_messages(content).expect("messages");
+    assert_eq!(messages.len(), 1);
+    assert!(matches!(
+        messages[0].message_type,
+        AgentProtocolMessageType::Conclusion
+    ));
+    assert!(messages[0].content.contains("\"日志已按保留策略清理\""));
+}
+
+#[test]
+fn parse_agent_protocol_messages_repairs_unescaped_quotes_from_run_0005() {
+    let content = r#"```json
+[
+  {"type": "artifact", "content": "T6 完成报告已写入 `.openteams/context/3058d52b-0264-416f-a787-d2346c012f07/frontend-t6-completion-report.md`，包含 6 个变更文件、核心改动点和契约对接验证表。"},
+  {"type": "record", "content": "frontend T6 已完成交付：`useRunRetention` hook 接入 `GET /api/chat/sessions/{session_id}/runs/retention`；WorkspaceDrawer 对 `log_state=pruned/tail`、`log_truncated`、`log_capture_degraded`、`artifact_state=stub/pruned` 实现了独立 UI 渲染；`handleLoadLog` 对 HTTP 410 单独提示"日志已按保留策略清理"，与 `Chat run log expired` 响应对应。"},
+  {"type": "send", "to": "coordinator", "intent": "notify", "content": "T6 已完成收口。6 个文件变更：`api.ts`（retention 接口）、`chat/types.ts`（类型）、`useChatData.ts`（hook）、`index.ts`（导出）、`WorkspaceDrawer.tsx`（retention UI）、`ChatSessions.tsx`（410 处理 + retention 注入）。报告见 `frontend-t6-completion-report.md`。唯一未覆盖项：response header 未解析（retention API 已能提前感知状态，无阻塞）。"},
+  {"type": "conclusion", "content": "T6 实现已全量落地，与 T4/T5 契约完全对齐。6 个文件改动包含 retention 状态展示、View Log 禁用态和 410 Gone 单独处理。`X-OpenTeams-Log-State` header 解析为非必要项，未实现但不影响功能完整性。"}
+]
+```"#;
+
+    let messages = ChatRunner::parse_agent_protocol_messages(content).expect("messages");
+    assert_eq!(messages.len(), 4);
+    assert!(matches!(
+        messages[0].message_type,
+        AgentProtocolMessageType::Artifact
+    ));
+    assert!(matches!(
+        messages[1].message_type,
+        AgentProtocolMessageType::Record
+    ));
+    assert!(messages[1].content.contains("\"日志已按保留策略清理\""));
+    assert!(matches!(
+        messages[2].message_type,
+        AgentProtocolMessageType::Send
+    ));
+    assert!(matches!(
+        messages[3].message_type,
+        AgentProtocolMessageType::Conclusion
+    ));
 }
 
 #[test]
@@ -1108,4 +1257,71 @@ fn resolve_team_protocol_guidelines_falls_back_when_empty() {
     let prompt = ChatRunner::resolve_team_protocol_guidelines(Some(" "));
 
     assert_eq!(prompt, "no team collaboration protocol");
+}
+
+#[test]
+fn resolve_session_team_protocol_returns_enabled_session_content_only() {
+    let now = Utc::now();
+    let session = ChatSession {
+        id: Uuid::new_v4(),
+        title: Some("demo".to_string()),
+        status: ChatSessionStatus::Active,
+        summary_text: None,
+        archive_ref: None,
+        last_seen_diff_key: None,
+        team_protocol: Some("  Follow the team protocol.  ".to_string()),
+        team_protocol_enabled: true,
+        default_workspace_path: None,
+        created_at: now,
+        updated_at: now,
+        archived_at: None,
+    };
+
+    assert_eq!(
+        ChatRunner::resolve_session_team_protocol(Some(&session)),
+        Some("Follow the team protocol.")
+    );
+}
+
+#[test]
+fn resolve_session_team_protocol_ignores_disabled_or_empty_session_content() {
+    let now = Utc::now();
+    let disabled_session = ChatSession {
+        id: Uuid::new_v4(),
+        title: Some("demo".to_string()),
+        status: ChatSessionStatus::Active,
+        summary_text: None,
+        archive_ref: None,
+        last_seen_diff_key: None,
+        team_protocol: Some("Follow the team protocol.".to_string()),
+        team_protocol_enabled: false,
+        default_workspace_path: None,
+        created_at: now,
+        updated_at: now,
+        archived_at: None,
+    };
+    let empty_session = ChatSession {
+        id: Uuid::new_v4(),
+        title: Some("demo".to_string()),
+        status: ChatSessionStatus::Active,
+        summary_text: None,
+        archive_ref: None,
+        last_seen_diff_key: None,
+        team_protocol: Some("   ".to_string()),
+        team_protocol_enabled: true,
+        default_workspace_path: None,
+        created_at: now,
+        updated_at: now,
+        archived_at: None,
+    };
+
+    assert_eq!(
+        ChatRunner::resolve_session_team_protocol(Some(&disabled_session)),
+        None
+    );
+    assert_eq!(
+        ChatRunner::resolve_session_team_protocol(Some(&empty_session)),
+        None
+    );
+    assert_eq!(ChatRunner::resolve_session_team_protocol(None), None);
 }

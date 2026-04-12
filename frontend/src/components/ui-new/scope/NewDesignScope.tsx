@@ -13,7 +13,9 @@ interface NewDesignScopeProps {
 }
 
 export function NewDesignScope({ children }: NewDesignScopeProps) {
-  const [container, setContainer] = useState<HTMLElement | null>(null);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(
+    null
+  );
   const hasTracked = useRef(false);
   const { resolvedTheme } = useTheme();
   const isTauriRuntime = typeof window !== 'undefined' && '__TAURI__' in window;
@@ -27,17 +29,23 @@ export function NewDesignScope({ children }: NewDesignScopeProps) {
 
   return (
     <div
-      ref={setContainer}
-      className={`new-design h-full ${
+      className={`new-design h-full w-full ${
         resolvedTheme === 'dark' ? 'dark' : ''
-      } ${isTauriRuntime ? '' : 'new-design--browser-scale'}`}
+      }`}
     >
-      {container && (
-        <PortalContainerContext.Provider value={container}>
-          <SequenceTrackerProvider>
-            <SequenceIndicator />
-            <NiceModal.Provider>{children}</NiceModal.Provider>
-          </SequenceTrackerProvider>
+      <div ref={setPortalContainer} />
+      {portalContainer && (
+        <PortalContainerContext.Provider value={portalContainer}>
+          <div
+            className={`h-full w-full ${
+              isTauriRuntime ? '' : 'new-design--browser-scale'
+            }`}
+          >
+            <SequenceTrackerProvider>
+              <SequenceIndicator />
+              <NiceModal.Provider>{children}</NiceModal.Provider>
+            </SequenceTrackerProvider>
+          </div>
         </PortalContainerContext.Provider>
       )}
     </div>

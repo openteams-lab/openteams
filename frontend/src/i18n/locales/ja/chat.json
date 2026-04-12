@@ -29,7 +29,10 @@
     "clearSessionSearch": "セッション検索をクリア",
     "noSearchResults": "「{{query}}」に一致するセッションはありません。",
     "generatedSessionTitle": "{{date}} 開始",
-    "aiTeam": "AIチーム"
+    "aiTeam": "AIチーム",
+    "menu": "メニュー",
+    "help": "ヘルプ",
+    "feedback": "フィードバック"
   },
   "contextMenu": {
     "editTitle": "名前を編集",

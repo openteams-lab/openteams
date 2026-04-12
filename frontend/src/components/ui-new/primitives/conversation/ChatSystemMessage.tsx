@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 interface ChatSystemMessageProps {
   content: string;
   className?: string;
+  textClassName?: string;
   expanded?: boolean;
   onToggle?: () => void;
 }
@@ -11,13 +12,15 @@ interface ChatSystemMessageProps {
 export function ChatSystemMessage({
   content,
   className,
+  textClassName = 'text-sm',
   expanded,
   onToggle,
 }: ChatSystemMessageProps) {
   return (
     <div
       className={cn(
-        'flex items-start gap-base text-sm text-low cursor-pointer',
+        'flex items-start gap-base text-low cursor-pointer',
+        textClassName,
         className
       )}
       onClick={onToggle}

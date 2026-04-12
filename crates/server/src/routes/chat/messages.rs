@@ -12,7 +12,10 @@ use db::models::{
 };
 use deployment::Deployment;
 use serde::Deserialize;
-use services::services::chat::ChatAttachmentMeta;
+use services::services::{
+    analytics_events::{AnalyticsProjector, DomainEvent},
+    chat::{ChatAttachmentMeta, extract_attachments},
+};
 use tokio::{fs, fs::File};
 use tokio_util::io::ReaderStream;
 use ts_rs::TS;
@@ -132,6 +135,22 @@ pub async fn create_message(
         payload.meta,
     )
     .await?;
+
+    if message.sender_type == ChatSenderType::User {
+        let attachments = extract_attachments(&message.meta.0);
+        let analytics_projector =
+            AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+        analytics_projector
+            .project_or_warn(DomainEvent::MessageSent {
+                session_id: session.id,
+                actor_user_id: deployment.user_id().to_string(),
+                message_length: message.content.len(),
+                mentions: message.mentions.0.clone(),
+                has_attachment: !attachments.is_empty(),
+                attachment_count: attachments.len(),
+            })
+            .await;
+    }
 
     deployment
         .chat_runner()
@@ -257,6 +276,20 @@ pub async fn upload_message_attachments(
         message_id,
     )
     .await?;
+
+    let attachments = extract_attachments(&message.meta.0);
+    let analytics_projector =
+        AnalyticsProjector::new(&deployment.db().pool, deployment.analytics().as_ref());
+    analytics_projector
+        .project_or_warn(DomainEvent::MessageSent {
+            session_id: session.id,
+            actor_user_id: deployment.user_id().to_string(),
+            message_length: message.content.len(),
+            mentions: message.mentions.0.clone(),
+            has_attachment: !attachments.is_empty(),
+            attachment_count: attachments.len(),
+        })
+        .await;
 
     deployment
         .chat_runner()

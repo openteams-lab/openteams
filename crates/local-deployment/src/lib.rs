@@ -131,7 +131,7 @@ impl Deployment for LocalDeployment {
 
         let approvals = Approvals::new(msg_stores.clone());
         let queued_message_service = QueuedMessageService::new();
-        let chat_runner = ChatRunner::new(db.clone());
+        let chat_runner = ChatRunner::with_analytics(db.clone(), analytics.clone());
         let recovered_orphaned_agents = chat_runner
             .recover_orphaned_session_agents()
             .await
@@ -142,6 +142,10 @@ impl Deployment for LocalDeployment {
                 "Recovered orphaned chat session agents during startup"
             );
         }
+        chat_runner
+            .run_startup_retention_janitor()
+            .await
+            .map_err(|err| DeploymentError::Other(err.into()))?;
 
         let oauth_credentials = Arc::new(OAuthCredentials::new(credentials_path()));
         if let Err(e) = oauth_credentials.load().await {

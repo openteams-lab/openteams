@@ -27,6 +27,10 @@ import {
 import { ApiError, chatApi, configApi } from '@/lib/api';
 import { resolveAppLanguageCode } from '@/i18n/languages';
 import { cn } from '@/lib/utils';
+import {
+  defaultChatBubbleFontSize,
+  getChatBubbleFontSizeTextClassName,
+} from '@/lib/chatBubbleFontSize';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useTheme } from '@/components/ThemeProvider';
 import { formatDateShortWithTime } from '@/utils/date';
@@ -56,6 +60,7 @@ import {
   type StreamRun,
   useChatData,
   useRunHistory,
+  useRunRetention,
   useChatMutations,
   useChatWebSocket,
   useMessageInput,
@@ -1487,6 +1492,10 @@ export function ChatSessions() {
   }, [sessionMembers]);
 
   const isArchived = activeSession?.status === ChatSessionStatus.archived;
+  const activeBubbleFontSize =
+    config?.chat_bubble_font_size ?? defaultChatBubbleFontSize;
+  const chatBubbleTextClassName =
+    getChatBubbleFontSizeTextClassName(activeBubbleFontSize);
   const activeSessionTitle = normalizeSessionTitle(activeSession?.title);
   const activeSessionSummary = activeSession?.summary_text?.trim() ?? '';
   const firstUserPromptTitle = useMemo(() => {
@@ -1673,6 +1682,16 @@ export function ChatSessions() {
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         ),
     [runHistory, workspaceAgentId]
+  );
+
+  const activeWorkspaceRunIds = useMemo(
+    () => activeWorkspaceRuns.map((r) => r.runId),
+    [activeWorkspaceRuns]
+  );
+
+  const retentionByRunId = useRunRetention(
+    workspaceDrawerOpen ? activeSessionId : null,
+    workspaceDrawerOpen ? activeWorkspaceRunIds : []
   );
   const formatProtocolNoticeContent = useCallback(
     (notice: ChatProtocolNotice) => {
@@ -3500,8 +3519,12 @@ export function ChatSessions() {
       const content = await chatApi.getRunLog(runId);
       setLogContent(content);
     } catch (error) {
-      console.warn('Failed to load run log', error);
-      setLogError('Unable to load run log.');
+      if (error instanceof ApiError && error.status === 410) {
+        setLogError(error.message || 'Chat run log expired');
+      } else {
+        console.warn('Failed to load run log', error);
+        setLogError('Unable to load run log.');
+      }
       setLogContent('');
     } finally {
       setLogLoading(false);
@@ -4000,6 +4023,7 @@ export function ChatSessions() {
                               : null
                           }
                           tone={tone}
+                          bubbleTextClassName={chatBubbleTextClassName}
                           referenceMessage={referenceMessage ?? null}
                           referenceSenderLabel={
                             referenceMessage
@@ -4058,6 +4082,7 @@ export function ChatSessions() {
                                 <ChatSystemMessage
                                   content={formatProtocolNoticeContent(notice)}
                                   expanded
+                                  textClassName={chatBubbleTextClassName}
                                   className={
                                     isEmptyMessageNotice
                                       ? 'text-[#6B7280]'
@@ -4316,6 +4341,7 @@ export function ChatSessions() {
         workspacePath={workspacePath}
         runs={activeWorkspaceRuns}
         messages={messagesData}
+        retentionByRunId={retentionByRunId}
         logRunId={logRunId}
         logContent={logContent}
         logLoading={logLoading}

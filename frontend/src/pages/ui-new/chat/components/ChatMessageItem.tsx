@@ -75,6 +75,7 @@ export interface ChatMessageItemProps {
   senderLabel: string;
   senderRunnerType: string | null;
   tone: MessageTone;
+  bubbleTextClassName?: string;
   // Reference/reply
   referenceMessage: ChatMessage | null;
   referenceSenderLabel: string | null;
@@ -114,6 +115,7 @@ export function ChatMessageItem({
   message,
   senderLabel,
   senderRunnerType,
+  bubbleTextClassName,
   referenceMessage,
   referenceSenderLabel,
   referencePreview,
@@ -295,7 +297,11 @@ export function ChatMessageItem({
                   <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-low">
                     Raw assistant output
                   </div>
-                  <ChatMarkdown content={rawOutput} hideCopyButton />
+                  <ChatMarkdown
+                    content={rawOutput}
+                    hideCopyButton
+                    textClassName={bubbleTextClassName}
+                  />
                 </div>
               )}
             </ChatEntryContainer>
@@ -350,7 +356,11 @@ export function ChatMessageItem({
                 />
               </div>
             ) : (
-              <ChatSystemMessage content={message.content} expanded />
+              <ChatSystemMessage
+                content={message.content}
+                expanded
+                textClassName={bubbleTextClassName}
+              />
             )}
             {hasError &&
               errorInfo.content &&
@@ -614,7 +624,11 @@ export function ChatMessageItem({
                 }
                 return (
                   <>
-                    <ChatMarkdown content={displayContent} hideCopyButton />
+                    <ChatMarkdown
+                      content={displayContent}
+                      hideCopyButton
+                      textClassName={bubbleTextClassName}
+                    />
                     {errorInfo && (
                       <div className="mt-base rounded-lg border border-error/30 bg-error/5 p-3">
                         <div className="flex items-start justify-between gap-2">

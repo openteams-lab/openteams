@@ -1,4 +1,5 @@
 pub mod analytics;
+pub mod analytics_events;
 pub mod approvals;
 pub mod auth;
 pub mod chat;

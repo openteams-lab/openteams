@@ -58,6 +58,19 @@
           "label": "語言",
           "placeholder": "選擇語言",
           "helper": "選擇您偏好的語言。瀏覽器預設將跟隨系統語言。"
+        },
+        "chatBubbleFontSize": {
+          "label": "聊天氣泡字體大小",
+          "placeholder": "選擇字體大小",
+          "helper": "選擇整個應用程式中聊天氣泡預設使用的字體大小。",
+          "options": {
+            "px12": "12 px",
+            "px13": "13 px",
+            "px14": "14 px",
+            "px15": "15 px",
+            "px16": "16 px",
+            "px18": "18 px"
+          }
         }
       },
       "taskExecution": {
@@ -303,7 +316,7 @@
       },
       "agentChaining": {
         "title": "代理鏈式調用",
-        "description": "控制一次鏈路中代理之間可自動接力的最大次數。",
+        "description": "",
         "maxDepth": {
           "label": "最大鏈路深度",
           "helper": "用於限制自動 @提及，避免代理循環觸發。預設值為 8；達到上限後，後續代理提及將不再自動執行。"

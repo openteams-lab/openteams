@@ -164,6 +164,7 @@ const EVENT_DEFINITIONS = {
     properties: {
       agent_id: idProperty,
       runner_type: stringProperty(64),
+      executor_profile_variant: stringProperty(128),
       has_workspace: booleanProperty,
     },
   },
@@ -310,15 +311,6 @@ interface TrackOptions {
   traceId?: string;
 }
 
-interface ViewTrackingContext {
-  trigger: 'button' | 'keyboard';
-  direction?: 'forward' | 'backward';
-  fromView?: 'attempt' | 'preview' | 'diffs';
-  projectId?: string;
-  taskId?: string;
-  attemptId?: string | null;
-}
-
 const DEVICE_ID_STORAGE_KEY = 'analytics_device_id';
 const OUTBOX_STORAGE_KEY = 'analytics_outbox_v2';
 const COLLECT_BATCH_ENDPOINT = '/api/analytics/collect/batch';
@@ -427,36 +419,6 @@ class AnalyticsService {
     this.track('ui_new_accessed', { surface: 'new_design' });
   }
 
-  trackPreviewNavigated(context: ViewTrackingContext) {
-    this.track('preview_navigated', {
-      trigger: context.trigger,
-      direction: context.direction,
-      project_id: context.projectId,
-      task_id: context.taskId,
-      attempt_id: context.attemptId ?? undefined,
-    });
-  }
-
-  trackDiffsNavigated(context: ViewTrackingContext) {
-    this.track('diffs_navigated', {
-      trigger: context.trigger,
-      direction: context.direction,
-      project_id: context.projectId,
-      task_id: context.taskId,
-      attempt_id: context.attemptId ?? undefined,
-    });
-  }
-
-  trackViewClosed(context: ViewTrackingContext) {
-    this.track('view_closed', {
-      trigger: context.trigger,
-      from_view: context.fromView,
-      project_id: context.projectId,
-      task_id: context.taskId,
-      attempt_id: context.attemptId ?? undefined,
-    });
-  }
-
   trackSessionCreate(sessionId: string, titleLength: number) {
     this.track('session_create', { title_length: titleLength }, { sessionId });
   }
@@ -510,6 +472,7 @@ class AnalyticsService {
     agentId: string,
     _agentName: string,
     runnerType: string,
+    executorProfileVariant: string | undefined,
     hasWorkspace: boolean
   ) {
     this.track(
@@ -517,6 +480,7 @@ class AnalyticsService {
       {
         agent_id: agentId,
         runner_type: runnerType,
+        executor_profile_variant: executorProfileVariant,
         has_workspace: hasWorkspace,
       },
       { sessionId }

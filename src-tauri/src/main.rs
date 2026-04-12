@@ -115,7 +115,7 @@ fn apply_default_webview_zoom(window: &tauri::Window) {
         // Match an end-user browser zoom setting of 80% at the WebView level so
         // fixed overlays, dialogs, and portal content all scale together.
         let _ = window.with_webview(|webview| unsafe {
-            let _ = webview.controller().SetZoomFactor(0.8);
+            let _ = webview.controller().SetZoomFactor(0.88);
         });
     }
 }

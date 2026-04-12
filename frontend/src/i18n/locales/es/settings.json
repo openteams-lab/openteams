@@ -58,6 +58,19 @@
           "label": "Idioma",
           "placeholder": "Selecciona tu idioma",
           "helper": "Elige tu idioma preferido. El predeterminado del navegador sigue el idioma de tu sistema."
+        },
+        "chatBubbleFontSize": {
+          "label": "Tamaño de fuente de los globos de chat",
+          "placeholder": "Seleccionar tamaño de fuente",
+          "helper": "Elige el tamaño de fuente predeterminado para los globos de chat en toda la aplicación.",
+          "options": {
+            "px12": "12 px",
+            "px13": "13 px",
+            "px14": "14 px",
+            "px15": "15 px",
+            "px16": "16 px",
+            "px18": "18 px"
+          }
         }
       },
       "taskExecution": {
@@ -303,7 +316,7 @@
       },
       "agentChaining": {
         "title": "Encadenamiento de agentes",
-        "description": "Controla cuántos relevos automáticos entre agentes pueden ocurrir en una misma cadena.",
+        "description": "",
         "maxDepth": {
           "label": "Profundidad máxima de la cadena",
           "helper": "Limita las menciones automáticas con @ para evitar bucles. El valor predeterminado es 8. Cuando se alcanza el límite, las siguientes menciones de agentes dejan de ejecutarse automáticamente."

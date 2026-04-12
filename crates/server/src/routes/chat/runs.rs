@@ -1,29 +1,96 @@
 use std::path::PathBuf;
 
 use axum::{
+    Extension,
     extract::{Path, Query, State},
-    http::header::CONTENT_TYPE,
-    response::{IntoResponse, Response},
+    http::{
+        HeaderValue, StatusCode,
+        header::{CONTENT_TYPE, HeaderName},
+    },
+    response::{IntoResponse, Json as ResponseJson, Response},
 };
-use db::models::chat_run::ChatRun;
+use db::models::{
+    chat_run::{ChatRun, ChatRunLogState, ChatRunRetentionInfo},
+    chat_session::ChatSession,
+};
 use deployment::Deployment;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::{
     fs::File,
     io::{AsyncReadExt, AsyncSeekExt, SeekFrom},
 };
+use ts_rs::TS;
+use utils::response::ApiResponse;
 use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError};
 
 const DEFAULT_LOG_CHUNK_BYTES: u64 = 256 * 1024;
 const MAX_LOG_CHUNK_BYTES: u64 = 2 * 1024 * 1024;
+const DEFAULT_RETENTION_LIST_LIMIT: u32 = 100;
+const MAX_RETENTION_LIST_LIMIT: u32 = 500;
 
 #[derive(Debug, Deserialize)]
 pub struct RunLogQuery {
     offset: Option<u64>,
     limit: Option<u64>,
     tail: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct ChatRunRetentionListQuery {
+    pub run_ids: Option<String>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct ChatRunRetentionListResponse {
+    pub runs: Vec<ChatRunRetentionInfo>,
+}
+
+fn parse_run_ids(raw: Option<&str>) -> Result<Option<Vec<Uuid>>, ApiError> {
+    let Some(raw) = raw.map(str::trim) else {
+        return Ok(None);
+    };
+
+    if raw.is_empty() {
+        return Ok(Some(Vec::new()));
+    }
+
+    raw.split(',')
+        .map(str::trim)
+        .filter(|segment| !segment.is_empty())
+        .map(|segment| {
+            Uuid::parse_str(segment)
+                .map_err(|_| ApiError::BadRequest("Invalid run_ids query parameter".to_string()))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
+}
+
+pub async fn get_session_runs_retention(
+    Extension(session): Extension<ChatSession>,
+    State(deployment): State<DeploymentImpl>,
+    Query(query): Query<ChatRunRetentionListQuery>,
+) -> Result<ResponseJson<ApiResponse<ChatRunRetentionListResponse>>, ApiError> {
+    let run_ids = parse_run_ids(query.run_ids.as_deref())?;
+    let limit = query
+        .limit
+        .unwrap_or(DEFAULT_RETENTION_LIST_LIMIT)
+        .clamp(1, MAX_RETENTION_LIST_LIMIT);
+    let runs = ChatRun::list_retention_for_session(
+        &deployment.db().pool,
+        session.id,
+        run_ids.as_deref(),
+        limit,
+    )
+    .await?;
+
+    Ok(ResponseJson(ApiResponse::success(
+        ChatRunRetentionListResponse { runs },
+    )))
 }
 
 pub async fn get_run_log(
@@ -35,13 +102,26 @@ pub async fn get_run_log(
         return Err(ApiError::BadRequest("Chat run not found".to_string()));
     };
 
-    let Some(log_path) = run.raw_log_path else {
-        return Err(ApiError::BadRequest("Chat run has no log".to_string()));
-    };
+    if run.log_state == ChatRunLogState::Pruned || run.raw_log_path.is_none() {
+        return Ok((
+            StatusCode::GONE,
+            ResponseJson(ApiResponse::<()>::error("Chat run log expired")),
+        )
+            .into_response());
+    }
+
+    let log_path = run.raw_log_path.expect("checked above");
 
     let mut file = match File::open(&log_path).await {
         Ok(file) => file,
         Err(_) => {
+            if run.log_state == ChatRunLogState::Pruned {
+                return Ok((
+                    StatusCode::GONE,
+                    ResponseJson(ApiResponse::<()>::error("Chat run log expired")),
+                )
+                    .into_response());
+            }
             return Err(ApiError::BadRequest(
                 "Chat run log file not found".to_string(),
             ));
@@ -90,7 +170,20 @@ pub async fn get_run_log(
     }
     let content = String::from_utf8_lossy(&buffer).into_owned();
 
-    Ok(([(CONTENT_TYPE, "text/plain; charset=utf-8")], content).into_response())
+    let mut response = ([(CONTENT_TYPE, "text/plain; charset=utf-8")], content).into_response();
+    response.headers_mut().insert(
+        HeaderName::from_static("x-openteams-log-state"),
+        HeaderValue::from_static(match run.log_state {
+            ChatRunLogState::Live => "live",
+            ChatRunLogState::Tail => "tail",
+            ChatRunLogState::Pruned => "pruned",
+        }),
+    );
+    response.headers_mut().insert(
+        HeaderName::from_static("x-openteams-log-truncated"),
+        HeaderValue::from_static(if run.log_truncated { "true" } else { "false" }),
+    );
+    Ok(response)
 }
 
 pub async fn get_run_diff(

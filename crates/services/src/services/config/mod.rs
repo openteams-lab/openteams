@@ -46,6 +46,7 @@ pub type SendMessageShortcut = versions::v9::SendMessageShortcut;
 pub type ChatMemberPreset = versions::v9::ChatMemberPreset;
 pub type ChatTeamPreset = versions::v9::ChatTeamPreset;
 pub type ChatPresetsConfig = versions::v9::ChatPresetsConfig;
+pub type ChatBubbleFontSize = versions::v9::ChatBubbleFontSize;
 pub type ChatCompressionConfig = versions::v9::ChatCompressionConfig;
 
 /// Will always return config, trying old schemas or eventually returning default
