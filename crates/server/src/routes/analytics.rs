@@ -2,11 +2,7 @@ use axum::{Json, extract::State, http::StatusCode};
 use db::models::analytics::{AnalyticsEvent, AnalyticsEventCategory, CreateAnalyticsEvent};
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use services::services::analytics::{
-    analytics_distinct_id_for_record, analytics_posthog_properties_for_record,
-    forward_analytics_record_to_posthog,
-};
+use services::services::analytics::forward_analytics_record_to_posthog;
 use ts_rs::TS;
 use utils::response::ApiResponse;
 use uuid::Uuid;
@@ -1007,6 +1003,11 @@ pub fn router() -> axum::Router<DeploymentImpl> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+    use services::services::analytics::{
+        analytics_distinct_id_for_record, analytics_posthog_properties_for_record,
+    };
+
     use super::*;
 
     #[test]
