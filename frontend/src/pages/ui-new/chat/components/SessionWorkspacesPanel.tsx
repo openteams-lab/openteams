@@ -43,6 +43,7 @@ type WorkspaceFileRow = {
   path: string;
   additions: number;
   deletions: number;
+  hasDiff: boolean;
 };
 
 type SelectedWorkspaceDiff = {
@@ -92,6 +93,7 @@ function summarizeWorkspaceFiles(
       path: file.path,
       additions: file.additions,
       deletions: file.deletions,
+      hasDiff: file.has_diff,
     }));
 
   return [
@@ -103,6 +105,7 @@ function summarizeWorkspaceFiles(
       path: file.path,
       additions: 0,
       deletions: 0,
+      hasDiff: false,
     })),
     ...response.changes.untracked.map((file) => ({
       key: `?:${file.path}`,
@@ -110,6 +113,7 @@ function summarizeWorkspaceFiles(
       path: file.path,
       additions: 0,
       deletions: 0,
+      hasDiff: false,
     })),
   ];
 }
@@ -676,7 +680,8 @@ export function SessionWorkspacesPanel({
                           )}
                         </span>
                         {state.isGitRepo &&
-                          (file.status === 'M' || file.status === 'A') && (
+                          (file.status === 'M' || file.status === 'A') &&
+                          file.hasDiff && (
                             <button
                               type="button"
                               className="chat-session-workspaces-file-action shrink-0 text-xs"

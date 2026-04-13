@@ -163,6 +163,8 @@ pub struct WorkspaceChangedFile {
     pub additions: usize,
     pub deletions: usize,
     pub unified_diff: Option<String>,
+    /// Whether a diff can be generated for this file (false for files in .gitignore'd directories).
+    pub has_diff: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, TS)]
@@ -292,6 +294,7 @@ fn diff_to_workspace_changed_file(
         additions,
         deletions,
         unified_diff,
+        has_diff: true,
     }
 }
 
@@ -669,6 +672,7 @@ fn build_plain_workspace_changes(
                     additions: 0,
                     deletions: 0,
                     unified_diff: None,
+                    has_diff: false,
                 };
                 if created_after_session {
                     changes.added.push(entry);
@@ -692,16 +696,25 @@ fn build_plain_workspace_changes(
 }
 
 fn collect_session_scoped_git_changes(
+    session_id: Uuid,
     workspace_path: &std::path::Path,
     runs: &[ChatRun],
     include_diff: bool,
 ) -> WorkspaceChangesResponse {
     let session_paths = collect_session_git_path_union(workspace_path, runs);
+
+    // Also collect all observed paths (including those in .gitignore'd directories)
+    // so we can fall back to plain file logic for files git cannot see.
+    let all_observed = collect_session_plain_observed_paths(session_id, workspace_path, runs);
+    let first_run_at = runs.iter().map(|run| run.created_at).min();
+
     if session_paths.is_empty() {
+        // No git-tracked changes, but there may be files in .gitignore'd directories.
+        let plain_changes = build_plain_workspace_changes(workspace_path, all_observed, first_run_at);
         return WorkspaceChangesResponse {
             workspace_path: workspace_path.to_string_lossy().to_string(),
             is_git_repo: true,
-            changes: Some(empty_workspace_changes()),
+            changes: Some(plain_changes),
             error: None,
         };
     }
@@ -778,14 +791,39 @@ fn collect_session_scoped_git_changes(
         }
     };
 
+    let mut git_changes = build_workspace_changes(diffs, &untracked_paths, include_diff);
+
+    // Find observed paths that git did not return (e.g. files in .gitignore'd directories).
+    // For those, apply plain file logic so they appear in the changes panel.
+    let git_covered: HashSet<&str> = git_changes
+        .modified
+        .iter()
+        .map(|f| f.path.as_str())
+        .chain(git_changes.added.iter().map(|f| f.path.as_str()))
+        .chain(git_changes.deleted.iter().map(|f| f.path.as_str()))
+        .chain(git_changes.untracked.iter().map(|f| f.path.as_str()))
+        .collect();
+
+    let uncovered_observed: BTreeMap<String, PlainWorkspaceObservedPath> = all_observed
+        .into_iter()
+        .filter(|(path, _)| !git_covered.contains(path.as_str()))
+        .collect();
+
+    if !uncovered_observed.is_empty() {
+        let plain_changes =
+            build_plain_workspace_changes(workspace_path, uncovered_observed, first_run_at);
+        git_changes.modified.extend(plain_changes.modified);
+        git_changes.added.extend(plain_changes.added);
+        git_changes.deleted.extend(plain_changes.deleted);
+        git_changes.modified.sort_by(|a, b| a.path.cmp(&b.path));
+        git_changes.added.sort_by(|a, b| a.path.cmp(&b.path));
+        git_changes.deleted.sort_by(|a, b| a.path.cmp(&b.path));
+    }
+
     WorkspaceChangesResponse {
         workspace_path: workspace_path.to_string_lossy().to_string(),
         is_git_repo: true,
-        changes: Some(build_workspace_changes(
-            diffs,
-            &untracked_paths,
-            include_diff,
-        )),
+        changes: Some(git_changes),
         error: None,
     }
 }
@@ -839,7 +877,7 @@ fn collect_workspace_changes(
     }
 
     if git2::Repository::open(&path).is_ok() {
-        return collect_session_scoped_git_changes(&path, &runs, include_diff);
+        return collect_session_scoped_git_changes(session_id, &path, &runs, include_diff);
     }
 
     collect_session_scoped_plain_changes(session_id, &path, &runs)

@@ -1376,6 +1376,25 @@ export function ChatSessions() {
 
     return map;
   }, [messageList]);
+  const runIdsWithSendMessages = useMemo(() => {
+    const runIds = new Set<string>();
+
+    for (const message of messageList) {
+      const runId = extractRunId(message.meta);
+      if (!runId) continue;
+      if (
+        message.meta &&
+        typeof message.meta === 'object' &&
+        !Array.isArray(message.meta) &&
+        (message.meta as { protocol?: { type?: unknown } }).protocol?.type ===
+          'send'
+      ) {
+        runIds.add(runId);
+      }
+    }
+
+    return runIds;
+  }, [messageList]);
   const workItemGroups = useMemo<ChatWorkItemGroup[]>(() => {
     const sorted = [...workItems].sort(
       (a, b) =>
@@ -1415,11 +1434,20 @@ export function ChatSessions() {
       });
     }
 
-    return [...groups.values()].sort(
-      (a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
-  }, [sessionAgents, workItems]);
+    return [...groups.values()]
+      .filter(
+        (group) =>
+          !(
+            group.artifacts.length === 0 &&
+            group.conclusions.length > 0 &&
+            runIdsWithSendMessages.has(group.runId)
+          )
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+  }, [runIdsWithSendMessages, sessionAgents, workItems]);
   const timelineEntries = useMemo<TimelineEntry[]>(
     () =>
       [
