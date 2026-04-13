@@ -4010,6 +4010,7 @@ export function ChatSessions() {
                         return (
                           <ChatWorkItemCard
                             key={entry.key}
+                            sessionId={activeSessionId!}
                             group={entry.group}
                             senderLabel={getWorkItemSenderLabel(entry.group)}
                             senderRunnerType={

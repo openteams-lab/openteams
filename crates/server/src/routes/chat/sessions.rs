@@ -365,6 +365,19 @@ fn looks_like_workspace_path(candidate: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn is_internal_openteams_runtime_path(path: &std::path::Path) -> bool {
+    let mut components = path.components().filter_map(|component| match component {
+        Component::Normal(part) => Some(part.to_string_lossy().to_string()),
+        Component::CurDir => None,
+        Component::ParentDir | Component::RootDir | Component::Prefix(_) => None,
+    });
+
+    matches!(
+        (components.next().as_deref(), components.next().as_deref()),
+        (Some(".openteams"), Some("context" | "runs"))
+    )
+}
+
 fn normalize_workspace_relative_path(
     raw: &str,
     workspace_root: &std::path::Path,
@@ -390,6 +403,10 @@ fn normalize_workspace_relative_path(
         candidate
     };
 
+    if is_internal_openteams_runtime_path(&relative) {
+        return None;
+    }
+
     let mut normalized = Vec::new();
     for component in relative.components() {
         match component {
@@ -399,7 +416,7 @@ fn normalize_workspace_relative_path(
         }
     }
 
-    if normalized.is_empty() || normalized.first().is_some_and(|part| part == ".openteams") {
+    if normalized.is_empty() {
         return None;
     }
 
@@ -598,19 +615,13 @@ fn collect_session_plain_observed_paths(
 
     for run in runs {
         let meta_paths = load_run_meta_observed_paths(run);
-        let mut added_from_meta = false;
         for entry in meta_paths {
             if let Some(path) = normalize_workspace_relative_path(&entry.path, workspace_path) {
                 let state = observed.entry(path).or_insert(PlainWorkspaceObservedPath {
                     existed_after_run: false,
                 });
                 state.existed_after_run |= entry.existed_after_run;
-                added_from_meta = true;
             }
-        }
-
-        if added_from_meta {
-            continue;
         }
 
         for record in work_records.iter().filter(|record| {
@@ -710,7 +721,8 @@ fn collect_session_scoped_git_changes(
 
     if session_paths.is_empty() {
         // No git-tracked changes, but there may be files in .gitignore'd directories.
-        let plain_changes = build_plain_workspace_changes(workspace_path, all_observed, first_run_at);
+        let plain_changes =
+            build_plain_workspace_changes(workspace_path, all_observed, first_run_at);
         return WorkspaceChangesResponse {
             workspace_path: workspace_path.to_string_lossy().to_string(),
             is_git_repo: true,
@@ -2085,6 +2097,121 @@ mod tests {
                 path: "deleted.txt".to_string()
             }]
         );
+    }
+
+    #[test]
+    fn normalize_workspace_relative_path_allows_user_openteams_files_but_filters_runtime_artifacts()
+    {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+
+        assert_eq!(
+            normalize_workspace_relative_path(".openteams/test.txt", tempdir.path()),
+            Some(".openteams/test.txt".to_string())
+        );
+        assert_eq!(
+            normalize_workspace_relative_path(
+                ".openteams/context/demo/messages.jsonl",
+                tempdir.path()
+            ),
+            None
+        );
+        assert_eq!(
+            normalize_workspace_relative_path(
+                ".openteams/runs/demo/run_records/output.txt",
+                tempdir.path()
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn collect_workspace_changes_merges_artifact_paths_with_git_meta_and_allows_user_openteams_files()
+     {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let repo_path = tempdir.path().join("repo");
+        let git = GitService::new();
+        git.initialize_repo_with_main_branch(&repo_path)
+            .expect("init repo");
+
+        fs::write(repo_path.join("tracked.txt"), "base\n").expect("write tracked");
+        git.commit(&repo_path, "baseline").expect("commit baseline");
+
+        fs::write(repo_path.join("tracked.txt"), "updated\n").expect("modify tracked");
+        fs::create_dir_all(repo_path.join("binaries")).expect("create binaries dir");
+        fs::write(repo_path.join("binaries").join("test.txt"), "binary\n")
+            .expect("write binaries file");
+        fs::create_dir_all(repo_path.join(".openteams").join("context").join("demo"))
+            .expect("create runtime dir");
+        fs::write(repo_path.join(".openteams").join("test.txt"), "user\n")
+            .expect("write user openteams file");
+        fs::write(
+            repo_path
+                .join(".openteams")
+                .join("context")
+                .join("demo")
+                .join("messages.jsonl"),
+            "runtime\n",
+        )
+        .expect("write runtime artifact");
+
+        let session_id = Uuid::new_v4();
+        let session_agent_id = Uuid::new_v4();
+        let run_dir = tempdir.path().join("run-record");
+        fs::create_dir_all(&run_dir).expect("create run dir");
+        fs::write(
+            run_dir.join("meta.json"),
+            r#"{"workspace_observed_paths":[{"path":"tracked.txt","source":"git_diff","existed_after_run":true}]}"#,
+        )
+        .expect("write meta");
+        let run = test_run(
+            session_id,
+            session_agent_id,
+            1,
+            &run_dir,
+            Utc::now() - chrono::Duration::minutes(1),
+        );
+
+        let protocol_dir = asset_dir()
+            .join("chat")
+            .join(format!("session_{session_id}"))
+            .join("protocol");
+        fs::create_dir_all(&protocol_dir).expect("create protocol dir");
+        fs::write(
+            protocol_dir.join("work_records.jsonl"),
+            format!(
+                concat!(
+                    "{{\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved `binaries/test.txt`.\"}}\n",
+                    "{{\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved `.openteams/test.txt` and `.openteams/context/demo/messages.jsonl`.\"}}\n"
+                ),
+                run_id = run.id
+            ),
+        )
+        .expect("write work records");
+
+        let response =
+            collect_workspace_changes(session_id, &repo_path.to_string_lossy(), true, vec![run]);
+
+        let session_asset_dir = asset_dir()
+            .join("chat")
+            .join(format!("session_{session_id}"));
+        let _ = fs::remove_dir_all(session_asset_dir);
+
+        assert!(response.is_git_repo);
+        assert!(response.error.is_none());
+        let changes = response.changes.expect("changes present");
+        let all_paths = changes
+            .modified
+            .iter()
+            .map(|entry| entry.path.as_str())
+            .chain(changes.added.iter().map(|entry| entry.path.as_str()))
+            .chain(changes.deleted.iter().map(|entry| entry.path.as_str()))
+            .chain(changes.untracked.iter().map(|entry| entry.path.as_str()))
+            .collect::<Vec<_>>();
+
+        assert!(all_paths.contains(&"tracked.txt"));
+        assert!(all_paths.contains(&"binaries/test.txt"));
+        assert!(all_paths.contains(&".openteams/test.txt"));
+        assert!(!all_paths.contains(&".openteams/context/demo/messages.jsonl"));
     }
 
     #[tokio::test]

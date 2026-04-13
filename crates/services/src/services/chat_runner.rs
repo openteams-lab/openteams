@@ -280,6 +280,22 @@ fn looks_like_workspace_path(candidate: &str) -> bool {
         .unwrap_or(false)
 }
 
+pub(super) fn is_internal_openteams_runtime_path(path: &Path) -> bool {
+    let mut components = path.components().filter_map(|component| match component {
+        Component::Normal(part) => Some(part.to_string_lossy().to_string()),
+        Component::CurDir => None,
+        Component::ParentDir | Component::RootDir | Component::Prefix(_) => None,
+    });
+
+    matches!(
+        (components.next().as_deref(), components.next().as_deref()),
+        (
+            Some(OPENTEAMS_HOME_DIR),
+            Some(CONTEXT_DIR_NAME | RUNS_DIR_NAME)
+        )
+    )
+}
+
 fn normalize_workspace_observed_path(raw: &str, workspace_root: &Path) -> Option<String> {
     let trimmed = raw
         .trim()
@@ -305,6 +321,10 @@ fn normalize_workspace_observed_path(raw: &str, workspace_root: &Path) -> Option
         candidate_path
     };
 
+    if is_internal_openteams_runtime_path(&relative) {
+        return None;
+    }
+
     let mut normalized = Vec::new();
     for component in relative.components() {
         match component {
@@ -314,11 +334,7 @@ fn normalize_workspace_observed_path(raw: &str, workspace_root: &Path) -> Option
         }
     }
 
-    if normalized.is_empty()
-        || normalized
-            .first()
-            .is_some_and(|part| part == OPENTEAMS_HOME_DIR)
-    {
+    if normalized.is_empty() {
         return None;
     }
 

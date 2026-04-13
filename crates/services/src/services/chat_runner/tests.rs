@@ -1259,6 +1259,45 @@ fn resolve_team_protocol_guidelines_falls_back_when_empty() {
     assert_eq!(prompt, "no team collaboration protocol");
 }
 
+#[tokio::test]
+async fn capture_untracked_files_allows_user_openteams_files_but_skips_runtime_artifacts() {
+    let tempdir = tempfile::tempdir().expect("create tempdir");
+    let repo_path = tempdir.path().join("repo");
+    git2::Repository::init(&repo_path).expect("init repo");
+
+    std::fs::create_dir_all(repo_path.join("binaries")).expect("create binaries dir");
+    std::fs::write(repo_path.join("binaries").join("test.txt"), "binary\n")
+        .expect("write binaries file");
+    std::fs::create_dir_all(repo_path.join(".openteams").join("context").join("demo"))
+        .expect("create runtime dir");
+    std::fs::write(repo_path.join(".openteams").join("test.txt"), "user\n")
+        .expect("write user openteams file");
+    std::fs::write(
+        repo_path
+            .join(".openteams")
+            .join("context")
+            .join("demo")
+            .join("messages.jsonl"),
+        "runtime\n",
+    )
+    .expect("write runtime artifact");
+
+    let run_dir = tempdir.path().join("run-record");
+    tokio::fs::create_dir_all(&run_dir)
+        .await
+        .expect("create run dir");
+
+    let files = ChatRunner::capture_untracked_files(&repo_path, &run_dir, Uuid::new_v4(), 1).await;
+
+    assert!(files.iter().any(|path| path == "binaries/test.txt"));
+    assert!(files.iter().any(|path| path == ".openteams/test.txt"));
+    assert!(
+        !files
+            .iter()
+            .any(|path| path == ".openteams/context/demo/messages.jsonl")
+    );
+}
+
 #[test]
 fn resolve_session_team_protocol_returns_enabled_session_content_only() {
     let now = Utc::now();

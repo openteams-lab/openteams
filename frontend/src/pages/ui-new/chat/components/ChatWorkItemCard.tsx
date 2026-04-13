@@ -12,11 +12,12 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
 } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
-import { fileSystemApi } from '@/lib/api';
+import { chatApi } from '@/lib/api';
 import { formatDateShortWithTime } from '@/utils/date';
 import { resolveLocalPathToAbsolutePath } from '@/utils/readOnlyLinks';
 import {
@@ -24,18 +25,25 @@ import {
   getAgentAvatarSeed,
   getAgentAvatarStyle,
 } from '../AgentAvatar';
+import { getRelativeWorkspaceFilePath } from '../utils';
 import type { ChatWorkItemGroup } from '../types';
 
 const ARTIFACT_FILE_PATH_RE =
   /(^|[\s([{"'])(?<path>(?:[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\){2,}[^\\\r\n<>:"|?*\s`"')\]}.,:;!?]+|[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\)*[^\\\r\n<>:"|?*]+\.[a-zA-Z0-9]{1,16}|\/(?:[^/\r\n]+\/){2,}[^/\r\n\s`"')\]}.,:;!?]+|\/(?:[^/\r\n]+\/)*[^/\r\n]+\.[a-zA-Z0-9]{1,16}|(?:\.{1,2}[\\/])?(?:[^\\/\r\n\s`"')\]}.,:;!?]+[\\/])*[^\\/\r\n\s`"')\]}.,:;!?]+\.[a-zA-Z0-9]{1,16}))/g;
+const DOT_PREFIXED_ARTIFACT_FILE_PATH_RE =
+  /(^|[\s([{"'])(?<path>\.[^\\/\r\n\s`"')\]}:;!?]+(?:[\\/][^\\/\r\n\s`"')\]}:;!?]+)*[\\/][^\\/\r\n\s`"')\]}:;!?]+\.[a-zA-Z0-9]{1,16})/g;
 
 type ExtractedArtifactPath = {
   rawPath: string;
   absolutePath: string;
 };
 
+function normalizeArtifactPathCandidate(value: string): string {
+  return value.trim().replace(/[.,:;!?]+$/g, '');
+}
+
 function isArtifactPathCandidate(value: string): boolean {
-  const trimmed = value.trim();
+  const trimmed = normalizeArtifactPathCandidate(value);
   if (!trimmed) return false;
 
   if (
@@ -47,7 +55,11 @@ function isArtifactPathCandidate(value: string): boolean {
   }
 
   ARTIFACT_FILE_PATH_RE.lastIndex = 0;
-  return ARTIFACT_FILE_PATH_RE.test(` ${trimmed}`);
+  DOT_PREFIXED_ARTIFACT_FILE_PATH_RE.lastIndex = 0;
+  return (
+    ARTIFACT_FILE_PATH_RE.test(` ${trimmed}`) ||
+    DOT_PREFIXED_ARTIFACT_FILE_PATH_RE.test(` ${trimmed}`)
+  );
 }
 
 function extractArtifactPaths(
@@ -60,18 +72,22 @@ function extractArtifactPaths(
 
   const paths = new Map<string, ExtractedArtifactPath>();
   const addPath = (rawPath: string) => {
-    if (!isArtifactPathCandidate(rawPath)) {
+    const normalizedRawPath = normalizeArtifactPathCandidate(rawPath);
+    if (!isArtifactPathCandidate(normalizedRawPath)) {
       return;
     }
 
-    const absolutePath = resolveLocalPathToAbsolutePath(rawPath, workspacePath);
+    const absolutePath = resolveLocalPathToAbsolutePath(
+      normalizedRawPath,
+      workspacePath
+    );
     if (!absolutePath) {
       return;
     }
 
     if (!paths.has(absolutePath)) {
       paths.set(absolutePath, {
-        rawPath: rawPath.trim(),
+        rawPath: normalizedRawPath,
         absolutePath,
       });
     }
@@ -89,36 +105,25 @@ function extractArtifactPaths(
     addPath(match.groups?.path ?? '');
   }
 
+  for (const match of content.matchAll(DOT_PREFIXED_ARTIFACT_FILE_PATH_RE)) {
+    addPath(match.groups?.path ?? '');
+  }
+
   return Array.from(paths.values());
 }
 
-function normalizeFileSystemPath(path: string): string {
-  const normalized = path.replace(/\\/g, '/');
-  const trimmed =
-    normalized === '/' || /^[a-zA-Z]:\/$/.test(normalized)
-      ? normalized
-      : normalized.replace(/\/+$/, '');
-
-  return /^[a-zA-Z]:\//.test(trimmed) || trimmed.startsWith('//')
-    ? trimmed.toLowerCase()
-    : trimmed;
-}
-
-function getParentDirectory(path: string): string | null {
-  const match = path.match(/^(.*[\\/])[^\\/]+$/);
-  if (!match) {
-    return null;
-  }
-
-  const parent = match[1];
-  if (parent === '/' || /^[a-zA-Z]:[\\/]$/.test(parent)) {
-    return parent;
-  }
-
-  return parent.replace(/[\\/]$/, '');
+function normalizeComparablePath(path: string): string {
+  return path
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/\/+/g, '/')
+    .replace(/\/$/, '')
+    .toLowerCase();
 }
 
 export interface ChatWorkItemCardProps {
+  sessionId: string;
   group: ChatWorkItemGroup;
   senderLabel: string;
   senderRunnerType: string | null;
@@ -142,6 +147,7 @@ const isInteractiveTarget = (target: EventTarget | null): boolean => {
 };
 
 export function ChatWorkItemCard({
+  sessionId,
   group,
   senderLabel,
   senderRunnerType,
@@ -179,60 +185,55 @@ export function ChatWorkItemCard({
 
     return Array.from(paths.values());
   }, [group.artifacts, hasWorkspacePath, workspacePath]);
-  const [fileChanges, setFileChanges] = useState<ExtractedArtifactPath[]>([]);
 
-  useEffect(() => {
-    if (!hasWorkspacePath || candidateFileChanges.length === 0) {
-      setFileChanges([]);
-      return;
+  const { data: workspaceChanges } = useQuery({
+    queryKey: ['chatSessionWorkspaceChanges', sessionId, workspacePath, false],
+    queryFn: () =>
+      chatApi.getSessionWorkspaceChanges(sessionId, workspacePath!, {
+        includeDiff: false,
+      }),
+    enabled: hasWorkspacePath && candidateFileChanges.length > 0,
+    staleTime: 30_000,
+  });
+
+  const sessionWorkspacePaths = useMemo(() => {
+    const changes = workspaceChanges?.changes;
+    if (!changes) {
+      return new Set<string>();
     }
 
-    let cancelled = false;
+    return new Set(
+      [
+        ...changes.modified.map((file) => file.path),
+        ...changes.added.map((file) => file.path),
+        ...changes.deleted.map((file) => file.path),
+        ...changes.untracked.map((file) => file.path),
+      ].map(normalizeComparablePath)
+    );
+  }, [workspaceChanges]);
 
-    const validateFileChanges = async () => {
-      const directoryEntryCache = new Map<string, Set<string>>();
-      const validPaths: ExtractedArtifactPath[] = [];
+  const fileChanges = useMemo(() => {
+    if (!hasWorkspacePath || candidateFileChanges.length === 0) {
+      return [];
+    }
 
-      for (const path of candidateFileChanges) {
-        const parentDirectory = getParentDirectory(path.absolutePath);
-        if (!parentDirectory) {
-          continue;
-        }
-
-        let directoryEntries = directoryEntryCache.get(parentDirectory);
-        if (!directoryEntries) {
-          try {
-            const response = await fileSystemApi.list(parentDirectory);
-            directoryEntries = new Set(
-              response.entries.map((entry) =>
-                normalizeFileSystemPath(String(entry.path))
-              )
-            );
-          } catch {
-            directoryEntries = new Set();
-          }
-
-          directoryEntryCache.set(parentDirectory, directoryEntries);
-        }
-
-        if (
-          directoryEntries.has(normalizeFileSystemPath(path.absolutePath))
-        ) {
-          validPaths.push(path);
-        }
+    return candidateFileChanges.filter((path) => {
+      const relativePath = getRelativeWorkspaceFilePath(
+        path.absolutePath,
+        workspacePath!
+      );
+      if (!relativePath) {
+        return false;
       }
 
-      if (!cancelled) {
-        setFileChanges(validPaths);
-      }
-    };
-
-    void validateFileChanges();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [candidateFileChanges, hasWorkspacePath]);
+      return sessionWorkspacePaths.has(normalizeComparablePath(relativePath));
+    });
+  }, [
+    candidateFileChanges,
+    hasWorkspacePath,
+    sessionWorkspacePaths,
+    workspacePath,
+  ]);
 
   const fileChangesTitle = t('timeline.workItem.filesChanged', {
     count: fileChanges.length,
