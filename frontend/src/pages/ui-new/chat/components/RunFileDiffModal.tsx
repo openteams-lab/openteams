@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowSquareUpRightIcon } from '@phosphor-icons/react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { DiffViewBody } from '@/components/ui-new/primitives/conversation/PierreConversationDiff';
 import { useTheme } from '@/components/ThemeProvider';
 import { chatApi, fileSystemApi } from '@/lib/api';
@@ -116,7 +121,8 @@ export function RunFileDiffModal({
   if (!isOpen) return null;
 
   const fileDiffTooLarge =
-    !!state.fileDiff && state.fileDiff.patch.length > MAX_INLINE_FILE_PATCH_CHARS;
+    !!state.fileDiff &&
+    state.fileDiff.patch.length > MAX_INLINE_FILE_PATCH_CHARS;
 
   return (
     <Dialog
@@ -152,42 +158,48 @@ export function RunFileDiffModal({
             <div className="text-xs text-error">{state.error}</div>
           )}
 
-          {!state.loading && !state.error && state.fileDiff && fileDiffTooLarge && (
-            <div className="space-y-3 rounded-sm border border-border bg-panel p-base">
-              <div className="text-xs text-low">
-                {t('modals.runFileDiff.tooLarge', {
-                  defaultValue:
-                    '该文件 diff 超过 300,000 字符，已降级为提示展示。你可以打开工作区目录继续查看。',
-                })}
-              </div>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 text-xs text-brand hover:text-brand-hover"
-                onClick={handleOpenWorkspace}
-              >
-                <ArrowSquareUpRightIcon className="size-icon-sm" />
-                <span>
-                  {t('modals.runFileDiff.openWorkspace', {
-                    defaultValue: '在文件管理器中打开',
+          {!state.loading &&
+            !state.error &&
+            state.fileDiff &&
+            fileDiffTooLarge && (
+              <div className="space-y-3 rounded-sm border border-border bg-panel p-base">
+                <div className="text-xs text-low">
+                  {t('modals.runFileDiff.tooLarge', {
+                    defaultValue:
+                      '该文件 diff 超过 300,000 字符，已降级为提示展示。你可以打开工作区目录继续查看。',
                   })}
-                </span>
-              </button>
-            </div>
-          )}
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-xs text-brand hover:text-brand-hover"
+                  onClick={handleOpenWorkspace}
+                >
+                  <ArrowSquareUpRightIcon className="size-icon-sm" />
+                  <span>
+                    {t('modals.runFileDiff.openWorkspace', {
+                      defaultValue: '在文件管理器中打开',
+                    })}
+                  </span>
+                </button>
+              </div>
+            )}
 
-          {!state.loading && !state.error && state.fileDiff && !fileDiffTooLarge && (
-            <div className="rounded-sm border border-border overflow-hidden">
-              <DiffViewBody
-                fileDiffMetadata={null}
-                unifiedDiff={state.fileDiff.patch}
-                isValid={state.fileDiff.patch.trim().length > 0}
-                hideLineNumbers={false}
-                theme={actualTheme}
-                wrapText={false}
-                modeOverride="split"
-              />
-            </div>
-          )}
+          {!state.loading &&
+            !state.error &&
+            state.fileDiff &&
+            !fileDiffTooLarge && (
+              <div className="rounded-sm border border-border overflow-hidden">
+                <DiffViewBody
+                  fileDiffMetadata={null}
+                  unifiedDiff={state.fileDiff.patch}
+                  isValid={state.fileDiff.patch.trim().length > 0}
+                  hideLineNumbers={false}
+                  theme={actualTheme}
+                  wrapText={false}
+                  modeOverride="split"
+                />
+              </div>
+            )}
 
           {openError && <div className="text-xs text-error">{openError}</div>}
         </div>

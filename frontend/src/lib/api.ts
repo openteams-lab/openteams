@@ -904,7 +904,9 @@ export const chatApi = {
     return handleApiResponse<void>(response);
   },
 
-  getSessionWorkspaces: async (sessionId: string): Promise<SessionWorkspace[]> => {
+  getSessionWorkspaces: async (
+    sessionId: string
+  ): Promise<SessionWorkspace[]> => {
     const response = await makeRequest(
       `/api/chat/sessions/${sessionId}/workspaces`
     );

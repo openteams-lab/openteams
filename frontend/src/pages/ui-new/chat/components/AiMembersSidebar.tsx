@@ -1244,10 +1244,7 @@ export function AiMembersSidebar({
               editingMember?.sessionAgent.id === sessionAgent.id;
 
             return (
-              <div
-                key={sessionAgent.id}
-                className="space-y-half"
-              >
+              <div key={sessionAgent.id} className="space-y-half">
                 <div
                   className="chat-session-member-card px-base py-half space-y-half"
                   style={getAgentAvatarStyle(avatarSeed)}

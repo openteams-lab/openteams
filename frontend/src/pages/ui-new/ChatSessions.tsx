@@ -967,8 +967,10 @@ export function ChatSessions() {
   const [sessionWorkspacesOpen, setSessionWorkspacesOpen] = useState(false);
   const [sessionWorkspacesInitialPath, setSessionWorkspacesInitialPath] =
     useState<string | null>(null);
-  const [sessionWorkspacesInitialFilePath, setSessionWorkspacesInitialFilePath] =
-    useState<string | null>(null);
+  const [
+    sessionWorkspacesInitialFilePath,
+    setSessionWorkspacesInitialFilePath,
+  ] = useState<string | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const previousSessionIdRef = useRef<string | null>(null);
@@ -3990,7 +3992,9 @@ export function ChatSessions() {
                             onToggleExpand={() =>
                               handleToggleWorkItemExpanded(entry.key)
                             }
-                            workspacePath={entry.group.workspacePath ?? undefined}
+                            workspacePath={
+                              entry.group.workspacePath ?? undefined
+                            }
                             onOpenWorkspaceChanges={handleOpenWorkspaceChanges}
                             isCleanupMode={isCleanupMode}
                             isSelected={isSelected}

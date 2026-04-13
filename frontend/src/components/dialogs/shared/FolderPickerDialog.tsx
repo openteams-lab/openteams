@@ -287,7 +287,7 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
               </div>
             </div>
 
-              <div className="rounded-[22px] border border-[#DCE4EF] bg-white/95 p-4 shadow-[0_18px_42px_rgba(148,163,184,0.1)] dark:border-[#2A3445] dark:bg-[#141C28] dark:shadow-[0_18px_42px_rgba(0,0,0,0.26)]">
+            <div className="rounded-[22px] border border-[#DCE4EF] bg-white/95 p-4 shadow-[0_18px_42px_rgba(148,163,184,0.1)] dark:border-[#2A3445] dark:bg-[#141C28] dark:shadow-[0_18px_42px_rgba(0,0,0,0.26)]">
               {rootEntries.length > 0 && (
                 <div className="mb-4 rounded-[18px] border border-[#E6EDF5] bg-[linear-gradient(180deg,#FBFDFF_0%,#F5F8FC_100%)] p-4 dark:border-[#2A3445] dark:bg-[linear-gradient(180deg,rgba(25,34,51,0.94)_0%,rgba(17,25,38,1)_100%)]">
                   <div className="mb-3 flex items-center justify-between gap-3">

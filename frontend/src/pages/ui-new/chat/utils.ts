@@ -915,14 +915,22 @@ export function findRunDiffFile(
 
   for (const entry of diffFiles) {
     const normalizedDiffPath = normalizeComparablePath(entry.path);
-    if (candidates.some((candidate) => matchesCandidate(normalizedDiffPath, candidate))) {
+    if (
+      candidates.some((candidate) =>
+        matchesCandidate(normalizedDiffPath, candidate)
+      )
+    ) {
       return entry;
     }
   }
 
-  const lowercaseCandidates = candidates.map((candidate) => candidate.toLowerCase());
+  const lowercaseCandidates = candidates.map((candidate) =>
+    candidate.toLowerCase()
+  );
   for (const entry of diffFiles) {
-    const normalizedDiffPath = normalizeComparablePath(entry.path).toLowerCase();
+    const normalizedDiffPath = normalizeComparablePath(
+      entry.path
+    ).toLowerCase();
     if (
       lowercaseCandidates.some(
         (candidate) =>

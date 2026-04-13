@@ -172,8 +172,7 @@ export function ChatMarkdown({
 }: ChatMarkdownProps) {
   const workspacePath = readOnlyLinkBasePath;
   const resolvedContent = useMemo(
-    () =>
-      onFilePath ? linkifyFilePaths(content, workspacePath) : content,
+    () => (onFilePath ? linkifyFilePaths(content, workspacePath) : content),
     [content, onFilePath, workspacePath]
   );
 

@@ -36,9 +36,7 @@ export function pathToFileHref(path: string | null | undefined): string | null {
   return null;
 }
 
-export function fileHrefToPath(
-  href: string | null | undefined
-): string | null {
+export function fileHrefToPath(href: string | null | undefined): string | null {
   if (!href) return null;
 
   try {
@@ -68,7 +66,10 @@ function resolveRelativeFileHref(
   if (!baseHref) return null;
 
   try {
-    const resolved = new URL(href, baseHref.endsWith('/') ? baseHref : `${baseHref}/`);
+    const resolved = new URL(
+      href,
+      baseHref.endsWith('/') ? baseHref : `${baseHref}/`
+    );
     return resolved.protocol === 'file:' ? resolved.toString() : null;
   } catch {
     return null;
