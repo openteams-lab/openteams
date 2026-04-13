@@ -12,9 +12,11 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
 } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
+import { fileSystemApi } from '@/lib/api';
 import { formatDateShortWithTime } from '@/utils/date';
 import { resolveLocalPathToAbsolutePath } from '@/utils/readOnlyLinks';
 import {
@@ -90,6 +92,32 @@ function extractArtifactPaths(
   return Array.from(paths.values());
 }
 
+function normalizeFileSystemPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/');
+  const trimmed =
+    normalized === '/' || /^[a-zA-Z]:\/$/.test(normalized)
+      ? normalized
+      : normalized.replace(/\/+$/, '');
+
+  return /^[a-zA-Z]:\//.test(trimmed) || trimmed.startsWith('//')
+    ? trimmed.toLowerCase()
+    : trimmed;
+}
+
+function getParentDirectory(path: string): string | null {
+  const match = path.match(/^(.*[\\/])[^\\/]+$/);
+  if (!match) {
+    return null;
+  }
+
+  const parent = match[1];
+  if (parent === '/' || /^[a-zA-Z]:[\\/]$/.test(parent)) {
+    return parent;
+  }
+
+  return parent.replace(/[\\/]$/, '');
+}
+
 export interface ChatWorkItemCardProps {
   group: ChatWorkItemGroup;
   senderLabel: string;
@@ -134,24 +162,78 @@ export function ChatWorkItemCard({
   );
   const agentAvatarStyle = getAgentAvatarStyle(agentAvatarSeed);
   const hasWorkspacePath = !!workspacePath;
-  const fileChanges = hasWorkspacePath
-    ? (() => {
-        const paths = new Map<string, ExtractedArtifactPath>();
+  const candidateFileChanges = useMemo(() => {
+    if (!hasWorkspacePath) {
+      return [];
+    }
 
-        for (const item of group.artifacts) {
-          for (const path of extractArtifactPaths(
-            item.content,
-            workspacePath
-          )) {
-            if (!paths.has(path.absolutePath)) {
-              paths.set(path.absolutePath, path);
-            }
-          }
+    const paths = new Map<string, ExtractedArtifactPath>();
+
+    for (const item of group.artifacts) {
+      for (const path of extractArtifactPaths(item.content, workspacePath)) {
+        if (!paths.has(path.absolutePath)) {
+          paths.set(path.absolutePath, path);
+        }
+      }
+    }
+
+    return Array.from(paths.values());
+  }, [group.artifacts, hasWorkspacePath, workspacePath]);
+  const [fileChanges, setFileChanges] = useState<ExtractedArtifactPath[]>([]);
+
+  useEffect(() => {
+    if (!hasWorkspacePath || candidateFileChanges.length === 0) {
+      setFileChanges([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const validateFileChanges = async () => {
+      const directoryEntryCache = new Map<string, Set<string>>();
+      const validPaths: ExtractedArtifactPath[] = [];
+
+      for (const path of candidateFileChanges) {
+        const parentDirectory = getParentDirectory(path.absolutePath);
+        if (!parentDirectory) {
+          continue;
         }
 
-        return Array.from(paths.values());
-      })()
-    : [];
+        let directoryEntries = directoryEntryCache.get(parentDirectory);
+        if (!directoryEntries) {
+          try {
+            const response = await fileSystemApi.list(parentDirectory);
+            directoryEntries = new Set(
+              response.entries.map((entry) =>
+                normalizeFileSystemPath(String(entry.path))
+              )
+            );
+          } catch {
+            directoryEntries = new Set();
+          }
+
+          directoryEntryCache.set(parentDirectory, directoryEntries);
+        }
+
+        if (
+          directoryEntries.has(normalizeFileSystemPath(path.absolutePath))
+        ) {
+          validPaths.push(path);
+        }
+      }
+
+      if (!cancelled) {
+        setFileChanges(validPaths);
+      }
+    };
+
+    void validateFileChanges();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [candidateFileChanges, hasWorkspacePath]);
+
   const fileChangesTitle = t('timeline.workItem.filesChanged', {
     count: fileChanges.length,
   });
