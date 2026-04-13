@@ -161,7 +161,11 @@
       "artifactCount_one": "{{count}} artefacto",
       "artifactCount_other": "{{count}} artefactos",
       "statusCount_one": "{{count}} actualización de estado",
-      "statusCount_other": "{{count}} actualizaciones de estado"
+      "statusCount_other": "{{count}} actualizaciones de estado",
+      "workspaceChanges": "Cambios del espacio de trabajo",
+      "openWorkspaceChanges": "Abrir cambios del espacio de trabajo",
+      "filesChanged_one": "{{count}} archivo modificado",
+      "filesChanged_other": "{{count}} archivos modificados"
     }
   },
   "members": {
@@ -170,6 +174,7 @@
     "selectSessionToManage": "Selecciona una sesión para gestionar miembros IA.",
     "noMembersYet": "Aún no hay miembros IA",
     "workspace": "Espacio de trabajo",
+    "history": "Historial",
     "edit": "Editar",
     "remove": "Eliminar",
     "addAiMember": "Añadir miembro IA",
@@ -661,6 +666,16 @@
       "fullErrorLog": "Registro de errores completo",
       "workspaceTrail": "Espacio de trabajo",
       "workspacePath": "Ruta del espacio de trabajo"
+    },
+    "workspaceSingleFileDiff": {
+      "openWorkspaceError": "No se pudo abrir este archivo.",
+      "openWorkspace": "Abrir en el administrador de archivos",
+      "openExplorerError": "No se pudo abrir este archivo.",
+      "openExplorerSuccess": "Este archivo se mostro en el administrador de archivos.",
+      "tooLarge": "La diferencia de este archivo supera los 300.000 caracteres, por lo que el renderizado en línea está deshabilitado.",
+      "notFound": "No se pudo cargar la diferencia del archivo.",
+      "loadError": "No se pudo cargar la diferencia del archivo.",
+      "resizeWindow": "Redimensionar la ventana de diferencias"
     }
   },
   "versionUpdate": {
@@ -715,5 +730,26 @@
     "title": "Preajustes de equipo de IA",
     "description": "Gestiona los preajustes de miembros y equipos de IA en un solo lugar.",
     "close": "Cerrar preajustes de equipo de IA"
+  },
+  "panel": {
+    "workspaces": {
+      "loadError": "No se pudieron cargar los espacios de trabajo de la sesión.",
+      "loading": "Cargando la lista de espacios de trabajo...",
+      "empty": "No hay espacios de trabajo en esta sesión.",
+      "members": "Miembros: {{names}}",
+      "openWorkspace": "Abrir directorio del espacio de trabajo",
+      "openExplorerError": "No se pudo abrir el directorio del espacio de trabajo.",
+      "loadWorkspaceError": "No se pudieron cargar los cambios del espacio de trabajo.",
+      "loadingWorkspace": "Cargando cambios...",
+      "notGitRepo": "No es un repositorio Git; solo se muestran archivos del alcance de la sesión.",
+      "noChanges": "No hay cambios en el espacio de trabajo.",
+      "truncated": "Hay demasiados archivos modificados. Solo se muestran los primeros 200.",
+      "eyebrow": "Espacios de trabajo de la sesión",
+      "title": "Cambios del espacio de trabajo",
+      "refresh": "Actualizar",
+      "close": "Cerrar",
+      "diffAction": "Diff",
+      "openExplorerSuccess": "Abierto en el administrador de archivos."
+    }
   }
 }

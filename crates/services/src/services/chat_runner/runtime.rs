@@ -65,7 +65,13 @@ impl RunLogSpool {
             fs::create_dir_all(parent).await?;
         }
 
-        let file = fs::File::create(&path).await?;
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .await?;
         Ok(Self {
             path,
             file: Some(file),
@@ -277,18 +283,28 @@ impl RunLogSpool {
                 fs::create_dir_all(parent).await?;
             }
             fs::write(tail_path, &persisted).await?;
-            let _ = fs::remove_file(&self.path).await;
             Ok::<(), std::io::Error>(())
         }
         .await;
 
         match persist_result {
-            Ok(()) => RunLogPersistResult {
-                snapshot,
-                log_path: tail_path.to_path_buf(),
-                log_state: ChatRunLogState::Tail,
-                persist_error: None,
-            },
+            Ok(()) => {
+                if let Err(err) = fs::remove_file(&self.path).await {
+                    tracing::warn!(
+                        run_id = %self.run_id,
+                        live_spool_path = %self.path.display(),
+                        error = %err,
+                        "failed to remove live raw log spool after tail persistence"
+                    );
+                }
+
+                RunLogPersistResult {
+                    snapshot,
+                    log_path: tail_path.to_path_buf(),
+                    log_state: ChatRunLogState::Tail,
+                    persist_error: None,
+                }
+            }
             Err(err) => RunLogPersistResult {
                 snapshot,
                 log_path: self.path.clone(),
@@ -320,6 +336,53 @@ impl RunLogSpool {
             log_state: ChatRunLogState::Live,
             persist_error,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use dashmap::DashMap;
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn persist_tail_keeps_tail_result_when_cleanup_fails() {
+        let temp = tempdir().expect("tempdir");
+        let live_path = temp.path().join("live.log");
+        let tail_path = temp.path().join("run").join("raw.tail.log");
+        let db_pool = sqlx::SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("sqlite pool");
+        let mut spool = RunLogSpool::new(
+            live_path,
+            Uuid::new_v4(),
+            db_pool,
+            "workspace".to_string(),
+            Arc::new(DashMap::new()),
+        )
+        .await
+        .expect("spool");
+
+        spool.write_text("hello tail").await.expect("write");
+
+        let cleanup_failure_path = temp.path().join("cleanup-blocker");
+        fs::create_dir_all(&cleanup_failure_path)
+            .await
+            .expect("cleanup blocker dir");
+        spool.path = cleanup_failure_path;
+
+        let persisted = spool.persist_tail_to(&tail_path, 1024).await;
+
+        assert_eq!(persisted.log_state, ChatRunLogState::Tail);
+        assert_eq!(persisted.log_path, tail_path);
+        assert!(persisted.persist_error.is_none());
+        assert_eq!(
+            fs::read_to_string(&persisted.log_path)
+                .await
+                .expect("tail file"),
+            "hello tail"
+        );
     }
 }
 
@@ -667,12 +730,149 @@ impl ChatRunner {
     }
 
     #[allow(clippy::too_many_arguments)]
+    async fn collect_run_artifact_paths(
+        session_id: Uuid,
+        run_id: Uuid,
+        workspace_path: &Path,
+    ) -> Vec<String> {
+        let content = match fs::read_to_string(Self::session_work_records_path(session_id)).await {
+            Ok(content) => content,
+            Err(_) => return Vec::new(),
+        };
+
+        let mut paths = BTreeMap::<String, ()>::new();
+        for line in content.lines() {
+            let Ok(entry) = serde_json::from_str::<StoredWorkRecordEntry>(line) else {
+                continue;
+            };
+            if entry.run_id != run_id || !entry.message_type.eq_ignore_ascii_case("artifact") {
+                continue;
+            }
+
+            for path in extract_workspace_paths_from_text(&entry.content, workspace_path) {
+                paths.insert(path, ());
+            }
+        }
+
+        paths.into_keys().collect()
+    }
+
+    fn observed_file_metadata(
+        workspace_path: &Path,
+        relative_path: &str,
+    ) -> (bool, Option<String>) {
+        let absolute_path = workspace_path.join(relative_path);
+        let Ok(metadata) = std::fs::metadata(&absolute_path) else {
+            return (false, None);
+        };
+        if !metadata.is_file() {
+            return (false, None);
+        }
+
+        let modified_at = metadata
+            .modified()
+            .ok()
+            .map(chrono::DateTime::<Utc>::from)
+            .map(|value| value.to_rfc3339());
+        (true, modified_at)
+    }
+
+    fn upsert_workspace_observed_path(
+        observed: &mut BTreeMap<String, WorkspaceObservedPathEntry>,
+        workspace_path: &Path,
+        relative_path: String,
+        source: &str,
+    ) {
+        let (existed_after_run, modified_at) =
+            Self::observed_file_metadata(workspace_path, &relative_path);
+
+        let entry =
+            observed
+                .entry(relative_path.clone())
+                .or_insert_with(|| WorkspaceObservedPathEntry {
+                    path: relative_path.clone(),
+                    source: source.to_string(),
+                    existed_after_run,
+                    modified_at: modified_at.clone(),
+                });
+
+        if !entry
+            .source
+            .split(',')
+            .any(|existing| existing.trim() == source)
+        {
+            entry.source.push(',');
+            entry.source.push_str(source);
+        }
+
+        entry.existed_after_run |= existed_after_run;
+        if entry.modified_at.is_none() {
+            entry.modified_at = modified_at;
+        }
+    }
+
+    async fn collect_workspace_observed_paths(
+        session_id: Uuid,
+        run_id: Uuid,
+        workspace_path: &Path,
+        latest_assistant: &str,
+        diff_info: Option<&DiffInfo>,
+        untracked_paths: &[String],
+    ) -> Vec<WorkspaceObservedPathEntry> {
+        let artifact_paths =
+            Self::collect_run_artifact_paths(session_id, run_id, workspace_path).await;
+        let output_paths = extract_workspace_paths_from_text(latest_assistant, workspace_path);
+        let mut observed = BTreeMap::<String, WorkspaceObservedPathEntry>::new();
+
+        if let Some(diff_info) = diff_info {
+            for path in &diff_info.observed_paths {
+                Self::upsert_workspace_observed_path(
+                    &mut observed,
+                    workspace_path,
+                    path.clone(),
+                    "git_diff",
+                );
+            }
+        }
+
+        for path in untracked_paths {
+            Self::upsert_workspace_observed_path(
+                &mut observed,
+                workspace_path,
+                path.clone(),
+                "git_untracked",
+            );
+        }
+
+        for path in artifact_paths {
+            Self::upsert_workspace_observed_path(
+                &mut observed,
+                workspace_path,
+                path,
+                "artifact_record",
+            );
+        }
+
+        for path in output_paths {
+            Self::upsert_workspace_observed_path(
+                &mut observed,
+                workspace_path,
+                path,
+                "output_text",
+            );
+        }
+
+        observed.into_values().collect()
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn spawn_stream_bridge(
         &self,
         msg_store: Arc<MsgStore>,
         session_id: Uuid,
         agent_id: Uuid,
         session_agent_id: Uuid,
+        run_index: i64,
         run_id: Uuid,
         output_path: PathBuf,
         meta_path: PathBuf,
@@ -851,11 +1051,30 @@ impl ChatRunner {
 
                         let _ = fs::write(&output_path, &latest_assistant).await;
 
-                        // TODO: Temporarily disabled diff and untracked file capture
-                        // let diff_info =
-                        //     ChatRunner::capture_git_diff(&workspace_path, &run_dir).await;
-                        // let untracked_files =
-                        //     ChatRunner::capture_untracked_files(&workspace_path, &run_dir).await;
+                        let diff_info = ChatRunner::capture_git_diff(
+                            &workspace_path,
+                            &run_dir,
+                            session_agent_id,
+                            run_index,
+                        )
+                        .await;
+                        let untracked_files = ChatRunner::capture_untracked_files(
+                            &workspace_path,
+                            &run_dir,
+                            session_agent_id,
+                            run_index,
+                        )
+                        .await;
+                        let workspace_observed_paths =
+                            ChatRunner::collect_workspace_observed_paths(
+                                session_id,
+                                run_id,
+                                &workspace_path,
+                                &latest_assistant,
+                                diff_info.as_ref(),
+                                &untracked_files,
+                            )
+                            .await;
                         let completion_status =
                             RunCompletionStatus::from_atomic(&completion_status);
                         let should_clear_agent_session = matches!(
@@ -992,6 +1211,9 @@ impl ChatRunner {
                         if let Some(ref err) = spool_persist.persist_error {
                             meta["log_persist_error"] = serde_json::json!(err);
                         }
+                        meta["workspace_observed_paths"] =
+                            serde_json::to_value(&workspace_observed_paths)
+                                .unwrap_or(serde_json::Value::Array(Vec::new()));
 
                         let _ = fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap())
                             .await;

@@ -1,9 +1,9 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     path::{Component, Path, PathBuf},
     str::FromStr,
     sync::{
-        Arc,
+        Arc, LazyLock,
         atomic::{AtomicBool, AtomicU8, Ordering},
     },
 };
@@ -39,6 +39,7 @@ use executors::{
     profile::{ExecutorConfigs, ExecutorProfileId, canonical_variant_key},
 };
 use futures::StreamExt;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
@@ -116,6 +117,7 @@ const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
 
 struct DiffInfo {
     _truncated: bool,
+    observed_paths: Vec<String>,
 }
 
 struct ContextSnapshot {
@@ -231,6 +233,119 @@ struct WorkRecordEntry {
     message_type: &'static str,
     content: String,
     created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct StoredWorkRecordEntry {
+    run_id: Uuid,
+    message_type: String,
+    content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct WorkspaceObservedPathEntry {
+    path: String,
+    source: String,
+    existed_after_run: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    modified_at: Option<String>,
+}
+
+static INLINE_CODE_PATH_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"`([^`\r\n]+)`").expect("inline code path regex"));
+
+const PATH_LIKE_EXTENSIONS: &[&str] = &[
+    "c", "cc", "cpp", "cs", "css", "go", "h", "hpp", "html", "java", "js", "json", "jsx", "md",
+    "mjs", "py", "rb", "rs", "scss", "sh", "sql", "svg", "toml", "ts", "tsx", "txt", "vue", "xml",
+    "yaml", "yml",
+];
+
+fn looks_like_workspace_path(candidate: &str) -> bool {
+    if candidate.is_empty() || candidate.contains("://") {
+        return false;
+    }
+
+    if candidate.contains('/') || candidate.contains('\\') {
+        return true;
+    }
+
+    Path::new(candidate)
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|extension| {
+            PATH_LIKE_EXTENSIONS
+                .iter()
+                .any(|allowed| allowed.eq_ignore_ascii_case(extension))
+        })
+        .unwrap_or(false)
+}
+
+fn normalize_workspace_observed_path(raw: &str, workspace_root: &Path) -> Option<String> {
+    let trimmed = raw
+        .trim()
+        .trim_matches(|ch: char| {
+            matches!(
+                ch,
+                '`' | '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';'
+            )
+        })
+        .trim_end_matches(|ch: char| matches!(ch, '.' | ':' | '!' | '?'));
+
+    if trimmed.is_empty() || !looks_like_workspace_path(trimmed) {
+        return None;
+    }
+
+    let candidate_path = PathBuf::from(trimmed);
+    let relative = if candidate_path.is_absolute() {
+        candidate_path
+            .strip_prefix(workspace_root)
+            .ok()?
+            .to_path_buf()
+    } else {
+        candidate_path
+    };
+
+    let mut normalized = Vec::new();
+    for component in relative.components() {
+        match component {
+            Component::Normal(part) => normalized.push(part.to_string_lossy().to_string()),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return None,
+        }
+    }
+
+    if normalized.is_empty()
+        || normalized
+            .first()
+            .is_some_and(|part| part == OPENTEAMS_HOME_DIR)
+    {
+        return None;
+    }
+
+    Some(normalized.join("/"))
+}
+
+fn extract_workspace_paths_from_text(text: &str, workspace_root: &Path) -> Vec<String> {
+    let mut candidates = Vec::new();
+
+    for capture in INLINE_CODE_PATH_RE.captures_iter(text) {
+        if let Some(matched) = capture.get(1) {
+            candidates.push(matched.as_str().to_string());
+        }
+    }
+
+    for token in text.split_whitespace() {
+        candidates.push(token.to_string());
+    }
+
+    let mut deduped = BTreeMap::<String, ()>::new();
+    for candidate in candidates {
+        if let Some(path) = normalize_workspace_observed_path(&candidate, workspace_root) {
+            deduped.insert(path, ());
+        }
+    }
+
+    deduped.into_keys().collect()
 }
 
 struct MessageSenderIdentity {
@@ -1146,6 +1261,7 @@ impl ChatRunner {
                 &CreateChatRun {
                     session_id,
                     session_agent_id,
+                    workspace_path: Some(workspace_path.clone()),
                     run_index,
                     run_dir: run_dir.to_string_lossy().to_string(),
                     input_path: Some(input_path.to_string_lossy().to_string()),
@@ -1239,6 +1355,7 @@ impl ChatRunner {
                 session_id,
                 agent_id,
                 session_agent_id,
+                run_index,
                 run_id,
                 output_path,
                 meta_path,

@@ -161,7 +161,11 @@
       "artifactCount_one": "{{count}} artefact",
       "artifactCount_other": "{{count}} artefacts",
       "statusCount_one": "{{count}} mise à jour de statut",
-      "statusCount_other": "{{count}} mises à jour de statut"
+      "statusCount_other": "{{count}} mises à jour de statut",
+      "workspaceChanges": "Modifications de l'espace de travail",
+      "openWorkspaceChanges": "Ouvrir les modifications de l'espace de travail",
+      "filesChanged_one": "{{count}} fichier modifie",
+      "filesChanged_other": "{{count}} fichiers modifies"
     }
   },
   "members": {
@@ -170,6 +174,7 @@
     "selectSessionToManage": "Sélectionnez une session pour gérer les membres IA.",
     "noMembersYet": "Aucun membre IA pour l'instant",
     "workspace": "Espace de travail",
+    "history": "Historique",
     "edit": "Modifier",
     "remove": "Supprimer",
     "addAiMember": "Ajouter un membre IA",
@@ -661,6 +666,16 @@
       "fullErrorLog": "Journal d'erreur complet",
       "workspaceTrail": "Espace de travail",
       "workspacePath": "Chemin de l'espace de travail"
+    },
+    "workspaceSingleFileDiff": {
+      "openWorkspaceError": "Impossible d'ouvrir ce fichier.",
+      "openWorkspace": "Ouvrir dans le gestionnaire de fichiers",
+      "openExplorerError": "Impossible d'ouvrir ce fichier.",
+      "openExplorerSuccess": "Ce fichier a ete affiche dans le gestionnaire de fichiers.",
+      "tooLarge": "Le diff de ce fichier depasse 300 000 caracteres, le rendu integre est donc desactive.",
+      "notFound": "Impossible de charger le diff du fichier.",
+      "loadError": "Impossible de charger le diff du fichier.",
+      "resizeWindow": "Redimensionner la fenetre de diff"
     }
   },
   "versionUpdate": {
@@ -715,5 +730,26 @@
     "title": "Préréglages d'équipe IA",
     "description": "Gérez les préréglages de membres et d'équipes IA au même endroit.",
     "close": "Fermer les préréglages d'équipe IA"
+  },
+  "panel": {
+    "workspaces": {
+      "loadError": "Impossible de charger les espaces de travail de la session.",
+      "loading": "Chargement de la liste des espaces de travail...",
+      "empty": "Aucun espace de travail dans cette session.",
+      "members": "Membres : {{names}}",
+      "openWorkspace": "Ouvrir le dossier de l'espace de travail",
+      "openExplorerError": "Impossible d'ouvrir le dossier de l'espace de travail.",
+      "loadWorkspaceError": "Impossible de charger les modifications de l'espace de travail.",
+      "loadingWorkspace": "Chargement des modifications...",
+      "notGitRepo": "Ce n'est pas un depot Git ; seuls les fichiers lies a la session sont affiches.",
+      "noChanges": "Aucune modification dans l'espace de travail.",
+      "truncated": "Trop de fichiers modifies. Seuls les 200 premiers sont affiches.",
+      "eyebrow": "Espaces de travail de la session",
+      "title": "Modifications de l'espace de travail",
+      "refresh": "Actualiser",
+      "close": "Fermer",
+      "diffAction": "Diff",
+      "openExplorerSuccess": "Ouvert dans le gestionnaire de fichiers."
+    }
   }
 }

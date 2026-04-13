@@ -161,7 +161,11 @@
       "artifactCount_one": "{{count}} 個交付物",
       "artifactCount_other": "{{count}} 個交付物",
       "statusCount_one": "{{count}} 則狀態更新",
-      "statusCount_other": "{{count}} 則狀態更新"
+      "statusCount_other": "{{count}} 則狀態更新",
+      "workspaceChanges": "工作區變更",
+      "openWorkspaceChanges": "打開工作區變更",
+      "filesChanged_one": "{{count}} 個檔案已變更",
+      "filesChanged_other": "{{count}} 個檔案已變更"
     }
   },
   "members": {
@@ -170,6 +174,7 @@
     "selectSessionToManage": "選擇一個會話來管理 AI 成員。",
     "noMembersYet": "暫無 AI 成員",
     "workspace": "工作區",
+    "history": "歷史",
     "edit": "編輯",
     "remove": "移除",
     "addAiMember": "新增 AI 成員",
@@ -661,6 +666,16 @@
       "fullErrorLog": "完整錯誤日誌",
       "workspaceTrail": "工作區",
       "workspacePath": "工作區路徑"
+    },
+    "workspaceSingleFileDiff": {
+      "openWorkspaceError": "無法打開該檔案。",
+      "openWorkspace": "在檔案管理器中打開",
+      "openExplorerError": "無法打開該檔案。",
+      "openExplorerSuccess": "已在檔案管理器中定位到該檔案。",
+      "tooLarge": "此檔案差異超過 300,000 個字元，已停用內嵌渲染。",
+      "notFound": "無法載入檔案差異。",
+      "loadError": "無法載入檔案差異。",
+      "resizeWindow": "調整差異視窗大小"
     }
   },
   "versionUpdate": {
@@ -715,5 +730,26 @@
     "title": "AI 團隊預設",
     "description": "在同一處管理成員預設與團隊預設。",
     "close": "關閉 AI 團隊預設"
+  },
+  "panel": {
+    "workspaces": {
+      "loadError": "無法載入會話工作區。",
+      "loading": "正在載入工作區列表...",
+      "empty": "目前會話中沒有工作區。",
+      "members": "成員：{{names}}",
+      "openWorkspace": "打開工作區目錄",
+      "openExplorerError": "無法打開工作區目錄。",
+      "loadWorkspaceError": "無法載入工作區變更。",
+      "loadingWorkspace": "正在載入變更...",
+      "notGitRepo": "不是 Git 倉庫，僅顯示會話範圍內的檔案。",
+      "noChanges": "工作區沒有變更。",
+      "truncated": "變更檔案過多，僅顯示前 200 個。",
+      "eyebrow": "會話工作區",
+      "title": "工作區變更",
+      "refresh": "重新整理",
+      "close": "關閉",
+      "diffAction": "差異",
+      "openExplorerSuccess": "已在檔案管理器中打開。"
+    }
   }
 }

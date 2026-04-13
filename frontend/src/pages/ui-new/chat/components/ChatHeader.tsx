@@ -4,6 +4,7 @@ import {
   BoxArrowDownIcon,
   BroomIcon,
   DotsThreeIcon,
+  FolderNotchOpenIcon,
   GitDiffIcon,
   MagnifyingGlassIcon,
   PencilSimpleIcon,
@@ -54,6 +55,7 @@ export interface ChatHeaderProps {
   hasChanges?: boolean;
   hasNewChanges?: boolean;
   onViewChanges?: () => void;
+  onOpenWorkspaceChanges?: () => void;
 }
 
 export function ChatHeader({
@@ -84,6 +86,7 @@ export function ChatHeader({
   hasChanges,
   hasNewChanges,
   onViewChanges,
+  onOpenWorkspaceChanges,
 }: ChatHeaderProps) {
   const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
@@ -274,6 +277,21 @@ export function ChatHeader({
               aria-label={t('header.searchMessages')}
             >
               <MagnifyingGlassIcon className="size-icon-sm" />
+            </button>
+          )}
+          {activeSession && !isSearchOpen && onOpenWorkspaceChanges && (
+            <button
+              type="button"
+              onClick={onOpenWorkspaceChanges}
+              className="chat-session-header-icon-btn chat-session-header-op-btn"
+              title={t('timeline.workItem.workspaceChanges', {
+                defaultValue: 'Workspace changes',
+              })}
+              aria-label={t('timeline.workItem.workspaceChanges', {
+                defaultValue: 'Workspace changes',
+              })}
+            >
+              <FolderNotchOpenIcon className="size-icon-sm" />
             </button>
           )}
           {hasChanges && onViewChanges && (

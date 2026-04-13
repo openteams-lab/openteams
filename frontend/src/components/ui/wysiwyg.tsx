@@ -109,6 +109,8 @@ type WysiwygProps = {
   allowFileLinks?: boolean;
   /** Resolve relative read-only links against this local file path */
   readOnlyLinkBasePath?: string | null;
+  /** Callback for read-only local file link clicks */
+  onReadOnlyLinkClick?: (resolvedHref: string, originalHref: string) => void;
 };
 
 /** Ref interface for WYSIWYGEditor, exposing imperative methods */
@@ -157,6 +159,7 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
       preserveHeightOnClear = false,
       allowFileLinks = false,
       readOnlyLinkBasePath = null,
+      onReadOnlyLinkClick,
     }: WysiwygProps,
     ref: React.ForwardedRef<WYSIWYGEditorRef>
   ) {
@@ -404,6 +407,7 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
                   <ReadOnlyLinkPlugin
                     allowFileLinks={allowFileLinks}
                     basePath={readOnlyLinkBasePath}
+                    onLinkClick={onReadOnlyLinkClick}
                   />
                 )}
                 {/* Clickable code for file paths in read-only mode */}

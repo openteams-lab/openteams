@@ -522,20 +522,29 @@ impl ClaudeLogProcessor {
                                 session_id_extracted = true;
                             }
 
-                            // Track message UUIDs for --resume-session-at:
-                            // - User messages: always valid, push immediately and clear pending
-                            // - Assistant messages: may have incomplete tool calls, store as pending
-                            // - Result messages: confirms assistant turn is complete, commit pending
+                            // Track only completed assistant turn UUIDs for --resume-session-at.
+                            // Synthetic/replay user messages are not stable resume anchors, and
+                            // assistant turns should only be committed once the turn has finished.
                             match &claude_json {
-                                ClaudeJson::User { uuid, .. } => {
+                                ClaudeJson::User { .. } => {
                                     pending_assistant_uuid = None;
-                                    if let Some(uuid) = uuid {
-                                        msg_store.push_message_id(uuid.clone());
-                                    }
                                 }
                                 ClaudeJson::Assistant { uuid, .. } => {
                                     pending_assistant_uuid = uuid.clone();
                                 }
+                                ClaudeJson::StreamEvent { event, uuid, .. } => match event {
+                                    ClaudeStreamEvent::MessageStart { message }
+                                        if message.role == "assistant" =>
+                                    {
+                                        pending_assistant_uuid = uuid.clone();
+                                    }
+                                    ClaudeStreamEvent::MessageStop => {
+                                        if let Some(uuid) = pending_assistant_uuid.take() {
+                                            msg_store.push_message_id(uuid);
+                                        }
+                                    }
+                                    _ => {}
+                                },
                                 ClaudeJson::Result { .. } => {
                                     if let Some(uuid) = pending_assistant_uuid.take() {
                                         msg_store.push_message_id(uuid);
@@ -2228,6 +2237,8 @@ impl ClaudeToolData {
 
 #[cfg(test)]
 mod tests {
+    use std::{path::PathBuf, sync::Arc};
+
     use super::*;
     use crate::logs::utils::{EntryIndexProvider, patch::extract_normalized_entry_from_patch};
 
@@ -2251,6 +2262,24 @@ mod tests {
     fn normalize(json: &ClaudeJson, worktree: &str) -> Vec<NormalizedEntry> {
         let mut processor = ClaudeLogProcessor::new();
         normalize_helper(&mut processor, json, worktree)
+    }
+
+    fn test_executor() -> ClaudeCode {
+        ClaudeCode {
+            claude_code_router: Some(false),
+            plan: None,
+            approvals: None,
+            model: None,
+            append_prompt: AppendPrompt::default(),
+            dangerously_skip_permissions: None,
+            cmd: crate::command::CmdOverrides {
+                base_command_override: None,
+                additional_params: None,
+                env: None,
+            },
+            approvals_service: None,
+            disable_api_key: None,
+        }
     }
 
     #[test]
@@ -2409,27 +2438,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_streaming_patch_generation() {
-        use std::sync::Arc;
-
         use workspace_utils::msg_store::MsgStore;
 
-        let executor = ClaudeCode {
-            claude_code_router: Some(false),
-            plan: None,
-            approvals: None,
-            model: None,
-            append_prompt: AppendPrompt::default(),
-            dangerously_skip_permissions: None,
-            cmd: crate::command::CmdOverrides {
-                base_command_override: None,
-                additional_params: None,
-                env: None,
-            },
-            approvals_service: None,
-            disable_api_key: None,
-        };
+        let executor = test_executor();
         let msg_store = Arc::new(MsgStore::new());
-        let current_dir = std::path::PathBuf::from("/tmp/test-worktree");
+        let current_dir = PathBuf::from("/tmp/test-worktree");
 
         // Push some test messages
         msg_store.push_stdout(
@@ -2454,6 +2467,81 @@ mod tests {
             patch_count > 0,
             "Expected JsonPatch messages to be generated from streaming processing"
         );
+    }
+
+    #[tokio::test]
+    async fn test_streaming_assistant_uuid_is_persisted_for_resume() {
+        use workspace_utils::{log_msg::LogMsg, msg_store::MsgStore};
+
+        let executor = test_executor();
+        let msg_store = Arc::new(MsgStore::new());
+        let current_dir = PathBuf::from("/tmp/test-worktree");
+
+        msg_store.push_stdout(
+            r#"{"type":"stream_event","uuid":"assistant-uuid-1","event":{"type":"message_start","message":{"id":"msg_1","role":"assistant","content":[]}}}
+"#
+            .to_string(),
+        );
+        msg_store.push_stdout(
+            r#"{"type":"stream_event","uuid":"assistant-uuid-1","event":{"type":"message_stop"}}
+"#
+            .to_string(),
+        );
+        msg_store.push_stdout(
+            r#"{"type":"result","subtype":"success","is_error":false,"duration_ms":1,"result":"done"}
+"#
+            .to_string(),
+        );
+        msg_store.push_finished();
+
+        executor.normalize_logs(msg_store.clone(), &current_dir);
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let message_ids: Vec<String> = msg_store
+            .get_history()
+            .into_iter()
+            .filter_map(|msg| match msg {
+                LogMsg::MessageId(id) => Some(id),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(message_ids, vec!["assistant-uuid-1".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_user_message_uuid_is_not_persisted_for_resume() {
+        use workspace_utils::{log_msg::LogMsg, msg_store::MsgStore};
+
+        let executor = test_executor();
+        let msg_store = Arc::new(MsgStore::new());
+        let current_dir = PathBuf::from("/tmp/test-worktree");
+
+        msg_store.push_stdout(
+            r#"{"type":"user","uuid":"user-uuid-1","message":{"role":"user","content":[{"type":"text","text":"hello"}]}}
+"#
+            .to_string(),
+        );
+        msg_store.push_stdout(
+            r#"{"type":"user","uuid":"synthetic-user-uuid-1","isSynthetic":true,"message":{"role":"user","content":[{"type":"text","text":"tool output"}]}}
+"#
+            .to_string(),
+        );
+        msg_store.push_finished();
+
+        executor.normalize_logs(msg_store.clone(), &current_dir);
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let message_ids: Vec<String> = msg_store
+            .get_history()
+            .into_iter()
+            .filter_map(|msg| match msg {
+                LogMsg::MessageId(id) => Some(id),
+                _ => None,
+            })
+            .collect();
+
+        assert!(message_ids.is_empty());
     }
 
     #[test]

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: Uuid\",\n                      session_id as \"session_id!: Uuid\",\n                      session_agent_id as \"session_agent_id!: Uuid\",\n                      run_index,\n                      run_dir,\n                      input_path,\n                      output_path,\n                      raw_log_path,\n                      meta_path,\n                      log_state as \"log_state!: ChatRunLogState\",\n                      artifact_state as \"artifact_state!: ChatRunArtifactState\",\n                      log_truncated as \"log_truncated!: bool\",\n                      log_capture_degraded as \"log_capture_degraded!: bool\",\n                      pruned_at as \"pruned_at: DateTime<Utc>\",\n                      prune_reason,\n                      retention_summary_json,\n                      created_at as \"created_at!: DateTime<Utc>\"\n               FROM chat_runs\n               WHERE session_agent_id = $1\n               ORDER BY run_index DESC\n               LIMIT 1",
+  "query": "SELECT id as \"id!: Uuid\",\n                      session_id as \"session_id!: Uuid\",\n                      session_agent_id as \"session_agent_id!: Uuid\",\n                      workspace_path,\n                      run_index,\n                      run_dir,\n                      input_path,\n                      output_path,\n                      raw_log_path,\n                      meta_path,\n                      log_state as \"log_state!: ChatRunLogState\",\n                      artifact_state as \"artifact_state!: ChatRunArtifactState\",\n                      log_truncated as \"log_truncated!: bool\",\n                      log_capture_degraded as \"log_capture_degraded!: bool\",\n                      pruned_at as \"pruned_at: DateTime<Utc>\",\n                      prune_reason,\n                      retention_summary_json,\n                      created_at as \"created_at!: DateTime<Utc>\"\n               FROM chat_runs\n               WHERE session_agent_id = $1\n               ORDER BY run_index DESC\n               LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -19,73 +19,78 @@
         "type_info": "Blob"
       },
       {
-        "name": "run_index",
+        "name": "workspace_path",
         "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "run_index",
+        "ordinal": 4,
         "type_info": "Integer"
       },
       {
         "name": "run_dir",
-        "ordinal": 4,
-        "type_info": "Text"
-      },
-      {
-        "name": "input_path",
         "ordinal": 5,
         "type_info": "Text"
       },
       {
-        "name": "output_path",
+        "name": "input_path",
         "ordinal": 6,
         "type_info": "Text"
       },
       {
-        "name": "raw_log_path",
+        "name": "output_path",
         "ordinal": 7,
         "type_info": "Text"
       },
       {
-        "name": "meta_path",
+        "name": "raw_log_path",
         "ordinal": 8,
         "type_info": "Text"
       },
       {
-        "name": "log_state!: ChatRunLogState",
+        "name": "meta_path",
         "ordinal": 9,
         "type_info": "Text"
       },
       {
-        "name": "artifact_state!: ChatRunArtifactState",
+        "name": "log_state!: ChatRunLogState",
         "ordinal": 10,
         "type_info": "Text"
       },
       {
-        "name": "log_truncated!: bool",
+        "name": "artifact_state!: ChatRunArtifactState",
         "ordinal": 11,
-        "type_info": "Integer"
+        "type_info": "Text"
       },
       {
-        "name": "log_capture_degraded!: bool",
+        "name": "log_truncated!: bool",
         "ordinal": 12,
         "type_info": "Integer"
       },
       {
-        "name": "pruned_at: DateTime<Utc>",
+        "name": "log_capture_degraded!: bool",
         "ordinal": 13,
-        "type_info": "Text"
+        "type_info": "Integer"
       },
       {
-        "name": "prune_reason",
+        "name": "pruned_at: DateTime<Utc>",
         "ordinal": 14,
         "type_info": "Text"
       },
       {
-        "name": "retention_summary_json",
+        "name": "prune_reason",
         "ordinal": 15,
         "type_info": "Text"
       },
       {
-        "name": "created_at!: DateTime<Utc>",
+        "name": "retention_summary_json",
         "ordinal": 16,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 17,
         "type_info": "Text"
       }
     ],
@@ -96,6 +101,7 @@
       true,
       false,
       false,
+      true,
       false,
       false,
       true,
@@ -112,5 +118,5 @@
       false
     ]
   },
-  "hash": "ca5b61d51550ffbeed9f0874c548289f3878069b7f60b5c5f073c5fc65864568"
+  "hash": "ea7c46ebffc03b19280d8a4322b207ac6db39a628927d7c3e3902716cf061e0e"
 }

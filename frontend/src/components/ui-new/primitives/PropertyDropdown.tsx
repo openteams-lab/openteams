@@ -39,7 +39,7 @@ export function PropertyDropdown<T extends string = string>({
         <button
           type="button"
           className={cn(
-            'flex items-center gap-half px-base py-half bg-panel rounded-sm',
+            'flex items-center gap-half px-base py-half bg-panel rounded-sm border border-border',
             'text-sm text-normal hover:bg-secondary transition-colors',
             'disabled:opacity-50 disabled:cursor-not-allowed'
           )}

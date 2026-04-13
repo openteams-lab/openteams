@@ -10,6 +10,7 @@ import {
   File,
   Folder,
   FolderOpen,
+  HardDrive,
   Home,
   Loader2,
   Search,
@@ -46,10 +47,66 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
     const { t } = useTranslation('common');
     const [currentPath, setCurrentPath] = useState<string>('');
     const [entries, setEntries] = useState<DirectoryEntry[]>([]);
+    const [rootEntries, setRootEntries] = useState<DirectoryEntry[]>([]);
     const [loading, setLoading] = useState(false);
+    const [loadingRoots, setLoadingRoots] = useState(false);
     const [error, setError] = useState('');
     const [manualPath, setManualPath] = useState(value);
     const [searchTerm, setSearchTerm] = useState('');
+
+    const isWindowsPath = (path: string) => /^[A-Za-z]:[\\/]/.test(path);
+
+    const getParentPath = (path: string) => {
+      const trimmed = path.trim();
+      if (!trimmed) return null;
+
+      if (isWindowsPath(trimmed)) {
+        const normalized = trimmed.replace(/[\\/]+$/, '');
+        if (/^[A-Za-z]:$/.test(normalized)) {
+          return null;
+        }
+
+        const separatorIndex = Math.max(
+          normalized.lastIndexOf('\\'),
+          normalized.lastIndexOf('/')
+        );
+
+        if (separatorIndex <= 2) {
+          return `${normalized.slice(0, 2)}\\`;
+        }
+
+        return normalized.slice(0, separatorIndex);
+      }
+
+      const normalized = trimmed.replace(/\/+$/, '') || '/';
+      if (normalized === '/') return null;
+
+      const separatorIndex = normalized.lastIndexOf('/');
+      return separatorIndex <= 0 ? '/' : normalized.slice(0, separatorIndex);
+    };
+
+    const activeRootPath = useMemo(() => {
+      if (!currentPath) return null;
+
+      if (isWindowsPath(currentPath)) {
+        return `${currentPath.slice(0, 2)}\\`;
+      }
+
+      return '/';
+    }, [currentPath]);
+
+    const loadRoots = async () => {
+      setLoadingRoots(true);
+
+      try {
+        const roots = await fileSystemApi.listRoots();
+        setRootEntries(roots.filter((entry) => entry.is_directory));
+      } catch {
+        setRootEntries([]);
+      } finally {
+        setLoadingRoots(false);
+      }
+    };
 
     const filteredEntries = useMemo(() => {
       if (!searchTerm.trim()) return entries;
@@ -62,6 +119,7 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
       if (modal.visible) {
         setManualPath(value);
         setSearchTerm('');
+        void loadRoots();
         void loadDirectory();
       }
     }, [modal.visible, value]);
@@ -103,8 +161,10 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
     };
 
     const handleParentDirectory = () => {
-      const parentPath = currentPath.split('/').slice(0, -1).join('/');
-      const newPath = parentPath || '/';
+      const parentPath = getParentPath(manualPath || currentPath);
+      if (!parentPath) return;
+
+      const newPath = parentPath;
       void loadDirectory(newPath);
       setManualPath(newPath);
     };
@@ -121,6 +181,12 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
       const selectedPath = manualPath || currentPath;
       modal.resolve(selectedPath);
       modal.hide();
+    };
+
+    const handleRootSelect = (rootPath: string) => {
+      setSearchTerm('');
+      setManualPath(rootPath);
+      void loadDirectory(rootPath);
     };
 
     const handleSelectManual = () => {
@@ -221,7 +287,59 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
               </div>
             </div>
 
-            <div className="rounded-[22px] border border-[#DCE4EF] bg-white/95 p-4 shadow-[0_18px_42px_rgba(148,163,184,0.1)] dark:border-[#2A3445] dark:bg-[#141C28] dark:shadow-[0_18px_42px_rgba(0,0,0,0.26)]">
+              <div className="rounded-[22px] border border-[#DCE4EF] bg-white/95 p-4 shadow-[0_18px_42px_rgba(148,163,184,0.1)] dark:border-[#2A3445] dark:bg-[#141C28] dark:shadow-[0_18px_42px_rgba(0,0,0,0.26)]">
+              {rootEntries.length > 0 && (
+                <div className="mb-4 rounded-[18px] border border-[#E6EDF5] bg-[linear-gradient(180deg,#FBFDFF_0%,#F5F8FC_100%)] p-4 dark:border-[#2A3445] dark:bg-[linear-gradient(180deg,rgba(25,34,51,0.94)_0%,rgba(17,25,38,1)_100%)]">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#7A8699] dark:text-[#7F8AA3]">
+                        {t('folderPicker.drivesTitle', 'Storage Roots')}
+                      </div>
+                      <div className="mt-1 text-sm text-[#6B778C] dark:text-[#BAC4D6]">
+                        {t(
+                          'folderPicker.drivesDescription',
+                          'Jump between available drives and root locations.'
+                        )}
+                      </div>
+                    </div>
+                    {loadingRoots && (
+                      <div className="inline-flex items-center gap-2 rounded-full border border-[#DCE4EF] bg-white px-3 py-1 text-xs font-medium text-[#6B778C] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#BAC4D6]">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        {t('folderPicker.loading', 'Loading')}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {rootEntries.map((entry) => {
+                      const entryPath =
+                        isWindowsPath(entry.path) && !entry.path.endsWith('\\')
+                          ? `${entry.path}\\`
+                          : entry.path;
+
+                      const isActive = activeRootPath === entryPath;
+
+                      return (
+                        <button
+                          key={entry.path}
+                          type="button"
+                          onClick={() => handleRootSelect(entryPath)}
+                          className={cn(
+                            'inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors',
+                            isActive
+                              ? 'border-[#BFD9FF] bg-[#EEF5FF] text-[#1D4E89] dark:border-[rgba(125,182,255,0.4)] dark:bg-[rgba(94,162,255,0.16)] dark:text-[#DCEBFF]'
+                              : 'border-[#DCE4EF] bg-white text-[#4A5A70] hover:bg-[#F2F6FB] hover:text-[#223044] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#BAC4D6] dark:hover:bg-[#1A2433] dark:hover:text-[#F3F6FB]'
+                          )}
+                        >
+                          <HardDrive className="h-4 w-4" />
+                          <span>{entry.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="mb-4 flex flex-wrap items-center gap-3">
                 <Button
                   type="button"
@@ -237,7 +355,7 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                   onClick={handleParentDirectory}
                   variant="outline"
                   size="icon"
-                  disabled={!currentPath || currentPath === '/'}
+                  disabled={!getParentPath(manualPath || currentPath)}
                   className={toolbarButtonClassName}
                 >
                   <ChevronUp className="h-4 w-4" />

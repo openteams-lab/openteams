@@ -163,10 +163,14 @@
     "workItem": {
       "artifacts": "交付物",
       "conclusion": "结论",
+      "workspaceChanges": "工作区变更",
       "artifactCount_one": "{{count}} 个交付物",
       "artifactCount_other": "{{count}} 个交付物",
       "statusCount_one": "{{count}} 条状态更新",
-      "statusCount_other": "{{count}} 条状态更新"
+      "statusCount_other": "{{count}} 条状态更新",
+      "openWorkspaceChanges": "打开工作区变更",
+      "filesChanged_one": "{{count}} 个文件已变更",
+      "filesChanged_other": "{{count}} 个文件已变更"
     }
   },
   "members": {
@@ -175,6 +179,7 @@
     "selectSessionToManage": "选择一个会话来管理 AI 成员。",
     "noMembersYet": "暂无 AI 成员",
     "workspace": "工作区",
+    "history": "历史",
     "edit": "编辑",
     "remove": "移除",
     "addAiMember": "添加 AI 成员",
@@ -666,6 +671,16 @@
       "loadingLog": "正在加载日志...",
       "logEmpty": "日志为空。",
       "fullErrorLog": "完整错误日志"
+    },
+    "workspaceSingleFileDiff": {
+      "openWorkspaceError": "无法打开该文件。",
+      "openWorkspace": "在文件管理器中打开",
+      "openExplorerError": "无法打开该文件。",
+      "openExplorerSuccess": "已在文件管理器中定位到该文件。",
+      "tooLarge": "此文件差异超过 300,000 个字符，已禁用内联渲染。",
+      "notFound": "无法加载文件差异。",
+      "loadError": "无法加载文件差异。",
+      "resizeWindow": "调整差异窗口大小"
     }
   },
   "versionUpdate": {
@@ -715,5 +730,26 @@
     "imagePreview": "图片预览",
     "filesChanged": "{{count}} 个文件",
     "runLabel": "运行 {{id}}"
+  },
+  "panel": {
+    "workspaces": {
+      "loadError": "无法加载会话工作区。",
+      "loading": "正在加载工作区列表...",
+      "empty": "当前会话中没有工作区。",
+      "members": "成员：{{names}}",
+      "openWorkspace": "打开工作区目录",
+      "openExplorerError": "无法打开工作区目录。",
+      "loadWorkspaceError": "无法加载工作区变更。",
+      "loadingWorkspace": "正在加载变更...",
+      "notGitRepo": "不是 Git 仓库，仅显示会话范围内的文件。",
+      "noChanges": "工作区没有变更。",
+      "truncated": "变更文件过多，仅显示前 200 个。",
+      "eyebrow": "会话工作区",
+      "title": "工作区变更",
+      "refresh": "刷新",
+      "close": "关闭",
+      "diffAction": "差异",
+      "openExplorerSuccess": "已在文件管理器中打开。"
+    }
   }
 }

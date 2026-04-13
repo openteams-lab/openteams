@@ -36,6 +36,30 @@ export function pathToFileHref(path: string | null | undefined): string | null {
   return null;
 }
 
+export function fileHrefToPath(
+  href: string | null | undefined
+): string | null {
+  if (!href) return null;
+
+  try {
+    const url = new URL(href);
+    if (url.protocol !== 'file:') return null;
+
+    const pathname = decodeURI(url.pathname);
+    if (url.host) {
+      return `\\\\${url.host}${pathname.replace(/\//g, '\\')}`;
+    }
+
+    if (/^\/[a-zA-Z]:/.test(pathname)) {
+      return pathname.slice(1).replace(/\//g, '\\');
+    }
+
+    return pathname;
+  } catch {
+    return null;
+  }
+}
+
 function resolveRelativeFileHref(
   href: string,
   basePath: string | null | undefined
@@ -44,11 +68,31 @@ function resolveRelativeFileHref(
   if (!baseHref) return null;
 
   try {
-    const resolved = new URL(href, baseHref);
+    const resolved = new URL(href, baseHref.endsWith('/') ? baseHref : `${baseHref}/`);
     return resolved.protocol === 'file:' ? resolved.toString() : null;
   } catch {
     return null;
   }
+}
+
+export function resolveLocalPathToAbsolutePath(
+  path: string | null | undefined,
+  workspacePath: string | null | undefined
+): string | null {
+  if (!path) return null;
+
+  const directHref = pathToFileHref(path);
+  if (directHref) {
+    return fileHrefToPath(directHref);
+  }
+
+  if (!workspacePath) return null;
+
+  const resolvedHref = resolveRelativeFileHref(
+    path.replace(/\\/g, '/'),
+    workspacePath
+  );
+  return fileHrefToPath(resolvedHref);
 }
 
 export function resolveReadOnlyLink(

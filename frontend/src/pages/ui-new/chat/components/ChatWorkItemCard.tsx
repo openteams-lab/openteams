@@ -1,4 +1,6 @@
 import {
+  ArrowRightIcon,
+  FolderNotchOpenIcon,
   CaretDownIcon,
   CheckCircleIcon,
   CheckSquareIcon,
@@ -14,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
 import { formatDateShortWithTime } from '@/utils/date';
+import { resolveLocalPathToAbsolutePath } from '@/utils/readOnlyLinks';
 import {
   AgentBrandIcon,
   getAgentAvatarSeed,
@@ -21,12 +24,80 @@ import {
 } from '../AgentAvatar';
 import type { ChatWorkItemGroup } from '../types';
 
+const ARTIFACT_FILE_PATH_RE =
+  /(^|[\s([{"'])(?<path>(?:[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\){2,}[^\\\r\n<>:"|?*\s`"')\]}.,:;!?]+|[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\)*[^\\\r\n<>:"|?*]+\.[a-zA-Z0-9]{1,16}|\/(?:[^/\r\n]+\/){2,}[^/\r\n\s`"')\]}.,:;!?]+|\/(?:[^/\r\n]+\/)*[^/\r\n]+\.[a-zA-Z0-9]{1,16}|(?:\.{1,2}[\\/])?(?:[^\\/\r\n\s`"')\]}.,:;!?]+[\\/])*[^\\/\r\n\s`"')\]}.,:;!?]+\.[a-zA-Z0-9]{1,16}))/g;
+
+type ExtractedArtifactPath = {
+  rawPath: string;
+  absolutePath: string;
+};
+
+function isArtifactPathCandidate(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+
+  if (
+    /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed) &&
+    !/^[a-zA-Z]:[\\/]/.test(trimmed) &&
+    !trimmed.startsWith('file://')
+  ) {
+    return false;
+  }
+
+  ARTIFACT_FILE_PATH_RE.lastIndex = 0;
+  return ARTIFACT_FILE_PATH_RE.test(` ${trimmed}`);
+}
+
+function extractArtifactPaths(
+  content: string,
+  workspacePath: string | undefined
+): ExtractedArtifactPath[] {
+  if (!workspacePath) {
+    return [];
+  }
+
+  const paths = new Map<string, ExtractedArtifactPath>();
+  const addPath = (rawPath: string) => {
+    if (!isArtifactPathCandidate(rawPath)) {
+      return;
+    }
+
+    const absolutePath = resolveLocalPathToAbsolutePath(rawPath, workspacePath);
+    if (!absolutePath) {
+      return;
+    }
+
+    if (!paths.has(absolutePath)) {
+      paths.set(absolutePath, {
+        rawPath: rawPath.trim(),
+        absolutePath,
+      });
+    }
+  };
+
+  for (const match of content.matchAll(/\[[^\]]+\]\(([^)\s]+)\)/g)) {
+    addPath(match[1] ?? '');
+  }
+
+  for (const match of content.matchAll(/`([^`]+)`/g)) {
+    addPath(match[1] ?? '');
+  }
+
+  for (const match of content.matchAll(ARTIFACT_FILE_PATH_RE)) {
+    addPath(match.groups?.path ?? '');
+  }
+
+  return Array.from(paths.values());
+}
+
 export interface ChatWorkItemCardProps {
   group: ChatWorkItemGroup;
   senderLabel: string;
   senderRunnerType: string | null;
   isExpanded: boolean;
   onToggleExpand: () => void;
+  workspacePath?: string;
+  onOpenWorkspaceChanges?: (workspacePath: string, filePath?: string) => void;
   isCleanupMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
@@ -48,6 +119,8 @@ export function ChatWorkItemCard({
   senderRunnerType,
   isExpanded,
   onToggleExpand,
+  workspacePath,
+  onOpenWorkspaceChanges,
   isCleanupMode = false,
   isSelected = false,
   onToggleSelect,
@@ -60,6 +133,28 @@ export function ChatWorkItemCard({
     senderLabel
   );
   const agentAvatarStyle = getAgentAvatarStyle(agentAvatarSeed);
+  const hasWorkspacePath = !!workspacePath;
+  const fileChanges = hasWorkspacePath
+    ? (() => {
+        const paths = new Map<string, ExtractedArtifactPath>();
+
+        for (const item of group.artifacts) {
+          for (const path of extractArtifactPaths(
+            item.content,
+            workspacePath
+          )) {
+            if (!paths.has(path.absolutePath)) {
+              paths.set(path.absolutePath, path);
+            }
+          }
+        }
+
+        return Array.from(paths.values());
+      })()
+    : [];
+  const fileChangesTitle = t('timeline.workItem.filesChanged', {
+    count: fileChanges.length,
+  });
 
   const handleCardSelect = () => {
     if (!isCleanupMode || !onToggleSelect) return;
@@ -163,6 +258,23 @@ export function ChatWorkItemCard({
             </div>
           </button>
           <div className="chat-session-work-item-header-actions">
+            {hasWorkspacePath && (
+              <button
+                type="button"
+                className={cn(
+                  'chat-session-work-item-workspace-button',
+                  onOpenWorkspaceChanges
+                    ? 'is-enabled'
+                    : 'cursor-not-allowed opacity-60'
+                )}
+                onClick={() => onOpenWorkspaceChanges?.(workspacePath!)}
+                disabled={!onOpenWorkspaceChanges}
+                title={t('timeline.workItem.openWorkspaceChanges')}
+                aria-label={t('timeline.workItem.openWorkspaceChanges')}
+              >
+                <FolderNotchOpenIcon className="size-icon-xs" />
+              </button>
+            )}
             <button
               type="button"
               className="chat-session-work-item-expand-button"
@@ -209,6 +321,46 @@ export function ChatWorkItemCard({
             </div>
           </section>
         )}
+
+        {isExpanded &&
+          workspacePath &&
+          onOpenWorkspaceChanges &&
+          fileChanges.length > 0 && (
+            <section className="chat-session-work-item-section">
+              <div className="chat-session-work-item-section-label">
+                <FileTextIcon className="size-icon-base" />
+                <span>{fileChangesTitle}</span>
+              </div>
+              <div className="chat-session-work-item-section-body">
+                <div className="chat-session-work-item-file-group">
+                  <div className="chat-session-work-item-file-links">
+                    {fileChanges.map((path) => (
+                      <button
+                        key={path.absolutePath}
+                        type="button"
+                        className="chat-session-work-item-file-link"
+                        onClick={() =>
+                          onOpenWorkspaceChanges(
+                            workspacePath,
+                            path.absolutePath
+                          )
+                        }
+                        title={path.absolutePath}
+                      >
+                        <span className="chat-session-work-item-file-link-label">
+                          {path.rawPath}
+                        </span>
+                        <ArrowRightIcon
+                          className="chat-session-work-item-file-link-icon"
+                          weight="bold"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
 
         {isExpanded && group.conclusions.length > 0 && (
           <section className="chat-session-work-item-section">

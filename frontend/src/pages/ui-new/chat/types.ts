@@ -68,6 +68,7 @@ export type ChatWorkItemGroup = {
   sessionAgentId: string;
   agentId: string;
   createdAt: string;
+  workspacePath: string | null;
   artifacts: ChatWorkItem[];
   conclusions: ChatWorkItem[];
 };

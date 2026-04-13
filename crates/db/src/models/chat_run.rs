@@ -46,6 +46,7 @@ pub struct ChatRun {
     pub id: Uuid,
     pub session_id: Uuid,
     pub session_agent_id: Uuid,
+    pub workspace_path: Option<String>,
     pub run_index: i64,
     pub run_dir: String,
     pub input_path: Option<String>,
@@ -66,6 +67,7 @@ pub struct ChatRun {
 pub struct CreateChatRun {
     pub session_id: Uuid,
     pub session_agent_id: Uuid,
+    pub workspace_path: Option<String>,
     pub run_index: i64,
     pub run_dir: String,
     pub input_path: Option<String>,
@@ -143,6 +145,7 @@ impl ChatRun {
             r#"SELECT id as "id!: Uuid",
                       session_id as "session_id!: Uuid",
                       session_agent_id as "session_agent_id!: Uuid",
+                      workspace_path,
                       run_index,
                       run_dir,
                       input_path,
@@ -164,12 +167,50 @@ impl ChatRun {
         .await
     }
 
+    pub async fn list_for_session_workspace(
+        pool: &SqlitePool,
+        session_id: Uuid,
+        workspace_path: &str,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as::<_, ChatRun>(
+            r#"
+            SELECT runs.id,
+                   runs.session_id,
+                   runs.session_agent_id,
+                   runs.workspace_path,
+                   runs.run_index,
+                   runs.run_dir,
+                   runs.input_path,
+                   runs.output_path,
+                   runs.raw_log_path,
+                   runs.meta_path,
+                   runs.log_state,
+                   runs.artifact_state,
+                   runs.log_truncated,
+                   runs.log_capture_degraded,
+                   runs.pruned_at,
+                   runs.prune_reason,
+                   runs.retention_summary_json,
+                   runs.created_at
+            FROM chat_runs runs
+            WHERE runs.session_id = ?1
+              AND runs.workspace_path = ?2
+            ORDER BY runs.created_at ASC
+            "#,
+        )
+        .bind(session_id)
+        .bind(workspace_path)
+        .fetch_all(pool)
+        .await
+    }
+
     pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             ChatRun,
             r#"SELECT id as "id!: Uuid",
                       session_id as "session_id!: Uuid",
                       session_agent_id as "session_agent_id!: Uuid",
+                      workspace_path,
                       run_index,
                       run_dir,
                       input_path,
@@ -201,6 +242,7 @@ impl ChatRun {
             r#"SELECT id as "id!: Uuid",
                       session_id as "session_id!: Uuid",
                       session_agent_id as "session_agent_id!: Uuid",
+                      workspace_path,
                       run_index,
                       run_dir,
                       input_path,
@@ -249,11 +291,12 @@ impl ChatRun {
         sqlx::query_as!(
             ChatRun,
             r#"INSERT INTO chat_runs
-               (id, session_id, session_agent_id, run_index, run_dir, input_path, output_path, raw_log_path, meta_path)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+               (id, session_id, session_agent_id, workspace_path, run_index, run_dir, input_path, output_path, raw_log_path, meta_path)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                RETURNING id as "id!: Uuid",
                          session_id as "session_id!: Uuid",
                          session_agent_id as "session_agent_id!: Uuid",
+                         workspace_path,
                          run_index,
                          run_dir,
                          input_path,
@@ -271,6 +314,7 @@ impl ChatRun {
             id,
             data.session_id,
             data.session_agent_id,
+            data.workspace_path,
             data.run_index,
             data.run_dir,
             data.input_path,
@@ -482,5 +526,122 @@ impl ChatRun {
         .await?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sqlx::SqlitePool;
+
+    use super::*;
+    use crate::{
+        models::{
+            chat_agent::{ChatAgent, CreateChatAgent},
+            chat_session::{ChatSession, CreateChatSession},
+            chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
+        },
+        run_migrations,
+    };
+
+    #[tokio::test]
+    async fn list_for_session_workspace_uses_run_workspace_snapshot() {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("create sqlite memory pool");
+        run_migrations(&pool).await.expect("run migrations");
+
+        let session = ChatSession::create(
+            &pool,
+            &CreateChatSession {
+                title: Some("test".to_string()),
+                workspace_path: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create session");
+        let agent = ChatAgent::create(
+            &pool,
+            &CreateChatAgent {
+                name: "tester".to_string(),
+                runner_type: "codex".to_string(),
+                system_prompt: Some(String::new()),
+                tools_enabled: Some(serde_json::json!({})),
+                model_name: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create agent");
+        let session_agent = ChatSessionAgent::create(
+            &pool,
+            &CreateChatSessionAgent {
+                session_id: session.id,
+                agent_id: agent.id,
+                workspace_path: Some("/workspace/a".to_string()),
+                allowed_skill_ids: Vec::new(),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create session agent");
+
+        let run_a = ChatRun::create(
+            &pool,
+            &CreateChatRun {
+                session_id: session.id,
+                session_agent_id: session_agent.id,
+                workspace_path: Some("/workspace/a".to_string()),
+                run_index: 1,
+                run_dir: "/tmp/run-a".to_string(),
+                input_path: None,
+                output_path: None,
+                raw_log_path: None,
+                meta_path: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create run a");
+
+        ChatSessionAgent::update_workspace_path(
+            &pool,
+            session_agent.id,
+            Some("/workspace/b".to_string()),
+        )
+        .await
+        .expect("update workspace path");
+
+        let run_b = ChatRun::create(
+            &pool,
+            &CreateChatRun {
+                session_id: session.id,
+                session_agent_id: session_agent.id,
+                workspace_path: Some("/workspace/b".to_string()),
+                run_index: 2,
+                run_dir: "/tmp/run-b".to_string(),
+                input_path: None,
+                output_path: None,
+                raw_log_path: None,
+                meta_path: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create run b");
+
+        let workspace_a_runs =
+            ChatRun::list_for_session_workspace(&pool, session.id, "/workspace/a")
+                .await
+                .expect("list workspace a runs");
+        let workspace_b_runs =
+            ChatRun::list_for_session_workspace(&pool, session.id, "/workspace/b")
+                .await
+                .expect("list workspace b runs");
+
+        assert_eq!(workspace_a_runs.len(), 1);
+        assert_eq!(workspace_a_runs[0].id, run_a.id);
+        assert_eq!(workspace_b_runs.len(), 1);
+        assert_eq!(workspace_b_runs[0].id, run_b.id);
     }
 }

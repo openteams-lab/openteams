@@ -36,6 +36,8 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
     const [workspacePath, setWorkspacePath] = useState('');
     const [validationError, setValidationError] = useState('');
     const [isValidating, setIsValidating] = useState(false);
+    const isTauriRuntime =
+      typeof window !== 'undefined' && '__TAURI__' in window;
 
     const workspaceHistory = useMemo(() => {
       const paths = existingSessions
@@ -72,6 +74,25 @@ const CreateSessionDialogImpl = NiceModal.create<CreateSessionDialogProps>(
     }, [t, workspacePath]);
 
     const handleBrowse = async () => {
+      if (isTauriRuntime) {
+        try {
+          const { open } = await import('@tauri-apps/api/dialog');
+          const selected = await open({
+            directory: true,
+            multiple: false,
+            defaultPath: workspacePath.trim() || undefined,
+            title: t('session.selectWorkspace', 'Select Workspace'),
+          });
+
+          if (typeof selected === 'string' && selected) {
+            setWorkspacePath(selected);
+            return;
+          }
+        } catch {
+          // Fall back to the in-app picker if the native dialog is unavailable.
+        }
+      }
+
       const selected = await FolderPickerDialog.show({
         value: workspacePath,
         title: t('session.selectWorkspace', 'Select Workspace'),

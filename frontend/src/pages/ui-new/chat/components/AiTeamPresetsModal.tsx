@@ -76,7 +76,7 @@ function AiTeamPresetsModalContent({ onClose }: { onClose: () => void }) {
       />
       <div className="fixed inset-0 z-[9999]">
         <div
-          className="chat-settings-theme settings-dialog-shell flex h-full w-full flex-col overflow-hidden bg-[rgba(255,255,255,0.96)] animate-in fade-in-0 slide-in-from-bottom-4 duration-200 rounded-none border-0 dark:bg-[rgba(16,23,34,0.98)] md:mx-auto md:my-[5vh] md:h-[85vh] md:max-w-[1220px] md:rounded-[28px] md:border md:border-white/70 md:shadow-[0_30px_80px_rgba(15,23,42,0.18)] md:backdrop-blur-xl md:dark:border-[#2A3445] md:dark:shadow-[0_30px_80px_rgba(0,0,0,0.42)]"
+          className="chat-settings-theme settings-dialog-shell flex h-full w-full flex-col overflow-hidden bg-[rgba(255,255,255,0.96)] animate-in fade-in-0 slide-in-from-bottom-4 duration-200 rounded-none border-0 dark:bg-[rgba(16,23,34,0.98)] md:mx-auto md:my-6 md:h-[min(85vh,calc(100vh-48px))] md:max-h-[calc(100vh-48px)] md:w-[min(1220px,calc(100vw-48px))] md:max-w-[calc(100vw-48px)] md:rounded-[28px] md:border md:border-white/70 md:shadow-[0_30px_80px_rgba(15,23,42,0.18)] md:backdrop-blur-xl md:dark:border-[#2A3445] md:dark:shadow-[0_30px_80px_rgba(0,0,0,0.42)]"
           style={{
             fontFamily: '"Inter", "PingFang SC", "Helvetica Neue", sans-serif',
           }}

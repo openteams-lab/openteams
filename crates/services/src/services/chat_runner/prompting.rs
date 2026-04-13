@@ -263,6 +263,8 @@ impl ChatRunner {
     pub(super) async fn capture_git_diff(
         workspace_path: &Path,
         run_dir: &Path,
+        session_agent_id: Uuid,
+        run_index: i64,
     ) -> Option<DiffInfo> {
         let check = Command::new("git")
             .arg("-C")
@@ -315,10 +317,31 @@ impl ChatRunner {
             return None;
         }
 
-        let diff_path = run_dir.join("diff.patch");
+        let diff_path = run_dir.join(format!(
+            "{}_diff.patch",
+            Self::run_records_prefix(session_agent_id, run_index)
+        ));
         if let Err(err) = fs::write(&diff_path, &diff).await {
             tracing::warn!("Failed to write diff patch: {}", err);
             return None;
+        }
+
+        let mut observed_paths = BTreeMap::<String, ()>::new();
+        for line in diff.lines() {
+            let Some(rest) = line.strip_prefix("diff --git a/") else {
+                continue;
+            };
+            let Some((old_path, new_path)) = rest.split_once(" b/") else {
+                continue;
+            };
+            let preferred = if new_path == "/dev/null" {
+                old_path
+            } else {
+                new_path
+            };
+            if let Some(path) = normalize_workspace_observed_path(preferred, workspace_path) {
+                observed_paths.insert(path, ());
+            }
         }
 
         // Consider diff truncated if it's over 4KB (for UI display purposes)
@@ -326,6 +349,7 @@ impl ChatRunner {
 
         Some(DiffInfo {
             _truncated: truncated,
+            observed_paths: observed_paths.into_keys().collect(),
         })
     }
 
@@ -333,6 +357,8 @@ impl ChatRunner {
     pub(super) async fn capture_untracked_files(
         workspace_path: &Path,
         run_dir: &Path,
+        session_agent_id: Uuid,
+        run_index: i64,
     ) -> Vec<String> {
         let output = Command::new("git")
             .arg("-C")
@@ -354,7 +380,10 @@ impl ChatRunner {
         };
 
         let mut files = Vec::new();
-        let untracked_dir = run_dir.join("untracked");
+        let untracked_dir = run_dir.join(format!(
+            "{}_untracked",
+            Self::run_records_prefix(session_agent_id, run_index)
+        ));
 
         for raw in output.stdout.split(|b| *b == b'\0') {
             if raw.is_empty() {
@@ -410,7 +439,9 @@ impl ChatRunner {
                 }
             }
 
-            files.push(rel_path.to_string_lossy().to_string());
+            if let Some(path) = normalize_workspace_observed_path(&rel, workspace_path) {
+                files.push(path);
+            }
         }
 
         files

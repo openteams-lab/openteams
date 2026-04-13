@@ -863,6 +863,80 @@ export function splitUnifiedDiff(patch: string): DiffFileEntry[] {
   return entries;
 }
 
+function normalizeComparablePath(path: string): string {
+  return path
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/\/+/g, '/')
+    .replace(/\/$/, '');
+}
+
+export function getRelativeWorkspaceFilePath(
+  filePath: string,
+  workspacePath: string
+): string | null {
+  const normalizedFilePath = normalizeComparablePath(filePath);
+  const normalizedWorkspacePath = normalizeComparablePath(workspacePath);
+
+  if (!normalizedFilePath || !normalizedWorkspacePath) {
+    return null;
+  }
+
+  const workspacePrefix = `${normalizedWorkspacePath}/`;
+  if (normalizedFilePath === normalizedWorkspacePath) {
+    return '';
+  }
+
+  if (normalizedFilePath.startsWith(workspacePrefix)) {
+    return normalizedFilePath.slice(workspacePrefix.length);
+  }
+
+  return null;
+}
+
+export function findRunDiffFile(
+  patch: string,
+  filePath: string,
+  workspacePath: string
+): DiffFileEntry | null {
+  const diffFiles = splitUnifiedDiff(patch);
+  const relativePath = getRelativeWorkspaceFilePath(filePath, workspacePath);
+  const candidates = Array.from(
+    new Set(
+      [relativePath, filePath]
+        .filter((value): value is string => Boolean(value))
+        .map(normalizeComparablePath)
+    )
+  );
+
+  const matchesCandidate = (diffPath: string, candidate: string): boolean =>
+    diffPath === candidate || diffPath.endsWith(`/${candidate}`);
+
+  for (const entry of diffFiles) {
+    const normalizedDiffPath = normalizeComparablePath(entry.path);
+    if (candidates.some((candidate) => matchesCandidate(normalizedDiffPath, candidate))) {
+      return entry;
+    }
+  }
+
+  const lowercaseCandidates = candidates.map((candidate) => candidate.toLowerCase());
+  for (const entry of diffFiles) {
+    const normalizedDiffPath = normalizeComparablePath(entry.path).toLowerCase();
+    if (
+      lowercaseCandidates.some(
+        (candidate) =>
+          normalizedDiffPath === candidate ||
+          normalizedDiffPath.endsWith(`/${candidate}`)
+      )
+    ) {
+      return entry;
+    }
+  }
+
+  return null;
+}
+
 function stableStringifyJson(value: unknown): string {
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value);

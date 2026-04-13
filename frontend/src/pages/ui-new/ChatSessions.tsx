@@ -103,6 +103,7 @@ import { ChatEmptyStateIndicator } from './chat/components/ChatEmptyStateIndicat
 import { AiMembersSidebar } from './chat/components/AiMembersSidebar';
 import { WorkspaceDrawer } from './chat/components/WorkspaceDrawer';
 import { DiffViewerModal } from './chat/components/DiffViewerModal';
+import { SessionWorkspacesPanel } from './chat/components/SessionWorkspacesPanel';
 import { PromptEditorModal } from './chat/components/PromptEditorModal';
 import { ConfirmModal } from './chat/components/ConfirmModal';
 import { FilePreviewModal } from './chat/components/FilePreviewModal';
@@ -170,6 +171,7 @@ const isProtocolErrorMessage = (message: ChatMessage) =>
   extractProtocolErrorMeta(message.meta) !== null;
 
 const MAX_SESSION_TITLE_LENGTH = 20;
+const DEFAULT_LEFT_SIDEBAR_WIDTH = 300;
 const COLLAPSED_LEFT_SIDEBAR_WIDTH = 52;
 const MESSAGE_SEARCH_HIGHLIGHT_NAME = 'chat-session-search-highlight';
 const MAX_MESSAGE_SEARCH_HIGHLIGHT_RANGES = 4000;
@@ -962,6 +964,11 @@ export function ChatSessions() {
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   const [workspaceDrawerOpen, setWorkspaceDrawerOpen] = useState(false);
   const [workspaceAgentId, setWorkspaceAgentId] = useState<string | null>(null);
+  const [sessionWorkspacesOpen, setSessionWorkspacesOpen] = useState(false);
+  const [sessionWorkspacesInitialPath, setSessionWorkspacesInitialPath] =
+    useState<string | null>(null);
+  const [sessionWorkspacesInitialFilePath, setSessionWorkspacesInitialFilePath] =
+    useState<string | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const previousSessionIdRef = useRef<string | null>(null);
@@ -1037,7 +1044,9 @@ export function ChatSessions() {
   const [isImportingTeam, setIsImportingTeam] = useState(false);
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [isDeletingMessages, setIsDeletingMessages] = useState(false);
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState(340);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(
+    DEFAULT_LEFT_SIDEBAR_WIDTH
+  );
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(280);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
@@ -1053,7 +1062,7 @@ export function ChatSessions() {
     startX: number;
     startWidth: number;
   } | null>(null);
-  const lastExpandedLeftWidthRef = useRef(340);
+  const lastExpandedLeftWidthRef = useRef(DEFAULT_LEFT_SIDEBAR_WIDTH);
   const sessionUpdatedAtByIdRef = useRef<Map<string, string>>(new Map());
   const hasShownAgentRunningWarningRef = useRef<Set<string>>(new Set());
 
@@ -1395,6 +1404,9 @@ export function ChatSessions() {
         sessionAgentId: item.session_agent_id,
         agentId: item.agent_id,
         createdAt: item.created_at,
+        workspacePath:
+          sessionAgents.find((entry) => entry.id === item.session_agent_id)
+            ?.workspace_path ?? null,
         artifacts: item.item_type === ChatWorkItemType.artifact ? [item] : [],
         conclusions:
           item.item_type === ChatWorkItemType.conclusion ? [item] : [],
@@ -1405,7 +1417,7 @@ export function ChatSessions() {
       (a, b) =>
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
-  }, [workItems]);
+  }, [sessionAgents, workItems]);
   const timelineEntries = useMemo<TimelineEntry[]>(
     () =>
       [
@@ -1680,6 +1692,15 @@ export function ChatSessions() {
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         ),
     [runHistory, workspaceAgentId]
+  );
+
+  const handleOpenWorkspaceChanges = useCallback(
+    (path?: string | null, filePath?: string | null) => {
+      setSessionWorkspacesInitialPath(path ?? null);
+      setSessionWorkspacesInitialFilePath(filePath ?? null);
+      setSessionWorkspacesOpen(true);
+    },
+    []
   );
 
   const activeWorkspaceRunIds = useMemo(
@@ -3823,6 +3844,7 @@ export function ChatSessions() {
                 ? () => handleSelectWorkspacePreview(artifactSpotlight)
                 : undefined
             }
+            onOpenWorkspaceChanges={() => handleOpenWorkspaceChanges()}
           />
 
           {/* Cleanup mode controls */}
@@ -3968,6 +3990,8 @@ export function ChatSessions() {
                             onToggleExpand={() =>
                               handleToggleWorkItemExpanded(entry.key)
                             }
+                            workspacePath={entry.group.workspacePath ?? undefined}
+                            onOpenWorkspaceChanges={handleOpenWorkspaceChanges}
                             isCleanupMode={isCleanupMode}
                             isSelected={isSelected}
                             onToggleSelect={() =>
@@ -4348,6 +4372,18 @@ export function ChatSessions() {
         logLoading={logLoading}
         logError={logError}
         onLoadLog={handleLoadLog}
+      />
+
+      <SessionWorkspacesPanel
+        isOpen={sessionWorkspacesOpen}
+        sessionId={activeSessionId}
+        initialWorkspacePath={sessionWorkspacesInitialPath}
+        initialFilePath={sessionWorkspacesInitialFilePath}
+        onClose={() => {
+          setSessionWorkspacesOpen(false);
+          setSessionWorkspacesInitialPath(null);
+          setSessionWorkspacesInitialFilePath(null);
+        }}
       />
 
       {/* Diff Viewer Modal */}

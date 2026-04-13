@@ -163,10 +163,14 @@
     "workItem": {
       "artifacts": "Artifacts",
       "conclusion": "Conclusion",
+      "workspaceChanges": "Workspace changes",
       "artifactCount_one": "{{count}} artifact",
       "artifactCount_other": "{{count}} artifacts",
       "statusCount_one": "{{count}} status update",
-      "statusCount_other": "{{count}} status updates"
+      "statusCount_other": "{{count}} status updates",
+      "openWorkspaceChanges": "Open workspace changes",
+      "filesChanged_one": "{{count}} file changed",
+      "filesChanged_other": "{{count}} files changed"
     }
   },
   "members": {
@@ -175,6 +179,7 @@
     "selectSessionToManage": "Select a session to manage AI members.",
     "noMembersYet": "No AI members yet",
     "workspace": "Workspace",
+    "history": "History",
     "edit": "Edit",
     "remove": "Remove",
     "addAiMember": "Add AI member",
@@ -666,6 +671,16 @@
       "loadingLog": "Loading log...",
       "logEmpty": "Log is empty.",
       "fullErrorLog": "Full Error Log"
+    },
+    "workspaceSingleFileDiff": {
+      "openWorkspaceError": "Unable to open this file.",
+      "openWorkspace": "Open in file manager",
+      "openExplorerError": "Unable to open this file.",
+      "openExplorerSuccess": "Revealed this file in the file manager.",
+      "tooLarge": "This file diff exceeds 300,000 characters, so inline rendering is disabled.",
+      "notFound": "Unable to load file diff.",
+      "loadError": "Unable to load file diff.",
+      "resizeWindow": "Resize diff window"
     }
   },
   "versionUpdate": {
@@ -715,5 +730,26 @@
     "imagePreview": "Image preview",
     "filesChanged": "{{count}} files",
     "runLabel": "Run {{id}}"
+  },
+  "panel": {
+    "workspaces": {
+      "loadError": "Unable to load session workspaces.",
+      "loading": "Loading workspace list...",
+      "empty": "No workspaces in this session.",
+      "members": "Members: {{names}}",
+      "openWorkspace": "Open workspace directory",
+      "openExplorerError": "Unable to open workspace directory.",
+      "loadWorkspaceError": "Unable to load workspace changes.",
+      "loadingWorkspace": "Loading changes...",
+      "notGitRepo": "Not a Git repository - showing session-scoped files only.",
+      "noChanges": "No workspace changes.",
+      "truncated": "Too many changed files. Only the first 200 are shown.",
+      "eyebrow": "Session workspaces",
+      "title": "Workspace changes",
+      "refresh": "Refresh",
+      "close": "Close",
+      "diffAction": "Diff",
+      "openExplorerSuccess": "Opened in file manager."
+    }
   }
 }
