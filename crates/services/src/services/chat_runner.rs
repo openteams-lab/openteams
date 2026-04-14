@@ -1,10 +1,10 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     path::{Component, Path, PathBuf},
     str::FromStr,
     sync::{
-        Arc,
-        atomic::{AtomicU8, Ordering},
+        Arc, LazyLock,
+        atomic::{AtomicBool, AtomicU8, Ordering},
     },
 };
 
@@ -39,6 +39,7 @@ use executors::{
     profile::{ExecutorConfigs, ExecutorProfileId, canonical_variant_key},
 };
 use futures::StreamExt;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
@@ -116,6 +117,7 @@ const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
 
 struct DiffInfo {
     _truncated: bool,
+    observed_paths: Vec<String>,
 }
 
 struct ContextSnapshot {
@@ -231,6 +233,155 @@ struct WorkRecordEntry {
     message_type: &'static str,
     content: String,
     created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct StoredWorkRecordEntry {
+    run_id: Uuid,
+    message_type: String,
+    content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct WorkspaceObservedPathEntry {
+    path: String,
+    source: String,
+    existed_after_run: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    modified_at: Option<String>,
+}
+
+static INLINE_CODE_PATH_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"`([^`\r\n]+)`").expect("inline code path regex"));
+
+const PATH_LIKE_EXTENSIONS: &[&str] = &[
+    "c", "cc", "cpp", "cs", "css", "go", "h", "hpp", "html", "java", "js", "json", "jsx", "md",
+    "mjs", "py", "rb", "rs", "scss", "sh", "sql", "svg", "toml", "ts", "tsx", "txt", "vue", "xml",
+    "yaml", "yml",
+];
+
+fn looks_like_workspace_path(candidate: &str) -> bool {
+    if candidate.is_empty() || candidate.contains("://") {
+        return false;
+    }
+
+    if candidate.contains('/') || candidate.contains('\\') {
+        return true;
+    }
+
+    Path::new(candidate)
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|extension| {
+            PATH_LIKE_EXTENSIONS
+                .iter()
+                .any(|allowed| allowed.eq_ignore_ascii_case(extension))
+        })
+        .unwrap_or(false)
+}
+
+pub(super) fn is_internal_openteams_runtime_path(path: &Path) -> bool {
+    let components = path
+        .components()
+        .filter_map(|component| match component {
+            Component::Normal(part) => Some(part.to_string_lossy().to_string()),
+            Component::CurDir => None,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => None,
+        })
+        .collect::<Vec<_>>();
+
+    match components.as_slice() {
+        [openteams, runs, ..] if openteams == OPENTEAMS_HOME_DIR && runs == RUNS_DIR_NAME => true,
+        [openteams, context, _session_id, file]
+            if openteams == OPENTEAMS_HOME_DIR
+                && context == CONTEXT_DIR_NAME
+                && matches!(
+                    file.as_str(),
+                    "messages.jsonl"
+                        | LEGACY_COMPACTED_CONTEXT_FILE_NAME
+                        | SHARED_BLACKBOARD_FILE_NAME
+                        | WORK_RECORDS_FILE_NAME
+                ) =>
+        {
+            true
+        }
+        [openteams, context, _session_id, internal_dir, ..]
+            if openteams == OPENTEAMS_HOME_DIR
+                && context == CONTEXT_DIR_NAME
+                && matches!(internal_dir.as_str(), "attachments" | "references") =>
+        {
+            true
+        }
+        _ => false,
+    }
+}
+
+fn normalize_workspace_observed_path(raw: &str, workspace_root: &Path) -> Option<String> {
+    let trimmed = raw
+        .trim()
+        .trim_matches(|ch: char| {
+            matches!(
+                ch,
+                '`' | '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';'
+            )
+        })
+        .trim_end_matches(['.', ':', '!', '?']);
+
+    if trimmed.is_empty() || !looks_like_workspace_path(trimmed) {
+        return None;
+    }
+
+    let candidate_path = PathBuf::from(trimmed);
+    let relative = if candidate_path.is_absolute() {
+        candidate_path
+            .strip_prefix(workspace_root)
+            .ok()?
+            .to_path_buf()
+    } else {
+        candidate_path
+    };
+
+    if is_internal_openteams_runtime_path(&relative) {
+        return None;
+    }
+
+    let mut normalized = Vec::new();
+    for component in relative.components() {
+        match component {
+            Component::Normal(part) => normalized.push(part.to_string_lossy().to_string()),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return None,
+        }
+    }
+
+    if normalized.is_empty() {
+        return None;
+    }
+
+    Some(normalized.join("/"))
+}
+
+fn extract_workspace_paths_from_text(text: &str, workspace_root: &Path) -> Vec<String> {
+    let mut candidates = Vec::new();
+
+    for capture in INLINE_CODE_PATH_RE.captures_iter(text) {
+        if let Some(matched) = capture.get(1) {
+            candidates.push(matched.as_str().to_string());
+        }
+    }
+
+    for token in text.split_whitespace() {
+        candidates.push(token.to_string());
+    }
+
+    let mut deduped = BTreeMap::<String, ()>::new();
+    for candidate in candidates {
+        if let Some(path) = normalize_workspace_observed_path(&candidate, workspace_root) {
+            deduped.insert(path, ());
+        }
+    }
+
+    deduped.into_keys().collect()
 }
 
 struct MessageSenderIdentity {
@@ -406,6 +557,7 @@ impl RunCompletionStatus {
 pub struct ChatRunner {
     db: DBService,
     analytics: Option<AnalyticsService>,
+    analytics_enabled: Arc<AtomicBool>,
     streams: Arc<DashMap<Uuid, broadcast::Sender<ChatStreamEvent>>>,
     // Store per-run lifecycle controls, key = session_agent_id
     run_controls: Arc<DashMap<Uuid, RunLifecycleControl>>,
@@ -421,13 +573,18 @@ pub struct ChatRunner {
 
 impl ChatRunner {
     pub fn new(db: DBService) -> Self {
-        Self::with_analytics(db, None)
+        Self::with_analytics(db, None, Arc::new(AtomicBool::new(true)))
     }
 
-    pub fn with_analytics(db: DBService, analytics: Option<AnalyticsService>) -> Self {
+    pub fn with_analytics(
+        db: DBService,
+        analytics: Option<AnalyticsService>,
+        analytics_enabled: Arc<AtomicBool>,
+    ) -> Self {
         Self {
             db,
             analytics,
+            analytics_enabled,
             streams: Arc::new(DashMap::new()),
             run_controls: Arc::new(DashMap::new()),
             pending_messages: Arc::new(DashMap::new()),
@@ -438,7 +595,11 @@ impl ChatRunner {
     }
 
     fn analytics_projector(&self) -> AnalyticsProjector<'_> {
-        AnalyticsProjector::new(&self.db.pool, self.analytics.as_ref())
+        AnalyticsProjector::new(
+            &self.db.pool,
+            self.analytics.as_ref(),
+            self.analytics_enabled.load(Ordering::Relaxed),
+        )
     }
 
     pub async fn recover_orphaned_session_agents(&self) -> Result<usize, ChatRunnerError> {
@@ -1049,6 +1210,9 @@ impl ChatRunner {
                 )
                 .await?;
             fs::create_dir_all(&workspace_path).await?;
+            let tracked_diff_baseline =
+                Self::capture_tracked_git_diff_snapshot(PathBuf::from(&workspace_path).as_path())
+                    .await;
             let run_records_dir = Self::workspace_run_records_dir(
                 PathBuf::from(&workspace_path).as_path(),
                 session_id,
@@ -1136,6 +1300,7 @@ impl ChatRunner {
                 &CreateChatRun {
                     session_id,
                     session_agent_id,
+                    workspace_path: Some(workspace_path.clone()),
                     run_index,
                     run_dir: run_dir.to_string_lossy().to_string(),
                     input_path: Some(input_path.to_string_lossy().to_string()),
@@ -1229,6 +1394,7 @@ impl ChatRunner {
                 session_id,
                 agent_id,
                 session_agent_id,
+                run_index,
                 run_id,
                 output_path,
                 meta_path,
@@ -1237,6 +1403,7 @@ impl ChatRunner {
                 tail_log_path,
                 raw_log_spool,
                 completion_status.clone(),
+                tracked_diff_baseline,
                 chain_depth,
                 context_snapshot.context_compacted,
                 context_snapshot.compression_warning.clone(),

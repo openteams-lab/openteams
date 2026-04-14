@@ -254,7 +254,7 @@ fn is_truthy_env_value(value: &str) -> bool {
     )
 }
 
-fn detect_deploy_mode() -> &'static str {
+pub(crate) fn detect_deploy_mode() -> &'static str {
     let is_desktop = env::var_os("AGENT_CHATGROUP_DESKTOP").is_some();
     let Ok(current_exe) = env::current_exe() else {
         return "unknown";

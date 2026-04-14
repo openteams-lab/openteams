@@ -4,7 +4,9 @@ import {
   BoxArrowDownIcon,
   BroomIcon,
   DotsThreeIcon,
+  FolderNotchOpenIcon,
   GitDiffIcon,
+  InfoIcon,
   MagnifyingGlassIcon,
   PencilSimpleIcon,
   TrashIcon,
@@ -43,6 +45,7 @@ export interface ChatHeaderProps {
   onCancelTitleEdit: () => void;
   // Session actions
   onDeleteSession: () => void;
+  onViewSessionId: () => void;
   onArchive: () => void;
   onRestore: () => void;
   isArchiving: boolean;
@@ -54,6 +57,7 @@ export interface ChatHeaderProps {
   hasChanges?: boolean;
   hasNewChanges?: boolean;
   onViewChanges?: () => void;
+  onOpenWorkspaceChanges?: () => void;
 }
 
 export function ChatHeader({
@@ -75,6 +79,7 @@ export function ChatHeader({
   onSaveTitle,
   onCancelTitleEdit,
   onDeleteSession,
+  onViewSessionId,
   onArchive,
   onRestore,
   isArchiving,
@@ -84,6 +89,7 @@ export function ChatHeader({
   hasChanges,
   hasNewChanges,
   onViewChanges,
+  onOpenWorkspaceChanges,
 }: ChatHeaderProps) {
   const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
@@ -196,6 +202,13 @@ export function ChatHeader({
                             : t('header.cleanupMessages')}
                         </DropdownMenuItem>
                       )}
+                      <DropdownMenuItem
+                        icon={InfoIcon}
+                        className="chat-session-header-menu-item"
+                        onSelect={onViewSessionId}
+                      >
+                        {t('header.viewSessionId')}
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator className="chat-session-header-menu-separator" />
                       <DropdownMenuItem
                         icon={TrashIcon}
@@ -274,6 +287,21 @@ export function ChatHeader({
               aria-label={t('header.searchMessages')}
             >
               <MagnifyingGlassIcon className="size-icon-sm" />
+            </button>
+          )}
+          {activeSession && !isSearchOpen && onOpenWorkspaceChanges && (
+            <button
+              type="button"
+              onClick={onOpenWorkspaceChanges}
+              className="chat-session-header-icon-btn chat-session-header-op-btn"
+              title={t('timeline.workItem.workspaceChanges', {
+                defaultValue: 'Workspace changes',
+              })}
+              aria-label={t('timeline.workItem.workspaceChanges', {
+                defaultValue: 'Workspace changes',
+              })}
+            >
+              <FolderNotchOpenIcon className="size-icon-sm" />
             </button>
           )}
           {hasChanges && onViewChanges && (

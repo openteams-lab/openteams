@@ -1042,6 +1042,7 @@ pub async fn track_first_agent_added(
 pub async fn track_first_message_sent(
     pool: &SqlitePool,
     session_id: Uuid,
+    user_id: Option<&str>,
 ) -> Result<AnalyticsEvent, sqlx::Error> {
     let properties = serde_json::json!({});
     AnalyticsEvent::create(
@@ -1049,7 +1050,7 @@ pub async fn track_first_message_sent(
         &CreateAnalyticsEvent {
             event_type: "first_message_sent".to_string(),
             event_category: AnalyticsEventCategory::Conversion,
-            user_id: None,
+            user_id: user_id.map(String::from),
             session_id: Some(session_id),
             properties,
             platform: None,

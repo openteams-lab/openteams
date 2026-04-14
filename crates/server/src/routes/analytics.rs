@@ -188,6 +188,34 @@ pub struct UserProfileQueryParams {
     pub user_id: String,
 }
 
+fn is_message_event_type(event_type: &str) -> bool {
+    matches!(event_type, "message_send" | "first_message_sent")
+}
+
+fn resolve_analytics_user_id(
+    requested_user_id: Option<String>,
+    fallback_user_id: &str,
+    event_type: &str,
+) -> Option<String> {
+    let requested_user_id = requested_user_id.and_then(|user_id| {
+        let trimmed = user_id.trim();
+        (!trimmed.is_empty()).then(|| trimmed.to_string())
+    });
+
+    if requested_user_id.is_some() {
+        return requested_user_id;
+    }
+
+    if is_message_event_type(event_type) {
+        let trimmed = fallback_user_id.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    None
+}
+
 fn parse_event_category(value: &str) -> Option<AnalyticsEventCategory> {
     match value {
         "user_action" => Some(AnalyticsEventCategory::UserAction),
@@ -211,6 +239,10 @@ pub async fn track_event(
     State(deployment): State<DeploymentImpl>,
     Json(req): Json<TrackEventRequest>,
 ) -> Result<Json<ApiResponse<String>>, (StatusCode, Json<ApiResponse<String>>)> {
+    if !deployment.analytics_enabled() {
+        return Ok(Json(ApiResponse::success("Analytics disabled".to_string())));
+    }
+
     let pool = &deployment.db().pool;
 
     // Parse event category
@@ -227,10 +259,12 @@ pub async fn track_event(
     let session_id = parse_session_id(req.session_id.as_deref())
         .map_err(|message| (StatusCode::BAD_REQUEST, Json(ApiResponse::error(message))))?;
 
+    let user_id = resolve_analytics_user_id(req.user_id, deployment.user_id(), &req.event_type);
+
     let create_event = CreateAnalyticsEvent {
         event_type: req.event_type,
         event_category,
-        user_id: req.user_id,
+        user_id,
         session_id,
         properties: req.properties,
         platform: req.platform,
@@ -263,6 +297,10 @@ pub async fn track_events_batch(
     State(deployment): State<DeploymentImpl>,
     Json(req): Json<TrackEventsBatchRequest>,
 ) -> Result<Json<ApiResponse<String>>, (StatusCode, Json<ApiResponse<String>>)> {
+    if !deployment.analytics_enabled() {
+        return Ok(Json(ApiResponse::success("Analytics disabled".to_string())));
+    }
+
     let pool = &deployment.db().pool;
 
     let mut events_to_create = Vec::with_capacity(req.events.len());
@@ -275,13 +313,18 @@ pub async fn track_events_batch(
         let session_id = parse_session_id(event_req.session_id.as_deref())
             .ok()
             .flatten();
+        let user_id = resolve_analytics_user_id(
+            event_req.user_id,
+            deployment.user_id(),
+            &event_req.event_type,
+        );
 
         events_to_create.push((
             Uuid::new_v4(),
             CreateAnalyticsEvent {
                 event_type: event_req.event_type,
                 event_category,
-                user_id: event_req.user_id,
+                user_id,
                 session_id,
                 properties: event_req.properties,
                 platform: event_req.platform,
@@ -1054,5 +1097,37 @@ mod tests {
         assert_eq!(properties["session_id"], json!(session_id.to_string()));
         assert_eq!(properties["device_id"], json!("d-1"));
         assert_eq!(properties["ingest_path"], json!("/analytics/events"));
+    }
+
+    #[test]
+    fn test_resolve_analytics_user_id_uses_message_event_fallback() {
+        assert_eq!(
+            resolve_analytics_user_id(None, "user-fallback", "message_send"),
+            Some("user-fallback".to_string())
+        );
+        assert_eq!(
+            resolve_analytics_user_id(None, "user-fallback", "first_message_sent"),
+            Some("user-fallback".to_string())
+        );
+    }
+
+    #[test]
+    fn test_resolve_analytics_user_id_keeps_explicit_value() {
+        assert_eq!(
+            resolve_analytics_user_id(
+                Some("user-explicit".to_string()),
+                "user-fallback",
+                "message_send",
+            ),
+            Some("user-explicit".to_string())
+        );
+    }
+
+    #[test]
+    fn test_resolve_analytics_user_id_does_not_fill_non_message_events() {
+        assert_eq!(
+            resolve_analytics_user_id(None, "user-fallback", "agent_run_start"),
+            None
+        );
     }
 }

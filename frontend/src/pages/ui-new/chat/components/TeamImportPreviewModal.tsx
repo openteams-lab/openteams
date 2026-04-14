@@ -281,8 +281,8 @@ export function TeamImportPreviewModal({
         className={cn(
           'team-import-preview-modal chat-session-modal-surface flex flex-col overflow-hidden rounded-[28px] border border-white/60 bg-white/72 shadow-[0_28px_90px_rgba(15,23,42,0.24)] backdrop-blur-[24px] dark:border-[rgba(148,163,184,0.16)] dark:bg-[linear-gradient(180deg,rgba(18,24,35,0.94)_0%,rgba(11,16,23,0.92)_100%)] dark:shadow-[0_28px_90px_rgba(0,0,0,0.5)]',
           isTeamImport
-            ? 'h-[88vh] max-h-[88vh] w-[min(90vw,980px)] max-w-[980px]'
-            : 'h-[78vh] max-h-[78vh] w-[min(82vw,700px)] max-w-[700px]'
+            ? 'h-[min(98vh,calc(110vh-40px))] max-h-[calc(110vh-40px)] w-[min(90vw,980px)] max-w-[calc(100vw-40px)]'
+            : 'h-[min(88vh,calc(110vh-40px))] max-h-[calc(110vh-40px)] w-[min(82vw,700px)] max-w-[calc(100vw-40px)]'
         )}
       >
         <div className="flex items-start justify-between gap-6 px-6 pb-3 pt-5">

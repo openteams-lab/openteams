@@ -46,7 +46,7 @@ export function MultiSelectDropdown<T extends string = string>({
         <button
           type="button"
           className={cn(
-            'flex items-center gap-half px-base py-half bg-panel rounded-sm',
+            'flex items-center gap-half px-base py-half bg-panel rounded-sm border border-border',
             'text-sm text-normal hover:bg-secondary transition-colors',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             triggerClassName
@@ -77,9 +77,9 @@ export function MultiSelectDropdown<T extends string = string>({
             key={option.value}
             checked={values.includes(option.value)}
             className={cn(
-              'focus:bg-[#dbe9ff] dark:focus:bg-[rgba(94,162,255,0.16)]',
-              'data-[state=checked]:bg-transparent data-[state=checked]:text-[#111827] dark:data-[state=checked]:text-[#F3F6FB]',
-              'data-[state=checked]:focus:bg-transparent'
+              'focus:bg-[#DCEBFF] focus:text-[#0F172A]',
+              'data-[highlighted]:bg-[#DCEBFF] data-[highlighted]:text-[#0F172A]',
+              'data-[state=checked]:bg-[#DCEBFF] data-[state=checked]:text-[#0F172A]'
             )}
             onSelect={(event) => event.preventDefault()}
             onCheckedChange={() => {

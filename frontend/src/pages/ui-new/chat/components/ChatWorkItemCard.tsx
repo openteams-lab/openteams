@@ -1,4 +1,6 @@
 import {
+  ArrowRightIcon,
+  FolderNotchOpenIcon,
   CaretDownIcon,
   CheckCircleIcon,
   CheckSquareIcon,
@@ -10,23 +12,125 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
 } from 'react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
+import { chatApi } from '@/lib/api';
 import { formatDateShortWithTime } from '@/utils/date';
+import { resolveLocalPathToAbsolutePath } from '@/utils/readOnlyLinks';
 import {
   AgentBrandIcon,
   getAgentAvatarSeed,
   getAgentAvatarStyle,
 } from '../AgentAvatar';
+import { getRelativeWorkspaceFilePath } from '../utils';
 import type { ChatWorkItemGroup } from '../types';
 
+const ARTIFACT_FILE_PATH_RE =
+  /(^|[\s([{"'])(?<path>(?:[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\){2,}[^\\\r\n<>:"|?*\s`"')\]}.,:;!?]+|[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\)*[^\\\r\n<>:"|?*]+\.[a-zA-Z0-9]{1,16}|\/(?:[^/\r\n]+\/){2,}[^/\r\n\s`"')\]}.,:;!?]+|\/(?:[^/\r\n]+\/)*[^/\r\n]+\.[a-zA-Z0-9]{1,16}|(?:\.{1,2}[\\/])?(?:[^\\/\r\n\s`"')\]}.,:;!?]+[\\/])*[^\\/\r\n\s`"')\]}.,:;!?]+\.[a-zA-Z0-9]{1,16}))/g;
+const DOT_PREFIXED_ARTIFACT_FILE_PATH_RE =
+  /(^|[\s([{"'])(?<path>\.[^\\/\r\n\s`"')\]}:;!?]+(?:[\\/][^\\/\r\n\s`"')\]}:;!?]+)*[\\/][^\\/\r\n\s`"')\]}:;!?]+\.[a-zA-Z0-9]{1,16})/g;
+
+type ExtractedArtifactPath = {
+  rawPath: string;
+  absolutePath: string;
+};
+
+function normalizeArtifactPathCandidate(value: string): string {
+  return value.trim().replace(/[.,:;!?]+$/g, '');
+}
+
+function isArtifactPathCandidate(value: string): boolean {
+  const trimmed = normalizeArtifactPathCandidate(value);
+  if (!trimmed) return false;
+
+  if (
+    /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed) &&
+    !/^[a-zA-Z]:[\\/]/.test(trimmed) &&
+    !trimmed.startsWith('file://')
+  ) {
+    return false;
+  }
+
+  ARTIFACT_FILE_PATH_RE.lastIndex = 0;
+  DOT_PREFIXED_ARTIFACT_FILE_PATH_RE.lastIndex = 0;
+  return (
+    ARTIFACT_FILE_PATH_RE.test(` ${trimmed}`) ||
+    DOT_PREFIXED_ARTIFACT_FILE_PATH_RE.test(` ${trimmed}`)
+  );
+}
+
+function extractArtifactPaths(
+  content: string,
+  workspacePath: string | undefined
+): ExtractedArtifactPath[] {
+  if (!workspacePath) {
+    return [];
+  }
+
+  const paths = new Map<string, ExtractedArtifactPath>();
+  const addPath = (rawPath: string) => {
+    const normalizedRawPath = normalizeArtifactPathCandidate(rawPath);
+    if (!isArtifactPathCandidate(normalizedRawPath)) {
+      return;
+    }
+
+    const absolutePath = resolveLocalPathToAbsolutePath(
+      normalizedRawPath,
+      workspacePath
+    );
+    if (!absolutePath) {
+      return;
+    }
+
+    if (!paths.has(absolutePath)) {
+      paths.set(absolutePath, {
+        rawPath: normalizedRawPath,
+        absolutePath,
+      });
+    }
+  };
+
+  for (const match of content.matchAll(/\[[^\]]+\]\(([^)\s]+)\)/g)) {
+    addPath(match[1] ?? '');
+  }
+
+  for (const match of content.matchAll(/`([^`]+)`/g)) {
+    addPath(match[1] ?? '');
+  }
+
+  for (const match of content.matchAll(ARTIFACT_FILE_PATH_RE)) {
+    addPath(match.groups?.path ?? '');
+  }
+
+  for (const match of content.matchAll(DOT_PREFIXED_ARTIFACT_FILE_PATH_RE)) {
+    addPath(match.groups?.path ?? '');
+  }
+
+  return Array.from(paths.values());
+}
+
+function normalizeComparablePath(path: string): string {
+  return path
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/\/+/g, '/')
+    .replace(/\/$/, '')
+    .toLowerCase();
+}
+
 export interface ChatWorkItemCardProps {
+  sessionId: string;
   group: ChatWorkItemGroup;
   senderLabel: string;
   senderRunnerType: string | null;
   isExpanded: boolean;
   onToggleExpand: () => void;
+  workspacePath?: string;
+  onOpenWorkspaceChanges?: (workspacePath: string, filePath?: string) => void;
   isCleanupMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
@@ -43,11 +147,14 @@ const isInteractiveTarget = (target: EventTarget | null): boolean => {
 };
 
 export function ChatWorkItemCard({
+  sessionId,
   group,
   senderLabel,
   senderRunnerType,
   isExpanded,
   onToggleExpand,
+  workspacePath,
+  onOpenWorkspaceChanges,
   isCleanupMode = false,
   isSelected = false,
   onToggleSelect,
@@ -60,6 +167,77 @@ export function ChatWorkItemCard({
     senderLabel
   );
   const agentAvatarStyle = getAgentAvatarStyle(agentAvatarSeed);
+  const hasWorkspacePath = !!workspacePath;
+  const candidateFileChanges = useMemo(() => {
+    if (!hasWorkspacePath) {
+      return [];
+    }
+
+    const paths = new Map<string, ExtractedArtifactPath>();
+
+    for (const item of group.artifacts) {
+      for (const path of extractArtifactPaths(item.content, workspacePath)) {
+        if (!paths.has(path.absolutePath)) {
+          paths.set(path.absolutePath, path);
+        }
+      }
+    }
+
+    return Array.from(paths.values());
+  }, [group.artifacts, hasWorkspacePath, workspacePath]);
+
+  const { data: workspaceChanges } = useQuery({
+    queryKey: ['chatSessionWorkspaceChanges', sessionId, workspacePath, false],
+    queryFn: () =>
+      chatApi.getSessionWorkspaceChanges(sessionId, workspacePath!, {
+        includeDiff: false,
+      }),
+    enabled: hasWorkspacePath && candidateFileChanges.length > 0,
+    staleTime: 30_000,
+  });
+
+  const sessionWorkspacePaths = useMemo(() => {
+    const changes = workspaceChanges?.changes;
+    if (!changes) {
+      return new Set<string>();
+    }
+
+    return new Set(
+      [
+        ...changes.modified.map((file) => file.path),
+        ...changes.added.map((file) => file.path),
+        ...changes.deleted.map((file) => file.path),
+        ...changes.untracked.map((file) => file.path),
+      ].map(normalizeComparablePath)
+    );
+  }, [workspaceChanges]);
+
+  const fileChanges = useMemo(() => {
+    if (!hasWorkspacePath || candidateFileChanges.length === 0) {
+      return [];
+    }
+
+    return candidateFileChanges.filter((path) => {
+      const relativePath = getRelativeWorkspaceFilePath(
+        path.absolutePath,
+        workspacePath!
+      );
+      if (!relativePath) {
+        return false;
+      }
+
+      return sessionWorkspacePaths.has(normalizeComparablePath(relativePath));
+    });
+  }, [
+    candidateFileChanges,
+    hasWorkspacePath,
+    sessionWorkspacePaths,
+    workspacePath,
+  ]);
+
+  const fileChangesTitle = t('timeline.workItem.filesChanged', {
+    count: fileChanges.length,
+  });
 
   const handleCardSelect = () => {
     if (!isCleanupMode || !onToggleSelect) return;
@@ -163,6 +341,23 @@ export function ChatWorkItemCard({
             </div>
           </button>
           <div className="chat-session-work-item-header-actions">
+            {hasWorkspacePath && (
+              <button
+                type="button"
+                className={cn(
+                  'chat-session-work-item-workspace-button',
+                  onOpenWorkspaceChanges
+                    ? 'is-enabled'
+                    : 'cursor-not-allowed opacity-60'
+                )}
+                onClick={() => onOpenWorkspaceChanges?.(workspacePath!)}
+                disabled={!onOpenWorkspaceChanges}
+                title={t('timeline.workItem.openWorkspaceChanges')}
+                aria-label={t('timeline.workItem.openWorkspaceChanges')}
+              >
+                <FolderNotchOpenIcon className="size-icon-xs" />
+              </button>
+            )}
             <button
               type="button"
               className="chat-session-work-item-expand-button"
@@ -209,6 +404,46 @@ export function ChatWorkItemCard({
             </div>
           </section>
         )}
+
+        {isExpanded &&
+          workspacePath &&
+          onOpenWorkspaceChanges &&
+          fileChanges.length > 0 && (
+            <section className="chat-session-work-item-section">
+              <div className="chat-session-work-item-section-label">
+                <FileTextIcon className="size-icon-base" />
+                <span>{fileChangesTitle}</span>
+              </div>
+              <div className="chat-session-work-item-section-body">
+                <div className="chat-session-work-item-file-group">
+                  <div className="chat-session-work-item-file-links">
+                    {fileChanges.map((path) => (
+                      <button
+                        key={path.absolutePath}
+                        type="button"
+                        className="chat-session-work-item-file-link"
+                        onClick={() =>
+                          onOpenWorkspaceChanges(
+                            workspacePath,
+                            path.absolutePath
+                          )
+                        }
+                        title={path.absolutePath}
+                      >
+                        <span className="chat-session-work-item-file-link-label">
+                          {path.rawPath}
+                        </span>
+                        <ArrowRightIcon
+                          className="chat-session-work-item-file-link-icon"
+                          weight="bold"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
 
         {isExpanded && group.conclusions.length > 0 && (
           <section className="chat-session-work-item-section">

@@ -3,12 +3,53 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { LinkNode } from '@lexical/link';
 import { resolveReadOnlyLink } from '@/utils/readOnlyLinks';
 
+function shouldInterceptLocalLink(
+  resolvedHref: string,
+  originalHref: string | null
+): boolean {
+  if (resolvedHref.startsWith('file:')) {
+    return true;
+  }
+
+  const original = originalHref?.trim() ?? '';
+  if (!original) {
+    return false;
+  }
+
+  if (/^[a-zA-Z]:[\\/]/.test(original)) {
+    return true;
+  }
+
+  if (
+    original.startsWith('/') ||
+    original.startsWith('./') ||
+    original.startsWith('../')
+  ) {
+    return true;
+  }
+
+  if (/^file:\/\//i.test(original)) {
+    return true;
+  }
+
+  if (/^https?:\/\//i.test(original)) {
+    return false;
+  }
+
+  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(original)) {
+    return false;
+  }
+
+  return true;
+}
+
 function applyLinkState(
   dom: HTMLAnchorElement,
   href: string | null,
   options: {
     allowFileLinks?: boolean;
     basePath?: string | null;
+    onLinkClick?: (resolvedHref: string, originalHref: string) => void;
   }
 ) {
   const resolved = resolveReadOnlyLink(href, options);
@@ -35,7 +76,15 @@ function applyLinkState(
     dom.style.cursor = 'pointer';
     dom.style.pointerEvents = 'auto';
     dom.title = href ?? resolved.href;
-    dom.onclick = (event) => event.stopPropagation();
+    if (options.onLinkClick && shouldInterceptLocalLink(resolved.href, href)) {
+      dom.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        options.onLinkClick?.(resolved.href, href ?? resolved.href);
+      };
+    } else {
+      dom.onclick = (event) => event.stopPropagation();
+    }
     return;
   }
 
@@ -60,9 +109,11 @@ function applyLinkState(
 export function ReadOnlyLinkPlugin({
   allowFileLinks = false,
   basePath = null,
+  onLinkClick,
 }: {
   allowFileLinks?: boolean;
   basePath?: string | null;
+  onLinkClick?: (resolvedHref: string, originalHref: string) => void;
 }) {
   const [editor] = useLexicalComposerContext();
 
@@ -80,6 +131,7 @@ export function ReadOnlyLinkPlugin({
           applyLinkState(dom, dom.getAttribute('href'), {
             allowFileLinks,
             basePath,
+            onLinkClick,
           });
         }
       }
@@ -95,12 +147,13 @@ export function ReadOnlyLinkPlugin({
         applyLinkState(link, link.getAttribute('href'), {
           allowFileLinks,
           basePath,
+          onLinkClick,
         });
       });
     });
 
     return unregister;
-  }, [allowFileLinks, basePath, editor]);
+  }, [allowFileLinks, basePath, editor, onLinkClick]);
 
   return null;
 }

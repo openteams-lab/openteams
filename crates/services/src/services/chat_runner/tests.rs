@@ -16,6 +16,7 @@ use db::{
     },
 };
 use executors::executors::CancellationToken;
+use git::GitService;
 use serde_json::json;
 use sqlx::SqlitePool;
 use tokio::{process::Command, sync::oneshot};
@@ -1257,6 +1258,130 @@ fn resolve_team_protocol_guidelines_falls_back_when_empty() {
     let prompt = ChatRunner::resolve_team_protocol_guidelines(Some(" "));
 
     assert_eq!(prompt, "no team collaboration protocol");
+}
+
+#[tokio::test]
+async fn capture_untracked_files_allows_user_openteams_files_but_skips_runtime_artifacts() {
+    let tempdir = tempfile::tempdir().expect("create tempdir");
+    let repo_path = tempdir.path().join("repo");
+    git2::Repository::init(&repo_path).expect("init repo");
+
+    std::fs::create_dir_all(repo_path.join("binaries")).expect("create binaries dir");
+    std::fs::write(repo_path.join("binaries").join("test.txt"), "binary\n")
+        .expect("write binaries file");
+    std::fs::create_dir_all(repo_path.join(".openteams").join("context").join("demo"))
+        .expect("create runtime dir");
+    std::fs::write(repo_path.join(".openteams").join("test.txt"), "user\n")
+        .expect("write user openteams file");
+    std::fs::write(
+        repo_path
+            .join(".openteams")
+            .join("context")
+            .join("demo")
+            .join("messages.jsonl"),
+        "runtime\n",
+    )
+    .expect("write runtime artifact");
+    std::fs::write(
+        repo_path
+            .join(".openteams")
+            .join("context")
+            .join("demo")
+            .join("independent-mode-discussion-proposal.md"),
+        "proposal\n",
+    )
+    .expect("write user proposal artifact");
+    std::fs::create_dir_all(
+        repo_path
+            .join(".openteams")
+            .join("context")
+            .join("demo")
+            .join("attachments")
+            .join("message-1"),
+    )
+    .expect("create attachment dir");
+    std::fs::write(
+        repo_path
+            .join(".openteams")
+            .join("context")
+            .join("demo")
+            .join("attachments")
+            .join("message-1")
+            .join("input.txt"),
+        "attachment\n",
+    )
+    .expect("write attachment artifact");
+
+    let run_dir = tempdir.path().join("run-record");
+    tokio::fs::create_dir_all(&run_dir)
+        .await
+        .expect("create run dir");
+
+    let files = ChatRunner::capture_untracked_files(&repo_path, &run_dir, Uuid::new_v4(), 1).await;
+
+    assert!(files.iter().any(|path| path == "binaries/test.txt"));
+    assert!(files.iter().any(|path| path == ".openteams/test.txt"));
+    assert!(
+        files
+            .iter()
+            .any(|path| path == ".openteams/context/demo/independent-mode-discussion-proposal.md")
+    );
+    assert!(
+        !files
+            .iter()
+            .any(|path| path == ".openteams/context/demo/messages.jsonl")
+    );
+    assert!(
+        !files
+            .iter()
+            .any(|path| path == ".openteams/context/demo/attachments/message-1/input.txt")
+    );
+}
+
+#[tokio::test]
+async fn capture_git_diff_skips_patch_when_diff_matches_run_baseline() {
+    let tempdir = tempfile::tempdir().expect("create tempdir");
+    let repo_path = tempdir.path().join("repo");
+    let git = GitService::new();
+    git.initialize_repo_with_main_branch(&repo_path)
+        .expect("init repo");
+
+    std::fs::write(repo_path.join("tracked.txt"), "base\n").expect("write tracked");
+    git.commit(&repo_path, "baseline").expect("commit baseline");
+
+    std::fs::write(repo_path.join("tracked.txt"), "dirty\n").expect("modify tracked");
+
+    let baseline = ChatRunner::capture_tracked_git_diff_snapshot(&repo_path).await;
+    assert!(
+        baseline
+            .as_deref()
+            .is_some_and(|diff| diff.contains("tracked.txt"))
+    );
+
+    let run_dir = tempdir.path().join("run-record");
+    tokio::fs::create_dir_all(&run_dir)
+        .await
+        .expect("create run dir");
+
+    let session_agent_id = Uuid::new_v4();
+    let diff_info = ChatRunner::capture_git_diff(
+        &repo_path,
+        &run_dir,
+        session_agent_id,
+        1,
+        baseline.as_deref(),
+    )
+    .await;
+
+    assert!(diff_info.is_none());
+    assert!(
+        !run_dir
+            .join(format!(
+                "{}_diff.patch",
+                ChatRunner::run_records_prefix(session_agent_id, 1)
+            ))
+            .exists()
+    );
 }
 
 #[test]

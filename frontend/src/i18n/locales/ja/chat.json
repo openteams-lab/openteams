@@ -39,6 +39,7 @@
     "archive": "アーカイブ",
     "restore": "復元",
     "cleanupMessages": "メッセージをクリーンアップ",
+    "viewSessionId": "セッションIDを表示",
     "delete": "セッションを削除"
   },
   "header": {
@@ -57,6 +58,7 @@
     "restoreSession": "セッションを復元",
     "cleanupMessages": "メッセージをクリーンアップ",
     "exitCleanupMode": "クリーンアップモードを終了",
+    "viewSessionId": "セッションIDを表示",
     "settings": "設定",
     "moreActions": "その他の操作",
     "generatedTitleBadge": "自動タイトル",
@@ -161,7 +163,11 @@
       "artifactCount_one": "{{count}} 件の成果物",
       "artifactCount_other": "{{count}} 件の成果物",
       "statusCount_one": "{{count}} 件のステータス更新",
-      "statusCount_other": "{{count}} 件のステータス更新"
+      "statusCount_other": "{{count}} 件のステータス更新",
+      "workspaceChanges": "ワークスペースの変更",
+      "openWorkspaceChanges": "ワークスペースの変更を開く",
+      "filesChanged_one": "{{count}} 件のファイルが変更されました",
+      "filesChanged_other": "{{count}} 件のファイルが変更されました"
     }
   },
   "members": {
@@ -170,6 +176,7 @@
     "selectSessionToManage": "AIメンバーを管理するセッションを選択してください。",
     "noMembersYet": "AIメンバーはまだいません",
     "workspace": "ワークスペース",
+    "history": "履歴",
     "edit": "編集",
     "remove": "削除",
     "addAiMember": "AIメンバーを追加",
@@ -600,6 +607,7 @@
         "removeMember": "AIメンバーを削除",
         "deleteSession": "セッションを削除",
         "deleteMessages": "メッセージを削除",
+        "viewSessionId": "現在のセッションID",
         "duplicateMemberName": "メンバー名が重複しています"
       },
       "messages": {
@@ -607,6 +615,7 @@
         "removeMember": "@{{name}} をこのセッションから削除してもよろしいですか？",
         "deleteSession": "「{{title}}」を削除してもよろしいですか？この操作は元に戻せず、すべてのメッセージが完全に削除されます。",
         "deleteMessages": "{{count}} 件のメッセージを削除してもよろしいですか？この操作は元に戻せません。",
+        "viewSessionId": "現在のセッション ID:\n\"{{id}}\"",
         "duplicateMemberName": "このセッションには AI メンバー {{name}} が既に存在します。重複名は追加できません。"
       }
     },
@@ -661,6 +670,16 @@
       "fullErrorLog": "完全なエラーログ",
       "workspaceTrail": "ワークスペース",
       "workspacePath": "ワークスペースパス"
+    },
+    "workspaceSingleFileDiff": {
+      "openWorkspaceError": "このファイルを開けませんでした。",
+      "openWorkspace": "ファイルマネージャーで開く",
+      "openExplorerError": "このファイルを開けませんでした。",
+      "openExplorerSuccess": "このファイルをファイルマネージャーで表示しました。",
+      "tooLarge": "このファイルの差分は 300,000 文字を超えているため、インライン表示は無効です。",
+      "notFound": "ファイル差分を読み込めませんでした。",
+      "loadError": "ファイル差分を読み込めませんでした。",
+      "resizeWindow": "差分ウィンドウのサイズを変更"
     }
   },
   "versionUpdate": {
@@ -715,5 +734,26 @@
     "title": "AIチームプリセット",
     "description": "メンバープリセットとチームプリセットをまとめて管理します。",
     "close": "AIチームプリセットを閉じる"
+  },
+  "panel": {
+    "workspaces": {
+      "loadError": "セッションのワークスペースを読み込めませんでした。",
+      "loading": "ワークスペース一覧を読み込み中...",
+      "empty": "このセッションにはワークスペースがありません。",
+      "members": "メンバー: {{names}}",
+      "openWorkspace": "ワークスペースディレクトリを開く",
+      "openExplorerError": "ワークスペースディレクトリを開けませんでした。",
+      "loadWorkspaceError": "ワークスペースの変更を読み込めませんでした。",
+      "loadingWorkspace": "変更を読み込み中...",
+      "notGitRepo": "Git リポジトリではないため、セッション範囲のファイルのみ表示しています。",
+      "noChanges": "ワークスペースに変更はありません。",
+      "truncated": "変更ファイルが多すぎるため、先頭 200 件のみ表示しています。",
+      "eyebrow": "セッションのワークスペース",
+      "title": "ワークスペースの変更",
+      "refresh": "更新",
+      "close": "閉じる",
+      "diffAction": "差分",
+      "openExplorerSuccess": "ファイルマネージャーで開きました。"
+    }
   }
 }

@@ -115,8 +115,8 @@ export function SearchableDropdown<T>({
                   preventFocusOnHover
                   badge={getItemBadge?.(item)}
                   className={cn(
-                    isSelected && 'bg-secondary',
-                    isHighlighted && 'bg-secondary'
+                    isSelected && 'bg-[#DCEBFF] text-[#0F172A]',
+                    isHighlighted && 'bg-[#DCEBFF] text-[#0F172A]'
                   )}
                 >
                   {getItemIcon?.(item)}

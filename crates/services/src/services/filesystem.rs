@@ -303,6 +303,40 @@ impl FilesystemService {
             })
     }
 
+    pub fn list_roots(&self) -> Vec<DirectoryEntry> {
+        #[cfg(windows)]
+        {
+            ('A'..='Z')
+                .filter_map(|drive_letter| {
+                    let drive_path = format!("{drive_letter}:\\");
+                    let path = PathBuf::from(&drive_path);
+                    if !path.exists() || !path.is_dir() {
+                        return None;
+                    }
+
+                    Some(DirectoryEntry {
+                        name: format!("{drive_letter}:"),
+                        path,
+                        is_directory: true,
+                        is_git_repo: false,
+                        last_modified: None,
+                    })
+                })
+                .collect()
+        }
+
+        #[cfg(not(windows))]
+        {
+            vec![DirectoryEntry {
+                name: "/".to_string(),
+                path: PathBuf::from("/"),
+                is_directory: true,
+                is_git_repo: false,
+                last_modified: None,
+            }]
+        }
+    }
+
     fn verify_directory(path: &Path) -> Result<(), FilesystemError> {
         if !path.exists() {
             return Err(FilesystemError::DirectoryDoesNotExist);

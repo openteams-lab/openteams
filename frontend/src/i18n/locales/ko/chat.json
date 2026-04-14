@@ -39,6 +39,7 @@
     "archive": "보관",
     "restore": "복원",
     "cleanupMessages": "메시지 정리",
+    "viewSessionId": "세션 ID 보기",
     "delete": "세션 삭제"
   },
   "header": {
@@ -57,6 +58,7 @@
     "restoreSession": "세션 복원",
     "cleanupMessages": "메시지 정리",
     "exitCleanupMode": "정리 모드 종료",
+    "viewSessionId": "세션 ID 보기",
     "settings": "설정",
     "moreActions": "추가 작업",
     "generatedTitleBadge": "자동 제목",
@@ -161,7 +163,11 @@
       "artifactCount_one": "산출물 {{count}}개",
       "artifactCount_other": "산출물 {{count}}개",
       "statusCount_one": "상태 업데이트 {{count}}개",
-      "statusCount_other": "상태 업데이트 {{count}}개"
+      "statusCount_other": "상태 업데이트 {{count}}개",
+      "workspaceChanges": "워크스페이스 변경",
+      "openWorkspaceChanges": "워크스페이스 변경 열기",
+      "filesChanged_one": "{{count}}개 파일 변경됨",
+      "filesChanged_other": "{{count}}개 파일 변경됨"
     }
   },
   "members": {
@@ -170,6 +176,7 @@
     "selectSessionToManage": "AI 멤버를 관리할 세션을 선택하세요.",
     "noMembersYet": "아직 AI 멤버가 없습니다",
     "workspace": "워크스페이스",
+    "history": "이력",
     "edit": "편집",
     "remove": "제거",
     "addAiMember": "AI 멤버 추가",
@@ -600,6 +607,7 @@
         "removeMember": "AI 멤버 제거",
         "deleteSession": "세션 삭제",
         "deleteMessages": "메시지 삭제",
+        "viewSessionId": "현재 세션 ID",
         "duplicateMemberName": "멤버 이름 중복"
       },
       "messages": {
@@ -607,6 +615,7 @@
         "removeMember": "@{{name}}을(를) 이 세션에서 제거하시겠습니까?",
         "deleteSession": "\"{{title}}\" 세션을 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며 모든 메시지가 영구적으로 삭제됩니다.",
         "deleteMessages": "{{count}}개의 메시지를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+        "viewSessionId": "현재 세션 ID:\n\"{{id}}\"",
         "duplicateMemberName": "이 세션에 AI 멤버 {{name}} 이(가) 이미 존재합니다. 중복 이름은 추가할 수 없습니다."
       }
     },
@@ -661,6 +670,16 @@
       "fullErrorLog": "전체 오류 로그",
       "workspaceTrail": "워크스페이스",
       "workspacePath": "워크스페이스 경로"
+    },
+    "workspaceSingleFileDiff": {
+      "openWorkspaceError": "이 파일을 열 수 없습니다.",
+      "openWorkspace": "파일 관리자에서 열기",
+      "openExplorerError": "이 파일을 열 수 없습니다.",
+      "openExplorerSuccess": "파일 관리자에서 이 파일을 표시했습니다.",
+      "tooLarge": "이 파일의 diff가 300,000자를 초과하여 인라인 렌더링이 비활성화되었습니다.",
+      "notFound": "파일 diff를 불러오지 못했습니다.",
+      "loadError": "파일 diff를 불러오지 못했습니다.",
+      "resizeWindow": "diff 창 크기 조절"
     }
   },
   "versionUpdate": {
@@ -715,5 +734,26 @@
     "title": "AI 팀 프리셋",
     "description": "멤버 프리셋과 팀 프리셋을 한곳에서 관리합니다.",
     "close": "AI 팀 프리셋 닫기"
+  },
+  "panel": {
+    "workspaces": {
+      "loadError": "세션 워크스페이스를 불러오지 못했습니다.",
+      "loading": "워크스페이스 목록을 불러오는 중...",
+      "empty": "이 세션에는 워크스페이스가 없습니다.",
+      "members": "멤버: {{names}}",
+      "openWorkspace": "워크스페이스 디렉터리 열기",
+      "openExplorerError": "워크스페이스 디렉터리를 열 수 없습니다.",
+      "loadWorkspaceError": "워크스페이스 변경 사항을 불러오지 못했습니다.",
+      "loadingWorkspace": "변경 사항을 불러오는 중...",
+      "notGitRepo": "Git 저장소가 아니므로 세션 범위 파일만 표시합니다.",
+      "noChanges": "워크스페이스 변경 사항이 없습니다.",
+      "truncated": "변경된 파일이 너무 많아 처음 200개만 표시합니다.",
+      "eyebrow": "세션 워크스페이스",
+      "title": "워크스페이스 변경",
+      "refresh": "새로고침",
+      "close": "닫기",
+      "diffAction": "Diff",
+      "openExplorerSuccess": "파일 관리자에서 열었습니다."
+    }
   }
 }

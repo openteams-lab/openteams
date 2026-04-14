@@ -5,6 +5,7 @@ import { SequenceTrackerProvider } from '@/keyboard/SequenceTracker';
 import { SequenceIndicator } from '@/keyboard/SequenceIndicator';
 import NiceModal from '@ebay/nice-modal-react';
 import { useTheme } from '@/components/ThemeProvider';
+import { useUserSystem } from '@/components/ConfigProvider';
 import { analytics } from '@/lib/analytics';
 import '@/styles/new/index.css';
 
@@ -18,14 +19,19 @@ export function NewDesignScope({ children }: NewDesignScopeProps) {
   );
   const hasTracked = useRef(false);
   const { resolvedTheme } = useTheme();
+  const { deployMode, loading } = useUserSystem();
   const isTauriRuntime = typeof window !== 'undefined' && '__TAURI__' in window;
 
   useEffect(() => {
-    if (!hasTracked.current) {
-      analytics.trackUiNewAccessed();
-      hasTracked.current = true;
+    if (hasTracked.current || loading) {
+      return;
     }
-  }, []);
+
+    analytics.trackUiNewAccessed(
+      deployMode ?? (isTauriRuntime ? 'tauri' : 'unknown')
+    );
+    hasTracked.current = true;
+  }, [deployMode, isTauriRuntime, loading]);
 
   return (
     <div

@@ -1,6 +1,9 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, OnceLock},
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use async_trait::async_trait;
@@ -46,6 +49,7 @@ pub struct LocalDeployment {
     user_id: String,
     db: DBService,
     analytics: Option<AnalyticsService>,
+    analytics_enabled: Arc<AtomicBool>,
     container: LocalContainerService,
     git: GitService,
     project: ProjectService,
@@ -96,6 +100,7 @@ impl Deployment for LocalDeployment {
         }
 
         let config = Arc::new(RwLock::new(raw_config));
+        let analytics_enabled = Arc::new(AtomicBool::new(config.read().await.analytics_enabled));
         let user_id = generate_user_id();
         let analytics = AnalyticsConfig::new().map(AnalyticsService::new);
         let git = GitService::new();
@@ -131,7 +136,8 @@ impl Deployment for LocalDeployment {
 
         let approvals = Approvals::new(msg_stores.clone());
         let queued_message_service = QueuedMessageService::new();
-        let chat_runner = ChatRunner::with_analytics(db.clone(), analytics.clone());
+        let chat_runner =
+            ChatRunner::with_analytics(db.clone(), analytics.clone(), analytics_enabled.clone());
         let recovered_orphaned_agents = chat_runner
             .recover_orphaned_session_agents()
             .await
@@ -204,6 +210,7 @@ impl Deployment for LocalDeployment {
             user_id,
             db,
             analytics,
+            analytics_enabled,
             container,
             git,
             project,
@@ -286,6 +293,14 @@ impl Deployment for LocalDeployment {
 }
 
 impl LocalDeployment {
+    pub fn analytics_enabled(&self) -> bool {
+        self.analytics_enabled.load(Ordering::Relaxed)
+    }
+
+    pub fn set_analytics_enabled(&self, enabled: bool) {
+        self.analytics_enabled.store(enabled, Ordering::Relaxed);
+    }
+
     pub fn remote_client(&self) -> Result<RemoteClient, RemoteClientNotConfigured> {
         self.remote_client.clone()
     }

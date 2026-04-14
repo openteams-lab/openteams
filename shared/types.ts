@@ -118,7 +118,7 @@ export enum ChatPermissionTtlType { once = "once", time = "time", session = "ses
 
 export type ChatArtifact = { id: string, session_id: string, name: string, path: string, type: string, created_by: string | null, pinned: boolean, created_at: string, };
 
-export type ChatRun = { id: string, session_id: string, session_agent_id: string, run_index: bigint, run_dir: string, input_path: string | null, output_path: string | null, raw_log_path: string | null, meta_path: string | null, log_state: ChatRunLogState, artifact_state: ChatRunArtifactState, log_truncated: boolean, log_capture_degraded: boolean, pruned_at: string | null, prune_reason: string | null, retention_summary_json: string | null, created_at: string, };
+export type ChatRun = { id: string, session_id: string, session_agent_id: string, workspace_path: string | null, run_index: bigint, run_dir: string, input_path: string | null, output_path: string | null, raw_log_path: string | null, meta_path: string | null, log_state: ChatRunLogState, artifact_state: ChatRunArtifactState, log_truncated: boolean, log_capture_degraded: boolean, pruned_at: string | null, prune_reason: string | null, retention_summary_json: string | null, created_at: string, };
 
 export enum ChatRunLogState { live = "live", tail = "tail", pruned = "pruned" }
 
@@ -244,7 +244,7 @@ export type ProviderProfile = { provider: string, username: string | null, displ
 
 export type TagSearchParams = { search: string | null, };
 
-export type UserSystemInfo = { config: Config, analytics_user_id: string, login_status: LoginStatus, home_directory: string, environment: Environment, 
+export type UserSystemInfo = { config: Config, analytics_user_id: string, deploy_mode: string, login_status: LoginStatus, home_directory: string, environment: Environment, 
 /**
  * Capabilities supported per executor (e.g., { "CLAUDE_CODE": ["SESSION_FORK"] })
  */
@@ -277,6 +277,24 @@ export type ChatSessionListQuery = { status: ChatSessionStatus | null, };
 export type CreateChatSessionAgentRequest = { agent_id: string, workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
 
 export type UpdateChatSessionAgentRequest = { workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
+
+export type SessionWorkspace = { workspace_path: string, agent_ids: Array<string>, agent_names: Array<string>, is_git_repo: boolean, };
+
+export type SessionWorkspacesResponse = { workspaces: Array<SessionWorkspace>, };
+
+export type SessionWorkspaceChangesQuery = { path: string, include_diff: boolean | null, };
+
+export type WorkspaceChangedFile = { path: string, additions: number, deletions: number, unified_diff: string | null, 
+/**
+ * Whether a diff can be generated for this file (false for files in .gitignore'd directories).
+ */
+has_diff: boolean, };
+
+export type WorkspacePathEntry = { path: string, };
+
+export type WorkspaceChanges = { modified: Array<WorkspaceChangedFile>, added: Array<WorkspaceChangedFile>, deleted: Array<WorkspacePathEntry>, untracked: Array<WorkspacePathEntry>, };
+
+export type WorkspaceChangesResponse = { workspace_path: string, is_git_repo: boolean, changes: WorkspaceChanges | null, error: string | null, };
 
 export type ChatRunRetentionListQuery = { run_ids: string | null, limit: number | null, };
 

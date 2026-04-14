@@ -39,6 +39,9 @@ import {
   ChatSessionAgent,
   CreateChatSessionAgentRequest,
   UpdateChatSessionAgentRequest,
+  SessionWorkspace,
+  SessionWorkspacesResponse,
+  WorkspaceChangesResponse,
   UpdateChatAgent,
   ChatSkill,
   CreateChatSkill,
@@ -84,6 +87,11 @@ export interface VersionCheckInfo {
 export interface VersionUpdateResult {
   success: boolean;
   message: string;
+}
+
+export interface OpenInExplorerResponse {
+  ok: boolean;
+  error?: string | null;
 }
 
 export class ApiError<E = unknown> extends Error {
@@ -197,6 +205,11 @@ export const handleApiResponse = async <T, E = T>(
 
 // File System APIs
 export const fileSystemApi = {
+  listRoots: async (): Promise<DirectoryEntry[]> => {
+    const response = await makeRequest('/api/filesystem/roots');
+    return handleApiResponse<DirectoryEntry[]>(response);
+  },
+
   list: async (path?: string): Promise<DirectoryListResponse> => {
     const queryParam = path ? `?path=${encodeURIComponent(path)}` : '';
     const response = await makeRequest(
@@ -211,6 +224,23 @@ export const fileSystemApi = {
       `/api/filesystem/git-repos${queryParam}`
     );
     return handleApiResponse<DirectoryEntry[]>(response);
+  },
+
+  openInExplorer: async (path: string): Promise<OpenInExplorerResponse> => {
+    const response = await makeRequest('/api/filesystem/open-in-explorer', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    });
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.statusText || 'Failed to open path in explorer',
+        response.status,
+        response
+      );
+    }
+
+    return response.json() as Promise<OpenInExplorerResponse>;
   },
 };
 
@@ -872,6 +902,33 @@ export const chatApi = {
       }
     );
     return handleApiResponse<void>(response);
+  },
+
+  getSessionWorkspaces: async (
+    sessionId: string
+  ): Promise<SessionWorkspace[]> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workspaces`
+    );
+    const data = await handleApiResponse<SessionWorkspacesResponse>(response);
+    return data?.workspaces ?? [];
+  },
+
+  getSessionWorkspaceChanges: async (
+    sessionId: string,
+    workspacePath: string,
+    options?: { includeDiff?: boolean }
+  ): Promise<WorkspaceChangesResponse> => {
+    const params = new URLSearchParams({
+      path: workspacePath,
+    });
+    if (options?.includeDiff !== undefined) {
+      params.set('include_diff', String(options.includeDiff));
+    }
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workspaces/changes?${params.toString()}`
+    );
+    return handleApiResponse<WorkspaceChangesResponse>(response);
   },
 
   getStreamUrl: (sessionId: string): string =>

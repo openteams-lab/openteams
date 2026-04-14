@@ -27,7 +27,7 @@ import { analytics } from '@/lib/analytics';
 const SentryRoutes = Sentry.withSentryReactRouterV6Routing(Routes);
 
 function AppContent() {
-  const { config, analyticsUserId, updateAndSaveConfig, loading } =
+  const { config, analyticsUserId, deployMode, updateAndSaveConfig, loading } =
     useUserSystem();
   const [disclaimerAcceptedInSession, setDisclaimerAcceptedInSession] =
     useState<boolean>(() => {
@@ -52,8 +52,9 @@ function AppContent() {
     analytics.configure({
       enabled: Boolean(config?.analytics_enabled),
       userId: analyticsUserId ?? undefined,
+      runtime: deployMode ?? undefined,
     });
-  }, [config?.analytics_enabled, analyticsUserId, loading]);
+  }, [config?.analytics_enabled, analyticsUserId, deployMode, loading]);
 
   useEffect(() => {
     if (!config) return;
