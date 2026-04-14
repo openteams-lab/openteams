@@ -413,7 +413,7 @@ fn normalize_workspace_relative_path(
                 '`' | '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';'
             )
         })
-        .trim_end_matches(|ch: char| matches!(ch, '.' | ':' | '!' | '?'));
+        .trim_end_matches(['.', ':', '!', '?']);
 
     if trimmed.is_empty() || !looks_like_workspace_path(trimmed) {
         return None;
@@ -1105,7 +1105,7 @@ async fn list_session_workspace_rows(
     pool: &sqlx::SqlitePool,
     session_id: Uuid,
 ) -> Result<Vec<SessionWorkspaceRow>, sqlx::Error> {
-    Ok(sqlx::query_as::<_, SessionWorkspaceRow>(
+    sqlx::query_as::<_, SessionWorkspaceRow>(
         r#"
         SELECT workspaces.workspace_path AS workspace_path,
                workspaces.agent_id AS agent_id,
@@ -1139,7 +1139,7 @@ async fn list_session_workspace_rows(
     )
     .bind(session_id)
     .fetch_all(pool)
-    .await?)
+    .await
 }
 
 pub async fn get_session_agents(
