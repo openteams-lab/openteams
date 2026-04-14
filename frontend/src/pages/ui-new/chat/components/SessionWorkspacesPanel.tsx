@@ -573,10 +573,18 @@ export function SessionWorkspacesPanel({
                 path={workspacePath}
                 className="chat-session-workspaces-panel-path truncate text-sm font-medium text-normal"
               />
-              <div className="chat-session-workspaces-panel-meta mt-1 text-xs text-low">
-                {t('panel.workspaces.members', {
-                  names: workspace.agent_names.join(', '),
-                })}
+              <div className="chat-session-workspaces-panel-meta mt-1">
+                <span className="chat-session-workspaces-panel-member-label">
+                  {t('panel.workspaces.members', { names: '' })}
+                </span>
+                {workspace.agent_names.map((name) => (
+                  <span
+                    key={`${workspacePath}:${name}`}
+                    className="chat-session-workspaces-panel-member-pill"
+                  >
+                    {name}
+                  </span>
+                ))}
               </div>
             </button>
             <button

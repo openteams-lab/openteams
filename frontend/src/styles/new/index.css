@@ -5541,15 +5541,44 @@
   }
 
   .new-design .chat-session-workspaces-panel-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .new-design .chat-session-workspaces-panel-member-label {
     color: #9ca3af;
     font-size: 11px;
     font-weight: 500;
+    margin-right: 2px;
+  }
+
+  .new-design .chat-session-workspaces-panel-member-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 20px;
+    padding: 0 8px;
+    border-radius: 9999px;
+    background: #e5e7eb;
+    color: #4b5563;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
   }
 
   .new-design
     .chat-session-workspaces-panel-card.is-highlighted
     .chat-session-workspaces-panel-meta {
-    color: rgba(37, 99, 235, 0.72);
+    color: inherit;
+  }
+
+  .new-design
+    .chat-session-workspaces-panel-card.is-highlighted
+    .chat-session-workspaces-panel-member-pill {
+    background: #dbeafe;
+    color: #1d4ed8;
   }
 
   .new-design .chat-session-workspaces-panel-open-button,
@@ -8687,6 +8716,11 @@
 
   .new-design.dark .chat-session-workspaces-panel-meta,
   .dark .new-design .chat-session-workspaces-panel-meta {
+    color: inherit;
+  }
+
+  .new-design.dark .chat-session-workspaces-panel-member-label,
+  .dark .new-design .chat-session-workspaces-panel-member-label {
     color: #8ea0b8;
   }
 
@@ -8697,7 +8731,24 @@
     .new-design
     .chat-session-workspaces-panel-card.is-highlighted
     .chat-session-workspaces-panel-meta {
-    color: #bfd8ff;
+    color: inherit;
+  }
+
+  .new-design.dark .chat-session-workspaces-panel-member-pill,
+  .dark .new-design .chat-session-workspaces-panel-member-pill {
+    background: rgba(148, 163, 184, 0.2);
+    color: #d7e3f7;
+  }
+
+  .new-design.dark
+    .chat-session-workspaces-panel-card.is-highlighted
+    .chat-session-workspaces-panel-member-pill,
+  .dark
+    .new-design
+    .chat-session-workspaces-panel-card.is-highlighted
+    .chat-session-workspaces-panel-member-pill {
+    background: rgba(96, 165, 250, 0.2);
+    color: #eff6ff;
   }
 
   .new-design.dark .chat-session-workspaces-panel-open-button,
