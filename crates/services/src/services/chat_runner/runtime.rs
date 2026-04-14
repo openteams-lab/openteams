@@ -402,155 +402,6 @@ impl RunLogSpool {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use dashmap::DashMap;
-    use executors::logs::{
-        NormalizedEntry, NormalizedEntryError, NormalizedEntryType, utils::patch::ConversationPatch,
-    };
-    use tempfile::tempdir;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn persist_tail_keeps_tail_result_when_cleanup_fails() {
-        let temp = tempdir().expect("tempdir");
-        let live_path = temp.path().join("live.log");
-        let tail_path = temp.path().join("run").join("raw.tail.log");
-        let db_pool = sqlx::SqlitePool::connect("sqlite::memory:")
-            .await
-            .expect("sqlite pool");
-        let mut spool = RunLogSpool::new(
-            live_path,
-            Uuid::new_v4(),
-            db_pool,
-            "workspace".to_string(),
-            Arc::new(DashMap::new()),
-        )
-        .await
-        .expect("spool");
-
-        spool.write_text("hello tail").await.expect("write");
-
-        let cleanup_failure_path = temp.path().join("cleanup-blocker");
-        fs::create_dir_all(&cleanup_failure_path)
-            .await
-            .expect("cleanup blocker dir");
-        spool.path = cleanup_failure_path;
-
-        let persisted = spool.persist_tail_to(&tail_path, 1024).await;
-
-        assert_eq!(persisted.log_state, ChatRunLogState::Tail);
-        assert_eq!(persisted.log_path, tail_path);
-        assert!(persisted.persist_error.is_none());
-        assert_eq!(
-            fs::read_to_string(&persisted.log_path)
-                .await
-                .expect("tail file"),
-            "hello tail"
-        );
-    }
-
-    #[tokio::test]
-    async fn persist_tail_drops_partial_leading_line_and_adds_notice() {
-        let temp = tempdir().expect("tempdir");
-        let live_path = temp.path().join("live.log");
-        let tail_path = temp.path().join("run").join("raw.tail.log");
-        let db_pool = sqlx::SqlitePool::connect("sqlite::memory:")
-            .await
-            .expect("sqlite pool");
-        let mut spool = RunLogSpool::new(
-            live_path,
-            Uuid::new_v4(),
-            db_pool,
-            "workspace".to_string(),
-            Arc::new(DashMap::new()),
-        )
-        .await
-        .expect("spool");
-
-        spool
-            .write_text("very-long-leading-line-without-boundary\nkept line 1\nkept line 2\n")
-            .await
-            .expect("write");
-
-        let persisted = spool.persist_tail_to(&tail_path, 20).await;
-        let content = fs::read_to_string(&persisted.log_path)
-            .await
-            .expect("tail file");
-
-        assert_eq!(persisted.log_state, ChatRunLogState::Tail);
-        assert_eq!(content, format!("{TAIL_PARTIAL_LINE_NOTICE}kept line 2\n"));
-    }
-
-    #[test]
-    fn reconcile_run_stream_state_from_history_recovers_shorter_final_output() {
-        let history = vec![
-            LogMsg::JsonPatch(ConversationPatch::add_normalized_entry(
-                0,
-                NormalizedEntry {
-                    timestamp: None,
-                    entry_type: NormalizedEntryType::AssistantMessage,
-                    content: "this is a long intermediate assistant output".to_string(),
-                    metadata: None,
-                },
-            )),
-            LogMsg::JsonPatch(ConversationPatch::replace(
-                0,
-                NormalizedEntry {
-                    timestamp: None,
-                    entry_type: NormalizedEntryType::AssistantMessage,
-                    content: r#"[{"type":"send","to":"user","content":"done"}]"#.to_string(),
-                    metadata: None,
-                },
-            )),
-        ];
-
-        let mut state = RunStreamStateSnapshot {
-            latest_assistant: "this is a long intermediate assistant output".to_string(),
-            assistant_update_count: 1,
-            ..RunStreamStateSnapshot::default()
-        };
-
-        ChatRunner::reconcile_run_stream_state_from_history(&mut state, &history);
-
-        assert_eq!(
-            state.latest_assistant,
-            r#"[{"type":"send","to":"user","content":"done"}]"#
-        );
-        assert_eq!(state.assistant_update_count, 2);
-    }
-
-    #[test]
-    fn reconcile_run_stream_state_from_history_keeps_live_output_when_history_is_stale() {
-        let history = vec![LogMsg::JsonPatch(ConversationPatch::add_normalized_entry(
-            0,
-            NormalizedEntry {
-                timestamp: None,
-                entry_type: NormalizedEntryType::AssistantMessage,
-                content: "older output".to_string(),
-                metadata: None,
-            },
-        ))];
-
-        let mut state = RunStreamStateSnapshot {
-            latest_assistant: "newer output".to_string(),
-            assistant_update_count: 2,
-            error_content: "newer error".to_string(),
-            error_update_count: 2,
-            error_type: Some(NormalizedEntryError::Other),
-            ..RunStreamStateSnapshot::default()
-        };
-
-        ChatRunner::reconcile_run_stream_state_from_history(&mut state, &history);
-
-        assert_eq!(state.latest_assistant, "newer output");
-        assert_eq!(state.assistant_update_count, 2);
-        assert_eq!(state.error_content, "newer error");
-        assert_eq!(state.error_update_count, 2);
-    }
-}
-
 impl ChatRunner {
     fn normalized_entry_error_name(error: Option<&NormalizedEntryError>) -> String {
         match error {
@@ -2466,5 +2317,154 @@ impl ChatRunner {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use dashmap::DashMap;
+    use executors::logs::{
+        NormalizedEntry, NormalizedEntryError, NormalizedEntryType, utils::patch::ConversationPatch,
+    };
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn persist_tail_keeps_tail_result_when_cleanup_fails() {
+        let temp = tempdir().expect("tempdir");
+        let live_path = temp.path().join("live.log");
+        let tail_path = temp.path().join("run").join("raw.tail.log");
+        let db_pool = sqlx::SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("sqlite pool");
+        let mut spool = RunLogSpool::new(
+            live_path,
+            Uuid::new_v4(),
+            db_pool,
+            "workspace".to_string(),
+            Arc::new(DashMap::new()),
+        )
+        .await
+        .expect("spool");
+
+        spool.write_text("hello tail").await.expect("write");
+
+        let cleanup_failure_path = temp.path().join("cleanup-blocker");
+        fs::create_dir_all(&cleanup_failure_path)
+            .await
+            .expect("cleanup blocker dir");
+        spool.path = cleanup_failure_path;
+
+        let persisted = spool.persist_tail_to(&tail_path, 1024).await;
+
+        assert_eq!(persisted.log_state, ChatRunLogState::Tail);
+        assert_eq!(persisted.log_path, tail_path);
+        assert!(persisted.persist_error.is_none());
+        assert_eq!(
+            fs::read_to_string(&persisted.log_path)
+                .await
+                .expect("tail file"),
+            "hello tail"
+        );
+    }
+
+    #[tokio::test]
+    async fn persist_tail_drops_partial_leading_line_and_adds_notice() {
+        let temp = tempdir().expect("tempdir");
+        let live_path = temp.path().join("live.log");
+        let tail_path = temp.path().join("run").join("raw.tail.log");
+        let db_pool = sqlx::SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("sqlite pool");
+        let mut spool = RunLogSpool::new(
+            live_path,
+            Uuid::new_v4(),
+            db_pool,
+            "workspace".to_string(),
+            Arc::new(DashMap::new()),
+        )
+        .await
+        .expect("spool");
+
+        spool
+            .write_text("very-long-leading-line-without-boundary\nkept line 1\nkept line 2\n")
+            .await
+            .expect("write");
+
+        let persisted = spool.persist_tail_to(&tail_path, 20).await;
+        let content = fs::read_to_string(&persisted.log_path)
+            .await
+            .expect("tail file");
+
+        assert_eq!(persisted.log_state, ChatRunLogState::Tail);
+        assert_eq!(content, format!("{TAIL_PARTIAL_LINE_NOTICE}kept line 2\n"));
+    }
+
+    #[test]
+    fn reconcile_run_stream_state_from_history_recovers_shorter_final_output() {
+        let history = vec![
+            LogMsg::JsonPatch(ConversationPatch::add_normalized_entry(
+                0,
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::AssistantMessage,
+                    content: "this is a long intermediate assistant output".to_string(),
+                    metadata: None,
+                },
+            )),
+            LogMsg::JsonPatch(ConversationPatch::replace(
+                0,
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::AssistantMessage,
+                    content: r#"[{"type":"send","to":"user","content":"done"}]"#.to_string(),
+                    metadata: None,
+                },
+            )),
+        ];
+
+        let mut state = RunStreamStateSnapshot {
+            latest_assistant: "this is a long intermediate assistant output".to_string(),
+            assistant_update_count: 1,
+            ..RunStreamStateSnapshot::default()
+        };
+
+        ChatRunner::reconcile_run_stream_state_from_history(&mut state, &history);
+
+        assert_eq!(
+            state.latest_assistant,
+            r#"[{"type":"send","to":"user","content":"done"}]"#
+        );
+        assert_eq!(state.assistant_update_count, 2);
+    }
+
+    #[test]
+    fn reconcile_run_stream_state_from_history_keeps_live_output_when_history_is_stale() {
+        let history = vec![LogMsg::JsonPatch(ConversationPatch::add_normalized_entry(
+            0,
+            NormalizedEntry {
+                timestamp: None,
+                entry_type: NormalizedEntryType::AssistantMessage,
+                content: "older output".to_string(),
+                metadata: None,
+            },
+        ))];
+
+        let mut state = RunStreamStateSnapshot {
+            latest_assistant: "newer output".to_string(),
+            assistant_update_count: 2,
+            error_content: "newer error".to_string(),
+            error_update_count: 2,
+            error_type: Some(NormalizedEntryError::Other),
+            ..RunStreamStateSnapshot::default()
+        };
+
+        ChatRunner::reconcile_run_stream_state_from_history(&mut state, &history);
+
+        assert_eq!(state.latest_assistant, "newer output");
+        assert_eq!(state.assistant_update_count, 2);
+        assert_eq!(state.error_content, "newer error");
+        assert_eq!(state.error_update_count, 2);
     }
 }

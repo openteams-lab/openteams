@@ -325,7 +325,7 @@ fn normalize_workspace_observed_path(raw: &str, workspace_root: &Path) -> Option
                 '`' | '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';'
             )
         })
-        .trim_end_matches(|ch: char| matches!(ch, '.' | ':' | '!' | '?'));
+        .trim_end_matches(['.', ':', '!', '?']);
 
     if trimmed.is_empty() || !looks_like_workspace_path(trimmed) {
         return None;
