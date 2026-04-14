@@ -8,7 +8,7 @@ import {
 } from '@/utils/readOnlyLinks';
 
 const FILE_PATH_RE =
-  /(^|[\s([{"'])(?<path>(?:[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\){2,}[^\\\r\n<>:"|?*\s`"')\]}.,:;!?]+|[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\)*[^\\\r\n<>:"|?*]+\.[a-zA-Z0-9]{1,16}|\/(?:[^\/\r\n]+\/){2,}[^\/\r\n\s`"')\]}.,:;!?]+|\/(?:[^\/\r\n]+\/)*[^\/\r\n]+\.[a-zA-Z0-9]{1,16}|(?:\.{1,2}[\\/])?(?:[^\\/\r\n\s`"')\]}.,:;!?]+[\\/])*[^\\/\r\n\s`"')\]}.,:;!?]+\.[a-zA-Z0-9]{1,16}))/g;
+  /(^|[\s([{"'])(?<path>(?:[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\){2,}[^\\\r\n<>:"|?*\s`"')\]}.,:;!?]+|[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\)*[^\\\r\n<>:"|?*]+\.[a-zA-Z0-9]{1,16}|\/(?:[^/\r\n]+\/){2,}[^/\r\n\s`"')\]}.,:;!?]+|\/(?:[^/\r\n]+\/)*[^/\r\n]+\.[a-zA-Z0-9]{1,16}|(?:\.{1,2}[\\/])?(?:[^\\/\r\n\s`"')\]}.,:;!?]+[\\/])*[^\\/\r\n\s`"')\]}.,:;!?]+\.[a-zA-Z0-9]{1,16}))/g;
 
 interface ChatMarkdownProps {
   content: string;
@@ -23,7 +23,7 @@ interface ChatMarkdownProps {
 }
 
 function escapeMarkdownLinkText(value: string): string {
-  return value.replace(/([\\\[\]])/g, '\\$1');
+  return value.replace(/([\\[\]])/g, '\\$1');
 }
 
 function getFileLinkHref(

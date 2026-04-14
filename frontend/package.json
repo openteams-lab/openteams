@@ -8,9 +8,9 @@
     "build": "tsc && vite build",
     "check": "tsc --noEmit",
     "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "lint:fix": "eslint . --ext ts,tsx --fix",
-    "lint:i18n": "LINT_I18N=true eslint . --ext ts,tsx --max-warnings 0",
+    "lint": "node ./scripts/run-eslint.cjs src vite.config.ts postcss.config.cjs --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "node ./scripts/run-eslint.cjs src vite.config.ts postcss.config.cjs --ext ts,tsx --fix",
+    "lint:i18n": "node ./scripts/run-eslint.cjs --env:LINT_I18N=true src vite.config.ts postcss.config.cjs --ext ts,tsx --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
   },

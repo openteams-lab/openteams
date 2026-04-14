@@ -175,6 +175,9 @@ module.exports = {
     {
       // Disable type-aware linting for config files
       files: ['*.config.{ts,js,cjs,mjs}', '.eslintrc.cjs'],
+      env: {
+        node: true,
+      },
       parserOptions: {
         project: null,
       },
