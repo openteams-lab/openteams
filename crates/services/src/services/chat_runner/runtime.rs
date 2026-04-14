@@ -37,6 +37,25 @@ pub(super) struct RunLogPersistResult {
     pub(super) persist_error: Option<String>,
 }
 
+#[derive(Debug, Default)]
+struct RunStreamStateSnapshot {
+    agent_session_id: Option<String>,
+    agent_message_id: Option<String>,
+    latest_assistant: String,
+    assistant_update_count: u64,
+    last_token_usage: Option<TokenUsageInfo>,
+    error_content: String,
+    error_update_count: u64,
+    error_type: Option<NormalizedEntryError>,
+}
+
+#[derive(Debug)]
+struct StreamPatchDelta {
+    stream_type: ChatStreamDeltaType,
+    content: String,
+    delta: bool,
+}
+
 pub(super) struct RunLogSpool {
     path: PathBuf,
     file: Option<fs::File>,
@@ -52,6 +71,9 @@ pub(super) struct RunLogSpool {
     last_synced_log_truncated: bool,
     last_synced_log_capture_degraded: bool,
 }
+
+const TAIL_PARTIAL_LINE_NOTICE: &str =
+    "[openteams] tail omitted a leading partial log line after truncation.\n";
 
 impl RunLogSpool {
     pub(super) async fn new(
@@ -115,20 +137,30 @@ impl RunLogSpool {
             .saturating_sub(delta_negative);
     }
 
-    async fn read_tail_bytes(&mut self, bytes_to_keep: u64) -> Result<Vec<u8>, std::io::Error> {
+    async fn read_tail_bytes(
+        &mut self,
+        bytes_to_keep: u64,
+    ) -> Result<(Vec<u8>, bool), std::io::Error> {
         let Some(file) = self.file.as_mut() else {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), false));
         };
 
         if bytes_to_keep == 0 || self.current_bytes == 0 {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), false));
         }
 
         let start = self.current_bytes.saturating_sub(bytes_to_keep);
+        let mut started_mid_line = false;
+        if start > 0 {
+            file.seek(SeekFrom::Start(start - 1)).await?;
+            let mut previous = [0_u8; 1];
+            file.read_exact(&mut previous).await?;
+            started_mid_line = !matches!(previous[0], b'\n' | b'\r');
+        }
         file.seek(SeekFrom::Start(start)).await?;
         let mut buffer = vec![0; bytes_to_keep as usize];
         file.read_exact(&mut buffer).await?;
-        Ok(buffer)
+        Ok((buffer, started_mid_line))
     }
 
     async fn rewrite_with_bytes(&mut self, bytes: &[u8]) -> Result<(), std::io::Error> {
@@ -149,6 +181,35 @@ impl RunLogSpool {
         self.update_workspace_bytes(bytes.len() as u64);
         self.current_bytes = bytes.len() as u64;
         Ok(())
+    }
+
+    fn align_persisted_tail_to_line_boundary(
+        mut bytes: Vec<u8>,
+        started_mid_line: bool,
+    ) -> Vec<u8> {
+        if bytes.is_empty() {
+            return bytes;
+        }
+
+        if !started_mid_line {
+            while matches!(bytes.first(), Some(b'\n' | b'\r')) {
+                bytes.remove(0);
+            }
+            return bytes;
+        }
+
+        let Some(first_newline) = bytes.iter().position(|byte| *byte == b'\n') else {
+            let mut persisted = Vec::with_capacity(TAIL_PARTIAL_LINE_NOTICE.len() + bytes.len());
+            persisted.extend_from_slice(TAIL_PARTIAL_LINE_NOTICE.as_bytes());
+            persisted.extend_from_slice(&bytes);
+            return persisted;
+        };
+
+        let remainder = &bytes[(first_newline + 1)..];
+        let mut persisted = Vec::with_capacity(TAIL_PARTIAL_LINE_NOTICE.len() + remainder.len());
+        persisted.extend_from_slice(TAIL_PARTIAL_LINE_NOTICE.as_bytes());
+        persisted.extend_from_slice(remainder);
+        persisted
     }
 
     async fn sync_live_retention_flags_if_needed(&mut self) {
@@ -228,7 +289,7 @@ impl RunLogSpool {
         }
 
         let bytes_to_keep = cap.saturating_sub(incoming.len() as u64);
-        let mut retained = self.read_tail_bytes(bytes_to_keep).await?;
+        let (mut retained, _) = self.read_tail_bytes(bytes_to_keep).await?;
         retained.extend_from_slice(incoming);
         self.dropped_bytes = self
             .dropped_bytes
@@ -255,7 +316,9 @@ impl RunLogSpool {
         } else {
             let keep = self.current_bytes.min(tail_limit);
             match self.read_tail_bytes(keep).await {
-                Ok(bytes) => bytes,
+                Ok((bytes, started_mid_line)) => {
+                    Self::align_persisted_tail_to_line_boundary(bytes, started_mid_line)
+                }
                 Err(err) => {
                     return self.release_to_live_fallback(Some(err.to_string())).await;
                 }
@@ -342,6 +405,9 @@ impl RunLogSpool {
 #[cfg(test)]
 mod tests {
     use dashmap::DashMap;
+    use executors::logs::{
+        NormalizedEntry, NormalizedEntryError, NormalizedEntryType, utils::patch::ConversationPatch,
+    };
     use tempfile::tempdir;
 
     use super::*;
@@ -383,6 +449,105 @@ mod tests {
                 .expect("tail file"),
             "hello tail"
         );
+    }
+
+    #[tokio::test]
+    async fn persist_tail_drops_partial_leading_line_and_adds_notice() {
+        let temp = tempdir().expect("tempdir");
+        let live_path = temp.path().join("live.log");
+        let tail_path = temp.path().join("run").join("raw.tail.log");
+        let db_pool = sqlx::SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("sqlite pool");
+        let mut spool = RunLogSpool::new(
+            live_path,
+            Uuid::new_v4(),
+            db_pool,
+            "workspace".to_string(),
+            Arc::new(DashMap::new()),
+        )
+        .await
+        .expect("spool");
+
+        spool
+            .write_text("very-long-leading-line-without-boundary\nkept line 1\nkept line 2\n")
+            .await
+            .expect("write");
+
+        let persisted = spool.persist_tail_to(&tail_path, 20).await;
+        let content = fs::read_to_string(&persisted.log_path)
+            .await
+            .expect("tail file");
+
+        assert_eq!(persisted.log_state, ChatRunLogState::Tail);
+        assert_eq!(content, format!("{TAIL_PARTIAL_LINE_NOTICE}kept line 2\n"));
+    }
+
+    #[test]
+    fn reconcile_run_stream_state_from_history_recovers_shorter_final_output() {
+        let history = vec![
+            LogMsg::JsonPatch(ConversationPatch::add_normalized_entry(
+                0,
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::AssistantMessage,
+                    content: "this is a long intermediate assistant output".to_string(),
+                    metadata: None,
+                },
+            )),
+            LogMsg::JsonPatch(ConversationPatch::replace(
+                0,
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::AssistantMessage,
+                    content: r#"[{"type":"send","to":"user","content":"done"}]"#.to_string(),
+                    metadata: None,
+                },
+            )),
+        ];
+
+        let mut state = RunStreamStateSnapshot {
+            latest_assistant: "this is a long intermediate assistant output".to_string(),
+            assistant_update_count: 1,
+            ..RunStreamStateSnapshot::default()
+        };
+
+        ChatRunner::reconcile_run_stream_state_from_history(&mut state, &history);
+
+        assert_eq!(
+            state.latest_assistant,
+            r#"[{"type":"send","to":"user","content":"done"}]"#
+        );
+        assert_eq!(state.assistant_update_count, 2);
+    }
+
+    #[test]
+    fn reconcile_run_stream_state_from_history_keeps_live_output_when_history_is_stale() {
+        let history = vec![LogMsg::JsonPatch(ConversationPatch::add_normalized_entry(
+            0,
+            NormalizedEntry {
+                timestamp: None,
+                entry_type: NormalizedEntryType::AssistantMessage,
+                content: "older output".to_string(),
+                metadata: None,
+            },
+        ))];
+
+        let mut state = RunStreamStateSnapshot {
+            latest_assistant: "newer output".to_string(),
+            assistant_update_count: 2,
+            error_content: "newer error".to_string(),
+            error_update_count: 2,
+            error_type: Some(NormalizedEntryError::Other),
+            ..RunStreamStateSnapshot::default()
+        };
+
+        ChatRunner::reconcile_run_stream_state_from_history(&mut state, &history);
+
+        assert_eq!(state.latest_assistant, "newer output");
+        assert_eq!(state.assistant_update_count, 2);
+        assert_eq!(state.error_content, "newer error");
+        assert_eq!(state.error_update_count, 2);
     }
 }
 
@@ -650,82 +815,171 @@ impl ChatRunner {
         sender: &broadcast::Sender<ChatStreamEvent>,
         last_content: &mut HashMap<usize, String>,
         latest_assistant: &mut String,
+        assistant_update_count: &mut u64,
         last_token_usage: &mut Option<TokenUsageInfo>,
         error_content: &mut String,
+        error_update_count: &mut u64,
         error_type: &mut Option<NormalizedEntryError>,
     ) {
-        if let Some((index, entry)) = extract_normalized_entry_from_patch(&patch) {
-            let stream_type = match &entry.entry_type {
-                NormalizedEntryType::AssistantMessage => Some(ChatStreamDeltaType::Assistant),
-                NormalizedEntryType::Thinking => Some(ChatStreamDeltaType::Thinking),
-                NormalizedEntryType::ErrorMessage { error_type: et } => {
-                    // Keep the first non-Other error type, or use Other if none found
-                    if error_type.is_none()
-                        || !matches!(et, NormalizedEntryError::Other)
-                            && matches!(error_type, Some(NormalizedEntryError::Other))
-                    {
-                        tracing::debug!(
-                            session_id = %session_id,
-                            session_agent_id = %session_agent_id,
-                            agent_id = %agent_id,
-                            run_id = %run_id,
-                            new_error_type = ?et,
-                            old_error_type = ?error_type,
-                            "[chat_runner] ErrorMessage detected from executor, updating error_type"
-                        );
-                        *error_type = Some(et.clone());
-                    }
-                    Some(ChatStreamDeltaType::Error)
-                }
-                NormalizedEntryType::TokenUsageInfo(usage) => {
-                    *last_token_usage = Some(usage.clone());
-                    None
-                }
-                _ => None,
-            };
+        if let Some(update) = Self::apply_stream_patch_to_state(
+            &patch,
+            last_content,
+            latest_assistant,
+            assistant_update_count,
+            last_token_usage,
+            error_content,
+            error_update_count,
+            error_type,
+        ) {
+            let _ = sender.send(ChatStreamEvent::AgentDelta {
+                session_id,
+                session_agent_id,
+                agent_id,
+                run_id,
+                stream_type: update.stream_type,
+                content: update.content,
+                delta: update.delta,
+                is_final: false,
+            });
+        }
+    }
 
-            if let Some(stream_type) = stream_type {
-                let current = entry.content;
-                let previous = last_content.get(&index).cloned().unwrap_or_default();
-                let (delta, is_delta) = if current.starts_with(&previous) {
-                    (current[previous.len()..].to_string(), true)
-                } else {
-                    (current.clone(), false)
-                };
-
-                last_content.insert(index, current.clone());
-                if matches!(stream_type, ChatStreamDeltaType::Assistant) {
-                    *latest_assistant = current.clone();
+    #[allow(clippy::too_many_arguments)]
+    fn apply_stream_patch_to_state(
+        patch: &json_patch::Patch,
+        last_content: &mut HashMap<usize, String>,
+        latest_assistant: &mut String,
+        assistant_update_count: &mut u64,
+        last_token_usage: &mut Option<TokenUsageInfo>,
+        error_content: &mut String,
+        error_update_count: &mut u64,
+        error_type: &mut Option<NormalizedEntryError>,
+    ) -> Option<StreamPatchDelta> {
+        let (index, entry) = extract_normalized_entry_from_patch(patch)?;
+        let stream_type = match &entry.entry_type {
+            NormalizedEntryType::AssistantMessage => Some(ChatStreamDeltaType::Assistant),
+            NormalizedEntryType::Thinking => Some(ChatStreamDeltaType::Thinking),
+            NormalizedEntryType::ErrorMessage { error_type: et } => {
+                if error_type.is_none()
+                    || !matches!(et, NormalizedEntryError::Other)
+                        && matches!(error_type, Some(NormalizedEntryError::Other))
+                {
+                    *error_type = Some(et.clone());
                 }
-                if matches!(stream_type, ChatStreamDeltaType::Error) {
-                    if !error_content.is_empty() {
-                        error_content.push('\n');
-                    }
-                    error_content.push_str(&current);
-                    tracing::debug!(
-                        session_id = %session_id,
-                        session_agent_id = %session_agent_id,
-                        agent_id = %agent_id,
-                        run_id = %run_id,
-                        error_content_len = error_content.len(),
-                        new_chunk_len = current.len(),
-                        "[chat_runner] Accumulating error content from stream"
+                Some(ChatStreamDeltaType::Error)
+            }
+            NormalizedEntryType::TokenUsageInfo(usage) => {
+                *last_token_usage = Some(usage.clone());
+                None
+            }
+            _ => None,
+        }?;
+
+        let current = entry.content;
+        let previous = last_content.get(&index).cloned().unwrap_or_default();
+        let (delta, is_delta) = if current.starts_with(&previous) {
+            (current[previous.len()..].to_string(), true)
+        } else {
+            (current.clone(), false)
+        };
+
+        last_content.insert(index, current.clone());
+        if matches!(stream_type, ChatStreamDeltaType::Assistant) {
+            *latest_assistant = current.clone();
+            if current != previous {
+                *assistant_update_count = assistant_update_count.saturating_add(1);
+            }
+        }
+        if matches!(stream_type, ChatStreamDeltaType::Error) {
+            if !error_content.is_empty() {
+                error_content.push('\n');
+            }
+            error_content.push_str(&current);
+            if current != previous {
+                *error_update_count = error_update_count.saturating_add(1);
+            }
+        }
+
+        if delta.is_empty() {
+            return None;
+        }
+
+        Some(StreamPatchDelta {
+            stream_type,
+            content: delta,
+            delta: is_delta,
+        })
+    }
+
+    fn rebuild_run_stream_state_from_history(history: &[LogMsg]) -> RunStreamStateSnapshot {
+        let mut snapshot = RunStreamStateSnapshot::default();
+        let mut last_content = HashMap::new();
+        let mut stdout_line_buffer = String::new();
+
+        for item in history {
+            match item {
+                LogMsg::SessionId(value) => {
+                    snapshot.agent_session_id = Some(value.clone());
+                }
+                LogMsg::MessageId(value) => {
+                    snapshot.agent_message_id = Some(value.clone());
+                }
+                LogMsg::Stdout(chunk) => {
+                    Self::update_token_usage_from_stdout_chunk(
+                        &mut stdout_line_buffer,
+                        &mut snapshot.last_token_usage,
+                        chunk,
                     );
                 }
-
-                if !delta.is_empty() {
-                    let _ = sender.send(ChatStreamEvent::AgentDelta {
-                        session_id,
-                        session_agent_id,
-                        agent_id,
-                        run_id,
-                        stream_type,
-                        content: delta,
-                        delta: is_delta,
-                        is_final: false,
-                    });
+                LogMsg::JsonPatch(patch) => {
+                    let _ = Self::apply_stream_patch_to_state(
+                        patch,
+                        &mut last_content,
+                        &mut snapshot.latest_assistant,
+                        &mut snapshot.assistant_update_count,
+                        &mut snapshot.last_token_usage,
+                        &mut snapshot.error_content,
+                        &mut snapshot.error_update_count,
+                        &mut snapshot.error_type,
+                    );
                 }
+                _ => {}
             }
+        }
+
+        Self::flush_token_usage_buffer(&mut stdout_line_buffer, &mut snapshot.last_token_usage);
+        snapshot
+    }
+
+    fn reconcile_run_stream_state_from_history(
+        state: &mut RunStreamStateSnapshot,
+        history: &[LogMsg],
+    ) {
+        let rebuilt = Self::rebuild_run_stream_state_from_history(history);
+
+        if rebuilt.agent_session_id.is_some() {
+            state.agent_session_id = rebuilt.agent_session_id;
+        }
+        if rebuilt.agent_message_id.is_some() {
+            state.agent_message_id = rebuilt.agent_message_id;
+        }
+        if rebuilt.assistant_update_count > state.assistant_update_count
+            || (state.latest_assistant.is_empty() && !rebuilt.latest_assistant.is_empty())
+        {
+            state.latest_assistant = rebuilt.latest_assistant;
+            state.assistant_update_count = rebuilt.assistant_update_count;
+        }
+        if rebuilt.last_token_usage.is_some() {
+            state.last_token_usage = rebuilt.last_token_usage;
+        }
+        if rebuilt.error_update_count > state.error_update_count
+            || (state.error_content.is_empty() && !rebuilt.error_content.is_empty())
+        {
+            state.error_content = rebuilt.error_content;
+            state.error_update_count = rebuilt.error_update_count;
+        }
+        if rebuilt.error_type.is_some() {
+            state.error_type = rebuilt.error_type;
         }
     }
 
@@ -881,6 +1135,7 @@ impl ChatRunner {
         tail_log_path: PathBuf,
         raw_log_spool: Arc<Mutex<RunLogSpool>>,
         completion_status: Arc<AtomicU8>,
+        tracked_diff_baseline: Option<String>,
         chain_depth: u32,
         context_compacted: bool,
         compression_warning: Option<chat::CompressionWarning>,
@@ -908,11 +1163,13 @@ impl ChatRunner {
             let mut stream = msg_store.history_plus_stream();
             let mut last_content: HashMap<usize, String> = HashMap::new();
             let mut latest_assistant = String::new();
+            let mut assistant_update_count = 0_u64;
             let mut agent_session_id: Option<String> = None;
             let mut agent_message_id: Option<String> = None;
             let mut last_token_usage: Option<TokenUsageInfo> = None;
             let mut stdout_line_buffer = String::new();
             let mut error_content = String::new();
+            let mut error_update_count = 0_u64;
             let mut error_type: Option<NormalizedEntryError> = None;
 
             while let Some(item) = stream.next().await {
@@ -956,8 +1213,10 @@ impl ChatRunner {
                             &sender,
                             &mut last_content,
                             &mut latest_assistant,
+                            &mut assistant_update_count,
                             &mut last_token_usage,
                             &mut error_content,
+                            &mut error_update_count,
                             &mut error_type,
                         );
                     }
@@ -1035,8 +1294,10 @@ impl ChatRunner {
                                         &sender,
                                         &mut last_content,
                                         &mut latest_assistant,
+                                        &mut assistant_update_count,
                                         &mut last_token_usage,
                                         &mut error_content,
+                                        &mut error_update_count,
                                         &mut error_type,
                                     );
                                 }
@@ -1049,6 +1310,27 @@ impl ChatRunner {
                             &mut last_token_usage,
                         );
 
+                        let mut reconciled_state = RunStreamStateSnapshot {
+                            agent_session_id: agent_session_id.clone(),
+                            agent_message_id: agent_message_id.clone(),
+                            latest_assistant: latest_assistant.clone(),
+                            assistant_update_count,
+                            last_token_usage: last_token_usage.clone(),
+                            error_content: error_content.clone(),
+                            error_update_count,
+                            error_type: error_type.clone(),
+                        };
+                        Self::reconcile_run_stream_state_from_history(
+                            &mut reconciled_state,
+                            &msg_store.get_history(),
+                        );
+                        agent_session_id = reconciled_state.agent_session_id;
+                        agent_message_id = reconciled_state.agent_message_id;
+                        latest_assistant = reconciled_state.latest_assistant;
+                        last_token_usage = reconciled_state.last_token_usage;
+                        error_content = reconciled_state.error_content;
+                        error_type = reconciled_state.error_type;
+
                         let _ = fs::write(&output_path, &latest_assistant).await;
 
                         let diff_info = ChatRunner::capture_git_diff(
@@ -1056,6 +1338,7 @@ impl ChatRunner {
                             &run_dir,
                             session_agent_id,
                             run_index,
+                            tracked_diff_baseline.as_deref(),
                         )
                         .await;
                         let untracked_files = ChatRunner::capture_untracked_files(

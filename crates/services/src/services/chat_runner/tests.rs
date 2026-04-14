@@ -16,6 +16,7 @@ use db::{
     },
 };
 use executors::executors::CancellationToken;
+use git::GitService;
 use serde_json::json;
 use sqlx::SqlitePool;
 use tokio::{process::Command, sync::oneshot};
@@ -1295,6 +1296,52 @@ async fn capture_untracked_files_allows_user_openteams_files_but_skips_runtime_a
         !files
             .iter()
             .any(|path| path == ".openteams/context/demo/messages.jsonl")
+    );
+}
+
+#[tokio::test]
+async fn capture_git_diff_skips_patch_when_diff_matches_run_baseline() {
+    let tempdir = tempfile::tempdir().expect("create tempdir");
+    let repo_path = tempdir.path().join("repo");
+    let git = GitService::new();
+    git.initialize_repo_with_main_branch(&repo_path)
+        .expect("init repo");
+
+    std::fs::write(repo_path.join("tracked.txt"), "base\n").expect("write tracked");
+    git.commit(&repo_path, "baseline").expect("commit baseline");
+
+    std::fs::write(repo_path.join("tracked.txt"), "dirty\n").expect("modify tracked");
+
+    let baseline = ChatRunner::capture_tracked_git_diff_snapshot(&repo_path).await;
+    assert!(
+        baseline
+            .as_deref()
+            .is_some_and(|diff| diff.contains("tracked.txt"))
+    );
+
+    let run_dir = tempdir.path().join("run-record");
+    tokio::fs::create_dir_all(&run_dir)
+        .await
+        .expect("create run dir");
+
+    let session_agent_id = Uuid::new_v4();
+    let diff_info = ChatRunner::capture_git_diff(
+        &repo_path,
+        &run_dir,
+        session_agent_id,
+        1,
+        baseline.as_deref(),
+    )
+    .await;
+
+    assert!(diff_info.is_none());
+    assert!(
+        !run_dir
+            .join(format!(
+                "{}_diff.patch",
+                ChatRunner::run_records_prefix(session_agent_id, 1)
+            ))
+            .exists()
     );
 }
 

@@ -259,13 +259,7 @@ impl ChatRunner {
         }
     }
 
-    #[allow(dead_code)]
-    pub(super) async fn capture_git_diff(
-        workspace_path: &Path,
-        run_dir: &Path,
-        session_agent_id: Uuid,
-        run_index: i64,
-    ) -> Option<DiffInfo> {
+    pub(super) async fn capture_tracked_git_diff_snapshot(workspace_path: &Path) -> Option<String> {
         let check = Command::new("git")
             .arg("-C")
             .arg(workspace_path)
@@ -314,6 +308,22 @@ impl ChatRunner {
 
         let diff = String::from_utf8_lossy(&output.stdout).to_string();
         if diff.trim().is_empty() {
+            return None;
+        }
+
+        Some(diff)
+    }
+
+    #[allow(dead_code)]
+    pub(super) async fn capture_git_diff(
+        workspace_path: &Path,
+        run_dir: &Path,
+        session_agent_id: Uuid,
+        run_index: i64,
+        baseline_diff: Option<&str>,
+    ) -> Option<DiffInfo> {
+        let diff = Self::capture_tracked_git_diff_snapshot(workspace_path).await?;
+        if baseline_diff == Some(diff.as_str()) {
             return None;
         }
 

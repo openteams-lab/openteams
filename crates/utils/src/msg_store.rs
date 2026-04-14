@@ -1,12 +1,15 @@
 use std::{
     collections::VecDeque,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex},
 };
 
 use axum::response::sse::Event;
 use futures::{StreamExt, TryStreamExt, future};
-use tokio::{sync::broadcast, task::JoinHandle};
-use tokio_stream::wrappers::BroadcastStream;
+use tokio::{
+    sync::{broadcast, mpsc},
+    task::JoinHandle,
+};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{log_msg::LogMsg, stream_lines::LinesStreamExt};
 
@@ -22,10 +25,11 @@ struct StoredMsg {
 struct Inner {
     history: VecDeque<StoredMsg>,
     total_bytes: usize,
+    subscribers: Vec<mpsc::UnboundedSender<LogMsg>>,
 }
 
 pub struct MsgStore {
-    inner: RwLock<Inner>,
+    inner: Mutex<Inner>,
     sender: broadcast::Sender<LogMsg>,
 }
 
@@ -39,9 +43,10 @@ impl MsgStore {
     pub fn new() -> Self {
         let (sender, _) = broadcast::channel(10000);
         Self {
-            inner: RwLock::new(Inner {
+            inner: Mutex::new(Inner {
                 history: VecDeque::with_capacity(32),
                 total_bytes: 0,
+                subscribers: Vec::new(),
             }),
             sender,
         }
@@ -51,7 +56,10 @@ impl MsgStore {
         let _ = self.sender.send(msg.clone()); // live listeners
         let bytes = msg.approx_bytes();
 
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.lock().unwrap();
+        inner
+            .subscribers
+            .retain(|subscriber| subscriber.send(msg.clone()).is_ok());
         while inner.total_bytes.saturating_add(bytes) > HISTORY_BYTES {
             if let Some(front) = inner.history.pop_front() {
                 inner.total_bytes = inner.total_bytes.saturating_sub(front.bytes);
@@ -93,7 +101,7 @@ impl MsgStore {
 
     pub fn get_history(&self) -> Vec<LogMsg> {
         self.inner
-            .read()
+            .lock()
             .unwrap()
             .history
             .iter()
@@ -101,15 +109,22 @@ impl MsgStore {
             .collect()
     }
 
+    fn subscribe_lossless(&self) -> (Vec<LogMsg>, mpsc::UnboundedReceiver<LogMsg>) {
+        let (tx, rx) = mpsc::unbounded_channel();
+        let mut inner = self.inner.lock().unwrap();
+        let history = inner.history.iter().map(|s| s.msg.clone()).collect();
+        inner.subscribers.push(tx);
+        (history, rx)
+    }
+
     /// History then live, as `LogMsg`.
     pub fn history_plus_stream(
         &self,
     ) -> futures::stream::BoxStream<'static, Result<LogMsg, std::io::Error>> {
-        let (history, rx) = (self.get_history(), self.get_receiver());
+        let (history, rx) = self.subscribe_lossless();
 
         let hist = futures::stream::iter(history.into_iter().map(Ok::<_, std::io::Error>));
-        let live = BroadcastStream::new(rx)
-            .filter_map(|res| async move { res.ok().map(Ok::<_, std::io::Error>) });
+        let live = UnboundedReceiverStream::new(rx).map(Ok::<_, std::io::Error>);
 
         Box::pin(hist.chain(live))
     }
@@ -210,5 +225,57 @@ impl MsgStore {
                 }
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::StreamExt;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn history_plus_stream_keeps_critical_patch_after_heavy_live_logs() {
+        let store = Arc::new(MsgStore::new());
+        let mut stream = store.history_plus_stream();
+
+        let expected_patch: json_patch::Patch = serde_json::from_str(
+            r#"[{"op":"add","path":"/assistant","value":"final assistant output"}]"#,
+        )
+        .expect("valid patch");
+        let expected_patch_json =
+            serde_json::to_string(&expected_patch).expect("serialize expected patch");
+
+        store.push(LogMsg::JsonPatch(expected_patch));
+        for i in 0..15000 {
+            store.push_stdout(format!("stdout chunk {i}\n"));
+        }
+        store.push_finished();
+
+        let mut found_patch = false;
+        let mut saw_finished = false;
+
+        while let Some(item) = stream.next().await {
+            match item.expect("stream item") {
+                LogMsg::JsonPatch(patch) => {
+                    let patch_json =
+                        serde_json::to_string(&patch).expect("serialize observed patch");
+                    if patch_json == expected_patch_json {
+                        found_patch = true;
+                    }
+                }
+                LogMsg::Finished => {
+                    saw_finished = true;
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        assert!(
+            found_patch,
+            "expected final assistant patch to remain available"
+        );
+        assert!(saw_finished, "expected stream to reach finished marker");
     }
 }
