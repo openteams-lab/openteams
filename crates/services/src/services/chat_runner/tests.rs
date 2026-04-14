@@ -1282,6 +1282,35 @@ async fn capture_untracked_files_allows_user_openteams_files_but_skips_runtime_a
         "runtime\n",
     )
     .expect("write runtime artifact");
+    std::fs::write(
+        repo_path
+            .join(".openteams")
+            .join("context")
+            .join("demo")
+            .join("independent-mode-discussion-proposal.md"),
+        "proposal\n",
+    )
+    .expect("write user proposal artifact");
+    std::fs::create_dir_all(
+        repo_path
+            .join(".openteams")
+            .join("context")
+            .join("demo")
+            .join("attachments")
+            .join("message-1"),
+    )
+    .expect("create attachment dir");
+    std::fs::write(
+        repo_path
+            .join(".openteams")
+            .join("context")
+            .join("demo")
+            .join("attachments")
+            .join("message-1")
+            .join("input.txt"),
+        "attachment\n",
+    )
+    .expect("write attachment artifact");
 
     let run_dir = tempdir.path().join("run-record");
     tokio::fs::create_dir_all(&run_dir)
@@ -1293,9 +1322,19 @@ async fn capture_untracked_files_allows_user_openteams_files_but_skips_runtime_a
     assert!(files.iter().any(|path| path == "binaries/test.txt"));
     assert!(files.iter().any(|path| path == ".openteams/test.txt"));
     assert!(
+        files
+            .iter()
+            .any(|path| path == ".openteams/context/demo/independent-mode-discussion-proposal.md")
+    );
+    assert!(
         !files
             .iter()
             .any(|path| path == ".openteams/context/demo/messages.jsonl")
+    );
+    assert!(
+        !files
+            .iter()
+            .any(|path| path == ".openteams/context/demo/attachments/message-1/input.txt")
     );
 }
 

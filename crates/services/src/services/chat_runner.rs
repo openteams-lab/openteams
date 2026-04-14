@@ -281,19 +281,39 @@ fn looks_like_workspace_path(candidate: &str) -> bool {
 }
 
 pub(super) fn is_internal_openteams_runtime_path(path: &Path) -> bool {
-    let mut components = path.components().filter_map(|component| match component {
-        Component::Normal(part) => Some(part.to_string_lossy().to_string()),
-        Component::CurDir => None,
-        Component::ParentDir | Component::RootDir | Component::Prefix(_) => None,
-    });
+    let components = path
+        .components()
+        .filter_map(|component| match component {
+            Component::Normal(part) => Some(part.to_string_lossy().to_string()),
+            Component::CurDir => None,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => None,
+        })
+        .collect::<Vec<_>>();
 
-    matches!(
-        (components.next().as_deref(), components.next().as_deref()),
-        (
-            Some(OPENTEAMS_HOME_DIR),
-            Some(CONTEXT_DIR_NAME | RUNS_DIR_NAME)
-        )
-    )
+    match components.as_slice() {
+        [openteams, runs, ..] if openteams == OPENTEAMS_HOME_DIR && runs == RUNS_DIR_NAME => true,
+        [openteams, context, _session_id, file]
+            if openteams == OPENTEAMS_HOME_DIR
+                && context == CONTEXT_DIR_NAME
+                && matches!(
+                    file.as_str(),
+                    "messages.jsonl"
+                        | LEGACY_COMPACTED_CONTEXT_FILE_NAME
+                        | SHARED_BLACKBOARD_FILE_NAME
+                        | WORK_RECORDS_FILE_NAME
+                ) =>
+        {
+            true
+        }
+        [openteams, context, _session_id, internal_dir, ..]
+            if openteams == OPENTEAMS_HOME_DIR
+                && context == CONTEXT_DIR_NAME
+                && matches!(internal_dir.as_str(), "attachments" | "references") =>
+        {
+            true
+        }
+        _ => false,
+    }
 }
 
 fn normalize_workspace_observed_path(raw: &str, workspace_root: &Path) -> Option<String> {

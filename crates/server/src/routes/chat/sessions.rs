@@ -366,16 +366,39 @@ fn looks_like_workspace_path(candidate: &str) -> bool {
 }
 
 fn is_internal_openteams_runtime_path(path: &std::path::Path) -> bool {
-    let mut components = path.components().filter_map(|component| match component {
-        Component::Normal(part) => Some(part.to_string_lossy().to_string()),
-        Component::CurDir => None,
-        Component::ParentDir | Component::RootDir | Component::Prefix(_) => None,
-    });
+    let components = path
+        .components()
+        .filter_map(|component| match component {
+            Component::Normal(part) => Some(part.to_string_lossy().to_string()),
+            Component::CurDir => None,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => None,
+        })
+        .collect::<Vec<_>>();
 
-    matches!(
-        (components.next().as_deref(), components.next().as_deref()),
-        (Some(".openteams"), Some("context" | "runs"))
-    )
+    match components.as_slice() {
+        [openteams, runs, ..] if openteams == ".openteams" && runs == "runs" => true,
+        [openteams, context, _session_id, file]
+            if openteams == ".openteams"
+                && context == "context"
+                && matches!(
+                    file.as_str(),
+                    "messages.jsonl"
+                        | "messages_compacted.background.jsonl"
+                        | "shared_blackboard.jsonl"
+                        | "work_records.jsonl"
+                ) =>
+        {
+            true
+        }
+        [openteams, context, _session_id, internal_dir, ..]
+            if openteams == ".openteams"
+                && context == "context"
+                && matches!(internal_dir.as_str(), "attachments" | "references") =>
+        {
+            true
+        }
+        _ => false,
+    }
 }
 
 fn normalize_workspace_relative_path(
@@ -2117,6 +2140,20 @@ mod tests {
         );
         assert_eq!(
             normalize_workspace_relative_path(
+                ".openteams/context/demo/independent-mode-discussion-proposal.md",
+                tempdir.path()
+            ),
+            Some(".openteams/context/demo/independent-mode-discussion-proposal.md".to_string())
+        );
+        assert_eq!(
+            normalize_workspace_relative_path(
+                ".openteams/context/demo/attachments/message-1/input.txt",
+                tempdir.path()
+            ),
+            None
+        );
+        assert_eq!(
+            normalize_workspace_relative_path(
                 ".openteams/runs/demo/run_records/output.txt",
                 tempdir.path()
             ),
@@ -2153,6 +2190,35 @@ mod tests {
             "runtime\n",
         )
         .expect("write runtime artifact");
+        fs::write(
+            repo_path
+                .join(".openteams")
+                .join("context")
+                .join("demo")
+                .join("independent-mode-discussion-proposal.md"),
+            "proposal\n",
+        )
+        .expect("write proposal artifact");
+        fs::create_dir_all(
+            repo_path
+                .join(".openteams")
+                .join("context")
+                .join("demo")
+                .join("attachments")
+                .join("message-1"),
+        )
+        .expect("create attachment dir");
+        fs::write(
+            repo_path
+                .join(".openteams")
+                .join("context")
+                .join("demo")
+                .join("attachments")
+                .join("message-1")
+                .join("input.txt"),
+            "attachment\n",
+        )
+        .expect("write attachment artifact");
 
         let session_id = Uuid::new_v4();
         let session_agent_id = Uuid::new_v4();
@@ -2181,7 +2247,7 @@ mod tests {
             format!(
                 concat!(
                     "{{\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved `binaries/test.txt`.\"}}\n",
-                    "{{\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved `.openteams/test.txt` and `.openteams/context/demo/messages.jsonl`.\"}}\n"
+                    "{{\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved `.openteams/test.txt`, `.openteams/context/demo/messages.jsonl`, and `.openteams/context/demo/independent-mode-discussion-proposal.md`.\"}}\n"
                 ),
                 run_id = run.id
             ),
@@ -2211,7 +2277,11 @@ mod tests {
         assert!(all_paths.contains(&"tracked.txt"));
         assert!(all_paths.contains(&"binaries/test.txt"));
         assert!(all_paths.contains(&".openteams/test.txt"));
+        assert!(
+            all_paths.contains(&".openteams/context/demo/independent-mode-discussion-proposal.md")
+        );
         assert!(!all_paths.contains(&".openteams/context/demo/messages.jsonl"));
+        assert!(!all_paths.contains(&".openteams/context/demo/attachments/message-1/input.txt"));
     }
 
     #[tokio::test]
