@@ -712,8 +712,9 @@ export function SessionWorkspacesPanel({
                             void handleOpenInExplorer(targetPath);
                           }}
                           title={t('panel.workspaces.openWorkspace')}
+                          aria-label={t('panel.workspaces.openWorkspace')}
                         >
-                          [↗]
+                          <ArrowSquareUpRightIcon className="size-icon-xs" />
                         </button>
                       </div>
                     ))}

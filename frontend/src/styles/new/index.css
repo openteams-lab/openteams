@@ -7593,6 +7593,57 @@
     background-clip: content-box;
   }
 
+  .new-design .chat-session-left .chat-session-conversation-list,
+  .new-design .chat-session-left .chat-session-list-collapsed {
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(122, 138, 170, 0.28) transparent;
+    padding-right: 4px;
+  }
+
+  .new-design .chat-session-left .chat-session-conversation-list::-webkit-scrollbar,
+  .new-design .chat-session-left .chat-session-list-collapsed::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .new-design .chat-session-left .chat-session-conversation-list::-webkit-scrollbar-thumb,
+  .new-design .chat-session-left .chat-session-list-collapsed::-webkit-scrollbar-thumb {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: rgba(112, 128, 161, 0.24);
+    background-clip: content-box;
+  }
+
+  .new-design .chat-session-left .chat-session-conversation-list::-webkit-scrollbar-thumb:hover,
+  .new-design .chat-session-left .chat-session-list-collapsed::-webkit-scrollbar-thumb:hover {
+    background: rgba(87, 104, 140, 0.42);
+    background-clip: content-box;
+  }
+
+  .new-design.dark .chat-session-left .chat-session-conversation-list,
+  .dark .new-design .chat-session-left .chat-session-conversation-list,
+  .new-design.dark .chat-session-left .chat-session-list-collapsed,
+  .dark .new-design .chat-session-left .chat-session-list-collapsed {
+    scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
+  }
+
+  .new-design.dark .chat-session-left .chat-session-conversation-list::-webkit-scrollbar-thumb,
+  .dark .new-design .chat-session-left .chat-session-conversation-list::-webkit-scrollbar-thumb,
+  .new-design.dark .chat-session-left .chat-session-list-collapsed::-webkit-scrollbar-thumb,
+  .dark .new-design .chat-session-left .chat-session-list-collapsed::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.18);
+    background-clip: content-box;
+  }
+
+  .new-design.dark .chat-session-left .chat-session-conversation-list::-webkit-scrollbar-thumb:hover,
+  .dark .new-design .chat-session-left .chat-session-conversation-list::-webkit-scrollbar-thumb:hover,
+  .new-design.dark .chat-session-left .chat-session-list-collapsed::-webkit-scrollbar-thumb:hover,
+  .dark .new-design .chat-session-left .chat-session-list-collapsed::-webkit-scrollbar-thumb:hover {
+    background: rgba(196, 207, 224, 0.32);
+    background-clip: content-box;
+  }
+
   /* ================================================================
      DARK MODE — Message cards, composer, empty state, members, overlays
      ================================================================ */
