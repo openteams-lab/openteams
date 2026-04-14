@@ -39,6 +39,7 @@
     "archive": "Archiver",
     "restore": "Restaurer",
     "cleanupMessages": "Nettoyer les messages",
+    "viewSessionId": "Voir l'ID de la session",
     "delete": "Supprimer la session"
   },
   "header": {
@@ -57,6 +58,7 @@
     "restoreSession": "Restaurer la session",
     "cleanupMessages": "Nettoyer les messages",
     "exitCleanupMode": "Quitter le mode nettoyage",
+    "viewSessionId": "Voir l'ID de la session",
     "settings": "Paramètres",
     "moreActions": "Plus d'actions",
     "generatedTitleBadge": "Titre auto",
@@ -605,6 +607,7 @@
         "removeMember": "Supprimer le membre IA",
         "deleteSession": "Supprimer la session",
         "deleteMessages": "Supprimer les messages",
+        "viewSessionId": "ID de la session actuelle",
         "duplicateMemberName": "Nom de membre en double"
       },
       "messages": {
@@ -612,6 +615,7 @@
         "removeMember": "Voulez-vous vraiment supprimer @{{name}} de cette session ?",
         "deleteSession": "Voulez-vous vraiment supprimer \"{{title}}\" ? Cette action est irréversible et tous les messages seront supprimés définitivement.",
         "deleteMessages": "Voulez-vous vraiment supprimer {{count}} message(s) ? Cette action est irréversible.",
+        "viewSessionId": "ID de la session actuelle :\n\"{{id}}\"",
         "duplicateMemberName": "Le membre IA {{name}} existe deja dans cette session. Les noms en double ne sont pas autorises."
       }
     },

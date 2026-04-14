@@ -1,6 +1,7 @@
 {
   "buttons": {
     "save": "儲存",
+    "copy": "複製",
     "cancel": "取消",
     "send": "傳送",
     "delete": "刪除",

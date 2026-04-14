@@ -1034,6 +1034,7 @@ export function ChatSessions() {
     tone?: 'default' | 'info' | 'success' | 'destructive';
     confirmText?: string;
     cancelText?: string;
+    copyValue?: string;
   } | null>(null);
   const [teamImportPlan, setTeamImportPlan] = useState<
     MemberPresetImportPlan[] | null
@@ -3778,6 +3779,19 @@ export function ChatSessions() {
             },
           });
         }}
+        onViewSessionId={(id) => {
+          setConfirmModal({
+            title: t('modals.confirm.titles.viewSessionId'),
+            message: t('modals.confirm.messages.viewSessionId', { id }),
+            mode: 'alert',
+            tone: 'info',
+            confirmText: t('common:ok'),
+            copyValue: id,
+            onConfirm: () => {
+              setConfirmModal(null);
+            },
+          });
+        }}
         onEditSessionTitle={(id) => {
           setIsSkillsPanelOpen(false);
           navigate(`/chat/${id}`);
@@ -3845,6 +3859,22 @@ export function ChatSessions() {
                 }),
                 onConfirm: async () => {
                   await deleteSession.mutateAsync(activeSession.id);
+                },
+              });
+            }}
+            onViewSessionId={() => {
+              if (!activeSession) return;
+              setConfirmModal({
+                title: t('modals.confirm.titles.viewSessionId'),
+                message: t('modals.confirm.messages.viewSessionId', {
+                  id: activeSession.id,
+                }),
+                mode: 'alert',
+                tone: 'info',
+                confirmText: t('common:ok'),
+                copyValue: activeSession.id,
+                onConfirm: () => {
+                  setConfirmModal(null);
                 },
               });
             }}
@@ -4456,6 +4486,7 @@ export function ChatSessions() {
         tone={confirmModal?.tone}
         confirmText={confirmModal?.confirmText}
         cancelText={confirmModal?.cancelText}
+        copyValue={confirmModal?.copyValue}
         onConfirm={async () => {
           if (!confirmModal) return;
           setIsConfirmLoading(true);

@@ -1,6 +1,7 @@
 {
   "buttons": {
     "save": "Enregistrer",
+    "copy": "Copier",
     "cancel": "Annuler",
     "send": "Envoyer",
     "delete": "Supprimer",

@@ -6,6 +6,7 @@ import {
   DotsThreeIcon,
   FolderNotchOpenIcon,
   GitDiffIcon,
+  InfoIcon,
   MagnifyingGlassIcon,
   PencilSimpleIcon,
   TrashIcon,
@@ -44,6 +45,7 @@ export interface ChatHeaderProps {
   onCancelTitleEdit: () => void;
   // Session actions
   onDeleteSession: () => void;
+  onViewSessionId: () => void;
   onArchive: () => void;
   onRestore: () => void;
   isArchiving: boolean;
@@ -77,6 +79,7 @@ export function ChatHeader({
   onSaveTitle,
   onCancelTitleEdit,
   onDeleteSession,
+  onViewSessionId,
   onArchive,
   onRestore,
   isArchiving,
@@ -199,6 +202,13 @@ export function ChatHeader({
                             : t('header.cleanupMessages')}
                         </DropdownMenuItem>
                       )}
+                      <DropdownMenuItem
+                        icon={InfoIcon}
+                        className="chat-session-header-menu-item"
+                        onSelect={onViewSessionId}
+                      >
+                        {t('header.viewSessionId')}
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator className="chat-session-header-menu-separator" />
                       <DropdownMenuItem
                         icon={TrashIcon}

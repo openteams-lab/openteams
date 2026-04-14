@@ -39,6 +39,7 @@
     "archive": "アーカイブ",
     "restore": "復元",
     "cleanupMessages": "メッセージをクリーンアップ",
+    "viewSessionId": "セッションIDを表示",
     "delete": "セッションを削除"
   },
   "header": {
@@ -57,6 +58,7 @@
     "restoreSession": "セッションを復元",
     "cleanupMessages": "メッセージをクリーンアップ",
     "exitCleanupMode": "クリーンアップモードを終了",
+    "viewSessionId": "セッションIDを表示",
     "settings": "設定",
     "moreActions": "その他の操作",
     "generatedTitleBadge": "自動タイトル",
@@ -605,6 +607,7 @@
         "removeMember": "AIメンバーを削除",
         "deleteSession": "セッションを削除",
         "deleteMessages": "メッセージを削除",
+        "viewSessionId": "現在のセッションID",
         "duplicateMemberName": "メンバー名が重複しています"
       },
       "messages": {
@@ -612,6 +615,7 @@
         "removeMember": "@{{name}} をこのセッションから削除してもよろしいですか？",
         "deleteSession": "「{{title}}」を削除してもよろしいですか？この操作は元に戻せず、すべてのメッセージが完全に削除されます。",
         "deleteMessages": "{{count}} 件のメッセージを削除してもよろしいですか？この操作は元に戻せません。",
+        "viewSessionId": "現在のセッション ID:\n\"{{id}}\"",
         "duplicateMemberName": "このセッションには AI メンバー {{name}} が既に存在します。重複名は追加できません。"
       }
     },

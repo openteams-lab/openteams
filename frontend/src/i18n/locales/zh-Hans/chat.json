@@ -44,6 +44,7 @@
     "archive": "归档",
     "restore": "恢复",
     "cleanupMessages": "清理消息",
+    "viewSessionId": "查看会话ID",
     "delete": "删除会话"
   },
   "header": {
@@ -72,6 +73,7 @@
     "restoreSession": "恢复会话",
     "cleanupMessages": "清理消息",
     "exitCleanupMode": "退出清理模式",
+    "viewSessionId": "查看会话ID",
     "settings": "设置",
     "moreActions": "更多操作"
   },
@@ -610,6 +612,7 @@
         "removeMember": "移除 AI 成员",
         "deleteSession": "删除会话",
         "deleteMessages": "删除消息",
+        "viewSessionId": "当前会话ID",
         "duplicateMemberName": "成员名称不可重复"
       },
       "messages": {
@@ -617,6 +620,7 @@
         "removeMember": "确定要将 @{{name}} 从此会话中移除吗？",
         "deleteSession": "确定要删除“{{title}}”吗？此操作无法撤销，所有消息将被永久删除。",
         "deleteMessages": "确定要删除 {{count}} 条消息吗？此操作无法撤销。",
+        "viewSessionId": "当前会话 ID：\n\"{{id}}\"",
         "duplicateMemberName": "当前会话中已存在成员 {{name}}，不允许重复添加。"
       }
     },

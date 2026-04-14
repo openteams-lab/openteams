@@ -39,6 +39,7 @@
     "archive": "Archive",
     "restore": "Restore",
     "cleanupMessages": "Cleanup messages",
+    "viewSessionId": "View session ID",
     "delete": "Delete session"
   },
   "aiTeamPresets": {
@@ -72,6 +73,7 @@
     "restoreSession": "Restore session",
     "cleanupMessages": "Cleanup messages",
     "exitCleanupMode": "Exit cleanup mode",
+    "viewSessionId": "View session ID",
     "settings": "Settings",
     "moreActions": "More actions"
   },
@@ -610,6 +612,7 @@
         "removeMember": "Remove AI Member",
         "deleteSession": "Delete Session",
         "deleteMessages": "Delete Messages",
+        "viewSessionId": "Current Session ID",
         "duplicateMemberName": "Duplicate Member Name"
       },
       "messages": {
@@ -617,6 +620,7 @@
         "removeMember": "Are you sure you want to remove @{{name}} from this session?",
         "deleteSession": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone and all messages will be permanently deleted.",
         "deleteMessages": "Are you sure you want to delete {{count}} message(s)? This action cannot be undone.",
+        "viewSessionId": "Current session ID:\n\"{{id}}\"",
         "duplicateMemberName": "AI member {{name}} already exists in this session. Duplicate names are not allowed."
       }
     },

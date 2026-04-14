@@ -8,6 +8,7 @@ import {
   ChatCircleDotsIcon,
   FileArchiveIcon,
   GearSixIcon,
+  InfoIcon,
   ListIcon,
   MagnifyingGlassIcon,
   PencilSimpleIcon,
@@ -59,6 +60,7 @@ export interface SessionListSidebarProps {
   onArchiveSession: (sessionId: string) => void;
   onRestoreSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string, sessionTitle: string) => void;
+  onViewSessionId: (sessionId: string) => void;
   onEditSessionTitle: (sessionId: string) => void;
   onToggleCleanupMode: (sessionId: string) => void;
   isArchiving: boolean;
@@ -90,6 +92,7 @@ export function SessionListSidebar({
   onArchiveSession,
   onRestoreSession,
   onDeleteSession,
+  onViewSessionId,
   onEditSessionTitle,
   onToggleCleanupMode,
   isArchiving,
@@ -406,6 +409,16 @@ export function SessionListSidebar({
               {t('contextMenu.cleanupMessages')}
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem
+            icon={InfoIcon}
+            className="chat-session-header-menu-item"
+            onSelect={() => {
+              onViewSessionId(session.id);
+              closeContextMenu();
+            }}
+          >
+            {t('contextMenu.viewSessionId')}
+          </DropdownMenuItem>
           <DropdownMenuSeparator className="chat-session-header-menu-separator" />
           <DropdownMenuItem
             icon={TrashIcon}

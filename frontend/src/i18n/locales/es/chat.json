@@ -39,6 +39,7 @@
     "archive": "Archivar",
     "restore": "Restaurar",
     "cleanupMessages": "Limpiar mensajes",
+    "viewSessionId": "Ver ID de la sesión",
     "delete": "Eliminar sesión"
   },
   "header": {
@@ -57,6 +58,7 @@
     "restoreSession": "Restaurar sesión",
     "cleanupMessages": "Limpiar mensajes",
     "exitCleanupMode": "Salir del modo limpieza",
+    "viewSessionId": "Ver ID de la sesión",
     "settings": "Configuración",
     "moreActions": "Más acciones",
     "generatedTitleBadge": "T?tulo autom?tico",
@@ -605,6 +607,7 @@
         "removeMember": "Eliminar miembro de IA",
         "deleteSession": "Eliminar sesión",
         "deleteMessages": "Eliminar mensajes",
+        "viewSessionId": "ID de la sesión actual",
         "duplicateMemberName": "Nombre de miembro duplicado"
       },
       "messages": {
@@ -612,6 +615,7 @@
         "removeMember": "¿Seguro que quieres eliminar a @{{name}} de esta sesión?",
         "deleteSession": "¿Seguro que quieres eliminar \"{{title}}\"? Esta acción no se puede deshacer y todos los mensajes se eliminarán permanentemente.",
         "deleteMessages": "¿Seguro que quieres eliminar {{count}} mensaje(s)? Esta acción no se puede deshacer.",
+        "viewSessionId": "ID de la sesión actual:\n\"{{id}}\"",
         "duplicateMemberName": "El miembro de IA {{name}} ya existe en esta sesion. No se permiten nombres duplicados."
       }
     },
