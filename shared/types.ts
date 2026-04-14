@@ -284,7 +284,11 @@ export type SessionWorkspacesResponse = { workspaces: Array<SessionWorkspace>, }
 
 export type SessionWorkspaceChangesQuery = { path: string, include_diff: boolean | null, };
 
-export type WorkspaceChangedFile = { path: string, additions: number, deletions: number, unified_diff: string | null, has_diff: boolean, };
+export type WorkspaceChangedFile = { path: string, additions: number, deletions: number, unified_diff: string | null, 
+/**
+ * Whether a diff can be generated for this file (false for files in .gitignore'd directories).
+ */
+has_diff: boolean, };
 
 export type WorkspacePathEntry = { path: string, };
 
