@@ -44,6 +44,8 @@
 ---
 ## 🔥 *News:*
 ### *Major updates*
+- **2026.04.14 (v0.3.15)**
+  - Workspace File Change Viewer
 - **2026.04.06 (v0.3.12)**
   - Enable dark ui mode
   - fix openteams-cli concurrency issues

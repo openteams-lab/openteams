@@ -44,6 +44,8 @@
 ---
 ## 🔥 *Nouveautés :*
 ### *Mises à jour majeures*
+- **2026.04.14 (v0.3.15)**
+  - Visualiseur des modifications de fichiers de l'espace de travail
 - **2026.04.06 (v0.3.12)**
   - Activation du mode interface sombre
   - Correction des problèmes de concurrence d'openteams-cli

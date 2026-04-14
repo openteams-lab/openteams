@@ -1242,7 +1242,7 @@ impl ChatRunner {
         markdown.push_str("- Optional: `intent`\n\n");
         markdown.push_str("Rules:\n");
         markdown.push_str("- One message targets exactly one receiver.\n");
-        markdown.push_str("- `to` must match a member name in `group members`.\n");
+        markdown.push_str("- `to` must match a member name in `group members` or you.\n");
         markdown.push_str("- `content` cannot be empty and should stay within 1 to 5 sentences.\n");
         markdown.push_str(
             "- Recommended `intent` values: `request`, `reply`, `notify`, `blocker`, `confirm`\n\n",
