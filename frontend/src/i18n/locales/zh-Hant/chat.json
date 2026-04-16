@@ -594,7 +594,10 @@
     "failed": "失敗",
     "received": "已接收",
     "stop": "停止",
-    "stopping": "正在停止..."
+    "stopping": "正在停止...",
+    "queued": "排隊中",
+    "queuedCount": "{{count}} 則訊息排隊中",
+    "queuedCount_other": "{{count}} 則訊息排隊中"
   },
   "modals": {
     "confirm": {

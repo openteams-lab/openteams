@@ -67,7 +67,6 @@ use crate::services::{
     native_skills::{NativeSkillError, list_native_skills_for_runner},
 };
 
-const UNTRACKED_FILE_LIMIT: u64 = 1024 * 1024;
 const OPENTEAMS_HOME_DIR: &str = ".openteams";
 const OPENTEAMS_WORKSPACE_DIR: &str = ".openteams";
 const RUNS_DIR_NAME: &str = "runs";
@@ -107,6 +106,7 @@ const PERSISTED_LOG_TAIL_BYTES_FAILURE: u64 = 1024 * 1024;
 const RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE: u64 = 500 * 1024 * 1024;
 const RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE: u64 = 200 * 1024 * 1024;
 const _: () = assert!(RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE < RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE);
+const OPENTEAMS_GITIGNORE_ENTRY: &str = ".openteams/";
 const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
   {"type": "send", "to": "you", "intent": "request", "content": "I have finished the front implementation"},
   {"type": "send", "to": "architect", "intent": "confirm", "content": "The UI is ready. Please confirm the API contract before I continue."},
@@ -600,6 +600,54 @@ impl ChatRunner {
             self.analytics.as_ref(),
             self.analytics_enabled.load(Ordering::Relaxed),
         )
+    }
+
+    async fn ensure_openteams_ignored_for_git_workspace(
+        workspace_path: &Path,
+    ) -> Result<(), ChatRunnerError> {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(workspace_path)
+            .args(["rev-parse", "--show-toplevel"])
+            .output()
+            .await?;
+
+        if !output.status.success() {
+            return Ok(());
+        }
+
+        let repo_root = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if repo_root.is_empty() {
+            return Ok(());
+        }
+
+        let gitignore_path = PathBuf::from(repo_root).join(".gitignore");
+        let existing = match fs::read_to_string(&gitignore_path).await {
+            Ok(content) => content,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(err) => return Err(err.into()),
+        };
+
+        let already_present = existing.lines().map(str::trim).any(|line| {
+            matches!(
+                line,
+                ".openteams/" | "/.openteams/" | ".openteams" | "/.openteams"
+            )
+        });
+
+        if already_present {
+            return Ok(());
+        }
+
+        let mut updated = existing;
+        if !updated.is_empty() && !updated.ends_with('\n') {
+            updated.push('\n');
+        }
+        updated.push_str(OPENTEAMS_GITIGNORE_ENTRY);
+        updated.push('\n');
+
+        fs::write(&gitignore_path, updated).await?;
+        Ok(())
     }
 
     pub async fn recover_orphaned_session_agents(&self) -> Result<usize, ChatRunnerError> {
@@ -1210,6 +1258,15 @@ impl ChatRunner {
                 )
                 .await?;
             fs::create_dir_all(&workspace_path).await?;
+            if let Err(err) =
+                Self::ensure_openteams_ignored_for_git_workspace(Path::new(&workspace_path)).await
+            {
+                tracing::warn!(
+                    workspace_path = %workspace_path,
+                    error = %err,
+                    "Failed to ensure .openteams is gitignored for workspace"
+                );
+            }
             let tracked_diff_baseline =
                 Self::capture_tracked_git_diff_snapshot(PathBuf::from(&workspace_path).as_path())
                     .await;

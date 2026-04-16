@@ -110,6 +110,7 @@ import { FilePreviewModal } from './chat/components/FilePreviewModal';
 import { SkillsPanel } from './chat/components/SkillsPanel';
 import { AiTeamPresetsModal } from './chat/components/AiTeamPresetsModal';
 import { ChatSystemMessage } from '@/components/ui-new/primitives/conversation/ChatSystemMessage';
+
 import type { ChatProtocolNotice } from './chat/hooks/useChatWebSocket';
 
 const mentionStatusPriority: Record<MentionStatus, number> = {
@@ -683,7 +684,6 @@ export function ChatSessions() {
   // Messages state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [workItems, setWorkItems] = useState<ChatWorkItem[]>([]);
-
   const upsertMessage = useCallback(
     (message: ChatMessage) => {
       setMessages((prev) => {
@@ -848,8 +848,10 @@ export function ChatSessions() {
   // WebSocket connection
   const {
     streamingRuns,
+    streamingRunsBySession,
     agentStates,
     agentStateInfos,
+    runningAgentSessions,
     mentionStatuses,
     mentionErrors,
     compressionWarning,
@@ -858,6 +860,7 @@ export function ChatSessions() {
     setAgentStateInfos,
     setMentionStatuses,
     pruneStreamingRunsForSession,
+    clearRunningSession,
     clearCompressionWarning,
     dismissProtocolNotice,
   } = useChatWebSocket(
@@ -1449,59 +1452,6 @@ export function ChatSessions() {
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
   }, [runIdsWithSendMessages, sessionAgents, workItems]);
-  const timelineEntries = useMemo<TimelineEntry[]>(
-    () =>
-      [
-        ...messageList.map((message) => ({
-          kind: 'message' as const,
-          key: getMessageEntryKey(message.id),
-          createdAtMs: new Date(message.created_at).getTime(),
-          message,
-        })),
-        ...workItemGroups.map((group) => ({
-          kind: 'work_item' as const,
-          key: getWorkItemEntryKey(group.runId),
-          createdAtMs: new Date(group.createdAt).getTime(),
-          group,
-        })),
-      ].sort((a, b) => a.createdAtMs - b.createdAtMs),
-    [messageList, workItemGroups]
-  );
-  const latestWorkItemEntryKey =
-    workItemGroups.length > 0
-      ? getWorkItemEntryKey(workItemGroups[workItemGroups.length - 1].runId)
-      : null;
-  const lastTimelineEntryKey =
-    timelineEntries.length > 0
-      ? timelineEntries[timelineEntries.length - 1].key
-      : null;
-  const workItemGroupByKey = useMemo(
-    () =>
-      new Map(
-        workItemGroups.map((group) => [getWorkItemEntryKey(group.runId), group])
-      ),
-    [workItemGroups]
-  );
-  const selectedCleanupMessageIds = useMemo(() => {
-    const messageIds = new Set<string>();
-
-    for (const key of selectedTimelineEntryKeys) {
-      if (key.startsWith('message:')) {
-        messageIds.add(key.slice('message:'.length));
-        continue;
-      }
-
-      const group = workItemGroupByKey.get(key);
-      if (!group) continue;
-
-      for (const messageId of messageIdsByRunId.get(group.runId) ?? []) {
-        messageIds.add(messageId);
-      }
-    }
-
-    return Array.from(messageIds);
-  }, [messageIdsByRunId, selectedTimelineEntryKeys, workItemGroupByKey]);
-
   const messageById = useMemo(
     () => new Map(messageList.map((message) => [message.id, message])),
     [messageList]
@@ -1686,6 +1636,26 @@ export function ChatSessions() {
     [agentStates, effectiveAgentStateInfos]
   );
 
+  useEffect(() => {
+    if (!activeSessionId || sessionMembers.length === 0) return;
+    const hasRunning = sessionMembers.some((member) => {
+      const state =
+        effectiveAgentStates[member.agent.id] ?? member.sessionAgent.state;
+      return (
+        state === ChatSessionAgentState.running ||
+        state === ChatSessionAgentState.stopping
+      );
+    });
+    if (!hasRunning) {
+      clearRunningSession(activeSessionId);
+    }
+  }, [
+    activeSessionId,
+    sessionMembers,
+    effectiveAgentStates,
+    clearRunningSession,
+  ]);
+
   const placeholderAgents = useMemo(
     () =>
       sessionMembers.filter((member) => {
@@ -1699,6 +1669,102 @@ export function ChatSessions() {
       }),
     [effectiveAgentStates, sessionMembers, streamingRunAgentIds]
   );
+  const placeholderAgentIds = useMemo(
+    () => new Set(placeholderAgents.map((member) => member.agent.id)),
+    [placeholderAgents]
+  );
+
+  const queuedMessagesByAgentId = useMemo(() => {
+    const map = new Map<string, ChatMessage[]>();
+    if (placeholderAgentIds.size === 0) return map;
+
+    for (const message of messageList) {
+      if (message.sender_type !== ChatSenderType.user) continue;
+      const messageMentionStatuses = mentionStatuses.get(message.id);
+      if (!messageMentionStatuses) continue;
+
+      for (const [agentName, status] of messageMentionStatuses.entries()) {
+        if (status !== 'received') continue;
+
+        const agentId = agentIdByName.get(agentName);
+        if (!agentId || !placeholderAgentIds.has(agentId)) continue;
+
+        const existing = map.get(agentId);
+        if (existing) {
+          existing.push(message);
+          continue;
+        }
+        map.set(agentId, [message]);
+      }
+    }
+
+    return map;
+  }, [messageList, mentionStatuses, agentIdByName, placeholderAgentIds]);
+
+  const queuedMessageIds = useMemo(() => {
+    const next = new Set<string>();
+    for (const messages of queuedMessagesByAgentId.values()) {
+      for (const message of messages) {
+        next.add(message.id);
+      }
+    }
+    return next;
+  }, [queuedMessagesByAgentId]);
+
+  const timelineEntries = useMemo<TimelineEntry[]>(
+    () =>
+      [
+        ...messageList
+          .filter((message) => !queuedMessageIds.has(message.id))
+          .map((message) => ({
+            kind: 'message' as const,
+            key: getMessageEntryKey(message.id),
+            createdAtMs: new Date(message.created_at).getTime(),
+            message,
+          })),
+        ...workItemGroups.map((group) => ({
+          kind: 'work_item' as const,
+          key: getWorkItemEntryKey(group.runId),
+          createdAtMs: new Date(group.createdAt).getTime(),
+          group,
+        })),
+      ].sort((a, b) => a.createdAtMs - b.createdAtMs),
+    [messageList, workItemGroups, queuedMessageIds]
+  );
+  const latestWorkItemEntryKey =
+    workItemGroups.length > 0
+      ? getWorkItemEntryKey(workItemGroups[workItemGroups.length - 1].runId)
+      : null;
+  const lastTimelineEntryKey =
+    timelineEntries.length > 0
+      ? timelineEntries[timelineEntries.length - 1].key
+      : null;
+  const workItemGroupByKey = useMemo(
+    () =>
+      new Map(
+        workItemGroups.map((group) => [getWorkItemEntryKey(group.runId), group])
+      ),
+    [workItemGroups]
+  );
+  const selectedCleanupMessageIds = useMemo(() => {
+    const messageIds = new Set<string>();
+
+    for (const key of selectedTimelineEntryKeys) {
+      if (key.startsWith('message:')) {
+        messageIds.add(key.slice('message:'.length));
+        continue;
+      }
+
+      const group = workItemGroupByKey.get(key);
+      if (!group) continue;
+
+      for (const messageId of messageIdsByRunId.get(group.runId) ?? []) {
+        messageIds.add(messageId);
+      }
+    }
+
+    return Array.from(messageIds);
+  }, [messageIdsByRunId, selectedTimelineEntryKeys, workItemGroupByKey]);
 
   const activeWorkspaceAgent = workspaceAgentId
     ? agentById.get(workspaceAgentId)
@@ -1867,6 +1933,41 @@ export function ChatSessions() {
     visibleWorkItemsData,
     pruneStreamingRunsForSession,
     sessionMembers,
+  ]);
+
+  const runningSessionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const [sessionId, runs] of Object.entries(streamingRunsBySession)) {
+      for (const run of Object.values(runs)) {
+        if (!run.isFinal) {
+          ids.add(sessionId);
+          break;
+        }
+      }
+    }
+    if (activeSessionId) {
+      const hasRunningAgent = sessionMembers.some((member) => {
+        const state =
+          effectiveAgentStates[member.agent.id] ?? member.sessionAgent.state;
+        return (
+          state === ChatSessionAgentState.running ||
+          state === ChatSessionAgentState.stopping
+        );
+      });
+      if (hasRunningAgent) {
+        ids.add(activeSessionId);
+      }
+    }
+    for (const sessionId of runningAgentSessions.values()) {
+      ids.add(sessionId);
+    }
+    return ids;
+  }, [
+    streamingRunsBySession,
+    activeSessionId,
+    sessionMembers,
+    effectiveAgentStates,
+    runningAgentSessions,
   ]);
 
   // Check agent availability
@@ -3523,6 +3624,10 @@ export function ChatSessions() {
             setWorkspaceDrawerOpen(false);
             setWorkspaceAgentId(null);
           }
+          if (editingMember?.sessionAgent.id === sessionAgentId) {
+            setEditingMember(null);
+            setIsAddMemberOpen(false);
+          }
         } catch (error) {
           console.error('Failed to remove AI member:', error);
           setMemberError('Failed to remove AI member.');
@@ -3717,6 +3822,7 @@ export function ChatSessions() {
         archivedSessions={archivedSessions}
         activeSessionId={sidebarActiveSessionId}
         unreadSessionIds={unreadSessionIds}
+        runningSessionIds={runningSessionIds}
         showArchived={showArchived}
         onToggleArchived={() => setShowArchived((prev) => !prev)}
         onSelectSession={(id) => {
@@ -4205,6 +4311,10 @@ export function ChatSessions() {
                             ChatSessionAgentState.stopping
                         }
                         onStop={handleStopAgent}
+                        queuedMessages={queuedMessagesByAgentId.get(
+                          member.agent.id
+                        )}
+                        chatBubbleTextClassName={chatBubbleTextClassName}
                       />
                     ))}
 

@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   type ChatMessage,
   type ChatSessionAgent,
-  type ChatSessionAgentState,
+  ChatSessionAgentState,
   type ChatStreamEvent,
   type ChatWorkItem,
   type CompressionWarning,
@@ -248,8 +248,10 @@ function removeRunFromSession(
 
 export interface UseChatWebSocketResult {
   streamingRuns: Record<string, StreamRun>;
+  streamingRunsBySession: StreamingRunsBySession;
   agentStates: Record<string, ChatSessionAgentState>;
   agentStateInfos: Record<string, AgentStateInfo>;
+  runningAgentSessions: Map<string, string>;
   mentionStatuses: Map<string, Map<string, MentionStatus>>;
   mentionErrors: Map<string, Map<string, MentionError>>;
   compressionWarning: CompressionWarning | null;
@@ -268,6 +270,7 @@ export interface UseChatWebSocketResult {
     completedRunIds: Set<string>,
     runningAgentIds: Set<string>
   ) => void;
+  clearRunningSession: (sessionId: string) => void;
   clearCompressionWarning: () => void;
   dismissProtocolNotice: (noticeId: string) => void;
 }
@@ -285,6 +288,9 @@ export function useChatWebSocket(
   const [agentStateInfos, setAgentStateInfos] = useState<
     Record<string, AgentStateInfo>
   >({});
+  const [runningAgentSessions, setRunningAgentSessions] = useState<
+    Map<string, string>
+  >(new Map());
   const [mentionStatuses, setMentionStatuses] = useState<
     Map<string, Map<string, MentionStatus>>
   >(new Map());
@@ -403,6 +409,26 @@ export function useChatWebSocket(
     []
   );
 
+  const clearRunningSession = useCallback((sessionId: string) => {
+    setRunningAgentSessions((prev) => {
+      let changed = false;
+      for (const [, sid] of prev) {
+        if (sid === sessionId) {
+          changed = true;
+          break;
+        }
+      }
+      if (!changed) return prev;
+      const next = new Map(prev);
+      for (const [aid, sid] of prev) {
+        if (sid === sessionId) {
+          next.delete(aid);
+        }
+      }
+      return next;
+    });
+  }, []);
+
   const handleMessageNew = useCallback((message: ChatMessage) => {
     const metaWarning = extractCompressionWarningFromMeta(message.meta);
     if (metaWarning) {
@@ -490,6 +516,26 @@ export function useChatWebSocket(
           startedAt: payload.started_at ?? null,
         },
       }));
+
+      const isRunning =
+        payload.state === ChatSessionAgentState.running ||
+        payload.state === ChatSessionAgentState.stopping;
+
+      if (isRunning && activeSessionId) {
+        setRunningAgentSessions((prev) => {
+          if (prev.get(payload.agent_id) === activeSessionId) return prev;
+          const next = new Map(prev);
+          next.set(payload.agent_id, activeSessionId);
+          return next;
+        });
+      } else {
+        setRunningAgentSessions((prev) => {
+          if (!prev.has(payload.agent_id)) return prev;
+          const next = new Map(prev);
+          next.delete(payload.agent_id);
+          return next;
+        });
+      }
 
       if (!activeSessionId) return;
       queryClient.setQueryData<ChatSessionAgent[]>(
@@ -610,7 +656,6 @@ export function useChatWebSocket(
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as ChatStreamPayload;
-          console.debug('payload -- ' + JSON.stringify(payload));
           if (payload.type === 'mention_acknowledged') {
             handleMentionAcknowledged(payload);
             return;
@@ -701,8 +746,10 @@ export function useChatWebSocket(
 
   return {
     streamingRuns,
+    streamingRunsBySession,
     agentStates,
     agentStateInfos,
+    runningAgentSessions,
     mentionStatuses,
     mentionErrors,
     compressionWarning,
@@ -711,6 +758,7 @@ export function useChatWebSocket(
     setAgentStateInfos,
     setMentionStatuses,
     pruneStreamingRunsForSession,
+    clearRunningSession,
     clearCompressionWarning,
     dismissProtocolNotice,
   };

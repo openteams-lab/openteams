@@ -1317,7 +1317,10 @@ async fn capture_untracked_files_allows_user_openteams_files_but_skips_runtime_a
         .await
         .expect("create run dir");
 
-    let files = ChatRunner::capture_untracked_files(&repo_path, &run_dir, Uuid::new_v4(), 1).await;
+    let session_agent_id = Uuid::new_v4();
+
+    let files =
+        ChatRunner::capture_untracked_files(&repo_path, &run_dir, session_agent_id, 1).await;
 
     assert!(files.iter().any(|path| path == "binaries/test.txt"));
     assert!(files.iter().any(|path| path == ".openteams/test.txt"));
@@ -1336,6 +1339,36 @@ async fn capture_untracked_files_allows_user_openteams_files_but_skips_runtime_a
             .iter()
             .any(|path| path == ".openteams/context/demo/attachments/message-1/input.txt")
     );
+    assert!(
+        !run_dir
+            .join(format!(
+                "{}_untracked",
+                ChatRunner::run_records_prefix(session_agent_id, 1)
+            ))
+            .exists()
+    );
+}
+
+#[tokio::test]
+async fn ensure_openteams_ignored_for_git_workspace_appends_entry_once() {
+    let tempdir = tempfile::tempdir().expect("create tempdir");
+    let repo_path = tempdir.path().join("repo");
+    git2::Repository::init(&repo_path).expect("init repo");
+
+    std::fs::write(repo_path.join(".gitignore"), "target/\n").expect("write gitignore");
+    let nested_workspace = repo_path.join("nested").join("workspace");
+    std::fs::create_dir_all(&nested_workspace).expect("create nested workspace");
+
+    ChatRunner::ensure_openteams_ignored_for_git_workspace(&nested_workspace)
+        .await
+        .expect("inject gitignore rule");
+    ChatRunner::ensure_openteams_ignored_for_git_workspace(&nested_workspace)
+        .await
+        .expect("avoid duplicate gitignore rule");
+
+    let gitignore = std::fs::read_to_string(repo_path.join(".gitignore")).expect("read gitignore");
+    assert_eq!(gitignore.matches(".openteams/").count(), 1);
+    assert!(gitignore.contains("target/\n.openteams/\n"));
 }
 
 #[tokio::test]

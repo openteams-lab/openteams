@@ -594,7 +594,10 @@
     "failed": "Fallido",
     "received": "Recibido",
     "stop": "Detener",
-    "stopping": "Deteniendo..."
+    "stopping": "Deteniendo...",
+    "queued": "En cola",
+    "queuedCount": "{{count}} mensaje(s) en cola",
+    "queuedCount_other": "{{count}} mensajes en cola"
   },
   "modals": {
     "confirm": {

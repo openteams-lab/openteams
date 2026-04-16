@@ -27,6 +27,8 @@ use utils::{path::ALWAYS_SKIP_DIRS, shell::resolve_executable_path_blocking};
 
 use super::Commit;
 
+const GIT_ONLY_SKIP_DIRS: &[&str] = &[".openteams"];
+
 #[derive(Debug, Error)]
 pub enum GitCliError {
     #[error("git executable not found or not runnable")]
@@ -904,8 +906,44 @@ impl GitCli {
     fn get_default_pathspec_excludes() -> Vec<OsString> {
         ALWAYS_SKIP_DIRS
             .iter()
+            .chain(GIT_ONLY_SKIP_DIRS.iter())
             .map(|d| OsString::from(format!(":(glob,exclude)**/{d}/")))
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::GitCli;
+
+    #[test]
+    fn get_worktree_status_skips_openteams_runtime_dir() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let repo_path = tempdir.path().join("repo");
+        git2::Repository::init(&repo_path).expect("init repo");
+
+        fs::create_dir_all(repo_path.join(".openteams").join("runs")).expect("create runs dir");
+        fs::write(
+            repo_path.join(".openteams").join("runs").join("temp.txt"),
+            "runtime\n",
+        )
+        .expect("write runtime file");
+        fs::write(repo_path.join("notes.txt"), "user\n").expect("write user file");
+
+        let status = GitCli::new()
+            .get_worktree_status(&repo_path)
+            .expect("read worktree status");
+
+        let paths = status
+            .entries
+            .into_iter()
+            .map(|entry| String::from_utf8_lossy(&entry.path).to_string())
+            .collect::<Vec<_>>();
+
+        assert!(paths.contains(&"notes.txt".to_string()));
+        assert!(!paths.iter().any(|path| path.starts_with(".openteams/")));
     }
 }
 /// Parsed entry from `git status --porcelain`

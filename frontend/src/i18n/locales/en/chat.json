@@ -599,7 +599,10 @@
     "failed": "Failed",
     "received": "Received",
     "stop": "Stop",
-    "stopping": "Stopping..."
+    "stopping": "Stopping...",
+    "queued": "Queued",
+    "queuedCount": "{{count}} message queued",
+    "queuedCount_other": "{{count}} messages queued"
   },
   "modals": {
     "confirm": {

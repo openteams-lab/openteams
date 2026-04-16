@@ -23,14 +23,12 @@ import {
 import { Instance } from "../project/instance"
 import { LSPServer } from "../lsp/server"
 import { BunProc } from "@/bun"
-import { Installation } from "@/installation"
 import { ConfigMarkdown } from "./markdown"
 import { constants, existsSync } from "fs"
 import { Bus } from "@/bus"
 import { GlobalBus } from "@/bus/global"
 import { Event } from "../server/event"
 import { Glob } from "../util/glob"
-import { PackageRegistry } from "@/bun/registry"
 import { proxied } from "@/util/proxied"
 import { iife } from "@/util/iife"
 import { Account } from "@/account"
@@ -272,23 +270,16 @@ export namespace Config {
 
   export async function installDependencies(dir: string) {
     const pkg = path.join(dir, "package.json")
-    const targetVersion = Installation.isLocal() ? "*" : Installation.VERSION
 
-    const json = await Filesystem.readJson<{ dependencies?: Record<string, string> }>(pkg).catch(() => ({
-      dependencies: {},
-    }))
-    json.dependencies = {
-      ...json.dependencies,
-      "@openteams/plugin": targetVersion,
-    }
-    await Filesystem.writeJson(pkg, json)
+    // Only install if user has defined their own package.json with dependencies
+    const pkgExists = await Filesystem.exists(pkg)
+    if (!pkgExists) return
 
-    const gitignore = path.join(dir, ".gitignore")
-    const hasGitIgnore = await Filesystem.exists(gitignore)
-    if (!hasGitIgnore)
-      await Filesystem.write(gitignore, ["node_modules", "package.json", "bun.lock", ".gitignore"].join("\n"))
+    const parsed = await Filesystem.readJson<{ dependencies?: Record<string, string> }>(pkg).catch(() => null)
+    const dependencies = parsed?.dependencies ?? {}
+    if (Object.keys(dependencies).length === 0) return
 
-    // Install any additional dependencies defined in the package.json
+    // Install user-defined dependencies in the config directory
     // This allows local plugins and custom tools to use external packages
     using _ = await Lock.write("bun-install")
     await BunProc.run(
@@ -341,30 +332,18 @@ export namespace Config {
       return false
     }
 
-    const nodeModules = path.join(dir, "node_modules")
-    if (!existsSync(nodeModules)) return true
-
     const pkg = path.join(dir, "package.json")
     const pkgExists = await Filesystem.exists(pkg)
-    if (!pkgExists) return true
+    if (!pkgExists) return false
 
     const parsed = await Filesystem.readJson<{ dependencies?: Record<string, string> }>(pkg).catch(() => null)
     const dependencies = parsed?.dependencies ?? {}
-    const depVersion = dependencies["@openteams/plugin"]
-    if (!depVersion) return true
+    if (Object.keys(dependencies).length === 0) return false
 
-    const targetVersion = Installation.isLocal() ? "latest" : Installation.VERSION
-    if (targetVersion === "latest") {
-      const isOutdated = await PackageRegistry.isOutdated("@openteams/plugin", depVersion, dir)
-      if (!isOutdated) return false
-      log.info("Cached version is outdated, proceeding with install", {
-        pkg: "@openteams/plugin",
-        cachedVersion: depVersion,
-      })
-      return true
-    }
-    if (depVersion === targetVersion) return false
-    return true
+    const nodeModules = path.join(dir, "node_modules")
+    if (!existsSync(nodeModules)) return true
+
+    return false
   }
 
   function rel(item: string, patterns: string[]) {
