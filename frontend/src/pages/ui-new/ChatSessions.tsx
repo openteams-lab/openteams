@@ -1649,7 +1649,12 @@ export function ChatSessions() {
     if (!hasRunning) {
       clearRunningSession(activeSessionId);
     }
-  }, [activeSessionId, sessionMembers, effectiveAgentStates, clearRunningSession]);
+  }, [
+    activeSessionId,
+    sessionMembers,
+    effectiveAgentStates,
+    clearRunningSession,
+  ]);
 
   const placeholderAgents = useMemo(
     () =>
@@ -1957,7 +1962,13 @@ export function ChatSessions() {
       ids.add(sessionId);
     }
     return ids;
-  }, [streamingRunsBySession, activeSessionId, sessionMembers, effectiveAgentStates, runningAgentSessions]);
+  }, [
+    streamingRunsBySession,
+    activeSessionId,
+    sessionMembers,
+    effectiveAgentStates,
+    runningAgentSessions,
+  ]);
 
   // Check agent availability
   useEffect(() => {
@@ -4300,7 +4311,9 @@ export function ChatSessions() {
                             ChatSessionAgentState.stopping
                         }
                         onStop={handleStopAgent}
-                        queuedMessages={queuedMessagesByAgentId.get(member.agent.id)}
+                        queuedMessages={queuedMessagesByAgentId.get(
+                          member.agent.id
+                        )}
                         chatBubbleTextClassName={chatBubbleTextClassName}
                       />
                     ))}

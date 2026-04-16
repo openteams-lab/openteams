@@ -353,13 +353,18 @@ export function SessionListSidebar({
                       {displayTitle}
                     </div>
                     {isRunning ? (
-                      <span className="chat-session-running-dots" aria-hidden="true">
+                      <span
+                        className="chat-session-running-dots"
+                        aria-hidden="true"
+                      >
                         <span />
                         <span />
                         <span />
                       </span>
                     ) : (
-                      <span className="chat-session-item-time">{timeLabel}</span>
+                      <span className="chat-session-item-time">
+                        {timeLabel}
+                      </span>
                     )}
                   </div>
                   {summaryPreview.length > 0 && (

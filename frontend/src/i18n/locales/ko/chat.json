@@ -596,7 +596,8 @@
     "stop": "중지",
     "stopping": "중지 중...",
     "queued": "대기 중",
-    "queuedCount": "{{count}}개 메시지 대기 중"
+    "queuedCount": "{{count}}개 메시지 대기 중",
+    "queuedCount_other": "{{count}}개 메시지 대기 중"
   },
   "modals": {
     "confirm": {

@@ -596,7 +596,8 @@
     "stop": "Arrêter",
     "stopping": "Arrêt en cours...",
     "queued": "En attente",
-    "queuedCount": "{{count}} message(s) en attente"
+    "queuedCount": "{{count}} message(s) en attente",
+    "queuedCount_other": "{{count}} messages en attente"
   },
   "modals": {
     "confirm": {

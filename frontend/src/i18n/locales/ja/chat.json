@@ -596,7 +596,8 @@
     "stop": "停止",
     "stopping": "停止中...",
     "queued": "待機中",
-    "queuedCount": "{{count}}件のメッセージが待機中"
+    "queuedCount": "{{count}}件のメッセージが待機中",
+    "queuedCount_other": "{{count}}件のメッセージが待機中"
   },
   "modals": {
     "confirm": {
