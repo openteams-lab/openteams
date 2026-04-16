@@ -746,12 +746,12 @@
     0%,
     100% {
       transform: scale(1);
-      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.24);
+      box-shadow: 0 0 0 0 rgba(110, 231, 183, 0.24);
     }
 
     50% {
       transform: scale(1.16);
-      box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+      box-shadow: 0 0 0 6px rgba(110, 231, 183, 0);
     }
   }
 
@@ -761,6 +761,48 @@
 
   .new-design .chat-session-status-breathe {
     animation: chat-session-breathe 1.8s ease-in-out infinite;
+  }
+
+  @keyframes chat-session-running-dot-bounce {
+    0%,
+    80%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.3;
+    }
+    40% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
+  }
+
+  .new-design .chat-session-running-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+    height: 16px;
+  }
+
+  .new-design .chat-session-running-dots span {
+    display: block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: #10b981;
+    animation: chat-session-running-dot-bounce 1.4s ease-in-out infinite;
+  }
+
+  .new-design .chat-session-running-dots span:nth-child(1) {
+    animation-delay: 0s;
+  }
+
+  .new-design .chat-session-running-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .new-design .chat-session-running-dots span:nth-child(3) {
+    animation-delay: 0.4s;
   }
 
   .new-design .chat-session-member-card {

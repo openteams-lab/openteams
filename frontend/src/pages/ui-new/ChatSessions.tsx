@@ -848,8 +848,10 @@ export function ChatSessions() {
   // WebSocket connection
   const {
     streamingRuns,
+    streamingRunsBySession,
     agentStates,
     agentStateInfos,
+    runningAgentSessions,
     mentionStatuses,
     mentionErrors,
     compressionWarning,
@@ -858,6 +860,7 @@ export function ChatSessions() {
     setAgentStateInfos,
     setMentionStatuses,
     pruneStreamingRunsForSession,
+    clearRunningSession,
     clearCompressionWarning,
     dismissProtocolNotice,
   } = useChatWebSocket(
@@ -1686,6 +1689,21 @@ export function ChatSessions() {
     [agentStates, effectiveAgentStateInfos]
   );
 
+  useEffect(() => {
+    if (!activeSessionId || sessionMembers.length === 0) return;
+    const hasRunning = sessionMembers.some((member) => {
+      const state =
+        effectiveAgentStates[member.agent.id] ?? member.sessionAgent.state;
+      return (
+        state === ChatSessionAgentState.running ||
+        state === ChatSessionAgentState.stopping
+      );
+    });
+    if (!hasRunning) {
+      clearRunningSession(activeSessionId);
+    }
+  }, [activeSessionId, sessionMembers, effectiveAgentStates, clearRunningSession]);
+
   const placeholderAgents = useMemo(
     () =>
       sessionMembers.filter((member) => {
@@ -1868,6 +1886,35 @@ export function ChatSessions() {
     pruneStreamingRunsForSession,
     sessionMembers,
   ]);
+
+  const runningSessionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const [sessionId, runs] of Object.entries(streamingRunsBySession)) {
+      for (const run of Object.values(runs)) {
+        if (!run.isFinal) {
+          ids.add(sessionId);
+          break;
+        }
+      }
+    }
+    if (activeSessionId) {
+      const hasRunningAgent = sessionMembers.some((member) => {
+        const state =
+          effectiveAgentStates[member.agent.id] ?? member.sessionAgent.state;
+        return (
+          state === ChatSessionAgentState.running ||
+          state === ChatSessionAgentState.stopping
+        );
+      });
+      if (hasRunningAgent) {
+        ids.add(activeSessionId);
+      }
+    }
+    for (const sessionId of runningAgentSessions.values()) {
+      ids.add(sessionId);
+    }
+    return ids;
+  }, [streamingRunsBySession, activeSessionId, sessionMembers, effectiveAgentStates, runningAgentSessions]);
 
   // Check agent availability
   useEffect(() => {
@@ -3523,6 +3570,10 @@ export function ChatSessions() {
             setWorkspaceDrawerOpen(false);
             setWorkspaceAgentId(null);
           }
+          if (editingMember?.sessionAgent.id === sessionAgentId) {
+            setEditingMember(null);
+            setIsAddMemberOpen(false);
+          }
         } catch (error) {
           console.error('Failed to remove AI member:', error);
           setMemberError('Failed to remove AI member.');
@@ -3717,6 +3768,7 @@ export function ChatSessions() {
         archivedSessions={archivedSessions}
         activeSessionId={sidebarActiveSessionId}
         unreadSessionIds={unreadSessionIds}
+        runningSessionIds={runningSessionIds}
         showArchived={showArchived}
         onToggleArchived={() => setShowArchived((prev) => !prev)}
         onSelectSession={(id) => {

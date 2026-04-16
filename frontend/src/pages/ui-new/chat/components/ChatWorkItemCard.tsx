@@ -19,98 +19,17 @@ import { cn } from '@/lib/utils';
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
 import { chatApi } from '@/lib/api';
 import { formatDateShortWithTime } from '@/utils/date';
-import { resolveLocalPathToAbsolutePath } from '@/utils/readOnlyLinks';
 import {
   AgentBrandIcon,
   getAgentAvatarSeed,
   getAgentAvatarStyle,
 } from '../AgentAvatar';
+import {
+  extractArtifactPaths,
+  type ExtractedArtifactPath,
+} from '../artifactPaths';
 import { getRelativeWorkspaceFilePath } from '../utils';
 import type { ChatWorkItemGroup } from '../types';
-
-const ARTIFACT_FILE_PATH_RE =
-  /(^|[\s([{"'])(?<path>(?:[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\){2,}[^\\\r\n<>:"|?*\s`"')\]}.,:;!?]+|[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\)*[^\\\r\n<>:"|?*]+\.[a-zA-Z0-9]{1,16}|\/(?:[^/\r\n]+\/){2,}[^/\r\n\s`"')\]}.,:;!?]+|\/(?:[^/\r\n]+\/)*[^/\r\n]+\.[a-zA-Z0-9]{1,16}|(?:\.{1,2}[\\/])?(?:[^\\/\r\n\s`"')\]}.,:;!?]+[\\/])*[^\\/\r\n\s`"')\]}.,:;!?]+\.[a-zA-Z0-9]{1,16}))/g;
-const DOT_PREFIXED_ARTIFACT_FILE_PATH_RE =
-  /(^|[\s([{"'])(?<path>\.[^\\/\r\n\s`"')\]}:;!?]+(?:[\\/][^\\/\r\n\s`"')\]}:;!?]+)*[\\/][^\\/\r\n\s`"')\]}:;!?]+\.[a-zA-Z0-9]{1,16})/g;
-
-type ExtractedArtifactPath = {
-  rawPath: string;
-  absolutePath: string;
-};
-
-function normalizeArtifactPathCandidate(value: string): string {
-  return value.trim().replace(/[.,:;!?]+$/g, '');
-}
-
-function isArtifactPathCandidate(value: string): boolean {
-  const trimmed = normalizeArtifactPathCandidate(value);
-  if (!trimmed) return false;
-
-  if (
-    /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed) &&
-    !/^[a-zA-Z]:[\\/]/.test(trimmed) &&
-    !trimmed.startsWith('file://')
-  ) {
-    return false;
-  }
-
-  ARTIFACT_FILE_PATH_RE.lastIndex = 0;
-  DOT_PREFIXED_ARTIFACT_FILE_PATH_RE.lastIndex = 0;
-  return (
-    ARTIFACT_FILE_PATH_RE.test(` ${trimmed}`) ||
-    DOT_PREFIXED_ARTIFACT_FILE_PATH_RE.test(` ${trimmed}`)
-  );
-}
-
-function extractArtifactPaths(
-  content: string,
-  workspacePath: string | undefined
-): ExtractedArtifactPath[] {
-  if (!workspacePath) {
-    return [];
-  }
-
-  const paths = new Map<string, ExtractedArtifactPath>();
-  const addPath = (rawPath: string) => {
-    const normalizedRawPath = normalizeArtifactPathCandidate(rawPath);
-    if (!isArtifactPathCandidate(normalizedRawPath)) {
-      return;
-    }
-
-    const absolutePath = resolveLocalPathToAbsolutePath(
-      normalizedRawPath,
-      workspacePath
-    );
-    if (!absolutePath) {
-      return;
-    }
-
-    if (!paths.has(absolutePath)) {
-      paths.set(absolutePath, {
-        rawPath: normalizedRawPath,
-        absolutePath,
-      });
-    }
-  };
-
-  for (const match of content.matchAll(/\[[^\]]+\]\(([^)\s]+)\)/g)) {
-    addPath(match[1] ?? '');
-  }
-
-  for (const match of content.matchAll(/`([^`]+)`/g)) {
-    addPath(match[1] ?? '');
-  }
-
-  for (const match of content.matchAll(ARTIFACT_FILE_PATH_RE)) {
-    addPath(match.groups?.path ?? '');
-  }
-
-  for (const match of content.matchAll(DOT_PREFIXED_ARTIFACT_FILE_PATH_RE)) {
-    addPath(match.groups?.path ?? '');
-  }
-
-  return Array.from(paths.values());
-}
 
 function normalizeComparablePath(path: string): string {
   return path

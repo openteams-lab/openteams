@@ -40,6 +40,7 @@ export interface SessionListSidebarProps {
   archivedSessions: ChatSession[];
   activeSessionId: string | null;
   unreadSessionIds: Set<string>;
+  runningSessionIds: Set<string>;
   showArchived: boolean;
   onToggleArchived: () => void;
   onSelectSession: (sessionId: string) => void;
@@ -72,6 +73,7 @@ export function SessionListSidebar({
   archivedSessions,
   activeSessionId,
   unreadSessionIds,
+  runningSessionIds,
   showArchived,
   onToggleArchived,
   onSelectSession,
@@ -299,6 +301,7 @@ export function SessionListSidebar({
   const renderSessionItem = (session: ChatSession) => {
     const isActive = session.id === activeSessionId;
     const hasUnread = !isActive && unreadSessionIds.has(session.id);
+    const isRunning = runningSessionIds.has(session.id);
     const isArchived = session.status === ChatSessionStatus.archived;
     const { fullTitle, displayTitle } = getDisplaySessionTitle(session);
     const summaryPreview = session.summary_text?.trim() ?? '';
@@ -349,7 +352,15 @@ export function SessionListSidebar({
                     >
                       {displayTitle}
                     </div>
-                    <span className="chat-session-item-time">{timeLabel}</span>
+                    {isRunning ? (
+                      <span className="chat-session-running-dots" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    ) : (
+                      <span className="chat-session-item-time">{timeLabel}</span>
+                    )}
                   </div>
                   {summaryPreview.length > 0 && (
                     <div

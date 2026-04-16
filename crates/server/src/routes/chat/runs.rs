@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path as StdPath, PathBuf};
 
 use axum::{
     Extension,
@@ -224,6 +224,45 @@ pub struct UntrackedFileQuery {
     path: String,
 }
 
+fn run_untracked_candidate_paths(run: &ChatRun, rel_path: &StdPath) -> Vec<PathBuf> {
+    let run_dir = PathBuf::from(&run.run_dir);
+    let mut candidates = vec![
+        run_dir
+            .join(format!(
+                "session_agent_{}_run_{:04}_untracked",
+                run.session_agent_id, run.run_index
+            ))
+            .join(rel_path),
+        run_dir
+            .join(format!("run_{:04}_untracked", run.run_index))
+            .join(rel_path),
+        run_dir.join("untracked").join(rel_path),
+    ];
+
+    if let Some(workspace_path) = run.workspace_path.as_deref() {
+        candidates.push(PathBuf::from(workspace_path).join(rel_path));
+    }
+
+    candidates
+}
+
+async fn read_run_untracked_file_content(
+    run: &ChatRun,
+    rel_path: &StdPath,
+) -> Result<String, ApiError> {
+    for candidate in run_untracked_candidate_paths(run, rel_path) {
+        match tokio::fs::read_to_string(&candidate).await {
+            Ok(content) => return Ok(content),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(_) => continue,
+        }
+    }
+
+    Err(ApiError::BadRequest(
+        "Untracked file content not found".to_string(),
+    ))
+}
+
 pub async fn get_run_untracked_file(
     State(deployment): State<DeploymentImpl>,
     Path(run_id): Path<Uuid>,
@@ -242,34 +281,65 @@ pub async fn get_run_untracked_file(
         return Err(ApiError::BadRequest("Invalid untracked path".to_string()));
     }
 
-    let scoped_untracked_dir = PathBuf::from(&run.run_dir).join(format!(
-        "session_agent_{}_run_{:04}_untracked",
-        run.session_agent_id, run.run_index
-    ));
-    let prefixed_untracked_dir =
-        PathBuf::from(&run.run_dir).join(format!("run_{:04}_untracked", run.run_index));
-    let legacy_untracked_dir = PathBuf::from(&run.run_dir).join("untracked");
-    let scoped_path = scoped_untracked_dir.join(&rel_path);
-    let content = match tokio::fs::read_to_string(&scoped_path).await {
-        Ok(content) => content,
-        Err(_) => {
-            let prefixed_path = prefixed_untracked_dir.join(&rel_path);
-            match tokio::fs::read_to_string(&prefixed_path).await {
-                Ok(content) => content,
-                Err(_) => {
-                    let legacy_path = legacy_untracked_dir.join(rel_path);
-                    match tokio::fs::read_to_string(&legacy_path).await {
-                        Ok(content) => content,
-                        Err(_) => {
-                            return Err(ApiError::BadRequest(
-                                "Untracked file content not found".to_string(),
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-    };
+    let content = read_run_untracked_file_content(&run, &rel_path).await?;
 
     Ok(([(CONTENT_TYPE, "text/plain; charset=utf-8")], content).into_response())
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+    use db::models::chat_run::ChatRunArtifactState;
+    use uuid::Uuid;
+
+    use super::*;
+
+    fn test_run(run_dir: &StdPath, workspace_path: Option<&StdPath>) -> ChatRun {
+        ChatRun {
+            id: Uuid::new_v4(),
+            session_id: Uuid::new_v4(),
+            session_agent_id: Uuid::new_v4(),
+            workspace_path: workspace_path.map(|path| path.to_string_lossy().to_string()),
+            run_index: 2,
+            run_dir: run_dir.to_string_lossy().to_string(),
+            input_path: None,
+            output_path: None,
+            raw_log_path: None,
+            meta_path: None,
+            log_state: ChatRunLogState::Live,
+            artifact_state: ChatRunArtifactState::Full,
+            log_truncated: false,
+            log_capture_degraded: false,
+            pruned_at: None,
+            prune_reason: None,
+            retention_summary_json: None,
+            created_at: Utc::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn read_run_untracked_file_content_falls_back_to_workspace_file() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let run_dir = tempdir.path().join("run-record");
+        let workspace_path = tempdir.path().join("workspace");
+        tokio::fs::create_dir_all(&run_dir)
+            .await
+            .expect("create run dir");
+        tokio::fs::create_dir_all(workspace_path.join("docs"))
+            .await
+            .expect("create workspace dir");
+        tokio::fs::write(
+            workspace_path.join("docs").join("note.md"),
+            "live content\n",
+        )
+        .await
+        .expect("write workspace file");
+
+        let run = test_run(&run_dir, Some(&workspace_path));
+        let content = read_run_untracked_file_content(&run, StdPath::new("docs/note.md"))
+            .await
+            .expect("read fallback content");
+
+        assert_eq!(content, "live content\n");
+    }
 }

@@ -404,23 +404,34 @@ pub async fn resend_message(
     State(deployment): State<DeploymentImpl>,
     Path((_session_id, message_id)): Path<(Uuid, Uuid)>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
-    let message = ChatMessage::find_by_id(&deployment.db().pool, message_id)
+    let original = ChatMessage::find_by_id(&deployment.db().pool, message_id)
         .await?
         .ok_or(ApiError::Database(sqlx::Error::RowNotFound))?;
 
-    if message.session_id != session.id {
+    if original.session_id != session.id {
         return Err(ApiError::Database(sqlx::Error::RowNotFound));
     }
 
-    if message.sender_type != ChatSenderType::User {
+    if original.sender_type != ChatSenderType::User {
         return Err(ApiError::BadRequest(
             "Only user messages can be resent.".to_string(),
         ));
     }
 
+    let new_message = services::services::chat::create_message(
+        &deployment.db().pool,
+        session.id,
+        original.sender_type,
+        original.sender_id,
+        original.content.clone(),
+        Some(original.meta.0.clone()),
+    )
+    .await
+    .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
     deployment
         .chat_runner()
-        .handle_message(&session, &message)
+        .handle_message(&session, &new_message)
         .await;
 
     Ok(ResponseJson(ApiResponse::success(())))
