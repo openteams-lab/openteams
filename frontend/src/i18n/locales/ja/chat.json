@@ -594,7 +594,9 @@
     "failed": "失敗",
     "received": "受信済み",
     "stop": "停止",
-    "stopping": "停止中..."
+    "stopping": "停止中...",
+    "queued": "待機中",
+    "queuedCount": "{{count}}件のメッセージが待機中"
   },
   "modals": {
     "confirm": {

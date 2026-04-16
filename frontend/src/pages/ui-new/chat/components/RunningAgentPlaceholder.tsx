@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { CaretDownIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import type { ChatMessage } from 'shared/types';
 import { ChatEntryContainer } from '@/components/ui-new/primitives/conversation/ChatEntryContainer';
 import { ChatErrorMessage } from '@/components/ui-new/primitives/conversation/ChatErrorMessage';
+import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
 import {
   AgentBrandIcon,
   getAgentAvatarSeed,
@@ -24,6 +26,8 @@ export interface RunningAgentPlaceholderProps {
   clock: number;
   isStopping: boolean;
   onStop: (sessionAgentId: string, agentId: string) => void;
+  queuedMessages?: ChatMessage[];
+  chatBubbleTextClassName?: string;
 }
 
 export function RunningAgentPlaceholder({
@@ -33,6 +37,8 @@ export function RunningAgentPlaceholder({
   clock,
   isStopping,
   onStop,
+  queuedMessages,
+  chatBubbleTextClassName,
 }: RunningAgentPlaceholderProps) {
   const { t } = useTranslation('chat');
   const [thinkingExpanded, setThinkingExpanded] = useState(true);
@@ -61,6 +67,7 @@ export function RunningAgentPlaceholder({
     .join('\n\n');
   const hasThinking = displayUnifiedContent.length > 0;
   const hasError = (run?.errorContent ?? '').trim().length > 0;
+  const hasQueued = (queuedMessages?.length ?? 0) > 0;
 
   return (
     <div className="chat-session-message-row is-agent flex justify-start">
@@ -162,6 +169,43 @@ export function RunningAgentPlaceholder({
                     tone="error"
                   />
                 </div>
+              </div>
+            )}
+
+            {hasQueued && (
+              <div className="chat-session-queued-messages">
+                <div className="chat-session-queued-messages-divider">
+                  <span className="chat-session-queued-messages-divider-text">
+                    {t('agent.queuedCount', {
+                      count: queuedMessages!.length,
+                      defaultValue:
+                        queuedMessages!.length === 1
+                          ? '1 message queued'
+                          : '{{count}} messages queued',
+                    })}
+                  </span>
+                </div>
+                {queuedMessages!.map((message, index) => (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      'chat-session-queued-message-item',
+                      index > 0 && 'mt-2'
+                    )}
+                  >
+                    <div className="flex items-center gap-half mb-1">
+                      <span className="chat-session-queued-badge">
+                        {t('agent.queued', { defaultValue: 'Queued' })}
+                      </span>
+                    </div>
+                    <div className="chat-session-queued-message-content">
+                      <ChatMarkdown
+                        content={message.content}
+                        textClassName={chatBubbleTextClassName}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

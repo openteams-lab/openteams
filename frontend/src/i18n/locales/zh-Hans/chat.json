@@ -599,7 +599,9 @@
     "failed": "失败",
     "received": "已接收",
     "stop": "停止",
-    "stopping": "正在停止..."
+    "stopping": "正在停止...",
+    "queued": "排队中",
+    "queuedCount": "{{count}} 条消息排队中"
   },
   "modals": {
     "confirm": {

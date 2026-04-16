@@ -594,7 +594,9 @@
     "failed": "Échoué",
     "received": "Reçu",
     "stop": "Arrêter",
-    "stopping": "Arrêt en cours..."
+    "stopping": "Arrêt en cours...",
+    "queued": "En attente",
+    "queuedCount": "{{count}} message(s) en attente"
   },
   "modals": {
     "confirm": {

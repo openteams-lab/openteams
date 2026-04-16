@@ -656,7 +656,6 @@ export function useChatWebSocket(
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as ChatStreamPayload;
-          console.debug('payload -- ' + JSON.stringify(payload));
           if (payload.type === 'mention_acknowledged') {
             handleMentionAcknowledged(payload);
             return;
