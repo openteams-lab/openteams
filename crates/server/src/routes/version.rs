@@ -1,4 +1,10 @@
-use std::{env, ffi::OsString, path::Path, process::Stdio, time::Duration};
+use std::{
+    env,
+    ffi::OsString,
+    path::{Path, PathBuf},
+    process::Stdio,
+    time::Duration,
+};
 
 use axum::{
     Json, Router,
@@ -90,16 +96,17 @@ pub async fn update_npx()
 
 pub async fn restart_service()
 -> Result<ResponseJson<ApiResponse<UpdateNpxResponse>>, (StatusCode, Json<ApiResponse<()>>)> {
-    let executable = env::current_exe().map_err(|error| {
-        internal_api_error(&format!("Failed to resolve current executable: {error}"))
-    })?;
+    let executable =
+        resolve_restart_executable().map_err(|message| internal_api_error(&message))?;
     let args: Vec<OsString> = env::args_os().skip(1).collect();
+    let working_dir = resolve_restart_working_dir(&executable);
 
     let mut command = Command::new(executable);
     command.args(args);
     command.stdin(Stdio::null());
     command.stdout(Stdio::null());
     command.stderr(Stdio::null());
+    command.current_dir(&working_dir);
     command.envs(env::vars_os());
     command.env(SKIP_BROWSER_ENV, "1");
 
@@ -110,9 +117,13 @@ pub async fn restart_service()
         command.env("BACKEND_PORT", port.to_string());
     }
 
-    spawn_detached(&mut command)
-        .await
-        .map_err(|error| internal_api_error(&format!("Failed to restart service: {error}")))?;
+    spawn_detached(&mut command).await.map_err(|error| {
+        internal_api_error(&format!(
+            "Failed to restart service from '{}' (cwd '{}'): {error}",
+            command.as_std().get_program().to_string_lossy(),
+            working_dir.display()
+        ))
+    })?;
 
     tokio::spawn(async move {
         sleep(PROCESS_EXIT_DELAY).await;
@@ -279,6 +290,68 @@ fn detect_deploy_mode_for_path(is_desktop: bool, current_exe: &Path) -> &'static
     }
 }
 
+fn resolve_restart_executable() -> Result<PathBuf, String> {
+    let current_exe = env::current_exe()
+        .map_err(|error| format!("Failed to resolve current executable: {error}"))?;
+    let deploy_mode = effective_deploy_mode()?;
+
+    if deploy_mode != "npx" {
+        return Ok(current_exe);
+    }
+
+    if let Some(installed_binary) = npx_installed_binary_path()
+        && installed_binary.exists()
+    {
+        return Ok(installed_binary);
+    }
+
+    if current_exe.exists() {
+        return Ok(current_exe);
+    }
+
+    Err(match npx_installed_binary_path() {
+        Some(installed_binary) => format!(
+            "Failed to resolve npx executable for restart. Checked '{}' and '{}', but neither exists.",
+            current_exe.display(),
+            installed_binary.display()
+        ),
+        None => format!(
+            "Failed to resolve npx executable for restart. Current executable '{}' does not exist, and the home directory could not be resolved.",
+            current_exe.display()
+        ),
+    })
+}
+
+fn npx_installed_binary_path() -> Option<PathBuf> {
+    dirs::home_dir().map(|home| {
+        home.join(".openteams")
+            .join("bin")
+            .join(current_binary_name())
+    })
+}
+
+fn current_binary_name() -> &'static str {
+    if cfg!(windows) {
+        "openteams.exe"
+    } else {
+        "openteams"
+    }
+}
+
+fn resolve_restart_working_dir(executable: &Path) -> PathBuf {
+    env::current_dir()
+        .ok()
+        .filter(|path| path.is_dir())
+        .or_else(|| {
+            executable
+                .parent()
+                .filter(|path| path.is_dir())
+                .map(Path::to_path_buf)
+        })
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(env::temp_dir)
+}
+
 async fn run_npm_exec<const N: usize>(
     args: [&str; N],
 ) -> Result<String, (StatusCode, Json<ApiResponse<()>>)> {
@@ -378,13 +451,15 @@ fn internal_api_error(message: &str) -> (StatusCode, Json<ApiResponse<()>>) {
 #[cfg(test)]
 mod tests {
     use std::{
+        env,
         path::Path,
         sync::{Mutex, OnceLock},
     };
 
     use super::{
-        MOCK_DEPLOY_MODE_ENV, default_mock_release_tag, detect_deploy_mode_for_path,
-        is_truthy_env_value, mock_deploy_mode_from_env, normalize_version,
+        MOCK_DEPLOY_MODE_ENV, current_binary_name, default_mock_release_tag,
+        detect_deploy_mode_for_path, is_truthy_env_value, mock_deploy_mode_from_env,
+        normalize_version, resolve_restart_working_dir,
     };
 
     static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -453,5 +528,25 @@ mod tests {
         let deploy_mode =
             detect_deploy_mode_for_path(false, Path::new("/home/test/.openteams/bin/openteams"));
         assert_eq!(deploy_mode, "npx");
+    }
+
+    #[test]
+    fn current_binary_name_matches_platform() {
+        let expected = if cfg!(windows) {
+            "openteams.exe"
+        } else {
+            "openteams"
+        };
+        assert_eq!(current_binary_name(), expected);
+    }
+
+    #[test]
+    fn restart_working_dir_prefers_current_dir_when_available() {
+        let executable = Path::new("/tmp/openteams");
+        let expected = env::current_dir().expect("cwd should resolve");
+
+        let resolved = resolve_restart_working_dir(executable);
+
+        assert_eq!(resolved, expected);
     }
 }
