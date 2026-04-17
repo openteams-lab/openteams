@@ -42,7 +42,7 @@ OpenTeams is a multi-agent conversation platform where multiple AI agents (Claud
 
 ```bash
 # Run OpenTeams web app
-npx openteams-web
+npx openteams-web@latest
 ```
 
 ### Requirements

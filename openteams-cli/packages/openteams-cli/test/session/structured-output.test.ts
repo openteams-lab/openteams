@@ -215,6 +215,36 @@ describe("structured-output.createStructuredOutputTool", () => {
     expect(inputSchema.jsonSchema?.$schema).toBeUndefined()
   })
 
+  test("converts items.oneOf to items.anyOf for provider compatibility", () => {
+    const schema = {
+      type: "array",
+      items: {
+        oneOf: [
+          {
+            type: "object",
+            properties: { type: { const: "send" } },
+            required: ["type"],
+          },
+          {
+            type: "object",
+            properties: { type: { const: "record" } },
+            required: ["type"],
+          },
+        ],
+      },
+    }
+
+    const tool = SessionPrompt.createStructuredOutputTool({
+      schema,
+      onSuccess: () => {},
+    })
+
+    const inputSchema = tool.inputSchema as any
+    expect(inputSchema.jsonSchema?.items?.oneOf).toBeUndefined()
+    expect(inputSchema.jsonSchema?.items?.anyOf).toHaveLength(2)
+    expect(schema.items.oneOf).toHaveLength(2)
+  })
+
   test("execute calls onSuccess with valid args", async () => {
     let capturedOutput: unknown
 

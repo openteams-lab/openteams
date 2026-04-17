@@ -107,12 +107,63 @@ const RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE: u64 = 500 * 1024 * 1024;
 const RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE: u64 = 200 * 1024 * 1024;
 const _: () = assert!(RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE < RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE);
 const OPENTEAMS_GITIGNORE_ENTRY: &str = ".openteams/";
+/// Maximum number of auto-retries when agent output fails JSON protocol parsing.
+/// Only `InvalidJson` and `NotJsonArray` errors trigger a retry; semantic errors
+/// (e.g. `EmptyMessage`, `MissingSendTarget`) are not retried.
+const MAX_PROTOCOL_PARSE_RETRIES: u32 = 1;
+const PROTOCOL_OUTPUT_SCHEMA_JSON: &str = r#"{
+  "type": "array",
+  "items": {
+    "anyOf": [
+      {
+        "type": "object",
+        "properties": {
+          "type": { "const": "send" },
+          "to": { "type": "string", "minLength": 1 },
+          "content": { "type": "string", "minLength": 1 },
+          "intent": {
+            "type": "string",
+            "enum": ["request", "reply", "notify", "blocker", "confirm"]
+          }
+        },
+        "required": ["type", "to", "content"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": { "const": "record" },
+          "content": { "type": "string", "minLength": 1 }
+        },
+        "required": ["type", "content"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": { "const": "artifact" },
+          "content": { "type": "string", "minLength": 1 }
+        },
+        "required": ["type", "content"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": { "const": "conclusion" },
+          "content": { "type": "string", "minLength": 1 }
+        },
+        "required": ["type", "content"],
+        "additionalProperties": false
+      }
+    ]
+  },
+  "minItems": 1
+}"#;
 const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
-  {"type": "send", "to": "you", "intent": "request", "content": "I have finished the front implementation"},
-  {"type": "send", "to": "architect", "intent": "confirm", "content": "The UI is ready. Please confirm the API contract before I continue."},
-  {"type": "record", "content": "The experiment metrics are `latency_p95_ms`, `success_rate`, and `token_cost_usd`."},
-  {"type": "artifact", "content": "Saved the experiment plan to `docs/experiments/chat-metrics-plan.md`."},
-  {"type": "conclusion", "content": "This round finished the metric definition. Next step is wiring collection into the runner."}
+  {"type": "send", "to": "you", "intent": "request", "content": "I have finished the implementation"},
+  {"type": "record", "content": "The metrics are `latency_p95_ms` and `success_rate`."},
+  {"type": "conclusion", "content": "Finished metric definition. Next: wire collection into runner."}
 ]"#;
 
 struct DiffInfo {
@@ -209,6 +260,22 @@ struct AgentProtocolError {
     code: ChatProtocolNoticeCode,
     target: Option<String>,
     detail: Option<String>,
+}
+
+/// Result of processing agent protocol output.
+/// Distinguishes between successful parse, retryable parse failures, and
+/// exhausted retries that fell back to raw output persistence.
+#[derive(Debug)]
+pub(super) enum ProtocolProcessResult {
+    /// Messages were parsed and dispatched successfully. Contains the number of
+    /// `send` messages created.
+    Success(usize),
+    /// The output could not be parsed as a valid JSON array. The caller should
+    /// decide whether to retry based on the current retry attempt count.
+    RetryableParseFailure {
+        code: ChatProtocolNoticeCode,
+        detail: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -511,6 +578,7 @@ struct PendingMessage {
     agent_id: Uuid,
     agent_name: String,
     message: ChatMessage,
+    track_source_message: bool,
 }
 
 #[derive(Clone)]
@@ -923,6 +991,16 @@ impl ChatRunner {
             .unwrap_or(0)
     }
 
+    /// Extract the protocol retry attempt count from a source message's metadata.
+    /// Returns 0 if the message is not a retry (normal first attempt).
+    fn extract_protocol_retry_attempt(meta: &sqlx::types::Json<serde_json::Value>) -> u32 {
+        meta.get("protocol_retry")
+            .and_then(|v| v.get("attempt"))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32)
+            .unwrap_or(0)
+    }
+
     fn emit(&self, session_id: Uuid, event: ChatStreamEvent) {
         let sender = self.sender_for(session_id);
         let _ = sender.send(event);
@@ -957,10 +1035,11 @@ impl ChatRunner {
             // Process the queued message by calling run_agent_for_mention
             // Use the stored agent_name to find the agent (handles rename gracefully)
             if let Err(err) = self
-                .run_agent_for_mention(
+                .run_agent_for_mention_internal(
                     pending_msg.session_id,
                     &pending_msg.agent_name,
                     &pending_msg.message,
+                    pending_msg.track_source_message,
                 )
                 .await
             {
@@ -994,25 +1073,27 @@ impl ChatRunner {
                     "marking queued message as failed due to agent failure"
                 );
 
-                // Update message meta to show failed status
-                self.update_mention_status(
-                    pending_msg.message.id,
-                    &pending_msg.agent_name,
-                    "failed",
-                )
-                .await;
+                if pending_msg.track_source_message {
+                    // Update message meta to show failed status
+                    self.update_mention_status(
+                        pending_msg.message.id,
+                        &pending_msg.agent_name,
+                        "failed",
+                    )
+                    .await;
 
-                // Emit failed event
-                self.emit(
-                    pending_msg.session_id,
-                    ChatStreamEvent::MentionAcknowledged {
-                        session_id: pending_msg.session_id,
-                        message_id: pending_msg.message.id,
-                        mentioned_agent: pending_msg.agent_name.clone(),
-                        agent_id: pending_msg.agent_id,
-                        status: MentionStatus::Failed,
-                    },
-                );
+                    // Emit failed event
+                    self.emit(
+                        pending_msg.session_id,
+                        ChatStreamEvent::MentionAcknowledged {
+                            session_id: pending_msg.session_id,
+                            message_id: pending_msg.message.id,
+                            mentioned_agent: pending_msg.agent_name.clone(),
+                            agent_id: pending_msg.agent_id,
+                            status: MentionStatus::Failed,
+                        },
+                    );
+                }
             }
         }
     }
@@ -1089,6 +1170,17 @@ impl ChatRunner {
         mention: &str,
         source_message: &ChatMessage,
     ) -> Result<(), ChatRunnerError> {
+        self.run_agent_for_mention_internal(session_id, mention, source_message, true)
+            .await
+    }
+
+    async fn run_agent_for_mention_internal(
+        &self,
+        session_id: Uuid,
+        mention: &str,
+        source_message: &ChatMessage,
+        track_source_message: bool,
+    ) -> Result<(), ChatRunnerError> {
         if source_message.sender_type == ChatSenderType::Agent
             && mention.eq_ignore_ascii_case(RESERVED_USER_HANDLE)
         {
@@ -1107,14 +1199,16 @@ impl ChatRunner {
         let Some((session_agent, agent)) = (match resolved {
             Ok(value) => value,
             Err(err) => {
-                self.report_mention_failure(
-                    session_id,
-                    source_message.id,
-                    mention,
-                    None,
-                    format!("Failed to resolve mentioned agent: {err}"),
-                )
-                .await;
+                if track_source_message {
+                    self.report_mention_failure(
+                        session_id,
+                        source_message.id,
+                        mention,
+                        None,
+                        format!("Failed to resolve mentioned agent: {err}"),
+                    )
+                    .await;
+                }
                 return Err(err);
             }
         }) else {
@@ -1125,24 +1219,28 @@ impl ChatRunner {
                     mention = mention,
                     "chat session agent not configured; marking mention as failed"
                 );
+                if track_source_message {
+                    self.report_mention_failure(
+                        session_id,
+                        source_message.id,
+                        &agent.name,
+                        Some(agent.id),
+                        "Agent is not configured in this session.",
+                    )
+                    .await;
+                }
+                return Err(ChatRunnerError::AgentNotFound(mention.to_string()));
+            }
+            if track_source_message {
                 self.report_mention_failure(
                     session_id,
                     source_message.id,
-                    &agent.name,
-                    Some(agent.id),
-                    "Agent is not configured in this session.",
+                    mention,
+                    None,
+                    "Mentioned agent was not found.",
                 )
                 .await;
-                return Err(ChatRunnerError::AgentNotFound(mention.to_string()));
             }
-            self.report_mention_failure(
-                session_id,
-                source_message.id,
-                mention,
-                None,
-                "Mentioned agent was not found.",
-            )
-            .await;
             return Err(ChatRunnerError::AgentNotFound(mention.to_string()));
         };
 
@@ -1176,6 +1274,7 @@ impl ChatRunner {
                 agent_id: agent.id,
                 agent_name: agent.name.clone(),
                 message: source_message.clone(),
+                track_source_message,
             };
 
             self.pending_messages
@@ -1183,21 +1282,23 @@ impl ChatRunner {
                 .or_default()
                 .push_back(pending);
 
-            // Emit a "received" status to indicate the message is queued
-            self.emit(
-                session_id,
-                ChatStreamEvent::MentionAcknowledged {
+            if track_source_message {
+                // Emit a "received" status to indicate the message is queued
+                self.emit(
                     session_id,
-                    message_id: source_message.id,
-                    mentioned_agent: agent.name.clone(),
-                    agent_id: agent.id,
-                    status: MentionStatus::Received,
-                },
-            );
+                    ChatStreamEvent::MentionAcknowledged {
+                        session_id,
+                        message_id: source_message.id,
+                        mentioned_agent: agent.name.clone(),
+                        agent_id: agent.id,
+                        status: MentionStatus::Received,
+                    },
+                );
 
-            // Persist received status to message meta
-            self.update_mention_status(source_message.id, &agent.name, "received")
-                .await;
+                // Persist received status to message meta
+                self.update_mention_status(source_message.id, &agent.name, "received")
+                    .await;
+            }
 
             return Ok(());
         }
@@ -1230,23 +1331,26 @@ impl ChatRunner {
             },
         );
 
-        // Emit MentionAcknowledged running event
-        self.emit(
-            session_id,
-            ChatStreamEvent::MentionAcknowledged {
+        if track_source_message {
+            // Emit MentionAcknowledged running event
+            self.emit(
                 session_id,
-                message_id: source_message.id,
-                mentioned_agent: agent.name.clone(),
-                agent_id: agent.id,
-                status: MentionStatus::Running,
-            },
-        );
+                ChatStreamEvent::MentionAcknowledged {
+                    session_id,
+                    message_id: source_message.id,
+                    mentioned_agent: agent.name.clone(),
+                    agent_id: agent.id,
+                    status: MentionStatus::Running,
+                },
+            );
 
-        // Persist running status to message meta
-        self.update_mention_status(source_message.id, &agent.name, "running")
-            .await;
+            // Persist running status to message meta
+            self.update_mention_status(source_message.id, &agent.name, "running")
+                .await;
+        }
 
         let chain_depth = self.extract_chain_depth(&source_message.meta);
+        let protocol_retry_attempt = Self::extract_protocol_retry_attempt(&source_message.meta);
 
         let run_id = Uuid::new_v4();
         let result = async {
@@ -1466,9 +1570,13 @@ impl ChatRunner {
                 context_snapshot.compression_warning.clone(),
                 self.clone(),
                 source_message.id,
+                source_message.created_at,
+                source_message.content.clone(),
                 agent.name.clone(),
                 prompt_language,
                 run_started_at,
+                protocol_retry_attempt,
+                track_source_message,
             );
 
             self.spawn_exit_watcher(
@@ -1500,14 +1608,16 @@ impl ChatRunner {
                         error_message: err.to_string(),
                     })
                     .await;
-                self.report_mention_failure(
-                    session_id,
-                    source_message.id,
-                    &agent.name,
-                    Some(agent_id),
-                    format!("Failed to start agent run: {err}"),
-                )
-                .await;
+                if track_source_message {
+                    self.report_mention_failure(
+                        session_id,
+                        source_message.id,
+                        &agent.name,
+                        Some(agent_id),
+                        format!("Failed to start agent run: {err}"),
+                    )
+                    .await;
+                }
             }
             let _ = ChatSessionAgent::update_state(
                 &self.db.pool,

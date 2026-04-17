@@ -66,9 +66,11 @@ const PIERRE_DIFFS_THEME_CSS = `
     --diffs-gap-style: none !important;
     
     /* Background colors - use standard CSS variables */
-    --diffs-light-bg: hsl(var(--bg-primary)) !important;
-    --diffs-bg-context-override: hsl(var(--bg-primary)) !important;
-    --diffs-bg-separator-override: hsl(var(--bg-primary)) !important;
+    --diffs-light: hsl(var(--text-high)) !important;
+    --diffs-light-bg: hsl(var(--bg-secondary)) !important;
+    --diffs-bg-context-override: hsl(220, 20%, 96%) !important;
+    --diffs-bg-separator-override: hsl(220, 18%, 94%) !important;
+    --diffs-bg-hover-override: hsl(220, 18%, 92%) !important;
     
     /* Addition colors - soft green matching old design */
     --diffs-light-addition-color: hsl(160, 77%, 35%) !important;
@@ -83,7 +85,7 @@ const PIERRE_DIFFS_THEME_CSS = `
     --diffs-bg-deletion-hover-override: hsl(10, 100%, 84%) !important;
     
     /* Line numbers */
-    --diffs-fg-number-override: hsl(var(--text-low)) !important;
+    --diffs-fg-number-override: hsl(var(--text-normal) / 0.62) !important;
   }
 
   /* Dark theme overrides */
