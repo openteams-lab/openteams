@@ -60,7 +60,15 @@ IMPORTANT:
 - Complete all necessary research and tool calls BEFORE calling this tool
 - This tool provides your final answer - no further actions are taken after calling it`
 
-const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
+const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output.
+You MUST use the StructuredOutput tool to provide your final response.
+Do NOT respond with plain text.
+
+The output must be a JSON array. Each item has a "type" field
+("send", "record", "artifact", or "conclusion") with type-specific required fields.
+Call the StructuredOutput tool with your response as the argument.`
+const STRUCTURED_OUTPUT_RETRY_FEEDBACK =
+  "The structured output tool was not called. You MUST call the StructuredOutput tool with a valid JSON array matching the schema."
 
 export namespace SessionPrompt {
   const log = Log.create({ service: "session.prompt" })
@@ -291,6 +299,9 @@ export namespace SessionPrompt {
     // Note: On session resumption, state is reset but outputFormat is preserved
     // on the user message and will be retrieved from lastUser below
     let structuredOutput: unknown | undefined
+    let structuredOutputRetriesRemaining: number | undefined
+    let structuredOutputRetryLimit = 0
+    let structuredOutputRetryFeedback: string | undefined
 
     let step = 0
     const session = await Session.get(sessionID)
@@ -318,13 +329,21 @@ export namespace SessionPrompt {
       }
 
       if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
+      const shouldContinueStructuredOutputRetry =
+        !!structuredOutputRetryFeedback && lastUser.format?.type === "json_schema"
       if (
         lastAssistant?.finish &&
         !["tool-calls", "unknown"].includes(lastAssistant.finish) &&
-        lastUser.id < lastAssistant.id
+        lastUser.id < lastAssistant.id &&
+        !shouldContinueStructuredOutputRetry
       ) {
         log.info("exiting loop", { sessionID })
         break
+      }
+
+      if (structuredOutputRetriesRemaining === undefined && lastUser.format?.type === "json_schema") {
+        structuredOutputRetryLimit = lastUser.format.retryCount
+        structuredOutputRetriesRemaining = lastUser.format.retryCount
       }
 
       step++
@@ -672,6 +691,14 @@ export namespace SessionPrompt {
         system,
         messages: [
           ...MessageV2.toModelMessages(msgs, model),
+          ...(structuredOutputRetryFeedback
+            ? [
+                {
+                  role: "user" as const,
+                  content: structuredOutputRetryFeedback,
+                },
+              ]
+            : []),
           ...(isLastStep
             ? [
                 {
@@ -700,10 +727,16 @@ export namespace SessionPrompt {
 
       if (modelFinished && !processor.message.error) {
         if (format.type === "json_schema") {
-          // Model stopped without calling StructuredOutput tool
+          if ((structuredOutputRetriesRemaining ?? 0) > 0) {
+            structuredOutputRetriesRemaining = (structuredOutputRetriesRemaining ?? 0) - 1
+            structuredOutputRetryFeedback = STRUCTURED_OUTPUT_RETRY_FEEDBACK
+            continue
+          }
+
+          const retriesUsed = structuredOutputRetryLimit - (structuredOutputRetriesRemaining ?? 0)
           processor.message.error = new MessageV2.StructuredOutputError({
             message: "Model did not produce structured output",
-            retries: 0,
+            retries: retriesUsed,
           }).toObject()
           await Session.updateMessage(processor.message)
           break
@@ -939,6 +972,18 @@ export namespace SessionPrompt {
   }): AITool {
     // Remove $schema property if present (not needed for tool input)
     const { $schema, ...toolSchema } = input.schema
+    const itemSchema =
+      toolSchema.items && typeof toolSchema.items === "object" && !Array.isArray(toolSchema.items)
+        ? toolSchema.items
+        : undefined
+
+    if (itemSchema?.oneOf) {
+      toolSchema.items = {
+        ...itemSchema,
+        anyOf: itemSchema.oneOf,
+      }
+      delete (toolSchema.items as Record<string, any>).oneOf
+    }
 
     return tool({
       id: "StructuredOutput" as any,

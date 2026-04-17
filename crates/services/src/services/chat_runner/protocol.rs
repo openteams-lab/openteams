@@ -438,7 +438,8 @@ impl ChatRunner {
         error_content: Option<&str>,
         error_type: Option<&NormalizedEntryError>,
         token_usage: Option<&TokenUsageInfo>,
-    ) -> Result<usize, ChatRunnerError> {
+        protocol_retry_attempt: u32,
+    ) -> Result<ProtocolProcessResult, ChatRunnerError> {
         let output_is_empty = latest_assistant.trim().is_empty();
         let has_error = error_content.is_some_and(|e| !e.is_empty());
         let error_info = error_content.map(|ec| (ec, error_type));
@@ -483,7 +484,7 @@ impl ChatRunner {
                             token_usage,
                         )
                         .await?;
-                        return Ok(1);
+                        return Ok(ProtocolProcessResult::Success(1));
                     }
                     tracing::info!(
                         session_id = %session_id,
@@ -494,10 +495,29 @@ impl ChatRunner {
                         agent_name,
                         "skipping empty assistant output"
                     );
-                    return Ok(0);
+                    return Ok(ProtocolProcessResult::Success(0));
                 }
 
                 if Self::should_handle_protocol_error_as_raw_output(&err) {
+                    // Check if we can retry before falling back to raw output
+                    if protocol_retry_attempt < MAX_PROTOCOL_PARSE_RETRIES {
+                        tracing::info!(
+                            session_id = %session_id,
+                            session_agent_id = %session_agent_id,
+                            agent_id = %agent_id,
+                            run_id = %run_id,
+                            agent_name,
+                            code = ?err.code,
+                            protocol_retry_attempt,
+                            max_retries = MAX_PROTOCOL_PARSE_RETRIES,
+                            "retryable protocol parse failure; signaling retry"
+                        );
+                        return Ok(ProtocolProcessResult::RetryableParseFailure {
+                            code: err.code,
+                            detail: err.detail,
+                        });
+                    }
+
                     tracing::info!(
                         session_id = %session_id,
                         session_agent_id = %session_agent_id,
@@ -507,7 +527,8 @@ impl ChatRunner {
                         agent_name,
                         code = ?err.code,
                         output_is_empty = output_is_empty,
-                        "persisting protocol fallback output as a raw assistant message"
+                        protocol_retry_attempt,
+                        "retries exhausted; persisting protocol fallback output as raw assistant message"
                     );
                     self.persist_raw_agent_message_and_work_record(
                         session_id,
@@ -523,7 +544,7 @@ impl ChatRunner {
                         token_usage,
                     )
                     .await?;
-                    return Ok(1);
+                    return Ok(ProtocolProcessResult::Success(1));
                 }
 
                 self.emit_protocol_error_message(
@@ -538,7 +559,7 @@ impl ChatRunner {
                     latest_assistant,
                 )
                 .await?;
-                return Ok(0);
+                return Ok(ProtocolProcessResult::Success(0));
             }
         };
 
@@ -653,6 +674,6 @@ impl ChatRunner {
             send_count += 1;
         }
 
-        Ok(send_count)
+        Ok(ProtocolProcessResult::Success(send_count))
     }
 }

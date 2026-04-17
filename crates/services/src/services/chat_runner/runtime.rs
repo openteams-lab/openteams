@@ -992,9 +992,13 @@ impl ChatRunner {
         compression_warning: Option<chat::CompressionWarning>,
         runner: ChatRunner,
         source_message_id: Uuid,
+        source_message_created_at: chrono::DateTime<Utc>,
+        source_message_content: String,
         agent_name: String,
         prompt_language: ResolvedPromptLanguage,
         run_started_at: chrono::DateTime<Utc>,
+        protocol_retry_attempt: u32,
+        track_source_message: bool,
     ) {
         let db = self.db.clone();
         let sender = self.sender_for(session_id);
@@ -1414,11 +1418,76 @@ impl ChatRunner {
                                 error_content_opt,
                                 error_type.as_ref(),
                                 Some(&token_usage),
+                                protocol_retry_attempt,
                             )
                             .await;
 
                         let messages_created = match process_result {
-                            Ok(count) => count,
+                            Ok(ProtocolProcessResult::Success(count)) => count,
+                            Ok(ProtocolProcessResult::RetryableParseFailure { code, detail }) => {
+                                tracing::warn!(
+                                    session_id = %session_id,
+                                    run_id = %run_id,
+                                    agent_id = %agent_id,
+                                    agent_name = %agent_name,
+                                    code = ?code,
+                                    detail = ?detail,
+                                    protocol_retry_attempt,
+                                    "protocol parse failure is retryable; retrying without persisting retry feedback"
+                                );
+
+                                let error_desc = detail.as_deref().unwrap_or("Invalid JSON output");
+                                let retry_content = format!(
+                                    "Your previous response was not a valid JSON array.\n\
+                                     Error: {error_desc}\n\n\
+                                     Retry the same input message below and respond with ONLY a JSON array matching the protocol format.\n\n\
+                                     Previous input message:\n\
+                                     <BEGIN_INPUT_MESSAGE>\n\
+                                     {source_message_content}\n\
+                                     <END_INPUT_MESSAGE>"
+                                );
+                                let retry_meta = sqlx::types::Json(serde_json::json!({
+                                    "protocol_retry": {
+                                        "attempt": protocol_retry_attempt + 1,
+                                        "previous_run_id": run_id,
+                                        "error_code": format!("{:?}", code),
+                                    },
+                                    "chain_depth": chain_depth,
+                                    "mentions": [agent_name],
+                                }));
+                                let retry_message = ChatMessage {
+                                    id: Uuid::new_v4(),
+                                    session_id,
+                                    sender_type: ChatSenderType::System,
+                                    sender_id: None,
+                                    content: retry_content,
+                                    mentions: sqlx::types::Json(vec![agent_name.clone()]),
+                                    meta: retry_meta,
+                                    created_at: source_message_created_at,
+                                };
+
+                                let retry_runner = runner.clone();
+                                let retry_agent_name = agent_name.clone();
+                                tokio::spawn(async move {
+                                    if let Err(err) = retry_runner
+                                        .run_agent_for_mention_internal(
+                                            session_id,
+                                            &retry_agent_name,
+                                            &retry_message,
+                                            false,
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            session_id = %session_id,
+                                            agent_name = %retry_agent_name,
+                                            error = %err,
+                                            "protocol retry run failed to dispatch"
+                                        );
+                                    }
+                                });
+                                0
+                            }
                             Err(err) => {
                                 tracing::warn!(
                                     session_id = %session_id,
@@ -1529,51 +1598,55 @@ impl ChatRunner {
                             started_at: None,
                         });
 
-                        // Emit MentionAcknowledged completed/failed event
-                        let mention_status = match completion_status {
-                            RunCompletionStatus::Failed => MentionStatus::Failed,
-                            RunCompletionStatus::Succeeded | RunCompletionStatus::Stopped => {
-                                MentionStatus::Completed
+                        if track_source_message {
+                            // Emit MentionAcknowledged completed/failed event
+                            let mention_status = match completion_status {
+                                RunCompletionStatus::Failed => MentionStatus::Failed,
+                                RunCompletionStatus::Succeeded | RunCompletionStatus::Stopped => {
+                                    MentionStatus::Completed
+                                }
+                            };
+                            tracing::debug!(
+                                mention_status = ?mention_status,
+                                "mention status: "
+                            );
+                            let _ = sender.send(ChatStreamEvent::MentionAcknowledged {
+                                session_id,
+                                message_id: source_message_id,
+                                mentioned_agent: agent_name.clone(),
+                                agent_id,
+                                status: mention_status.clone(),
+                            });
+
+                            // Persist completed/failed status to message meta
+                            let status_str = match mention_status {
+                                MentionStatus::Completed => "completed",
+                                MentionStatus::Failed => "failed",
+                                MentionStatus::Running => "running",
+                                MentionStatus::Received => "received",
+                            };
+                            if let Ok(Some(msg)) =
+                                ChatMessage::find_by_id(&db.pool, source_message_id).await
+                            {
+                                let mut meta = msg.meta.0.clone();
+                                let mention_statuses = meta
+                                    .get_mut("mention_statuses")
+                                    .and_then(|v| v.as_object_mut());
+
+                                if let Some(statuses) = mention_statuses {
+                                    statuses
+                                        .insert(agent_name.clone(), serde_json::json!(status_str));
+                                } else {
+                                    let mut new_statuses = serde_json::Map::new();
+                                    new_statuses
+                                        .insert(agent_name.clone(), serde_json::json!(status_str));
+                                    meta["mention_statuses"] =
+                                        serde_json::Value::Object(new_statuses);
+                                }
+
+                                let _ = ChatMessage::update_meta(&db.pool, source_message_id, meta)
+                                    .await;
                             }
-                        };
-                        tracing::debug!(
-                            mention_status = ?mention_status,
-                            "mention status: "
-                        );
-                        let _ = sender.send(ChatStreamEvent::MentionAcknowledged {
-                            session_id,
-                            message_id: source_message_id,
-                            mentioned_agent: agent_name.clone(),
-                            agent_id,
-                            status: mention_status.clone(),
-                        });
-
-                        // Persist completed/failed status to message meta
-                        let status_str = match mention_status {
-                            MentionStatus::Completed => "completed",
-                            MentionStatus::Failed => "failed",
-                            MentionStatus::Running => "running",
-                            MentionStatus::Received => "received",
-                        };
-                        if let Ok(Some(msg)) =
-                            ChatMessage::find_by_id(&db.pool, source_message_id).await
-                        {
-                            let mut meta = msg.meta.0.clone();
-                            let mention_statuses = meta
-                                .get_mut("mention_statuses")
-                                .and_then(|v| v.as_object_mut());
-
-                            if let Some(statuses) = mention_statuses {
-                                statuses.insert(agent_name.clone(), serde_json::json!(status_str));
-                            } else {
-                                let mut new_statuses = serde_json::Map::new();
-                                new_statuses
-                                    .insert(agent_name.clone(), serde_json::json!(status_str));
-                                meta["mention_statuses"] = serde_json::Value::Object(new_statuses);
-                            }
-
-                            let _ =
-                                ChatMessage::update_meta(&db.pool, source_message_id, meta).await;
                         }
 
                         if let Err(err) = runner
