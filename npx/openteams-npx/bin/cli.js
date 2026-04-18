@@ -21,6 +21,9 @@ const CLI_VERSION = require("../package.json").version;
 
 const APP_NAME = "openteams";
 const APP_BINARY_BASE = "openteams";
+const INTERNAL_APPLY_UPDATE_AND_RESTART_COMMAND =
+  "__internal-apply-update-and-restart";
+const NPX_MANAGED_ENV = "OPENTEAMS_NPX_MANAGED";
 
 const INSTALL_DIR = path.join(os.homedir(), ".openteams");
 const BIN_DIR = path.join(INSTALL_DIR, "bin");
@@ -743,11 +746,215 @@ function parseUpdateAndRestartArgs(args) {
   return { waitMs, runArgs };
 }
 
-function launchBinary(binaryPath, args) {
+function spawnDetachedSelf(command, args) {
+  const scriptPath = path.resolve(__filename);
+  const child = spawn(process.execPath, [scriptPath, command, ...args], {
+    detached: true,
+    stdio: "ignore",
+    env: process.env,
+    windowsHide: true,
+  });
+  child.unref();
+}
+
+function quoteWindowsCmdArg(value) {
+  const stringValue = String(value || "");
+  if (!/[ \t"&()^<>|]/.test(stringValue)) {
+    return stringValue;
+  }
+
+  return `"${stringValue.replace(/"/g, '""')}"`;
+}
+
+function quotePosixShellArg(value) {
+  return `'${String(value || "").replace(/'/g, `'\\''`)}'`;
+}
+
+function quoteAppleScriptString(value) {
+  return `"${String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')}"`;
+}
+
+function buildNpxRelaunchArgs(runArgs) {
+  return runArgs.length > 0 ? ["--", ...runArgs] : [];
+}
+
+function buildNpxCommandArgs(runArgs) {
+  return ["openteams", ...buildNpxRelaunchArgs(runArgs)];
+}
+
+function buildPosixRelaunchCommand(runArgs) {
+  const cwd = quotePosixShellArg(process.cwd());
+  const command = ["npx", ...buildNpxCommandArgs(runArgs)]
+    .map(quotePosixShellArg)
+    .join(" ");
+  return `cd ${cwd} && ${command}`;
+}
+
+function buildPosixShellExecArgs(shell, commandLine) {
+  const shellName = path.basename(shell).toLowerCase();
+  return shellName === "bash"
+    ? ["-lc", commandLine]
+    : ["-c", commandLine];
+}
+
+function resolveExecutable(candidates) {
+  const pathEntries = String(process.env.PATH || "")
+    .split(path.delimiter)
+    .filter(Boolean);
+  const extensions = process.platform === "win32"
+    ? String(process.env.PATHEXT || ".EXE;.CMD;.BAT;.COM")
+      .split(";")
+      .filter(Boolean)
+    : [""];
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    if (path.isAbsolute(candidate)) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+      continue;
+    }
+
+    for (const entry of pathEntries) {
+      const basePath = path.join(entry, candidate);
+      const possiblePaths = process.platform === "win32"
+        ? [basePath, ...extensions.map((ext) => `${basePath}${ext.toLowerCase()}`), ...extensions.map((ext) => `${basePath}${ext}`)]
+        : [basePath];
+
+      for (const possiblePath of possiblePaths) {
+        if (fs.existsSync(possiblePath)) {
+          return possiblePath;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function spawnDetachedCommand(command, args, options = {}) {
+  const child = spawn(command, args, {
+    detached: true,
+    stdio: "ignore",
+    env: process.env,
+    windowsHide: options.windowsHide ?? true,
+  });
+  child.unref();
+  return Promise.resolve(0);
+}
+
+function launchDetachedNpx(runArgs) {
+  return spawnDetachedCommand("npx", buildNpxCommandArgs(runArgs));
+}
+
+function launchMacTerminal(runArgs) {
+  const osaScript = resolveExecutable(["osascript"]);
+  if (!osaScript) {
+    return false;
+  }
+
+  const commandLine = buildPosixRelaunchCommand(runArgs);
+  const osaArgs = [
+    "-e",
+    'tell application "Terminal" to activate',
+    "-e",
+    `tell application "Terminal" to do script ${quoteAppleScriptString(commandLine)}`,
+  ];
+
+  spawnDetachedCommand(osaScript, osaArgs, { windowsHide: false });
+  return true;
+}
+
+function launchLinuxTerminal(runArgs) {
+  if (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
+    return false;
+  }
+
+  const shell = resolveExecutable(["bash", "sh"]);
+  if (!shell) {
+    return false;
+  }
+
+  const commandLine = buildPosixRelaunchCommand(runArgs);
+  const shellExecArgs = buildPosixShellExecArgs(shell, commandLine);
+  const shellExecString = `${quotePosixShellArg(shell)} ${shellExecArgs[0]} ${quotePosixShellArg(commandLine)}`;
+  const terminalCandidates = [
+    ["x-terminal-emulator", ["-e", shell, ...shellExecArgs]],
+    ["gnome-terminal", ["--", shell, ...shellExecArgs]],
+    ["konsole", ["-e", shell, ...shellExecArgs]],
+    ["xfce4-terminal", ["--hold", "-e", shellExecString]],
+    ["mate-terminal", ["--", shell, ...shellExecArgs]],
+    ["tilix", ["-e", shell, ...shellExecArgs]],
+    ["kitty", [shell, ...shellExecArgs]],
+    ["alacritty", ["-e", shell, ...shellExecArgs]],
+    ["lxterminal", ["-e", shellExecString]],
+    ["xterm", ["-hold", "-e", shell, ...shellExecArgs]],
+  ];
+
+  for (const [command, args] of terminalCandidates) {
+    const executable = resolveExecutable([command]);
+    if (!executable) {
+      continue;
+    }
+
+    spawnDetachedCommand(executable, args, { windowsHide: false });
+    return true;
+  }
+
+  return false;
+}
+
+function launchViaNpxInNewTerminal(runArgs) {
+  const npxArgs = buildNpxCommandArgs(runArgs);
+
+  if (process.platform === "win32") {
+    const commandLine = ["npx", ...npxArgs].map(quoteWindowsCmdArg).join(" ");
+    return spawnDetachedCommand(
+      "cmd.exe",
+      ["/d", "/c", "start", "\"OpenTeams\"", "cmd.exe", "/d", "/k", commandLine],
+      { windowsHide: false },
+    );
+  }
+
+  if (process.platform === "darwin" && launchMacTerminal(runArgs)) {
+    return Promise.resolve(0);
+  }
+
+  if (process.platform === "linux" && launchLinuxTerminal(runArgs)) {
+    return Promise.resolve(0);
+  }
+
+  return launchDetachedNpx(runArgs);
+}
+
+function launchBinary(binaryPath, args, options = {}) {
+  const { detached = false } = options;
+  const childEnv = {
+    ...process.env,
+    [NPX_MANAGED_ENV]: "1",
+  };
+
+  if (detached) {
+    const child = spawn(binaryPath, args, {
+      detached: true,
+      stdio: "ignore",
+      env: childEnv,
+      windowsHide: true,
+    });
+    child.unref();
+    return Promise.resolve(0);
+  }
+
   return new Promise((resolve, reject) => {
     const child = spawn(binaryPath, args, {
       stdio: "inherit",
-      env: process.env,
+      env: childEnv,
     });
 
     child.on("error", (err) => reject(err));
@@ -863,6 +1070,23 @@ function checkNodeVersion() {
   }
 }
 
+async function runApplyUpdateAndRestart(args) {
+  const { waitMs, runArgs } = parseUpdateAndRestartArgs(args);
+
+  printBanner();
+  printStep("1/3", "Waiting for the current app process to exit...");
+  if (waitMs > 0) {
+    await delay(waitMs);
+  }
+
+  applyStagedUpdate();
+  printStep("3/3", "Launching updated binary...");
+  printInfo(`Launching updated ${APP_NAME} via npx...`);
+  console.log("");
+
+  await launchViaNpxInNewTerminal(runArgs);
+}
+
 async function main() {
   checkNodeVersion();
 
@@ -922,21 +1146,17 @@ async function main() {
     command === "apply-update-and-restart"
     || command === "update-and-restart"
   ) {
-    const { waitMs, runArgs } = parseUpdateAndRestartArgs(args.slice(1));
-
     printBanner();
-    printStep("1/3", "Waiting for the current app process to exit...");
-    if (waitMs > 0) {
-      await delay(waitMs);
-    }
-
-    const binaryPath = applyStagedUpdate();
-    printStep("3/3", "Launching updated binary...");
-    printInfo(`Launching updated ${APP_NAME}...`);
+    printStep("1/1", "Scheduling staged update helper...");
+    spawnDetachedSelf(INTERNAL_APPLY_UPDATE_AND_RESTART_COMMAND, args.slice(1));
+    printInfo("Detached update helper started.");
     console.log("");
+    return;
+  }
 
-    const exitCode = await launchBinary(binaryPath, runArgs);
-    process.exit(exitCode);
+  if (command === INTERNAL_APPLY_UPDATE_AND_RESTART_COMMAND) {
+    await runApplyUpdateAndRestart(args.slice(1));
+    return;
   }
 
   let runArgs = args;
