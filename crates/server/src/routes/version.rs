@@ -222,7 +222,7 @@ fn should_direct_execute_npx_update_target(target: &str) -> bool {
     }
 
     let path = Path::new(trimmed);
-    if !path.is_absolute() && !trimmed.starts_with('.') {
+    if !is_local_script_path(trimmed, path) {
         return false;
     }
 
@@ -230,6 +230,25 @@ fn should_direct_execute_npx_update_target(target: &str) -> bool {
         path.extension().and_then(|value| value.to_str()),
         Some("js" | "cjs" | "mjs")
     )
+}
+
+fn is_local_script_path(raw: &str, path: &Path) -> bool {
+    path.is_absolute()
+        || raw.starts_with("./")
+        || raw.starts_with(".\\")
+        || raw.starts_with("../")
+        || raw.starts_with("..\\")
+        || raw.starts_with('/')
+        || raw.starts_with('\\')
+        || has_windows_drive_prefix(raw)
+}
+
+fn has_windows_drive_prefix(raw: &str) -> bool {
+    let bytes = raw.as_bytes();
+    bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && matches!(bytes[2], b'/' | b'\\')
 }
 
 fn resolve_updates_root_dir() -> Result<PathBuf, String> {
@@ -1079,7 +1098,13 @@ mod tests {
             "E:/workspace/projectSS/openteams/npx/openteams-npx/bin/cli.js"
         ));
         assert!(should_direct_execute_npx_update_target(
+            r"E:\workspace\projectSS\openteams\npx\openteams-npx\bin\cli.js"
+        ));
+        assert!(should_direct_execute_npx_update_target(
             "./npx/openteams-npx/bin/cli.js"
+        ));
+        assert!(should_direct_execute_npx_update_target(
+            "/workspace/projectSS/openteams/npx/openteams-npx/bin/cli.js"
         ));
         assert!(!should_direct_execute_npx_update_target(
             "@openteams-lab/openteams-web@latest"
