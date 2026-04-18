@@ -43,5 +43,8 @@
   ],
   "dependencies": {
     "adm-zip": "^0.5.16"
-  }
+  },
+  "bundleDependencies": [
+    "adm-zip"
+  ]
 }

@@ -715,12 +715,12 @@
       "unavailable": "无法更新"
     },
     "status": {
-      "checking": "正在检查桌面端更新器...",
+      "checking": "正在检查应用更新...",
       "downloading": "正在下载并安装更新...",
       "ready": "更新已安装完成，重启后生效。",
       "upToDate": "当前已是最新版本。",
-      "error": "桌面端更新失败。",
-      "preparing": "正在准备桌面端更新包...",
+      "error": "应用更新失败。",
+      "preparing": "正在准备应用更新包...",
       "packageUpdating": "正在后台更新 npx 包..."
     }
   },

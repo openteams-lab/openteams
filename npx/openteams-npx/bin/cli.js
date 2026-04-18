@@ -25,6 +25,10 @@ const APP_BINARY_BASE = "openteams";
 const INSTALL_DIR = path.join(os.homedir(), ".openteams");
 const BIN_DIR = path.join(INSTALL_DIR, "bin");
 const METADATA_PATH = path.join(INSTALL_DIR, "install.json");
+const UPDATES_DIR = path.join(INSTALL_DIR, "updates");
+const STAGING_ROOT = path.join(UPDATES_DIR, "staged");
+const PENDING_UPDATE_PATH = path.join(UPDATES_DIR, "pending-update.json");
+const DEFAULT_UPDATE_RESTART_WAIT_MS = 1500;
 
 function printBanner() {
   console.log("");
@@ -52,6 +56,10 @@ function printWarning(message) {
 
 function printError(message) {
   console.error(`  ERROR  ${message}`);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function getEffectiveArch() {
@@ -145,6 +153,18 @@ function readInstallMetadata() {
   }
 }
 
+function readPendingUpdate() {
+  if (!fs.existsSync(PENDING_UPDATE_PATH)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(PENDING_UPDATE_PATH, "utf8"));
+  } catch (_err) {
+    return null;
+  }
+}
+
 function writeInstallMetadata(binaryPath, platformDir) {
   const remoteSource = resolveRemoteSource();
   const metadata = {
@@ -163,6 +183,11 @@ function writeInstallMetadata(binaryPath, platformDir) {
 
   fs.mkdirSync(INSTALL_DIR, { recursive: true });
   fs.writeFileSync(METADATA_PATH, JSON.stringify(metadata, null, 2), "utf8");
+}
+
+function writePendingUpdate(metadata) {
+  fs.mkdirSync(UPDATES_DIR, { recursive: true });
+  fs.writeFileSync(PENDING_UPDATE_PATH, JSON.stringify(metadata, null, 2), "utf8");
 }
 
 function prependPathForCurrentProcess() {
@@ -305,7 +330,57 @@ function cleanupOldCaches() {
   }
 }
 
-function extractBinary(zipPath, expectedBinaryName) {
+function removePathIfExists(targetPath) {
+  if (!targetPath) {
+    return;
+  }
+
+  try {
+    fs.rmSync(targetPath, {
+      recursive: true,
+      force: true,
+    });
+  } catch (_err) {
+    // Ignore cleanup failures.
+  }
+}
+
+function clearPendingUpdate() {
+  const pending = readPendingUpdate();
+  if (pending?.stagingDir) {
+    removePathIfExists(pending.stagingDir);
+  }
+
+  removePathIfExists(PENDING_UPDATE_PATH);
+}
+
+function createStagingDir(platformDir) {
+  fs.mkdirSync(STAGING_ROOT, { recursive: true });
+  const stagingDir = path.join(
+    STAGING_ROOT,
+    `${BINARY_TAG}-${platformDir}-${Date.now()}`,
+  );
+  fs.mkdirSync(stagingDir, { recursive: true });
+  return stagingDir;
+}
+
+function isWindowsLockedFileError(error) {
+  if (process.platform !== "win32" || !error) {
+    return false;
+  }
+
+  const code = typeof error.code === "string" ? error.code : "";
+  if (["EBUSY", "EPERM", "EACCES"].includes(code)) {
+    return true;
+  }
+
+  const message = String(error.message || "");
+  return /resource busy|used by another process|being used by another process|access is denied/i.test(
+    message,
+  );
+}
+
+function extractBinaryOnce(zipPath, expectedBinaryName) {
   fs.mkdirSync(BIN_DIR, { recursive: true });
 
   const expectedPath = path.join(BIN_DIR, expectedBinaryName);
@@ -350,6 +425,73 @@ function extractBinary(zipPath, expectedBinaryName) {
   return binaryPath;
 }
 
+function extractBinaryToDir(zipPath, expectedBinaryName, targetDir) {
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  const expectedPath = path.join(targetDir, expectedBinaryName);
+  removePathIfExists(expectedPath);
+
+  const zip = new AdmZip(zipPath);
+  zip.extractAllTo(targetDir, true);
+
+  let binaryPath = expectedPath;
+  if (!fs.existsSync(binaryPath)) {
+    const candidates = fs
+      .readdirSync(targetDir)
+      .filter((name) =>
+        [expectedBinaryName, `${expectedBinaryName}.exe`].includes(name),
+      );
+
+    if (candidates.length > 0) {
+      binaryPath = path.join(targetDir, candidates[0]);
+    }
+  }
+
+  if (!fs.existsSync(binaryPath)) {
+    throw new Error(
+      `Extracted binary not found in ${targetDir}. The archive may be invalid.`,
+    );
+  }
+
+  if (process.platform !== "win32") {
+    try {
+      fs.chmodSync(binaryPath, 0o755);
+    } catch (_err) {
+      // Ignore chmod failures and try to run anyway.
+    }
+  }
+
+  return binaryPath;
+}
+
+async function extractBinary(zipPath, expectedBinaryName) {
+  if (process.platform !== "win32") {
+    return extractBinaryOnce(zipPath, expectedBinaryName);
+  }
+
+  let lastError;
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    try {
+      return extractBinaryOnce(zipPath, expectedBinaryName);
+    } catch (error) {
+      lastError = error;
+      if (!isWindowsLockedFileError(error) || attempt === 20) {
+        throw error;
+      }
+
+      if (attempt === 1) {
+        printWarning(
+          "Installed binary is still locked. Waiting for OpenTeams to fully exit before replacing it...",
+        );
+      }
+
+      await delay(500);
+    }
+  }
+
+  throw lastError;
+}
+
 async function installBinary(options = {}) {
   const { force = false, includeCli = true } = options;
   const target = getPlatformTarget();
@@ -388,13 +530,16 @@ async function installBinary(options = {}) {
   }
 
   printStep("3/3", "Extracting and installing binary...");
-  const binaryPath = extractBinary(zipPaths[APP_BINARY_BASE], getBinaryName(APP_BINARY_BASE));
+  const binaryPath = await extractBinary(
+    zipPaths[APP_BINARY_BASE],
+    getBinaryName(APP_BINARY_BASE),
+  );
 
   // Extract CLI if available
   if (zipPaths["openteams-cli"]) {
     try {
       const cliBinaryName = getBinaryName("openteams-cli");
-      extractBinary(zipPaths["openteams-cli"], cliBinaryName);
+      await extractBinary(zipPaths["openteams-cli"], cliBinaryName);
       printInfo("CLI binary installed alongside server.");
     } catch (err) {
       printWarning(`Failed to extract CLI binary: ${err.message}`);
@@ -412,6 +557,147 @@ async function installBinary(options = {}) {
   return binaryPath;
 }
 
+async function stageUpdate(options = {}) {
+  const { force = false, includeCli = true } = options;
+  const target = getPlatformTarget();
+
+  if (target.note) {
+    printWarning(target.note);
+  }
+
+  printStep("1/3", "Preparing staged update...");
+  fs.mkdirSync(INSTALL_DIR, { recursive: true });
+  clearPendingUpdate();
+
+  if (force) {
+    try {
+      fs.rmSync(
+        path.join(CACHE_DIR, BINARY_TAG, target.platformDir, `${APP_BINARY_BASE}.zip`),
+        { force: true },
+      );
+      fs.rmSync(
+        path.join(CACHE_DIR, BINARY_TAG, target.platformDir, "openteams-cli.zip"),
+        { force: true },
+      );
+    } catch (_err) {
+      // Ignore cache cleanup failures.
+    }
+  }
+
+  printStep("2/3", "Downloading prebuilt binary...");
+  const binaries = includeCli
+    ? [APP_BINARY_BASE, "openteams-cli"]
+    : [APP_BINARY_BASE];
+
+  let zipPaths;
+  try {
+    zipPaths = await ensureBinaries(target.platformDir, binaries, showProgress);
+    if (!LOCAL_DEV_MODE) {
+      process.stderr.write("\n");
+    }
+  } catch (err) {
+    process.stderr.write("\n");
+    throw new Error(`Download failed: ${err.message}`);
+  }
+
+  printStep("3/3", "Extracting update into staging area...");
+  const stagingDir = createStagingDir(target.platformDir);
+  const stagedBinaryPath = extractBinaryToDir(
+    zipPaths[APP_BINARY_BASE],
+    getBinaryName(APP_BINARY_BASE),
+    stagingDir,
+  );
+
+  let stagedCliPath = null;
+  if (zipPaths["openteams-cli"]) {
+    try {
+      stagedCliPath = extractBinaryToDir(
+        zipPaths["openteams-cli"],
+        getBinaryName("openteams-cli"),
+        stagingDir,
+      );
+      printInfo("CLI binary staged alongside server.");
+    } catch (err) {
+      printWarning(`Failed to stage CLI binary: ${err.message}`);
+    }
+  }
+
+  const pendingMetadata = {
+    app: APP_NAME,
+    cliVersion: CLI_VERSION,
+    binaryTag: BINARY_TAG,
+    platform: target.platformDir,
+    stagingDir,
+    binaryPath: stagedBinaryPath,
+    cliBinaryPath: stagedCliPath,
+    createdAt: new Date().toISOString(),
+  };
+
+  writePendingUpdate(pendingMetadata);
+
+  printSuccess(
+    `Staged update for ${APP_NAME}. Restart to apply the new binaries.`,
+  );
+  return pendingMetadata;
+}
+
+function moveStagedBinaryIntoPlace(stagingDir, binaryBase) {
+  const binaryName = getBinaryName(binaryBase);
+  const stagedPath = path.join(stagingDir, binaryName);
+  if (!fs.existsSync(stagedPath)) {
+    return null;
+  }
+
+  fs.mkdirSync(BIN_DIR, { recursive: true });
+  const installPath = getInstalledBinaryPath(binaryBase);
+  removePathIfExists(installPath);
+  fs.renameSync(stagedPath, installPath);
+
+  if (process.platform !== "win32") {
+    try {
+      fs.chmodSync(installPath, 0o755);
+    } catch (_err) {
+      // Ignore chmod failures and try to run anyway.
+    }
+  }
+
+  return installPath;
+}
+
+function applyStagedUpdate() {
+  const pending = readPendingUpdate();
+  if (!pending?.stagingDir) {
+    throw new Error(
+      "No staged update found. Run the update step first before restarting.",
+    );
+  }
+
+  printStep("2/3", "Applying staged binaries...");
+  const binaryPath = moveStagedBinaryIntoPlace(pending.stagingDir, APP_BINARY_BASE);
+  if (!binaryPath) {
+    throw new Error(
+      `Staged app binary was not found in ${pending.stagingDir}.`,
+    );
+  }
+
+  try {
+    moveStagedBinaryIntoPlace(pending.stagingDir, "openteams-cli");
+  } catch (err) {
+    printWarning(`Failed to apply staged CLI binary: ${err.message}`);
+  }
+
+  writeInstallMetadata(binaryPath, pending.platform || getPlatformTarget().platformDir);
+  removePathIfExists(pending.stagingDir);
+  removePathIfExists(PENDING_UPDATE_PATH);
+
+  if (!LOCAL_DEV_MODE) {
+    cleanupOldCaches();
+  }
+
+  printSuccess(`Applied staged update to ${binaryPath}`);
+  return binaryPath;
+}
+
 function isInstalled() {
   return fs.existsSync(getInstalledBinaryPath());
 }
@@ -424,6 +710,37 @@ async function ensureInstalled() {
 
   printInfo("No local installation found. Installing now...");
   return installBinary();
+}
+
+function parseUpdateAndRestartArgs(args) {
+  let waitMs = DEFAULT_UPDATE_RESTART_WAIT_MS;
+  const passthroughIndex = args.indexOf("--");
+  const optionArgs =
+    passthroughIndex >= 0 ? args.slice(0, passthroughIndex) : args.slice();
+  const runArgs =
+    passthroughIndex >= 0 ? args.slice(passthroughIndex + 1) : [];
+
+  for (let index = 0; index < optionArgs.length; index += 1) {
+    const current = optionArgs[index];
+    if (current.startsWith("--wait-ms=")) {
+      const value = Number.parseInt(current.slice("--wait-ms=".length), 10);
+      if (Number.isFinite(value) && value >= 0) {
+        waitMs = value;
+      }
+      continue;
+    }
+
+    if (current === "--wait-ms") {
+      const next = optionArgs[index + 1];
+      const value = Number.parseInt(next || "", 10);
+      if (Number.isFinite(value) && value >= 0) {
+        waitMs = value;
+        index += 1;
+      }
+    }
+  }
+
+  return { waitMs, runArgs };
 }
 
 function launchBinary(binaryPath, args) {
@@ -451,8 +768,11 @@ Usage: npx openteams [command] [args]
 
 Commands:
   install       Download and install prebuilt binary only
+  stage-update  Download and extract the next version without replacing current binaries
   start         Install if needed, then run binary
   update        Force re-download and reinstall current binary tag
+  apply-update-and-restart  Internal helper: apply staged update then relaunch binary
+  update-and-restart  Internal alias for apply-update-and-restart
   status        Show installation and binary source status
   uninstall     Remove local installation under ~/.openteams
   --help, -h    Show help
@@ -587,6 +907,36 @@ async function main() {
     printInfo("Update completed.");
     console.log("");
     return;
+  }
+
+  if (command === "stage-update") {
+    printBanner();
+    await stageUpdate({ force: true });
+    console.log("");
+    printInfo("Restart OpenTeams to apply the staged update.");
+    console.log("");
+    return;
+  }
+
+  if (
+    command === "apply-update-and-restart"
+    || command === "update-and-restart"
+  ) {
+    const { waitMs, runArgs } = parseUpdateAndRestartArgs(args.slice(1));
+
+    printBanner();
+    printStep("1/3", "Waiting for the current app process to exit...");
+    if (waitMs > 0) {
+      await delay(waitMs);
+    }
+
+    const binaryPath = applyStagedUpdate();
+    printStep("3/3", "Launching updated binary...");
+    printInfo(`Launching updated ${APP_NAME}...`);
+    console.log("");
+
+    const exitCode = await launchBinary(binaryPath, runArgs);
+    process.exit(exitCode);
   }
 
   let runArgs = args;

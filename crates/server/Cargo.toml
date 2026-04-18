@@ -55,6 +55,8 @@ toml = "0.8"
 dirs = "6"
 jsonc-parser = { version = "0.29", features = ["serde"] }
 semver = "1"
+flate2 = "1.0"
+tar = "0.4"
 
 [build-dependencies]
 dotenv = "0.15"

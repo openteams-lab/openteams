@@ -715,12 +715,12 @@
       "unavailable": "Update unavailable"
     },
     "status": {
-      "checking": "Checking desktop updater...",
+      "checking": "Checking for app updates...",
       "downloading": "Downloading and installing update...",
       "ready": "Update installed. Restart to finish.",
       "upToDate": "You are already on the latest version.",
-      "error": "Desktop update failed.",
-      "preparing": "Preparing desktop update package...",
+      "error": "App update failed.",
+      "preparing": "Preparing app update package...",
       "packageUpdating": "Updating npx package in the background..."
     }
   },
