@@ -6,7 +6,8 @@
     "openteams": "npx/openteams-npx/bin/cli.js"
   },
   "files": [
-    "npx/openteams-npx/bin/cli.js",
+    "npx/openteams-npx/bin/**",
+    "npx/openteams-npx/package.json",
     "npx/openteams-npx/dist/**"
   ],
   "scripts": {
@@ -37,6 +38,12 @@
     "desktop:build": "pnpm tauri build",
     "desktop:prepare-sidecar": "node scripts/desktop/prepare-sidecar.js --release"
   },
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  },
+  "bundleDependencies": [
+    "adm-zip"
+  ],
   "devDependencies": {
     "@tauri-apps/cli": "^1.5.0",
     "concurrently": "^8.2.2",

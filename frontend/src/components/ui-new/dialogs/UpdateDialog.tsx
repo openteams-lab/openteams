@@ -310,8 +310,13 @@ const UpdateDialogImpl = NiceModal.create<NoProps>(() => {
               )}
 
               {actionError && (
-                <div className="text-sm leading-6 text-[#C25B63] dark:text-[#FCA5A5]">
-                  {actionError}
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-[#C25B63] dark:text-[#FCA5A5]">
+                    {t('versionUpdate.status.error')}
+                  </div>
+                  <pre className="max-h-[240px] overflow-auto rounded-[12px] border border-[#F2D5D8] bg-white/70 p-3 text-xs leading-5 text-[#A9444D] whitespace-pre-wrap break-words dark:border-[rgba(248,113,113,0.22)] dark:bg-[rgba(15,23,42,0.45)] dark:text-[#FCA5A5]">
+                    {actionError}
+                  </pre>
                 </div>
               )}
             </div>

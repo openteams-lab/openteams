@@ -709,12 +709,12 @@
       "unavailable": "Actualización no disponible"
     },
     "status": {
-      "checking": "Comprobando actualizador de escritorio...",
+      "checking": "Buscando actualizaciones de la aplicación...",
       "downloading": "Descargando e instalando actualización...",
       "ready": "Actualización instalada. Reinicia para completar.",
       "upToDate": "Ya estás en la última versión.",
-      "error": "La actualización de escritorio falló.",
-      "preparing": "Preparando paquete de actualización de escritorio...",
+      "error": "La actualización de la aplicación falló.",
+      "preparing": "Preparando el paquete de actualización de la aplicación...",
       "packageUpdating": "Actualizando el paquete npx en segundo plano..."
     }
   },

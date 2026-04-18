@@ -709,12 +709,12 @@
       "unavailable": "Mise à jour indisponible"
     },
     "status": {
-      "checking": "Vérification du programme de mise à jour du bureau...",
+      "checking": "Vérification des mises à jour de l'application...",
       "downloading": "Téléchargement et installation de la mise à jour...",
       "ready": "Mise à jour installée. Redémarrez pour terminer.",
       "upToDate": "Vous utilisez déjà la dernière version.",
-      "error": "La mise à jour du bureau a échoué.",
-      "preparing": "Préparation du paquet de mise à jour du bureau...",
+      "error": "La mise à jour de l'application a échoué.",
+      "preparing": "Préparation du paquet de mise à jour de l'application...",
       "packageUpdating": "Mise à jour du paquet npx en arrière-plan..."
     }
   },

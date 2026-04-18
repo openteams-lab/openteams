@@ -1593,8 +1593,23 @@ export function ChatSessions() {
     for (const member of sessionMembers) {
       const agentId = member.agent.id;
       const baseInfo = agentStateInfos[agentId];
-      const baseState =
-        baseInfo?.state ?? agentStates[agentId] ?? member.sessionAgent.state;
+      const sessionState = member.sessionAgent.state;
+      const sessionUpdatedAtMs = Date.parse(member.sessionAgent.updated_at);
+      const localStartedAtMs = baseInfo?.startedAt
+        ? Date.parse(baseInfo.startedAt)
+        : Number.NaN;
+      const shouldTrustSessionState =
+        sessionState !== ChatSessionAgentState.running &&
+        sessionState !== ChatSessionAgentState.stopping &&
+        (!baseInfo?.state ||
+          baseInfo.state === ChatSessionAgentState.running ||
+          baseInfo.state === ChatSessionAgentState.stopping) &&
+        Number.isFinite(sessionUpdatedAtMs) &&
+        (!Number.isFinite(localStartedAtMs) ||
+          sessionUpdatedAtMs >= localStartedAtMs);
+      const baseState = shouldTrustSessionState
+        ? sessionState
+        : (baseInfo?.state ?? agentStates[agentId] ?? sessionState);
       const shouldHoldStoppingState =
         stoppingAgents.has(agentId) &&
         (streamingRunAgentIds.has(agentId) ||
@@ -1649,7 +1664,12 @@ export function ChatSessions() {
     if (!hasRunning) {
       clearRunningSession(activeSessionId);
     }
-  }, [activeSessionId, sessionMembers, effectiveAgentStates, clearRunningSession]);
+  }, [
+    activeSessionId,
+    sessionMembers,
+    effectiveAgentStates,
+    clearRunningSession,
+  ]);
 
   const placeholderAgents = useMemo(
     () =>
@@ -1957,7 +1977,69 @@ export function ChatSessions() {
       ids.add(sessionId);
     }
     return ids;
-  }, [streamingRunsBySession, activeSessionId, sessionMembers, effectiveAgentStates, runningAgentSessions]);
+  }, [
+    streamingRunsBySession,
+    activeSessionId,
+    sessionMembers,
+    effectiveAgentStates,
+    runningAgentSessions,
+  ]);
+
+  const trackedInactiveRunningSessionIds = useMemo(
+    () =>
+      Array.from(new Set(runningAgentSessions.values())).filter(
+        (sessionId) => sessionId !== activeSessionId
+      ),
+    [activeSessionId, runningAgentSessions]
+  );
+
+  useEffect(() => {
+    if (trackedInactiveRunningSessionIds.length === 0) return;
+
+    let cancelled = false;
+
+    const reconcileRunningSessions = async () => {
+      const results = await Promise.all(
+        trackedInactiveRunningSessionIds.map(async (sessionId) => {
+          try {
+            const sessionAgents = await chatApi.listSessionAgents(sessionId);
+            const hasRunningAgent = sessionAgents.some(
+              (sessionAgent) =>
+                sessionAgent.state === ChatSessionAgentState.running ||
+                sessionAgent.state === ChatSessionAgentState.stopping
+            );
+
+            return { sessionId, hasRunningAgent };
+          } catch (error) {
+            console.warn(
+              'Failed to reconcile running session state',
+              sessionId,
+              error
+            );
+            return null;
+          }
+        })
+      );
+
+      if (cancelled) return;
+
+      for (const result of results) {
+        if (result && !result.hasRunningAgent) {
+          clearRunningSession(result.sessionId);
+        }
+      }
+    };
+
+    void reconcileRunningSessions();
+    const intervalId = window.setInterval(() => {
+      void reconcileRunningSessions();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [trackedInactiveRunningSessionIds, clearRunningSession]);
 
   // Check agent availability
   useEffect(() => {
@@ -4300,7 +4382,9 @@ export function ChatSessions() {
                             ChatSessionAgentState.stopping
                         }
                         onStop={handleStopAgent}
-                        queuedMessages={queuedMessagesByAgentId.get(member.agent.id)}
+                        queuedMessages={queuedMessagesByAgentId.get(
+                          member.agent.id
+                        )}
                         chatBubbleTextClassName={chatBubbleTextClassName}
                       />
                     ))}
