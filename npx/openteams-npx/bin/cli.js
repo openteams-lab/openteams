@@ -553,10 +553,6 @@ async function installBinary(options = {}) {
   ensurePathConfigured();
   writeInstallMetadata(binaryPath, target.platformDir);
 
-  if (!LOCAL_DEV_MODE) {
-    cleanupOldCaches();
-  }
-
   printSuccess(`Installed ${APP_NAME} to ${binaryPath}`);
   return binaryPath;
 }
@@ -694,10 +690,6 @@ function applyStagedUpdate() {
   removePathIfExists(pending.stagingDir);
   removePathIfExists(PENDING_UPDATE_PATH);
 
-  if (!LOCAL_DEV_MODE) {
-    cleanupOldCaches();
-  }
-
   printSuccess(`Applied staged update to ${binaryPath}`);
   return binaryPath;
 }
@@ -789,6 +781,12 @@ function buildNpxCommandArgs(runArgs) {
   return [NPX_RELAUNCH_PACKAGE, ...buildNpxRelaunchArgs(runArgs)];
 }
 
+function resolveNpxExecutable() {
+  return process.platform === "win32"
+    ? resolveExecutable(["npx.cmd", "npx.exe", "npx"])
+    : resolveExecutable(["npx"]);
+}
+
 function buildPosixRelaunchCommand(runArgs) {
   const cwd = quotePosixShellArg(process.cwd());
   const command = ["npx", ...buildNpxCommandArgs(runArgs)]
@@ -799,10 +797,11 @@ function buildPosixRelaunchCommand(runArgs) {
 
 function buildPowerShellRelaunchCommand(runArgs) {
   const cwd = quotePowerShellArg(process.cwd());
-  const command = ["npx", ...buildNpxCommandArgs(runArgs)]
+  const npxExecutable = resolveNpxExecutable() || "npx";
+  const command = [npxExecutable, ...buildNpxCommandArgs(runArgs)]
     .map(quotePowerShellArg)
     .join(" ");
-  return `Set-Location -LiteralPath ${cwd}; ${command}`;
+  return `Set-Location -LiteralPath ${cwd}; & ${command}`;
 }
 
 function buildPosixShellExecArgs(shell, commandLine) {
@@ -863,7 +862,10 @@ function spawnDetachedCommand(command, args, options = {}) {
 }
 
 function launchDetachedNpx(runArgs) {
-  return spawnDetachedCommand("npx", buildNpxCommandArgs(runArgs));
+  return spawnDetachedCommand(
+    resolveNpxExecutable() || "npx",
+    buildNpxCommandArgs(runArgs),
+  );
 }
 
 function launchMacTerminal(runArgs) {

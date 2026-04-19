@@ -105,12 +105,62 @@ function fetchJson(url) {
   });
 }
 
-function downloadFile(url, destinationPath, expectedSha256, onProgress) {
+function normalizeExpectedChecksum(value) {
+  return typeof value === "string" && value.trim()
+    ? value.trim().toLowerCase()
+    : null;
+}
+
+function resolveExpectedChecksums(binaryInfo = {}) {
+  return {
+    md5: normalizeExpectedChecksum(binaryInfo.md5),
+    sha256: normalizeExpectedChecksum(binaryInfo.sha256),
+  };
+}
+
+function hashFile(filePath, algorithm) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash(algorithm);
+    const stream = fs.createReadStream(filePath);
+
+    stream.on("data", (chunk) => {
+      hash.update(chunk);
+    });
+    stream.on("error", reject);
+    stream.on("end", () => {
+      resolve(hash.digest("hex"));
+    });
+  });
+}
+
+async function isCachedZipReusable(zipPath, binaryInfo) {
+  if (!fs.existsSync(zipPath)) {
+    return false;
+  }
+
+  const checksums = resolveExpectedChecksums(binaryInfo);
+
+  if (checksums.md5) {
+    const actualMd5 = await hashFile(zipPath, "md5");
+    return actualMd5 === checksums.md5;
+  }
+
+  if (checksums.sha256) {
+    const actualSha256 = await hashFile(zipPath, "sha256");
+    return actualSha256 === checksums.sha256;
+  }
+
+  return true;
+}
+
+function downloadFile(url, destinationPath, expectedChecksums, onProgress) {
   const tempPath = `${destinationPath}.tmp`;
+  const checksums = resolveExpectedChecksums(expectedChecksums);
 
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(tempPath);
-    const hash = crypto.createHash("sha256");
+    const sha256Hash = checksums.sha256 ? crypto.createHash("sha256") : null;
+    const md5Hash = checksums.md5 ? crypto.createHash("md5") : null;
 
     const cleanup = () => {
       try {
@@ -128,7 +178,7 @@ function downloadFile(url, destinationPath, expectedSha256, onProgress) {
           return downloadFile(
             res.headers.location,
             destinationPath,
-            expectedSha256,
+            checksums,
             onProgress,
           )
             .then(resolve)
@@ -146,7 +196,12 @@ function downloadFile(url, destinationPath, expectedSha256, onProgress) {
 
         res.on("data", (chunk) => {
           downloadedSize += chunk.length;
-          hash.update(chunk);
+          if (sha256Hash) {
+            sha256Hash.update(chunk);
+          }
+          if (md5Hash) {
+            md5Hash.update(chunk);
+          }
           if (onProgress) {
             onProgress(downloadedSize, Number.isFinite(totalSize) ? totalSize : 0);
           }
@@ -157,12 +212,23 @@ function downloadFile(url, destinationPath, expectedSha256, onProgress) {
         file.on("finish", () => {
           file.close();
 
-          const actualSha256 = hash.digest("hex");
-          if (expectedSha256 && actualSha256 !== expectedSha256) {
+          const actualSha256 = sha256Hash ? sha256Hash.digest("hex") : null;
+          const actualMd5 = md5Hash ? md5Hash.digest("hex") : null;
+
+          if (checksums.sha256 && actualSha256 !== checksums.sha256) {
             cleanup();
             return reject(
               new Error(
-                `Checksum mismatch, expected ${expectedSha256}, got ${actualSha256}`,
+                `SHA256 mismatch, expected ${checksums.sha256}, got ${actualSha256}`,
+              ),
+            );
+          }
+
+          if (checksums.md5 && actualMd5 !== checksums.md5) {
+            cleanup();
+            return reject(
+              new Error(
+                `MD5 mismatch, expected ${checksums.md5}, got ${actualMd5}`,
               ),
             );
           }
@@ -200,11 +266,6 @@ async function ensureBinary(platform, binaryName, onProgress) {
 
   const platformCacheDir = path.join(CACHE_DIR, BINARY_TAG, platform);
   const zipPath = path.join(platformCacheDir, `${binaryName}.zip`);
-
-  if (fs.existsSync(zipPath)) {
-    return zipPath;
-  }
-
   fs.mkdirSync(platformCacheDir, { recursive: true });
 
   const manifest = await fetchJson(
@@ -218,8 +279,16 @@ async function ensureBinary(platform, binaryName, onProgress) {
     );
   }
 
+  if (await isCachedZipReusable(zipPath, binaryInfo)) {
+    return zipPath;
+  }
+
+  if (fs.existsSync(zipPath)) {
+    fs.rmSync(zipPath, { force: true });
+  }
+
   const binaryUrl = `${source.baseUrl}/binaries/${BINARY_TAG}/${platform}/${binaryName}.zip`;
-  await downloadFile(binaryUrl, zipPath, binaryInfo.sha256, onProgress);
+  await downloadFile(binaryUrl, zipPath, binaryInfo, onProgress);
 
   return zipPath;
 }
