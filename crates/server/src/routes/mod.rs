@@ -8,6 +8,7 @@ use crate::{DeploymentImpl, middleware};
 
 pub mod analytics;
 pub mod approvals;
+pub mod browser_lifecycle;
 pub mod chat;
 pub mod config;
 pub mod filesystem;
@@ -24,6 +25,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
     // Create routers with different middleware layers
     let base_routes = Router::new()
         .route("/health", get(health::health_check))
+        .merge(browser_lifecycle::router())
         .merge(config::router())
         .merge(chat::router(&deployment))
         .merge(tags::router(&deployment))

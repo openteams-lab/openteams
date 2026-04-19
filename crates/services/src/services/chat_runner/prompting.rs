@@ -1096,6 +1096,7 @@ impl ChatRunner {
             .filter(|member| member.agent_id != agent.id)
             .collect::<Vec<_>>();
         let active_skills = Self::filter_active_skills(skills, Some(message.content.as_str()));
+        let is_protocol_retry = Self::extract_protocol_retry_attempt(&message.meta) > 0;
 
         // Compute relative paths for context files
         let messages_rel = pathdiff::diff_paths(&messages_path, workspace_path)
@@ -1192,104 +1193,76 @@ impl ChatRunner {
         }
 
         markdown.push_str("\n## Output Requirements\n");
-        markdown.push_str(
-            "Return **only a JSON array** that must be parseable by a standard JSON parser.  \n",
-        );
-        markdown.push_str("Array items may only use these four message types: `send`, `record`, `artifact`, `conclusion`.\n\n");
+        markdown.push_str("Return **only a JSON array** matching the following schema.\n\n");
 
-        markdown.push_str("### General Rules\n");
+        markdown.push_str("### Rules\n");
         markdown.push_str("1. Output only content directly related to the current task.\n");
-        markdown.push_str("2. Keep messages concise. Put complex content into files in the current workspace instead of sending long text directly.\n");
-        markdown.push_str("3. Every `content` value must remain a valid JSON string, with quotes, backslashes, and newlines escaped properly.\n");
-        markdown.push_str("4. Send a `send` message only when necessary.\n");
-        markdown.push_str("5. When sending to the user, `to` must be `\"you\"`.\n\n");
-
-        markdown.push_str("### Message Types\n\n");
-
-        markdown.push_str("#### 1) send\n");
-        markdown.push_str("Fields:\n");
-        markdown.push_str("- Required: `type`, `to`, `content`\n");
-        markdown.push_str("- Optional: `intent`\n\n");
-        markdown.push_str("Rules:\n");
-        markdown.push_str("- One message targets exactly one receiver.\n");
-        markdown.push_str("- `to` must match a member name in `group members` or you.\n");
-        markdown.push_str("- `content` cannot be empty and should stay within 1 to 5 sentences.\n");
         markdown.push_str(
-            "- Recommended `intent` values: `request`, `reply`, `notify`, `blocker`, `confirm`\n\n",
+            "2. Keep messages concise. Put complex content into files instead of long text.\n",
         );
-
-        markdown.push_str("#### 2) record\n");
-        markdown.push_str("Fields:\n");
-        markdown.push_str("- Required: `type`, `content`\n\n");
-        markdown.push_str("Rules:\n");
-        markdown.push_str("- Record only long-lived shared facts.\n");
-        markdown.push_str("- Do not write process notes, temporary status, or blockers.\n");
-        markdown.push_str("- Written to `");
+        markdown.push_str("3. `send.to` must match a group member name or `\"you\"` (the user).\n");
+        markdown.push_str("4. `record`: long-lived shared facts only. Written to `");
         markdown.push_str(&shared_blackboard_rel.to_string_lossy());
-        markdown.push_str("`.\n\n");
-
-        markdown.push_str("#### 3) artifact\n");
-        markdown.push_str("Fields:\n");
-        markdown.push_str("- Required: `type`, `content`\n\n");
-        markdown.push_str("Rules:\n");
-        markdown.push_str("- Record only deliverables or concrete file paths.\n");
-        markdown.push_str("- Written to `");
+        markdown.push_str("`.\n");
+        markdown.push_str("5. `artifact`: deliverables or file paths only. Written to `");
+        markdown.push_str(&work_records_rel.to_string_lossy());
+        markdown.push_str("`.\n");
+        markdown.push_str(
+            "6. `conclusion`: current-turn summary only (completed work, blockers, next steps). Max 3 sentences. Written to `",
+        );
         markdown.push_str(&work_records_rel.to_string_lossy());
         markdown.push_str("`.\n\n");
 
-        markdown.push_str("#### 4) conclusion\n");
-        markdown.push_str("Fields:\n");
-        markdown.push_str("- Required: `type`, `content`\n\n");
-        markdown.push_str("Rules:\n");
-        markdown.push_str("- Write only the current turn's summary, such as completed work, blockers, or next step.\n");
-        markdown.push_str("- Keep it within 3 sentences.\n");
-        markdown.push_str("- Do not write long-lived facts.\n");
-        markdown.push_str("- Written to `");
-        markdown.push_str(&work_records_rel.to_string_lossy());
-        markdown.push_str("`.\n\n");
+        markdown.push_str("### Schema\n");
+        markdown.push_str("```json\n");
+        markdown.push_str(PROTOCOL_OUTPUT_SCHEMA_JSON);
+        markdown.push_str("\n```\n\n");
 
-        markdown.push_str("### Message Format Example\n");
+        markdown.push_str("### Example\n");
         markdown.push_str("```json\n");
         markdown.push_str(MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON);
         markdown.push_str("\n```\n\n");
 
-        markdown.push_str("## Agent\n");
-        markdown.push_str("- name: ");
-        markdown.push_str(&agent.name);
-        markdown.push('\n');
-        let normalized_system_prompt =
-            Self::strip_embedded_team_protocol_from_system_prompt(&agent.system_prompt);
-        markdown.push_str("- role: ");
-        markdown.push_str(&normalized_system_prompt);
-        markdown.push('\n');
-
-        if active_skills.is_empty() {
-            markdown.push_str("- skills: No skills enabled. Do not use any skills.\n");
-        } else {
-            markdown.push_str("- skills: ");
-            let skill_names: Vec<&str> = active_skills.iter().map(|s| s.name.as_str()).collect();
-            markdown.push_str(&skill_names.join(", "));
+        if !is_protocol_retry {
+            markdown.push_str("## Agent\n");
+            markdown.push_str("- name: ");
+            markdown.push_str(&agent.name);
             markdown.push('\n');
-        }
+            let normalized_system_prompt =
+                Self::strip_embedded_team_protocol_from_system_prompt(&agent.system_prompt);
+            markdown.push_str("- role: ");
+            markdown.push_str(&normalized_system_prompt);
+            markdown.push('\n');
 
-        markdown.push_str("- language: ");
-        markdown.push_str(prompt_language.setting);
-        markdown.push_str("\n\n");
+            if active_skills.is_empty() {
+                markdown.push_str("- skills: No skills enabled. Do not use any skills.\n");
+            } else {
+                markdown.push_str("- skills: ");
+                let skill_names: Vec<&str> =
+                    active_skills.iter().map(|s| s.name.as_str()).collect();
+                markdown.push_str(&skill_names.join(", "));
+                markdown.push('\n');
+            }
 
-        markdown.push_str("## Team Protocol\n");
-        if let Some(protocol) = team_protocol {
-            if !protocol.trim().is_empty() {
-                markdown.push_str(protocol.trim());
-                if !protocol.trim().ends_with('\n') {
-                    markdown.push('\n');
+            markdown.push_str("- language: ");
+            markdown.push_str(prompt_language.setting);
+            markdown.push_str("\n\n");
+
+            markdown.push_str("## Team Protocol\n");
+            if let Some(protocol) = team_protocol {
+                if !protocol.trim().is_empty() {
+                    markdown.push_str(protocol.trim());
+                    if !protocol.trim().ends_with('\n') {
+                        markdown.push('\n');
+                    }
+                } else {
+                    markdown.push_str("No team protocol configured.\n");
                 }
             } else {
                 markdown.push_str("No team protocol configured.\n");
             }
-        } else {
-            markdown.push_str("No team protocol configured.\n");
+            markdown.push('\n');
         }
-        markdown.push('\n');
 
         markdown.push_str("## Group Members\n");
         if visible_members.is_empty() {

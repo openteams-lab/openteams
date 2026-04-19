@@ -1,5 +1,6 @@
 pub mod error;
 pub mod middleware;
+pub mod npx_browser_lifecycle;
 pub mod routes;
 
 // #[cfg(feature = "cloud")]

@@ -710,12 +710,12 @@
       "unavailable": "無法更新"
     },
     "status": {
-      "checking": "正在檢查桌面更新程式...",
+      "checking": "正在檢查應用更新...",
       "downloading": "正在下載並安裝更新...",
       "ready": "更新已安裝。請重新啟動以完成。",
       "upToDate": "你已經是最新版本。",
-      "error": "桌面更新失敗。",
-      "preparing": "正在準備桌面更新套件...",
+      "error": "應用更新失敗。",
+      "preparing": "正在準備應用更新套件...",
       "packageUpdating": "正在背景更新 npx 套件..."
     }
   },

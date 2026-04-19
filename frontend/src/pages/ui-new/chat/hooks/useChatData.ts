@@ -16,6 +16,8 @@ import type {
 } from '../types';
 import { extractRunId, extractErrorFromMeta } from '../utils';
 
+const CHAT_SESSIONS_REFETCH_INTERVAL_MS = 15000;
+
 export interface UseChatDataResult {
   sessions: ChatSession[];
   sortedSessions: ChatSession[];
@@ -41,7 +43,7 @@ export function useChatData(activeSessionId: string | null): UseChatDataResult {
     queryKey: ['chatSessions'],
     queryFn: () => chatApi.listSessions(),
     staleTime: 0,
-    refetchInterval: 5000,
+    refetchInterval: CHAT_SESSIONS_REFETCH_INTERVAL_MS,
     refetchIntervalInBackground: true,
   });
 

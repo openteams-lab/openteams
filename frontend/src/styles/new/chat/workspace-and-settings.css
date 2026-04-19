@@ -1371,7 +1371,7 @@
     flex: 1;
     flex-direction: column;
     overflow: hidden;
-    background: rgba(249, 247, 242, 0.88);
+    background: rgba(243, 246, 248, 0.96);
   }
 
   .new-design .chat-session-diff-modal-viewport {
@@ -1421,6 +1421,7 @@
   .new-design .chat-session-diff-line-row {
     display: flex;
     align-items: stretch;
+    background: rgba(248, 250, 252, 0.88);
     font-family: 'IBM Plex Mono', monospace;
     font-size: 13px;
     line-height: 1.8;
@@ -1428,15 +1429,15 @@
   }
 
   .new-design .chat-session-diff-line-row:hover {
-    background: rgba(15, 23, 42, 0.03);
+    background: rgba(226, 232, 240, 0.72);
   }
 
   .new-design .chat-session-diff-line-num {
     width: 56px;
     flex-shrink: 0;
     padding: 0 12px 0 10px;
-    background: rgba(0, 0, 0, 0.02);
-    color: #b0a89e;
+    background: rgba(226, 232, 240, 0.7);
+    color: #6b7280;
     text-align: right;
     user-select: none;
   }
@@ -1446,7 +1447,7 @@
     flex: 1;
     padding: 0 24px;
     white-space: pre;
-    color: #4a453e;
+    color: #1f2937;
   }
 
   .new-design .chat-session-diff-sign {

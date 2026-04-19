@@ -6,7 +6,7 @@ use executors::{
     env::{ExecutionEnv, RepoContext},
     model_sync,
 };
-use server::{DeploymentImpl, routes};
+use server::{DeploymentImpl, npx_browser_lifecycle, routes};
 use services::services::container::ContainerService;
 use sqlx::Error as SqlxError;
 use strip_ansi_escapes::strip;
@@ -223,6 +223,8 @@ async fn main() -> Result<(), OpenTeamsError> {
         }
     }
 
+    npx_browser_lifecycle::start_shutdown_monitor();
+
     axum::serve(listener, app_router)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
@@ -258,13 +260,16 @@ pub async fn shutdown_signal() {
         tokio::select! {
             _ = ctrl_c => {},
             _ = terminate => {},
+            _ = npx_browser_lifecycle::wait_for_shutdown_signal() => {},
         }
     }
 
     #[cfg(not(unix))]
     {
-        // Only ctrl_c is available, so just await it
-        ctrl_c.await;
+        tokio::select! {
+            _ = ctrl_c => {},
+            _ = npx_browser_lifecycle::wait_for_shutdown_signal() => {},
+        }
     }
 }
 

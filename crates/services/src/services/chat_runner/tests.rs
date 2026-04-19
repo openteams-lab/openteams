@@ -26,9 +26,10 @@ use uuid::Uuid;
 use super::{
     AgentProtocolError, AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner,
     ChatStreamEvent, MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON, MessageAttachmentContext,
-    RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE, RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE, ReferenceAttachment,
-    ReferenceContext, ResolvedPromptLanguage, RunCompletionStatus, SessionAgentSummary,
-    TokenUsageInfo, runtime::RunLogForwarders,
+    PROTOCOL_OUTPUT_SCHEMA_JSON, RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE,
+    RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE, ReferenceAttachment, ReferenceContext,
+    ResolvedPromptLanguage, RunCompletionStatus, SessionAgentSummary, TokenUsageInfo,
+    runtime::RunLogForwarders,
 };
 use crate::services::config::UiLanguage;
 
@@ -790,13 +791,16 @@ fn should_handle_protocol_error_as_raw_output_only_for_json_shape_errors() {
 fn markdown_protocol_output_example_json_is_valid() {
     let messages = ChatRunner::parse_agent_protocol_messages(MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON)
         .expect("json");
-    assert_eq!(messages.len(), 5);
+    assert_eq!(messages.len(), 3);
     assert!(matches!(
         messages.first().map(|message| &message.message_type),
         Some(AgentProtocolMessageType::Send)
     ));
     assert_eq!(messages[0].intent.as_deref(), Some("request"));
-    assert_eq!(messages[1].intent.as_deref(), Some("confirm"));
+    assert!(matches!(
+        messages[1].message_type,
+        AgentProtocolMessageType::Record
+    ));
 }
 
 #[test]
@@ -1206,13 +1210,14 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
     assert!(prompt.contains("- sender: you"));
     assert!(prompt.contains("@fullstack"));
     assert!(prompt.contains("## Output Requirements"));
-    assert!(prompt.contains("### General Rules"));
-    assert!(prompt.contains("### Message Types"));
-    assert!(prompt.contains("#### 1) send"));
-    assert!(prompt.contains("#### 2) record"));
-    assert!(prompt.contains("#### 3) artifact"));
-    assert!(prompt.contains("#### 4) conclusion"));
-    assert!(prompt.contains("### Message Format Example"));
+    assert!(prompt.contains("### Rules"));
+    assert!(prompt.contains("### Schema"));
+    assert!(prompt.contains("send.to"));
+    assert!(prompt.contains("record`: long-lived shared facts only."));
+    assert!(prompt.contains("artifact`: deliverables or file paths only."));
+    assert!(prompt.contains("conclusion`: current-turn summary only"));
+    assert!(prompt.contains(PROTOCOL_OUTPUT_SCHEMA_JSON));
+    assert!(prompt.contains("### Example"));
     assert!(prompt.contains("## Agent"));
     assert!(prompt.contains("- name: fullstack"));
     assert!(prompt.contains("Full-stack Engineer"));
@@ -1239,6 +1244,40 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
     assert!(prompt.contains("- to: agent:fullstack"));
     assert!(prompt.contains("- message_id: 88bd7b05-1ba3-407c-8ca3-a52f14c8aced"));
     assert!(prompt.contains("- timestamp: 2026-03-10 06:22:12.973 UTC"));
+}
+
+#[test]
+fn build_exact_markdown_prompt_for_protocol_retry_omits_agent_and_team_protocol_sections() {
+    let agent = test_agent("fullstack", "Full-stack Engineer");
+    let message = test_message(
+        "Your previous response was not a valid JSON array.\nPrevious input message:\n<BEGIN_INPUT_MESSAGE>\n@fullstack fix the API\n<END_INPUT_MESSAGE>",
+        json!({
+            "protocol_retry": { "attempt": 1, "previous_run_id": Uuid::new_v4() }
+        }),
+    );
+
+    let prompt = ChatRunner::build_exact_markdown_prompt(
+        &agent,
+        &message,
+        Path::new(r"E:\workspace\projectSS\MainPage2\.openteams\context\demo"),
+        Path::new(r"E:\workspace\projectSS\MainPage2"),
+        &[],
+        None,
+        None,
+        &[],
+        ResolvedPromptLanguage {
+            setting: "simplified_chinese",
+            code: "zh-Hans",
+            instruction: "You MUST respond in Simplified Chinese.",
+        },
+        Some("Follow the team protocol."),
+    );
+
+    assert!(prompt.contains("## Input Message"));
+    assert!(prompt.contains("<BEGIN_INPUT_MESSAGE>"));
+    assert!(prompt.contains("@fullstack fix the API"));
+    assert!(!prompt.contains("## Agent"));
+    assert!(!prompt.contains("## Team Protocol"));
 }
 
 #[test]

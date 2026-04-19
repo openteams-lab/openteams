@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '@/i18n';
 import { SharedAppLayout } from '@/components/ui-new/containers/SharedAppLayout';
+import { useNpxBrowserLifecycle } from '@/hooks/useNpxBrowserLifecycle';
 import { usePreviousPath } from '@/hooks/usePreviousPath';
 
 import { UserSystemProvider, useUserSystem } from '@/components/ConfigProvider';
@@ -43,6 +44,7 @@ function AppContent() {
 
   // Track previous path for back navigation
   usePreviousPath();
+  useNpxBrowserLifecycle(!loading && deployMode === 'npx');
 
   useEffect(() => {
     if (loading) {
