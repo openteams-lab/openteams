@@ -21,6 +21,7 @@ const CLI_VERSION = require("../package.json").version;
 
 const APP_NAME = "openteams";
 const APP_BINARY_BASE = "openteams";
+const NPX_RELAUNCH_PACKAGE = "openteams-web";
 const INTERNAL_APPLY_UPDATE_AND_RESTART_COMMAND =
   "__internal-apply-update-and-restart";
 const NPX_MANAGED_ENV = "OPENTEAMS_NPX_MANAGED";
@@ -770,6 +771,10 @@ function quotePosixShellArg(value) {
   return `'${String(value || "").replace(/'/g, `'\\''`)}'`;
 }
 
+function quotePowerShellArg(value) {
+  return `'${String(value || "").replace(/'/g, "''")}'`;
+}
+
 function quoteAppleScriptString(value) {
   return `"${String(value || "")
     .replace(/\\/g, "\\\\")
@@ -781,7 +786,7 @@ function buildNpxRelaunchArgs(runArgs) {
 }
 
 function buildNpxCommandArgs(runArgs) {
-  return ["openteams", ...buildNpxRelaunchArgs(runArgs)];
+  return [NPX_RELAUNCH_PACKAGE, ...buildNpxRelaunchArgs(runArgs)];
 }
 
 function buildPosixRelaunchCommand(runArgs) {
@@ -790,6 +795,14 @@ function buildPosixRelaunchCommand(runArgs) {
     .map(quotePosixShellArg)
     .join(" ");
   return `cd ${cwd} && ${command}`;
+}
+
+function buildPowerShellRelaunchCommand(runArgs) {
+  const cwd = quotePowerShellArg(process.cwd());
+  const command = ["npx", ...buildNpxCommandArgs(runArgs)]
+    .map(quotePowerShellArg)
+    .join(" ");
+  return `Set-Location -LiteralPath ${cwd}; ${command}`;
 }
 
 function buildPosixShellExecArgs(shell, commandLine) {
@@ -914,10 +927,9 @@ function launchViaNpxInNewTerminal(runArgs) {
   const npxArgs = buildNpxCommandArgs(runArgs);
 
   if (process.platform === "win32") {
-    const commandLine = ["npx", ...npxArgs].map(quoteWindowsCmdArg).join(" ");
     return spawnDetachedCommand(
-      "cmd.exe",
-      ["/d", "/c", "start", "\"OpenTeams\"", "cmd.exe", "/d", "/k", commandLine],
+      "powershell.exe",
+      ["-NoExit", "-Command", buildPowerShellRelaunchCommand(runArgs)],
       { windowsHide: false },
     );
   }
