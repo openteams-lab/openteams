@@ -94,6 +94,10 @@ pub async fn wait_for_shutdown_signal() {
     }
 }
 
+pub fn request_shutdown() {
+    let _ = shutdown_sender().send(true);
+}
+
 fn should_request_shutdown() -> bool {
     let now = Instant::now();
     let mut state = STATE.lock().expect("browser lifecycle state lock poisoned");

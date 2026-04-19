@@ -132,9 +132,9 @@ function getPlatformTarget() {
     };
   }
 
-  printError(`Unsupported platform: ${platform}-${arch}`);
-  printError("Supported targets: linux-x64, linux-arm64, macos-x64, macos-arm64, windows-x64");
-  process.exit(1);
+  throw new Error(
+    `Unsupported platform: ${platform}-${arch}. Supported targets: linux-x64, linux-arm64, macos-x64, macos-arm64, windows-x64`,
+  );
 }
 
 function getBinaryName(baseName) {
@@ -804,6 +804,15 @@ function buildPowerShellRelaunchCommand(runArgs) {
   return `Set-Location -LiteralPath ${cwd}; & ${command}`;
 }
 
+function buildWindowsCmdRelaunchCommand(runArgs) {
+  const cwd = quoteWindowsCmdArg(process.cwd());
+  const npxExecutable = resolveNpxExecutable() || "npx";
+  const command = [npxExecutable, ...buildNpxCommandArgs(runArgs)]
+    .map(quoteWindowsCmdArg)
+    .join(" ");
+  return `cd /d ${cwd} && call ${command}`;
+}
+
 function buildPosixShellExecArgs(shell, commandLine) {
   const shellName = path.basename(shell).toLowerCase();
   return shellName === "bash"
@@ -926,12 +935,10 @@ function launchLinuxTerminal(runArgs) {
 }
 
 function launchViaNpxInNewTerminal(runArgs) {
-  const npxArgs = buildNpxCommandArgs(runArgs);
-
   if (process.platform === "win32") {
     return spawnDetachedCommand(
-      "powershell.exe",
-      ["-NoExit", "-Command", buildPowerShellRelaunchCommand(runArgs)],
+      "cmd.exe",
+      ["/K", buildWindowsCmdRelaunchCommand(runArgs)],
       { windowsHide: false },
     );
   }
@@ -1149,7 +1156,7 @@ async function main() {
 
   if (command === "stage-update") {
     printBanner();
-    await stageUpdate({ force: true });
+    await stageUpdate({ force: false });
     console.log("");
     printInfo("Restart OpenTeams to apply the staged update.");
     console.log("");

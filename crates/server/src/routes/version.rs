@@ -19,9 +19,9 @@ use serde::{Deserialize, Serialize};
 use tar::Archive;
 use tokio::{process::Command, time::sleep};
 use ts_rs::TS;
-use utils::{port_file::read_port_file, response::ApiResponse, version::APP_VERSION};
+use utils::{response::ApiResponse, version::APP_VERSION};
 
-use crate::DeploymentImpl;
+use crate::{DeploymentImpl, npx_browser_lifecycle};
 
 const GITHUB_LATEST_RELEASE_URL: &str =
     "https://api.github.com/repos/openteams-lab/openteams/releases/latest";
@@ -29,7 +29,7 @@ const NPX_UPDATE_PACKAGE_SPEC: &str = "@openteams-lab/openteams-web@latest";
 const NPX_UPDATE_PACKAGE_ENV: &str = "OPENTEAMS_NPX_UPDATE_PACKAGE";
 const NPX_UPDATE_STATE_FILE: &str = "prepared-package.json";
 const PROCESS_EXIT_DELAY: Duration = Duration::from_millis(500);
-const SKIP_BROWSER_ENV: &str = "OPENTEAMS_SKIP_BROWSER";
+// const SKIP_BROWSER_ENV: &str = "OPENTEAMS_SKIP_BROWSER";
 const MOCK_GITHUB_LATEST_RELEASE_ENV: &str = "OPENTEAMS_MOCK_GITHUB_LATEST_RELEASE";
 const MOCK_DEPLOY_MODE_ENV: &str = "OPENTEAMS_MOCK_DEPLOY_MODE";
 const MOCK_RELEASE_TAG_ENV: &str = "OPENTEAMS_MOCK_GITHUB_RELEASE_TAG";
@@ -121,31 +121,31 @@ pub async fn restart_service()
     let args: Vec<OsString> = env::args_os().skip(1).collect();
     let working_dir = resolve_restart_working_dir();
 
-    let mut command = if should_stage_npx_update_for_restart()
-        .map_err(|message| internal_api_error(&message))?
-    {
-        build_npx_restart_helper_command(&args).map_err(|message| internal_api_error(&message))?
-    } else {
-        let executable =
-            resolve_restart_executable().map_err(|message| internal_api_error(&message))?;
-        let mut command = Command::new(executable);
-        command.args(&args);
-        command
-    };
+    let mut command =
+        if should_stage_npx_update_for_restart().map_err(|message| internal_api_error(&message))? {
+            build_npx_restart_helper_command(&args, std::process::id())
+                .map_err(|message| internal_api_error(&message))?
+        } else {
+            let executable =
+                resolve_restart_executable().map_err(|message| internal_api_error(&message))?;
+            let mut command = Command::new(executable);
+            command.args(&args);
+            command
+        };
 
     command.stdin(Stdio::null());
     command.stdout(Stdio::null());
     command.stderr(Stdio::null());
     command.current_dir(&working_dir);
     command.envs(env::vars_os());
-    command.env(SKIP_BROWSER_ENV, "1");
+    // command.env(SKIP_BROWSER_ENV, "1");
 
-    if env::var_os("BACKEND_PORT").is_none()
-        && env::var_os("PORT").is_none()
-        && let Some(port) = current_backend_port().await
-    {
-        command.env("BACKEND_PORT", port.to_string());
-    }
+    // if env::var_os("BACKEND_PORT").is_none()
+    //     && env::var_os("PORT").is_none()
+    //     && let Some(port) = current_backend_port().await
+    // {
+    //     command.env("BACKEND_PORT", port.to_string());
+    // }
 
     spawn_detached(&mut command).await.map_err(|error| {
         internal_api_error(&format!(
@@ -157,7 +157,7 @@ pub async fn restart_service()
 
     tokio::spawn(async move {
         sleep(PROCESS_EXIT_DELAY).await;
-        std::process::exit(0);
+        npx_browser_lifecycle::request_shutdown();
     });
 
     Ok(ResponseJson(ApiResponse::success(UpdateNpxResponse {
@@ -738,9 +738,13 @@ fn resolve_restart_executable() -> Result<PathBuf, String> {
     })
 }
 
-fn build_npx_restart_helper_command(args: &[OsString]) -> Result<Command, String> {
+fn build_npx_restart_helper_command(args: &[OsString], parent_pid: u32) -> Result<Command, String> {
     let prepared = load_prepared_npx_package()?;
-    let helper_args = vec![OsString::from("--wait-ms=1500"), OsString::from("--")];
+    let helper_args = vec![
+        OsString::from("--wait-ms=1500"),
+        OsString::from(format!("--parent-pid={parent_pid}")),
+        OsString::from("--"),
+    ];
     let mut merged_args = helper_args;
     merged_args.extend(args.iter().cloned());
 
@@ -900,21 +904,21 @@ fn is_progress_line(line: &str) -> bool {
     line.starts_with("Downloading:")
 }
 
-async fn current_backend_port() -> Option<u16> {
-    if let Ok(port) = env::var("BACKEND_PORT")
-        && let Ok(port) = port.trim().parse::<u16>()
-    {
-        return Some(port);
-    }
+// async fn current_backend_port() -> Option<u16> {
+//     if let Ok(port) = env::var("BACKEND_PORT")
+//         && let Ok(port) = port.trim().parse::<u16>()
+//     {
+//         return Some(port);
+//     }
 
-    if let Ok(port) = env::var("PORT")
-        && let Ok(port) = port.trim().parse::<u16>()
-    {
-        return Some(port);
-    }
+//     if let Ok(port) = env::var("PORT")
+//         && let Ok(port) = port.trim().parse::<u16>()
+//     {
+//         return Some(port);
+//     }
 
-    read_port_file("openteams").await.ok()
-}
+//     read_port_file("openteams").await.ok()
+// }
 
 #[cfg(unix)]
 async fn spawn_detached(command: &mut Command) -> std::io::Result<()> {
