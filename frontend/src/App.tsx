@@ -44,7 +44,7 @@ function AppContent() {
 
   // Track previous path for back navigation
   usePreviousPath();
-  useNpxBrowserLifecycle(!loading && deployMode === 'unknown');
+  useNpxBrowserLifecycle(!loading && deployMode === 'npx');
 
   useEffect(() => {
     if (loading) {
