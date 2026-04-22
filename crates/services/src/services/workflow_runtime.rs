@@ -1,5 +1,8 @@
 use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
+
 use db::{
     DBService,
     models::{
@@ -44,6 +47,19 @@ const WORKFLOW_REAP_TIMEOUT: Duration = Duration::from_secs(3);
 const WORKFLOW_KILL_WAIT_TIMEOUT: Duration = Duration::from_secs(2);
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
 
+/// Global registry: step_id → (CancellationToken, child_pid).
+/// Used to cancel a running agent process when a step is interrupted.
+static RUNNING_STEPS: Lazy<DashMap<Uuid, executors::executors::CancellationToken>> =
+    Lazy::new(DashMap::new);
+
+/// Cancel the running agent process for the given step, if any.
+/// Called from the orchestrator's `interrupt_step` to truly stop execution.
+pub fn cancel_running_step(step_id: Uuid) {
+    if let Some((_, token)) = RUNNING_STEPS.remove(&step_id) {
+        token.cancel();
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum WorkflowRuntimeError {
     #[error(transparent)]
@@ -56,6 +72,8 @@ pub enum WorkflowRuntimeError {
     Executor(#[from] ExecutorError),
     #[error("workflow validation error: {0}")]
     Validation(String),
+    #[error("workflow step interrupted: {0}")]
+    Interrupted(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -72,8 +90,9 @@ pub struct WorkflowCardAgent {
 pub enum WorkflowCardState {
     PreviewReady,
     PreviewInvalid,
+    Pending,
     Running,
-    WaitingUser,
+    Waiting,
     Paused,
     Completed,
     Failed,
@@ -634,10 +653,12 @@ pub fn build_workflow_card_projection(
         .unwrap_or_else(|| (None, Vec::new()));
 
     let state = match execution.status {
+        WorkflowExecutionStatus::Pending => WorkflowCardState::Pending,
         WorkflowExecutionStatus::Completed => WorkflowCardState::Completed,
         WorkflowExecutionStatus::Failed => WorkflowCardState::Failed,
         WorkflowExecutionStatus::Paused => WorkflowCardState::Paused,
-        WorkflowExecutionStatus::WaitingUser => WorkflowCardState::WaitingUser,
+        WorkflowExecutionStatus::Waiting => WorkflowCardState::Waiting,
+        WorkflowExecutionStatus::Recompiling => WorkflowCardState::Paused,
         _ => WorkflowCardState::Running,
     };
 
@@ -673,6 +694,7 @@ pub async fn run_workflow_agent_prompt(
     agent: &ChatAgent,
     session_agent: &ChatSessionAgent,
     prompt: &str,
+    step_id: Uuid,
 ) -> Result<String, WorkflowRuntimeError> {
     let workspace_path = resolve_workspace_path(session, agent, session_agent);
     fs::create_dir_all(&workspace_path).await?;
@@ -698,22 +720,36 @@ pub async fn run_workflow_agent_prompt(
         .spawn(workspace_path.as_path(), prompt, &env)
         .await?;
 
+    // Register the cancel token so interrupt_step can terminate this process.
+    if let Some(cancel) = spawned.cancel.clone() {
+        RUNNING_STEPS.insert(step_id, cancel);
+    }
+
     let msg_store = Arc::new(MsgStore::new());
     spawn_log_forwarders(&mut spawned.child, msg_store.clone())?;
     executor.normalize_logs(msg_store.clone(), workspace_path.as_path());
 
     let mut failed_by_signal = false;
+    let mut interrupted = false;
     let mut status = None;
 
     if let Some(exit_signal) = spawned.exit_signal.take() {
         match time::timeout(WORKFLOW_EXECUTION_TIMEOUT, exit_signal).await {
             Ok(Ok(ExecutorExitResult::Success)) => {}
-            Ok(Ok(ExecutorExitResult::Failure)) => failed_by_signal = true,
+            Ok(Ok(ExecutorExitResult::Failure)) => {
+                // Check if this failure was caused by an interrupt cancellation.
+                if !RUNNING_STEPS.contains_key(&step_id) {
+                    interrupted = true;
+                } else {
+                    failed_by_signal = true;
+                }
+            }
             Ok(Err(_)) => {
                 status = Some(wait_for_process_exit(&mut spawned, &agent.name).await?);
             }
             Err(_) => {
                 terminate_child(&mut spawned).await;
+                RUNNING_STEPS.remove(&step_id);
                 return Err(WorkflowRuntimeError::Validation(format!(
                     "workflow 执行超时：{}",
                     agent.name
@@ -721,10 +757,13 @@ pub async fn run_workflow_agent_prompt(
             }
         }
 
-        if status.is_none() {
+        if status.is_none() && !interrupted {
             match time::timeout(WORKFLOW_REAP_TIMEOUT, spawned.child.wait()).await {
                 Ok(Ok(exit_status)) => status = Some(exit_status),
-                Ok(Err(err)) => return Err(WorkflowRuntimeError::Io(err)),
+                Ok(Err(err)) => {
+                    RUNNING_STEPS.remove(&step_id);
+                    return Err(WorkflowRuntimeError::Io(err));
+                }
                 Err(_) => terminate_child(&mut spawned).await,
             }
         }
@@ -732,8 +771,20 @@ pub async fn run_workflow_agent_prompt(
         status = Some(wait_for_process_exit(&mut spawned, &agent.name).await?);
     }
 
+    // Unregister from the running steps map.
+    RUNNING_STEPS.remove(&step_id);
+
     msg_store.push_finished();
     time::sleep(WORKFLOW_DRAIN_TIMEOUT).await;
+
+    if interrupted {
+        // Ensure the child is cleaned up.
+        terminate_child(&mut spawned).await;
+        return Err(WorkflowRuntimeError::Interrupted(format!(
+            "workflow step 被中断：{}",
+            agent.name
+        )));
+    }
 
     if failed_by_signal {
         return Err(WorkflowRuntimeError::Validation(format!(
@@ -745,6 +796,13 @@ pub async fn run_workflow_agent_prompt(
     if let Some(exit_status) = status
         && !exit_status.success()
     {
+        // Check if the non-zero exit was caused by interrupt.
+        if spawned.cancel.as_ref().is_some_and(|c| c.is_cancelled()) {
+            return Err(WorkflowRuntimeError::Interrupted(format!(
+                "workflow step 被中断：{}",
+                agent.name
+            )));
+        }
         return Err(WorkflowRuntimeError::Validation(format!(
             "workflow 执行失败：{}",
             agent.name

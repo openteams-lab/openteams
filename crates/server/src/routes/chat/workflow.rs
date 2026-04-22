@@ -134,6 +134,7 @@ pub async fn generate_plan_and_run(
         lead_agent,
         lead_session_agent,
         &prompt,
+        uuid::Uuid::nil(),
     )
     .await
     .map_err(|err| ApiError::BadRequest(err.to_string()))?;
@@ -406,7 +407,7 @@ pub async fn pause_all(
     Ok((
         StatusCode::OK,
         ResponseJson(ApiResponse::<PauseAllResponse>::success(PauseAllResponse {
-            status: format!("{:?}", execution.status),
+            status: format!("{:?}", execution.status).to_lowercase(),
         })),
     )
         .into_response())
@@ -456,7 +457,7 @@ pub async fn interrupt_step(
         StatusCode::OK,
         ResponseJson(ApiResponse::<InterruptStepResponse>::success(
             InterruptStepResponse {
-                status: format!("{:?}", step.status),
+                status: format!("{:?}", step.status).to_lowercase(),
             },
         )),
     )
@@ -519,7 +520,7 @@ pub async fn submit_step_input(
     Json(payload): Json<StepInputRequest>,
 ) -> Result<Response, ApiError> {
     let pool = &deployment.db().pool;
-    let (_step, execution) = load_step_for_session(pool, &session, step_id).await?;
+    let (_step, _execution) = load_step_for_session(pool, &session, step_id).await?;
 
     let result = WorkflowOrchestrator::submit_step_input(
         pool,
@@ -530,10 +531,7 @@ pub async fn submit_step_input(
     .await
     .map_err(|err| ApiError::BadRequest(err.to_string()))?;
 
-    if result.should_wake_scheduler
-        || matches!(result.execution.status, WorkflowExecutionStatus::Running)
-            && execution.status == WorkflowExecutionStatus::WaitingUser
-    {
+    if result.should_wake_scheduler {
         let deployment_clone = deployment.clone();
         let execution_id = result.execution.id;
         tokio::spawn(async move {

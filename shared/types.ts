@@ -158,6 +158,48 @@ export type AssignSkillToAgent = { agent_id: string, skill_id: string, enabled: 
 
 export type UpdateAgentSkill = { enabled: boolean | null, };
 
+export enum WorkflowPlanStatus { draft = "draft", ready = "ready", superseded = "superseded", cancelled = "cancelled" }
+
+export enum WorkflowValidationStatus { pending = "pending", valid = "valid", invalid = "invalid" }
+
+export enum WorkflowRevisionEditor { lead = "lead", system = "system" }
+
+export enum WorkflowExecutionStatus { pending = "pending", running = "running", failed = "failed", paused = "paused", recompiling = "recompiling", completed = "completed", waiting = "waiting" }
+
+export enum WorkflowRoundStatus { running = "running", waiting_user_acceptance = "waiting_user_acceptance", accepted = "accepted", rejected = "rejected", archived = "archived" }
+
+export enum WorkflowStepType { task = "task", review = "review", result = "result" }
+
+export enum WorkflowStepStatus { pending = "pending", ready = "ready", running = "running", interrupt_requested = "interrupt_requested", interrupted = "interrupted", waiting_input = "waiting_input", waiting_review = "waiting_review", blocked = "blocked", completed = "completed", failed = "failed", skipped = "skipped", cancelled = "cancelled" }
+
+export enum WorkflowEdgeKind { hard = "hard", soft = "soft" }
+
+export enum WorkflowAgentSessionRole { lead = "lead", worker = "worker", reviewer = "reviewer" }
+
+export enum WorkflowAgentSessionState { idle = "idle", running = "running", interrupt_requested = "interrupt_requested", interrupted = "interrupted", waiting_input = "waiting_input", waiting_approval = "waiting_approval", paused = "paused", completed = "completed", failed = "failed", expired = "expired" }
+
+export enum WorkflowEventType { execution_created = "execution_created", execution_running = "execution_running", execution_failed = "execution_failed", execution_completed = "execution_completed", execution_paused = "execution_paused", execution_waiting = "execution_waiting", round_started = "round_started", round_result_ready = "round_result_ready", user_accepted = "user_accepted", user_rejected = "user_rejected", round_archived = "round_archived", plan_revision_created = "plan_revision_created", plan_recompiled = "plan_recompiled", step_status_changed = "step_status_changed", agent_session_state_changed = "agent_session_state_changed" }
+
+export type WorkflowPlanJson = { version: string, title: string, goal: string, agents: WorkflowPlanAgents, globals: WorkflowPlanGlobals | null, viewport: WorkflowPlanViewport | null, nodes: Array<WorkflowPlanNode>, edges: Array<WorkflowPlanEdge>, policies: WorkflowPlanPolicies | null, };
+
+export type WorkflowPlanAgents = { lead: string, available: Array<string>, };
+
+export type WorkflowPlanGlobals = { interrupt_mode: string, default_retry: number, global_pause_supported: boolean, };
+
+export type WorkflowPlanViewport = { x: number, y: number, zoom: number, };
+
+export type WorkflowPlanNode = { id: string, type: string, position: WorkflowNodePosition, data: WorkflowNodeData, };
+
+export type WorkflowNodePosition = { x: number, y: number, };
+
+export type WorkflowNodeData = { stepType: string, agentId: string | null, title: string, instructions: string, acceptance: Array<string> | null, outputs: Array<string> | null, interruptible: boolean, maxRetry: number | null, status: string | null, };
+
+export type WorkflowPlanEdge = { id: string, source: string, target: string, type: string | null, data: WorkflowEdgeData | null, };
+
+export type WorkflowEdgeData = { kind: string, };
+
+export type WorkflowPlanPolicies = { approval_required_on: Array<string> | null, permission_required_on: Array<string> | null, on_failure: string | null, allow_plan_revision: boolean, };
+
 export type RemoteSkillMeta = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: string[], compatible_agents: string[], source_url: string | null, 
 /**
  * Download count from skills.sh registry
@@ -174,7 +216,7 @@ export type SkillCategory = { id: string, name: string, description: string | nu
 
 export type InstalledNativeSkill = { skill: ChatSkill, enabled: boolean, can_toggle: boolean, native_path: string, config_path: string | null, };
 
-export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "message_updated", message: ChatMessage, } | { "type": "work_item_new", work_item: ChatWorkItem, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, } | { "type": "protocol_notice", session_id: string, session_agent_id: string, agent_id: string, run_id: string, agent_name: string, code: ChatProtocolNoticeCode, target: string | null, detail: string | null, output_is_empty: boolean, } | { "type": "mention_error", session_id: string, message_id: string, agent_name: string, agent_id: string | null, reason: string, } | { "type": "workflow_generate_detected", session_id: string, session_agent_id: string, run_id: string, } | { "type": "workflow_plan_preview_ready", session_id: string, plan_id: string, workflow_card_message: ChatMessage, } | { "type": "workflow_execution_updated", session_id: string, execution_id: string, };
+export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "message_updated", message: ChatMessage, } | { "type": "work_item_new", work_item: ChatWorkItem, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, } | { "type": "protocol_notice", session_id: string, session_agent_id: string, agent_id: string, run_id: string, agent_name: string, code: ChatProtocolNoticeCode, target: string | null, detail: string | null, output_is_empty: boolean, } | { "type": "mention_error", session_id: string, message_id: string, agent_name: string, agent_id: string | null, reason: string, } | { "type": "workflow_generate_detected", session_id: string, session_agent_id: string, run_id: string, } | { "type": "workflow_plan_preview_ready", session_id: string, plan_id: string, workflow_card_message: ChatMessage, } | { "type": "workflow_execution_updated", session_id: string, execution_id: string, } | { "type": "workflow_graph_updated", session_id: string, execution_id: string, graph_version: string, reason: string, nodes: Array<WorkflowPlanNode>, edges: Array<WorkflowPlanEdge>, changed_step_ids: Array<string>, };
 
 export type ChatStreamDeltaType = "assistant" | "thinking" | "error";
 
@@ -325,6 +367,14 @@ export type DirectoryEntry = { name: string, path: string, is_directory: boolean
 export type DirectoryListResponse = { entries: Array<DirectoryEntry>, current_path: string, };
 
 export type SearchMode = "taskform" | "settings";
+
+export type WorkflowCardAgent = { session_agent_id: string, workflow_agent_session_id: string | null, agent_id: string, name: string, };
+
+export type WorkflowCardState = "preview_ready" | "preview_invalid" | "pending" | "running" | "waiting" | "paused" | "completed" | "failed";
+
+export type WorkflowCardStep = { id: string, step_key: string, title: string, step_type: string, status: string, agent_name: string | null, summary_text: string | null, };
+
+export type WorkflowCardProjection = { execution_id: string | null, plan_id: string, revision_id: string, title: string, goal: string, state: WorkflowCardState, execution_status: string, error_message: string | null, completed_step_count: number, total_step_count: number, result_summary: string | null, outputs: Array<string>, agents: Array<WorkflowCardAgent>, steps: Array<WorkflowCardStep>, plan: WorkflowPlanJson, started_at: string | null, completed_at: string | null, validation_errors: string | null, };
 
 export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, commit_reminder_enabled: boolean, commit_reminder_prompt: string | null, send_message_shortcut: SendMessageShortcut, 
 /**

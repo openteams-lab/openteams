@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc, time::Instant};
 
 use sqlx::{
     Error, Pool, Sqlite, SqlitePool,
@@ -9,10 +9,585 @@ use utils::assets::asset_dir;
 
 pub mod models;
 
+const WORKFLOW_EXECUTION_STATUS_MIGRATION_VERSION: i64 = 20260422120000;
+
+async fn apply_workflow_execution_status_migration_shim(
+    pool: &Pool<Sqlite>,
+    migrator: &sqlx::migrate::Migrator,
+) -> Result<(), Error> {
+    let Some(migration) = migrator
+        .iter()
+        .find(|migration| migration.version == WORKFLOW_EXECUTION_STATUS_MIGRATION_VERSION)
+    else {
+        return Ok(());
+    };
+
+    let migrations_table_exists = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'",
+    )
+    .fetch_one(pool)
+    .await?;
+    if migrations_table_exists == 0 {
+        return Ok(());
+    }
+
+    let already_applied = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM _sqlx_migrations WHERE version = ?1 AND success = 1",
+    )
+    .bind(WORKFLOW_EXECUTION_STATUS_MIGRATION_VERSION)
+    .fetch_one(pool)
+    .await?;
+    if already_applied > 0 {
+        return Ok(());
+    }
+
+    let workflow_table_exists = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'chat_workflow_executions'",
+    )
+    .fetch_one(pool)
+    .await?;
+    if workflow_table_exists == 0 {
+        return Ok(());
+    }
+
+    tracing::info!(
+        "Applying compatibility shim for migration {} before sqlx migrator runs",
+        WORKFLOW_EXECUTION_STATUS_MIGRATION_VERSION
+    );
+
+    let started = Instant::now();
+    let mut conn = pool.acquire().await?;
+    sqlx::query("PRAGMA foreign_keys = OFF")
+        .execute(&mut *conn)
+        .await?;
+
+    let result = async {
+        let old_table_exists = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'chat_workflow_executions_old'",
+        )
+        .fetch_one(&mut *conn)
+        .await?;
+
+        if old_table_exists > 0 {
+            sqlx::query("DROP TABLE IF EXISTS chat_workflow_executions")
+                .execute(&mut *conn)
+                .await?;
+        } else {
+            sqlx::query(
+                "ALTER TABLE chat_workflow_executions RENAME TO chat_workflow_executions_old",
+            )
+            .execute(&mut *conn)
+            .await?;
+        }
+
+        sqlx::query(
+            r#"
+            CREATE TABLE chat_workflow_executions (
+                id                       BLOB    NOT NULL PRIMARY KEY,
+                session_id               BLOB    NOT NULL,
+                plan_id                  BLOB    NOT NULL REFERENCES chat_workflow_plans(id),
+                active_revision_id       BLOB    REFERENCES chat_workflow_plan_revisions(id),
+                active_round_id          BLOB,
+                workflow_card_message_id BLOB,
+                lead_session_agent_id    BLOB,
+                status                   TEXT    NOT NULL DEFAULT 'pending'
+                                                 CHECK (status IN (
+                                                     'pending', 'running', 'failed', 'paused',
+                                                     'recompiling', 'completed', 'waiting'
+                                                 )),
+                current_round            INTEGER NOT NULL DEFAULT 0,
+                title                    TEXT    NOT NULL DEFAULT '',
+                compiled_graph_hash      TEXT,
+                started_at               TEXT,
+                completed_at             TEXT,
+                created_at               TEXT    NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at               TEXT    NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO chat_workflow_executions (
+                id,
+                session_id,
+                plan_id,
+                active_revision_id,
+                active_round_id,
+                workflow_card_message_id,
+                lead_session_agent_id,
+                status,
+                current_round,
+                title,
+                compiled_graph_hash,
+                started_at,
+                completed_at,
+                created_at,
+                updated_at
+            )
+            SELECT
+                id,
+                session_id,
+                plan_id,
+                active_revision_id,
+                active_round_id,
+                workflow_card_message_id,
+                lead_session_agent_id,
+                CASE status
+                    WHEN 'bootstrapping' THEN 'pending'
+                    WHEN 'interrupting' THEN 'running'
+                    WHEN 'waiting_user' THEN 'waiting'
+                    WHEN 'waiting_user_acceptance' THEN 'waiting'
+                    WHEN 'resuming' THEN 'running'
+                    WHEN 'completing' THEN 'running'
+                    WHEN 'cancelled' THEN 'failed'
+                    ELSE status
+                END,
+                current_round,
+                title,
+                compiled_graph_hash,
+                started_at,
+                completed_at,
+                created_at,
+                updated_at
+            FROM chat_workflow_executions_old
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+
+        sqlx::query("DROP TABLE chat_workflow_executions_old")
+            .execute(&mut *conn)
+            .await?;
+
+        sqlx::query("ALTER TABLE chat_workflow_rounds RENAME TO chat_workflow_rounds_old")
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            r#"
+            CREATE TABLE chat_workflow_rounds (
+                id                  BLOB    NOT NULL PRIMARY KEY,
+                execution_id        BLOB    NOT NULL REFERENCES chat_workflow_executions(id),
+                round_index         INTEGER NOT NULL DEFAULT 1,
+                source_revision_id  BLOB    REFERENCES chat_workflow_plan_revisions(id),
+                status              TEXT    NOT NULL DEFAULT 'running'
+                                            CHECK (status IN (
+                                                'running', 'waiting_user_acceptance',
+                                                'accepted', 'rejected', 'archived'
+                                            )),
+                result_step_id      BLOB,
+                user_decision_summary TEXT,
+                started_at          TEXT,
+                completed_at        TEXT,
+                archived_at         TEXT,
+                created_at          TEXT    NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at          TEXT    NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            r#"
+            INSERT INTO chat_workflow_rounds (
+                id, execution_id, round_index, source_revision_id, status, result_step_id,
+                user_decision_summary, started_at, completed_at, archived_at, created_at,
+                updated_at
+            )
+            SELECT
+                id, execution_id, round_index, source_revision_id, status, result_step_id,
+                user_decision_summary, started_at, completed_at, archived_at, created_at,
+                updated_at
+            FROM chat_workflow_rounds_old
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query("DROP TABLE chat_workflow_rounds_old")
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_rounds_execution_id ON chat_workflow_rounds(execution_id)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "CREATE UNIQUE INDEX idx_workflow_rounds_exec_index ON chat_workflow_rounds(execution_id, round_index)",
+        )
+        .execute(&mut *conn)
+        .await?;
+
+        sqlx::query("ALTER TABLE chat_workflow_steps RENAME TO chat_workflow_steps_old")
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            r#"
+            CREATE TABLE chat_workflow_steps (
+                id                              BLOB    NOT NULL PRIMARY KEY,
+                execution_id                    BLOB    NOT NULL REFERENCES chat_workflow_executions(id),
+                round_id                        BLOB    NOT NULL REFERENCES chat_workflow_rounds(id),
+                compiled_revision_id            BLOB    REFERENCES chat_workflow_plan_revisions(id),
+                step_key                        TEXT    NOT NULL,
+                step_type                       TEXT    NOT NULL
+                                                        CHECK (step_type IN ('task', 'review', 'result')),
+                title                           TEXT    NOT NULL DEFAULT '',
+                instructions                    TEXT    NOT NULL DEFAULT '',
+                assigned_workflow_agent_session_id BLOB,
+                status                          TEXT    NOT NULL DEFAULT 'pending'
+                                                        CHECK (status IN (
+                                                            'pending', 'ready', 'running',
+                                                            'interrupt_requested', 'interrupted',
+                                                            'waiting_input', 'waiting_review',
+                                                            'blocked', 'completed', 'failed',
+                                                            'skipped', 'cancelled'
+                                                        )),
+                retry_count                     INTEGER NOT NULL DEFAULT 0,
+                max_retry                       INTEGER NOT NULL DEFAULT 1,
+                round_index                     INTEGER NOT NULL DEFAULT 1,
+                display_order                   INTEGER NOT NULL DEFAULT 0,
+                latest_run_id                   BLOB,
+                summary_text                    TEXT,
+                created_at                      TEXT    NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at                      TEXT    NOT NULL DEFAULT (datetime('now', 'subsec')),
+                started_at                      TEXT,
+                completed_at                    TEXT
+            )
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            r#"
+            INSERT INTO chat_workflow_steps (
+                id, execution_id, round_id, compiled_revision_id, step_key, step_type, title,
+                instructions, assigned_workflow_agent_session_id, status, retry_count,
+                max_retry, round_index, display_order, latest_run_id, summary_text,
+                created_at, updated_at, started_at, completed_at
+            )
+            SELECT
+                id, execution_id, round_id, compiled_revision_id, step_key, step_type, title,
+                instructions, assigned_workflow_agent_session_id, status, retry_count,
+                max_retry, round_index, display_order, latest_run_id, summary_text,
+                created_at, updated_at, started_at, completed_at
+            FROM chat_workflow_steps_old
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query("DROP TABLE chat_workflow_steps_old")
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_steps_execution_id ON chat_workflow_steps(execution_id)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query("CREATE INDEX idx_workflow_steps_round_id ON chat_workflow_steps(round_id)")
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query("CREATE INDEX idx_workflow_steps_status ON chat_workflow_steps(status)")
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            "CREATE UNIQUE INDEX idx_workflow_steps_round_key ON chat_workflow_steps(round_id, step_key)",
+        )
+        .execute(&mut *conn)
+        .await?;
+
+        sqlx::query(
+            "ALTER TABLE chat_workflow_step_edges RENAME TO chat_workflow_step_edges_old",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            r#"
+            CREATE TABLE chat_workflow_step_edges (
+                id                  BLOB    NOT NULL PRIMARY KEY,
+                execution_id        BLOB    NOT NULL REFERENCES chat_workflow_executions(id),
+                compiled_revision_id BLOB   REFERENCES chat_workflow_plan_revisions(id),
+                from_step_id        BLOB    NOT NULL REFERENCES chat_workflow_steps(id),
+                to_step_id          BLOB    NOT NULL REFERENCES chat_workflow_steps(id),
+                edge_kind           TEXT    NOT NULL DEFAULT 'hard'
+                                            CHECK (edge_kind IN ('hard', 'soft')),
+                created_at          TEXT    NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            r#"
+            INSERT INTO chat_workflow_step_edges (
+                id, execution_id, compiled_revision_id, from_step_id, to_step_id, edge_kind,
+                created_at
+            )
+            SELECT
+                id, execution_id, compiled_revision_id, from_step_id, to_step_id, edge_kind,
+                created_at
+            FROM chat_workflow_step_edges_old
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query("DROP TABLE chat_workflow_step_edges_old")
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_step_edges_execution_id ON chat_workflow_step_edges(execution_id)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_step_edges_from ON chat_workflow_step_edges(from_step_id)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query("CREATE INDEX idx_workflow_step_edges_to ON chat_workflow_step_edges(to_step_id)")
+            .execute(&mut *conn)
+            .await?;
+
+        sqlx::query(
+            "ALTER TABLE chat_workflow_agent_sessions RENAME TO chat_workflow_agent_sessions_old",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            r#"
+            CREATE TABLE chat_workflow_agent_sessions (
+                id                      BLOB    NOT NULL PRIMARY KEY,
+                workflow_execution_id   BLOB    NOT NULL REFERENCES chat_workflow_executions(id),
+                session_agent_id        BLOB    NOT NULL,
+                role                    TEXT    NOT NULL DEFAULT 'worker'
+                                                CHECK (role IN ('lead', 'worker', 'reviewer')),
+                agent_session_id        TEXT,
+                agent_message_id        TEXT,
+                state                   TEXT    NOT NULL DEFAULT 'idle'
+                                                CHECK (state IN (
+                                                    'idle', 'running', 'interrupt_requested',
+                                                    'interrupted', 'waiting_input', 'waiting_approval',
+                                                    'paused', 'completed', 'failed', 'expired'
+                                                )),
+                created_at              TEXT    NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at              TEXT    NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            r#"
+            INSERT INTO chat_workflow_agent_sessions (
+                id, workflow_execution_id, session_agent_id, role, agent_session_id,
+                agent_message_id, state, created_at, updated_at
+            )
+            SELECT
+                id, workflow_execution_id, session_agent_id, role, agent_session_id,
+                agent_message_id, state, created_at, updated_at
+            FROM chat_workflow_agent_sessions_old
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query("DROP TABLE chat_workflow_agent_sessions_old")
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_agent_sessions_execution_id ON chat_workflow_agent_sessions(workflow_execution_id)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_agent_sessions_state ON chat_workflow_agent_sessions(state)",
+        )
+        .execute(&mut *conn)
+        .await?;
+
+        sqlx::query("ALTER TABLE chat_workflow_events RENAME TO chat_workflow_events_old")
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            r#"
+            CREATE TABLE chat_workflow_events (
+                id              BLOB    NOT NULL PRIMARY KEY,
+                execution_id    BLOB    NOT NULL REFERENCES chat_workflow_executions(id),
+                round_id        BLOB,
+                step_id         BLOB,
+                agent_session_id BLOB,
+                event_type      TEXT    NOT NULL,
+                status_before   TEXT,
+                status_after    TEXT,
+                detail_json     TEXT,
+                created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            r#"
+            INSERT INTO chat_workflow_events (
+                id, execution_id, round_id, step_id, agent_session_id, event_type,
+                status_before, status_after, detail_json, created_at
+            )
+            SELECT
+                id, execution_id, round_id, step_id, agent_session_id, event_type,
+                status_before, status_after, detail_json, created_at
+            FROM chat_workflow_events_old
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query("DROP TABLE chat_workflow_events_old")
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_events_execution_id ON chat_workflow_events(execution_id)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_events_event_type ON chat_workflow_events(event_type)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_events_created_at ON chat_workflow_events(created_at)",
+        )
+        .execute(&mut *conn)
+        .await?;
+
+        sqlx::query(
+            "ALTER TABLE chat_workflow_transcripts RENAME TO chat_workflow_transcripts_old",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            r#"
+            CREATE TABLE chat_workflow_transcripts (
+                id                        BLOB NOT NULL PRIMARY KEY,
+                execution_id              BLOB NOT NULL REFERENCES chat_workflow_executions(id),
+                round_id                  BLOB REFERENCES chat_workflow_rounds(id),
+                workflow_agent_session_id BLOB REFERENCES chat_workflow_agent_sessions(id),
+                step_id                   BLOB REFERENCES chat_workflow_steps(id),
+                sender_type               TEXT NOT NULL DEFAULT 'system',
+                entry_type                TEXT NOT NULL DEFAULT 'message',
+                content                   TEXT NOT NULL DEFAULT '',
+                meta_json                 TEXT,
+                created_at                TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            r#"
+            INSERT INTO chat_workflow_transcripts (
+                id, execution_id, round_id, workflow_agent_session_id, step_id, sender_type,
+                entry_type, content, meta_json, created_at
+            )
+            SELECT
+                id, execution_id, round_id, workflow_agent_session_id, step_id, sender_type,
+                entry_type, content, meta_json, created_at
+            FROM chat_workflow_transcripts_old
+            "#,
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query("DROP TABLE chat_workflow_transcripts_old")
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_transcripts_execution_id ON chat_workflow_transcripts(execution_id)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_transcripts_step_id ON chat_workflow_transcripts(step_id)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_transcripts_entry_type ON chat_workflow_transcripts(entry_type)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_transcripts_created_at ON chat_workflow_transcripts(created_at)",
+        )
+        .execute(&mut *conn)
+        .await?;
+
+        sqlx::query(
+            "CREATE INDEX idx_workflow_executions_session_id ON chat_workflow_executions(session_id)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_executions_plan_id ON chat_workflow_executions(plan_id)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_executions_status ON chat_workflow_executions(status)",
+        )
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "CREATE INDEX idx_workflow_executions_active_revision_id ON chat_workflow_executions(active_revision_id)",
+        )
+        .execute(&mut *conn)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO _sqlx_migrations (
+                version,
+                description,
+                success,
+                checksum,
+                execution_time
+            )
+            VALUES (?1, ?2, 1, ?3, ?4)
+            "#,
+        )
+        .bind(migration.version)
+        .bind(migration.description.clone())
+        .bind(&*migration.checksum)
+        .bind(started.elapsed().as_nanos() as i64)
+        .execute(&mut *conn)
+        .await?;
+
+        sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(&mut *conn)
+            .await?;
+
+        let fk_violations = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM pragma_foreign_key_check")
+            .fetch_one(&mut *conn)
+            .await?;
+        if fk_violations > 0 {
+            return Err(Error::Protocol(
+                "workflow execution status migration shim left foreign key violations".into(),
+            ));
+        }
+
+        Ok::<(), Error>(())
+    }
+    .await;
+
+    let _ = sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&mut *conn)
+        .await;
+
+    result
+}
+
 async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), Error> {
     use std::collections::HashSet;
 
     let migrator = sqlx::migrate!("./migrations");
+    apply_workflow_execution_status_migration_shim(pool, &migrator).await?;
     let mut processed_versions: HashSet<i64> = HashSet::new();
 
     loop {

@@ -1217,7 +1217,7 @@ export function ChatSessions() {
       const projection =
         workflowCardProjectionByMessageId[message.id] ??
         extractWorkflowCardProjection(message.meta);
-      return projection?.execution_id && projection.execution_status === 'waiting_user';
+      return projection?.execution_id && projection.execution_status === 'waiting';
     });
 
     if (!pendingWorkflowCard) {

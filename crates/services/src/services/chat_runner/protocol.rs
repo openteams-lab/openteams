@@ -804,6 +804,7 @@ impl ChatRunner {
             lead_agent,
             lead_session_agent,
             &prompt,
+            Uuid::nil(),
         )
         .await
         {

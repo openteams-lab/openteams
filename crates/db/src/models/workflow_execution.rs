@@ -67,7 +67,7 @@ impl WorkflowExecution {
         session_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(&format!(
-            "{EXECUTION_SELECT}\nWHERE session_id = ?1 AND status NOT IN ('completed', 'failed', 'cancelled')\nORDER BY created_at DESC"
+            "{EXECUTION_SELECT}\nWHERE session_id = ?1 AND status NOT IN ('completed', 'failed')\nORDER BY created_at DESC"
         ))
         .bind(session_id)
         .fetch_all(pool)

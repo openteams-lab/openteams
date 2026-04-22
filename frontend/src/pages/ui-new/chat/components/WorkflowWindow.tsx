@@ -412,7 +412,7 @@ export function WorkflowWindow({
     projection.state === 'preview_ready' || projection.state === 'preview_invalid';
   const isRunning = projection.execution_status === 'running';
   const canResume =
-    projection.execution_status === 'paused' || projection.execution_status === 'failed';
+    projection.execution_status === 'paused' || projection.execution_status === 'failed' || projection.state === 'pending';
 
   const agents = projection.agents ?? [];
   const leadAgentId =

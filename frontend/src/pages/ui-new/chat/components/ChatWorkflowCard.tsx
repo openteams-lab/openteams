@@ -1,7 +1,6 @@
 import type { ChatMessage } from 'shared/types';
 import { CheckCircleIcon, ClockIcon, PlayIcon, WarningCircleIcon, PauseIcon } from '@phosphor-icons/react';
 import type { WorkflowCardData } from '@/lib/api';
-import { cn } from '@/lib/utils';
 import { WorkflowGraphBoard } from './WorkflowGraphBoard';
 
 type WorkflowCardNode = {
@@ -33,8 +32,9 @@ type WorkflowCardProjectionInternal = {
   state:
     | 'preview_ready'
     | 'preview_invalid'
+    | 'pending'
     | 'running'
-    | 'waiting_user'
+    | 'waiting'
     | 'completed'
     | 'failed'
     | 'paused';
@@ -122,7 +122,7 @@ export function ChatWorkflowCard({
       <PlayIcon className="size-icon-sm text-[#D97706]" weight="fill" />
     ) : projection.state === 'paused' ? (
       <PauseIcon className="size-icon-sm text-[#D97706]" weight="fill" />
-    ) : projection.state === 'waiting_user' ? (
+    ) : projection.state === 'waiting' ? (
       <WarningCircleIcon className="size-icon-sm text-[#7C3AED]" weight="fill" />
     ) : (
       <ClockIcon className="size-icon-sm text-[#2563EB]" weight="fill" />
@@ -137,10 +137,12 @@ export function ChatWorkflowCard({
           ? 'Plan Ready'
           : projection.state === 'preview_invalid'
             ? 'Plan Invalid'
-            : projection.state === 'waiting_user'
+            : projection.state === 'waiting'
               ? 'Action Required'
             : projection.state === 'paused'
               ? 'Paused'
+              : projection.state === 'pending'
+                ? 'Preparing'
               : 'Workflow Running';
 
   return (

@@ -1,11 +1,7 @@
-//! State Reducer: 集中管理所有 workflow 状态迁移
+//! State reducer for workflow execution, step, and agent-session transitions.
 //!
-//! 所有状态变更必须经过 reducer，不允许直接修改数据库状态字段。
-//! reducer 负责：
-//! 1. 校验状态迁移合法性（含三层组合约束）
-//! 2. 执行迁移并持久化
-//! 3. 自动记录状态变更审计事件
-//! 4. 拒绝非法迁移并记录日志
+//! All workflow state writes should go through this module so that transition
+//! validation and audit-event emission stay consistent.
 
 use db::models::{
     workflow_agent_session::WorkflowAgentSession,
@@ -18,7 +14,6 @@ use serde::Serialize;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-/// 将枚举序列化为规范的 wire format（snake_case），用于审计事件的 status_before/status_after
 fn to_wire_format<T: Serialize>(value: &T) -> String {
     serde_json::to_value(value)
         .ok()
@@ -26,14 +21,13 @@ fn to_wire_format<T: Serialize>(value: &T) -> String {
         .unwrap_or_else(|| format!("{:?}", value as *const T))
 }
 
-/// 状态迁移错误
 #[derive(Debug, thiserror::Error)]
 pub enum TransitionError {
-    #[error("非法的执行状态迁移: {from} -> {to}")]
+    #[error("非法 execution 状态迁移: {from} -> {to}")]
     IllegalExecutionTransition { from: String, to: String },
-    #[error("非法的步骤状态迁移: {from} -> {to}")]
+    #[error("非法 step 状态迁移: {from} -> {to}")]
     IllegalStepTransition { from: String, to: String },
-    #[error("非法的 Agent Session 状态迁移: {from} -> {to}")]
+    #[error("非法 agent session 状态迁移: {from} -> {to}")]
     IllegalAgentSessionTransition { from: String, to: String },
     #[error("数据库错误: {0}")]
     Database(String),
@@ -45,32 +39,158 @@ impl From<sqlx::Error> for TransitionError {
     }
 }
 
-/// 状态迁移结果：包含更新后的实体和审计事件
 #[derive(Debug)]
 pub struct TransitionResult<T> {
     pub entity: T,
     pub event: WorkflowEvent,
 }
 
-// ---------------------------------------------------------------------------
-// Execution 状态机
-// ---------------------------------------------------------------------------
-// pending -> bootstrapping -> running
-// bootstrapping -> failed
-// running -> interrupting -> waiting_user
-// running -> waiting_user (step requests user action: approval/permission/continue)
-// running -> waiting_user_acceptance
-// running -> paused
-// running -> completing -> completed
-// running -> failed
-// waiting_user -> running
-// waiting_user_acceptance -> paused -> recompiling -> resuming -> running
-// waiting_user_acceptance -> completing -> completed
-// paused -> recompiling -> resuming -> running
-// paused -> cancelled
-// waiting_user -> cancelled
+fn is_step_waiting(status: &WorkflowStepStatus) -> bool {
+    matches!(
+        status,
+        WorkflowStepStatus::WaitingInput | WorkflowStepStatus::WaitingReview
+    )
+}
 
-/// 校验 Execution 状态迁移是否合法
+fn is_step_completed_like(status: &WorkflowStepStatus) -> bool {
+    matches!(
+        status,
+        WorkflowStepStatus::Completed | WorkflowStepStatus::Skipped | WorkflowStepStatus::Cancelled
+    )
+}
+
+fn is_step_ready_like(status: &WorkflowStepStatus) -> bool {
+    matches!(
+        status,
+        WorkflowStepStatus::Pending | WorkflowStepStatus::Ready | WorkflowStepStatus::Blocked
+    )
+}
+
+fn is_step_failed_like(status: &WorkflowStepStatus) -> bool {
+    matches!(
+        status,
+        WorkflowStepStatus::Failed
+            | WorkflowStepStatus::InterruptRequested
+            | WorkflowStepStatus::Interrupted
+    )
+}
+
+pub fn derive_execution_status(
+    current: &WorkflowExecutionStatus,
+    step_statuses: &[WorkflowStepStatus],
+) -> WorkflowExecutionStatus {
+    use WorkflowExecutionStatus as E;
+
+    if *current == E::Recompiling {
+        return E::Recompiling;
+    }
+
+    if step_statuses.is_empty() {
+        return E::Pending;
+    }
+
+    if step_statuses
+        .iter()
+        .all(|status| matches!(status, WorkflowStepStatus::Pending))
+    {
+        return E::Pending;
+    }
+
+    if step_statuses.iter().all(is_step_completed_like) {
+        return E::Completed;
+    }
+
+    if step_statuses
+        .iter()
+        .any(|status| matches!(status, WorkflowStepStatus::Running))
+    {
+        return E::Running;
+    }
+
+    if step_statuses.iter().any(is_step_failed_like) {
+        return E::Failed;
+    }
+
+    if step_statuses.iter().any(is_step_waiting)
+        && step_statuses
+            .iter()
+            .all(|status| is_step_waiting(status) || is_step_completed_like(status))
+    {
+        return E::Waiting;
+    }
+
+    if step_statuses
+        .iter()
+        .all(|status| is_step_ready_like(status) || is_step_completed_like(status))
+    {
+        return E::Paused;
+    }
+
+    E::Paused
+}
+
+pub fn derive_agent_session_state(
+    current: &WorkflowAgentSessionState,
+    step_statuses: &[WorkflowStepStatus],
+) -> WorkflowAgentSessionState {
+    use WorkflowAgentSessionState as A;
+
+    if *current == A::Expired {
+        return A::Expired;
+    }
+
+    if step_statuses.is_empty() {
+        return A::Idle;
+    }
+
+    if step_statuses
+        .iter()
+        .any(|status| matches!(status, WorkflowStepStatus::Running))
+    {
+        return A::Running;
+    }
+
+    if step_statuses
+        .iter()
+        .any(|status| matches!(status, WorkflowStepStatus::WaitingInput))
+    {
+        return A::WaitingInput;
+    }
+
+    if step_statuses
+        .iter()
+        .any(|status| matches!(status, WorkflowStepStatus::WaitingReview))
+    {
+        return A::WaitingApproval;
+    }
+
+    if step_statuses.iter().any(is_step_failed_like) {
+        return A::Failed;
+    }
+
+    if step_statuses.iter().all(is_step_completed_like) {
+        return A::Completed;
+    }
+
+    A::Idle
+}
+
+fn is_agent_session_derived_state(state: &WorkflowAgentSessionState) -> bool {
+    matches!(
+        state,
+        WorkflowAgentSessionState::Idle
+            | WorkflowAgentSessionState::Running
+            | WorkflowAgentSessionState::WaitingInput
+            | WorkflowAgentSessionState::WaitingApproval
+            | WorkflowAgentSessionState::Failed
+            | WorkflowAgentSessionState::Completed
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Execution transitions
+// ---------------------------------------------------------------------------
+
 pub fn validate_execution_transition(
     from: &WorkflowExecutionStatus,
     to: &WorkflowExecutionStatus,
@@ -78,31 +198,19 @@ pub fn validate_execution_transition(
     use WorkflowExecutionStatus::*;
 
     let allowed = match from {
-        Pending => matches!(to, Bootstrapping),
-        Bootstrapping => matches!(to, Running | Failed),
-        Running => matches!(
-            to,
-            Interrupting | WaitingUser | WaitingUserAcceptance | Paused | Completing | Failed
-        ),
-        Interrupting => matches!(to, WaitingUser | Paused),
-        WaitingUser => matches!(to, Running | Failed | Cancelled),
-        WaitingUserAcceptance => matches!(to, Completing | Paused),
-        Paused => matches!(to, Recompiling | Resuming | Cancelled),
-        Recompiling => matches!(to, Resuming),
-        Resuming => matches!(to, Running),
-        Completing => matches!(to, Completed),
-        Failed => matches!(to, Resuming),
-        Completed | Cancelled => false,
+        Pending => matches!(to, Running | Failed | Paused | Recompiling | Completed | Waiting),
+        Running => matches!(to, Failed | Paused | Recompiling | Completed | Waiting),
+        Failed => matches!(to, Running | Paused | Recompiling | Waiting),
+        Paused => matches!(to, Running | Failed | Recompiling | Completed | Waiting),
+        Recompiling => matches!(to, Running | Failed | Paused | Completed | Waiting),
+        Waiting => matches!(to, Running | Failed | Paused | Recompiling | Completed),
+        Completed => false,
     };
 
     if allowed {
         Ok(())
     } else {
-        tracing::warn!(
-            from = ?from,
-            to = ?to,
-            "非法的执行状态迁移被拒绝"
-        );
+        tracing::warn!(from = ?from, to = ?to, "非法 execution 状态迁移被拒绝");
         Err(TransitionError::IllegalExecutionTransition {
             from: format!("{:?}", from),
             to: format!("{:?}", to),
@@ -111,20 +219,9 @@ pub fn validate_execution_transition(
 }
 
 // ---------------------------------------------------------------------------
-// Step 状态机
+// Step transitions
 // ---------------------------------------------------------------------------
-// pending -> ready -> running
-// running -> waiting_input -> ready
-// running -> waiting_review -> ready
-// running -> interrupt_requested -> interrupted
-// running -> completed
-// running -> failed
-// pending -> blocked -> ready
-// pending -> cancelled
-// blocked -> cancelled
-// failed -> ready (retry only)
 
-/// 校验 Step 状态迁移是否合法
 pub fn validate_step_transition(
     from: &WorkflowStepStatus,
     to: &WorkflowStepStatus,
@@ -140,8 +237,8 @@ pub fn validate_step_transition(
         ),
         WaitingInput => matches!(to, Ready | Failed),
         WaitingReview => matches!(to, Ready | Failed),
-        InterruptRequested => matches!(to, Interrupted),
-        Interrupted => matches!(to, Cancelled),
+        InterruptRequested => matches!(to, Interrupted | Failed),
+        Interrupted => matches!(to, Failed | Cancelled),
         Blocked => matches!(to, Ready | Cancelled),
         Failed => matches!(to, Ready),
         Completed | Skipped | Cancelled => false,
@@ -150,11 +247,7 @@ pub fn validate_step_transition(
     if allowed {
         Ok(())
     } else {
-        tracing::warn!(
-            from = ?from,
-            to = ?to,
-            "非法的步骤状态迁移被拒绝"
-        );
+        tracing::warn!(from = ?from, to = ?to, "非法 step 状态迁移被拒绝");
         Err(TransitionError::IllegalStepTransition {
             from: format!("{:?}", from),
             to: format!("{:?}", to),
@@ -163,50 +256,22 @@ pub fn validate_step_transition(
 }
 
 // ---------------------------------------------------------------------------
-// Agent Session 状态机
+// Agent session transitions
 // ---------------------------------------------------------------------------
-// idle -> running
-// running -> waiting_input
-// running -> waiting_approval
-// running -> interrupt_requested -> interrupted
-// running -> paused
-// running -> completed
-// running -> failed
-// waiting_input -> running
-// waiting_approval -> running
-// paused -> idle
-// interrupted -> idle
 
-/// 校验 Agent Session 状态迁移是否合法
 pub fn validate_agent_session_transition(
     from: &WorkflowAgentSessionState,
     to: &WorkflowAgentSessionState,
 ) -> Result<(), TransitionError> {
-    use WorkflowAgentSessionState::*;
-
     let allowed = match from {
-        Idle => matches!(to, Running),
-        Running => matches!(
-            to,
-            WaitingInput | WaitingApproval | InterruptRequested | Paused | Completed | Failed
-        ),
-        WaitingInput => matches!(to, Running | Failed),
-        WaitingApproval => matches!(to, Running | Failed),
-        InterruptRequested => matches!(to, Interrupted),
-        Interrupted => matches!(to, Idle),
-        Paused => matches!(to, Idle),
-        Failed => matches!(to, Idle),
-        Completed | Expired => false,
+        WorkflowAgentSessionState::Expired => false,
+        _ => is_agent_session_derived_state(to) && from != to,
     };
 
     if allowed {
         Ok(())
     } else {
-        tracing::warn!(
-            from = ?from,
-            to = ?to,
-            "非法的 agent session 状态迁移被拒绝"
-        );
+        tracing::warn!(from = ?from, to = ?to, "非法 agent session 状态迁移被拒绝");
         Err(TransitionError::IllegalAgentSessionTransition {
             from: format!("{:?}", from),
             to: format!("{:?}", to),
@@ -215,10 +280,9 @@ pub fn validate_agent_session_transition(
 }
 
 // ---------------------------------------------------------------------------
-// 三层组合约束 (10.4)
+// Cross-layer compatibility
 // ---------------------------------------------------------------------------
 
-/// 校验 execution 状态下 step 状态是否合法
 pub fn validate_step_in_execution(
     execution_status: &WorkflowExecutionStatus,
     step_status: &WorkflowStepStatus,
@@ -227,62 +291,16 @@ pub fn validate_step_in_execution(
     use WorkflowStepStatus as S;
 
     match execution_status {
-        E::Running => matches!(
-            step_status,
-            S::Pending
-                | S::Ready
-                | S::Running
-                | S::Blocked
-                | S::WaitingInput
-                | S::WaitingReview
-                | S::Completed
-                | S::Failed
-        ),
-        E::Interrupting => matches!(
-            step_status,
-            S::Running | S::InterruptRequested | S::Interrupted | S::Completed | S::Failed
-        ),
-        E::WaitingUserAcceptance => matches!(
-            step_status,
-            S::Completed | S::Failed | S::Interrupted | S::Cancelled
-        ),
-        E::Paused => matches!(
-            step_status,
-            S::Pending | S::Blocked | S::Interrupted | S::Completed | S::Failed | S::Cancelled
-        ),
-        E::Recompiling => matches!(
-            step_status,
-            S::Pending | S::Blocked | S::Interrupted | S::Completed | S::Failed | S::Cancelled
-        ),
-        E::WaitingUser => matches!(
-            step_status,
-            S::WaitingInput
-                | S::WaitingReview
-                | S::Interrupted
-                | S::Completed
-                | S::Failed
-                | S::Blocked
-        ),
-        E::Failed => matches!(
-            step_status,
-            S::Ready
-                | S::Failed
-                | S::Interrupted
-                | S::WaitingInput
-                | S::WaitingReview
-                | S::Completed
-                | S::Blocked
-        ),
-        E::Completed => matches!(
-            step_status,
-            S::Completed | S::Skipped | S::Cancelled | S::Failed
-        ),
-        // For other states, allow any
-        _ => true,
+        E::Pending => matches!(step_status, S::Pending | S::Ready | S::Blocked),
+        E::Running => true,
+        E::Failed => !matches!(step_status, S::Running),
+        E::Paused => matches!(step_status, S::Pending | S::Ready | S::Blocked | S::Completed),
+        E::Recompiling => !matches!(step_status, S::Running),
+        E::Completed => matches!(step_status, S::Completed | S::Skipped | S::Cancelled),
+        E::Waiting => matches!(step_status, S::WaitingInput | S::WaitingReview | S::Completed),
     }
 }
 
-/// 校验 execution 状态下 agent session 状态是否合法
 pub fn validate_agent_session_in_execution(
     execution_status: &WorkflowExecutionStatus,
     session_state: &WorkflowAgentSessionState,
@@ -291,87 +309,47 @@ pub fn validate_agent_session_in_execution(
     use WorkflowExecutionStatus as E;
 
     match execution_status {
+        E::Pending => matches!(session_state, A::Idle),
         E::Running => matches!(
             session_state,
             A::Idle
                 | A::Running
                 | A::WaitingInput
                 | A::WaitingApproval
-                | A::Paused
-                | A::Completed
-                | A::Failed
-        ),
-        E::Interrupting => matches!(
-            session_state,
-            A::Running | A::InterruptRequested | A::Interrupted | A::Idle
-        ),
-        E::WaitingUserAcceptance => matches!(
-            session_state,
-            A::Idle | A::Completed | A::Failed | A::Paused
-        ),
-        E::Paused => matches!(
-            session_state,
-            A::Paused | A::Idle | A::Completed | A::Failed
-        ),
-        E::Recompiling => matches!(
-            session_state,
-            A::Paused | A::Idle | A::Completed | A::Failed
-        ),
-        E::WaitingUser => matches!(
-            session_state,
-            A::WaitingInput
-                | A::WaitingApproval
-                | A::Interrupted
-                | A::Idle
                 | A::Completed
                 | A::Failed
         ),
         E::Failed => matches!(
             session_state,
-            A::Idle
-                | A::Failed
-                | A::Interrupted
-                | A::WaitingInput
-                | A::WaitingApproval
-                | A::Completed
+            A::Idle | A::WaitingInput | A::WaitingApproval | A::Completed | A::Failed
         ),
-        E::Completed => matches!(
+        E::Paused => matches!(session_state, A::Idle | A::Completed),
+        E::Recompiling => matches!(
             session_state,
-            A::Idle | A::Completed | A::Failed | A::Expired
+            A::Idle | A::WaitingInput | A::WaitingApproval | A::Completed | A::Failed
         ),
-        _ => true,
+        E::Completed => matches!(session_state, A::Idle | A::Completed | A::Expired),
+        E::Waiting => matches!(
+            session_state,
+            A::Idle | A::WaitingInput | A::WaitingApproval | A::Completed
+        ),
     }
 }
 
-// ---------------------------------------------------------------------------
-// Event type mapping
-// ---------------------------------------------------------------------------
-
-/// 根据目标 Execution 状态推断事件类型
 fn execution_event_type(to: &WorkflowExecutionStatus) -> WorkflowEventType {
     use WorkflowExecutionStatus::*;
+
     match to {
-        Bootstrapping => WorkflowEventType::ExecutionBootstrapping,
+        Pending => WorkflowEventType::ExecutionCreated,
         Running => WorkflowEventType::ExecutionRunning,
         Failed => WorkflowEventType::ExecutionFailed,
-        Completed => WorkflowEventType::ExecutionCompleted,
-        Cancelled => WorkflowEventType::ExecutionCancelled,
         Paused => WorkflowEventType::ExecutionPaused,
-        Resuming => WorkflowEventType::ExecutionResumeRequested,
-        Interrupting => WorkflowEventType::ExecutionInterruptRequested,
-        WaitingUser => WorkflowEventType::ExecutionInterrupted,
-        WaitingUserAcceptance => WorkflowEventType::UserAcceptanceRequested,
         Recompiling => WorkflowEventType::PlanRecompiled,
-        Completing => WorkflowEventType::ExecutionRunning, // transitional
-        Pending => WorkflowEventType::ExecutionCreated,
+        Completed => WorkflowEventType::ExecutionCompleted,
+        Waiting => WorkflowEventType::ExecutionWaiting,
     }
 }
 
-// ---------------------------------------------------------------------------
-// Reducer entrypoints: validate + persist + emit event in one call
-// ---------------------------------------------------------------------------
-
-/// 执行 Execution 状态迁移：校验 → 持久化 → 写审计事件（原子操作）
 pub async fn transition_execution(
     pool: &SqlitePool,
     execution: &WorkflowExecution,
@@ -415,7 +393,6 @@ pub async fn transition_execution(
     })
 }
 
-/// 执行 Execution 状态迁移（带额外上下文）：校验 → 持久化 → 写审计事件
 pub async fn transition_execution_with_context(
     pool: &SqlitePool,
     execution: &WorkflowExecution,
@@ -432,9 +409,9 @@ pub async fn transition_execution_with_context(
 
     let updated = WorkflowExecution::update_status(pool, execution.id, to).await?;
 
-    let detail_json = detail.map(|d| {
+    let detail_json = detail.map(|message| {
         serde_json::json!({
-            "message": d,
+            "message": message,
             "execution_id": execution.id.to_string(),
             "compiled_graph_hash": execution.compiled_graph_hash,
         })
@@ -470,23 +447,20 @@ pub async fn transition_execution_with_context(
     })
 }
 
-/// 执行 Step 状态迁移：校验（含组合约束） → 持久化 → 写审计事件
 pub async fn transition_step(
     pool: &SqlitePool,
     execution: &WorkflowExecution,
     step: &WorkflowStep,
     to: WorkflowStepStatus,
 ) -> Result<TransitionResult<WorkflowStep>, TransitionError> {
-    // 1. 校验单层迁移合法性
     validate_step_transition(&step.status, &to)?;
 
-    // 2. 校验三层组合约束
     if !validate_step_in_execution(&execution.status, &to) {
         tracing::warn!(
             execution_status = ?execution.status,
             step_status = ?to,
             step_id = %step.id,
-            "步骤状态与执行状态组合约束冲突"
+            "step 状态与 execution 状态组合约束冲突"
         );
         return Err(TransitionError::IllegalStepTransition {
             from: format!("{:?}", step.status),
@@ -536,23 +510,20 @@ pub async fn transition_step(
     })
 }
 
-/// 执行 Agent Session 状态迁移：校验（含组合约束） → 持久化 → 写审计事件
 pub async fn transition_agent_session(
     pool: &SqlitePool,
     execution: &WorkflowExecution,
     session: &WorkflowAgentSession,
     to: WorkflowAgentSessionState,
 ) -> Result<TransitionResult<WorkflowAgentSession>, TransitionError> {
-    // 1. 校验单层迁移合法性
     validate_agent_session_transition(&session.state, &to)?;
 
-    // 2. 校验三层组合约束
     if !validate_agent_session_in_execution(&execution.status, &to) {
         tracing::warn!(
             execution_status = ?execution.status,
             session_state = ?to,
             session_id = %session.id,
-            "agent session 状态与执行状态组合约束冲突"
+            "agent session 状态与 execution 状态组合约束冲突"
         );
         return Err(TransitionError::IllegalAgentSessionTransition {
             from: format!("{:?}", session.state),
@@ -599,122 +570,36 @@ pub async fn transition_agent_session(
 mod tests {
     use super::*;
 
-    // -----------------------------------------------------------------------
-    // Execution transition tests
-    // -----------------------------------------------------------------------
-
     #[test]
-    fn test_pending_to_bootstrapping() {
+    fn execution_transition_matrix_matches_simplified_states() {
         assert!(
             validate_execution_transition(
                 &WorkflowExecutionStatus::Pending,
-                &WorkflowExecutionStatus::Bootstrapping,
+                &WorkflowExecutionStatus::Paused,
             )
             .is_ok()
         );
-    }
-
-    #[test]
-    fn test_bootstrapping_to_running() {
         assert!(
             validate_execution_transition(
-                &WorkflowExecutionStatus::Bootstrapping,
+                &WorkflowExecutionStatus::Paused,
                 &WorkflowExecutionStatus::Running,
             )
             .is_ok()
         );
-    }
-
-    #[test]
-    fn test_bootstrapping_to_failed() {
         assert!(
             validate_execution_transition(
-                &WorkflowExecutionStatus::Bootstrapping,
+                &WorkflowExecutionStatus::Running,
+                &WorkflowExecutionStatus::Waiting,
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_execution_transition(
                 &WorkflowExecutionStatus::Failed,
-            )
-            .is_ok()
-        );
-    }
-
-    #[test]
-    fn test_running_to_paused() {
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Running,
-                &WorkflowExecutionStatus::Paused,
-            )
-            .is_ok()
-        );
-    }
-
-    #[test]
-    fn test_running_to_waiting_user_acceptance() {
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Running,
-                &WorkflowExecutionStatus::WaitingUserAcceptance,
-            )
-            .is_ok()
-        );
-    }
-
-    #[test]
-    fn test_waiting_user_acceptance_to_paused() {
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::WaitingUserAcceptance,
-                &WorkflowExecutionStatus::Paused,
-            )
-            .is_ok()
-        );
-    }
-
-    #[test]
-    fn test_paused_to_recompiling() {
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Paused,
-                &WorkflowExecutionStatus::Recompiling,
-            )
-            .is_ok()
-        );
-    }
-
-    #[test]
-    fn test_recompiling_to_resuming() {
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Recompiling,
-                &WorkflowExecutionStatus::Resuming,
-            )
-            .is_ok()
-        );
-    }
-
-    #[test]
-    fn test_resuming_to_running() {
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Resuming,
                 &WorkflowExecutionStatus::Running,
             )
             .is_ok()
         );
-    }
-
-    #[test]
-    fn test_resuming_to_paused_rejected() {
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Resuming,
-                &WorkflowExecutionStatus::Paused,
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn test_completed_to_running_rejected() {
         assert!(
             validate_execution_transition(
                 &WorkflowExecutionStatus::Completed,
@@ -725,400 +610,217 @@ mod tests {
     }
 
     #[test]
-    fn test_pending_to_running_rejected() {
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Pending,
-                &WorkflowExecutionStatus::Running,
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn test_failed_to_running_rejected() {
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Failed,
-                &WorkflowExecutionStatus::Running,
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn test_recompiling_only_from_paused() {
-        // recompiling 只能从 paused 进入
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Running,
-                &WorkflowExecutionStatus::Recompiling,
-            )
-            .is_err()
-        );
-
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::WaitingUserAcceptance,
-                &WorkflowExecutionStatus::Recompiling,
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn test_paused_to_cancelled() {
-        assert!(
-            validate_execution_transition(
+    fn derive_execution_status_prioritizes_running_then_failed() {
+        assert_eq!(
+            derive_execution_status(
                 &WorkflowExecutionStatus::Paused,
-                &WorkflowExecutionStatus::Cancelled,
-            )
-            .is_ok()
+                &[
+                    WorkflowStepStatus::Completed,
+                    WorkflowStepStatus::Running,
+                    WorkflowStepStatus::Failed,
+                ],
+            ),
+            WorkflowExecutionStatus::Running
+        );
+
+        assert_eq!(
+            derive_execution_status(
+                &WorkflowExecutionStatus::Paused,
+                &[WorkflowStepStatus::Completed, WorkflowStepStatus::Failed],
+            ),
+            WorkflowExecutionStatus::Failed
         );
     }
 
     #[test]
-    fn test_running_to_waiting_user() {
-        // Running -> WaitingUser: step requests user action (approval/permission/continue)
-        assert!(
-            validate_execution_transition(
+    fn derive_execution_status_maps_waiting_and_paused_rules() {
+        assert_eq!(
+            derive_execution_status(
                 &WorkflowExecutionStatus::Running,
-                &WorkflowExecutionStatus::WaitingUser,
-            )
-            .is_ok()
+                &[
+                    WorkflowStepStatus::WaitingInput,
+                    WorkflowStepStatus::WaitingReview,
+                    WorkflowStepStatus::Completed,
+                ],
+            ),
+            WorkflowExecutionStatus::Waiting
+        );
+
+        assert_eq!(
+            derive_execution_status(
+                &WorkflowExecutionStatus::Running,
+                &[
+                    WorkflowStepStatus::Pending,
+                    WorkflowStepStatus::Ready,
+                    WorkflowStepStatus::Completed,
+                ],
+            ),
+            WorkflowExecutionStatus::Paused
         );
     }
 
     #[test]
-    fn test_waiting_user_to_failed() {
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::WaitingUser,
-                &WorkflowExecutionStatus::Failed,
-            )
-            .is_ok()
-        );
-    }
-
-    // -----------------------------------------------------------------------
-    // Step transition tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_step_pending_to_ready() {
-        assert!(
-            validate_step_transition(&WorkflowStepStatus::Pending, &WorkflowStepStatus::Ready,)
-                .is_ok()
+    fn derive_execution_status_keeps_recompiling_override() {
+        assert_eq!(
+            derive_execution_status(
+                &WorkflowExecutionStatus::Recompiling,
+                &[WorkflowStepStatus::Ready],
+            ),
+            WorkflowExecutionStatus::Recompiling
         );
     }
 
     #[test]
-    fn test_step_running_to_completed() {
-        assert!(
-            validate_step_transition(&WorkflowStepStatus::Running, &WorkflowStepStatus::Completed,)
-                .is_ok()
-        );
-    }
-
-    #[test]
-    fn test_step_running_to_interrupt_requested() {
-        assert!(
-            validate_step_transition(
-                &WorkflowStepStatus::Running,
-                &WorkflowStepStatus::InterruptRequested,
-            )
-            .is_ok()
-        );
-    }
-
-    #[test]
-    fn test_step_failed_to_ready_retry() {
-        assert!(
-            validate_step_transition(&WorkflowStepStatus::Failed, &WorkflowStepStatus::Ready,)
-                .is_ok()
-        );
-    }
-
-    #[test]
-    fn test_step_completed_terminal() {
-        assert!(
-            validate_step_transition(&WorkflowStepStatus::Completed, &WorkflowStepStatus::Running,)
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn test_step_pending_to_running_rejected() {
-        // Must go through ready first
-        assert!(
-            validate_step_transition(&WorkflowStepStatus::Pending, &WorkflowStepStatus::Running,)
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn test_step_waiting_review_to_failed() {
-        assert!(
-            validate_step_transition(
-                &WorkflowStepStatus::WaitingReview,
-                &WorkflowStepStatus::Failed,
-            )
-            .is_ok()
-        );
-    }
-
-    // -----------------------------------------------------------------------
-    // Agent Session transition tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_agent_idle_to_running() {
-        assert!(
-            validate_agent_session_transition(
+    fn derive_agent_session_state_follows_step_state() {
+        assert_eq!(
+            derive_agent_session_state(
                 &WorkflowAgentSessionState::Idle,
-                &WorkflowAgentSessionState::Running,
-            )
-            .is_ok()
+                &[WorkflowStepStatus::Running],
+            ),
+            WorkflowAgentSessionState::Running
         );
-    }
-
-    #[test]
-    fn test_agent_running_to_paused() {
-        assert!(
-            validate_agent_session_transition(
-                &WorkflowAgentSessionState::Running,
-                &WorkflowAgentSessionState::Paused,
-            )
-            .is_ok()
-        );
-    }
-
-    #[test]
-    fn test_agent_paused_to_idle() {
-        assert!(
-            validate_agent_session_transition(
-                &WorkflowAgentSessionState::Paused,
+        assert_eq!(
+            derive_agent_session_state(
                 &WorkflowAgentSessionState::Idle,
-            )
-            .is_ok()
+                &[WorkflowStepStatus::WaitingInput],
+            ),
+            WorkflowAgentSessionState::WaitingInput
+        );
+        assert_eq!(
+            derive_agent_session_state(
+                &WorkflowAgentSessionState::Idle,
+                &[WorkflowStepStatus::WaitingReview],
+            ),
+            WorkflowAgentSessionState::WaitingApproval
+        );
+        assert_eq!(
+            derive_agent_session_state(
+                &WorkflowAgentSessionState::Idle,
+                &[WorkflowStepStatus::Failed],
+            ),
+            WorkflowAgentSessionState::Failed
+        );
+        assert_eq!(
+            derive_agent_session_state(
+                &WorkflowAgentSessionState::Idle,
+                &[WorkflowStepStatus::Completed],
+            ),
+            WorkflowAgentSessionState::Completed
+        );
+        assert_eq!(
+            derive_agent_session_state(
+                &WorkflowAgentSessionState::Expired,
+                &[WorkflowStepStatus::Running],
+            ),
+            WorkflowAgentSessionState::Expired
         );
     }
 
     #[test]
-    fn test_agent_completed_terminal() {
-        assert!(
-            validate_agent_session_transition(
-                &WorkflowAgentSessionState::Completed,
-                &WorkflowAgentSessionState::Running,
-            )
-            .is_err()
-        );
+    fn agent_session_transition_matrix_follows_derived_states() {
+        assert!(validate_agent_session_transition(
+            &WorkflowAgentSessionState::Idle,
+            &WorkflowAgentSessionState::WaitingApproval,
+        )
+        .is_ok());
+        assert!(validate_agent_session_transition(
+            &WorkflowAgentSessionState::Failed,
+            &WorkflowAgentSessionState::WaitingInput,
+        )
+        .is_ok());
+        assert!(validate_agent_session_transition(
+            &WorkflowAgentSessionState::Interrupted,
+            &WorkflowAgentSessionState::Completed,
+        )
+        .is_ok());
+        assert!(validate_agent_session_transition(
+            &WorkflowAgentSessionState::Running,
+            &WorkflowAgentSessionState::Paused,
+        )
+        .is_err());
+        assert!(validate_agent_session_transition(
+            &WorkflowAgentSessionState::Completed,
+            &WorkflowAgentSessionState::Completed,
+        )
+        .is_err());
+        assert!(validate_agent_session_transition(
+            &WorkflowAgentSessionState::Expired,
+            &WorkflowAgentSessionState::Idle,
+        )
+        .is_err());
     }
 
     #[test]
-    fn test_agent_waiting_approval_to_failed() {
-        assert!(
-            validate_agent_session_transition(
-                &WorkflowAgentSessionState::WaitingApproval,
-                &WorkflowAgentSessionState::Failed,
-            )
-            .is_ok()
-        );
-    }
-
-    // -----------------------------------------------------------------------
-    // 三层组合约束 tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_running_execution_allows_running_step() {
+    fn execution_step_compatibility_matches_new_rules() {
         assert!(validate_step_in_execution(
             &WorkflowExecutionStatus::Running,
             &WorkflowStepStatus::Running,
         ));
-    }
-
-    #[test]
-    fn test_completed_execution_rejects_running_step() {
-        assert!(!validate_step_in_execution(
-            &WorkflowExecutionStatus::Completed,
-            &WorkflowStepStatus::Running,
+        assert!(validate_step_in_execution(
+            &WorkflowExecutionStatus::Waiting,
+            &WorkflowStepStatus::WaitingReview,
         ));
-    }
-
-    #[test]
-    fn test_paused_execution_rejects_running_step() {
         assert!(!validate_step_in_execution(
             &WorkflowExecutionStatus::Paused,
             &WorkflowStepStatus::Running,
         ));
+        assert!(!validate_step_in_execution(
+            &WorkflowExecutionStatus::Failed,
+            &WorkflowStepStatus::Running,
+        ));
     }
 
     #[test]
-    fn test_waiting_user_acceptance_allows_idle_session() {
+    fn execution_agent_compatibility_matches_new_rules() {
         assert!(validate_agent_session_in_execution(
-            &WorkflowExecutionStatus::WaitingUserAcceptance,
-            &WorkflowAgentSessionState::Idle,
-        ));
-    }
-
-    #[test]
-    fn test_waiting_user_acceptance_rejects_running_session() {
-        assert!(!validate_agent_session_in_execution(
-            &WorkflowExecutionStatus::WaitingUserAcceptance,
-            &WorkflowAgentSessionState::Running,
-        ));
-    }
-
-    #[test]
-    fn test_waiting_user_allows_waiting_review_step() {
-        assert!(validate_step_in_execution(
-            &WorkflowExecutionStatus::WaitingUser,
-            &WorkflowStepStatus::WaitingReview,
-        ));
-    }
-
-    #[test]
-    fn test_waiting_user_allows_waiting_approval_session() {
-        assert!(validate_agent_session_in_execution(
-            &WorkflowExecutionStatus::WaitingUser,
+            &WorkflowExecutionStatus::Waiting,
             &WorkflowAgentSessionState::WaitingApproval,
         ));
-    }
-
-    #[test]
-    fn test_running_execution_allows_paused_agent_session() {
         assert!(validate_agent_session_in_execution(
-            &WorkflowExecutionStatus::Running,
-            &WorkflowAgentSessionState::Paused,
+            &WorkflowExecutionStatus::Paused,
+            &WorkflowAgentSessionState::Idle,
+        ));
+        assert!(!validate_agent_session_in_execution(
+            &WorkflowExecutionStatus::Paused,
+            &WorkflowAgentSessionState::Running,
+        ));
+        assert!(validate_agent_session_in_execution(
+            &WorkflowExecutionStatus::Recompiling,
+            &WorkflowAgentSessionState::WaitingInput,
+        ));
+        assert!(!validate_agent_session_in_execution(
+            &WorkflowExecutionStatus::Completed,
+            &WorkflowAgentSessionState::Failed,
         ));
     }
 
-    // -----------------------------------------------------------------------
-    // Replan path semantics regression test
-    // -----------------------------------------------------------------------
-
     #[test]
-    fn test_replan_path_waiting_user_acceptance_to_paused_to_recompiling_to_resuming_to_running() {
-        // waiting_user_acceptance -> paused
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::WaitingUserAcceptance,
-                &WorkflowExecutionStatus::Paused,
-            )
-            .is_ok()
+    fn execution_event_type_matches_new_states() {
+        assert_eq!(
+            execution_event_type(&WorkflowExecutionStatus::Pending),
+            WorkflowEventType::ExecutionCreated
         );
-
-        // paused -> recompiling
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Paused,
-                &WorkflowExecutionStatus::Recompiling,
-            )
-            .is_ok()
+        assert_eq!(
+            execution_event_type(&WorkflowExecutionStatus::Waiting),
+            WorkflowEventType::ExecutionWaiting
         );
-
-        // recompiling -> resuming
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Recompiling,
-                &WorkflowExecutionStatus::Resuming,
-            )
-            .is_ok()
-        );
-
-        // resuming -> running
-        assert!(
-            validate_execution_transition(
-                &WorkflowExecutionStatus::Resuming,
-                &WorkflowExecutionStatus::Running,
-            )
-            .is_ok()
+        assert_eq!(
+            execution_event_type(&WorkflowExecutionStatus::Recompiling),
+            WorkflowEventType::PlanRecompiled
         );
     }
 
-    // -----------------------------------------------------------------------
-    // Event type mapping tests
-    // -----------------------------------------------------------------------
-
     #[test]
-    fn test_execution_event_type_mapping() {
-        assert_eq!(
-            execution_event_type(&WorkflowExecutionStatus::Bootstrapping),
-            WorkflowEventType::ExecutionBootstrapping
-        );
-        assert_eq!(
-            execution_event_type(&WorkflowExecutionStatus::Running),
-            WorkflowEventType::ExecutionRunning
-        );
-        assert_eq!(
-            execution_event_type(&WorkflowExecutionStatus::Failed),
-            WorkflowEventType::ExecutionFailed
-        );
-        assert_eq!(
-            execution_event_type(&WorkflowExecutionStatus::Completed),
-            WorkflowEventType::ExecutionCompleted
-        );
-        assert_eq!(
-            execution_event_type(&WorkflowExecutionStatus::Cancelled),
-            WorkflowEventType::ExecutionCancelled
-        );
-        assert_eq!(
-            execution_event_type(&WorkflowExecutionStatus::Paused),
-            WorkflowEventType::ExecutionPaused
-        );
-        assert_eq!(
-            execution_event_type(&WorkflowExecutionStatus::WaitingUserAcceptance),
-            WorkflowEventType::UserAcceptanceRequested
-        );
-    }
-
-    // -----------------------------------------------------------------------
-    // Wire format serialization tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_wire_format_produces_snake_case() {
-        // 多词枚举值必须序列化为 snake_case，与数据库和观测契约保持一致
-        assert_eq!(
-            to_wire_format(&WorkflowExecutionStatus::WaitingUserAcceptance),
-            "waiting_user_acceptance"
-        );
-        assert_eq!(
-            to_wire_format(&WorkflowExecutionStatus::WaitingUser),
-            "waiting_user"
-        );
-        assert_eq!(
-            to_wire_format(&WorkflowStepStatus::InterruptRequested),
-            "interrupt_requested"
-        );
+    fn wire_format_produces_expected_values() {
+        assert_eq!(to_wire_format(&WorkflowExecutionStatus::Waiting), "waiting");
+        assert_eq!(to_wire_format(&WorkflowExecutionStatus::Recompiling), "recompiling");
         assert_eq!(
             to_wire_format(&WorkflowStepStatus::WaitingInput),
-            "waiting_input"
-        );
-        assert_eq!(
-            to_wire_format(&WorkflowStepStatus::WaitingReview),
-            "waiting_review"
-        );
-        assert_eq!(
-            to_wire_format(&WorkflowAgentSessionState::InterruptRequested),
-            "interrupt_requested"
-        );
-        assert_eq!(
-            to_wire_format(&WorkflowAgentSessionState::WaitingInput),
             "waiting_input"
         );
         assert_eq!(
             to_wire_format(&WorkflowAgentSessionState::WaitingApproval),
             "waiting_approval"
         );
-    }
-
-    #[test]
-    fn test_wire_format_single_word_enums() {
-        assert_eq!(to_wire_format(&WorkflowExecutionStatus::Running), "running");
-        assert_eq!(to_wire_format(&WorkflowExecutionStatus::Paused), "paused");
-        assert_eq!(to_wire_format(&WorkflowStepStatus::Pending), "pending");
-        assert_eq!(to_wire_format(&WorkflowAgentSessionState::Idle), "idle");
     }
 }

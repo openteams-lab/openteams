@@ -86,22 +86,12 @@ pub enum WorkflowRevisionEditor {
 #[ts(use_ts_enum)]
 pub enum WorkflowExecutionStatus {
     Pending,
-    Bootstrapping,
     Running,
-    Interrupting,
-    #[sqlx(rename = "waiting_user")]
-    #[serde(rename = "waiting_user")]
-    WaitingUser,
-    #[sqlx(rename = "waiting_user_acceptance")]
-    #[serde(rename = "waiting_user_acceptance")]
-    WaitingUserAcceptance,
+    Failed,
     Paused,
     Recompiling,
-    Resuming,
-    Completing,
     Completed,
-    Failed,
-    Cancelled,
+    Waiting,
 }
 
 #[derive(Debug, Clone, Type, Serialize, Deserialize, PartialEq, TS)]
@@ -213,18 +203,13 @@ pub enum WorkflowAgentSessionState {
 #[ts(use_ts_enum)]
 pub enum WorkflowEventType {
     ExecutionCreated,
-    ExecutionBootstrapping,
     ExecutionRunning,
     ExecutionFailed,
     ExecutionCompleted,
-    ExecutionCancelled,
     ExecutionPaused,
-    ExecutionResumeRequested,
-    ExecutionInterruptRequested,
-    ExecutionInterrupted,
+    ExecutionWaiting,
     RoundStarted,
     RoundResultReady,
-    UserAcceptanceRequested,
     UserAccepted,
     UserRejected,
     RoundArchived,
