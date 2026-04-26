@@ -106,3 +106,4 @@ openteams-cloud/
 website/
 .playwright-mcp/
 qa_test/
+.codex-target/
