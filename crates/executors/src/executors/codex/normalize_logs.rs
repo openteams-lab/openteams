@@ -1683,41 +1683,35 @@ fn handle_jsonrpc_response(
     msg_store: &Arc<MsgStore>,
     entry_index: &EntryIndexProvider,
 ) {
-    if let Ok(response) = serde_json::from_value::<ThreadStartResponse>(response.result.clone()) {
+    let result = response.result;
+
+    if let Ok(response) = serde_json::from_value::<ThreadStartResponse>(result.clone()) {
         let ThreadStartResponse {
             thread,
             model,
             reasoning_effort,
             ..
         } = response;
-        if let Some(path) = thread.path {
-            match SessionHandler::extract_session_id_from_rollout_path(path) {
-                Ok(session_id) => msg_store.push_session_id(session_id),
-                Err(err) => tracing::error!("failed to extract session id: {err}"),
-            }
-        }
+        push_session_id_from_thread(thread.id, thread.path, msg_store);
 
         handle_model_params(model, reasoning_effort, msg_store, entry_index);
         return;
     }
 
-    if let Ok(response) = serde_json::from_value::<ThreadResumeResponse>(response.result.clone()) {
+    if let Ok(response) = serde_json::from_value::<ThreadResumeResponse>(result.clone()) {
         let ThreadResumeResponse {
             thread,
             model,
             reasoning_effort,
             ..
         } = response;
-        if let Some(path) = thread.path {
-            match SessionHandler::extract_session_id_from_rollout_path(path) {
-                Ok(session_id) => msg_store.push_session_id(session_id),
-                Err(err) => tracing::error!("failed to extract session id: {err}"),
-            }
-        }
+        push_session_id_from_thread(thread.id, thread.path, msg_store);
 
         handle_model_params(model, reasoning_effort, msg_store, entry_index);
         return;
     }
+
+    handle_jsonrpc_thread_response_value(&result, msg_store, entry_index);
 }
 
 fn handle_model_params(
@@ -1742,6 +1736,62 @@ fn handle_model_params(
             metadata: None,
         },
     );
+}
+
+fn handle_jsonrpc_thread_response_value(
+    result: &Value,
+    msg_store: &Arc<MsgStore>,
+    entry_index: &EntryIndexProvider,
+) {
+    let Some(thread) = result.get("thread") else {
+        return;
+    };
+
+    let thread_id = thread
+        .get("id")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned);
+    let path = thread
+        .get("path")
+        .and_then(Value::as_str)
+        .map(PathBuf::from);
+
+    if let Some(thread_id) = thread_id {
+        push_session_id_from_thread(thread_id, path, msg_store);
+    } else if let Some(path) = path {
+        match SessionHandler::extract_session_id_from_rollout_path(path) {
+            Ok(session_id) => msg_store.push_session_id(session_id),
+            Err(err) => tracing::error!("failed to extract session id: {err}"),
+        }
+    }
+
+    let Some(model) = result.get("model").and_then(Value::as_str) else {
+        return;
+    };
+    let reasoning_effort = result
+        .get("reasoningEffort")
+        .cloned()
+        .and_then(|value| serde_json::from_value::<ReasoningEffort>(value).ok());
+
+    handle_model_params(model.to_string(), reasoning_effort, msg_store, entry_index);
+}
+
+fn push_session_id_from_thread(
+    thread_id: String,
+    path: Option<PathBuf>,
+    msg_store: &Arc<MsgStore>,
+) {
+    if let Some(path) = path {
+        match SessionHandler::extract_session_id_from_rollout_path(path) {
+            Ok(session_id) => {
+                msg_store.push_session_id(session_id);
+                return;
+            }
+            Err(err) => tracing::error!("failed to extract session id: {err}"),
+        }
+    }
+
+    msg_store.push_session_id(thread_id);
 }
 
 fn build_command_output(stdout: Option<&str>, stderr: Option<&str>) -> Option<String> {
@@ -1949,6 +1999,29 @@ mod tests {
                 },
                 "permissionProfile": null,
                 "reasoningEffort": "medium"
+            }),
+        };
+
+        handle_jsonrpc_response(response, &msg_store, &entry_index);
+
+        assert_eq!(
+            session_id_from_history(&msg_store).as_deref(),
+            Some("88d1d63d-b84e-4f3d-9d87-1fb21839379d")
+        );
+    }
+
+    #[test]
+    fn handle_jsonrpc_response_falls_back_to_thread_json() {
+        let msg_store = std::sync::Arc::new(MsgStore::new());
+        let entry_index = EntryIndexProvider::start_from(&msg_store);
+        let response = codex_app_server_protocol::JSONRPCResponse {
+            id: RequestId::Integer(1),
+            result: serde_json::json!({
+                "thread": {
+                    "id": "88d1d63d-b84e-4f3d-9d87-1fb21839379d",
+                    "path": null
+                },
+                "model": 123
             }),
         };
 
