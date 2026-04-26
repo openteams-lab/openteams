@@ -138,12 +138,19 @@ impl JsonRpcPeer {
                                         }
                                     }
                                     Ok(JSONRPCMessage::Notification(notification)) => {
+                                        let method = notification.method.clone();
                                         match callbacks
                                             .on_notification(&reader_peer, line, notification)
                                             .await
                                         {
                                             // finished
-                                            Ok(true) => break,
+                                            Ok(true) => {
+                                                tracing::debug!(
+                                                    method = %method,
+                                                    "[codex-jsonrpc] notification requested reader shutdown"
+                                                );
+                                                break;
+                                            }
                                             Ok(false) => {}
                                             Err(_) => {
                                                 break;
@@ -166,8 +173,9 @@ impl JsonRpcPeer {
                 }
             }
 
-            exit_tx.send_exit_signal(ExecutorExitResult::Success).await;
             let _ = reader_peer.shutdown().await;
+            tracing::debug!("[codex-jsonrpc] sending executor exit signal");
+            exit_tx.send_exit_signal(ExecutorExitResult::Success).await;
         });
 
         peer
@@ -194,6 +202,9 @@ impl JsonRpcPeer {
         for (_, sender) in pending.drain() {
             let _ = sender.send(PendingResponse::Shutdown);
         }
+        drop(pending);
+
+        let _ = self.stdin.lock().await.shutdown().await;
         Ok(())
     }
 

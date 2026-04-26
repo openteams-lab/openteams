@@ -1,22 +1,13 @@
 use std::path::Path;
 
-use codex_app_server_protocol::JSONRPCNotification;
-use codex_core::{
-    AuthManager, RolloutRecorder, ThreadManager,
-    config::{Config, ConfigOverrides},
-    models_manager::collaboration_mode_presets::CollaborationModesConfig,
-};
-use codex_protocol::{
-    config_types::SandboxMode as CodexSandboxMode,
-    protocol::{
-        AgentMessageEvent, AskForApproval as CodexAskForApproval, ErrorEvent, Event, EventMsg,
-        Op as CoreOp, RolloutItem, SessionSource, TokenUsageInfo, TurnContextItem,
-    },
+use codex_app_server_protocol::{JSONRPCNotification, ThreadResumeParams};
+use codex_protocol::protocol::{
+    AgentMessageEvent, ErrorEvent, EventMsg, RolloutItem, TokenUsageInfo, TurnContextItem,
 };
 use serde_json::json;
 
 use super::{
-    AskForApproval, Codex, SandboxMode,
+    Codex,
     client::{AppServerClient, LogWriter},
     session::SessionHandler,
 };
@@ -142,93 +133,50 @@ impl Codex {
         &self,
         current_dir: &Path,
         session_id: &str,
-        instructions: Option<String>,
-        _env: &ExecutionEnv,
+        _instructions: Option<String>,
+        env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let (mut spawned, writer) = spawn_local_output_process()?;
-        let log_writer = LogWriter::new(writer);
-        let (exit_signal_tx, exit_signal_rx) = tokio::sync::oneshot::channel();
-
-        let codex = self.clone();
+        let command_parts = self.build_command_builder()?.build_initial()?;
+        let thread_params = self.build_thread_start_params(current_dir);
         let session_id = session_id.to_string();
-        let current_dir = current_dir.to_path_buf();
-        tokio::spawn(async move {
-            let result = codex
-                .compact_inner(&current_dir, &session_id, instructions, &log_writer)
-                .await;
-            let exit_result = match result {
-                Ok(()) => ExecutorExitResult::Success,
-                Err(err) => {
-                    let message = format!("Compact failed: {err}");
-                    let _ = codex
-                        .log_event(
-                            &log_writer,
-                            EventMsg::Error(ErrorEvent {
-                                message,
-                                codex_error_info: None,
-                            }),
-                        )
-                        .await;
-                    ExecutorExitResult::Failure
+
+        self.spawn_app_server(
+            current_dir,
+            command_parts,
+            env,
+            move |client, _exit_signal_tx| async move {
+                let auth_status = client.get_auth_status().await?;
+                if auth_status.requires_openai_auth.unwrap_or(true)
+                    && auth_status.auth_method.is_none()
+                {
+                    return Err(ExecutorError::AuthRequired(
+                        "Codex authentication required".to_string(),
+                    ));
                 }
-            };
-            let _ = exit_signal_tx.send(exit_result);
-        });
 
-        spawned.exit_signal = Some(exit_signal_rx);
-        Ok(spawned)
-    }
-
-    async fn compact_inner(
-        &self,
-        current_dir: &Path,
-        session_id: &str,
-        instructions: Option<String>,
-        log_writer: &LogWriter,
-    ) -> Result<(), ExecutorError> {
-        let rollout_path = SessionHandler::find_rollout_file_path(session_id)
-            .map_err(|err| ExecutorError::Io(std::io::Error::other(err.to_string())))?;
-        let config = self.build_core_config(current_dir, instructions).await?;
-        let auth_manager = AuthManager::shared(
-            config.codex_home.clone(),
-            true,
-            config.cli_auth_credentials_store_mode,
-        );
-        let thread_manager = ThreadManager::new(
-            &config,
-            auth_manager.clone(),
-            SessionSource::Exec,
-            CollaborationModesConfig::default(),
-        );
-        let new_thread = thread_manager
-            .resume_thread_from_rollout(config, rollout_path, auth_manager)
-            .await
-            .map_err(|err| ExecutorError::Io(std::io::Error::other(err.to_string())))?;
-        let thread = new_thread.thread;
-        thread
-            .submit(CoreOp::Compact)
-            .await
-            .map_err(|err| ExecutorError::Io(std::io::Error::other(err.to_string())))?;
-
-        loop {
-            let event: Event = thread
-                .next_event()
-                .await
-                .map_err(|err| ExecutorError::Io(std::io::Error::other(err.to_string())))?;
-            self.log_event(log_writer, event.msg.clone()).await?;
-            if matches!(event.msg, EventMsg::TurnComplete(_)) {
-                break;
-            }
-        }
-
-        let _ = thread.submit(CoreOp::Shutdown).await;
-        while let Ok(event) = thread.next_event().await {
-            if matches!(event.msg, EventMsg::ShutdownComplete) {
-                break;
-            }
-        }
-
-        Ok(())
+                let rollout_path = SessionHandler::find_rollout_file_path(&session_id)
+                    .map_err(|err| ExecutorError::Io(std::io::Error::other(err.to_string())))?;
+                let params = ThreadResumeParams {
+                    thread_id: session_id,
+                    path: Some(rollout_path),
+                    model: thread_params.model,
+                    model_provider: thread_params.model_provider,
+                    cwd: thread_params.cwd,
+                    approval_policy: thread_params.approval_policy,
+                    sandbox: thread_params.sandbox,
+                    config: thread_params.config,
+                    base_instructions: thread_params.base_instructions,
+                    developer_instructions: thread_params.developer_instructions,
+                    ..Default::default()
+                };
+                let response = client.resume_thread(params).await?;
+                let thread_id = response.thread.id;
+                client.register_session(&thread_id).await?;
+                client.start_compact(thread_id).await?;
+                Ok(())
+            },
+        )
+        .await
     }
 
     // Handle slash commands that require interaction with the app server
@@ -279,6 +227,7 @@ impl Codex {
                 Ok(message) => EventMsg::AgentMessage(AgentMessageEvent {
                     message,
                     phase: None,
+                    memory_citation: None,
                 }),
                 Err(message) => EventMsg::Error(ErrorEvent {
                     message,
@@ -313,44 +262,6 @@ impl Codex {
 
         spawned.exit_signal = Some(exit_signal_rx);
         Ok(spawned)
-    }
-
-    pub async fn build_core_config(
-        &self,
-        current_dir: &Path,
-        compact_prompt_override: Option<String>,
-    ) -> Result<Config, ExecutorError> {
-        let approval_policy = match self.ask_for_approval.as_ref() {
-            Some(policy) => Some(Self::map_ask_for_approval(policy)),
-            None if matches!(self.sandbox.as_ref(), None | Some(SandboxMode::Auto)) => {
-                Some(CodexAskForApproval::OnRequest)
-            }
-            None => None,
-        };
-        let sandbox_mode = match self.sandbox.as_ref() {
-            None | Some(SandboxMode::Auto) => Some(CodexSandboxMode::WorkspaceWrite),
-            Some(SandboxMode::ReadOnly) => Some(CodexSandboxMode::ReadOnly),
-            Some(SandboxMode::WorkspaceWrite) => Some(CodexSandboxMode::WorkspaceWrite),
-            Some(SandboxMode::DangerFullAccess) => Some(CodexSandboxMode::DangerFullAccess),
-        };
-
-        let overrides = ConfigOverrides {
-            cwd: Some(current_dir.to_path_buf()),
-            model: self.model.clone(),
-            model_provider: self.model_provider.clone(),
-            config_profile: self.profile.clone(),
-            approval_policy,
-            sandbox_mode,
-            base_instructions: self.base_instructions.clone(),
-            developer_instructions: self.developer_instructions.clone(),
-            compact_prompt: compact_prompt_override.or_else(|| self.compact_prompt.clone()),
-            include_apply_patch_tool: self.include_apply_patch_tool,
-            ..Default::default()
-        };
-
-        Config::load_with_cli_overrides_and_harness_overrides(Vec::new(), overrides)
-            .await
-            .map_err(|err| ExecutorError::Io(std::io::Error::other(err.to_string())))
     }
 
     async fn build_status_message(
@@ -417,10 +328,25 @@ impl Codex {
     async fn load_rollout_items(session_id: &str) -> Result<Vec<RolloutItem>, ExecutorError> {
         let rollout_path = SessionHandler::find_rollout_file_path(session_id)
             .map_err(|err| ExecutorError::Io(std::io::Error::other(err.to_string())))?;
-        let history = RolloutRecorder::get_rollout_history(&rollout_path)
+        let content = tokio::fs::read_to_string(&rollout_path)
             .await
-            .map_err(|err| ExecutorError::Io(std::io::Error::other(err.to_string())))?;
-        Ok(history.get_rollout_items())
+            .map_err(ExecutorError::Io)?;
+        let mut items = Vec::new();
+        for (index, line) in content.lines().enumerate() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let item = serde_json::from_str::<RolloutItem>(line).map_err(|err| {
+                ExecutorError::Io(std::io::Error::other(format!(
+                    "failed to parse rollout item at line {} in {}: {err}",
+                    index + 1,
+                    rollout_path.display()
+                )))
+            })?;
+            items.push(item);
+        }
+        Ok(items)
     }
 
     fn latest_turn_context(items: &[RolloutItem]) -> Option<TurnContextItem> {
@@ -470,15 +396,6 @@ impl Codex {
         lines
     }
 
-    fn map_ask_for_approval(value: &AskForApproval) -> CodexAskForApproval {
-        match value {
-            AskForApproval::UnlessTrusted => CodexAskForApproval::UnlessTrusted,
-            AskForApproval::OnFailure => CodexAskForApproval::OnFailure,
-            AskForApproval::OnRequest => CodexAskForApproval::OnRequest,
-            AskForApproval::Never => CodexAskForApproval::Never,
-        }
-    }
-
     pub async fn log_event(
         &self,
         log_writer: &LogWriter,
@@ -514,6 +431,7 @@ pub async fn log_event_raw(log_writer: &LogWriter, message: String) -> Result<()
         EventMsg::AgentMessage(AgentMessageEvent {
             message,
             phase: None,
+            memory_citation: None,
         }),
     )
     .await

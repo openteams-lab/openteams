@@ -6,9 +6,8 @@ use std::{
 
 use codex_app_server_protocol::{
     CommandExecutionStatus, JSONRPCNotification, JSONRPCRequest, JSONRPCResponse,
-    McpToolCallResult, McpToolCallStatus, NewConversationResponse, PatchApplyStatus,
-    PatchChangeKind, ServerNotification, ServerRequest, ThreadItem, ThreadResumeResponse,
-    ThreadStartResponse, TurnPlanStepStatus,
+    McpToolCallResult, McpToolCallStatus, PatchApplyStatus, PatchChangeKind, ServerNotification,
+    ServerRequest, ThreadItem, ThreadResumeResponse, ThreadStartResponse, TurnPlanStepStatus,
 };
 use codex_protocol::{
     openai_models::ReasoningEffort,
@@ -786,6 +785,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 EventMsg::McpToolCallBegin(McpToolCallBeginEvent {
                     call_id,
                     invocation,
+                    ..
                 }) => {
                     state.assistant = None;
                     state.thinking = None;
@@ -1134,7 +1134,6 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 | EventMsg::AgentMessageContentDelta(..)
                 | EventMsg::ReasoningContentDelta(..)
                 | EventMsg::ReasoningRawContentDelta(..)
-                | EventMsg::ListCustomPromptsResponse(..)
                 | EventMsg::ListSkillsResponse(..)
                 | EventMsg::SkillsUpdateAvailable
                 | EventMsg::TurnAborted(..)
@@ -1475,6 +1474,7 @@ fn handle_v2_item_started(
         ThreadItem::ImageView { path, .. } => {
             state.assistant = None;
             state.thinking = None;
+            let path = path.as_path().to_string_lossy();
             let relative_path = make_path_relative(&path, worktree_path);
             add_normalized_entry(
                 msg_store,
@@ -1607,7 +1607,7 @@ fn handle_v2_item_completed(
                     McpToolCallStatus::InProgress => ToolStatus::Created,
                 };
                 if let Some(result) = result {
-                    mcp_tool_state.result = Some(tool_result_from_v2_mcp_result(result));
+                    mcp_tool_state.result = Some(tool_result_from_v2_mcp_result(*result));
                 } else if let Some(error) = error {
                     mcp_tool_state.result = Some(ToolResult {
                         r#type: ToolResultValueType::Markdown,
@@ -1718,23 +1718,6 @@ fn handle_jsonrpc_response(
         handle_model_params(model, reasoning_effort, msg_store, entry_index);
         return;
     }
-
-    let Ok(response) = serde_json::from_value::<NewConversationResponse>(response.result.clone())
-    else {
-        return;
-    };
-
-    match SessionHandler::extract_session_id_from_rollout_path(response.rollout_path) {
-        Ok(session_id) => msg_store.push_session_id(session_id),
-        Err(err) => tracing::error!("failed to extract session id: {err}"),
-    }
-
-    handle_model_params(
-        response.model,
-        response.reasoning_effort,
-        msg_store,
-        entry_index,
-    );
 }
 
 fn handle_model_params(
@@ -1910,8 +1893,6 @@ impl ToNormalizedEntryOpt for Approval {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use codex_app_server_protocol::RequestId;
     use workspace_utils::{log_msg::LogMsg, msg_store::MsgStore};
 
@@ -1929,44 +1910,46 @@ mod tests {
     fn handle_jsonrpc_response_supports_thread_start_response() {
         let msg_store = std::sync::Arc::new(MsgStore::new());
         let entry_index = EntryIndexProvider::start_from(&msg_store);
-        let response = codex_app_server_protocol::ThreadStartResponse {
-            thread: codex_app_server_protocol::Thread {
-                id: "88d1d63d-b84e-4f3d-9d87-1fb21839379d".to_string(),
-                preview: String::new(),
-                ephemeral: false,
-                model_provider: "openai".to_string(),
-                created_at: 0,
-                updated_at: 0,
-                status: codex_app_server_protocol::ThreadStatus::Idle,
-                path: Some(PathBuf::from(
-                    "C:/Users/Admin/.codex/sessions/2026/03/06/rollout-2026-03-06T10-00-00-88d1d63d-b84e-4f3d-9d87-1fb21839379d.jsonl",
-                )),
-                cwd: PathBuf::from("E:/workspace/projectSS/openteams-codex-latest-protocol"),
-                cli_version: "0.0.0".to_string(),
-                source: codex_app_server_protocol::SessionSource::AppServer,
-                agent_nickname: None,
-                agent_role: None,
-                git_info: None,
-                name: None,
-                turns: Vec::new(),
-            },
-            model: "gpt-5-codex".to_string(),
-            model_provider: "openai".to_string(),
-            service_tier: None,
-            cwd: PathBuf::from("E:/workspace/projectSS/openteams-codex-latest-protocol"),
-            approval_policy: codex_app_server_protocol::AskForApproval::OnRequest,
-            sandbox: codex_app_server_protocol::SandboxPolicy::WorkspaceWrite {
-                writable_roots: Vec::new(),
-                read_only_access: Default::default(),
-                network_access: false,
-                exclude_tmpdir_env_var: false,
-                exclude_slash_tmp: false,
-            },
-            reasoning_effort: Some(codex_protocol::openai_models::ReasoningEffort::Medium),
-        };
         let response = codex_app_server_protocol::JSONRPCResponse {
             id: RequestId::Integer(1),
-            result: serde_json::to_value(response).unwrap(),
+            result: serde_json::json!({
+                "thread": {
+                    "id": "88d1d63d-b84e-4f3d-9d87-1fb21839379d",
+                    "forkedFromId": null,
+                    "preview": "",
+                    "ephemeral": false,
+                    "modelProvider": "openai",
+                    "createdAt": 0,
+                    "updatedAt": 0,
+                    "status": { "type": "idle" },
+                    "path": "C:/Users/Admin/.codex/sessions/2026/03/06/rollout-2026-03-06T10-00-00-88d1d63d-b84e-4f3d-9d87-1fb21839379d.jsonl",
+                    "cwd": "E:/workspace/projectSS/openteams-codex-latest-protocol",
+                    "cliVersion": "0.0.0",
+                    "source": "appServer",
+                    "agentNickname": null,
+                    "agentRole": null,
+                    "gitInfo": null,
+                    "name": null,
+                    "turns": []
+                },
+                "model": "gpt-5-codex",
+                "modelProvider": "openai",
+                "serviceTier": null,
+                "cwd": "E:/workspace/projectSS/openteams-codex-latest-protocol",
+                "instructionSources": [],
+                "approvalPolicy": "on-request",
+                "approvalsReviewer": "user",
+                "sandbox": {
+                    "type": "workspaceWrite",
+                    "writableRoots": [],
+                    "readOnlyAccess": { "type": "fullAccess" },
+                    "networkAccess": false,
+                    "excludeTmpdirEnvVar": false,
+                    "excludeSlashTmp": false
+                },
+                "permissionProfile": null,
+                "reasoningEffort": "medium"
+            }),
         };
 
         handle_jsonrpc_response(response, &msg_store, &entry_index);

@@ -60,7 +60,8 @@ impl KimiCode {
         ]);
 
         if let Some(model) = &self.model {
-            builder = builder.extend_params(["--model", model.as_str()]);
+            let model = Self::normalize_model_name(model);
+            builder = builder.extend_params(["--model".to_string(), model]);
         }
 
         if self.yolo.unwrap_or(false) {
@@ -68,6 +69,14 @@ impl KimiCode {
         }
 
         apply_overrides(builder, &self.cmd)
+    }
+
+    fn normalize_model_name(model: &str) -> String {
+        match model.trim() {
+            "kimi-k2.5" => "moonshot-cn/kimi-k2.5".to_string(),
+            "kimi-k2.6" => "moonshot-cn/kimi-k2.6".to_string(),
+            other => other.to_string(),
+        }
     }
 
     fn extract_assistant_text(message: &Value) -> String {
@@ -92,6 +101,31 @@ impl KimiCode {
                                 .and_then(|v| v.as_str())
                                 .map(|v| v.to_string())
                         })
+                })
+                .collect::<String>(),
+            _ => String::new(),
+        }
+    }
+
+    fn extract_assistant_thinking(message: &Value) -> String {
+        let Some(content) = message.get("content") else {
+            return String::new();
+        };
+
+        match content {
+            Value::Array(parts) => parts
+                .iter()
+                .filter_map(|part| {
+                    let part_type = part.get("type").and_then(|v| v.as_str());
+                    if !matches!(part_type, Some("think" | "thinking")) {
+                        return None;
+                    }
+
+                    part.get("think")
+                        .and_then(|v| v.as_str())
+                        .or_else(|| part.get("thinking").and_then(|v| v.as_str()))
+                        .or_else(|| part.get("text").and_then(|v| v.as_str()))
+                        .map(|v| v.to_string())
                 })
                 .collect::<String>(),
             _ => String::new(),
@@ -290,6 +324,8 @@ impl StandardCodingAgentExecutor for KimiCode {
             let mut model_reported = false;
             let mut current_assistant_index: Option<usize> = None;
             let mut current_assistant_text = String::new();
+            let mut current_thinking_index: Option<usize> = None;
+            let mut current_thinking_text = String::new();
             let mut tool_entries: HashMap<String, ToolEntryState> = HashMap::new();
 
             while let Some(Ok(line)) = stdout_lines.next().await {
@@ -373,10 +409,37 @@ impl StandardCodingAgentExecutor for KimiCode {
                             );
                         }
 
+                        let thinking = KimiCode::extract_assistant_thinking(message);
+                        if !thinking.is_empty() {
+                            let merged =
+                                KimiCode::merge_assistant_text(&current_thinking_text, &thinking);
+                            current_thinking_text = merged.clone();
+
+                            let entry = NormalizedEntry {
+                                timestamp: None,
+                                entry_type: NormalizedEntryType::Thinking,
+                                content: merged,
+                                metadata: None,
+                            };
+
+                            if let Some(index) = current_thinking_index {
+                                msg_store.push_patch(ConversationPatch::replace(index, entry));
+                            } else {
+                                let index = entry_index_provider.next();
+                                current_thinking_index = Some(index);
+                                msg_store.push_patch(ConversationPatch::add_normalized_entry(
+                                    index, entry,
+                                ));
+                            }
+                        }
+
                         let text = KimiCode::extract_assistant_text(message);
                         if text.is_empty() {
                             continue;
                         }
+
+                        current_thinking_index = None;
+                        current_thinking_text.clear();
 
                         let merged = KimiCode::merge_assistant_text(&current_assistant_text, &text);
                         current_assistant_text = merged.clone();
@@ -400,6 +463,8 @@ impl StandardCodingAgentExecutor for KimiCode {
                     "tool" => {
                         current_assistant_index = None;
                         current_assistant_text.clear();
+                        current_thinking_index = None;
+                        current_thinking_text.clear();
 
                         let (tool_call_id, result_text) = KimiCode::extract_tool_result(message);
                         let Some(tool_call_id) = tool_call_id else {
@@ -438,6 +503,8 @@ impl StandardCodingAgentExecutor for KimiCode {
                     _ => {
                         current_assistant_index = None;
                         current_assistant_text.clear();
+                        current_thinking_index = None;
+                        current_thinking_text.clear();
                         let entry = NormalizedEntry {
                             timestamp: None,
                             entry_type: NormalizedEntryType::SystemMessage,
@@ -540,6 +607,43 @@ mod tests {
         assert_eq!(text, "你好，我是 Kimi。");
     }
 
+    #[test]
+    fn extract_assistant_thinking_reads_kimi_think_parts() {
+        let message = json!({
+            "role": "assistant",
+            "content": [
+                {"type": "think", "think": "first"},
+                {"type": "thinking", "thinking": " second"},
+                {"type": "text", "text": "visible"}
+            ]
+        });
+
+        let thinking = KimiCode::extract_assistant_thinking(&message);
+        assert_eq!(thinking, "first second");
+    }
+
+    #[test]
+    fn build_command_includes_configured_model() {
+        let executor = KimiCode {
+            append_prompt: AppendPrompt::default(),
+            model: Some("kimi-k2.5".to_string()),
+            yolo: None,
+            cmd: Default::default(),
+        };
+
+        let command = executor
+            .build_command_builder()
+            .expect("command builder")
+            .build_initial()
+            .expect("command parts");
+        let (_program, args) = command.into_parts_for_test();
+
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["--model", "moonshot-cn/kimi-k2.5"])
+        );
+    }
+
     #[tokio::test]
     async fn normalize_logs_supports_role_stream_json_payload() {
         let executor = KimiCode {
@@ -572,9 +676,22 @@ mod tests {
             }
         }
 
+        let mut saw_thinking = false;
+        for item in msg_store.get_history() {
+            if let LogMsg::JsonPatch(patch) = item
+                && let Some((_, entry)) = extract_normalized_entry_from_patch(&patch)
+                && matches!(entry.entry_type, NormalizedEntryType::Thinking)
+                && entry.content.contains("internal")
+            {
+                saw_thinking = true;
+                break;
+            }
+        }
+
         assert!(
             saw_assistant,
             "expected assistant message patch from role payload"
         );
+        assert!(saw_thinking, "expected thinking patch from role payload");
     }
 }

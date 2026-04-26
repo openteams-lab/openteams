@@ -75,6 +75,34 @@ pub(super) struct RunLogSpool {
 const TAIL_PARTIAL_LINE_NOTICE: &str =
     "[openteams] tail omitted a leading partial log line after truncation.\n";
 
+fn filter_benign_executor_stderr(text: &str) -> Option<String> {
+    let mut filtered = String::new();
+    let mut suppressed = false;
+
+    for line in text.split_inclusive('\n') {
+        if is_benign_codex_rollout_stderr(line) {
+            suppressed = true;
+        } else {
+            filtered.push_str(line);
+        }
+    }
+
+    if suppressed {
+        (!filtered.is_empty()).then_some(filtered)
+    } else {
+        Some(text.to_string())
+    }
+}
+
+fn is_benign_codex_rollout_stderr(line: &str) -> bool {
+    // Codex app-server 0.125 can emit this while shutting down after a terminal
+    // turn. The run has already completed, so surfacing it as an agent error is
+    // misleading; keep all other stderr intact.
+    line.contains("ERROR codex_core::session: failed to record rollout items:")
+        && line.contains("thread ")
+        && line.contains(" not found")
+}
+
 impl RunLogSpool {
     pub(super) async fn new(
         path: PathBuf,
@@ -484,13 +512,19 @@ impl ChatRunner {
                     Ok(bytes) => {
                         let text = decoder.decode_chunk(&bytes);
                         if !text.is_empty() {
-                            tracing::debug!(
-                                stderr_len = text.len(),
-                                "[chat_runner] Received stderr chunk"
-                            );
-                            stderr_store.push(LogMsg::Stderr(text.clone()));
-                            let mut spool = stderr_log.lock().await;
-                            let _ = spool.write_text(&text).await;
+                            if let Some(text) = filter_benign_executor_stderr(&text) {
+                                tracing::debug!(
+                                    stderr_len = text.len(),
+                                    "[chat_runner] Received stderr chunk"
+                                );
+                                stderr_store.push(LogMsg::Stderr(text.clone()));
+                                let mut spool = stderr_log.lock().await;
+                                let _ = spool.write_text(&text).await;
+                            } else {
+                                tracing::debug!(
+                                    "[chat_runner] Suppressed benign executor stderr chunk"
+                                );
+                            }
                         }
                     }
                     Err(err) => {
@@ -502,13 +536,17 @@ impl ChatRunner {
 
             let tail = decoder.finish();
             if !tail.is_empty() {
-                tracing::debug!(
-                    tail_len = tail.len(),
-                    "[chat_runner] stderr forwarder ending with tail"
-                );
-                stderr_store.push(LogMsg::Stderr(tail.clone()));
-                let mut spool = stderr_log.lock().await;
-                let _ = spool.write_text(&tail).await;
+                if let Some(tail) = filter_benign_executor_stderr(&tail) {
+                    tracing::debug!(
+                        tail_len = tail.len(),
+                        "[chat_runner] stderr forwarder ending with tail"
+                    );
+                    stderr_store.push(LogMsg::Stderr(tail.clone()));
+                    let mut spool = stderr_log.lock().await;
+                    let _ = spool.write_text(&tail).await;
+                } else {
+                    tracing::debug!("[chat_runner] Suppressed benign executor stderr tail");
+                }
             }
             tracing::debug!("[chat_runner] stderr forwarder ended");
         });
@@ -1584,12 +1622,35 @@ impl ChatRunner {
                             }
                         };
 
-                        let _ = ChatSessionAgent::update_state(
+                        let update_result = ChatSessionAgent::update_state(
                             &db.pool,
                             session_agent_id,
                             final_state.clone(),
                         )
                         .await;
+                        match update_result {
+                            Ok(_) => {
+                                tracing::debug!(
+                                    session_id = %session_id,
+                                    session_agent_id = %session_agent_id,
+                                    agent_id = %agent_id,
+                                    run_id = %run_id,
+                                    final_state = ?final_state,
+                                    "[chat_runner] Updated final agent state"
+                                );
+                            }
+                            Err(err) => {
+                                tracing::debug!(
+                                    session_id = %session_id,
+                                    session_agent_id = %session_agent_id,
+                                    agent_id = %agent_id,
+                                    run_id = %run_id,
+                                    final_state = ?final_state,
+                                    error = %err,
+                                    "[chat_runner] Failed to update final agent state"
+                                );
+                            }
+                        }
 
                         let _ = sender.send(ChatStreamEvent::AgentState {
                             session_agent_id,
@@ -2143,6 +2204,11 @@ impl ChatRunner {
                 completion = RunCompletionStatus::Failed;
             }
             LifecycleEvent::ExitSignal(exit_result) => {
+                tracing::debug!(
+                    session_agent_id = %session_agent_id,
+                    exit_result = ?exit_result,
+                    "[chat_runner] Received executor exit signal"
+                );
                 let signaled_failure = matches!(
                     exit_result,
                     executors::executors::ExecutorExitResult::Failure
@@ -2210,6 +2276,11 @@ impl ChatRunner {
 
         completion.store(&completion_status);
         Self::wait_for_log_forwarders(log_forwarders, &msg_store).await;
+        tracing::debug!(
+            session_agent_id = %session_agent_id,
+            completion_status = ?completion_status,
+            "[chat_runner] Marking message stream finished"
+        );
         msg_store.push_finished();
     }
 
@@ -2265,7 +2336,14 @@ impl ChatRunner {
                     signal.await
                 }, if exit_signal.is_some() => {
                     match signal_result {
-                        Ok(exit_result) => return LifecycleEvent::ExitSignal(exit_result),
+                        Ok(exit_result) => {
+                            tracing::debug!(
+                                session_agent_id = %session_agent_id,
+                                exit_result = ?exit_result,
+                                "[chat_runner] Lifecycle received executor exit signal"
+                            );
+                            return LifecycleEvent::ExitSignal(exit_result);
+                        }
                         Err(err) => {
                             msg_store.push(LogMsg::Stderr(format!("exit signal receive error: {err}")));
                             tracing::warn!(
@@ -2402,6 +2480,23 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+
+    #[test]
+    fn filter_benign_executor_stderr_removes_codex_rollout_noise() {
+        let text = "keep before\n2026-04-26T07:04:42.156906Z ERROR codex_core::session: failed to record rollout items: thread 019dc89a-a51a-7b13-9fe1-42564144c237 not found\nkeep after\n";
+
+        assert_eq!(
+            filter_benign_executor_stderr(text),
+            Some("keep before\nkeep after\n".to_string())
+        );
+    }
+
+    #[test]
+    fn filter_benign_executor_stderr_keeps_other_errors() {
+        let text = "ERROR codex_core::session: some other failure\n";
+
+        assert_eq!(filter_benign_executor_stderr(text), Some(text.to_string()));
+    }
 
     #[tokio::test]
     async fn persist_tail_keeps_tail_result_when_cleanup_fails() {

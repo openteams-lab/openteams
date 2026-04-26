@@ -293,7 +293,7 @@ impl StandardCodingAgentExecutor for Codex {
 }
 
 impl Codex {
-    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.114.0";
+    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.125.0";
 
     pub fn base_command() -> &'static str {
         Self::BASE_COMMAND

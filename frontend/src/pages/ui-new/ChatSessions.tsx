@@ -2861,29 +2861,39 @@ export function ChatSessions() {
     }
   };
 
+  const addAttachedFiles = (files: FileList | File[]) => {
+    if (!activeSessionId || isArchived) return;
+
+    const list = Array.from(files);
+    if (list.length === 0) return;
+
+    const allowedFiles = list.filter((file) => isAllowedAttachment(file));
+    const rejectedCount = list.length - allowedFiles.length;
+
+    if (rejectedCount > 0) {
+      setAttachmentError(
+        `Some files were rejected (${rejectedCount}). Only text files and images are allowed.`
+      );
+    } else {
+      setAttachmentError(null);
+    }
+
+    if (allowedFiles.length > 0) {
+      setAttachedFiles((prev) => [...prev, ...allowedFiles]);
+    }
+  };
+
   const handleAttachmentInputChange = (
     event: ChangeEvent<HTMLInputElement>
   ) => {
     if (event.target.files) {
-      const files = Array.from(event.target.files);
-      const allowedFiles = files.filter((file) => isAllowedAttachment(file));
-
-      if (allowedFiles.length !== files.length) {
-        const rejectedCount = files.length - allowedFiles.length;
-        setAttachmentError(
-          `Some files were rejected (${rejectedCount}). Only text files and images are allowed.`
-        );
-      }
-
-      setAttachedFiles((prev) => [...prev, ...allowedFiles]);
+      addAttachedFiles(event.target.files);
     }
     event.target.value = '';
   };
 
-  const removeAttachedFile = (fileName: string, fileSize: number) => {
-    setAttachedFiles((prev) =>
-      prev.filter((file) => !(file.name === fileName && file.size === fileSize))
-    );
+  const removeAttachedFile = (fileIndex: number) => {
+    setAttachedFiles((prev) => prev.filter((_, index) => index !== fileIndex));
   };
 
   const clearAttachedFiles = () => {
@@ -4447,6 +4457,7 @@ export function ChatSessions() {
                   attachmentError={attachmentError}
                   isUploadingAttachments={isUploadingAttachments}
                   onAttachmentInputChange={handleAttachmentInputChange}
+                  onPasteAttachmentFiles={addAttachedFiles}
                   onRemoveAttachedFile={removeAttachedFile}
                   onClearAttachedFiles={clearAttachedFiles}
                   onPreviewFile={previewAttachedFile}

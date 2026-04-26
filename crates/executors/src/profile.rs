@@ -488,7 +488,7 @@ pub fn to_default_variant(id: &ExecutorProfileId) -> ExecutorProfileId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::executors::codex::Codex;
+    use crate::executors::{claude::ClaudeCode, codex::Codex, kimi::KimiCode};
 
     #[test]
     fn default_profiles_use_gpt_5_4_for_codex() {
@@ -518,5 +518,63 @@ mod tests {
     #[test]
     fn canonical_variant_key_preserves_provider_model_ids() {
         assert_eq!(canonical_variant_key("litellm/gpt-5.4"), "litellm/gpt-5.4");
+    }
+
+    #[test]
+    fn default_profiles_include_new_model_variants() {
+        let profiles = ExecutorConfigs::from_defaults();
+
+        assert_codex_model(&profiles, "GPT_5_5", "gpt-5.5");
+        assert_codex_model(&profiles, "GPT_5_5_HIGH", "gpt-5.5");
+        assert_claude_model(&profiles, "OPUS_4_6", "claude-opus-4-6");
+        assert_claude_model(&profiles, "SONNET_4_6", "claude-sonnet-4-6");
+        assert_claude_model(&profiles, "OPUS_4_7", "claude-opus-4-7");
+        assert_kimi_model(&profiles, "KIMI_K2_5", "moonshot-cn/kimi-k2.5");
+        assert_kimi_model(&profiles, "KIMI_K2_6", "moonshot-cn/kimi-k2.6");
+    }
+
+    fn assert_codex_model(profiles: &ExecutorConfigs, variant: &str, expected: &str) {
+        match profiles
+            .get_coding_agent(&ExecutorProfileId::with_variant(
+                BaseCodingAgent::Codex,
+                variant.to_string(),
+            ))
+            .unwrap_or_else(|| panic!("codex {variant} profile should exist"))
+        {
+            CodingAgent::Codex(Codex { model, .. }) => {
+                assert_eq!(model.as_deref(), Some(expected));
+            }
+            other => panic!("expected codex profile, got {other:?}"),
+        }
+    }
+
+    fn assert_claude_model(profiles: &ExecutorConfigs, variant: &str, expected: &str) {
+        match profiles
+            .get_coding_agent(&ExecutorProfileId::with_variant(
+                BaseCodingAgent::ClaudeCode,
+                variant.to_string(),
+            ))
+            .unwrap_or_else(|| panic!("claude code {variant} profile should exist"))
+        {
+            CodingAgent::ClaudeCode(ClaudeCode { model, .. }) => {
+                assert_eq!(model.as_deref(), Some(expected));
+            }
+            other => panic!("expected claude code profile, got {other:?}"),
+        }
+    }
+
+    fn assert_kimi_model(profiles: &ExecutorConfigs, variant: &str, expected: &str) {
+        match profiles
+            .get_coding_agent(&ExecutorProfileId::with_variant(
+                BaseCodingAgent::KimiCode,
+                variant.to_string(),
+            ))
+            .unwrap_or_else(|| panic!("kimi code {variant} profile should exist"))
+        {
+            CodingAgent::KimiCode(KimiCode { model, .. }) => {
+                assert_eq!(model.as_deref(), Some(expected));
+            }
+            other => panic!("expected kimi code profile, got {other:?}"),
+        }
     }
 }

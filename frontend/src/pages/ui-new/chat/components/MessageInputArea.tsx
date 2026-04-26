@@ -1,4 +1,8 @@
-import type { RefObject, ChangeEvent } from 'react';
+import type {
+  RefObject,
+  ChangeEvent,
+  ClipboardEvent as ReactClipboardEvent,
+} from 'react';
 import {
   CaretRightIcon,
   PaperclipIcon,
@@ -68,6 +72,38 @@ const resizeTextarea = (textarea: HTMLTextAreaElement) => {
 export const isAllowedAttachment = (file: File) =>
   isTextAttachment(file) || isImageAttachment(file);
 
+const fallbackClipboardFileName = (file: File, index: number) => {
+  if (file.name.trim()) return file.name;
+
+  const extension = file.type.startsWith('image/')
+    ? (file.type.split('/')[1] ?? 'png')
+    : file.type === 'text/plain'
+      ? 'txt'
+      : 'dat';
+
+  return `pasted-attachment-${Date.now()}-${index + 1}.${extension}`;
+};
+
+const normalizeClipboardFile = (file: File, index: number) =>
+  file.name.trim()
+    ? file
+    : new File([file], fallbackClipboardFileName(file, index), {
+        type: file.type,
+        lastModified: file.lastModified || Date.now(),
+      });
+
+const getClipboardFiles = (clipboardData: DataTransfer) => {
+  const itemFiles = Array.from(clipboardData.items)
+    .filter((item) => item.kind === 'file')
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file));
+
+  const files =
+    itemFiles.length > 0 ? itemFiles : Array.from(clipboardData.files);
+
+  return files.map(normalizeClipboardFile);
+};
+
 export interface MessageInputAreaProps {
   // Input state
   draft: string;
@@ -94,7 +130,8 @@ export interface MessageInputAreaProps {
   attachmentError: string | null;
   isUploadingAttachments: boolean;
   onAttachmentInputChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onRemoveAttachedFile: (name: string, size: number) => void;
+  onPasteAttachmentFiles: (files: File[]) => void;
+  onRemoveAttachedFile: (index: number) => void;
   onClearAttachedFiles: () => void;
   onPreviewFile: (file: File) => void;
   fileInputRef: RefObject<HTMLInputElement>;
@@ -128,6 +165,7 @@ export function MessageInputArea({
   attachmentError,
   isUploadingAttachments,
   onAttachmentInputChange,
+  onPasteAttachmentFiles,
   onRemoveAttachedFile,
   onClearAttachedFiles,
   onPreviewFile,
@@ -160,6 +198,16 @@ export function MessageInputArea({
       agent,
     })),
   ];
+  const handlePaste = (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+    if (isArchived || !activeSessionId || isUploadingAttachments) return;
+
+    const files = getClipboardFiles(event.clipboardData);
+    if (files.length === 0) return;
+
+    event.preventDefault();
+    onPasteAttachmentFiles(files);
+  };
+
   return (
     <div className="chat-session-input-area shrink-0">
       <div className="chat-session-input-shell">
@@ -210,7 +258,7 @@ export function MessageInputArea({
                 <button
                   type="button"
                   className="chat-session-attachment-action"
-                  onClick={() => onRemoveAttachedFile(file.name, file.size)}
+                  onClick={() => onRemoveAttachedFile(index)}
                 >
                   <XIcon className="size-icon-2xs" />
                 </button>
@@ -238,6 +286,7 @@ export function MessageInputArea({
               onDraftChange(event.target.value, event.target.selectionStart);
               resizeTextarea(event.target);
             }}
+            onPaste={handlePaste}
             onKeyDown={(event) => {
               if (onMentionKeyDown(event)) {
                 return;

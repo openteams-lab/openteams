@@ -145,6 +145,7 @@ fn supports_model(config: &CodingAgent) -> bool {
             | CodingAgent::CursorAgent(_)
             | CodingAgent::Copilot(_)
             | CodingAgent::Droid(_)
+            | CodingAgent::KimiCode(_)
             | CodingAgent::OpenTeamsCli(_)
     )
 }
@@ -192,6 +193,11 @@ pub fn with_model(config: &CodingAgent, model: &str) -> Option<CodingAgent> {
             next.model = Some(model);
             Some(CodingAgent::Droid(next))
         }
+        CodingAgent::KimiCode(base) => {
+            let mut next = base.clone();
+            next.model = Some(model);
+            Some(CodingAgent::KimiCode(next))
+        }
         CodingAgent::OpenTeamsCli(base) => {
             let mut next = base.clone();
             next.model = Some(model);
@@ -207,4 +213,30 @@ fn auto_variant_key(model: &str) -> String {
         AUTO_MODEL_VARIANT_PREFIX,
         canonical_variant_key(model)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        executors::{AppendPrompt, CodingAgent},
+        model_sync::{supports_model, with_model},
+    };
+
+    #[test]
+    fn with_model_sets_kimi_code_model() {
+        let base = CodingAgent::KimiCode(crate::executors::kimi::KimiCode {
+            append_prompt: AppendPrompt::default(),
+            model: None,
+            yolo: None,
+            cmd: Default::default(),
+        });
+
+        assert!(supports_model(&base));
+
+        let Some(CodingAgent::KimiCode(config)) = with_model(&base, "kimi-k2.5") else {
+            panic!("expected KimiCode config");
+        };
+
+        assert_eq!(config.model.as_deref(), Some("kimi-k2.5"));
+    }
 }
