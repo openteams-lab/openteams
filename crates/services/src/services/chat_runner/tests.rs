@@ -8,7 +8,7 @@ use command_group::AsyncCommandGroup;
 use db::{
     DBService,
     models::{
-        chat_agent::ChatAgent,
+        chat_agent::{ChatAgent, CreateChatAgent},
         chat_message::{ChatMessage, ChatSenderType},
         chat_session::{ChatSession, ChatSessionStatus},
         chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
@@ -119,6 +119,18 @@ async fn setup_chat_runner_db() -> DBService {
     for statement in [
         "PRAGMA foreign_keys = ON",
         r#"
+            CREATE TABLE chat_agents (
+                id BLOB PRIMARY KEY,
+                name TEXT NOT NULL,
+                runner_type TEXT NOT NULL,
+                system_prompt TEXT NOT NULL DEFAULT '',
+                tools_enabled TEXT NOT NULL DEFAULT '{}',
+                model_name TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+        r#"
             CREATE TABLE chat_session_agents (
                 id BLOB PRIMARY KEY,
                 session_id BLOB NOT NULL,
@@ -144,6 +156,41 @@ async fn setup_chat_runner_db() -> DBService {
     DBService { pool }
 }
 
+async fn insert_test_chat_agent(db: &DBService, name: &str) -> ChatAgent {
+    ChatAgent::create(
+        &db.pool,
+        &CreateChatAgent {
+            name: name.to_string(),
+            runner_type: "codex".to_string(),
+            system_prompt: Some(format!("You are {name}.")),
+            tools_enabled: Some(json!({})),
+            model_name: None,
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("insert chat agent")
+}
+
+async fn insert_test_session_agent(
+    db: &DBService,
+    session_id: Uuid,
+    agent_id: Uuid,
+) -> ChatSessionAgent {
+    ChatSessionAgent::create(
+        &db.pool,
+        &db::models::chat_session_agent::CreateChatSessionAgent {
+            session_id,
+            agent_id,
+            workspace_path: None,
+            allowed_skill_ids: Vec::new(),
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("insert session agent")
+}
+
 fn finished_count(msg_store: &MsgStore) -> usize {
     msg_store
         .get_history()
@@ -157,6 +204,66 @@ fn empty_log_forwarders() -> RunLogForwarders {
         stdout: tokio::spawn(async {}),
         stderr: tokio::spawn(async {}),
     }
+}
+
+#[tokio::test]
+async fn default_route_for_unmentioned_user_message_uses_first_session_agent() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    let first_agent = insert_test_chat_agent(&db, "first").await;
+    let second_agent = insert_test_chat_agent(&db, "second").await;
+    insert_test_session_agent(&db, session_id, first_agent.id).await;
+    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+    insert_test_session_agent(&db, session_id, second_agent.id).await;
+    let message = test_message("please handle this", json!({}));
+
+    let default_mention = runner
+        .resolve_default_mention_for_unmentioned_user_message(session_id, &message)
+        .await
+        .expect("resolve default mention");
+
+    assert_eq!(default_mention.as_deref(), Some("first"));
+}
+
+#[tokio::test]
+async fn default_route_ignores_messages_with_explicit_mentions() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    let first_agent = insert_test_chat_agent(&db, "first").await;
+    insert_test_session_agent(&db, session_id, first_agent.id).await;
+    let mut message = test_message("@someone please handle this", json!({}));
+    message.mentions = sqlx::types::Json(vec!["someone".to_string()]);
+
+    let default_mention = runner
+        .resolve_default_mention_for_unmentioned_user_message(session_id, &message)
+        .await
+        .expect("resolve default mention");
+
+    assert_eq!(default_mention, None);
+}
+
+#[tokio::test]
+async fn default_route_ignores_unmentioned_agent_messages() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    let first_agent = insert_test_chat_agent(&db, "first").await;
+    insert_test_session_agent(&db, session_id, first_agent.id).await;
+    let message = test_message_with_sender(
+        ChatSenderType::Agent,
+        Some(first_agent.id),
+        "done",
+        json!({}),
+    );
+
+    let default_mention = runner
+        .resolve_default_mention_for_unmentioned_user_message(session_id, &message)
+        .await
+        .expect("resolve default mention");
+
+    assert_eq!(default_mention, None);
 }
 
 #[test]

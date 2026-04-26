@@ -31,6 +31,11 @@ impl CommandParts {
         Self { program, args }
     }
 
+    #[cfg(test)]
+    pub(crate) fn into_parts_for_test(self) -> (String, Vec<String>) {
+        (self.program, self.args)
+    }
+
     pub async fn into_resolved(self) -> Result<(PathBuf, Vec<String>), ExecutorError> {
         let CommandParts { program, args } = self;
         let executable = resolve_executable_path(&program)

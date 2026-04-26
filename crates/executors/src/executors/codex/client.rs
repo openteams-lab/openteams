@@ -19,8 +19,9 @@ use codex_app_server_protocol::{
     JSONRPCResponse, ListMcpServerStatusParams, ListMcpServerStatusResponse,
     McpServerElicitationAction, McpServerElicitationRequestResponse, PermissionGrantScope,
     PermissionsRequestApprovalResponse, RequestId, ReviewStartParams, ReviewStartResponse,
-    ReviewTarget, ServerNotification, ServerRequest, ThreadItem, ThreadResumeParams,
-    ThreadResumeResponse, ThreadStartParams, ThreadStartResponse, ToolRequestUserInputAnswer,
+    ReviewTarget, ServerNotification, ServerRequest, ThreadCompactStartParams,
+    ThreadCompactStartResponse, ThreadItem, ThreadResumeParams, ThreadResumeResponse,
+    ThreadStartParams, ThreadStartResponse, ToolRequestUserInputAnswer,
     ToolRequestUserInputResponse, TurnCompletedNotification, TurnStartParams, TurnStartResponse,
     TurnStatus, UserInput,
 };
@@ -53,6 +54,7 @@ pub struct AppServerClient {
     commit_reminder: bool,
     commit_reminder_prompt: String,
     commit_reminder_sent: AtomicBool,
+    turn_started: AtomicBool,
     cancel: CancellationToken,
 }
 
@@ -78,6 +80,7 @@ impl AppServerClient {
             commit_reminder,
             commit_reminder_prompt,
             commit_reminder_sent: AtomicBool::new(false),
+            turn_started: AtomicBool::new(false),
             cancel,
         })
     }
@@ -183,6 +186,17 @@ impl AppServerClient {
         self.send_request(request, "review/start").await
     }
 
+    pub async fn start_compact(
+        &self,
+        thread_id: String,
+    ) -> Result<ThreadCompactStartResponse, ExecutorError> {
+        let request = ClientRequest::ThreadCompactStart {
+            request_id: self.next_request_id(),
+            params: ThreadCompactStartParams { thread_id },
+        };
+        self.send_request(request, "thread/compact/start").await
+    }
+
     pub async fn list_mcp_server_status(
         &self,
         cursor: Option<String>,
@@ -192,6 +206,7 @@ impl AppServerClient {
             params: ListMcpServerStatusParams {
                 cursor,
                 limit: None,
+                detail: None,
             },
         };
         self.send_request(request, "mcpServerStatus/list").await
@@ -369,6 +384,7 @@ impl AppServerClient {
                 let response = PermissionsRequestApprovalResponse {
                     permissions: GrantedPermissionProfile::default(),
                     scope: PermissionGrantScope::Turn,
+                    strict_auto_review: None,
                 };
                 send_server_response(peer, request_id, response).await
             }
@@ -643,7 +659,9 @@ impl AppServerClient {
         raw: &str,
         notification: JSONRPCNotification,
     ) -> Result<bool, ExecutorError> {
-        let parsed_notification = serde_json::from_str::<ServerNotification>(raw).ok();
+        let parsed_notification = ServerNotification::try_from(notification.clone())
+            .ok()
+            .or_else(|| serde_json::from_str::<ServerNotification>(raw).ok());
         if let Some(server_notification) = parsed_notification.as_ref() {
             self.cache_notification_item(server_notification).await;
         }
@@ -652,6 +670,15 @@ impl AppServerClient {
         self.log_writer.log_raw(&raw).await?;
 
         if let Some(server_notification) = parsed_notification {
+            if let ServerNotification::TurnStarted(started) = &server_notification {
+                self.turn_started.store(true, Ordering::SeqCst);
+                tracing::debug!(
+                    thread_id = %started.thread_id,
+                    turn_id = %started.turn.id,
+                    "[codex-client] turn started"
+                );
+            }
+
             if let ServerNotification::TurnCompleted(TurnCompletedNotification {
                 thread_id,
                 turn,
@@ -678,13 +705,50 @@ impl AppServerClient {
                     return Ok(false);
                 }
 
-                // The app-server emits `turn/completed` before the legacy bridge finishes
-                // flushing `item/completed`, `codex/event/agent_message`, and finally
-                // `codex/event/task_complete`. Stopping here truncates the final answer.
+                if has_finished {
+                    tracing::debug!(
+                        thread_id = %thread_id,
+                        turn_id = %turn.id,
+                        status = ?turn.status,
+                        "[codex-client] terminal turn/completed notification"
+                    );
+                    return Ok(true);
+                }
+
                 return Ok(false);
             }
 
+            if let ServerNotification::ThreadStatusChanged(status) = server_notification {
+                if matches!(status.status, codex_app_server_protocol::ThreadStatus::Idle)
+                    && self.turn_started.load(Ordering::SeqCst)
+                {
+                    tracing::debug!(
+                        thread_id = %status.thread_id,
+                        status = ?status.status,
+                        "[codex-client] terminal thread/status/changed notification"
+                    );
+                    return Ok(true);
+                } else if matches!(status.status, codex_app_server_protocol::ThreadStatus::Idle) {
+                    tracing::debug!(
+                        thread_id = %status.thread_id,
+                        status = ?status.status,
+                        "[codex-client] ignoring idle thread status before turn start"
+                    );
+                }
+            }
+
             return Ok(false);
+        }
+
+        if is_terminal_app_server_notification(
+            &notification,
+            self.turn_started.load(Ordering::SeqCst),
+        ) {
+            tracing::debug!(
+                method = %notification.method,
+                "[codex-client] terminal raw app-server notification"
+            );
+            return Ok(true);
         }
 
         let method = notification.method.as_str();
@@ -714,7 +778,37 @@ impl AppServerClient {
             return Ok(false);
         }
 
+        if has_finished {
+            tracing::debug!(
+                method = %method,
+                "[codex-client] terminal legacy codex event notification"
+            );
+        }
+
         Ok(has_finished)
+    }
+}
+
+fn is_terminal_app_server_notification(
+    notification: &JSONRPCNotification,
+    turn_started: bool,
+) -> bool {
+    match notification.method.as_str() {
+        "turn/completed" => notification
+            .params
+            .as_ref()
+            .and_then(|params| params.get("turn"))
+            .and_then(|turn| turn.get("status"))
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|status| matches!(status, "completed" | "interrupted" | "failed")),
+        "thread/status/changed" => notification
+            .params
+            .as_ref()
+            .and_then(|params| params.get("status"))
+            .and_then(|status| status.get("type"))
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|status| status == "idle" && turn_started),
+        _ => false,
     }
 }
 
@@ -798,6 +892,7 @@ fn request_id(request: &ClientRequest) -> RequestId {
         | ClientRequest::ThreadResume { request_id, .. }
         | ClientRequest::TurnStart { request_id, .. }
         | ClientRequest::ReviewStart { request_id, .. }
+        | ClientRequest::ThreadCompactStart { request_id, .. }
         | ClientRequest::McpServerStatusList { request_id, .. } => request_id.clone(),
         _ => unreachable!("request_id called for unsupported request variant"),
     }
@@ -806,6 +901,7 @@ fn request_id(request: &ClientRequest) -> RequestId {
 fn thread_item_id(item: &ThreadItem) -> Option<&str> {
     match item {
         ThreadItem::UserMessage { id, .. }
+        | ThreadItem::HookPrompt { id, .. }
         | ThreadItem::AgentMessage { id, .. }
         | ThreadItem::Reasoning { id, .. }
         | ThreadItem::CommandExecution { id, .. }
@@ -868,7 +964,7 @@ impl LogWriter {
 #[cfg(test)]
 mod tests {
     use codex_app_server_protocol::{
-        JSONRPCNotification, ServerNotification, Turn, TurnCompletedNotification, TurnStatus,
+        JSONRPCNotification, Turn, TurnCompletedNotification, TurnStatus,
     };
     use tokio::io::sink;
     use tokio_util::sync::CancellationToken;
@@ -889,20 +985,74 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn turn_completed_does_not_finish_stream() {
+    async fn turn_completed_finishes_stream() {
         let client = build_client();
-        let raw = serde_json::to_string(&ServerNotification::TurnCompleted(
-            TurnCompletedNotification {
-                thread_id: "thread-1".to_string(),
-                turn: Turn {
-                    id: "turn-1".to_string(),
-                    items: Vec::new(),
-                    status: TurnStatus::Completed,
-                    error: None,
-                },
+        let params = TurnCompletedNotification {
+            thread_id: "thread-1".to_string(),
+            turn: Turn {
+                id: "turn-1".to_string(),
+                items: Vec::new(),
+                status: TurnStatus::Completed,
+                error: None,
+                started_at: None,
+                completed_at: None,
+                duration_ms: None,
             },
-        ))
-        .unwrap();
+        };
+        let notification = JSONRPCNotification {
+            method: "turn/completed".to_string(),
+            params: Some(serde_json::to_value(params).unwrap()),
+        };
+        let raw = serde_json::to_string(&notification).unwrap();
+
+        let should_finish = client
+            .handle_notification(&raw, notification)
+            .await
+            .unwrap();
+
+        assert!(should_finish);
+    }
+
+    #[tokio::test]
+    async fn in_progress_turn_completed_does_not_finish_stream() {
+        let client = build_client();
+        let params = TurnCompletedNotification {
+            thread_id: "thread-1".to_string(),
+            turn: Turn {
+                id: "turn-1".to_string(),
+                items: Vec::new(),
+                status: TurnStatus::InProgress,
+                error: None,
+                started_at: None,
+                completed_at: None,
+                duration_ms: None,
+            },
+        };
+        let notification = JSONRPCNotification {
+            method: "turn/completed".to_string(),
+            params: Some(serde_json::to_value(params).unwrap()),
+        };
+        let raw = serde_json::to_string(&notification).unwrap();
+
+        let should_finish = client
+            .handle_notification(&raw, notification)
+            .await
+            .unwrap();
+
+        assert!(!should_finish);
+    }
+
+    #[tokio::test]
+    async fn idle_thread_status_before_turn_start_does_not_finish_stream() {
+        let client = build_client();
+        let raw = serde_json::json!({
+            "method": "thread/status/changed",
+            "params": {
+                "threadId": "thread-1",
+                "status": { "type": "idle" }
+            }
+        })
+        .to_string();
         let notification: JSONRPCNotification = serde_json::from_str(&raw).unwrap();
 
         let should_finish = client
@@ -911,6 +1061,51 @@ mod tests {
             .unwrap();
 
         assert!(!should_finish);
+    }
+
+    #[tokio::test]
+    async fn idle_thread_status_after_turn_start_finishes_stream() {
+        let client = build_client();
+        let turn_started_raw = serde_json::json!({
+            "method": "turn/started",
+            "params": {
+                "threadId": "thread-1",
+                "turn": {
+                    "id": "turn-1",
+                    "items": [],
+                    "status": "inProgress",
+                    "error": null,
+                    "startedAt": 1,
+                    "completedAt": null,
+                    "durationMs": null
+                }
+            }
+        })
+        .to_string();
+        let turn_started_notification: JSONRPCNotification =
+            serde_json::from_str(&turn_started_raw).unwrap();
+        let started_should_finish = client
+            .handle_notification(&turn_started_raw, turn_started_notification)
+            .await
+            .unwrap();
+        assert!(!started_should_finish);
+
+        let raw = serde_json::json!({
+            "method": "thread/status/changed",
+            "params": {
+                "threadId": "thread-1",
+                "status": { "type": "idle" }
+            }
+        })
+        .to_string();
+        let notification: JSONRPCNotification = serde_json::from_str(&raw).unwrap();
+
+        let should_finish = client
+            .handle_notification(&raw, notification)
+            .await
+            .unwrap();
+
+        assert!(should_finish);
     }
 
     #[tokio::test]

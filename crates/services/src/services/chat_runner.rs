@@ -952,7 +952,33 @@ impl ChatRunner {
         }
 
         let session_id = session.id;
-        let mentions = message.mentions.0.clone();
+        let mut mentions = message.mentions.0.clone();
+        if mentions.is_empty() {
+            match self
+                .resolve_default_mention_for_unmentioned_user_message(session_id, message)
+                .await
+            {
+                Ok(Some(default_mention)) => {
+                    tracing::debug!(
+                        session_id = %session_id,
+                        message_id = %message.id,
+                        mention = %default_mention,
+                        "routing unmentioned user message to first session agent"
+                    );
+                    mentions.push(default_mention);
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        message_id = %message.id,
+                        error = %err,
+                        "failed to resolve default session agent for unmentioned user message"
+                    );
+                }
+            }
+        }
+
         for mention in mentions {
             if message.sender_type == ChatSenderType::Agent
                 && mention.eq_ignore_ascii_case(RESERVED_USER_HANDLE)
@@ -982,6 +1008,41 @@ impl ChatRunner {
                 }
             });
         }
+    }
+
+    async fn resolve_default_mention_for_unmentioned_user_message(
+        &self,
+        session_id: Uuid,
+        message: &ChatMessage,
+    ) -> Result<Option<String>, ChatRunnerError> {
+        if message.sender_type != ChatSenderType::User || !message.mentions.0.is_empty() {
+            return Ok(None);
+        }
+
+        let session_agents =
+            ChatSessionAgent::find_all_for_session(&self.db.pool, session_id).await?;
+        if session_agents.is_empty() {
+            return Ok(None);
+        }
+
+        let agents = ChatAgent::find_all(&self.db.pool).await?;
+        let agent_map: HashMap<Uuid, ChatAgent> =
+            agents.into_iter().map(|agent| (agent.id, agent)).collect();
+
+        for session_agent in session_agents {
+            if let Some(agent) = agent_map.get(&session_agent.agent_id) {
+                return Ok(Some(agent.name.clone()));
+            }
+
+            tracing::warn!(
+                session_id = %session_id,
+                session_agent_id = %session_agent.id,
+                agent_id = %session_agent.agent_id,
+                "default route skipped session agent with missing backing agent"
+            );
+        }
+
+        Ok(None)
     }
 
     fn extract_chain_depth(&self, meta: &sqlx::types::Json<serde_json::Value>) -> u32 {
