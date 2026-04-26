@@ -43,6 +43,21 @@
 
 ---
 ## 🔥 *News:*
+### Feature Preview
+In v0.4.0, we’ll be introducing a major update:
+- Current state: The current free-form collaboration model based on @mentions is too open-ended. Because agent outputs are inherently uncertain, collaboration can be unstable, and the collaboration chain may break at certain points.
+- Improvement: We want to introduce a workflow mode to improve collaboration efficiency. This mode uses a centralized communication architecture similar to Claude’s agent teams. Each task becomes a workflow node, and all nodes together form a task-flow DAG. An independent scheduler manages workflow state transitions. For complex tasks, a single planning round may not fully satisfy the requirements, so the workflow should support a second or even third iteration. To make this possible, workflows will include configurable iteration counts and support viewing iteration history.
+- We believe this change will significantly improve the practicality of OpenTeams. Stay tuned~
+
+
+-- 中文 --
+我们将在v0.4.0中进行以下重大更新：
+- 现状：当前通过@进行自由协作的方式太开放，因为agent输出具有不确定性，所以协作非常不稳定，协作链会有一定概率断裂；
+- 改进：我们希望设计出一种工作流模式来提升协作效率。工作流模式采用中心化的通信架构（类似claude的agent teams），每个任务是一个工作流节点，所有节点组成一个任务流DAG，由一个独立的调度器来管控工作流的状态转移。对于复杂任务，一轮计划可能无法完全满足需求，因此需要进第二轮甚至第三轮迭代，所以这里需要给工作流设置迭代次数，并能查看历史迭代。示意图：
+- 这次改动我们相信一定能够让openteams的实用性大幅提升，敬请期待~
+
+<img width="1100" height="546" alt="Image" src="https://github.com/user-attachments/assets/be065bc4-f736-47a8-a989-05e5142264f8" />
+
 ### *Major updates*
 - **2026.04.14 (v0.3.15)**
   - Workspace File Change Viewer
