@@ -2288,7 +2288,10 @@ mod tests {
     #[tokio::test]
     async fn normalize_logs_maps_app_server_file_change_patch_updated_to_edit() {
         let msg_store = std::sync::Arc::new(MsgStore::new());
-        super::normalize_logs(msg_store.clone(), std::path::Path::new("E:/workspace"));
+        super::normalize_logs(
+            msg_store.clone(),
+            std::path::Path::new("/tmp/test-worktree"),
+        );
         tokio::task::yield_now().await;
 
         let line = serde_json::json!({
@@ -2299,7 +2302,7 @@ mod tests {
                 "turnId": "turn-1",
                 "itemId": "patch-1",
                 "changes": [{
-                    "path": "E:/workspace/src/main.rs",
+                    "path": "/tmp/test-worktree/src/main.rs",
                     "kind": { "type": "update", "movePath": null },
                     "diff": "@@ -1 +1 @@\n-old\n+new\n"
                 }]
