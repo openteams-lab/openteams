@@ -1766,6 +1766,7 @@ impl StreamingContentState {
             ) => {
                 self.buffer.push_str(thinking);
             }
+            (StreamingContentKind::Thinking, ClaudeContentBlockDelta::SignatureDelta { .. }) => {}
             _ => {
                 tracing::warn!(
                     "Mismatched content types: delta {:?}, kind {:?}",
@@ -1990,6 +1991,8 @@ pub enum ClaudeContentBlockDelta {
     TextDelta { text: String },
     #[serde(rename = "thinking_delta")]
     ThinkingDelta { thinking: String },
+    #[serde(rename = "signature_delta")]
+    SignatureDelta { signature: String },
     #[serde(other)]
     Unknown,
 }
