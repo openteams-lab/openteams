@@ -445,6 +445,58 @@ fn normalize_v2_file_changes(
         .collect()
 }
 
+fn sync_patch_entries(
+    patch_state: &mut PatchState,
+    normalized: Vec<(String, Vec<FileChange>)>,
+    status: ToolStatus,
+    awaiting_approval: bool,
+    call_id: &str,
+    msg_store: &Arc<MsgStore>,
+    entry_index: &EntryIndexProvider,
+) {
+    let normalized_len = normalized.len();
+    let mut iter = normalized.into_iter();
+
+    for entry in &mut patch_state.entries {
+        if let Some((path, file_changes)) = iter.next() {
+            entry.path = path;
+            entry.changes = file_changes;
+            entry.status = status.clone();
+            entry.awaiting_approval = awaiting_approval;
+            entry.call_id = call_id.to_string();
+            if let Some(index) = entry.index {
+                replace_normalized_entry(msg_store, index, entry.to_normalized_entry());
+            } else {
+                let index =
+                    add_normalized_entry(msg_store, entry_index, entry.to_normalized_entry());
+                entry.index = Some(index);
+            }
+        }
+    }
+
+    if normalized_len < patch_state.entries.len() {
+        for entry in patch_state.entries.drain(normalized_len..) {
+            if let Some(index) = entry.index {
+                msg_store.push_patch(ConversationPatch::remove(index));
+            }
+        }
+    }
+
+    for (path, file_changes) in iter {
+        let mut entry = PatchEntry {
+            index: None,
+            path,
+            changes: file_changes,
+            status: status.clone(),
+            awaiting_approval,
+            call_id: call_id.to_string(),
+        };
+        let index = add_normalized_entry(msg_store, entry_index, entry.to_normalized_entry());
+        entry.index = Some(index);
+        patch_state.entries.push(entry);
+    }
+}
+
 pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
     let entry_index = EntryIndexProvider::start_from(&msg_store);
     normalize_stderr_logs(msg_store.clone(), entry_index.clone());
@@ -1277,6 +1329,31 @@ fn handle_server_notification(
                 }
             }
         }
+        ServerNotification::FileChangePatchUpdated(payload) => {
+            state.assistant = None;
+            state.thinking = None;
+            let normalized = normalize_v2_file_changes(worktree_path, &payload.changes);
+            let patch_state = state.patches.entry(payload.item_id.clone()).or_default();
+            sync_patch_entries(
+                patch_state,
+                normalized,
+                ToolStatus::Created,
+                false,
+                &payload.item_id,
+                msg_store,
+                entry_index,
+            );
+        }
+        ServerNotification::McpToolCallProgress(payload) => {
+            if let Some(tool_state) = state.mcp_tools.get_mut(&payload.item_id)
+                && !payload.message.is_empty()
+            {
+                tool_state.result = Some(ToolResult::markdown(payload.message));
+                if let Some(index) = tool_state.index {
+                    replace_normalized_entry(msg_store, index, tool_state.to_normalized_entry());
+                }
+            }
+        }
         ServerNotification::TurnPlanUpdated(payload) => {
             let todos: Vec<TodoItem> = payload
                 .plan
@@ -1361,6 +1438,90 @@ fn handle_server_notification(
                 },
             );
         }
+        ServerNotification::ModelRerouted(payload) => {
+            add_normalized_entry(
+                msg_store,
+                entry_index,
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::SystemMessage,
+                    content: format!(
+                        "Model rerouted from {} to {}: {:?}",
+                        payload.from_model, payload.to_model, payload.reason
+                    ),
+                    metadata: None,
+                },
+            );
+        }
+        ServerNotification::Warning(payload) => {
+            add_normalized_entry(
+                msg_store,
+                entry_index,
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::ErrorMessage {
+                        error_type: NormalizedEntryError::Other,
+                    },
+                    content: payload.message,
+                    metadata: None,
+                },
+            );
+        }
+        ServerNotification::GuardianWarning(payload) => {
+            add_normalized_entry(
+                msg_store,
+                entry_index,
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::ErrorMessage {
+                        error_type: NormalizedEntryError::Other,
+                    },
+                    content: payload.message,
+                    metadata: None,
+                },
+            );
+        }
+        ServerNotification::DeprecationNotice(payload) => {
+            let content = match payload.details {
+                Some(details) if !details.trim().is_empty() => {
+                    format!("Deprecation notice: {}\n{}", payload.summary, details)
+                }
+                _ => format!("Deprecation notice: {}", payload.summary),
+            };
+            add_normalized_entry(
+                msg_store,
+                entry_index,
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::SystemMessage,
+                    content,
+                    metadata: None,
+                },
+            );
+        }
+        ServerNotification::ConfigWarning(payload) => {
+            let mut parts = vec![format!("Config warning: {}", payload.summary)];
+            if let Some(path) = payload.path {
+                parts.push(format!("path: {path}"));
+            }
+            if let Some(details) = payload.details
+                && !details.trim().is_empty()
+            {
+                parts.push(details);
+            }
+            add_normalized_entry(
+                msg_store,
+                entry_index,
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::ErrorMessage {
+                        error_type: NormalizedEntryError::Other,
+                    },
+                    content: parts.join("\n"),
+                    metadata: None,
+                },
+            );
+        }
         ServerNotification::Error(payload) => {
             add_normalized_entry(
                 msg_store,
@@ -1419,21 +1580,15 @@ fn handle_v2_item_started(
             state.thinking = None;
             let normalized = normalize_v2_file_changes(worktree_path, &changes);
             let patch_state = state.patches.entry(id.clone()).or_default();
-            patch_state.entries.clear();
-            for (path, file_changes) in normalized {
-                let mut entry = PatchEntry {
-                    index: None,
-                    path,
-                    changes: file_changes,
-                    status: ToolStatus::Created,
-                    awaiting_approval: false,
-                    call_id: id.clone(),
-                };
-                let index =
-                    add_normalized_entry(msg_store, entry_index, entry.to_normalized_entry());
-                entry.index = Some(index);
-                patch_state.entries.push(entry);
-            }
+            sync_patch_entries(
+                patch_state,
+                normalized,
+                ToolStatus::Created,
+                false,
+                &id,
+                msg_store,
+                entry_index,
+            );
         }
         ThreadItem::McpToolCall {
             id,
@@ -1521,6 +1676,18 @@ fn handle_v2_item_started(
                 upsert_normalized_entry(msg_store, index, entry, is_new);
             }
         }
+        ThreadItem::ContextCompaction { .. } => {
+            add_normalized_entry(
+                msg_store,
+                entry_index,
+                NormalizedEntry {
+                    timestamp: None,
+                    entry_type: NormalizedEntryType::SystemMessage,
+                    content: "Context compacted".to_string(),
+                    metadata: None,
+                },
+            );
+        }
         _ => {}
     }
 }
@@ -1588,18 +1755,17 @@ fn handle_v2_item_completed(
                 PatchApplyStatus::InProgress => ToolStatus::Created,
             };
 
-            if let Some(mut patch_state) = state.patches.remove(&id) {
-                let normalized = normalize_v2_file_changes(worktree_path, &changes);
-                for (entry, (path, file_changes)) in patch_state.entries.iter_mut().zip(normalized)
-                {
-                    entry.path = path;
-                    entry.changes = file_changes;
-                    entry.status = status.clone();
-                    if let Some(index) = entry.index {
-                        replace_normalized_entry(msg_store, index, entry.to_normalized_entry());
-                    }
-                }
-            }
+            let normalized = normalize_v2_file_changes(worktree_path, &changes);
+            let mut patch_state = state.patches.remove(&id).unwrap_or_default();
+            sync_patch_entries(
+                &mut patch_state,
+                normalized,
+                status,
+                false,
+                &id,
+                msg_store,
+                entry_index,
+            );
         }
         ThreadItem::McpToolCall {
             id,
@@ -2040,6 +2206,131 @@ mod tests {
         assert!(entries.iter().any(|entry| {
             matches!(entry.entry_type, NormalizedEntryType::AssistantMessage)
                 && entry.content == "Done"
+        }));
+    }
+
+    #[tokio::test]
+    async fn normalize_logs_maps_app_server_agent_delta_to_assistant() {
+        let msg_store = std::sync::Arc::new(MsgStore::new());
+        super::normalize_logs(msg_store.clone(), std::path::Path::new("E:/workspace"));
+        tokio::task::yield_now().await;
+
+        let line = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "item/agentMessage/delta",
+            "params": {
+                "threadId": "thread-1",
+                "turnId": "turn-1",
+                "itemId": "item-1",
+                "delta": "Hello from app server"
+            }
+        })
+        .to_string();
+        msg_store.push_stdout(format!("{line}\n"));
+        msg_store.push_finished();
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let entries = normalized_entries_from_history(&msg_store);
+        assert!(entries.iter().any(|entry| {
+            matches!(entry.entry_type, NormalizedEntryType::AssistantMessage)
+                && entry.content == "Hello from app server"
+        }));
+    }
+
+    #[tokio::test]
+    async fn normalize_logs_maps_app_server_reasoning_delta_to_thinking() {
+        let msg_store = std::sync::Arc::new(MsgStore::new());
+        super::normalize_logs(msg_store.clone(), std::path::Path::new("E:/workspace"));
+        tokio::task::yield_now().await;
+
+        let line = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "item/reasoning/summaryTextDelta",
+            "params": {
+                "threadId": "thread-1",
+                "turnId": "turn-1",
+                "itemId": "item-1",
+                "delta": "Reading the new app-server stream",
+                "summaryIndex": 0
+            }
+        })
+        .to_string();
+        msg_store.push_stdout(format!("{line}\n"));
+        msg_store.push_finished();
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let entries = normalized_entries_from_history(&msg_store);
+        assert!(entries.iter().any(|entry| {
+            matches!(entry.entry_type, NormalizedEntryType::Thinking)
+                && entry.content == "Reading the new app-server stream"
+        }));
+    }
+
+    #[tokio::test]
+    async fn normalize_logs_maps_app_server_file_change_patch_updated_to_edit() {
+        let msg_store = std::sync::Arc::new(MsgStore::new());
+        super::normalize_logs(msg_store.clone(), std::path::Path::new("E:/workspace"));
+        tokio::task::yield_now().await;
+
+        let line = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "item/fileChange/patchUpdated",
+            "params": {
+                "threadId": "thread-1",
+                "turnId": "turn-1",
+                "itemId": "patch-1",
+                "changes": [{
+                    "path": "E:/workspace/src/main.rs",
+                    "kind": { "type": "update", "movePath": null },
+                    "diff": "@@ -1 +1 @@\n-old\n+new\n"
+                }]
+            }
+        })
+        .to_string();
+        msg_store.push_stdout(format!("{line}\n"));
+        msg_store.push_finished();
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let entries = normalized_entries_from_history(&msg_store);
+        assert!(entries.iter().any(|entry| {
+            matches!(
+                &entry.entry_type,
+                NormalizedEntryType::ToolUse {
+                    tool_name,
+                    action_type: crate::logs::ActionType::FileEdit { path, .. },
+                    ..
+                } if tool_name == "edit" && path == "src/main.rs"
+            )
+        }));
+    }
+
+    #[tokio::test]
+    async fn normalize_logs_maps_app_server_warning_to_error_message() {
+        let msg_store = std::sync::Arc::new(MsgStore::new());
+        super::normalize_logs(msg_store.clone(), std::path::Path::new("E:/workspace"));
+        tokio::task::yield_now().await;
+
+        let line = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "warning",
+            "params": {
+                "threadId": "thread-1",
+                "message": "This setting will be ignored"
+            }
+        })
+        .to_string();
+        msg_store.push_stdout(format!("{line}\n"));
+        msg_store.push_finished();
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let entries = normalized_entries_from_history(&msg_store);
+        assert!(entries.iter().any(|entry| {
+            matches!(entry.entry_type, NormalizedEntryType::ErrorMessage { .. })
+                && entry.content == "This setting will be ignored"
         }));
     }
 
