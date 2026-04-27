@@ -536,9 +536,19 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     let (entry, index, is_new) = state.assistant_message_append(delta);
                     upsert_normalized_entry(&msg_store, index, entry, is_new);
                 }
+                EventMsg::AgentMessageContentDelta(event) => {
+                    state.thinking = None;
+                    let (entry, index, is_new) = state.assistant_message_append(event.delta);
+                    upsert_normalized_entry(&msg_store, index, entry, is_new);
+                }
                 EventMsg::AgentReasoningDelta(AgentReasoningDeltaEvent { delta }) => {
                     state.assistant = None;
                     let (entry, index, is_new) = state.thinking_append(delta);
+                    upsert_normalized_entry(&msg_store, index, entry, is_new);
+                }
+                EventMsg::ReasoningContentDelta(event) => {
+                    state.assistant = None;
+                    let (entry, index, is_new) = state.thinking_append(event.delta);
                     upsert_normalized_entry(&msg_store, index, entry, is_new);
                 }
                 EventMsg::AgentMessage(AgentMessageEvent { message, .. }) => {
@@ -1131,8 +1141,6 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 | EventMsg::RawResponseItem(..)
                 | EventMsg::ItemStarted(..)
                 | EventMsg::ItemCompleted(..)
-                | EventMsg::AgentMessageContentDelta(..)
-                | EventMsg::ReasoningContentDelta(..)
                 | EventMsg::ReasoningRawContentDelta(..)
                 | EventMsg::ListSkillsResponse(..)
                 | EventMsg::SkillsUpdateAvailable
@@ -1947,13 +1955,92 @@ mod tests {
     use workspace_utils::{log_msg::LogMsg, msg_store::MsgStore};
 
     use super::handle_jsonrpc_response;
-    use crate::logs::utils::EntryIndexProvider;
+    use crate::logs::{
+        NormalizedEntry, NormalizedEntryType,
+        utils::{EntryIndexProvider, patch::extract_normalized_entry_from_patch},
+    };
 
     fn session_id_from_history(store: &MsgStore) -> Option<String> {
         store.get_history().into_iter().find_map(|msg| match msg {
             LogMsg::SessionId(id) => Some(id),
             _ => None,
         })
+    }
+
+    fn normalized_entries_from_history(store: &MsgStore) -> Vec<NormalizedEntry> {
+        store
+            .get_history()
+            .into_iter()
+            .filter_map(|msg| match msg {
+                LogMsg::JsonPatch(patch) => {
+                    extract_normalized_entry_from_patch(&patch).map(|(_, entry)| entry)
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn normalize_logs_maps_canonical_reasoning_delta_to_thinking() {
+        let msg_store = std::sync::Arc::new(MsgStore::new());
+        super::normalize_logs(msg_store.clone(), std::path::Path::new("E:/workspace"));
+        tokio::task::yield_now().await;
+
+        let line = serde_json::json!({
+            "method": "codex/event",
+            "params": {
+                "msg": {
+                    "type": "reasoning_content_delta",
+                    "thread_id": "thread-1",
+                    "turn_id": "turn-1",
+                    "item_id": "item-1",
+                    "delta": "Inspecting the workspace",
+                    "summary_index": 0
+                }
+            }
+        })
+        .to_string();
+        msg_store.push_stdout(format!("{line}\n"));
+        msg_store.push_finished();
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let entries = normalized_entries_from_history(&msg_store);
+        assert!(entries.iter().any(|entry| {
+            matches!(entry.entry_type, NormalizedEntryType::Thinking)
+                && entry.content == "Inspecting the workspace"
+        }));
+    }
+
+    #[tokio::test]
+    async fn normalize_logs_maps_canonical_agent_delta_to_assistant() {
+        let msg_store = std::sync::Arc::new(MsgStore::new());
+        super::normalize_logs(msg_store.clone(), std::path::Path::new("E:/workspace"));
+        tokio::task::yield_now().await;
+
+        let line = serde_json::json!({
+            "method": "codex/event",
+            "params": {
+                "msg": {
+                    "type": "agent_message_content_delta",
+                    "thread_id": "thread-1",
+                    "turn_id": "turn-1",
+                    "item_id": "item-1",
+                    "delta": "Done"
+                }
+            }
+        })
+        .to_string();
+        msg_store.push_stdout(format!("{line}\n"));
+        msg_store.push_finished();
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let entries = normalized_entries_from_history(&msg_store);
+        assert!(entries.iter().any(|entry| {
+            matches!(entry.entry_type, NormalizedEntryType::AssistantMessage)
+                && entry.content == "Done"
+        }));
     }
 
     #[test]
