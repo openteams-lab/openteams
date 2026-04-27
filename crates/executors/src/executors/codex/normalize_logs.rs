@@ -2146,6 +2146,23 @@ mod tests {
             .collect()
     }
 
+    async fn eventually_has_normalized_entry(
+        store: &MsgStore,
+        mut predicate: impl FnMut(&NormalizedEntry) -> bool,
+    ) -> bool {
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            let entries = normalized_entries_from_history(store);
+            if entries.iter().any(&mut predicate) {
+                return true;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return false;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    }
+
     #[tokio::test]
     async fn normalize_logs_maps_canonical_reasoning_delta_to_thinking() {
         let msg_store = std::sync::Arc::new(MsgStore::new());
@@ -2169,13 +2186,13 @@ mod tests {
         msg_store.push_stdout(format!("{line}\n"));
         msg_store.push_finished();
 
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
-        let entries = normalized_entries_from_history(&msg_store);
-        assert!(entries.iter().any(|entry| {
-            matches!(entry.entry_type, NormalizedEntryType::Thinking)
-                && entry.content == "Inspecting the workspace"
-        }));
+        assert!(
+            eventually_has_normalized_entry(&msg_store, |entry| {
+                matches!(entry.entry_type, NormalizedEntryType::Thinking)
+                    && entry.content == "Inspecting the workspace"
+            })
+            .await
+        );
     }
 
     #[tokio::test]
@@ -2200,13 +2217,13 @@ mod tests {
         msg_store.push_stdout(format!("{line}\n"));
         msg_store.push_finished();
 
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
-        let entries = normalized_entries_from_history(&msg_store);
-        assert!(entries.iter().any(|entry| {
-            matches!(entry.entry_type, NormalizedEntryType::AssistantMessage)
-                && entry.content == "Done"
-        }));
+        assert!(
+            eventually_has_normalized_entry(&msg_store, |entry| {
+                matches!(entry.entry_type, NormalizedEntryType::AssistantMessage)
+                    && entry.content == "Done"
+            })
+            .await
+        );
     }
 
     #[tokio::test]
@@ -2229,13 +2246,13 @@ mod tests {
         msg_store.push_stdout(format!("{line}\n"));
         msg_store.push_finished();
 
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
-        let entries = normalized_entries_from_history(&msg_store);
-        assert!(entries.iter().any(|entry| {
-            matches!(entry.entry_type, NormalizedEntryType::AssistantMessage)
-                && entry.content == "Hello from app server"
-        }));
+        assert!(
+            eventually_has_normalized_entry(&msg_store, |entry| {
+                matches!(entry.entry_type, NormalizedEntryType::AssistantMessage)
+                    && entry.content == "Hello from app server"
+            })
+            .await
+        );
     }
 
     #[tokio::test]
@@ -2259,13 +2276,13 @@ mod tests {
         msg_store.push_stdout(format!("{line}\n"));
         msg_store.push_finished();
 
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
-        let entries = normalized_entries_from_history(&msg_store);
-        assert!(entries.iter().any(|entry| {
-            matches!(entry.entry_type, NormalizedEntryType::Thinking)
-                && entry.content == "Reading the new app-server stream"
-        }));
+        assert!(
+            eventually_has_normalized_entry(&msg_store, |entry| {
+                matches!(entry.entry_type, NormalizedEntryType::Thinking)
+                    && entry.content == "Reading the new app-server stream"
+            })
+            .await
+        );
     }
 
     #[tokio::test]
@@ -2292,19 +2309,19 @@ mod tests {
         msg_store.push_stdout(format!("{line}\n"));
         msg_store.push_finished();
 
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
-        let entries = normalized_entries_from_history(&msg_store);
-        assert!(entries.iter().any(|entry| {
-            matches!(
-                &entry.entry_type,
-                NormalizedEntryType::ToolUse {
-                    tool_name,
-                    action_type: crate::logs::ActionType::FileEdit { path, .. },
-                    ..
-                } if tool_name == "edit" && path == "src/main.rs"
-            )
-        }));
+        assert!(
+            eventually_has_normalized_entry(&msg_store, |entry| {
+                matches!(
+                    &entry.entry_type,
+                    NormalizedEntryType::ToolUse {
+                        tool_name,
+                        action_type: crate::logs::ActionType::FileEdit { path, .. },
+                        ..
+                    } if tool_name == "edit" && path == "src/main.rs"
+                )
+            })
+            .await
+        );
     }
 
     #[tokio::test]
@@ -2325,13 +2342,13 @@ mod tests {
         msg_store.push_stdout(format!("{line}\n"));
         msg_store.push_finished();
 
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
-        let entries = normalized_entries_from_history(&msg_store);
-        assert!(entries.iter().any(|entry| {
-            matches!(entry.entry_type, NormalizedEntryType::ErrorMessage { .. })
-                && entry.content == "This setting will be ignored"
-        }));
+        assert!(
+            eventually_has_normalized_entry(&msg_store, |entry| {
+                matches!(entry.entry_type, NormalizedEntryType::ErrorMessage { .. })
+                    && entry.content == "This setting will be ignored"
+            })
+            .await
+        );
     }
 
     #[test]
