@@ -896,7 +896,7 @@ impl ChatRunner {
                 "The current agent is always recorded as the sender automatically. Do not impersonate other senders.\n",
                 "Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.\n",
                 "Use `to = \\\"you\\\"` when sending a message to the user. Here `you` refers to the human user.\n",
-                "For send items, `intent` is optional but recommended when the routing semantics matter.\n",
+                "For send items to another agent, set `intent` to `request` or `reply` when the receiver should be executed.\n",
             ),
             "text",
         );
@@ -922,9 +922,9 @@ impl ChatRunner {
                 "- A send item targets exactly one receiver.\n",
                 "- Use concise language with a clear goal.\n",
                 "- Content may be empty.\n",
-                "- Prefer setting `intent` for machine-readable routing semantics.\n",
+                "- Use `intent` for machine-readable routing semantics.\n",
                 "- Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply required; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.\n",
-                "- The system will render the final group message as `@receiver content` and route it to that receiver.\n",
+                "- The system will render the final group message as `@receiver content`; only `request` and `reply` send items are routed to another agent.\n",
             ),
             "text",
         );

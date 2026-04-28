@@ -202,12 +202,23 @@ fn normalize_protocol_send_target(target: &str) -> Option<String> {
     }
 }
 
+fn is_routable_agent_send_intent(intent: Option<&str>) -> bool {
+    matches!(
+        intent.map(|value| value.trim().to_ascii_lowercase()),
+        Some(intent) if matches!(intent.as_str(), "reply" | "request")
+    )
+}
+
 pub fn parse_agent_send_mentions(meta: &Value) -> Vec<String> {
     let Some(protocol) = meta.get("protocol").and_then(Value::as_object) else {
         return Vec::new();
     };
 
     if protocol.get("type").and_then(Value::as_str) != Some("send") {
+        return Vec::new();
+    }
+
+    if !is_routable_agent_send_intent(protocol.get("intent").and_then(Value::as_str)) {
         return Vec::new();
     }
 
@@ -1825,10 +1836,31 @@ mod tests {
         let mentions = parse_agent_send_mentions(&serde_json::json!({
             "protocol": {
                 "type": "send",
-                "to": "@alice"
+                "to": "@alice",
+                "intent": "request"
             }
         }));
         assert_eq!(mentions, vec!["alice"]);
+    }
+
+    #[test]
+    fn parse_agent_send_mentions_requires_routable_intent() {
+        let mentions = parse_agent_send_mentions(&serde_json::json!({
+            "protocol": {
+                "type": "send",
+                "to": "researcher",
+                "intent": "notify"
+            }
+        }));
+        assert!(mentions.is_empty());
+
+        let mentions = parse_agent_send_mentions(&serde_json::json!({
+            "protocol": {
+                "type": "send",
+                "to": "researcher"
+            }
+        }));
+        assert!(mentions.is_empty());
     }
 
     #[test]
@@ -1985,7 +2017,8 @@ mod tests {
             Some(serde_json::json!({
                 "protocol": {
                     "type": "send",
-                    "to": "backend"
+                    "to": "backend",
+                    "intent": "reply"
                 }
             })),
         )
@@ -1993,6 +2026,32 @@ mod tests {
         .expect("create protocol-routed agent message");
 
         assert_eq!(message.mentions.0, vec!["backend"]);
+    }
+
+    #[tokio::test]
+    async fn create_message_does_not_route_agent_send_protocol_without_routable_intent() {
+        let pool = setup_chat_message_pool().await;
+        let session = create_active_session(&pool).await;
+        let sender = create_agent_member(&pool, "planner").await;
+
+        let message = create_message(
+            &pool,
+            session.id,
+            ChatSenderType::Agent,
+            Some(sender.id),
+            "@backend FYI".to_string(),
+            Some(serde_json::json!({
+                "protocol": {
+                    "type": "send",
+                    "to": "backend",
+                    "intent": "notify"
+                }
+            })),
+        )
+        .await
+        .expect("create non-routed agent message");
+
+        assert!(message.mentions.0.is_empty());
     }
 
     fn make_session_agent(state: ChatSessionAgentState) -> ChatSessionAgent {
