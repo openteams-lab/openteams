@@ -35,6 +35,48 @@ function normalizeModelLookupValue(
   return trimmed ? trimmed.toLowerCase() : null;
 }
 
+function normalizeSearchValue(value: string | null | undefined): string {
+  return (value ?? '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function compactSearchValue(value: string | null | undefined): string {
+  return normalizeSearchValue(value).replace(/[^a-z0-9]+/g, '');
+}
+
+function isSubsequence(needle: string, haystack: string): boolean {
+  if (!needle) return true;
+  let needleIndex = 0;
+  for (const char of haystack) {
+    if (char === needle[needleIndex]) {
+      needleIndex += 1;
+      if (needleIndex === needle.length) return true;
+    }
+  }
+  return false;
+}
+
+function matchesSearchCandidate(candidate: string, query: string): boolean {
+  const normalizedCandidate = normalizeSearchValue(candidate);
+  const normalizedQuery = normalizeSearchValue(query).trim();
+  if (!normalizedQuery) return true;
+
+  return normalizedQuery
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((token) => {
+      if (normalizedCandidate.includes(token)) return true;
+      const compactCandidate = compactSearchValue(candidate);
+      const compactToken = compactSearchValue(token);
+      return (
+        compactCandidate.includes(compactToken) ||
+        isSubsequence(compactToken, compactCandidate)
+      );
+    });
+}
+
 export function isOpencodeExecutor(
   executor: BaseCodingAgent | string | null | undefined
 ): boolean {
@@ -267,6 +309,37 @@ export function getVariantDisplayLabel(
   }
 
   return `${prettyVariant} (${modelLabel})`;
+}
+
+export function matchesModelVariantSearch(
+  executor: BaseCodingAgent | string | null | undefined,
+  variantName: string,
+  profiles: ExecutorConfigs['executors'] | null | undefined,
+  query: string
+): boolean {
+  const modelName = getVariantModelName(executor, variantName, profiles);
+  const modelLabel = formatExecutorModelLabel(executor, modelName);
+  const candidates = [
+    variantName,
+    toPrettyCase(variantName),
+    getVariantDisplayLabel(executor, variantName, profiles),
+    modelName ?? '',
+    modelLabel ?? '',
+  ];
+
+  return candidates.some((candidate) =>
+    matchesSearchCandidate(candidate, query)
+  );
+}
+
+export function matchesModelSearch(
+  modelName: string | null | undefined,
+  modelLabel: string | null | undefined,
+  query: string
+): boolean {
+  return [modelName ?? '', modelLabel ?? ''].some((candidate) =>
+    matchesSearchCandidate(candidate, query)
+  );
 }
 
 /**

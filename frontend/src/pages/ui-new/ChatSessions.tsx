@@ -42,6 +42,7 @@ import {
   getVariantDisplayLabel,
   getVariantModelName,
   getVariantOptions as getExecutorVariantOptions,
+  matchesModelVariantSearch,
   withExecutorProfileVariant,
 } from '@/utils/executor';
 import { CreateSessionDialog } from '@/components/ui-new/dialogs/CreateSessionDialog';
@@ -1326,6 +1327,17 @@ export function ChatSessions() {
     (runnerType: string): string[] => {
       return getExecutorVariantOptions(runnerType as BaseCodingAgent, profiles);
     },
+    [profiles]
+  );
+
+  const matchesVariantSearch = useCallback(
+    (runnerType: string, variant: string, query: string): boolean =>
+      matchesModelVariantSearch(
+        runnerType as BaseCodingAgent,
+        variant,
+        profiles,
+        query
+      ),
     [profiles]
   );
 
@@ -4563,6 +4575,7 @@ export function ChatSessions() {
             getModelDisplayName={getModelDisplayName}
             getVariantLabel={getVariantLabel}
             getVariantOptions={getVariantOptions}
+            matchesVariantSearch={matchesVariantSearch}
             onOpenAddMember={handleOpenAddMemberPanel}
             onCancelMember={() => {
               setIsAddMemberOpen(false);

@@ -219,6 +219,60 @@
     background: #f9f9fa !important;
   }
 
+  .new-design .chat-session-model-dropdown,
+  .new-design .onboarding-model-dropdown,
+  .new-design .preset-member-model-dropdown {
+    border-radius: 8px !important;
+    border: 1px solid #d8e0ee !important;
+    background: #ffffff !important;
+    padding: 4px !important;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1) !important;
+  }
+
+  .new-design .team-import-preview-model-dropdown {
+    border-radius: 18px !important;
+    border: 1px solid #d8e2f0 !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    padding: 6px !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 20px 36px rgba(148, 163, 184, 0.16) !important;
+  }
+
+  .new-design .chat-session-model-dropdown .dropdown-menu-search,
+  .new-design .onboarding-model-dropdown .dropdown-menu-search,
+  .new-design .preset-member-model-dropdown .dropdown-menu-search,
+  .new-design .team-import-preview-model-dropdown .dropdown-menu-search {
+    margin: 0 0 4px;
+    border: 1px solid #e6edf6;
+    border-radius: 7px;
+    background: #f8fafc;
+  }
+
+  .new-design .team-import-preview-model-dropdown .dropdown-menu-search {
+    border-radius: 14px;
+    background: rgba(248, 250, 252, 0.92);
+  }
+
+  .new-design .chat-session-model-dropdown .dropdown-menu-separator,
+  .new-design .onboarding-model-dropdown .dropdown-menu-separator,
+  .new-design .preset-member-model-dropdown .dropdown-menu-separator,
+  .new-design .team-import-preview-model-dropdown .dropdown-menu-separator {
+    background: #e7edf5;
+  }
+
+  .new-design .searchable-dropdown-item {
+    color: #1f2937;
+  }
+
+  .new-design .searchable-dropdown-item:focus,
+  .new-design .searchable-dropdown-item[data-highlighted],
+  .new-design .searchable-dropdown-item.is-highlighted,
+  .new-design .searchable-dropdown-item.is-selected {
+    background: #f1f5fb !important;
+    color: #111827 !important;
+  }
+
   .new-design .chat-settings-theme .dropdown-menu-item,
   .new-design .chat-settings-theme .dropdown-menu-checkbox-item,
   .new-design .chat-settings-theme .dropdown-menu-radio-item,
