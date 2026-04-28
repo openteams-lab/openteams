@@ -205,7 +205,7 @@ fn normalize_protocol_send_target(target: &str) -> Option<String> {
 fn is_routable_agent_send_intent(intent: Option<&str>) -> bool {
     matches!(
         intent.map(|value| value.trim().to_ascii_lowercase()),
-        Some(intent) if matches!(intent.as_str(), "reply" | "request")
+        Some(intent) if matches!(intent.as_str(), "reply" | "request" | "notify")
     )
 }
 
@@ -1844,7 +1844,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_agent_send_mentions_requires_routable_intent() {
+    fn parse_agent_send_mentions_routes_notify_intent() {
         let mentions = parse_agent_send_mentions(&serde_json::json!({
             "protocol": {
                 "type": "send",
@@ -1852,7 +1852,7 @@ mod tests {
                 "intent": "notify"
             }
         }));
-        assert!(mentions.is_empty());
+        assert_eq!(mentions, vec!["researcher"]);
 
         let mentions = parse_agent_send_mentions(&serde_json::json!({
             "protocol": {
@@ -2029,7 +2029,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn create_message_does_not_route_agent_send_protocol_without_routable_intent() {
+    async fn create_message_routes_agent_send_protocol_with_notify_intent() {
         let pool = setup_chat_message_pool().await;
         let session = create_active_session(&pool).await;
         let sender = create_agent_member(&pool, "planner").await;
@@ -2049,9 +2049,9 @@ mod tests {
             })),
         )
         .await
-        .expect("create non-routed agent message");
+        .expect("create notify-routed agent message");
 
-        assert!(message.mentions.0.is_empty());
+        assert_eq!(message.mentions.0, vec!["backend"]);
     }
 
     fn make_session_agent(state: ChatSessionAgentState) -> ChatSessionAgent {

@@ -896,7 +896,8 @@ impl ChatRunner {
                 "The current agent is always recorded as the sender automatically. Do not impersonate other senders.\n",
                 "Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.\n",
                 "Use `to = \\\"you\\\"` when sending a message to the user. Here `you` refers to the human user.\n",
-                "For send items to another agent, set `intent` to `request` or `reply` when the receiver should be executed.\n",
+                "For send items to another agent, `request`, `reply`, and `notify` will execute the receiver.\n",
+                "Use `notify` only for informational handoffs; the receiver must not send a reply or acknowledgment for notify messages.\n",
             ),
             "text",
         );
@@ -923,8 +924,9 @@ impl ChatRunner {
                 "- Use concise language with a clear goal.\n",
                 "- Content may be empty.\n",
                 "- Use `intent` for machine-readable routing semantics.\n",
-                "- Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply required; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.\n",
-                "- The system will render the final group message as `@receiver content`; only `request` and `reply` send items are routed to another agent.\n",
+                "- Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply should be sent; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.\n",
+                "- The system will render the final group message as `@receiver content`; `request`, `reply`, and `notify` send items are routed to another agent.\n",
+                "- When you receive a `notify` message, do not send a reply or acknowledgment to the sender.\n",
             ),
             "text",
         );
@@ -1126,6 +1128,11 @@ impl ChatRunner {
             markdown.push_str("- intent_meaning: ");
             markdown.push_str(&meaning);
             markdown.push('\n');
+            if intent == "notify" {
+                markdown.push_str(
+                    "- response_requirement: Notification only. Do not send a reply or acknowledgment to the sender.\n",
+                );
+            }
         }
 
         if let Some(reference) = reference {
@@ -2186,7 +2193,7 @@ impl ChatRunner {
         match intent {
             "request" => Some("Ask for work or information."),
             "reply" => Some("The receiver should reply."),
-            "notify" => Some("Informational only. No reply is required."),
+            "notify" => Some("Informational only. Do not send a reply."),
             "blocker" => Some("Report a blocking issue."),
             "confirm" => Some("Explicit confirmation is required."),
             _ => None,
