@@ -488,7 +488,11 @@ pub fn to_default_variant(id: &ExecutorProfileId) -> ExecutorProfileId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::executors::{claude::ClaudeCode, codex::Codex, kimi::KimiCode};
+    use crate::executors::{
+        claude::ClaudeCode,
+        codex::{Codex, ReasoningSummary},
+        kimi::KimiCode,
+    };
 
     #[test]
     fn default_profiles_use_gpt_5_4_for_codex() {
@@ -505,8 +509,13 @@ mod tests {
             .expect("codex GPT_5_4 profile should exist");
 
         let assert_model = |agent: CodingAgent| match agent {
-            CodingAgent::Codex(Codex { model, .. }) => {
+            CodingAgent::Codex(Codex {
+                model,
+                model_reasoning_summary,
+                ..
+            }) => {
                 assert_eq!(model.as_deref(), Some("gpt-5.4"));
+                assert_eq!(model_reasoning_summary, Some(ReasoningSummary::Auto));
             }
             other => panic!("expected codex profile, got {other:?}"),
         };
@@ -541,8 +550,13 @@ mod tests {
             ))
             .unwrap_or_else(|| panic!("codex {variant} profile should exist"))
         {
-            CodingAgent::Codex(Codex { model, .. }) => {
+            CodingAgent::Codex(Codex {
+                model,
+                model_reasoning_summary,
+                ..
+            }) => {
                 assert_eq!(model.as_deref(), Some(expected));
+                assert_eq!(model_reasoning_summary, Some(ReasoningSummary::Auto));
             }
             other => panic!("expected codex profile, got {other:?}"),
         }
