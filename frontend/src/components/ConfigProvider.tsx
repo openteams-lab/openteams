@@ -73,6 +73,12 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
     queryKey: ['user-system'],
     queryFn: configApi.getConfig,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    // Backend may take a few seconds on first launch (migrations, config write).
+    // Retry aggressively so transient connection refusals don't permanently
+    // surface as "load failed" in dependent components.
+    retry: 8,
+    retryDelay: (attemptIndex) =>
+      Math.min(500 * 2 ** attemptIndex, 5000),
   });
 
   const config = userSystemInfo?.config || null;
