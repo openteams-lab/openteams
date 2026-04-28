@@ -77,8 +77,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
     // Retry aggressively so transient connection refusals don't permanently
     // surface as "load failed" in dependent components.
     retry: 8,
-    retryDelay: (attemptIndex) =>
-      Math.min(500 * 2 ** attemptIndex, 5000),
+    retryDelay: (attemptIndex) => Math.min(500 * 2 ** attemptIndex, 5000),
   });
 
   const config = userSystemInfo?.config || null;
