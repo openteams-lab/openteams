@@ -1135,8 +1135,18 @@ export function SkillsPanel({
           </section>
 
           {(installedError || marketError) && (
-            <div className="mt-2 text-sm text-error">
-              {installedError ?? marketError}
+            <div className="mt-2 flex items-center gap-3 text-sm text-error">
+              <span>{installedError ?? marketError}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  void refreshAll();
+                }}
+                disabled={isLoadingMarket || isLoadingInstalled}
+                className="rounded-[8px] border border-error/40 bg-white/70 px-2.5 py-0.5 text-[12px] font-medium text-error transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[rgba(239,68,68,0.18)] dark:hover:bg-[rgba(239,68,68,0.28)]"
+              >
+                {t('skillLibrary.errors.retry', { defaultValue: 'Retry' })}
+              </button>
             </div>
           )}
         </div>

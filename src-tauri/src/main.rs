@@ -120,6 +120,40 @@ fn apply_default_webview_zoom(window: &tauri::Window) {
     }
 }
 
+/// Wait until the backend TCP port accepts connections (server has bound + is
+/// ready to serve), then navigate the webview. Avoids first-launch white screen
+/// and the race condition that turns transient connection refusals into a
+/// permanent "load failed" state in React Query.
+fn wait_for_backend_then_navigate(window: tauri::Window, port: u16) {
+    std::thread::spawn(move || {
+        let target = format!("http://localhost:{}", port);
+        let addr = format!("127.0.0.1:{}", port);
+        // Probe up to 60s (200 * 300ms). Server boot includes 87 SQLite migrations
+        // and a 1-2MB config write on first launch, which can take a few seconds.
+        for _ in 0..200 {
+            if std::net::TcpStream::connect_timeout(
+                &addr.parse().expect("valid loopback addr"),
+                std::time::Duration::from_millis(500),
+            )
+            .is_ok()
+            {
+                let _ = window.eval(&format!(
+                    "window.location.replace('{}')",
+                    target.replace('\'', "\\'")
+                ));
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(300));
+        }
+        // Last-resort navigation so the user sees the (broken) target instead of
+        // a perpetual blank screen.
+        let _ = window.eval(&format!(
+            "window.location.replace('{}')",
+            target.replace('\'', "\\'")
+        ));
+    });
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![delete_all_user_data, delete_cache_data])
@@ -133,13 +167,7 @@ fn main() {
 
             if let Some(window) = app.get_window("main") {
                 apply_default_webview_zoom(&window);
-
-                // Tauri 1.x remote IPC access is more reliable with localhost than loopback IPs.
-                let url = format!("http://localhost:{}", port);
-                window.eval(&format!(
-                    "window.location.replace('{}')",
-                    url.replace('\'', "\\'")
-                ))?;
+                wait_for_backend_then_navigate(window, port);
             }
 
             Ok(())

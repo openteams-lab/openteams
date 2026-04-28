@@ -275,8 +275,14 @@ export function ChatPresetsEditorPanel({
   const { t } = useTranslation('settings');
   const { t: tChat } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
-  const { config, profiles, updateAndSaveConfig, homeDirectory } =
-    useUserSystem();
+  const {
+    config,
+    profiles,
+    updateAndSaveConfig,
+    homeDirectory,
+    loading: isUserSystemLoading,
+    reloadSystem,
+  } = useUserSystem();
   const { setDirty: setContextDirty } = useSettingsDirty();
 
   const sourcePresets = useMemo(
@@ -702,10 +708,28 @@ export function ChatPresetsEditorPanel({
   };
 
   if (!config) {
+    if (isUserSystemLoading) {
+      return (
+        <div className="flex items-center justify-center py-12 text-[13px] text-[#64748B] dark:text-[#94A3B8]">
+          {t('settings.presets.loading', {
+            defaultValue: 'Loading presets...',
+          })}
+        </div>
+      );
+    }
     return (
       <div className="py-8">
-        <div className="rounded-[16px] border border-[#FECACA] bg-[#FFF5F5] p-4 text-[13px] text-[#DC2626] dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(239,68,68,0.12)] dark:text-[#FCA5A5]">
-          {t('settings.presets.loadError')}
+        <div className="flex flex-col items-start gap-3 rounded-[16px] border border-[#FECACA] bg-[#FFF5F5] p-4 text-[13px] text-[#DC2626] dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(239,68,68,0.12)] dark:text-[#FCA5A5]">
+          <span>{t('settings.presets.loadError')}</span>
+          <button
+            type="button"
+            onClick={() => {
+              void reloadSystem();
+            }}
+            className="rounded-[10px] border border-[#FCA5A5] bg-white/70 px-3 py-1 text-[12px] font-medium text-[#DC2626] hover:bg-white dark:border-[rgba(248,113,113,0.4)] dark:bg-[rgba(239,68,68,0.18)] dark:text-[#FCA5A5] dark:hover:bg-[rgba(239,68,68,0.28)]"
+          >
+            {tCommon('buttons.retry', { defaultValue: 'Retry' })}
+          </button>
         </div>
       </div>
     );
