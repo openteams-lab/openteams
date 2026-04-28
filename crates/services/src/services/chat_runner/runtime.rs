@@ -56,6 +56,12 @@ struct StreamPatchDelta {
     delta: bool,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct StreamPatchFilter {
+    suppress_codex_tool_runtime_details: bool,
+    suppress_error_streaming: bool,
+}
+
 pub(super) struct RunLogSpool {
     path: PathBuf,
     file: Option<fs::File>,
@@ -101,6 +107,30 @@ fn is_benign_codex_rollout_stderr(line: &str) -> bool {
     line.contains("ERROR codex_core::session: failed to record rollout items:")
         && line.contains("thread ")
         && line.contains(" not found")
+}
+
+fn is_codex_tool_call_failure(content: &str) -> bool {
+    let normalized = content.trim().to_lowercase();
+    if normalized.is_empty() {
+        return false;
+    }
+
+    let has_failure = normalized.contains("failed")
+        || normalized.contains("failure")
+        || normalized.contains("error");
+    if !has_failure {
+        return false;
+    }
+
+    normalized.contains("tool")
+        || normalized.contains("mcp")
+        || normalized.contains("dynamic tool call")
+        || normalized.contains("exec")
+        || normalized.contains("command")
+        || normalized.contains("shell")
+        || normalized.contains("bash")
+        || normalized.contains("apply patch")
+        || normalized.contains("patch")
 }
 
 impl RunLogSpool {
@@ -709,6 +739,7 @@ impl ChatRunner {
         error_content: &mut String,
         error_update_count: &mut u64,
         error_type: &mut Option<NormalizedEntryError>,
+        stream_filter: StreamPatchFilter,
     ) {
         if let Some(update) = Self::apply_stream_patch_to_state(
             &patch,
@@ -719,6 +750,7 @@ impl ChatRunner {
             error_content,
             error_update_count,
             error_type,
+            stream_filter,
         ) {
             let _ = sender.send(ChatStreamEvent::AgentDelta {
                 session_id,
@@ -743,6 +775,7 @@ impl ChatRunner {
         error_content: &mut String,
         error_update_count: &mut u64,
         error_type: &mut Option<NormalizedEntryError>,
+        stream_filter: StreamPatchFilter,
     ) -> Option<StreamPatchDelta> {
         let (index, entry) = extract_normalized_entry_from_patch(patch)?;
         let stream_type = match &entry.entry_type {
@@ -765,6 +798,9 @@ impl ChatRunner {
         }?;
 
         let current = entry.content;
+        let suppress_stream = stream_filter.suppress_codex_tool_runtime_details
+            && matches!(stream_type, ChatStreamDeltaType::Error)
+            && is_codex_tool_call_failure(&current);
         let previous = last_content.get(&index).cloned().unwrap_or_default();
         let (delta, is_delta) = if current.starts_with(&previous) {
             (current[previous.len()..].to_string(), true)
@@ -779,7 +815,7 @@ impl ChatRunner {
                 *assistant_update_count = assistant_update_count.saturating_add(1);
             }
         }
-        if matches!(stream_type, ChatStreamDeltaType::Error) {
+        if matches!(stream_type, ChatStreamDeltaType::Error) && !suppress_stream {
             if !error_content.is_empty() {
                 error_content.push('\n');
             }
@@ -789,7 +825,11 @@ impl ChatRunner {
             }
         }
 
-        if delta.is_empty() {
+        if suppress_stream
+            || delta.is_empty()
+            || (matches!(stream_type, ChatStreamDeltaType::Error)
+                && stream_filter.suppress_error_streaming)
+        {
             return None;
         }
 
@@ -800,7 +840,10 @@ impl ChatRunner {
         })
     }
 
-    fn rebuild_run_stream_state_from_history(history: &[LogMsg]) -> RunStreamStateSnapshot {
+    fn rebuild_run_stream_state_from_history(
+        history: &[LogMsg],
+        stream_filter: StreamPatchFilter,
+    ) -> RunStreamStateSnapshot {
         let mut snapshot = RunStreamStateSnapshot::default();
         let mut last_content = HashMap::new();
         let mut stdout_line_buffer = String::new();
@@ -830,6 +873,7 @@ impl ChatRunner {
                         &mut snapshot.error_content,
                         &mut snapshot.error_update_count,
                         &mut snapshot.error_type,
+                        stream_filter,
                     );
                 }
                 _ => {}
@@ -843,8 +887,9 @@ impl ChatRunner {
     fn reconcile_run_stream_state_from_history(
         state: &mut RunStreamStateSnapshot,
         history: &[LogMsg],
+        stream_filter: StreamPatchFilter,
     ) {
-        let rebuilt = Self::rebuild_run_stream_state_from_history(history);
+        let rebuilt = Self::rebuild_run_stream_state_from_history(history, stream_filter);
 
         if rebuilt.agent_session_id.is_some() {
             state.agent_session_id = rebuilt.agent_session_id;
@@ -1037,9 +1082,14 @@ impl ChatRunner {
         run_started_at: chrono::DateTime<Utc>,
         protocol_retry_attempt: u32,
         track_source_message: bool,
+        suppress_codex_tool_runtime_details: bool,
     ) {
         let db = self.db.clone();
         let sender = self.sender_for(session_id);
+        let stream_filter = StreamPatchFilter {
+            suppress_codex_tool_runtime_details,
+            suppress_error_streaming: true,
+        };
 
         tracing::debug!(
             session_id = %session_id,
@@ -1111,6 +1161,7 @@ impl ChatRunner {
                             &mut error_content,
                             &mut error_update_count,
                             &mut error_type,
+                            stream_filter,
                         );
                     }
                     Ok(LogMsg::Finished) => {
@@ -1192,6 +1243,7 @@ impl ChatRunner {
                                         &mut error_content,
                                         &mut error_update_count,
                                         &mut error_type,
+                                        stream_filter,
                                     );
                                 }
                                 _ => {}
@@ -1216,6 +1268,7 @@ impl ChatRunner {
                         Self::reconcile_run_stream_state_from_history(
                             &mut reconciled_state,
                             &msg_store.get_history(),
+                            stream_filter,
                         );
                         agent_session_id = reconciled_state.agent_session_id;
                         agent_message_id = reconciled_state.agent_message_id;
@@ -1351,10 +1404,19 @@ impl ChatRunner {
                             "is_estimated": token_usage.is_estimated,
                         });
 
-                        if !error_content.is_empty() {
-                            let summary: String = error_content.chars().take(200).collect();
+                        let visible_error_content =
+                            if matches!(completion_status, RunCompletionStatus::Failed)
+                                && !error_content.is_empty()
+                            {
+                                Some(error_content.as_str())
+                            } else {
+                                None
+                            };
+
+                        if let Some(visible_error_content) = visible_error_content {
+                            let summary: String = visible_error_content.chars().take(200).collect();
                             let mut error_meta = serde_json::json!({
-                                "content": error_content,
+                                "content": visible_error_content,
                                 "summary": summary,
                             });
                             if let Some(ref et) = error_type {
@@ -1368,7 +1430,7 @@ impl ChatRunner {
                                 run_id = %run_id,
                                 agent_id = %agent_id,
                                 error_type = ?error_type,
-                                error_content_len = error_content.len(),
+                                error_content_len = visible_error_content.len(),
                                 summary = %summary,
                                 "[chat_runner] Persisting error info to meta.json"
                             );
@@ -1394,11 +1456,8 @@ impl ChatRunner {
                         let _ = fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap())
                             .await;
 
-                        let error_summary = if error_content.is_empty() {
-                            None
-                        } else {
-                            Some(error_content.chars().take(200).collect::<String>())
-                        };
+                        let error_summary = visible_error_content
+                            .map(|content| content.chars().take(200).collect::<String>());
                         let retention_summary = ChatRunRetentionSummary {
                             kind: Some(if error_summary.is_some() {
                                 "failure_stub".to_string()
@@ -1436,12 +1495,6 @@ impl ChatRunner {
                         )
                         .await;
 
-                        let error_content_opt = if error_content.is_empty() {
-                            None
-                        } else {
-                            Some(error_content.as_str())
-                        };
-
                         let process_result = runner
                             .process_agent_protocol_output(
                                 session_id,
@@ -1453,7 +1506,7 @@ impl ChatRunner {
                                 chain_depth,
                                 prompt_language,
                                 &latest_assistant,
-                                error_content_opt,
+                                visible_error_content,
                                 error_type.as_ref(),
                                 Some(&token_usage),
                                 protocol_retry_attempt,
@@ -1539,13 +1592,15 @@ impl ChatRunner {
                         };
 
                         // If there's an error but no messages were created, ensure we persist an error message
-                        if messages_created == 0 && !error_content.is_empty() {
+                        if messages_created == 0
+                            && let Some(visible_error_content) = visible_error_content
+                        {
                             tracing::info!(
                                 session_id = %session_id,
                                 run_id = %run_id,
                                 agent_id = %agent_id,
                                 agent_name = %agent_name,
-                                error_content_len = error_content.len(),
+                                error_content_len = visible_error_content.len(),
                                 "persisting error message for failed agent run with no output"
                             );
                             if let Err(err) = runner
@@ -1556,7 +1611,7 @@ impl ChatRunner {
                                     run_id,
                                     &agent_name,
                                     source_message_id,
-                                    &error_content,
+                                    visible_error_content,
                                     error_type.as_ref(),
                                 )
                                 .await
@@ -2498,6 +2553,130 @@ mod tests {
         assert_eq!(filter_benign_executor_stderr(text), Some(text.to_string()));
     }
 
+    #[test]
+    fn stream_patch_filter_keeps_codex_thinking_delta() {
+        let patch = ConversationPatch::add_normalized_entry(
+            0,
+            NormalizedEntry {
+                timestamp: None,
+                entry_type: NormalizedEntryType::Thinking,
+                content: "Running shell command".to_string(),
+                metadata: None,
+            },
+        );
+        let mut last_content = HashMap::new();
+        let mut latest_assistant = String::new();
+        let mut assistant_update_count = 0;
+        let mut last_token_usage = None;
+        let mut error_content = String::new();
+        let mut error_update_count = 0;
+        let mut error_type = None;
+
+        let update = ChatRunner::apply_stream_patch_to_state(
+            &patch,
+            &mut last_content,
+            &mut latest_assistant,
+            &mut assistant_update_count,
+            &mut last_token_usage,
+            &mut error_content,
+            &mut error_update_count,
+            &mut error_type,
+            StreamPatchFilter {
+                suppress_codex_tool_runtime_details: true,
+                ..StreamPatchFilter::default()
+            },
+        );
+
+        let update = update.expect("thinking delta should still be emitted");
+        assert!(matches!(update.stream_type, ChatStreamDeltaType::Thinking));
+        assert_eq!(update.content, "Running shell command");
+        assert!(error_content.is_empty());
+        assert_eq!(assistant_update_count, 0);
+    }
+
+    #[test]
+    fn stream_patch_filter_suppresses_codex_tool_failure_error() {
+        let patch = ConversationPatch::add_normalized_entry(
+            0,
+            NormalizedEntry {
+                timestamp: None,
+                entry_type: NormalizedEntryType::ErrorMessage {
+                    error_type: NormalizedEntryError::Other,
+                },
+                content: "Tool call failed: command exited with code 1".to_string(),
+                metadata: None,
+            },
+        );
+        let mut last_content = HashMap::new();
+        let mut latest_assistant = String::new();
+        let mut assistant_update_count = 0;
+        let mut last_token_usage = None;
+        let mut error_content = String::new();
+        let mut error_update_count = 0;
+        let mut error_type = None;
+
+        let update = ChatRunner::apply_stream_patch_to_state(
+            &patch,
+            &mut last_content,
+            &mut latest_assistant,
+            &mut assistant_update_count,
+            &mut last_token_usage,
+            &mut error_content,
+            &mut error_update_count,
+            &mut error_type,
+            StreamPatchFilter {
+                suppress_codex_tool_runtime_details: true,
+                ..StreamPatchFilter::default()
+            },
+        );
+
+        assert!(update.is_none());
+        assert!(error_content.is_empty());
+        assert_eq!(error_update_count, 0);
+    }
+
+    #[test]
+    fn stream_patch_filter_can_collect_error_without_streaming_it() {
+        let patch = ConversationPatch::add_normalized_entry(
+            0,
+            NormalizedEntry {
+                timestamp: None,
+                entry_type: NormalizedEntryType::ErrorMessage {
+                    error_type: NormalizedEntryError::Other,
+                },
+                content: "stderr warning from executor".to_string(),
+                metadata: None,
+            },
+        );
+        let mut last_content = HashMap::new();
+        let mut latest_assistant = String::new();
+        let mut assistant_update_count = 0;
+        let mut last_token_usage = None;
+        let mut error_content = String::new();
+        let mut error_update_count = 0;
+        let mut error_type = None;
+
+        let update = ChatRunner::apply_stream_patch_to_state(
+            &patch,
+            &mut last_content,
+            &mut latest_assistant,
+            &mut assistant_update_count,
+            &mut last_token_usage,
+            &mut error_content,
+            &mut error_update_count,
+            &mut error_type,
+            StreamPatchFilter {
+                suppress_error_streaming: true,
+                ..StreamPatchFilter::default()
+            },
+        );
+
+        assert!(update.is_none());
+        assert_eq!(error_content, "stderr warning from executor");
+        assert_eq!(error_update_count, 1);
+        assert_eq!(error_type, Some(NormalizedEntryError::Other));
+    }
+
     #[tokio::test]
     async fn persist_tail_keeps_tail_result_when_cleanup_fails() {
         let temp = tempdir().expect("tempdir");
@@ -2598,7 +2777,11 @@ mod tests {
             ..RunStreamStateSnapshot::default()
         };
 
-        ChatRunner::reconcile_run_stream_state_from_history(&mut state, &history);
+        ChatRunner::reconcile_run_stream_state_from_history(
+            &mut state,
+            &history,
+            StreamPatchFilter::default(),
+        );
 
         assert_eq!(
             state.latest_assistant,
@@ -2628,7 +2811,11 @@ mod tests {
             ..RunStreamStateSnapshot::default()
         };
 
-        ChatRunner::reconcile_run_stream_state_from_history(&mut state, &history);
+        ChatRunner::reconcile_run_stream_state_from_history(
+            &mut state,
+            &history,
+            StreamPatchFilter::default(),
+        );
 
         assert_eq!(state.latest_assistant, "newer output");
         assert_eq!(state.assistant_update_count, 2);

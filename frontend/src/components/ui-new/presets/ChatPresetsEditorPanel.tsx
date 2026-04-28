@@ -3,6 +3,7 @@ import { cloneDeep, isEqual } from 'lodash';
 import { useTranslation } from 'react-i18next';
 import {
   CheckIcon,
+  CaretDownIcon,
   CopyIcon,
   EyeIcon,
   EyeSlashIcon,
@@ -27,6 +28,7 @@ import {
   formatExecutorModelLabel,
   getVariantModelName,
   getVariantOptions as getExecutorVariantOptions,
+  matchesModelSearch,
 } from '@/utils/executor';
 import { toPrettyCase, replaceWhitespaceWithUnderscores } from '@/utils/string';
 import {
@@ -36,6 +38,7 @@ import {
   SettingsSelect,
 } from '../dialogs/settings/SettingsComponents';
 import { useSettingsDirty } from '../dialogs/settings/SettingsDirtyContext';
+import { SearchableDropdownContainer } from '../containers/SearchableDropdownContainer';
 
 type PresetsTab = 'members' | 'teams';
 
@@ -527,6 +530,14 @@ export function ChatPresetsEditorPanel({
     ];
   }, [getRecommendedModelOptions, selectedMember, t]);
 
+  const selectedRecommendedModelOption = useMemo(
+    () =>
+      recommendedModelOptions.find(
+        (option) => option.value === (selectedMember?.recommended_model ?? '')
+      ) ?? recommendedModelOptions[0],
+    [recommendedModelOptions, selectedMember?.recommended_model]
+  );
+
   const updateMember = useCallback(
     (
       memberId: string,
@@ -864,20 +875,58 @@ export function ChatPresetsEditorPanel({
           <SettingsField
             label={t('settings.presets.members.fields.recommendedModel')}
           >
-            <SettingsSelect
-              value={selectedMember.recommended_model ?? ''}
-              options={recommendedModelOptions}
-              onChange={(value) =>
+            <SearchableDropdownContainer
+              items={recommendedModelOptions}
+              selectedValue={selectedMember.recommended_model ?? ''}
+              getItemKey={(option) => option.value}
+              getItemLabel={(option) => option.label}
+              filterItem={(option, query) =>
+                option.value.length === 0
+                  ? option.label.toLowerCase().includes(query)
+                  : matchesModelSearch(option.value, option.label, query)
+              }
+              onSelect={(option) =>
                 updateMember(selectedMember.id, (current) => ({
                   ...current,
-                  recommended_model: value.length > 0 ? value : null,
+                  recommended_model:
+                    option.value.length > 0 ? option.value : null,
                 }))
               }
-              disabled={!selectedMember.runner_type}
-              className={presetMemberSelectTriggerClassName}
-              contentClassName={presetMemberSelectContentClassName}
-              itemClassName={presetMemberSelectItemClassName}
-              selectedItemClassName={presetMemberSelectItemSelectedClassName}
+              trigger={
+                <button
+                  type="button"
+                  disabled={!selectedMember.runner_type}
+                  className={cn(
+                    settingsFieldClassName,
+                    presetMemberSelectTriggerClassName,
+                    'flex items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50'
+                  )}
+                >
+                  <Tooltip
+                    content={selectedRecommendedModelOption?.label ?? ''}
+                    side="bottom"
+                    maxWidth={560}
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {selectedRecommendedModelOption?.label ?? ''}
+                    </span>
+                  </Tooltip>
+                  <CaretDownIcon
+                    className="size-icon-xs shrink-0 text-[#8C8C8C] dark:text-[#7F8AA3]"
+                    weight="fill"
+                  />
+                </button>
+              }
+              contentClassName={`${presetMemberSelectContentClassName} preset-member-model-dropdown w-[var(--radix-dropdown-menu-trigger-width)]`}
+              placeholder={t(
+                'settings.presets.members.fields.recommendedModel'
+              )}
+              emptyMessage={t('settings.presets.members.fields.noModels', {
+                defaultValue: 'No matching models.',
+              })}
+              getItemBadge={null}
+              getItemIcon={null}
+              getItemTooltip={(option) => option.label}
             />
           </SettingsField>
 

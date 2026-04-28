@@ -15,6 +15,7 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
 } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   type ChatMessage,
@@ -135,6 +136,8 @@ export function ChatMessageItem({
   onToggleSelect,
 }: ChatMessageItemProps) {
   const { t } = useTranslation('chat');
+  const { t: tCommon } = useTranslation('common');
+  const [copySuccessVisible, setCopySuccessVisible] = useState(false);
   const isUser = message.sender_type === ChatSenderType.user;
   const isAgent = message.sender_type === ChatSenderType.agent;
   const agentAvatarSeed = isAgent
@@ -198,6 +201,17 @@ export function ChatMessageItem({
         is_estimated: rawTokenUsage.is_estimated as boolean | undefined,
       })
     : null;
+
+  useEffect(() => {
+    if (!copySuccessVisible) return;
+    const timer = window.setTimeout(() => setCopySuccessVisible(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [copySuccessVisible]);
+
+  useEffect(() => {
+    setCopySuccessVisible(false);
+  }, [message.id]);
+
   const protocolError = extractProtocolErrorMeta(message.meta);
   const errorInfo = extractErrorFromMeta(message.meta);
   const apiError =
@@ -215,6 +229,14 @@ export function ChatMessageItem({
   const handleCleanupCardSelect = () => {
     if (!isCleanupMode) return;
     onToggleSelect();
+  };
+  const handleCopyMessage = async () => {
+    try {
+      await writeClipboardViaBridge(message.content);
+      setCopySuccessVisible(true);
+    } catch (error) {
+      console.warn('Failed to copy chat message', error);
+    }
   };
   const handleCleanupCardClick = (event: ReactMouseEvent<HTMLElement>) => {
     if (isInteractiveTarget(event.target)) {
@@ -858,16 +880,34 @@ export function ChatMessageItem({
             <div
               className={cn(
                 'chat-session-message-actions absolute opacity-0 group-hover:opacity-100 flex items-center gap-2 -bottom-8 transition-opacity duration-200',
-                'right-0'
+                'right-0',
+                copySuccessVisible && 'opacity-100'
               )}
             >
               <button
                 type="button"
-                className="p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors"
-                title={t('message.copy')}
-                onClick={() => void writeClipboardViaBridge(message.content)}
+                className="relative p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors"
+                title={
+                  copySuccessVisible
+                    ? tCommon('actions.copied')
+                    : t('message.copy')
+                }
+                aria-label={
+                  copySuccessVisible
+                    ? tCommon('actions.copied')
+                    : t('message.copy')
+                }
+                onClick={() => void handleCopyMessage()}
               >
                 <CopyIcon className="size-icon-xs" />
+                {copySuccessVisible && (
+                  <span
+                    className="chat-session-message-copy-success"
+                    role="status"
+                  >
+                    {tCommon('actions.copied')}
+                  </span>
+                )}
               </button>
               {isUser && (
                 <button

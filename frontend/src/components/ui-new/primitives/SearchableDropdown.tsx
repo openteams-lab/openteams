@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './Dropdown';
+import { Tooltip } from './Tooltip';
 
 interface SearchableDropdownProps<T> {
   /** Array of filtered items to display */
@@ -57,6 +58,9 @@ interface SearchableDropdownProps<T> {
 
   /** Optional icon/avatar to render before each item's label */
   getItemIcon?: (item: T) => ReactNode;
+
+  /** Optional tooltip text for each item */
+  getItemTooltip?: (item: T) => string | undefined;
 }
 
 export function SearchableDropdown<T>({
@@ -79,6 +83,7 @@ export function SearchableDropdown<T>({
   emptyMessage = 'No items found',
   getItemBadge,
   getItemIcon,
+  getItemTooltip,
 }: SearchableDropdownProps<T>) {
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
@@ -106,6 +111,8 @@ export function SearchableDropdown<T>({
             itemContent={(idx) => {
               const item = filteredItems[idx];
               const key = getItemKey(item);
+              const label = getItemLabel(item);
+              const tooltip = getItemTooltip?.(item) ?? label;
               const isHighlighted = idx === highlightedIndex;
               const isSelected = selectedValue === key;
               return (
@@ -115,12 +122,15 @@ export function SearchableDropdown<T>({
                   preventFocusOnHover
                   badge={getItemBadge?.(item)}
                   className={cn(
-                    isSelected && 'bg-[#DCEBFF] text-[#0F172A]',
-                    isHighlighted && 'bg-[#DCEBFF] text-[#0F172A]'
+                    'searchable-dropdown-item',
+                    isSelected && 'is-selected',
+                    isHighlighted && 'is-highlighted'
                   )}
                 >
                   {getItemIcon?.(item)}
-                  {getItemLabel(item)}
+                  <Tooltip content={tooltip} side="right" maxWidth={560}>
+                    <span className="block min-w-0 truncate">{label}</span>
+                  </Tooltip>
                 </DropdownMenuItem>
               );
             }}

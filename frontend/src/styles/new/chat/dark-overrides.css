@@ -55,6 +55,20 @@
     border-color: rgba(94, 162, 255, 0.3);
   }
 
+  .new-design.dark .chat-session-message-copy-success,
+  .dark .new-design .chat-session-message-copy-success {
+    border-color: #2a3445;
+    background: #192233;
+    color: #cfe3ff;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  }
+
+  .new-design.dark .chat-session-message-copy-success::after,
+  .dark .new-design .chat-session-message-copy-success::after {
+    border-color: #192233 transparent transparent;
+    filter: drop-shadow(0 1px 0 #2a3445);
+  }
+
   /* Work item cards */
   .new-design.dark .chat-session-work-item-card,
   .dark .new-design .chat-session-work-item-card {
@@ -783,6 +797,62 @@
     border-color: #344257 !important;
     color: #f3f6fb !important;
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+  }
+
+  .new-design.dark .chat-session-model-dropdown,
+  .dark .new-design .chat-session-model-dropdown,
+  .new-design.dark .onboarding-model-dropdown,
+  .dark .new-design .onboarding-model-dropdown,
+  .new-design.dark .preset-member-model-dropdown,
+  .dark .new-design .preset-member-model-dropdown,
+  .new-design.dark .team-import-preview-model-dropdown,
+  .dark .new-design .team-import-preview-model-dropdown {
+    border-color: #2a3445 !important;
+    background: #111926 !important;
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.35) !important;
+  }
+
+  .new-design.dark .chat-session-model-dropdown .dropdown-menu-search,
+  .dark .new-design .chat-session-model-dropdown .dropdown-menu-search,
+  .new-design.dark .onboarding-model-dropdown .dropdown-menu-search,
+  .dark .new-design .onboarding-model-dropdown .dropdown-menu-search,
+  .new-design.dark .preset-member-model-dropdown .dropdown-menu-search,
+  .dark .new-design .preset-member-model-dropdown .dropdown-menu-search,
+  .new-design.dark .team-import-preview-model-dropdown .dropdown-menu-search,
+  .dark .new-design .team-import-preview-model-dropdown .dropdown-menu-search {
+    border-color: #2a3445;
+    background: #192233;
+  }
+
+  .new-design.dark .chat-session-model-dropdown .dropdown-menu-separator,
+  .dark .new-design .chat-session-model-dropdown .dropdown-menu-separator,
+  .new-design.dark .onboarding-model-dropdown .dropdown-menu-separator,
+  .dark .new-design .onboarding-model-dropdown .dropdown-menu-separator,
+  .new-design.dark .preset-member-model-dropdown .dropdown-menu-separator,
+  .dark .new-design .preset-member-model-dropdown .dropdown-menu-separator,
+  .new-design.dark .team-import-preview-model-dropdown .dropdown-menu-separator,
+  .dark
+    .new-design
+    .team-import-preview-model-dropdown
+    .dropdown-menu-separator {
+    background: #2a3445;
+  }
+
+  .new-design.dark .searchable-dropdown-item,
+  .dark .new-design .searchable-dropdown-item {
+    color: #f3f6fb;
+  }
+
+  .new-design.dark .searchable-dropdown-item:focus,
+  .dark .new-design .searchable-dropdown-item:focus,
+  .new-design.dark .searchable-dropdown-item[data-highlighted],
+  .dark .new-design .searchable-dropdown-item[data-highlighted],
+  .new-design.dark .searchable-dropdown-item.is-highlighted,
+  .dark .new-design .searchable-dropdown-item.is-highlighted,
+  .new-design.dark .searchable-dropdown-item.is-selected,
+  .dark .new-design .searchable-dropdown-item.is-selected {
+    background: #222c3d !important;
+    color: #f3f6fb !important;
   }
 
   /* Dark team import modal */

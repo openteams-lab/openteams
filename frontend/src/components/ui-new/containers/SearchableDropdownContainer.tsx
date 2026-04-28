@@ -34,6 +34,9 @@ interface SearchableDropdownContainerProps<T> {
 
   /** Icon/avatar to render before each item's label (null = no icons) */
   getItemIcon: ((item: T) => ReactNode) | null;
+
+  /** Tooltip text for each item (null = label) */
+  getItemTooltip: ((item: T) => string | undefined) | null;
 }
 
 export function SearchableDropdownContainer<T>({
@@ -49,6 +52,7 @@ export function SearchableDropdownContainer<T>({
   emptyMessage,
   getItemBadge,
   getItemIcon,
+  getItemTooltip,
 }: SearchableDropdownContainerProps<T>) {
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
@@ -167,6 +171,7 @@ export function SearchableDropdownContainer<T>({
       emptyMessage={emptyMessage}
       getItemBadge={getItemBadge ?? undefined}
       getItemIcon={getItemIcon ?? undefined}
+      getItemTooltip={getItemTooltip ?? undefined}
     />
   );
 }

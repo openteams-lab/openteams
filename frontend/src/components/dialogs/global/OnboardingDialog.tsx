@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { BaseCodingAgent, EditorType } from 'shared/types';
 import type { EditorConfig, ExecutorProfileId } from 'shared/types';
@@ -8,7 +8,13 @@ import { useUserSystem } from '@/components/ConfigProvider';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal, type NoProps } from '@/lib/modals';
 import { useAgentAvailability } from '@/hooks/useAgentAvailability';
-import { getVariantDisplayLabel, getVariantOptions } from '@/utils/executor';
+import {
+  getVariantDisplayLabel,
+  getVariantOptions,
+  matchesModelVariantSearch,
+} from '@/utils/executor';
+import { SearchableDropdownContainer } from '@/components/ui-new/containers/SearchableDropdownContainer';
+import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
 
 export type OnboardingResult = {
   profile: ExecutorProfileId;
@@ -221,25 +227,64 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
                 ))}
               </select>
 
-              <select
-                value={variantValue}
-                onChange={(event) => handleVariantChange(event.target.value)}
-                className="h-11 min-w-0 flex-1 appearance-none rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-sm text-[#333333] outline-none transition-all duration-300 ease-in-out focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)] disabled:cursor-not-allowed disabled:opacity-80 dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:focus:border-[#5EA2FF] dark:focus:bg-[#111926] dark:focus:shadow-[0_0_0_4px_rgba(94,162,255,0.12)]"
-                style={selectBackgroundStyle}
-                disabled={
-                  variantOptions.length <= 1 && variantOptions[0] === 'DEFAULT'
+              <SearchableDropdownContainer
+                items={variantOptions}
+                selectedValue={variantValue}
+                getItemKey={(variant) => variant}
+                getItemLabel={(variant) =>
+                  getVariantDisplayLabel(profile.executor, variant, profiles)
                 }
-              >
-                {variantOptions.map((variant) => (
-                  <option key={variant} value={variant}>
-                    {getVariantDisplayLabel(
-                      profile.executor,
-                      variant,
-                      profiles
-                    )}
-                  </option>
-                ))}
-              </select>
+                filterItem={(variant, query) =>
+                  matchesModelVariantSearch(
+                    profile.executor,
+                    variant,
+                    profiles,
+                    query
+                  )
+                }
+                onSelect={handleVariantChange}
+                trigger={
+                  <button
+                    type="button"
+                    disabled={
+                      variantOptions.length <= 1 &&
+                      variantOptions[0] === 'DEFAULT'
+                    }
+                    className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-[#E8EEF5] bg-[#F9FBFF] px-[14px] text-left text-sm text-[#333333] outline-none transition-all duration-300 ease-in-out focus:border-[#4A90E2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(74,144,226,0.06)] disabled:cursor-not-allowed disabled:opacity-80 dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:focus:border-[#5EA2FF] dark:focus:bg-[#111926] dark:focus:shadow-[0_0_0_4px_rgba(94,162,255,0.12)]"
+                  >
+                    <Tooltip
+                      content={getVariantDisplayLabel(
+                        profile.executor,
+                        variantValue,
+                        profiles
+                      )}
+                      side="bottom"
+                      maxWidth={560}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {getVariantDisplayLabel(
+                          profile.executor,
+                          variantValue,
+                          profiles
+                        )}
+                      </span>
+                    </Tooltip>
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#8C8C8C]" />
+                  </button>
+                }
+                contentClassName="settings-select-dropdown onboarding-model-dropdown w-[var(--radix-dropdown-menu-trigger-width)] rounded-[10px] border border-[#E8EEF5] bg-white p-1 shadow-[0_12px_30px_rgba(0,0,0,0.08)] dark:border-[#2B3648] dark:bg-[#192233] dark:shadow-[0_12px_30px_rgba(0,0,0,0.4)]"
+                placeholder={t('onboardingDialog.searchModels', {
+                  defaultValue: 'Search models',
+                })}
+                emptyMessage={t('onboardingDialog.noMatchingModels', {
+                  defaultValue: 'No matching models.',
+                })}
+                getItemBadge={null}
+                getItemIcon={null}
+                getItemTooltip={(variant) =>
+                  getVariantDisplayLabel(profile.executor, variant, profiles)
+                }
+              />
             </div>
 
             <div

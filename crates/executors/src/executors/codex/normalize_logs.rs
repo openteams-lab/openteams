@@ -497,6 +497,19 @@ fn sync_patch_entries(
     }
 }
 
+fn update_patch_status(
+    patch_state: &mut PatchState,
+    status: ToolStatus,
+    msg_store: &Arc<MsgStore>,
+) {
+    for entry in &mut patch_state.entries {
+        entry.status = status.clone();
+        if let Some(index) = entry.index {
+            replace_normalized_entry(msg_store, index, entry.to_normalized_entry());
+        }
+    }
+}
+
 pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
     let entry_index = EntryIndexProvider::start_from(&msg_store);
     normalize_stderr_logs(msg_store.clone(), entry_index.clone());
@@ -1327,6 +1340,16 @@ fn handle_server_notification(
                 if let Some(index) = command_state.index {
                     replace_normalized_entry(msg_store, index, command_state.to_normalized_entry());
                 }
+            }
+        }
+        ServerNotification::FileChangeOutputDelta(payload) => {
+            state.assistant = None;
+            state.thinking = None;
+
+            if payload.delta.trim_start().starts_with("Success.")
+                && let Some(patch_state) = state.patches.get_mut(&payload.item_id)
+            {
+                update_patch_status(patch_state, ToolStatus::Success, msg_store);
             }
         }
         ServerNotification::FileChangePatchUpdated(payload) => {
@@ -2321,6 +2344,65 @@ mod tests {
                         action_type: crate::logs::ActionType::FileEdit { path, .. },
                         ..
                     } if tool_name == "edit" && path == "src/main.rs"
+                )
+            })
+            .await
+        );
+    }
+
+    #[tokio::test]
+    async fn normalize_logs_maps_app_server_file_change_output_delta_to_success() {
+        let msg_store = std::sync::Arc::new(MsgStore::new());
+        super::normalize_logs(
+            msg_store.clone(),
+            std::path::Path::new("/tmp/test-worktree"),
+        );
+        tokio::task::yield_now().await;
+
+        let started = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "item/started",
+            "params": {
+                "threadId": "thread-1",
+                "turnId": "turn-1",
+                "item": {
+                    "type": "fileChange",
+                    "id": "patch-1",
+                    "changes": [{
+                        "path": "/tmp/test-worktree/src/main.rs",
+                        "kind": { "type": "update", "movePath": null },
+                        "diff": "@@ -1 +1 @@\n-old\n+new\n"
+                    }],
+                    "status": "inProgress"
+                }
+            }
+        })
+        .to_string();
+        let output_delta = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "item/fileChange/outputDelta",
+            "params": {
+                "threadId": "thread-1",
+                "turnId": "turn-1",
+                "itemId": "patch-1",
+                "delta": "Success. Updated the following files:\nM src/main.rs\n"
+            }
+        })
+        .to_string();
+        msg_store.push_stdout(format!("{started}\n{output_delta}\n"));
+        msg_store.push_finished();
+
+        assert!(
+            eventually_has_normalized_entry(&msg_store, |entry| {
+                matches!(
+                    &entry.entry_type,
+                    NormalizedEntryType::ToolUse {
+                        tool_name,
+                        action_type: crate::logs::ActionType::FileEdit { path, .. },
+                        status,
+                    } if tool_name == "edit"
+                        && path == "src/main.rs"
+                        && matches!(status, crate::logs::ToolStatus::Success)
                 )
             })
             .await

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { WheelEvent as ReactWheelEvent } from 'react';
-import { XIcon } from '@phosphor-icons/react';
+import { CaretDownIcon, XIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { BaseCodingAgent, type JsonValue } from 'shared/types';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
+import { SearchableDropdownContainer } from '@/components/ui-new/containers/SearchableDropdownContainer';
 import { cn } from '@/lib/utils';
 import { toPrettyCase } from '@/utils/string';
 import {
@@ -28,6 +29,11 @@ interface TeamImportPreviewModalProps {
   memberError: string | null;
   getVariantOptions: (runnerType: string) => string[];
   getVariantLabel: (runnerType: string, variant: string) => string;
+  matchesVariantSearch: (
+    runnerType: string,
+    variant: string,
+    query: string
+  ) => boolean;
   getPlanVariant: (toolsEnabled: JsonValue) => string;
   onVariantChange: (
     index: number,
@@ -131,6 +137,7 @@ export function TeamImportPreviewModal({
   memberError,
   getVariantOptions,
   getVariantLabel,
+  matchesVariantSearch,
   getPlanVariant,
   onVariantChange,
   onUpdatePlanEntry,
@@ -439,27 +446,73 @@ export function TeamImportPreviewModal({
                                 <label className="team-import-preview-field-label text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                   {variantFieldLabel}
                                 </label>
-                                <select
-                                  value={currentPlanVariant}
-                                  onChange={(event) =>
+                                <SearchableDropdownContainer
+                                  items={currentPlanVariantOptions}
+                                  selectedValue={currentPlanVariant}
+                                  getItemKey={(variant) => variant}
+                                  getItemLabel={(variant) =>
+                                    getVariantLabel(
+                                      currentPlan.runnerType,
+                                      variant
+                                    )
+                                  }
+                                  filterItem={(variant, query) =>
+                                    matchesVariantSearch(
+                                      currentPlan.runnerType,
+                                      variant,
+                                      query
+                                    )
+                                  }
+                                  onSelect={(variant) =>
                                     onVariantChange(
                                       activeCardIndex,
-                                      event.target.value,
+                                      variant,
                                       currentPlan.toolsEnabled
                                     )
                                   }
-                                  disabled={isImportingTeam}
-                                  className="team-import-preview-field min-h-11 w-full rounded-2xl px-4 py-2.5 text-[15px] leading-6 text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  {currentPlanVariantOptions.map((variant) => (
-                                    <option key={variant} value={variant}>
-                                      {getVariantLabel(
-                                        currentPlan.runnerType,
-                                        variant
-                                      )}
-                                    </option>
-                                  ))}
-                                </select>
+                                  trigger={
+                                    <button
+                                      type="button"
+                                      disabled={isImportingTeam}
+                                      className="team-import-preview-field flex min-h-11 w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-left text-[15px] leading-6 text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      <Tooltip
+                                        content={getVariantLabel(
+                                          currentPlan.runnerType,
+                                          currentPlanVariant
+                                        )}
+                                        side="bottom"
+                                        maxWidth={560}
+                                      >
+                                        <span className="min-w-0 flex-1 truncate">
+                                          {getVariantLabel(
+                                            currentPlan.runnerType,
+                                            currentPlanVariant
+                                          )}
+                                        </span>
+                                      </Tooltip>
+                                      <CaretDownIcon
+                                        className="size-4 shrink-0 text-slate-400"
+                                        weight="bold"
+                                      />
+                                    </button>
+                                  }
+                                  contentClassName="team-import-preview-model-dropdown w-[var(--radix-dropdown-menu-trigger-width)]"
+                                  placeholder={t('members.searchModels', {
+                                    defaultValue: 'Search models',
+                                  })}
+                                  emptyMessage={t('members.noMatchingModels', {
+                                    defaultValue: 'No matching models.',
+                                  })}
+                                  getItemBadge={null}
+                                  getItemIcon={null}
+                                  getItemTooltip={(variant) =>
+                                    getVariantLabel(
+                                      currentPlan.runnerType,
+                                      variant
+                                    )
+                                  }
+                                />
                               </div>
                             )}
                           </div>

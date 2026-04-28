@@ -114,66 +114,76 @@
       "DEFAULT": {
         "CODEX": {
           "model": "gpt-5.4",
-          "sandbox": "danger-full-access"
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
         }
       },
       "HIGH": {
         "CODEX": {
           "model": "gpt-5.4",
           "sandbox": "danger-full-access",
-          "model_reasoning_effort": "high"
+          "model_reasoning_effort": "high",
+          "model_reasoning_summary": "auto"
         }
       },
       "GPT_5_4": {
         "CODEX": {
           "model": "gpt-5.4",
-          "sandbox": "danger-full-access"
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
         }
       },
       "GPT_5_4_HIGH": {
         "CODEX": {
           "model": "gpt-5.4",
           "sandbox": "danger-full-access",
-          "model_reasoning_effort": "high"
+          "model_reasoning_effort": "high",
+          "model_reasoning_summary": "auto"
         }
       },
       "GPT_5_5": {
         "CODEX": {
           "model": "gpt-5.5",
-          "sandbox": "danger-full-access"
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
         }
       },
       "GPT_5_5_HIGH": {
         "CODEX": {
           "model": "gpt-5.5",
           "sandbox": "danger-full-access",
-          "model_reasoning_effort": "high"
+          "model_reasoning_effort": "high",
+          "model_reasoning_summary": "auto"
         }
       },
       "GPT_5_3_CODEX": {
         "CODEX": {
           "model": "gpt-5.3-codex",
-          "sandbox": "danger-full-access"
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
         }
       },
       "GPT_5_3_CODEX_HIGH": {
         "CODEX": {
           "model": "gpt-5.3-codex",
           "sandbox": "danger-full-access",
-          "model_reasoning_effort": "high"
+          "model_reasoning_effort": "high",
+          "model_reasoning_summary": "auto"
         }
       },
       "APPROVALS": {
         "CODEX": {
           "model": "gpt-5.4",
           "sandbox": "workspace-write",
-          "ask_for_approval": "unless-trusted"
+          "ask_for_approval": "unless-trusted",
+          "model_reasoning_summary": "auto"
         }
       },
       "MAX": {
         "CODEX": {
           "model": "gpt-5.1-codex-max",
-          "sandbox": "danger-full-access"
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
         }
       }
     },

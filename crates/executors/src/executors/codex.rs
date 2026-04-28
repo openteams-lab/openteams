@@ -352,12 +352,14 @@ impl Codex {
             );
         }
 
-        if let Some(summary) = &self.model_reasoning_summary {
-            overrides.insert(
-                "model_reasoning_summary".to_string(),
-                Value::String(summary.as_ref().to_string()),
-            );
-        }
+        let reasoning_summary = self
+            .model_reasoning_summary
+            .as_ref()
+            .unwrap_or(&ReasoningSummary::Auto);
+        overrides.insert(
+            "model_reasoning_summary".to_string(),
+            Value::String(reasoning_summary.as_ref().to_string()),
+        );
 
         if let Some(format) = &self.model_reasoning_summary_format
             && format != &ReasoningSummaryFormat::None

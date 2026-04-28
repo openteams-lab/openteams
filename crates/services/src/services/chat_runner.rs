@@ -1638,6 +1638,7 @@ impl ChatRunner {
                 run_started_at,
                 protocol_retry_attempt,
                 track_source_message,
+                executor_profile_id.executor == BaseCodingAgent::Codex,
             );
 
             self.spawn_exit_watcher(

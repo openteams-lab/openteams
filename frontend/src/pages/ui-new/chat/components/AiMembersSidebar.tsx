@@ -73,6 +73,7 @@ import {
 import { AgentSkillsSection } from './AgentSkillsSection';
 import { TeamProtocolEditorModal } from './TeamProtocolEditorModal';
 import { TeamImportPreviewModal } from './TeamImportPreviewModal';
+import { SearchableDropdownContainer } from '@/components/ui-new/containers/SearchableDropdownContainer';
 
 const truncateByChars = (value: string, maxChars: number): string => {
   const chars = Array.from(value);
@@ -449,6 +450,11 @@ export interface AiMembersSidebarProps {
   ) => string | null;
   getVariantLabel: (runnerType: string, variant: string) => string;
   getVariantOptions: (runnerType: string) => string[];
+  matchesVariantSearch: (
+    runnerType: string,
+    variant: string,
+    query: string
+  ) => boolean;
   // Actions
   onOpenAddMember: () => void;
   onCancelMember: () => void;
@@ -517,6 +523,7 @@ export function AiMembersSidebar({
   getModelDisplayName,
   getVariantLabel,
   getVariantOptions,
+  matchesVariantSearch,
   onOpenAddMember,
   onCancelMember,
   onSaveMember,
@@ -950,22 +957,53 @@ export function AiMembersSidebar({
       {memberVariantOptions.length > 0 && (
         <div className="space-y-half">
           <label className="text-xs text-low">{variantFieldLabel}</label>
-          <select
-            value={newMemberVariant}
-            onChange={(event) => onVariantChange(event.target.value)}
-            className={cn(
-              'chat-session-member-field w-full rounded-sm border bg-panel px-base py-half',
-              'text-sm text-normal focus:outline-none'
-            )}
-          >
-            {memberVariantOptions.map((variant) => {
-              return (
-                <option key={variant} value={variant}>
-                  {getVariantLabel(newMemberRunnerType, variant)}
-                </option>
-              );
+          <SearchableDropdownContainer
+            items={memberVariantOptions}
+            selectedValue={newMemberVariant}
+            getItemKey={(variant) => variant}
+            getItemLabel={(variant) =>
+              getVariantLabel(newMemberRunnerType, variant)
+            }
+            filterItem={(variant, query) =>
+              matchesVariantSearch(newMemberRunnerType, variant, query)
+            }
+            onSelect={onVariantChange}
+            trigger={
+              <button
+                type="button"
+                className={cn(
+                  'chat-session-member-field flex w-full items-center gap-base rounded-sm border bg-panel px-base py-half text-left',
+                  'text-sm text-normal focus:outline-none'
+                )}
+              >
+                <Tooltip
+                  content={getVariantLabel(
+                    newMemberRunnerType,
+                    newMemberVariant
+                  )}
+                  side="bottom"
+                  maxWidth={560}
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {getVariantLabel(newMemberRunnerType, newMemberVariant)}
+                  </span>
+                </Tooltip>
+                <CaretDownIcon className="size-3 shrink-0" weight="bold" />
+              </button>
+            }
+            contentClassName="chat-session-model-dropdown w-[var(--radix-dropdown-menu-trigger-width)]"
+            placeholder={t('members.searchModels', {
+              defaultValue: 'Search models',
             })}
-          </select>
+            emptyMessage={t('members.noMatchingModels', {
+              defaultValue: 'No matching models.',
+            })}
+            getItemBadge={null}
+            getItemIcon={null}
+            getItemTooltip={(variant) =>
+              getVariantLabel(newMemberRunnerType, variant)
+            }
+          />
           {getModelDisplayName(
             newMemberRunnerType,
             getModelName(newMemberRunnerType, newMemberVariant)
@@ -1381,6 +1419,7 @@ export function AiMembersSidebar({
         memberError={memberError}
         getVariantOptions={getVariantOptions}
         getVariantLabel={getVariantLabel}
+        matchesVariantSearch={matchesVariantSearch}
         getPlanVariant={getImportPlanVariant}
         onVariantChange={handleImportPlanVariantChange}
         onUpdatePlanEntry={onUpdateTeamImportPlanEntry}

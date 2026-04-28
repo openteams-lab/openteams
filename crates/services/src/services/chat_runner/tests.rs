@@ -1239,6 +1239,50 @@ fn build_exact_markdown_prompt_includes_routed_message_intent_meaning() {
 }
 
 #[test]
+fn build_exact_markdown_prompt_tells_notify_receiver_not_to_reply() {
+    let agent = test_agent("coordinator", "");
+    let message = test_message_with_sender(
+        ChatSenderType::Agent,
+        Some(Uuid::new_v4()),
+        "@coordinator Frontend task is done",
+        json!({
+            "sender": {
+                "label": "frontend",
+                "name": "frontend"
+            },
+            "protocol": {
+                "type": "send",
+                "to": "coordinator",
+                "intent": "notify"
+            }
+        }),
+    );
+
+    let prompt = ChatRunner::build_exact_markdown_prompt(
+        &agent,
+        &message,
+        Path::new(r"E:\workspace\projectSS\MainPage2\.openteams\context\demo"),
+        Path::new(r"E:\workspace\projectSS\MainPage2"),
+        &[],
+        None,
+        None,
+        &[],
+        ResolvedPromptLanguage {
+            setting: "english",
+            code: "en",
+            instruction: "You MUST respond in English.",
+        },
+        Some("Follow the team protocol."),
+    );
+
+    assert!(prompt.contains("- intent: notify"));
+    assert!(prompt.contains("- intent_meaning: Informational only. Do not send a reply."));
+    assert!(prompt.contains(
+        "- response_requirement: Notification only. Do not send a reply or acknowledgment to the sender."
+    ));
+}
+
+#[test]
 fn build_exact_markdown_prompt_includes_team_protocol_section_when_empty() {
     let agent = test_agent("product", "You are the Product Manager.");
     let message = test_message_with_sender(ChatSenderType::User, None, "@product hello", json!({}));
