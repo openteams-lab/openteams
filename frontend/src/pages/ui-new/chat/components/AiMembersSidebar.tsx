@@ -498,8 +498,7 @@ export function AiMembersSidebar({
   activeSessionId,
   isArchived,
   width,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, unused-imports/no-unused-vars
-  isPanelOpen,
+  isPanelOpen: _isPanelOpen,
   onTogglePanel,
   isAddMemberOpen,
   editingMember,
