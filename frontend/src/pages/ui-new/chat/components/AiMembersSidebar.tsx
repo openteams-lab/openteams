@@ -51,7 +51,7 @@ import {
 } from '@/utils/executor';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
-import { useToast } from '@/components/ui-new/primitives/Toast';
+import { useToast } from '@/components/ui-new/containers/ToastContainer';
 import {
   Select,
   SelectContent,
@@ -498,6 +498,7 @@ export function AiMembersSidebar({
   activeSessionId,
   isArchived,
   width,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, unused-imports/no-unused-vars
   isPanelOpen,
   onTogglePanel,
   isAddMemberOpen,
@@ -811,7 +812,7 @@ export function AiMembersSidebar({
         setIsTeamPresetSnapshotSaving(false);
       }
     },
-    [activeSessionId, queryClient, t]
+    [activeSessionId, queryClient, t, toast]
   );
 
   const handlePresetCategoryOpenChange = useCallback((open: boolean) => {

@@ -1576,50 +1576,54 @@ impl ChatRunner {
                                         }
                                     }
                                 } else {
-                                tracing::warn!(
-                                    session_id = %session_id,
-                                    run_id = %run_id,
-                                    agent_id = %agent_id,
-                                    agent_name = %agent_name,
-                                    code = ?code,
-                                    detail = ?detail,
-                                    protocol_retry_attempt,
-                                    "protocol parse failure is retryable; retrying without persisting retry feedback"
-                                );
+                                    tracing::warn!(
+                                        session_id = %session_id,
+                                        run_id = %run_id,
+                                        agent_id = %agent_id,
+                                        agent_name = %agent_name,
+                                        code = ?code,
+                                        detail = ?detail,
+                                        protocol_retry_attempt,
+                                        "protocol parse failure is retryable; retrying without persisting retry feedback"
+                                    );
 
-                                let error_desc = detail.as_deref().unwrap_or("Invalid JSON output");
-                                let retry_content = format!(
-                                    "Your previous response was not a valid JSON array.\n\
+                                    let error_desc =
+                                        detail.as_deref().unwrap_or("Invalid JSON output");
+                                    let retry_content = format!(
+                                        "Your previous response was not a valid JSON array.\n\
                                      Error: {error_desc}\n\n\
                                      Retry the same input message below and respond with ONLY a JSON array matching the protocol format.\n\n\
                                      Previous input message:\n\
                                      <BEGIN_INPUT_MESSAGE>\n\
                                      {source_message_content}\n\
                                      <END_INPUT_MESSAGE>"
-                                );
-                                let retry_meta = sqlx::types::Json(serde_json::json!({
-                                    "protocol_retry": {
-                                        "attempt": protocol_retry_attempt + 1,
-                                        "previous_run_id": run_id,
-                                        "error_code": format!("{:?}", code),
-                                    },
-                                    "chain_depth": chain_depth,
-                                    "mentions": [agent_name],
-                                }));
-                                let retry_message = ChatMessage {
-                                    id: source_message_id,
-                                    session_id,
-                                    sender_type: ChatSenderType::System,
-                                    sender_id: None,
-                                    content: retry_content,
-                                    mentions: sqlx::types::Json(vec![agent_name.clone()]),
-                                    meta: retry_meta,
-                                    created_at: source_message_created_at,
-                                };
+                                    );
+                                    let retry_meta = sqlx::types::Json(serde_json::json!({
+                                        "protocol_retry": {
+                                            "attempt": protocol_retry_attempt + 1,
+                                            "previous_run_id": run_id,
+                                            "error_code": format!("{:?}", code),
+                                        },
+                                        "chain_depth": chain_depth,
+                                        "mentions": [agent_name],
+                                    }));
+                                    let retry_message = ChatMessage {
+                                        id: source_message_id,
+                                        session_id,
+                                        sender_type: ChatSenderType::System,
+                                        sender_id: None,
+                                        content: retry_content,
+                                        mentions: sqlx::types::Json(vec![agent_name.clone()]),
+                                        meta: retry_meta,
+                                        created_at: source_message_created_at,
+                                    };
 
-                                protocol_retry_request =
-                                    Some((agent_name.clone(), retry_message, track_source_message));
-                                0
+                                    protocol_retry_request = Some((
+                                        agent_name.clone(),
+                                        retry_message,
+                                        track_source_message,
+                                    ));
+                                    0
                                 }
                             }
                             Err(err) => {
@@ -2364,7 +2368,9 @@ impl ChatRunner {
                 }
 
                 // If the exit signal includes an error message, write it to msg_store
-                if let executors::executors::ExecutorExitResult::FailureWithError(ref err_msg) = exit_result {
+                if let executors::executors::ExecutorExitResult::FailureWithError(ref err_msg) =
+                    exit_result
+                {
                     if !err_msg.is_empty() {
                         msg_store.push(LogMsg::Stderr(err_msg.clone()));
                     }

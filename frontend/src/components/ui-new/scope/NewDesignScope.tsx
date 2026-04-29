@@ -7,7 +7,7 @@ import NiceModal from '@ebay/nice-modal-react';
 import { useTheme } from '@/components/ThemeProvider';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { analytics } from '@/lib/analytics';
-import { ToastProvider } from '@/components/ui-new/primitives/Toast';
+import { ToastProvider } from '@/components/ui-new/containers/ToastContainer';
 import '@/styles/new/index.css';
 
 interface NewDesignScopeProps {

@@ -7,8 +7,8 @@ use std::{
 use codex_app_server_protocol::{
     CommandExecutionStatus, JSONRPCNotification, JSONRPCRequest, JSONRPCResponse,
     McpToolCallResult, McpToolCallStatus, PatchApplyStatus, PatchChangeKind, ServerNotification,
-    ServerRequest, ThreadItem, ThreadResumeResponse, ThreadStartResponse, TurnCompletedNotification,
-    TurnPlanStepStatus, TurnStatus,
+    ServerRequest, ThreadItem, ThreadResumeResponse, ThreadStartResponse,
+    TurnCompletedNotification, TurnPlanStepStatus, TurnStatus,
 };
 use codex_protocol::{
     openai_models::ReasoningEffort,

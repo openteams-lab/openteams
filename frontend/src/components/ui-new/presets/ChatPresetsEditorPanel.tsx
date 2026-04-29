@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 import { PromptEditorModal } from '@/pages/ui-new/chat/components/PromptEditorModal';
 import { AgentSkillsSection } from '@/pages/ui-new/chat/components/AgentSkillsSection';
 import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
-import { useToast } from '@/components/ui-new/primitives/Toast';
+import { useToast } from '@/components/ui-new/containers/ToastContainer';
 import {
   formatExecutorModelLabel,
   getVariantModelName,
