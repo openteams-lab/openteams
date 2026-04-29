@@ -486,7 +486,7 @@ impl ChatRunner {
                         .await?;
                         return Ok(ProtocolProcessResult::Success(1));
                     }
-                    tracing::info!(
+                    tracing::warn!(
                         session_id = %session_id,
                         session_agent_id = %session_agent_id,
                         agent_id = %agent_id,
@@ -528,23 +528,21 @@ impl ChatRunner {
                         code = ?err.code,
                         output_is_empty = output_is_empty,
                         protocol_retry_attempt,
-                        "retries exhausted; persisting protocol fallback output as raw assistant message"
+                        "retries exhausted; reporting protocol parse failure"
                     );
-                    self.persist_raw_agent_message_and_work_record(
+                    self.emit_protocol_error_message(
                         session_id,
                         session_agent_id,
                         agent_id,
                         run_id,
                         agent_name,
                         source_message_id,
-                        chain_depth,
-                        prompt_language,
+                        &err,
+                        output_is_empty,
                         latest_assistant,
-                        error_info,
-                        token_usage,
                     )
                     .await?;
-                    return Ok(ProtocolProcessResult::Success(1));
+                    return Ok(ProtocolProcessResult::ProtocolFailure);
                 }
 
                 self.emit_protocol_error_message(
@@ -559,7 +557,7 @@ impl ChatRunner {
                     latest_assistant,
                 )
                 .await?;
-                return Ok(ProtocolProcessResult::Success(0));
+                return Ok(ProtocolProcessResult::ProtocolFailure);
             }
         };
 

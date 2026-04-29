@@ -69,6 +69,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             "/team-protocol",
             get(presets::get_team_protocol).post(presets::update_team_protocol),
         )
+        .route(
+            "/presets/snapshot",
+            axum::routing::post(presets::create_preset_snapshot),
+        )
         .layer(from_fn_with_state(
             deployment.clone(),
             load_chat_session_middleware,

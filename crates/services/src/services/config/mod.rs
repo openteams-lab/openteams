@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use thiserror::Error;
 
@@ -67,5 +70,25 @@ pub async fn save_config_to_file(
 ) -> Result<(), ConfigError> {
     let raw_config = serde_json::to_string_pretty(config)?;
     std::fs::write(config_path, raw_config)?;
+    Ok(())
+}
+
+/// Saves the config via a same-directory temporary file and atomic replace.
+pub async fn save_config_to_file_atomic(
+    config: &Config,
+    config_path: &Path,
+) -> Result<(), ConfigError> {
+    let raw_config = serde_json::to_string_pretty(config)?;
+
+    if let Some(parent) = config_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let temp_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
+    let mut temp_file = tempfile::NamedTempFile::new_in(temp_dir)?;
+    temp_file.write_all(raw_config.as_bytes())?;
+    temp_file.as_file_mut().sync_all()?;
+    temp_file.persist(config_path).map_err(|err| err.error)?;
+
     Ok(())
 }

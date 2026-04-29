@@ -284,6 +284,34 @@
         "close": "Fermer l'éditeur du protocole d'équipe"
       }
     },
+    "teamPresetSnapshot": {
+      "open": "Enregistrer l'équipe",
+      "tooltip": "Enregistrez tous les membres IA de la liste actuelle comme une équipe prédéfinie, tout en conservant aussi les règles d'équipe.",
+      "saved": "Préréglage d'équipe {{name}} enregistré.",
+      "overwritten": "Préréglage d'équipe {{name}} mis à jour.",
+      "membersSaved": "Membres : {{names}}.",
+      "modal": {
+        "title": "Enregistrer l'équipe",
+        "description": "Enregistrez cette configuration de membres de session comme préréglage d'équipe réutilisable.",
+        "dedupeHint": "Les membres portant le même nom reçoivent automatiquement un suffixe numérique.",
+        "name": "Nom",
+        "namePlaceholder": "Utiliser le titre de la session",
+        "teamPresetId": "ID du préréglage",
+        "teamPresetIdPlaceholder": "delivery_team",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "Description facultative du préréglage",
+        "overwrite": "Écraser le préréglage personnalisé existant avec le même ID",
+        "save": "Enregistrer le préréglage",
+        "close": "Fermer la boîte de dialogue d'enregistrement du préréglage d'équipe"
+      },
+      "errors": {
+        "noMembers": "Ajoutez des membres IA avant d'enregistrer un préréglage d'équipe.",
+        "idRequired": "L'ID du préréglage est requis.",
+        "conflict": "Un préréglage d'équipe avec cet ID existe déjà. Modifiez le nom ou l'ID, ou activez l'écrasement.",
+        "builtin": "Les préréglages d'équipe intégrés ne peuvent pas être écrasés.",
+        "save": "Échec de l'enregistrement du préréglage d'équipe."
+      }
+    },
     "importPreview": {
       "title": "Importer l'équipe : {{teamName}}",
       "description": "Les membres suivants seront ajoutés à cette session :",

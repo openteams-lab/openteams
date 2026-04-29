@@ -437,6 +437,10 @@ impl LocalContainerService {
                     status_result = match exit_result {
                         Ok(ExecutorExitResult::Success) => Ok(success_exit_status()),
                         Ok(ExecutorExitResult::Failure) => Ok(failure_exit_status()),
+                        Ok(ExecutorExitResult::FailureWithError(ref err_msg)) => {
+                            tracing::error!("Executor exited with error: {} {}", exec_id, err_msg);
+                            Ok(failure_exit_status())
+                        }
                         Err(_) => Ok(success_exit_status()), // Channel closed, assume success
                     };
                 }

@@ -284,6 +284,34 @@
         "close": "チームプロトコルエディターを閉じる"
       }
     },
+    "teamPresetSnapshot": {
+      "open": "チームを保存",
+      "tooltip": "現在の一覧にあるすべての AI メンバーをプリセットチームとして保存し、チーム方針も保持します。",
+      "saved": "チームプリセット {{name}} を保存しました。",
+      "overwritten": "チームプリセット {{name}} を更新しました。",
+      "membersSaved": "メンバー: {{names}}。",
+      "modal": {
+        "title": "チームを保存",
+        "description": "現在のセッションメンバー構成を再利用可能なチームプリセットとして保存します。",
+        "dedupeHint": "同名のメンバーには自動的に連番サフィックスが付きます。",
+        "name": "名前",
+        "namePlaceholder": "セッションタイトルを使用",
+        "teamPresetId": "プリセット ID",
+        "teamPresetIdPlaceholder": "delivery_team",
+        "descriptionLabel": "説明",
+        "descriptionPlaceholder": "任意のプリセット説明",
+        "overwrite": "同じ ID の既存カスタムプリセットを上書き",
+        "save": "プリセットを保存",
+        "close": "チームプリセット保存ダイアログを閉じる"
+      },
+      "errors": {
+        "noMembers": "チームプリセットを保存する前に AI メンバーを追加してください。",
+        "idRequired": "プリセット ID は必須です。",
+        "conflict": "この ID のチームプリセットは既に存在します。名前または ID を変更するか、上書きを有効にしてください。",
+        "builtin": "組み込みのチームプリセットは上書きできません。",
+        "save": "チームプリセットの保存に失敗しました。"
+      }
+    },
     "importPreview": {
       "title": "チームをインポート: {{teamName}}",
       "description": "次のメンバーがこのセッションに追加されます:",

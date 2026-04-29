@@ -342,12 +342,14 @@ pub trait StandardCodingAgentExecutor {
 }
 
 /// Result communicated through the exit signal
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ExecutorExitResult {
     /// Process completed successfully (exit code 0)
     Success,
     /// Process should be marked as failed (non-zero exit)
     Failure,
+    /// Process failed with a specific error message (e.g., from turn/completed)
+    FailureWithError(String),
 }
 
 /// Optional exit notification from an executor.

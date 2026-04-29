@@ -290,6 +290,34 @@
         "close": "Close team protocol editor"
       }
     },
+    "teamPresetSnapshot": {
+      "open": "Save Team",
+      "tooltip": "Save all AI members in the current list as a preset team, and keep the team guidelines too.",
+      "saved": "Saved team preset {{name}}.",
+      "overwritten": "Updated team preset {{name}}.",
+      "membersSaved": "Members: {{names}}.",
+      "modal": {
+        "title": "Save Team",
+        "description": "Save this session member setup as a reusable team preset.",
+        "dedupeHint": "Members with duplicate names automatically get a numeric suffix.",
+        "name": "Name",
+        "namePlaceholder": "Use session title",
+        "teamPresetId": "Preset ID",
+        "teamPresetIdPlaceholder": "delivery_team",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "Optional preset description",
+        "overwrite": "Overwrite existing custom preset with the same ID",
+        "save": "Save preset",
+        "close": "Close save team preset dialog"
+      },
+      "errors": {
+        "noMembers": "Add AI members before saving a team preset.",
+        "idRequired": "Preset ID is required.",
+        "conflict": "A team preset with this ID already exists. Change the name or ID, or enable overwrite.",
+        "builtin": "Built-in team presets cannot be overwritten.",
+        "save": "Failed to save team preset."
+      }
+    },
     "importPreview": {
       "title": "Import Team: {{teamName}}",
       "description": "The following members will be added to this session:",

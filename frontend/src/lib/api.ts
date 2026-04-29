@@ -55,6 +55,7 @@ import {
   RemoteSkillPackage,
   SkillCategory,
   ChatRunRetentionInfo,
+  CreatePresetSnapshotResponse,
 } from 'shared/types';
 import type {
   CliConfig,
@@ -92,6 +93,13 @@ export interface VersionUpdateResult {
 export interface OpenInExplorerResponse {
   ok: boolean;
   error?: string | null;
+}
+
+export interface CreatePresetSnapshotPayload {
+  team_preset_id: string;
+  name: string | null;
+  description: string | null;
+  overwrite_strategy: 'fail_if_exists' | 'overwrite_custom';
 }
 
 export class ApiError<E = unknown> extends Error {
@@ -815,6 +823,25 @@ export const chatApi = {
       }
     );
     return handleApiResponse<TeamProtocolConfig>(response);
+  },
+
+  createPresetSnapshot: async (
+    sessionId: string,
+    data: CreatePresetSnapshotPayload
+  ): Promise<CreatePresetSnapshotResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/presets/snapshot`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          team_preset_id: data.team_preset_id,
+          name: data.name,
+          description: data.description,
+          overwrite_strategy: data.overwrite_strategy,
+        }),
+      }
+    );
+    return handleApiResponse<CreatePresetSnapshotResponse>(response);
   },
 
   deleteMessagesBatch: async (

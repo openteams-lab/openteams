@@ -175,7 +175,8 @@ impl JsonRpcPeer {
 
             let _ = reader_peer.shutdown().await;
             tracing::debug!("[codex-jsonrpc] sending executor exit signal");
-            exit_tx.send_exit_signal(ExecutorExitResult::Success).await;
+            let exit_result = callbacks.get_exit_result().await;
+            exit_tx.send_exit_signal(exit_result).await;
         });
 
         peer
@@ -314,4 +315,8 @@ pub trait JsonRpcCallbacks: Send + Sync {
     ) -> Result<bool, ExecutorError>;
 
     async fn on_non_json(&self, _raw: &str) -> Result<(), ExecutorError>;
+
+    async fn get_exit_result(&self) -> ExecutorExitResult {
+        ExecutorExitResult::Success
+    }
 }

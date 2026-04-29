@@ -25,11 +25,11 @@ use uuid::Uuid;
 
 use super::{
     AgentProtocolError, AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner,
-    ChatStreamEvent, MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON, MessageAttachmentContext,
-    PROTOCOL_OUTPUT_SCHEMA_JSON, RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE,
-    RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE, ReferenceAttachment, ReferenceContext,
-    ResolvedPromptLanguage, RunCompletionStatus, SessionAgentSummary, TokenUsageInfo,
-    runtime::RunLogForwarders,
+    ChatStreamEvent, MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON, MAX_PROTOCOL_PARSE_RETRIES,
+    MessageAttachmentContext, PROTOCOL_OUTPUT_SCHEMA_JSON, ProtocolProcessResult,
+    RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE, RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE, ReferenceAttachment,
+    ReferenceContext, ResolvedPromptLanguage, RunCompletionStatus, SessionAgentSummary,
+    TokenUsageInfo, runtime::RunLogForwarders,
 };
 use crate::services::config::UiLanguage;
 
@@ -119,6 +119,23 @@ async fn setup_chat_runner_db() -> DBService {
     for statement in [
         "PRAGMA foreign_keys = ON",
         r#"
+            CREATE TABLE chat_sessions (
+                id BLOB PRIMARY KEY,
+                title TEXT,
+                status TEXT NOT NULL DEFAULT 'active'
+                    CHECK (status IN ('active','archived')),
+                summary_text TEXT,
+                archive_ref TEXT,
+                last_seen_diff_key TEXT,
+                team_protocol TEXT DEFAULT '',
+                team_protocol_enabled INTEGER DEFAULT 0,
+                default_workspace_path TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                archived_at TEXT
+            )
+            "#,
+        r#"
             CREATE TABLE chat_agents (
                 id BLOB PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -146,6 +163,33 @@ async fn setup_chat_runner_db() -> DBService {
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
             )
             "#,
+        r#"
+            CREATE TABLE chat_messages (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                sender_type TEXT NOT NULL
+                    CHECK (sender_type IN ('user','agent','system')),
+                sender_id BLOB,
+                content TEXT NOT NULL,
+                mentions TEXT NOT NULL DEFAULT '[]',
+                meta TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+            )
+            "#,
+        r#"
+            CREATE TABLE chat_work_items (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                run_id BLOB NOT NULL,
+                session_agent_id BLOB NOT NULL,
+                agent_id BLOB NOT NULL,
+                item_type TEXT NOT NULL CHECK (item_type IN ('artifact','conclusion')),
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+            )
+            "#,
     ] {
         sqlx::query(statement)
             .execute(&pool)
@@ -154,6 +198,21 @@ async fn setup_chat_runner_db() -> DBService {
     }
 
     DBService { pool }
+}
+
+async fn insert_test_chat_session(db: &DBService, session_id: Uuid) {
+    sqlx::query(
+        r#"
+        INSERT INTO chat_sessions (id, title, status)
+        VALUES (?, ?, ?)
+        "#,
+    )
+    .bind(session_id)
+    .bind("test session")
+    .bind(ChatSessionStatus::Active)
+    .execute(&db.pool)
+    .await
+    .expect("insert chat session");
 }
 
 async fn insert_test_chat_agent(db: &DBService, name: &str) -> ChatAgent {
@@ -595,7 +654,7 @@ async fn stop_agent_cancels_pre_registered_run_control() {
     .await
     .expect("insert running session agent");
 
-    let stop = runner.register_run_control(session_agent_id);
+    let stop = runner.register_run_control(session_agent_id, Uuid::new_v4());
 
     runner
         .stop_agent(session_id, session_agent_id)
@@ -892,6 +951,99 @@ fn should_handle_protocol_error_as_raw_output_only_for_json_shape_errors() {
     assert!(!ChatRunner::should_handle_protocol_error_as_raw_output(
         &missing_target
     ));
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_requests_retry_for_first_json_shape_failure() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            0,
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            r#"{"type":"send","to":"you","content":"object is not allowed"}"#,
+            None,
+            None,
+            None,
+            0,
+        )
+        .await
+        .expect("process protocol output");
+
+    match result {
+        ProtocolProcessResult::RetryableParseFailure { code, .. } => {
+            assert_eq!(code, ChatProtocolNoticeCode::NotJsonArray);
+        }
+        other => panic!("expected retryable parse failure, got {other:?}"),
+    }
+
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert!(messages.is_empty());
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_reports_error_after_retry_exhaustion() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+    let run_id = Uuid::new_v4();
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            run_id,
+            Uuid::new_v4(),
+            0,
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            "still not json",
+            None,
+            None,
+            None,
+            MAX_PROTOCOL_PARSE_RETRIES,
+        )
+        .await
+        .expect("process protocol output");
+
+    assert!(matches!(result, ProtocolProcessResult::ProtocolFailure));
+
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender_type, ChatSenderType::System);
+    assert!(messages[0].content.contains("could not be processed"));
+    assert_eq!(
+        messages[0].meta["protocol_error"]["code"],
+        json!("invalid_json")
+    );
+    assert_eq!(
+        messages[0].meta["protocol_error"]["raw_output"],
+        json!("still not json")
+    );
+    assert_eq!(messages[0].meta["run_id"], json!(run_id));
 }
 
 #[test]

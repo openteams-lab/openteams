@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { PromptEditorModal } from '@/pages/ui-new/chat/components/PromptEditorModal';
 import { AgentSkillsSection } from '@/pages/ui-new/chat/components/AgentSkillsSection';
 import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
+import { useToast } from '@/components/ui-new/primitives/Toast';
 import {
   formatExecutorModelLabel,
   getVariantModelName,
@@ -244,10 +245,8 @@ const presetInlineActionButtonClassName = cn(
   'rounded-[10px] border-[#E2E8F0] bg-white px-3 py-[5px] text-[11px] font-medium text-[#64748B] hover:bg-[#F8FAFC] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#BAC4D6] dark:hover:bg-[#1A2433]'
 );
 
-const presetDestructiveButtonClassName = cn(
-  presetToolbarButtonClassName,
-  'border-[#FECACA] bg-[#FFF5F5] text-[#EF4444] hover:bg-[#FEF2F2] dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(239,68,68,0.12)] dark:text-[#FCA5A5] dark:hover:bg-[rgba(239,68,68,0.18)]'
-);
+const presetDestructiveButtonClassName =
+  'inline-flex items-center justify-center gap-2 rounded-[12px] px-4 py-[9px] text-[13px] font-medium transition-colors duration-200 border-[#fecaca] bg-[#fee2e2] text-[#b91c1c] hover:bg-[#fecaca] dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(239,68,68,0.12)] dark:text-[#FCA5A5] dark:hover:bg-[rgba(239,68,68,0.18)] disabled:cursor-not-allowed disabled:opacity-50';
 
 const presetMemberSelectTriggerClassName =
   'preset-member-select-trigger rounded-[14px] border-[#D1D5DB] bg-[#F8FAFC] px-4 py-3 text-[#334155] focus:border-[#3B82F6] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:focus:border-[#5EA2FF] dark:focus:bg-[#111926] dark:focus:shadow-[0_0_0_3px_rgba(94,162,255,0.15)]';
@@ -278,6 +277,7 @@ export function ChatPresetsEditorPanel({
   const { t } = useTranslation('settings');
   const { t: tChat } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
+  const { toast } = useToast();
   const {
     config,
     profiles,
@@ -305,7 +305,6 @@ export function ChatPresetsEditorPanel({
     useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
   const [teamMemberSearch, setTeamMemberSearch] = useState('');
   const [showMemberSearch, setShowMemberSearch] = useState(false);
@@ -397,24 +396,26 @@ export function ChatPresetsEditorPanel({
     [tChat]
   );
 
-  // Filtered members for sidebar list
+  // Filtered members for sidebar list (custom presets before built-in)
   const filteredSidebarMembers = useMemo(() => {
-    if (!memberSearch.trim()) return draft.members;
-    const searchLower = memberSearch.toLowerCase().trim();
-    return draft.members.filter((member) => {
-      const localizedName = member.is_builtin
-        ? replaceWhitespaceWithUnderscores(
-            tChat(`members.presetDisplay.members.${member.id}`, {
-              defaultValue: member.name,
-            })
-          )
-        : replaceWhitespaceWithUnderscores(member.name);
-      return (
-        localizedName.toLowerCase().includes(searchLower) ||
-        member.id.toLowerCase().includes(searchLower) ||
-        member.description.toLowerCase().includes(searchLower)
-      );
-    });
+    const base = !memberSearch.trim()
+      ? draft.members
+      : draft.members.filter((member) => {
+          const searchLower = memberSearch.toLowerCase().trim();
+          const localizedName = member.is_builtin
+            ? replaceWhitespaceWithUnderscores(
+                tChat(`members.presetDisplay.members.${member.id}`, {
+                  defaultValue: member.name,
+                })
+              )
+            : replaceWhitespaceWithUnderscores(member.name);
+          return (
+            localizedName.toLowerCase().includes(searchLower) ||
+            member.id.toLowerCase().includes(searchLower) ||
+            member.description.toLowerCase().includes(searchLower)
+          );
+        });
+    return [...base].sort((a, b) => Number(a.is_builtin) - Number(b.is_builtin));
   }, [draft.members, memberSearch, tChat]);
 
   // Filtered members for team member selection
@@ -696,7 +697,6 @@ export function ChatPresetsEditorPanel({
 
     setSaving(true);
     setError(null);
-    setSuccess(false);
     try {
       const next = normalizeDraft(draft);
       const ok = await updateAndSaveConfig({ chat_presets: next });
@@ -705,8 +705,7 @@ export function ChatPresetsEditorPanel({
         return;
       }
       setDraft(cloneDeep(next));
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      toast(t('settings.presets.saveSuccess'));
     } finally {
       setSaving(false);
     }
@@ -715,7 +714,6 @@ export function ChatPresetsEditorPanel({
   const handleDiscard = () => {
     setDraft(cloneDeep(sourcePresets));
     setError(null);
-    setSuccess(false);
   };
 
   if (!config) {
@@ -1275,11 +1273,6 @@ export function ChatPresetsEditorPanel({
             {error}
           </div>
         ) : null}
-        {success ? (
-          <div className="mb-4 rounded-[16px] border border-[#BBF7D0] bg-[#F0FDF4] px-5 py-4 text-[13px] font-medium text-[#15803D] dark:border-[rgba(52,211,153,0.24)] dark:bg-[rgba(34,197,94,0.12)] dark:text-[#86EFAC]">
-            {t('settings.presets.saveSuccess')}
-          </div>
-        ) : null}
 
         <div className="flex min-h-0 flex-1 overflow-hidden rounded-[28px] border border-white/80 bg-[rgba(255,255,255,0.92)] shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-[#2A3445] dark:bg-[#141C28] dark:shadow-[0_24px_60px_rgba(0,0,0,0.3)]">
           <aside className="flex w-[292px] min-w-[292px] flex-col border-r border-[#E2E8F0] bg-[#F8FAFC]/95 dark:border-[#2A3445] dark:bg-[#101722]">
@@ -1417,7 +1410,7 @@ export function ChatPresetsEditorPanel({
                       {t('settings.presets.teams.empty')}
                     </div>
                   ) : (
-                    draft.teams.map((team) => (
+                    [...draft.teams].sort((a, b) => Number(a.is_builtin) - Number(b.is_builtin)).map((team) => (
                       <PresetListItem
                         key={team.id}
                         title={getLocalizedTeamName(team)}

@@ -284,6 +284,34 @@
         "close": "팀 프로토콜 편집기 닫기"
       }
     },
+    "teamPresetSnapshot": {
+      "open": "팀 저장",
+      "tooltip": "현재 목록의 모든 AI 멤버를 하나의 프리셋 팀으로 저장하고, 팀 가이드라인도 함께 유지합니다.",
+      "saved": "팀 프리셋 {{name}}을(를) 저장했습니다.",
+      "overwritten": "팀 프리셋 {{name}}을(를) 업데이트했습니다.",
+      "membersSaved": "멤버: {{names}}.",
+      "modal": {
+        "title": "팀 저장",
+        "description": "현재 세션 멤버 구성을 재사용 가능한 팀 프리셋으로 저장합니다.",
+        "dedupeHint": "이름이 중복된 멤버에는 자동으로 숫자 접미사가 붙습니다.",
+        "name": "이름",
+        "namePlaceholder": "세션 제목 사용",
+        "teamPresetId": "프리셋 ID",
+        "teamPresetIdPlaceholder": "delivery_team",
+        "descriptionLabel": "설명",
+        "descriptionPlaceholder": "선택 사항인 프리셋 설명",
+        "overwrite": "같은 ID의 기존 사용자 지정 프리셋 덮어쓰기",
+        "save": "프리셋 저장",
+        "close": "팀 프리셋 저장 대화상자 닫기"
+      },
+      "errors": {
+        "noMembers": "팀 프리셋을 저장하기 전에 AI 멤버를 추가하세요.",
+        "idRequired": "프리셋 ID는 필수입니다.",
+        "conflict": "이 ID를 가진 팀 프리셋이 이미 존재합니다. 이름이나 ID를 바꾸거나 덮어쓰기를 활성화하세요.",
+        "builtin": "기본 제공 팀 프리셋은 덮어쓸 수 없습니다.",
+        "save": "팀 프리셋을 저장하지 못했습니다."
+      }
+    },
     "importPreview": {
       "title": "팀 가져오기: {{teamName}}",
       "description": "다음 멤버가 이 세션에 추가됩니다:",

@@ -654,6 +654,12 @@ export type RestartCliResponse = { restarted: boolean, message: string, base_url
 
 export type TeamProtocolConfig = { content: string, enabled: boolean, };
 
+export type CreatePresetSnapshotRequest = { team_preset_id: string | null, name: string | null, description: string | null, overwrite_strategy: PresetSnapshotOverwriteStrategy | null, };
+
+export type PresetSnapshotOverwriteStrategy = "fail_if_exists" | "overwrite_custom";
+
+export type CreatePresetSnapshotResponse = { team: ChatTeamPreset, members: Array<ChatMemberPreset>, overwritten: boolean, };
+
 export type GitBranch = { name: string, is_current: boolean, is_remote: boolean, last_commit_date: Date, };
 
 export type QueuedMessage = { 

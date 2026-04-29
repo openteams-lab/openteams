@@ -31,8 +31,10 @@ import {
   TreeStructureIcon,
   TerminalIcon,
   TrendUpIcon,
+  FloppyDiskIcon,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   BaseCodingAgent,
   ChatSessionAgentState,
@@ -41,7 +43,7 @@ import {
   type JsonValue,
 } from 'shared/types';
 import { cn } from '@/lib/utils';
-import { chatApi } from '@/lib/api';
+import { ApiError, chatApi } from '@/lib/api';
 import { getWorkspacePathExample } from '@/utils/platform';
 import {
   extractExecutorProfileVariant,
@@ -49,6 +51,7 @@ import {
 } from '@/utils/executor';
 import { PrimaryButton } from '@/components/ui-new/primitives/PrimaryButton';
 import { Tooltip } from '@/components/ui-new/primitives/Tooltip';
+import { useToast } from '@/components/ui-new/primitives/Toast';
 import {
   Select,
   SelectContent,
@@ -74,6 +77,7 @@ import { AgentSkillsSection } from './AgentSkillsSection';
 import { TeamProtocolEditorModal } from './TeamProtocolEditorModal';
 import { TeamImportPreviewModal } from './TeamImportPreviewModal';
 import { SearchableDropdownContainer } from '@/components/ui-new/containers/SearchableDropdownContainer';
+import { SaveTeamPresetSnapshotModal } from './SaveTeamPresetSnapshotModal';
 
 const truncateByChars = (value: string, maxChars: number): string => {
   const chars = Array.from(value);
@@ -546,6 +550,8 @@ export function AiMembersSidebar({
 }: AiMembersSidebarProps) {
   const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const variantFieldLabel =
     newMemberRunnerType === BaseCodingAgent.OPEN_TEAMS_CLI
       ? t('members.model')
@@ -558,6 +564,13 @@ export function AiMembersSidebar({
   const [isTeamBulletinExpanded, setIsTeamBulletinExpanded] = useState(false);
   const [isTeamProtocolEditorOpen, setIsTeamProtocolEditorOpen] =
     useState(false);
+  const [isTeamPresetSnapshotOpen, setIsTeamPresetSnapshotOpen] =
+    useState(false);
+  const [isTeamPresetSnapshotSaving, setIsTeamPresetSnapshotSaving] =
+    useState(false);
+  const [teamPresetSnapshotError, setTeamPresetSnapshotError] = useState<
+    string | null
+  >(null);
   const [teamProtocolContent, setTeamProtocolContent] = useState('');
   const [teamProtocolEnabled, setTeamProtocolEnabled] = useState(false);
   const [isTeamProtocolLoading, setIsTeamProtocolLoading] = useState(false);
@@ -573,6 +586,19 @@ export function AiMembersSidebar({
   >(null);
   const workspacePathPlaceholder = getWorkspacePathExample();
   const teamBulletinTitle = t('members.teamBulletin.title');
+  const saveTeamPresetTitle =
+    sessionMembers.length === 0
+      ? t('members.teamPresetSnapshot.errors.noMembers', {
+          defaultValue: 'Add AI members before saving a team preset.',
+        })
+      : t('members.teamPresetSnapshot.tooltip', {
+          defaultValue:
+            'Save all AI members in the current list as a preset team, and keep the team guidelines too.',
+        });
+  const isSaveTeamPresetDisabled =
+    !activeSessionId ||
+    sessionMembers.length === 0 ||
+    isTeamPresetSnapshotSaving;
 
   const hasPresets =
     enabledMemberPresets.length > 0 || enabledTeamPresets.length > 0;
@@ -594,25 +620,27 @@ export function AiMembersSidebar({
     [t]
   );
   const normalizedPresetSearch = presetSearchQuery.trim().toLowerCase();
-  const filteredMemberPresets = enabledMemberPresets.filter((preset) => {
-    // Category filter
-    if (selectedCategory) {
-      const presetCategory = getPresetCategory(preset);
-      if (presetCategory !== selectedCategory) {
-        return false;
+  const filteredMemberPresets = enabledMemberPresets
+    .filter((preset) => {
+      // Category filter
+      if (selectedCategory) {
+        const presetCategory = getPresetCategory(preset);
+        if (presetCategory !== selectedCategory) {
+          return false;
+        }
       }
-    }
 
-    // Search filter
-    return getLocalizedMemberPresetName(preset, t)
-      .toLowerCase()
-      .includes(normalizedPresetSearch);
-  });
-  const filteredTeamPresets = enabledTeamPresets.filter((team) =>
-    getLocalizedTeamPresetName(team, t)
-      .toLowerCase()
-      .includes(normalizedPresetSearch)
-  );
+      // Search filter
+      return getLocalizedMemberPresetName(preset, t)
+        .toLowerCase()
+        .includes(normalizedPresetSearch);
+    });
+  const filteredTeamPresets = enabledTeamPresets
+    .filter((team) =>
+      getLocalizedTeamPresetName(team, t)
+        .toLowerCase()
+        .includes(normalizedPresetSearch)
+    );
   const hasPresetSearchResults =
     filteredMemberPresets.length > 0 || filteredTeamPresets.length > 0;
   const shouldShowExpandedTeams =
@@ -639,8 +667,10 @@ export function AiMembersSidebar({
   useEffect(() => {
     if (!activeSessionId) {
       setIsTeamProtocolEditorOpen(false);
+      setIsTeamPresetSnapshotOpen(false);
       setTeamProtocolLoadError(null);
       setTeamProtocolSaveError(null);
+      setTeamPresetSnapshotError(null);
       return;
     }
 
@@ -709,12 +739,92 @@ export function AiMembersSidebar({
     [activeSessionId, t]
   );
 
+  const handleSaveTeamPresetSnapshot = useCallback(
+    async (payload: {
+      team_preset_id: string;
+      name: string | null;
+      description: string | null;
+      overwrite_strategy: 'fail_if_exists' | 'overwrite_custom';
+    }) => {
+      if (!activeSessionId) return false;
+      setIsTeamPresetSnapshotSaving(true);
+      setTeamPresetSnapshotError(null);
+      try {
+        const saved = await chatApi.createPresetSnapshot(activeSessionId, {
+          team_preset_id: payload.team_preset_id,
+          name: payload.name,
+          description: payload.description,
+          overwrite_strategy: payload.overwrite_strategy,
+        });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['user-system'] }),
+          queryClient.invalidateQueries({ queryKey: ['chatPresets'] }),
+        ]);
+        const savedMessage = saved.overwritten
+          ? t('members.teamPresetSnapshot.overwritten', {
+              name: saved.team.name,
+              defaultValue: 'Updated team preset {{name}}.',
+            })
+          : t('members.teamPresetSnapshot.saved', {
+              name: saved.team.name,
+              defaultValue: 'Saved team preset {{name}}.',
+            });
+        const savedMemberNames = saved.members
+          .map((member) => member.name.trim())
+          .filter(Boolean);
+        const memberMessage =
+          savedMemberNames.length > 0
+            ? t('members.teamPresetSnapshot.membersSaved', {
+                names: savedMemberNames.join(', '),
+                defaultValue: 'Members: {{names}}.',
+              })
+            : '';
+        toast(`${savedMessage} ${memberMessage}`.trim());
+        return true;
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 409) {
+          setTeamPresetSnapshotError(
+            t('members.teamPresetSnapshot.errors.conflict', {
+              defaultValue:
+                'A team preset with this ID already exists. Change the name or ID, or enable overwrite.',
+            })
+          );
+          return false;
+        }
+        if (error instanceof ApiError && error.status === 403) {
+          setTeamPresetSnapshotError(
+            t('members.teamPresetSnapshot.errors.builtin', {
+              defaultValue: 'Built-in team presets cannot be overwritten.',
+            })
+          );
+          return false;
+        }
+        setTeamPresetSnapshotError(
+          error instanceof Error && error.message
+            ? error.message
+            : t('members.teamPresetSnapshot.errors.save', {
+                defaultValue: 'Failed to save team preset.',
+              })
+        );
+        return false;
+      } finally {
+        setIsTeamPresetSnapshotSaving(false);
+      }
+    },
+    [activeSessionId, queryClient, t]
+  );
+
   const handlePresetCategoryOpenChange = useCallback((open: boolean) => {
     if (open) return;
 
     requestAnimationFrame(() => {
       presetCategoryTriggerRef.current?.blur();
     });
+  }, []);
+
+  const openTeamPresetSnapshotModal = useCallback(() => {
+    setTeamPresetSnapshotError(null);
+    setIsTeamPresetSnapshotOpen(true);
   }, []);
 
   const renderPresetTab = () => (
@@ -1163,33 +1273,26 @@ export function AiMembersSidebar({
               {t('members.title')}
             </div>
           </div>
-          <button
-            type="button"
-            className={cn(
-              'chat-session-header-member-toggle chat-session-members-header-toggle',
-              isPanelOpen && 'active'
-            )}
-            onClick={onTogglePanel}
-            aria-label={
-              isPanelOpen
-                ? t('header.closeMembersPanel')
-                : t('header.openMembersPanel')
-            }
-            title={
-              isPanelOpen
-                ? t('header.closeMembersPanel')
-                : t('header.openMembersPanel')
-            }
-          >
-            <UsersThreeIcon className="size-icon-xs" />
-            <span>
-              {sessionMembers.length} {t('header.aiMembers')}
-            </span>
-          </button>
+          <div className="flex items-center gap-2">
+            {activeSessionId ? (
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs font-medium text-[#4a90e2] transition-colors hover:text-[#357ABD] disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#5EA2FF] dark:hover:text-[#7DB6FF]"
+                disabled={isSaveTeamPresetDisabled}
+                title={saveTeamPresetTitle}
+                onClick={openTeamPresetSnapshotModal}
+              >
+                <FloppyDiskIcon className="size-3.5" />
+                {t('members.teamPresetSnapshot.open', {
+                  defaultValue: 'Save Team',
+                })}
+              </button>
+            ) : null}
+          </div>
         </div>
         <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto px-base pb-base pt-half space-y-base">
           {activeSessionId && (
-            <section className="mb-5 overflow-hidden rounded-[12px] border border-[#dce6f2] bg-[#fbfdff] shadow-[0_8px_18px_rgba(148,163,184,0.08)] dark:border-[#2A3445] dark:bg-[rgba(18,24,35,0.84)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
+            <section className="mb-1 overflow-hidden rounded-[12px] border border-[#dce6f2] bg-[#fbfdff] shadow-[0_8px_18px_rgba(148,163,184,0.08)] dark:border-[#2A3445] dark:bg-[rgba(18,24,35,0.84)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
               <button
                 type="button"
                 className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[#f3f8ff] dark:hover:bg-[rgba(94,162,255,0.08)]"
@@ -1253,6 +1356,28 @@ export function AiMembersSidebar({
                 </div>
               </div>
             </section>
+          )}
+
+          {activeSessionId && (
+            <div className="flex items-center my-1 px-1">
+              <div
+                className="h-px flex-1"
+                style={{
+                  background:
+                    'linear-gradient(to right, transparent, var(--color-border, #dce6f2), transparent)',
+                }}
+              />
+              <span className="shrink-0 px-3 text-xs text-low dark:text-[#7F8AA3]">
+                {sessionMembers.length} {t('header.aiMembers')}
+              </span>
+              <div
+                className="h-px flex-1"
+                style={{
+                  background:
+                    'linear-gradient(to right, transparent, var(--color-border, #dce6f2), transparent)',
+                }}
+              />
+            </div>
           )}
 
           {!activeSessionId && (
@@ -1403,6 +1528,17 @@ export function AiMembersSidebar({
           setTeamProtocolSaveError(null);
         }}
         onSave={handleSaveTeamProtocol}
+      />
+      <SaveTeamPresetSnapshotModal
+        isOpen={isTeamPresetSnapshotOpen}
+        isSaving={isTeamPresetSnapshotSaving}
+        error={teamPresetSnapshotError}
+        onClose={() => {
+          if (isTeamPresetSnapshotSaving) return;
+          setIsTeamPresetSnapshotOpen(false);
+          setTeamPresetSnapshotError(null);
+        }}
+        onSave={handleSaveTeamPresetSnapshot}
       />
       <TeamImportPreviewModal
         isOpen={Boolean(teamImportPlan)}
