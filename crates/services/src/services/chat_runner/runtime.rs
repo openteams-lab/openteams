@@ -475,10 +475,19 @@ impl ChatRunner {
         .to_string()
     }
 
-    pub(super) fn register_run_control(&self, session_agent_id: Uuid) -> CancellationToken {
+    pub(super) fn register_run_control(
+        &self,
+        session_agent_id: Uuid,
+        run_id: Uuid,
+    ) -> CancellationToken {
         let stop = CancellationToken::new();
-        self.run_controls
-            .insert(session_agent_id, RunLifecycleControl { stop: stop.clone() });
+        self.run_controls.insert(
+            session_agent_id,
+            RunLifecycleControl {
+                run_id,
+                stop: stop.clone(),
+            },
+        );
         stop
     }
 
@@ -1513,9 +1522,60 @@ impl ChatRunner {
                             )
                             .await;
 
+                        let mut protocol_retry_request: Option<(String, ChatMessage, bool)> = None;
+                        let mut protocol_processing_failed = false;
                         let messages_created = match process_result {
                             Ok(ProtocolProcessResult::Success(count)) => count,
+                            Ok(ProtocolProcessResult::ProtocolFailure) => {
+                                protocol_processing_failed = true;
+                                0
+                            }
                             Ok(ProtocolProcessResult::RetryableParseFailure { code, detail }) => {
+                                if matches!(completion_status, RunCompletionStatus::Failed) {
+                                    protocol_processing_failed = true;
+                                    tracing::warn!(
+                                        session_id = %session_id,
+                                        run_id = %run_id,
+                                        agent_id = %agent_id,
+                                        agent_name = %agent_name,
+                                        code = ?code,
+                                        detail = ?detail,
+                                        protocol_retry_attempt,
+                                        "retryable protocol parse failure occurred during failed run; skipping retry dispatch"
+                                    );
+                                    if latest_assistant.trim().is_empty() {
+                                        0
+                                    } else {
+                                        if let Err(err) = runner
+                                            .persist_raw_agent_message_and_work_record(
+                                                session_id,
+                                                session_agent_id,
+                                                agent_id,
+                                                run_id,
+                                                &agent_name,
+                                                source_message_id,
+                                                chain_depth,
+                                                prompt_language,
+                                                &latest_assistant,
+                                                visible_error_content
+                                                    .map(|content| (content, error_type.as_ref())),
+                                                Some(&token_usage),
+                                            )
+                                            .await
+                                        {
+                                            tracing::warn!(
+                                                session_id = %session_id,
+                                                run_id = %run_id,
+                                                agent_id = %agent_id,
+                                                error = %err,
+                                                "failed to persist raw assistant output for failed retryable protocol parse"
+                                            );
+                                            0
+                                        } else {
+                                            1
+                                        }
+                                    }
+                                } else {
                                 tracing::warn!(
                                     session_id = %session_id,
                                     run_id = %run_id,
@@ -1547,7 +1607,7 @@ impl ChatRunner {
                                     "mentions": [agent_name],
                                 }));
                                 let retry_message = ChatMessage {
-                                    id: Uuid::new_v4(),
+                                    id: source_message_id,
                                     session_id,
                                     sender_type: ChatSenderType::System,
                                     sender_id: None,
@@ -1557,29 +1617,13 @@ impl ChatRunner {
                                     created_at: source_message_created_at,
                                 };
 
-                                let retry_runner = runner.clone();
-                                let retry_agent_name = agent_name.clone();
-                                tokio::spawn(async move {
-                                    if let Err(err) = retry_runner
-                                        .run_agent_for_mention_internal(
-                                            session_id,
-                                            &retry_agent_name,
-                                            &retry_message,
-                                            false,
-                                        )
-                                        .await
-                                    {
-                                        tracing::warn!(
-                                            session_id = %session_id,
-                                            agent_name = %retry_agent_name,
-                                            error = %err,
-                                            "protocol retry run failed to dispatch"
-                                        );
-                                    }
-                                });
+                                protocol_retry_request =
+                                    Some((agent_name.clone(), retry_message, track_source_message));
                                 0
+                                }
                             }
                             Err(err) => {
+                                protocol_processing_failed = true;
                                 tracing::warn!(
                                     session_id = %session_id,
                                     run_id = %run_id,
@@ -1659,16 +1703,18 @@ impl ChatRunner {
                                 .await;
                         }
 
-                        let _ = sender.send(ChatStreamEvent::AgentDelta {
-                            session_id,
-                            session_agent_id,
-                            agent_id,
-                            run_id,
-                            stream_type: ChatStreamDeltaType::Assistant,
-                            content: latest_assistant.clone(),
-                            delta: false,
-                            is_final: true,
-                        });
+                        if !(latest_assistant.is_empty() && visible_error_content.is_some()) {
+                            let _ = sender.send(ChatStreamEvent::AgentDelta {
+                                session_id,
+                                session_agent_id,
+                                agent_id,
+                                run_id,
+                                stream_type: ChatStreamDeltaType::Assistant,
+                                content: latest_assistant.clone(),
+                                delta: false,
+                                is_final: true,
+                            });
+                        }
 
                         let final_state = match completion_status {
                             RunCompletionStatus::Failed => ChatSessionAgentState::Dead,
@@ -1714,10 +1760,13 @@ impl ChatRunner {
                             started_at: None,
                         });
 
-                        if track_source_message {
+                        if track_source_message && protocol_retry_request.is_none() {
                             // Emit MentionAcknowledged completed/failed event
                             let mention_status = match completion_status {
                                 RunCompletionStatus::Failed => MentionStatus::Failed,
+                                RunCompletionStatus::Succeeded if protocol_processing_failed => {
+                                    MentionStatus::Failed
+                                }
                                 RunCompletionStatus::Succeeded | RunCompletionStatus::Stopped => {
                                     MentionStatus::Completed
                                 }
@@ -1778,9 +1827,40 @@ impl ChatRunner {
                             );
                         }
 
-                        // Process any pending messages in the queue for this agent
-                        // Only process if the agent completed successfully (not failed/dead)
                         if final_state == ChatSessionAgentState::Idle {
+                            if let Some((retry_agent_name, retry_message, retry_track_source)) =
+                                protocol_retry_request
+                            {
+                                tracing::info!(
+                                    session_id = %session_id,
+                                    session_agent_id = %session_agent_id,
+                                    agent_id = %agent_id,
+                                    run_id = %run_id,
+                                    agent_name = %retry_agent_name,
+                                    "dispatching protocol retry after current run reached idle"
+                                );
+                                if let Err(err) = runner
+                                    .run_agent_for_mention_internal(
+                                        session_id,
+                                        &retry_agent_name,
+                                        &retry_message,
+                                        retry_track_source,
+                                    )
+                                    .await
+                                {
+                                    tracing::warn!(
+                                        session_id = %session_id,
+                                        agent_name = %retry_agent_name,
+                                        error = %err,
+                                        "protocol retry run failed to dispatch"
+                                    );
+                                }
+                                break;
+                            }
+
+                            // Process any pending messages in the queue for this agent after
+                            // protocol retries so the corrective run is not starved behind later
+                            // user messages.
                             runner
                                 .process_pending_queue(session_id, session_agent_id)
                                 .await;
@@ -1799,7 +1879,12 @@ impl ChatRunner {
         });
     }
 
-    pub(super) fn spawn_exit_watcher(&self, args: ExitWatcherArgs, session_agent_id: Uuid) {
+    pub(super) fn spawn_exit_watcher(
+        &self,
+        args: ExitWatcherArgs,
+        session_agent_id: Uuid,
+        run_id: Uuid,
+    ) {
         let run_controls = self.run_controls.clone();
         tokio::spawn(async move {
             Self::watch_executor_lifecycle_with_timeout(
@@ -1814,7 +1899,12 @@ impl ChatRunner {
                 EXECUTOR_GRACEFUL_STOP_TIMEOUT,
             )
             .await;
-            run_controls.remove(&session_agent_id);
+            let should_remove = run_controls
+                .get(&session_agent_id)
+                .is_some_and(|control| control.run_id == run_id);
+            if should_remove {
+                run_controls.remove(&session_agent_id);
+            }
         });
     }
 
@@ -2267,9 +2357,17 @@ impl ChatRunner {
                 let signaled_failure = matches!(
                     exit_result,
                     executors::executors::ExecutorExitResult::Failure
+                        | executors::executors::ExecutorExitResult::FailureWithError(_)
                 );
                 if signaled_failure {
                     completion = RunCompletionStatus::Failed;
+                }
+
+                // If the exit signal includes an error message, write it to msg_store
+                if let executors::executors::ExecutorExitResult::FailureWithError(ref err_msg) = exit_result {
+                    if !err_msg.is_empty() {
+                        msg_store.push(LogMsg::Stderr(err_msg.clone()));
+                    }
                 }
 
                 match process::terminate_process_group(&mut child, graceful_timeout).await {
