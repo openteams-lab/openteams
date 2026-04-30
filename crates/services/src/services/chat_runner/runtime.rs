@@ -1545,35 +1545,33 @@ impl ChatRunner {
                                     );
                                     if latest_assistant.trim().is_empty() {
                                         0
+                                    } else if let Err(err) = runner
+                                        .persist_raw_agent_message_and_work_record(
+                                            session_id,
+                                            session_agent_id,
+                                            agent_id,
+                                            run_id,
+                                            &agent_name,
+                                            source_message_id,
+                                            chain_depth,
+                                            prompt_language,
+                                            &latest_assistant,
+                                            visible_error_content
+                                                .map(|content| (content, error_type.as_ref())),
+                                            Some(&token_usage),
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            session_id = %session_id,
+                                            run_id = %run_id,
+                                            agent_id = %agent_id,
+                                            error = %err,
+                                            "failed to persist raw assistant output for failed retryable protocol parse"
+                                        );
+                                        0
                                     } else {
-                                        if let Err(err) = runner
-                                            .persist_raw_agent_message_and_work_record(
-                                                session_id,
-                                                session_agent_id,
-                                                agent_id,
-                                                run_id,
-                                                &agent_name,
-                                                source_message_id,
-                                                chain_depth,
-                                                prompt_language,
-                                                &latest_assistant,
-                                                visible_error_content
-                                                    .map(|content| (content, error_type.as_ref())),
-                                                Some(&token_usage),
-                                            )
-                                            .await
-                                        {
-                                            tracing::warn!(
-                                                session_id = %session_id,
-                                                run_id = %run_id,
-                                                agent_id = %agent_id,
-                                                error = %err,
-                                                "failed to persist raw assistant output for failed retryable protocol parse"
-                                            );
-                                            0
-                                        } else {
-                                            1
-                                        }
+                                        1
                                     }
                                 } else {
                                     tracing::warn!(
@@ -2370,10 +2368,9 @@ impl ChatRunner {
                 // If the exit signal includes an error message, write it to msg_store
                 if let executors::executors::ExecutorExitResult::FailureWithError(ref err_msg) =
                     exit_result
+                    && !err_msg.is_empty()
                 {
-                    if !err_msg.is_empty() {
-                        msg_store.push(LogMsg::Stderr(err_msg.clone()));
-                    }
+                    msg_store.push(LogMsg::Stderr(err_msg.clone()));
                 }
 
                 match process::terminate_process_group(&mut child, graceful_timeout).await {
