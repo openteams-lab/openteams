@@ -619,27 +619,25 @@ export function AiMembersSidebar({
     [t]
   );
   const normalizedPresetSearch = presetSearchQuery.trim().toLowerCase();
-  const filteredMemberPresets = enabledMemberPresets
-    .filter((preset) => {
-      // Category filter
-      if (selectedCategory) {
-        const presetCategory = getPresetCategory(preset);
-        if (presetCategory !== selectedCategory) {
-          return false;
-        }
+  const filteredMemberPresets = enabledMemberPresets.filter((preset) => {
+    // Category filter
+    if (selectedCategory) {
+      const presetCategory = getPresetCategory(preset);
+      if (presetCategory !== selectedCategory) {
+        return false;
       }
+    }
 
-      // Search filter
-      return getLocalizedMemberPresetName(preset, t)
-        .toLowerCase()
-        .includes(normalizedPresetSearch);
-    });
-  const filteredTeamPresets = enabledTeamPresets
-    .filter((team) =>
-      getLocalizedTeamPresetName(team, t)
-        .toLowerCase()
-        .includes(normalizedPresetSearch)
-    );
+    // Search filter
+    return getLocalizedMemberPresetName(preset, t)
+      .toLowerCase()
+      .includes(normalizedPresetSearch);
+  });
+  const filteredTeamPresets = enabledTeamPresets.filter((team) =>
+    getLocalizedTeamPresetName(team, t)
+      .toLowerCase()
+      .includes(normalizedPresetSearch)
+  );
   const hasPresetSearchResults =
     filteredMemberPresets.length > 0 || filteredTeamPresets.length > 0;
   const shouldShowExpandedTeams =

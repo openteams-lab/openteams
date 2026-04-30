@@ -415,7 +415,9 @@ export function ChatPresetsEditorPanel({
             member.description.toLowerCase().includes(searchLower)
           );
         });
-    return [...base].sort((a, b) => Number(a.is_builtin) - Number(b.is_builtin));
+    return [...base].sort(
+      (a, b) => Number(a.is_builtin) - Number(b.is_builtin)
+    );
   }, [draft.members, memberSearch, tChat]);
 
   // Filtered members for team member selection
@@ -1410,17 +1412,21 @@ export function ChatPresetsEditorPanel({
                       {t('settings.presets.teams.empty')}
                     </div>
                   ) : (
-                    [...draft.teams].sort((a, b) => Number(a.is_builtin) - Number(b.is_builtin)).map((team) => (
-                      <PresetListItem
-                        key={team.id}
-                        title={getLocalizedTeamName(team)}
-                        subtitle={team.description}
-                        selected={selectedTeamId === team.id}
-                        disabled={!team.enabled}
-                        isBuiltin={team.is_builtin}
-                        onClick={() => setSelectedTeamId(team.id)}
-                      />
-                    ))
+                    [...draft.teams]
+                      .sort(
+                        (a, b) => Number(a.is_builtin) - Number(b.is_builtin)
+                      )
+                      .map((team) => (
+                        <PresetListItem
+                          key={team.id}
+                          title={getLocalizedTeamName(team)}
+                          subtitle={team.description}
+                          selected={selectedTeamId === team.id}
+                          disabled={!team.enabled}
+                          isBuiltin={team.is_builtin}
+                          onClick={() => setSelectedTeamId(team.id)}
+                        />
+                      ))
                   )}
                 </div>
               </div>
