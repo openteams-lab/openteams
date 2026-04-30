@@ -498,7 +498,6 @@ export function AiMembersSidebar({
   activeSessionId,
   isArchived,
   width,
-  isPanelOpen: _isPanelOpen,
   onTogglePanel,
   isAddMemberOpen,
   editingMember,

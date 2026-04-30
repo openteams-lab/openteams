@@ -713,18 +713,17 @@ impl AppServerClient {
 
                 if has_finished {
                     // If the turn failed with an error, store it for the exit signal
-                    if matches!(turn.status, TurnStatus::Failed) {
-                        if let Some(ref error) = turn.error {
-                            if !error.message.is_empty() {
-                                tracing::warn!(
-                                    thread_id = %thread_id,
-                                    turn_id = %turn.id,
-                                    error_message = %error.message,
-                                    "[codex-client] turn failed with error"
-                                );
-                                *self.turn_error.lock().await = Some(error.message.clone());
-                            }
-                        }
+                    if matches!(turn.status, TurnStatus::Failed)
+                        && let Some(ref error) = turn.error
+                        && !error.message.is_empty()
+                    {
+                        tracing::warn!(
+                            thread_id = %thread_id,
+                            turn_id = %turn.id,
+                            error_message = %error.message,
+                            "[codex-client] turn failed with error"
+                        );
+                        *self.turn_error.lock().await = Some(error.message.clone());
                     }
                     tracing::debug!(
                         thread_id = %thread_id,
