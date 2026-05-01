@@ -39,7 +39,7 @@ use super::jsonrpc::{JsonRpcCallbacks, JsonRpcPeer};
 use crate::{
     approvals::{ExecutorApprovalError, ExecutorApprovalService},
     env::RepoContext,
-    executors::{ExecutorError, codex::normalize_logs::Approval},
+    executors::{ExecutorError, ExecutorExitResult, codex::normalize_logs::Approval},
 };
 
 pub struct AppServerClient {
@@ -56,6 +56,7 @@ pub struct AppServerClient {
     commit_reminder_sent: AtomicBool,
     turn_started: AtomicBool,
     cancel: CancellationToken,
+    turn_error: Mutex<Option<String>>,
 }
 
 impl AppServerClient {
@@ -82,6 +83,7 @@ impl AppServerClient {
             commit_reminder_sent: AtomicBool::new(false),
             turn_started: AtomicBool::new(false),
             cancel,
+            turn_error: Mutex::new(None),
         })
     }
 
@@ -95,6 +97,10 @@ impl AppServerClient {
 
     pub fn log_writer(&self) -> &LogWriter {
         &self.log_writer
+    }
+
+    pub async fn take_turn_error(&self) -> Option<String> {
+        self.turn_error.lock().await.take()
     }
 
     pub async fn initialize(&self) -> Result<(), ExecutorError> {
@@ -706,6 +712,19 @@ impl AppServerClient {
                 }
 
                 if has_finished {
+                    // If the turn failed with an error, store it for the exit signal
+                    if matches!(turn.status, TurnStatus::Failed)
+                        && let Some(ref error) = turn.error
+                        && !error.message.is_empty()
+                    {
+                        tracing::warn!(
+                            thread_id = %thread_id,
+                            turn_id = %turn.id,
+                            error_message = %error.message,
+                            "[codex-client] turn failed with error"
+                        );
+                        *self.turn_error.lock().await = Some(error.message.clone());
+                    }
                     tracing::debug!(
                         thread_id = %thread_id,
                         turn_id = %turn.id,
@@ -864,6 +883,13 @@ impl JsonRpcCallbacks for AppServerClient {
     async fn on_non_json(&self, raw: &str) -> Result<(), ExecutorError> {
         self.log_writer.log_raw(raw).await?;
         Ok(())
+    }
+
+    async fn get_exit_result(&self) -> ExecutorExitResult {
+        match self.take_turn_error().await {
+            Some(error_msg) => ExecutorExitResult::FailureWithError(error_msg),
+            None => ExecutorExitResult::Success,
+        }
     }
 }
 

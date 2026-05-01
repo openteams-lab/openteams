@@ -284,6 +284,34 @@
         "close": "關閉團隊協議編輯器"
       }
     },
+    "teamPresetSnapshot": {
+      "open": "儲存團隊",
+      "tooltip": "將目前清單中的所有 AI 成員儲存為一個預設團隊，團隊準則也會一併保留。",
+      "saved": "已儲存團隊預設 {{name}}。",
+      "overwritten": "已更新團隊預設 {{name}}。",
+      "membersSaved": "成員：{{names}}。",
+      "modal": {
+        "title": "儲存團隊",
+        "description": "將目前會話成員配置儲存為可重複使用的團隊預設。",
+        "dedupeHint": "同名成員會自動加上編號後綴。",
+        "name": "名稱",
+        "namePlaceholder": "使用會話標題",
+        "teamPresetId": "預設 ID",
+        "teamPresetIdPlaceholder": "delivery_team",
+        "descriptionLabel": "描述",
+        "descriptionPlaceholder": "可選的預設描述",
+        "overwrite": "覆蓋同 ID 的自訂預設",
+        "save": "儲存預設",
+        "close": "關閉儲存團隊預設對話框"
+      },
+      "errors": {
+        "noMembers": "請先新增 AI 成員，再儲存團隊預設。",
+        "idRequired": "預設 ID 為必填項。",
+        "conflict": "此 ID 的團隊預設已存在。請修改名稱或 ID，或啟用覆蓋。",
+        "builtin": "內建團隊預設不可覆蓋。",
+        "save": "儲存團隊預設失敗。"
+      }
+    },
     "importPreview": {
       "title": "匯入團隊：{{teamName}}",
       "description": "以下成員將加入此會話：",

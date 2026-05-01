@@ -485,24 +485,26 @@ where
     if !idle_seen {
         // The OpenTeamsCli server streams events independently; wait for `session.idle` so we capture
         // tail updates reliably (e.g. final tool completion events).
-        tokio::select! {
-            _ = cancel.cancelled() => return Ok(()),
-            _ = &mut activity_deadline => return Err(activity_error()),
-            event = control_rx.recv() => match event {
-                Some(ControlEvent::Activity) => {
-                    activity_deadline.as_mut().reset(Instant::now() + activity_timeout);
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => return Ok(()),
+                _ = &mut activity_deadline => return Err(activity_error()),
+                event = control_rx.recv() => match event {
+                    Some(ControlEvent::Activity) => {
+                        activity_deadline.as_mut().reset(Instant::now() + activity_timeout);
+                    }
+                    Some(ControlEvent::Idle) | None => break,
+                    Some(ControlEvent::AuthRequired { message }) => return Err(ExecutorError::AuthRequired(message)),
+                    Some(ControlEvent::SessionError { message }) => {
+                        return Err(ExecutorError::Io(io::Error::other(message)));
+                    }
+                    Some(ControlEvent::Disconnected) if !cancel.is_cancelled() => {
+                        return Err(ExecutorError::Io(io::Error::other(
+                            "OpenTeamsCli event stream disconnected while waiting for session to go idle",
+                        )));
+                    }
+                    Some(ControlEvent::Disconnected) => return Ok(()),
                 }
-                Some(ControlEvent::Idle) | None => {}
-                Some(ControlEvent::AuthRequired { message }) => return Err(ExecutorError::AuthRequired(message)),
-                Some(ControlEvent::SessionError { message }) => {
-                    return Err(ExecutorError::Io(io::Error::other(message)));
-                }
-                Some(ControlEvent::Disconnected) if !cancel.is_cancelled() => {
-                    return Err(ExecutorError::Io(io::Error::other(
-                        "OpenTeamsCli event stream disconnected while waiting for session to go idle",
-                    )));
-                }
-                Some(ControlEvent::Disconnected) => return Ok(()),
             }
         }
     }
@@ -2044,6 +2046,31 @@ mod tests {
         .await;
 
         assert!(result.is_ok(), "idle should end the request wait");
+    }
+
+    #[tokio::test]
+    async fn run_request_with_control_keeps_waiting_after_activity_until_idle_or_error() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+            tx.send(ControlEvent::Activity).expect("send activity");
+            tokio::time::sleep(Duration::from_millis(5)).await;
+            tx.send(ControlEvent::SessionError {
+                message: "Invalid API Key".to_string(),
+            })
+            .expect("send session error");
+        });
+
+        let result = run_request_with_control_timeout(
+            &mut future::ready(Ok::<(), ExecutorError>(())),
+            &mut rx,
+            tokio_util::sync::CancellationToken::new(),
+            Duration::from_millis(100),
+        )
+        .await;
+
+        let err = result.expect_err("session error after activity should fail request");
+        assert!(err.to_string().contains("Invalid API Key"));
     }
 
     #[tokio::test]

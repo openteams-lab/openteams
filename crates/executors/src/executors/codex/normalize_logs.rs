@@ -7,7 +7,8 @@ use std::{
 use codex_app_server_protocol::{
     CommandExecutionStatus, JSONRPCNotification, JSONRPCRequest, JSONRPCResponse,
     McpToolCallResult, McpToolCallStatus, PatchApplyStatus, PatchChangeKind, ServerNotification,
-    ServerRequest, ThreadItem, ThreadResumeResponse, ThreadStartResponse, TurnPlanStepStatus,
+    ServerRequest, ThreadItem, ThreadResumeResponse, ThreadStartResponse,
+    TurnCompletedNotification, TurnPlanStepStatus, TurnStatus,
 };
 use codex_protocol::{
     openai_models::ReasoningEffort,
@@ -1558,6 +1559,27 @@ fn handle_server_notification(
                     metadata: None,
                 },
             );
+        }
+        ServerNotification::TurnCompleted(TurnCompletedNotification { turn, .. }) => {
+            if matches!(turn.status, TurnStatus::Failed) {
+                let error_message = turn
+                    .error
+                    .as_ref()
+                    .map(|e| e.message.as_str())
+                    .unwrap_or("Agent turn failed with no error message");
+                add_normalized_entry(
+                    msg_store,
+                    entry_index,
+                    NormalizedEntry {
+                        timestamp: None,
+                        entry_type: NormalizedEntryType::ErrorMessage {
+                            error_type: NormalizedEntryError::Other,
+                        },
+                        content: error_message.to_string(),
+                        metadata: None,
+                    },
+                );
+            }
         }
         _ => {}
     }

@@ -285,6 +285,34 @@
         "close": "Cerrar editor del protocolo del equipo"
       }
     },
+    "teamPresetSnapshot": {
+      "open": "Guardar equipo",
+      "tooltip": "Guarda todos los miembros de IA de la lista actual como un equipo preestablecido y conserva también las directrices del equipo.",
+      "saved": "Se guardó el preajuste de equipo {{name}}.",
+      "overwritten": "Se actualizó el preajuste de equipo {{name}}.",
+      "membersSaved": "Miembros: {{names}}.",
+      "modal": {
+        "title": "Guardar equipo",
+        "description": "Guarda esta configuración de miembros de la sesión como un preajuste de equipo reutilizable.",
+        "dedupeHint": "Los miembros con nombres duplicados reciben automáticamente un sufijo numérico.",
+        "name": "Nombre",
+        "namePlaceholder": "Usar el título de la sesión",
+        "teamPresetId": "ID del preajuste",
+        "teamPresetIdPlaceholder": "delivery_team",
+        "descriptionLabel": "Descripción",
+        "descriptionPlaceholder": "Descripción opcional del preajuste",
+        "overwrite": "Sobrescribir el preajuste personalizado existente con el mismo ID",
+        "save": "Guardar preajuste",
+        "close": "Cerrar el cuadro de diálogo para guardar el preajuste de equipo"
+      },
+      "errors": {
+        "noMembers": "Añade miembros de IA antes de guardar un preajuste de equipo.",
+        "idRequired": "El ID del preajuste es obligatorio.",
+        "conflict": "Ya existe un preajuste de equipo con este ID. Cambia el nombre o el ID, o habilita la sobrescritura.",
+        "builtin": "Los preajustes de equipo integrados no se pueden sobrescribir.",
+        "save": "No se pudo guardar el preajuste de equipo."
+      }
+    },
     "importPreview": {
       "title": "Importar equipo: {{teamName}}",
       "description": "Los siguientes miembros se añadirán a esta sesión:",

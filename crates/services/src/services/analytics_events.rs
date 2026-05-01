@@ -89,6 +89,14 @@ pub enum DomainEvent {
         skill_name: String,
         source: SkillInstallSource,
     },
+    PresetSnapshotCreated {
+        session_id: Uuid,
+        actor_user_id: String,
+        team_preset_id: String,
+        member_count: usize,
+        overwritten: bool,
+        overwrite_strategy: String,
+    },
     AgentRunStarted {
         session_id: Uuid,
         agent_id: Uuid,
@@ -124,6 +132,7 @@ impl DomainEvent {
             Self::SkillEnabled { .. } => "skill_enabled",
             Self::SkillDisabled { .. } => "skill_disabled",
             Self::SkillInstalled { .. } => "skill_installed",
+            Self::PresetSnapshotCreated { .. } => "preset_snapshot_created",
             Self::AgentRunStarted { .. } => "agent_run_started",
             Self::AgentRunCompleted { .. } => "agent_run_completed",
             Self::AgentRunErrored { .. } => "agent_run_errored",
@@ -291,6 +300,26 @@ impl DomainEvent {
                     "skill_id": skill_id.to_string(),
                     "skill_name": skill_name,
                     "source": source.as_str()
+                }),
+            },
+            Self::PresetSnapshotCreated {
+                session_id,
+                actor_user_id,
+                team_preset_id,
+                member_count,
+                overwritten,
+                overwrite_strategy,
+            } => AnalyticsProjection {
+                ingest_path: "/chat/sessions/{session_id}/presets/snapshot",
+                event_type: "preset_snapshot_create",
+                event_category: AnalyticsEventCategory::UserAction,
+                user_id: Some(actor_user_id),
+                session_id: Some(session_id),
+                properties: json!({
+                    "team_preset_id": team_preset_id,
+                    "member_count": member_count,
+                    "overwritten": overwritten,
+                    "overwrite_strategy": overwrite_strategy
                 }),
             },
             Self::AgentRunStarted {

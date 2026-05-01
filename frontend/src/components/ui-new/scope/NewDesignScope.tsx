@@ -7,6 +7,7 @@ import NiceModal from '@ebay/nice-modal-react';
 import { useTheme } from '@/components/ThemeProvider';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { analytics } from '@/lib/analytics';
+import { ToastProvider } from '@/components/ui-new/containers/ToastContainer';
 import '@/styles/new/index.css';
 
 interface NewDesignScopeProps {
@@ -47,10 +48,12 @@ export function NewDesignScope({ children }: NewDesignScopeProps) {
               isTauriRuntime ? '' : 'new-design--browser-scale'
             }`}
           >
-            <SequenceTrackerProvider>
-              <SequenceIndicator />
-              <NiceModal.Provider>{children}</NiceModal.Provider>
-            </SequenceTrackerProvider>
+            <ToastProvider>
+              <SequenceTrackerProvider>
+                <SequenceIndicator />
+                <NiceModal.Provider>{children}</NiceModal.Provider>
+              </SequenceTrackerProvider>
+            </ToastProvider>
           </div>
         </PortalContainerContext.Provider>
       )}

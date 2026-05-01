@@ -289,6 +289,34 @@
         "close": "关闭团队协议编辑器"
       }
     },
+    "teamPresetSnapshot": {
+      "open": "保存团队",
+      "tooltip": "将当前列表中的所有AI成员保存为一个预设团队，团队准则也将被保留。",
+      "saved": "已保存团队预设 {{name}}。",
+      "overwritten": "已更新团队预设 {{name}}。",
+      "membersSaved": "成员：{{names}}。",
+      "modal": {
+        "title": "保存团队",
+        "description": "将当前会话成员配置保存为可复用的团队预设。",
+        "dedupeHint": "同名成员会自动追加序号。",
+        "name": "名称",
+        "namePlaceholder": "使用会话标题",
+        "teamPresetId": "预设 ID",
+        "teamPresetIdPlaceholder": "delivery_team",
+        "descriptionLabel": "描述",
+        "descriptionPlaceholder": "可选的预设描述",
+        "overwrite": "覆盖同 ID 的自定义预设",
+        "save": "保存预设",
+        "close": "关闭保存团队预设弹窗"
+      },
+      "errors": {
+        "noMembers": "请先添加 AI 成员，再保存团队预设。",
+        "idRequired": "预设 ID 为必填项。",
+        "conflict": "该 ID 的团队预设已存在。请修改名称或 ID，或启用覆盖。",
+        "builtin": "内置团队预设不可覆盖。",
+        "save": "保存团队预设失败。"
+      }
+    },
     "importPreview": {
       "title": "导入团队：{{teamName}}",
       "description": "以下成员将加入此会话：",

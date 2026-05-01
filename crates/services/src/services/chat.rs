@@ -933,6 +933,7 @@ async fn call_agent_for_summary(
         match tokio::time::timeout(SUMMARY_EXECUTION_TIMEOUT, exit_signal).await {
             Ok(Ok(ExecutorExitResult::Success)) => {}
             Ok(Ok(ExecutorExitResult::Failure)) => failed_by_signal = true,
+            Ok(Ok(ExecutorExitResult::FailureWithError(_))) => failed_by_signal = true,
             Ok(Err(err)) => {
                 tracing::warn!(
                     agent_name = %agent.name,
