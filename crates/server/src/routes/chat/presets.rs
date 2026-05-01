@@ -406,13 +406,13 @@ fn validate_member_id_conflicts(
     replaceable_member_ids: &HashSet<String>,
 ) -> Result<(), ApiError> {
     for member in members {
-        if let Some(existing) = presets.members.iter().find(|preset| preset.id == member.id) {
-            if existing.is_builtin || !replaceable_member_ids.contains(&existing.id) {
-                return Err(ApiError::Conflict(format!(
-                    "Member preset ID already exists: {}",
-                    member.id
-                )));
-            }
+        if let Some(existing) = presets.members.iter().find(|preset| preset.id == member.id)
+            && (existing.is_builtin || !replaceable_member_ids.contains(&existing.id))
+        {
+            return Err(ApiError::Conflict(format!(
+                "Member preset ID already exists: {}",
+                member.id
+            )));
         }
     }
     Ok(())
