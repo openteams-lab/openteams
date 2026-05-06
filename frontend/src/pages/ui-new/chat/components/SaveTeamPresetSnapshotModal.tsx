@@ -9,10 +9,17 @@ interface SaveTeamPresetSnapshotPayload {
   overwrite_strategy: 'fail_if_exists' | 'overwrite_custom';
 }
 
+export interface SaveTeamPresetInitialValues {
+  team_preset_id: string;
+  name: string;
+  description: string;
+}
+
 export interface SaveTeamPresetSnapshotModalProps {
   isOpen: boolean;
   isSaving?: boolean;
   error?: string | null;
+  initialValues?: SaveTeamPresetInitialValues | null;
   onClose: () => void;
   onSave: (
     payload: SaveTeamPresetSnapshotPayload
@@ -23,6 +30,7 @@ export function SaveTeamPresetSnapshotModal({
   isOpen,
   isSaving = false,
   error,
+  initialValues,
   onClose,
   onSave,
 }: SaveTeamPresetSnapshotModalProps) {
@@ -39,12 +47,19 @@ export function SaveTeamPresetSnapshotModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setTeamPresetId('');
-    setName('');
-    setDescription('');
-    setOverwriteCustom(false);
+    if (initialValues) {
+      setTeamPresetId(initialValues.team_preset_id);
+      setName(initialValues.name);
+      setDescription(initialValues.description);
+      setOverwriteCustom(true);
+    } else {
+      setTeamPresetId('');
+      setName('');
+      setDescription('');
+      setOverwriteCustom(false);
+    }
     setValidationError(null);
-  }, [isOpen]);
+  }, [isOpen, initialValues]);
 
   useEffect(() => {
     if (!isOpen) return;

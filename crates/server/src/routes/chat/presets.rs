@@ -225,7 +225,7 @@ fn build_preset_snapshot(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_string)
-        .unwrap_or_else(|| format!("Snapshot of chat session {}.", session.id));
+        .unwrap_or_default();
 
     let existing_team_index = presets.teams.iter().position(|preset| preset.id == team_id);
     let overwritten = existing_team_index.is_some();
@@ -541,6 +541,15 @@ mod tests {
         }
     }
 
+    fn snapshot_request_without_description(id: &str) -> CreatePresetSnapshotRequest {
+        CreatePresetSnapshotRequest {
+            team_preset_id: Some(id.to_string()),
+            name: Some("Delivery Team".to_string()),
+            description: None,
+            overwrite_strategy: Some(PresetSnapshotOverwriteStrategy::FailIfExists),
+        }
+    }
+
     #[test]
     fn build_preset_snapshot_creates_custom_members_and_team() {
         let session = test_session(true);
@@ -573,6 +582,22 @@ mod tests {
         );
         assert_eq!(presets.members.len(), 2);
         assert_eq!(presets.teams.len(), 1);
+    }
+
+    #[test]
+    fn build_preset_snapshot_keeps_blank_team_description_empty() {
+        let session = test_session(true);
+        let mut presets = test_presets();
+
+        let response = build_preset_snapshot(
+            &session,
+            vec![test_row("backend")],
+            snapshot_request_without_description("delivery"),
+            &mut presets,
+        )
+        .expect("snapshot succeeds");
+
+        assert_eq!(response.team.description, "");
     }
 
     #[test]
