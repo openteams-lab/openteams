@@ -59,6 +59,8 @@ In v0.4.0, we’ll be introducing a major update:
 <img width="1100" height="546" alt="Image" src="https://github.com/user-attachments/assets/be065bc4-f736-47a8-a989-05e5142264f8" />
 
 ### *Major updates*
+- **2026.05.07 (v0.3.22)**
+  - Supports saving members from a group chat session as a preset team with a single click
 - **2026.04.14 (v0.3.15)**
   - Workspace File Change Viewer
 - **2026.04.06 (v0.3.12)**

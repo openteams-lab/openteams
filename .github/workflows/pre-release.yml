@@ -348,9 +348,10 @@ jobs:
 
       - name: Install Zig
         if: runner.os == 'Linux' && !contains(matrix.target, 'windows')
-        uses: BloopAI/setup-zig@main
+        uses: mlugg/setup-zig@v2.2.1
         with:
           version: 0.15.2
+          cache-key: ${{ matrix.target }}
 
       - name: Install cargo zigbuild
         if: runner.os == 'Linux' && !contains(matrix.target, 'windows')

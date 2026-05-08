@@ -225,6 +225,14 @@ function getTeamIcon(teamId: string) {
   return teamRoleIcons[teamId] ?? UsersThreeIcon;
 }
 
+function getTeamPresetSnapshotFormDescription(
+  description: string,
+  sessionId: string
+) {
+  const legacySnapshotDescription = `Snapshot of chat session ${sessionId}.`;
+  return description.trim() === legacySnapshotDescription ? '' : description;
+}
+
 function MemberNameWithTooltip({ name }: { name: string }) {
   const textRef = useRef<HTMLDivElement | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
@@ -573,10 +581,10 @@ export function AiMembersSidebar({
   const [teamPresetSnapshotError, setTeamPresetSnapshotError] = useState<
     string | null
   >(null);
-  const [savedPresetInfo, setSavedPresetInfo] =
+  const [savedPresetInfoOverride, setSavedPresetInfoOverride] =
     useState<SaveTeamPresetInitialValues | null>(null);
   useEffect(() => {
-    setSavedPresetInfo(null);
+    setSavedPresetInfoOverride(null);
   }, [activeSessionId]);
   const [teamProtocolContent, setTeamProtocolContent] = useState('');
   const [teamProtocolEnabled, setTeamProtocolEnabled] = useState(false);
@@ -650,6 +658,33 @@ export function AiMembersSidebar({
     filteredMemberPresets.length > 0 || filteredTeamPresets.length > 0;
   const shouldShowExpandedTeams =
     isTeamPresetsExpanded || normalizedPresetSearch.length > 0;
+  const persistedSavedPresetInfo =
+    useMemo<SaveTeamPresetInitialValues | null>(() => {
+      if (!activeSessionId) return null;
+      const memberById = new Map(
+        enabledMemberPresets.map((member) => [member.id, member])
+      );
+      const sessionMemberMarker = `from chat session ${activeSessionId}.`;
+      const matchingTeam = enabledTeamPresets
+        .filter((team) => {
+          if (team.is_builtin) return false;
+          return team.member_ids.some((memberId) =>
+            memberById.get(memberId)?.description.includes(sessionMemberMarker)
+          );
+        })
+        .at(-1);
+
+      if (!matchingTeam) return null;
+      return {
+        team_preset_id: matchingTeam.id,
+        name: matchingTeam.name ?? '',
+        description: getTeamPresetSnapshotFormDescription(
+          matchingTeam.description ?? '',
+          activeSessionId
+        ),
+      };
+    }, [activeSessionId, enabledMemberPresets, enabledTeamPresets]);
+  const savedPresetInfo = savedPresetInfoOverride ?? persistedSavedPresetInfo;
 
   // When entering edit mode, switch to custom tab
   useEffect(() => {
@@ -765,7 +800,7 @@ export function AiMembersSidebar({
           queryClient.invalidateQueries({ queryKey: ['user-system'] }),
           queryClient.invalidateQueries({ queryKey: ['chatPresets'] }),
         ]);
-        setSavedPresetInfo({
+        setSavedPresetInfoOverride({
           team_preset_id: payload.team_preset_id,
           name: saved.team.name ?? '',
           description: saved.team.description ?? '',

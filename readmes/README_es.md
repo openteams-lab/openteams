@@ -43,7 +43,17 @@
 
 ---
 ## 🔥 *Novedades:*
+### Vista previa de funcionalidades
+En v0.4.0 introduciremos una actualización importante:
+- Estado actual: el modelo actual de colaboración libre basado en @mentions es demasiado abierto. Como las salidas de los Agents son inherentemente inciertas, la colaboración puede volverse inestable y la cadena de colaboración puede romperse en ciertos puntos.
+- Mejora: queremos introducir un modo de workflow para mejorar la eficiencia de la colaboración. Este modo usa una arquitectura de comunicación centralizada, similar a los Agent Teams de Claude. Cada tarea se convierte en un nodo de workflow y todos los nodos forman juntos un DAG de flujo de tareas. Un planificador independiente gestiona las transiciones de estado del workflow. Para tareas complejas, una sola ronda de planificación puede no satisfacer por completo los requisitos, por lo que el workflow debe admitir una segunda o incluso una tercera iteración. Para hacerlo posible, los workflows incluirán recuentos de iteración configurables y permitirán ver el historial de iteraciones.
+- Creemos que este cambio mejorará significativamente la utilidad práctica de OpenTeams. Mantente atento.
+
+<img width="1100" height="546" alt="Image" src="https://github.com/user-attachments/assets/be065bc4-f736-47a8-a989-05e5142264f8" />
+
 ### *Actualizaciones importantes*
+- **2026.05.07 (v0.3.22)**
+  - Permite guardar con un clic los miembros de una sesión de chat grupal como un equipo predefinido
 - **2026.04.14 (v0.3.15)**
   - Visor de cambios de archivos del espacio de trabajo
 - **2026.04.06 (v0.3.12)**
