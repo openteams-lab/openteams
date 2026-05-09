@@ -235,15 +235,11 @@ const panelFieldClassName = cn(
 const promptEditorClassName =
   'min-h-[280px] w-full resize-y rounded-[20px] border border-[#D8E2F0] bg-[#EEF3F9] px-5 py-4 font-mono text-[13px] leading-6 text-[#334155] outline-none transition-all duration-200 placeholder:text-[#94A3B8] focus:border-[#2563EB] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.18)] dark:border-[#2A3445] dark:bg-[#111926] dark:text-[#F3F6FB] dark:placeholder:text-[#7F8AA3] dark:focus:border-[#5EA2FF] dark:focus:shadow-[0_0_0_3px_rgba(94,162,255,0.15)]';
 
-const presetToolbarButtonClassName = cn(
-  settingsSecondaryButtonClassName,
-  'rounded-[12px] border-[#E2E8F0] bg-white px-4 py-[9px] text-[13px] font-medium text-[#475569] hover:bg-[#F8FAFC] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#BAC4D6] dark:hover:bg-[#1A2433]'
-);
+const presetToolbarButtonClassName =
+  'inline-flex items-center justify-center gap-2 rounded-[12px] border border-[#5094fb] bg-white px-4 py-[9px] text-[13px] font-medium text-[#5094fb] transition-colors duration-200 hover:bg-[#eef4ff] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#192233] dark:text-[#5ea2ff] dark:border-[#5ea2ff] dark:hover:bg-[rgba(94,162,255,0.1)]';
 
-const presetInlineActionButtonClassName = cn(
-  settingsSecondaryButtonClassName,
-  'rounded-[10px] border-[#E2E8F0] bg-white px-3 py-[5px] text-[11px] font-medium text-[#64748B] hover:bg-[#F8FAFC] dark:border-[#2A3445] dark:bg-[#192233] dark:text-[#BAC4D6] dark:hover:bg-[#1A2433]'
-);
+const presetInlineActionButtonClassName =
+  'inline-flex items-center justify-center gap-2 rounded-[10px] border border-[#5094fb] bg-white px-3 py-[5px] text-[11px] font-medium text-[#5094fb] transition-colors duration-200 hover:bg-[#eef4ff] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#192233] dark:text-[#5ea2ff] dark:border-[#5ea2ff] dark:hover:bg-[rgba(94,162,255,0.1)]';
 
 const presetDestructiveButtonClassName =
   'inline-flex items-center justify-center gap-2 rounded-[12px] px-4 py-[9px] text-[13px] font-medium transition-colors duration-200 border-[#fecaca] bg-[#fee2e2] text-[#b91c1c] hover:bg-[#fecaca] dark:border-[rgba(248,113,113,0.24)] dark:bg-[rgba(239,68,68,0.12)] dark:text-[#FCA5A5] dark:hover:bg-[rgba(239,68,68,0.18)] disabled:cursor-not-allowed disabled:opacity-50';

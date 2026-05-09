@@ -534,7 +534,7 @@ export function ChatWorkflowCard({
           <button
             type="button"
             onClick={() => onResume(projection.execution_id!)}
-            className="flex items-center gap-2 rounded-full bg-[#2563EB] px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#1D4ED8]"
+            className="flex items-center gap-2 rounded-full bg-[var(--chat-session-send-blue,#5094fb)] px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[var(--chat-session-send-blue-hover,#4084eb)]"
           >
             <PlayIcon className="size-4" weight="bold" />
             Resume

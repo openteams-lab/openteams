@@ -1247,7 +1247,7 @@ export function AiMembersSidebar({
   );
 
   const renderMemberFormPanel = () => (
-    <div className="chat-session-member-form-panel rounded-sm p-base space-y-half">
+    <div className="chat-session-member-form-panel rounded-sm px-1 py-base space-y-half" style={{ marginLeft: '-4px', marginRight: '-4px' }}>
       {!editingMember && (
         <div className="chat-session-member-form-tabs flex gap-1 rounded-xl p-1">
           <button
@@ -1335,9 +1335,9 @@ export function AiMembersSidebar({
             ) : null}
           </div>
         </div>
-        <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto px-base pb-base pt-half space-y-base">
+        <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto px-1.5 pb-base pt-half space-y-base">
           {activeSessionId && (
-            <section className="mb-1 overflow-hidden rounded-[12px] border border-[#dce6f2] bg-[#fbfdff] shadow-[0_8px_18px_rgba(148,163,184,0.08)] dark:border-[#2A3445] dark:bg-[rgba(18,24,35,0.84)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
+            <section className="mb-1 overflow-hidden rounded-[12px] border border-[#dce6f2] bg-[#f8fafc] dark:border-[#2A3445] dark:bg-[#192233]">
               <button
                 type="button"
                 className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[#f3f8ff] dark:hover:bg-[rgba(94,162,255,0.08)]"
