@@ -1,3 +1,4 @@
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use ts_rs::TS;
@@ -103,8 +104,8 @@ impl WorkflowTranscript {
         id: Uuid,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            "INSERT INTO chat_workflow_transcripts (id, execution_id, round_id, workflow_agent_session_id, step_id, sender_type, entry_type, content, meta_json)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "INSERT INTO chat_workflow_transcripts (id, execution_id, round_id, workflow_agent_session_id, step_id, sender_type, entry_type, content, meta_json, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              RETURNING *",
         )
         .bind(id)
@@ -116,6 +117,7 @@ impl WorkflowTranscript {
         .bind(&data.entry_type)
         .bind(&data.content)
         .bind(&data.meta_json)
+        .bind(Utc::now().to_rfc3339())
         .fetch_one(pool)
         .await
     }
@@ -137,9 +139,9 @@ impl WorkflowTranscript {
             r#"
             INSERT INTO chat_workflow_transcripts (
                 id, execution_id, round_id, workflow_agent_session_id, step_id,
-                sender_type, entry_type, content, meta_json
+                sender_type, entry_type, content, meta_json, created_at
             )
-            SELECT ?1, ?2, NULL, NULL, NULL, 'control', 'final_review', ?3, ?4
+            SELECT ?1, ?2, NULL, NULL, NULL, 'control', 'final_review', ?3, ?4, ?5
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM chat_workflow_transcripts
@@ -159,6 +161,7 @@ impl WorkflowTranscript {
         .bind(execution_id)
         .bind(content)
         .bind(&meta_json)
+        .bind(Utc::now().to_rfc3339())
         .fetch_optional(pool)
         .await?;
 

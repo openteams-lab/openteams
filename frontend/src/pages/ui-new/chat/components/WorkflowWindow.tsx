@@ -102,6 +102,27 @@ const REVIEW_READY_STEP_STATUSES = new Set([
   'cancelled',
 ]);
 
+function parseWorkflowTranscriptTime(createdAt: string): Date {
+  const trimmed = createdAt.trim();
+  const normalized =
+    /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(trimmed)
+      ? `${trimmed.replace(' ', 'T')}Z`
+      : trimmed;
+
+  return new Date(normalized);
+}
+
+function formatWorkflowLogTimestamp(createdAt: string): string {
+  const date = parseWorkflowTranscriptTime(createdAt);
+  if (Number.isNaN(date.getTime())) return '--:--:--';
+  return date.toLocaleTimeString(undefined, {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
 function mergeAndSortTranscriptEntries(
   primary: WorkflowTranscriptEntry[],
   secondary: WorkflowTranscriptEntry[]
@@ -116,8 +137,8 @@ function mergeAndSortTranscriptEntries(
   }
 
   return [...mergedMap.values()].sort((left, right) => {
-    const leftAt = Date.parse(left.created_at);
-    const rightAt = Date.parse(right.created_at);
+    const leftAt = parseWorkflowTranscriptTime(left.created_at).getTime();
+    const rightAt = parseWorkflowTranscriptTime(right.created_at).getTime();
     return (
       (Number.isNaN(leftAt) ? 0 : leftAt) -
       (Number.isNaN(rightAt) ? 0 : rightAt)
@@ -650,16 +671,6 @@ const hasFooterActions =
       transcriptEntries.filter((entry) => isWorkflowRuntimeThinkingEntry(entry)),
     [transcriptEntries]
   );
-  const formatLogTimestamp = (createdAt: string) => {
-    const date = new Date(createdAt);
-    if (Number.isNaN(date.getTime())) return '--:--:--';
-    return date.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  };
   const agentLogGroups = useMemo(
     () =>
       Array.from(
@@ -675,7 +686,7 @@ const hasFooterActions =
             .filter(Boolean)
             .map((line, index) => ({
               key: `${entry.id}-${index}`,
-              timestamp: formatLogTimestamp(entry.created_at),
+              timestamp: formatWorkflowLogTimestamp(entry.created_at),
               content: line,
               isError: /error|failed|fatal|exception/i.test(line),
             }));

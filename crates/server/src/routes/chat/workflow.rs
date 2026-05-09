@@ -7,6 +7,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Json as ResponseJson, Response},
 };
+use chrono::{DateTime, NaiveDateTime, Utc};
 use db::models::{
     chat_agent::ChatAgent,
     chat_message::ChatMessage,
@@ -1095,6 +1096,20 @@ pub struct WorkflowTranscriptQuery {
     pub workflow_agent_session_id: Option<Uuid>,
 }
 
+fn normalize_workflow_transcript_created_at(created_at: &str) -> String {
+    if let Ok(date_time) = DateTime::parse_from_rfc3339(created_at) {
+        return date_time.with_timezone(&Utc).to_rfc3339();
+    }
+
+    for format in ["%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S%.f"] {
+        if let Ok(naive) = NaiveDateTime::parse_from_str(created_at, format) {
+            return naive.and_utc().to_rfc3339();
+        }
+    }
+
+    created_at.to_string()
+}
+
 async fn list_transcript_response(
     pool: &sqlx::SqlitePool,
     session: &ChatSession,
@@ -1171,7 +1186,7 @@ async fn list_transcript_response(
                 entry_type: t.entry_type,
                 content: t.content,
                 meta_json: t.meta_json,
-                created_at: t.created_at,
+                created_at: normalize_workflow_transcript_created_at(&t.created_at),
                 agent_name,
             }
         })
