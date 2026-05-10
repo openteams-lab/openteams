@@ -70,6 +70,7 @@ export function useChatMutations(
       chatApi.updateSession(params.sessionId, {
         title: params.title,
         status: null,
+        lead_agent_id: null,
         summary_text: null,
         archive_ref: null,
         last_seen_diff_key: null,

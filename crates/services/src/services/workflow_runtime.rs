@@ -860,6 +860,37 @@ pub fn should_retry_workflow_protocol_parse_failure(raw_output: &str) -> bool {
     !raw_output.trim().is_empty()
 }
 
+/// Resolves the effective lead agent for a session.
+/// Returns (lead_agent, lead_session_agent) or error if no agents exist.
+///
+/// Resolution logic:
+/// 1. If `session.lead_agent_id` is set and references a valid agent in the session, use it.
+/// 2. Otherwise, fall back to the first session agent.
+/// 3. Return an error if the session has no agents.
+pub fn resolve_lead_agent<'a>(
+    session: &ChatSession,
+    session_agents: &'a [ChatSessionAgent],
+    agents: &'a [ChatAgent],
+) -> Result<(&'a ChatAgent, &'a ChatSessionAgent), WorkflowRuntimeError> {
+    // 1. Try explicit lead_agent_id
+    if let Some(lead_id) = session.lead_agent_id {
+        if let Some(sa) = session_agents.iter().find(|sa| sa.agent_id == lead_id) {
+            if let Some(agent) = agents.iter().find(|a| a.id == lead_id) {
+                return Ok((agent, sa));
+            }
+        }
+    }
+    // 2. Fallback to first session agent
+    let first_sa = session_agents
+        .first()
+        .ok_or_else(|| WorkflowRuntimeError::Validation("No agents in session".into()))?;
+    let agent = agents
+        .iter()
+        .find(|a| a.id == first_sa.agent_id)
+        .ok_or_else(|| WorkflowRuntimeError::Validation("Lead agent record not found".into()))?;
+    Ok((agent, first_sa))
+}
+
 pub fn resolve_workflow_goal(
     explicit_goal: Option<&str>,
     messages: &[ChatMessage],

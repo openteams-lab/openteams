@@ -35,7 +35,6 @@ import { toPrettyCase, replaceWhitespaceWithUnderscores } from '@/utils/string';
 import {
   SettingsField,
   settingsFieldClassName,
-  settingsSecondaryButtonClassName,
   SettingsSelect,
 } from '../dialogs/settings/SettingsComponents';
 import { useSettingsDirty } from '../dialogs/settings/SettingsDirtyContext';
@@ -627,6 +626,8 @@ export function ChatPresetsEditorPanel({
       teams: prev.teams.map((team) => ({
         ...team,
         member_ids: team.member_ids.filter((id) => id !== member.id),
+        lead_member_id:
+          team.lead_member_id === member.id ? undefined : team.lead_member_id,
       })),
     }));
   }, []);
@@ -1128,6 +1129,46 @@ export function ChatPresetsEditorPanel({
             />
           </SettingsField>
 
+          {selectedTeam.member_ids.length > 0 && (
+            <SettingsField
+              label={t('settings.presets.teams.fields.leadAgent', {
+                defaultValue: 'Lead Agent',
+              })}
+              description={t('settings.presets.teams.fields.leadAgentDescription', {
+                defaultValue: 'The member responsible for generating execution plans in workflow mode. Defaults to the first member if not set.',
+              })}
+            >
+              <SettingsSelect
+                value={selectedTeam.lead_member_id ?? ''}
+                options={[
+                  {
+                    value: '',
+                    label: t('settings.presets.teams.fields.leadAgentDefault', {
+                      defaultValue: 'Default (first member)',
+                    }),
+                  },
+                  ...selectedTeam.member_ids
+                    .map((memberId) => draft.members.find((m) => m.id === memberId))
+                    .filter((m): m is ChatMemberPreset => !!m)
+                    .map((member) => ({
+                      value: member.id,
+                      label: `@${getLocalizedMemberName(member)}`,
+                    })),
+                ]}
+                onChange={(value) =>
+                  updateTeam(selectedTeam.id, (current) => ({
+                    ...current,
+                    lead_member_id: value || undefined,
+                  }))
+                }
+                className={presetMemberSelectTriggerClassName}
+                contentClassName={presetMemberSelectContentClassName}
+                itemClassName={presetMemberSelectItemClassName}
+                selectedItemClassName={presetMemberSelectItemSelectedClassName}
+              />
+            </SettingsField>
+          )}
+
           <SettingsField
             label={
               <div className="flex items-center justify-between gap-3">
@@ -1186,9 +1227,14 @@ export function ChatPresetsEditorPanel({
                                     (id) => id !== member.id
                                   )
                                 : [...current.member_ids, member.id];
+                              const nextLeadMemberId =
+                                checked && current.lead_member_id === member.id
+                                  ? undefined
+                                  : current.lead_member_id;
                               return {
                                 ...current,
                                 member_ids: Array.from(new Set(nextIds)),
+                                lead_member_id: nextLeadMemberId,
                               };
                             })
                           }

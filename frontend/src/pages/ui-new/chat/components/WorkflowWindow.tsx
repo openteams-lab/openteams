@@ -17,6 +17,8 @@ import {
   FileText,
   ScrollText,
   Bot,
+  Crown,
+  Hand,
   RotateCcw,
   Ban,
   Settings,
@@ -108,6 +110,106 @@ const REVIEW_READY_STEP_STATUSES = new Set([
   'skipped',
   'cancelled',
 ]);
+
+function ReviewSwitch({
+  icon: Icon,
+  label,
+  tooltip,
+  checked,
+  onChange,
+}: {
+  icon: LucideIcon;
+  label: string;
+  tooltip: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        'group relative flex h-9 items-center justify-between gap-2 rounded-lg border px-2.5 text-left transition-all',
+        checked
+          ? 'border-[#5094fb]/30 bg-[#5094fb]/5'
+          : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'
+      )}
+    >
+      <span className="flex min-w-0 items-center gap-1.5">
+        <Icon
+          className={cn(
+            'h-3.5 w-3.5 shrink-0',
+            checked ? 'text-[#5094fb]' : 'text-slate-400'
+          )}
+        />
+        <span className="truncate text-xs font-semibold text-slate-700">
+          {label}
+        </span>
+      </span>
+      <span
+        className={cn(
+          'relative h-4 w-7 shrink-0 rounded-full transition-colors',
+          checked ? 'bg-[#5094fb]' : 'bg-slate-200'
+        )}
+      >
+        <span
+          className={cn(
+            'absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
+            checked ? 'translate-x-3.5' : 'translate-x-0.5'
+          )}
+        />
+      </span>
+      <span className="pointer-events-none absolute left-0 top-full z-[90] mt-1 hidden max-w-[240px] rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium leading-4 text-slate-900 shadow-lg group-hover:block">
+        {tooltip}
+      </span>
+    </button>
+  );
+}
+
+function ReviewSettingTooltipText({
+  text,
+  className,
+  tooltipClassName,
+}: {
+  text: string;
+  className: string;
+  tooltipClassName?: string;
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const handleMouseEnter = useCallback(() => {
+    const element = contentRef.current;
+    if (!element) return;
+    setShowTooltip(
+      element.scrollWidth > element.clientWidth ||
+        element.scrollHeight > element.clientHeight
+    );
+  }, []);
+
+  return (
+    <div
+      className="relative min-w-0"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <div ref={contentRef} className={className}>
+        {text}
+      </div>
+      {showTooltip && (
+        <div
+          className={cn(
+            'pointer-events-none absolute left-0 top-full z-[90] mt-1 max-w-[320px] rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium leading-4 text-slate-900 shadow-lg',
+            tooltipClassName
+          )}
+        >
+          {text}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function parseWorkflowTranscriptTime(createdAt: string): Date {
   const trimmed = createdAt.trim();
@@ -1986,85 +2088,88 @@ export function WorkflowWindow({
       {/* Main Content Area */}
       <div className="relative flex-1 overflow-hidden flex">
         {isReviewSettingsOpen && (
-          <div className="absolute right-6 top-6 z-[70] w-[360px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-              <div>
-                <div className="text-sm font-semibold text-slate-900">
-                  Review settings
+          <div className="absolute right-6 top-6 z-[70] w-[400px] overflow-hidden rounded-xl border border-slate-100/70 bg-white shadow-xl flex flex-col">
+            <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4 bg-slate-50">
+              <div className="pr-4">
+                <div className="text-sm font-semibold text-slate-900 mb-1">
+                  Review Settings
                 </div>
-                <div className="text-[11px] text-slate-500">
-                  Configure task reviews and workflow loop user reviews.
+                <div className="text-xs text-slate-500 leading-relaxed">
+                  Choose who should review each workflow result.
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsReviewSettingsOpen(false)}
-                className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                className="mt-0.5 shrink-0 rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
                 aria-label="Close review settings"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="max-h-[420px] overflow-y-auto px-4 py-3">
+            <div className="max-h-[500px] overflow-y-auto p-4 flex flex-col gap-6">
               {taskReviewSettingsRows.length > 0 && (
                 <div>
-                  <div className="grid grid-cols-[1fr_76px_76px] gap-2 border-b border-slate-100 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <span>Task step</span>
-                    <span className="text-center">Lead</span>
-                    <span className="text-center">User</span>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-800">
+                      Task Steps
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Lead / User review
+                    </div>
                   </div>
-                  <div className="divide-y divide-slate-100">
+                  <div className="flex flex-col gap-3">
                     {taskReviewSettingsRows.map((row) => {
                       const draft = reviewSettingsDraft[row.stepId] ?? {
                         leadReview: row.leadReview,
                         userReview: row.userReview,
                       };
+
                       return (
                         <div
                           key={row.stepId}
-                          className="grid grid-cols-[1fr_76px_76px] items-center gap-2 py-3"
+                          className="flex flex-col gap-2.5 rounded-lg border border-slate-100 bg-white p-3"
                         >
-                          <div className="min-w-0">
-                            <div className="group relative min-w-0">
-                              <div className="truncate text-xs font-semibold text-slate-800">
-                                {row.title}
-                              </div>
-                              <div className="pointer-events-none absolute left-0 top-full z-[90] mt-1 hidden max-w-[280px] rounded-md bg-slate-900 px-2.5 py-1.5 text-[9px] font-medium leading-4 text-white shadow-lg group-hover:block">
-                                {row.title}
-                              </div>
-                            </div>
-                            <div className="mt-0.5 text-[10px] uppercase tracking-wider text-slate-400">
-                              {row.stepType}
-                            </div>
-                          </div>
-                          <label className="flex justify-center">
-                            <input
-                              type="checkbox"
+                          <ReviewSettingTooltipText
+                            text={row.title}
+                            className="truncate text-sm font-semibold text-slate-800"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <ReviewSwitch
+                              icon={Crown}
+                              label="Lead"
+                              tooltip={
+                                draft.leadReview
+                                  ? '关闭此任务节点的主Agent审核'
+                                  : '开启此任务节点的主Agent审核'
+                              }
                               checked={draft.leadReview}
-                              onChange={(event) =>
+                              onChange={(checked) =>
                                 updateReviewSettingDraft(
                                   row.stepId,
                                   'leadReview',
-                                  event.target.checked
+                                  checked
                                 )
                               }
-                              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                             />
-                          </label>
-                          <label className="flex justify-center">
-                            <input
-                              type="checkbox"
+                            <ReviewSwitch
+                              icon={Hand}
+                              label="User"
+                              tooltip={
+                                draft.userReview
+                                  ? '关闭此任务节点的用户审核'
+                                  : '开启此任务节点的用户审核'
+                              }
                               checked={draft.userReview}
-                              onChange={(event) =>
+                              onChange={(checked) =>
                                 updateReviewSettingDraft(
                                   row.stepId,
                                   'userReview',
-                                  event.target.checked
+                                  checked
                                 )
                               }
-                              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                             />
-                          </label>
+                          </div>
                         </div>
                       );
                     })}
@@ -2073,14 +2178,16 @@ export function WorkflowWindow({
               )}
 
               {loopReviewSettingsRows.length > 0 && (
-                <div
-                  className={taskReviewSettingsRows.length > 0 ? 'mt-5' : ''}
-                >
-                  <div className="grid grid-cols-[1fr_76px] gap-2 border-b border-slate-100 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <span>Workflow loop</span>
-                    <span className="text-center">User</span>
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-800">
+                      Workflow Loops
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      User review only
+                    </div>
                   </div>
-                  <div className="divide-y divide-slate-100">
+                  <div className="flex flex-col gap-3">
                     {loopReviewSettingsRows.map((row) => {
                       const draft = reviewSettingsDraft[row.stepId] ?? {
                         leadReview: false,
@@ -2089,40 +2196,38 @@ export function WorkflowWindow({
                       return (
                         <div
                           key={row.stepId}
-                          className="grid grid-cols-[1fr_76px] items-center gap-2 py-3"
+                          className="flex flex-col gap-2.5 rounded-lg border border-slate-100 bg-white p-3"
                         >
-                          <div className="min-w-0">
-                            <div className="group relative min-w-0">
-                              <div className="truncate text-xs font-semibold text-slate-800">
-                                {row.title}
-                              </div>
-                              <div className="pointer-events-none absolute left-0 top-full z-[90] mt-1 hidden max-w-[280px] rounded-md bg-slate-900 px-2.5 py-1.5 text-[9px] font-medium leading-4 text-white shadow-lg group-hover:block">
-                                {row.title}
-                              </div>
-                            </div>
-                            <div className="group relative mt-0.5 min-w-0">
-                              <div className="truncate text-[10px] uppercase tracking-wider text-slate-400">
-                                {row.description}
-                              </div>
-                              <div className="pointer-events-none absolute left-0 top-full z-[90] mt-1 hidden max-w-[300px] rounded-md bg-slate-900 px-2.5 py-1.5 text-[9px] font-medium normal-case leading-4 tracking-normal text-white shadow-lg group-hover:block">
-                                {row.description}
-                              </div>
-                            </div>
+                          <div>
+                            <ReviewSettingTooltipText
+                              text={row.title}
+                              className="truncate text-sm font-semibold text-slate-800"
+                            />
+                            <ReviewSettingTooltipText
+                              text={row.description}
+                              className="mt-0.5 line-clamp-2 text-[11px] text-slate-400"
+                              tooltipClassName="max-w-[340px]"
+                            />
                           </div>
-                          <label className="flex justify-center">
-                            <input
-                              type="checkbox"
+                          <div className="grid grid-cols-1 gap-2">
+                            <ReviewSwitch
+                              icon={Hand}
+                              label="User"
+                              tooltip={
+                                draft.userReview
+                                  ? '关闭此工作流循环的用户审核'
+                                  : '开启此工作流循环的用户审核'
+                              }
                               checked={draft.userReview}
-                              onChange={(event) =>
+                              onChange={(checked) =>
                                 updateReviewSettingDraft(
                                   row.stepId,
                                   'userReview',
-                                  event.target.checked
+                                  checked
                                 )
                               }
-                              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                             />
-                          </label>
+                          </div>
                         </div>
                       );
                     })}
@@ -2130,11 +2235,11 @@ export function WorkflowWindow({
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-200 px-4 py-3">
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4">
               <button
                 type="button"
                 onClick={() => setIsReviewSettingsOpen(false)}
-                className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
               >
                 Cancel
               </button>
@@ -2142,9 +2247,9 @@ export function WorkflowWindow({
                 type="button"
                 onClick={handleSaveReviewSettings}
                 disabled={!projection.execution_id || !onUpdateReviewSettings}
-                className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-md bg-[#5094fb] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#4080e0] disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
               >
-                Save
+                Save Changes
               </button>
             </div>
           </div>

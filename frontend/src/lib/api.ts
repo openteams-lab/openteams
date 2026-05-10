@@ -832,6 +832,23 @@ export const chatApi = {
     return handleApiResponse<ChatSession>(response);
   },
 
+  updateSessionLead: async (
+    sessionId: string,
+    leadAgentId: string | null
+  ): Promise<ChatSession> => {
+    return chatApi.updateSession(sessionId, {
+      title: null,
+      status: null,
+      lead_agent_id: leadAgentId,
+      summary_text: null,
+      archive_ref: null,
+      last_seen_diff_key: null,
+      team_protocol: null,
+      team_protocol_enabled: null,
+      default_workspace_path: null,
+    });
+  },
+
   markDiffSeen: async (
     sessionId: string,
     diffKey: string
@@ -841,6 +858,7 @@ export const chatApi = {
       body: JSON.stringify({
         title: null,
         status: null,
+        lead_agent_id: null,
         summary_text: null,
         archive_ref: null,
         last_seen_diff_key: diffKey,

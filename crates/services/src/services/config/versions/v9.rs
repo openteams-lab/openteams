@@ -120,6 +120,9 @@ pub struct ChatTeamPreset {
     pub description: String,
     /// List of member preset IDs to include in this team
     pub member_ids: Vec<String>,
+    /// Optional ID of the lead member preset (references a member in member_ids)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lead_member_id: Option<String>,
     /// Optional team protocol injected when importing this team preset
     #[serde(default)]
     pub team_protocol: String,

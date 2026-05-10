@@ -632,6 +632,41 @@ impl WorkflowOrchestrator {
                 "step_waiting_review",
             )
             .await?;
+
+            if !waiting_review_step.lead_review_required {
+                if waiting_review_step.user_review_required {
+                    match Self::wait_for_step_user_review_stub(
+                        pool,
+                        chat_runner,
+                        execution,
+                        &waiting_review_step,
+                        workflow_session,
+                        &persisted.result,
+                    )
+                    .await?
+                    {
+                        StepUserReviewResolution::Parked => return Ok(StepOutcome::Parked),
+                        StepUserReviewResolution::Approved { .. }
+                        | StepUserReviewResolution::Rejected { .. } => {
+                            return Err(OrchestratorError::IllegalTransition(
+                                "step user review resolved synchronously".to_string(),
+                            ));
+                        }
+                    }
+                }
+
+                Self::transition_step_and_sync(
+                    pool,
+                    chat_runner,
+                    execution,
+                    &waiting_review_step,
+                    WorkflowStepStatus::Completed,
+                    "step_completed",
+                )
+                .await?;
+                return Ok(StepOutcome::Completed);
+            }
+
             Self::emit_step_domain_event(
                 pool,
                 execution,
@@ -1462,21 +1497,26 @@ impl WorkflowOrchestrator {
             }
         };
 
+        let latest_running_step = WorkflowStep::find_by_id(pool, running_step.id)
+            .await?
+            .unwrap_or_else(|| running_step.clone());
+
         match protocol_message {
             WorkflowStepProtocolMessage::FinalResult {
                 summary,
                 content,
                 outputs,
                 ..
-            } if running_step.step_type == WorkflowStepType::Task
-                && running_step.lead_review_required =>
+            } if latest_running_step.step_type == WorkflowStepType::Task
+                && (latest_running_step.lead_review_required
+                    || latest_running_step.user_review_required) =>
             {
                 Self::execute_step_with_feedback(
                     db,
                     pool,
                     chat_runner,
                     execution,
-                    &running_step,
+                    &latest_running_step,
                     workflow_session,
                     session,
                     session_agent,

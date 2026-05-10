@@ -18,6 +18,7 @@ pub struct ChatSession {
     pub id: Uuid,
     pub title: Option<String>,
     pub status: ChatSessionStatus,
+    pub lead_agent_id: Option<Uuid>,
     pub summary_text: Option<String>,
     pub archive_ref: Option<String>,
     pub last_seen_diff_key: Option<String>,
@@ -39,6 +40,7 @@ pub struct CreateChatSession {
 pub struct UpdateChatSession {
     pub title: Option<String>,
     pub status: Option<ChatSessionStatus>,
+    pub lead_agent_id: Option<Option<Uuid>>,
     pub summary_text: Option<String>,
     pub archive_ref: Option<String>,
     pub last_seen_diff_key: Option<String>,
@@ -58,6 +60,7 @@ impl ChatSession {
                 r#"SELECT id as "id!: Uuid",
                           title,
                           status as "status!: ChatSessionStatus",
+                          lead_agent_id as "lead_agent_id: Uuid",
                           summary_text,
                           archive_ref,
                           last_seen_diff_key,
@@ -80,6 +83,7 @@ impl ChatSession {
                 r#"SELECT id as "id!: Uuid",
                           title,
                           status as "status!: ChatSessionStatus",
+                          lead_agent_id as "lead_agent_id: Uuid",
                           summary_text,
                           archive_ref,
                           last_seen_diff_key,
@@ -105,6 +109,7 @@ impl ChatSession {
             r#"SELECT id as "id!: Uuid",
                       title,
                       status as "status!: ChatSessionStatus",
+                      lead_agent_id as "lead_agent_id: Uuid",
                       summary_text,
                       archive_ref,
                       last_seen_diff_key,
@@ -134,6 +139,7 @@ impl ChatSession {
                RETURNING id as "id!: Uuid",
                          title,
                          status as "status!: ChatSessionStatus",
+                         lead_agent_id as "lead_agent_id: Uuid",
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
@@ -163,6 +169,10 @@ impl ChatSession {
 
         let title = data.title.clone().or(existing.title);
         let status = data.status.clone().unwrap_or(existing.status);
+        let lead_agent_id = match &data.lead_agent_id {
+            Some(value) => value.clone(), // Some(Some(uuid)) = set, Some(None) = clear
+            None => existing.lead_agent_id, // Not provided, keep existing
+        };
         let summary_text = data.summary_text.clone().or(existing.summary_text);
         let archive_ref = data.archive_ref.clone().or(existing.archive_ref);
         let last_seen_diff_key = data
@@ -189,18 +199,20 @@ impl ChatSession {
             r#"UPDATE chat_sessions
                SET title = $2,
                    status = $3,
-                   summary_text = $4,
-                   archive_ref = $5,
-                   last_seen_diff_key = $6,
-                   team_protocol = $7,
-                   team_protocol_enabled = $8,
-                   archived_at = $9,
-                   default_workspace_path = $10,
+                   lead_agent_id = $4,
+                   summary_text = $5,
+                   archive_ref = $6,
+                   last_seen_diff_key = $7,
+                   team_protocol = $8,
+                   team_protocol_enabled = $9,
+                   archived_at = $10,
+                   default_workspace_path = $11,
                    updated_at = datetime('now', 'subsec')
                WHERE id = $1
                RETURNING id as "id!: Uuid",
                          title,
                          status as "status!: ChatSessionStatus",
+                         lead_agent_id as "lead_agent_id: Uuid",
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
@@ -213,6 +225,7 @@ impl ChatSession {
             id,
             title,
             status,
+            lead_agent_id,
             summary_text,
             archive_ref,
             last_seen_diff_key,

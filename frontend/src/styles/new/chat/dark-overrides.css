@@ -638,6 +638,12 @@
     filter: brightness(1.02) saturate(1.02);
   }
 
+  .new-design.dark .chat-session-member-lead-icon,
+  .dark .new-design .chat-session-member-lead-icon {
+    color: #fbbf24;
+    filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.4));
+  }
+
   .new-design.dark .chat-session-member-card:hover,
   .dark .new-design .chat-session-member-card:hover,
   .new-design.dark .chat-session-member-card:focus-within,

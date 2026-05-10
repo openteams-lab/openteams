@@ -88,6 +88,20 @@ pub async fn update_session(
     State(deployment): State<DeploymentImpl>,
     Json(payload): Json<UpdateChatSession>,
 ) -> Result<ResponseJson<ApiResponse<ChatSession>>, ApiError> {
+    // Validate lead_agent_id if provided
+    if let Some(Some(lead_agent_id)) = &payload.lead_agent_id {
+        let session_agents =
+            ChatSessionAgent::find_all_for_session(&deployment.db().pool, session.id).await?;
+        let agent_exists = session_agents
+            .iter()
+            .any(|sa| sa.agent_id == *lead_agent_id);
+        if !agent_exists {
+            return Err(ApiError::BadRequest(
+                "Agent is not a member of this session".to_string(),
+            ));
+        }
+    }
+
     let updated = ChatSession::update(&deployment.db().pool, session.id, &payload).await?;
     Ok(ResponseJson(ApiResponse::success(updated)))
 }
@@ -1381,12 +1395,32 @@ pub async fn delete_session_agent(
 
     let rows = ChatSessionAgent::delete(&deployment.db().pool, existing.id).await?;
     if rows == 0 {
-        Err(ApiError::BadRequest(
+        return Err(ApiError::BadRequest(
             "Chat session agent not found".to_string(),
-        ))
-    } else {
-        Ok(ResponseJson(ApiResponse::success(())))
+        ));
     }
+
+    // If the removed agent was the lead, reset lead_agent_id to the first remaining agent
+    if session.lead_agent_id == Some(existing.agent_id) {
+        let remaining_agents =
+            ChatSessionAgent::find_all_for_session(&deployment.db().pool, session.id).await?;
+        let new_lead_agent_id = remaining_agents.first().map(|sa| sa.agent_id);
+
+        let update = UpdateChatSession {
+            title: None,
+            status: None,
+            lead_agent_id: Some(new_lead_agent_id),
+            summary_text: None,
+            archive_ref: None,
+            last_seen_diff_key: None,
+            team_protocol: None,
+            team_protocol_enabled: None,
+            default_workspace_path: None,
+        };
+        ChatSession::update(&deployment.db().pool, session.id, &update).await?;
+    }
+
+    Ok(ResponseJson(ApiResponse::success(())))
 }
 
 pub async fn archive_session(
@@ -1420,6 +1454,7 @@ pub async fn archive_session(
         &UpdateChatSession {
             title: None,
             status: Some(ChatSessionStatus::Archived),
+            lead_agent_id: None,
             summary_text: None,
             archive_ref: Some(archive_ref),
             last_seen_diff_key: None,
@@ -1465,6 +1500,7 @@ pub async fn restore_session(
         &UpdateChatSession {
             title: None,
             status: Some(ChatSessionStatus::Active),
+            lead_agent_id: None,
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
@@ -1718,6 +1754,7 @@ mod tests {
             id: Uuid::new_v4(),
             title: Some("Test Session".to_string()),
             status: ChatSessionStatus::Active,
+            lead_agent_id: None,
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,

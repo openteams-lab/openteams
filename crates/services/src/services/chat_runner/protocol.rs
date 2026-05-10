@@ -927,7 +927,7 @@ impl ChatRunner {
             workflow_orchestrator::WorkflowOrchestrator,
             workflow_runtime::{
                 WorkflowCardAgent, WorkflowCardState, build_plan_generation_prompt,
-                extract_json_payload, run_workflow_agent_prompt,
+                extract_json_payload, resolve_lead_agent, run_workflow_agent_prompt,
             },
             workflow_validator,
         };
@@ -950,11 +950,10 @@ impl ChatRunner {
             }
         }
 
-        let lead_session_agent = &session_agents[0];
-        let lead_agent = agents
-            .iter()
-            .find(|agent| agent.id == lead_session_agent.agent_id)
-            .ok_or_else(|| ChatRunnerError::AgentNotFound("lead agent not found".to_string()))?;
+        let (lead_agent, lead_session_agent) =
+            resolve_lead_agent(&session, &session_agents, &agents).map_err(|err| {
+                ChatRunnerError::AgentNotFound(format!("lead agent resolution failed: {err}"))
+            })?;
         let lead_agent_id = lead_agent.id.to_string();
         let available_agents: Vec<WorkflowCardAgent> = session_agents
             .iter()

@@ -182,7 +182,6 @@ export function MessageInputArea({
   onSend,
   onToggleChatInputMode,
   isWorkflowMode,
-  leadAgentName,
   isArchived,
   activeSessionId,
 }: MessageInputAreaProps) {

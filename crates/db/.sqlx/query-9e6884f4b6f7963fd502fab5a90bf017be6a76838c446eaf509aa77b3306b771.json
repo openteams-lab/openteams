@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: Uuid\",\n                          title,\n                          status as \"status!: ChatSessionStatus\",\n                          summary_text,\n                          archive_ref,\n                          last_seen_diff_key,\n                          team_protocol,\n                          team_protocol_enabled as \"team_protocol_enabled!: bool\",\n                          default_workspace_path,\n                          created_at as \"created_at!: DateTime<Utc>\",\n                          updated_at as \"updated_at!: DateTime<Utc>\",\n                          archived_at as \"archived_at: DateTime<Utc>\"\n                   FROM chat_sessions\n                   WHERE status = $1\n                   ORDER BY updated_at DESC",
+  "query": "SELECT id as \"id!: Uuid\",\n                      title,\n                      status as \"status!: ChatSessionStatus\",\n                      lead_agent_id as \"lead_agent_id: Uuid\",\n                      summary_text,\n                      archive_ref,\n                      last_seen_diff_key,\n                      team_protocol,\n                      team_protocol_enabled as \"team_protocol_enabled!: bool\",\n                      default_workspace_path,\n                      created_at as \"created_at!: DateTime<Utc>\",\n                      updated_at as \"updated_at!: DateTime<Utc>\",\n                      archived_at as \"archived_at: DateTime<Utc>\"\n               FROM chat_sessions\n               WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -19,48 +19,53 @@
         "type_info": "Text"
       },
       {
-        "name": "summary_text",
+        "name": "lead_agent_id: Uuid",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "archive_ref",
+        "name": "summary_text",
         "ordinal": 4,
         "type_info": "Text"
       },
       {
-        "name": "last_seen_diff_key",
+        "name": "archive_ref",
         "ordinal": 5,
         "type_info": "Text"
       },
       {
-        "name": "team_protocol",
+        "name": "last_seen_diff_key",
         "ordinal": 6,
         "type_info": "Text"
       },
       {
-        "name": "team_protocol_enabled!: bool",
+        "name": "team_protocol",
         "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "team_protocol_enabled!: bool",
+        "ordinal": 8,
         "type_info": "Integer"
       },
       {
         "name": "default_workspace_path",
-        "ordinal": 8,
-        "type_info": "Text"
-      },
-      {
-        "name": "created_at!: DateTime<Utc>",
         "ordinal": 9,
         "type_info": "Text"
       },
       {
-        "name": "updated_at!: DateTime<Utc>",
+        "name": "created_at!: DateTime<Utc>",
         "ordinal": 10,
         "type_info": "Text"
       },
       {
-        "name": "archived_at: DateTime<Utc>",
+        "name": "updated_at!: DateTime<Utc>",
         "ordinal": 11,
+        "type_info": "Text"
+      },
+      {
+        "name": "archived_at: DateTime<Utc>",
+        "ordinal": 12,
         "type_info": "Text"
       }
     ],
@@ -77,10 +82,11 @@
       true,
       true,
       true,
+      true,
       false,
       false,
       true
     ]
   },
-  "hash": "c29f6e45cd9be62fcfda8506879e63b353b6bd7cfebc17ddb1534c335ef9d9ab"
+  "hash": "9e6884f4b6f7963fd502fab5a90bf017be6a76838c446eaf509aa77b3306b771"
 }

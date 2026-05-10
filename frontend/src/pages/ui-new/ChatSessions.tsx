@@ -682,8 +682,8 @@ export function ChatSessions() {
     Record<string, ChatInputMode>
   >({});
   const activeChatInputMode: ChatInputMode = activeSessionId
-    ? (chatInputModeBySessionId[activeSessionId] ?? 'free')
-    : 'free';
+    ? (chatInputModeBySessionId[activeSessionId] ?? 'workflow')
+    : 'workflow';
   const isWorkflowInputMode = activeChatInputMode === 'workflow';
   const visibleMessagesData = useMemo(() => messagesData, [messagesData]);
   const visibleWorkItemsData = useMemo(() => workItemsData, [workItemsData]);
@@ -1781,8 +1781,8 @@ export function ChatSessions() {
   >(null);
   const [teamImportName, setTeamImportName] = useState<string | null>(null);
   const [teamImportLeadMemberId, setTeamImportLeadMemberId] = useState<
-    string | null
-  >(null);
+    string | null | undefined
+  >(undefined);
   const [teamImportProtocol, setTeamImportProtocol] = useState<string | null>(
     null
   );
@@ -1916,7 +1916,7 @@ export function ChatSessions() {
     setPromptFileLoading(false);
     setTeamImportPlan(null);
     setTeamImportName(null);
-    setTeamImportLeadMemberId(null);
+    setTeamImportLeadMemberId(undefined);
   }, [activeSessionId, resetDiffViewer]);
 
   useEffect(() => {
@@ -4024,7 +4024,7 @@ export function ChatSessions() {
       }
 
       setTeamImportName(getLocalizedMemberPresetName(preset, t));
-      setTeamImportLeadMemberId(null);
+      setTeamImportLeadMemberId(undefined);
       setTeamImportProtocol(null);
       setTeamImportPlan([plan]);
       setMemberError(null);
@@ -4151,7 +4151,7 @@ export function ChatSessions() {
       setMemberError(t('members.importPreview.errors.nothingToImport'));
       setTeamImportPlan(null);
       setTeamImportName(null);
-      setTeamImportLeadMemberId(null);
+      setTeamImportLeadMemberId(undefined);
       setTeamImportProtocol(null);
       return;
     }
@@ -4185,38 +4185,27 @@ export function ChatSessions() {
       }
       const presetToAgentMap = await importMembersFromPlan(preparedPlan);
 
-      // Set lead_agent_id from team preset's lead_member_id
-      if (teamImportLeadMemberId && presetToAgentMap.size > 0) {
-        const leadAgentId = presetToAgentMap.get(teamImportLeadMemberId);
-        if (leadAgentId) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await chatApi.updateSession(activeSessionId, {
-            lead_agent_id: leadAgentId,
-          } as any);
-        } else {
-          // Fallback to first imported member if lead_member_id not found
-          const firstAgentId = presetToAgentMap.values().next().value;
-          if (firstAgentId) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await chatApi.updateSession(activeSessionId, {
-              lead_agent_id: firstAgentId,
-            } as any);
-          }
+      // Set lead_agent_id from team preset's lead_member_id.
+      // teamImportLeadMemberId === undefined means single member import (don't change lead).
+      // teamImportLeadMemberId === null means team import without explicit lead (fall back to first).
+      // teamImportLeadMemberId === string means team import with explicit lead.
+      if (teamImportLeadMemberId !== undefined && presetToAgentMap.size > 0) {
+        let leadAgentId: string | undefined;
+        if (teamImportLeadMemberId) {
+          leadAgentId = presetToAgentMap.get(teamImportLeadMemberId);
         }
-      } else if (presetToAgentMap.size > 0) {
-        // No lead_member_id set - fall back to first member
-        const firstAgentId = presetToAgentMap.values().next().value;
-        if (firstAgentId) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await chatApi.updateSession(activeSessionId, {
-            lead_agent_id: firstAgentId,
-          } as any);
+        // Fall back to first imported member if lead_member_id is null or not found
+        if (!leadAgentId) {
+          leadAgentId = presetToAgentMap.values().next().value;
+        }
+        if (leadAgentId) {
+          await chatApi.updateSessionLead(activeSessionId, leadAgentId);
         }
       }
 
       setTeamImportPlan(null);
       setTeamImportName(null);
-      setTeamImportLeadMemberId(null);
+      setTeamImportLeadMemberId(undefined);
       setTeamImportProtocol(null);
       setIsAddMemberOpen(false);
     } catch (error) {
@@ -4247,7 +4236,7 @@ export function ChatSessions() {
     if (isImportingTeam) return;
     setTeamImportPlan(null);
     setTeamImportName(null);
-    setTeamImportLeadMemberId(null);
+    setTeamImportLeadMemberId(undefined);
     setTeamImportProtocol(null);
   }, [isImportingTeam]);
 
@@ -5435,6 +5424,8 @@ export function ChatSessions() {
             width={rightSidebarWidth}
             isPanelOpen={isRightSidebarOpen}
             onTogglePanel={() => setIsRightSidebarOpen((prev) => !prev)}
+            leadAgentId={activeSession?.lead_agent_id ?? null}
+            isWorkflowMode={isWorkflowInputMode}
             isAddMemberOpen={isAddMemberOpen}
             editingMember={editingMember}
             newMemberName={newMemberName}

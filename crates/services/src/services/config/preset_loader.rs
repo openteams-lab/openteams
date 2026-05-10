@@ -862,6 +862,7 @@ impl PresetLoader {
             name: frontmatter.name,
             description: frontmatter.description,
             member_ids,
+            lead_member_id: None,
             team_protocol: body.trim().to_string(),
             is_builtin: true,
             enabled: true,
