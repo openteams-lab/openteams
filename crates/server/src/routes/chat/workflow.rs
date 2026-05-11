@@ -253,7 +253,7 @@ pub async fn generate_plan_and_run(
         )
         .await
         {
-            tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed");
+            tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed when running plan");
         }
     });
 
@@ -446,7 +446,7 @@ pub async fn execute_plan(
         )
         .await
         {
-            tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed");
+            tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed when executing plan");
         }
     });
 
@@ -702,7 +702,7 @@ pub async fn resume_execution(
         )
         .await
         {
-            tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed");
+            tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed when resuming execution");
         }
     });
 
@@ -890,7 +890,7 @@ pub async fn submit_step_input(
             )
             .await
             {
-                tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed");
+                tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed after submitting step input");
             }
         });
     }
@@ -1177,7 +1177,7 @@ async fn resolve_step_action(
             )
             .await
             {
-                tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed");
+                tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed after resolving step action");
             }
         });
     }
@@ -1479,7 +1479,7 @@ pub async fn resolve_approval(
             )
             .await
             {
-                tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed");
+                tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed after resolving approval action");
             }
         });
     }

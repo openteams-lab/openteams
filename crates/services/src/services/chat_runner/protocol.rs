@@ -1011,6 +1011,7 @@ impl ChatRunner {
                 session_id = %session_id,
                 "[plan_generation] skipping: running or completed execution already exists"
             );
+            
             self.mark_plan_generation_failed(
                 session_id,
                 placeholder.id,

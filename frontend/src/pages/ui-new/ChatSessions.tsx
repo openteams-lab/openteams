@@ -4527,6 +4527,9 @@ export function ChatSessions() {
           await queryClient.invalidateQueries({
             queryKey: ['chatSessionAgents', activeSessionId],
           });
+          await queryClient.invalidateQueries({
+            queryKey: ['chatSessions'],
+          });
           await queryClient.refetchQueries({
             queryKey: ['chatSessionAgents', activeSessionId],
           });

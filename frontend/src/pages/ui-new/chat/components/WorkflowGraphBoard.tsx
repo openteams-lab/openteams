@@ -574,7 +574,7 @@ export function WorkflowGraphBoard({
         return 'border-rose-500 bg-rose-50 ring-4 ring-rose-500/20';
       case 'waiting_review':
       case 'waiting_input':
-        return 'border-amber-500 bg-amber-50 ring-4 ring-amber-400/40';
+        return 'border-violet-500 bg-violet-50 ring-4 ring-violet-400/40';
       case 'ready':
         return 'border-yellow-500 bg-yellow-50 ring-2 ring-yellow-400/30';
       default:
@@ -716,7 +716,7 @@ export function WorkflowGraphBoard({
                   status === 'running' && 'text-indigo-500',
                   status === 'completed' && 'text-emerald-500',
                   (status === 'waiting_review' || status === 'waiting_input') &&
-                    'text-amber-500',
+                    'text-violet-500',
                   (status === 'failed' || status === 'interrupted') &&
                     'text-rose-500',
                   status === 'pending' && 'text-slate-400'

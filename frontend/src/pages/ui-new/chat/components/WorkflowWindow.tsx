@@ -784,7 +784,7 @@ function InspectorCard({
   const statusColors: Record<string, string> = {
     failed: 'bg-rose-50 text-rose-600 border-rose-200',
     completed: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-    waiting_review: 'bg-amber-50 text-amber-600 border-amber-200',
+    waiting_review: 'bg-fuchsia-50 text-fuchsia-600 border-fuchsia-200',
     pre_completed: 'bg-amber-50 text-amber-600 border-amber-200',
     running: 'bg-blue-50 text-blue-600 border-blue-200',
     revising: 'bg-blue-50 text-blue-600 border-blue-200',
@@ -1188,7 +1188,7 @@ function InspectorCard({
             {isChatVisible ? t('workflow.inspector.closeChat', { defaultValue: 'Close Chat' }) : t('workflow.inspector.openChat', { defaultValue: 'Open Chat' })}
           </button>
 
-          {step.status === 'running' && (onInterruptStep || onStopStep) && (
+          {(step.status === 'running' || step.status === 'waiting_review' || step.status === 'waiting_input') && (onInterruptStep || onStopStep) && (
             <button
               type="button"
               onClick={() => {
@@ -2112,7 +2112,7 @@ export function WorkflowWindow({
                   type="button"
                   onClick={() => {
                     const runningStep = projection.steps.find(
-                      (s) => s.status === 'running'
+                      (s) => s.status === 'running' || s.status === 'waiting_review' || s.status === 'waiting_input'
                     );
                     if (runningStep) {
                       if (onInterruptStep) onInterruptStep(runningStep.id);

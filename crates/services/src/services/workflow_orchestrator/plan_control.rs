@@ -485,7 +485,12 @@ impl WorkflowOrchestrator {
 
         let steps = WorkflowStep::find_by_execution(pool, execution.id).await?;
         for step in &steps {
-            if step.status == WorkflowStepStatus::Running {
+            if matches!(
+                step.status,
+                WorkflowStepStatus::Running
+                    | WorkflowStepStatus::WaitingReview
+                    | WorkflowStepStatus::WaitingInput
+            ) {
                 cancel_running_step(step.id);
                 let interrupt_requested = Self::transition_step_and_sync(
                     pool,
@@ -552,7 +557,12 @@ impl WorkflowOrchestrator {
             .await?
             .ok_or_else(|| OrchestratorError::NotFound(format!("step {} 未找到", step_id)))?;
 
-        if step.status != WorkflowStepStatus::Running {
+        if !matches!(
+            step.status,
+            WorkflowStepStatus::Running
+                | WorkflowStepStatus::WaitingReview
+                | WorkflowStepStatus::WaitingInput
+        ) {
             return Err(OrchestratorError::IllegalTransition(format!(
                 "cannot interrupt: step is {:?}",
                 step.status

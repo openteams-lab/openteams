@@ -100,7 +100,7 @@ pub async fn respond_to_review(
             )
             .await
             {
-                tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed");
+                tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed after responding to review");
             }
         });
     }
@@ -158,7 +158,7 @@ pub async fn submit_iteration_feedback(
             )
             .await
             {
-                tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed");
+                tracing::error!(execution_id = %execution_id, error = %err, "workflow scheduler failed after submitting iteration feedback");
             }
         });
     }
