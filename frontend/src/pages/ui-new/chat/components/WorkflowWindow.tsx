@@ -796,7 +796,7 @@ function InspectorCard({
           }, new Map<string, { key: string; agentName: string; lines: Array<{ key: string; timestamp: string; content: string; isError: boolean }> }>())
           .values()
       ),
-    [agentName, step.id, streamEntries]
+    [agentName, step.id, streamEntries, t]
   );
   const outputEntries = useMemo(
     () =>

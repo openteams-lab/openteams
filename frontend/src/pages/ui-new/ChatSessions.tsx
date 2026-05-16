@@ -3833,7 +3833,7 @@ export function ChatSessions() {
         );
       }
     },
-    [activeSessionId, handleLoadDiff, queryClient]
+    [activeSessionId, handleLoadDiff, queryClient, recordWorkflowEvent]
   );
 
   // Determine if there are new unseen changes
