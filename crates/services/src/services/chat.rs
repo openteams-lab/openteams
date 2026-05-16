@@ -2012,6 +2012,7 @@ mod tests {
                 team_protocol TEXT DEFAULT '',
                 team_protocol_enabled INTEGER DEFAULT 0,
                 default_workspace_path TEXT,
+                chat_input_mode TEXT,
                 lead_agent_id TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),

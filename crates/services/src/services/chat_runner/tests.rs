@@ -106,6 +106,7 @@ async fn setup_chat_runner_db() -> DBService {
                 team_protocol TEXT DEFAULT '',
                 team_protocol_enabled INTEGER DEFAULT 0,
                 default_workspace_path TEXT,
+                chat_input_mode TEXT,
                 lead_agent_id TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
@@ -1383,7 +1384,7 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
     );
 
     // Verify key sections exist instead of exact string match
-    assert!(prompt.contains("# ChatGroup Message"));
+    assert!(prompt.contains("# Chat Message"));
     assert!(prompt.contains("## Input Message"));
     assert!(prompt.contains("- sender: you"));
     assert!(prompt.contains("@fullstack"));
@@ -1400,7 +1401,8 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
     assert!(prompt.contains("## Agent"));
     assert!(prompt.contains("- name: fullstack"));
     assert!(prompt.contains("Full-stack Engineer"));
-    assert!(prompt.contains("- language: simplified_chinese"));
+    assert!(prompt.contains("## Using language:"));
+    assert!(prompt.contains("simplified_chinese"));
     assert!(prompt.contains("## Team Protocol"));
     assert!(prompt.contains("Follow the team protocol."));
     assert!(prompt.contains("## Group Members"));

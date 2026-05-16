@@ -4827,7 +4827,7 @@ mod tests {
             ],
         );
 
-        assert!(prompt.contains("Lead Agent"));
+        assert!(prompt.contains("You are reviewing a worker's step task output."));
         assert!(prompt.contains("Ship a stable workflow review loop."));
         assert!(prompt.contains(&step.title));
         assert!(prompt.contains(&step.instructions));
