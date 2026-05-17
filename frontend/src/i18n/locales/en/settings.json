@@ -745,7 +745,10 @@
           "namePlaceholder": "e.g. Full-stack Development Team",
           "description": "Description",
           "descriptionPlaceholder": "What this team is for",
-          "members": "Team Members"
+          "members": "Team Members",
+          "leadAgent": "Lead Agent",
+          "leadAgentDescription": "The member responsible for generating execution plans in workflow mode. Defaults to the first member if not set.",
+          "leadAgentDefault": "Default (first member)"
         }
       }
     }
@@ -837,7 +840,10 @@
           "namePlaceholder": "e.g., Full-stack Development Team",
           "description": "Description",
           "descriptionPlaceholder": "e.g., End-to-end development team",
-          "members": "Team Members"
+          "members": "Team Members",
+          "leadAgent": "Lead Agent",
+          "leadAgentDescription": "The member responsible for generating execution plans in workflow mode. Defaults to the first member if not set.",
+          "leadAgentDefault": "Default (first member)"
         }
       }
     }

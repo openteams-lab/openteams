@@ -98,7 +98,30 @@
         "value": "Evaluez le style visuel actuel de l'interface. Donnez des retours concrets sur la typographie, la couleur, l'espacement, la hierarchie et la coherence des interactions, puis proposez les ameliorations les plus impactantes."
       }
     },
-    "mentionAgents": "Mentionner des agents",
+    "modeCards": {
+      "label": "Options de mode de travail",
+      "workflow": {
+        "label": "Mode workflow",
+        "description": "Confirmez les besoins, discutez de la solution, générez un plan et exécutez les tâches avec l’agent principal. Adapté aux tâches complexes.",
+        "detail": "En mode workflow, vous échangez avec l’agent principal, qui génère le plan et attribue les tâches aux autres membres.\nLe système transforme le plan en graphe visuel de nœuds de tâches et le planifie automatiquement, afin que vous puissiez suivre clairement l’exécution de chaque tâche.\nAvant le début de l’exécution, le plan peut être modifié librement ; si le premier tour ne répond pas aux attentes, vous pouvez lancer une nouvelle itération.\nVous pouvez changer d’agent principal en cliquant sur la carte d’un membre dans la liste des membres IA."
+      },
+      "free": {
+        "label": "Mode discussion libre",
+        "description": "Utilisez @ pour parler à n’importe quel agent. Les agents peuvent communiquer librement entre eux, adapté aux tâches simples ou aux discussions de groupe quotidiennes.",
+        "detail": "En mode discussion libre, vous pouvez directement utiliser @ pour confier une tâche à n’importe quel membre.\nLes agents peuvent discuter et collaborer librement tout en respectant le protocole d’équipe.\nLe mode discussion libre peut guider le comportement et la collaboration des membres via le protocole d’équipe, afin d’explorer des modes de collaboration plus ouverts."
+      },
+      "switchHint": "Utilisez le bouton de bascule en bas du champ de message pour changer de mode de travail à tout moment. Le contexte reste partagé après le changement."
+    },
+    "mentionAgents": "@Membres de l’équipe",
+    "chatModeName": "mode discussion libre",
+    "workflowModeName": "mode workflow",
+    "modeSwitchTooltip": "Mode actuel {{currentMode}}, cliquez pour passer en {{targetMode}}",
+    "switchToFreeMode": "Basculer en discussion libre",
+    "switchToWorkflowMode": "Basculer en mode workflow",
+    "freeModeDescription": "Discussion libre : utilisez @ pour router les messages aux membres.",
+    "workflowModeDescription": "Mode workflow : les messages sont routés vers l’agent principal.",
+    "workflowModeLabel": "- Mode workflow",
+    "workflowPlaceholder": "Discutez de la solution avec l’agent principal, générez un plan et exécutez-le...",
     "mentionAllOption": "Tous les membres (@all)",
     "mentionAllSuggestion": "@Tous les membres",
     "mentionAllBadge": "@all",
@@ -345,7 +368,7 @@
         "invalidWorkspacePath": "Échec de l'import : Chemin d'espace de travail invalide.",
         "nothingToImport": "Échec de l'import : Rien à importer de ce preset d'équipe.",
         "baseCodingAgentRequired": "Échec de l'import : Un agent de codage de base est requis.",
-        "selectedCodingAgentUnavailable": "Échec de l'import : L'agent de codage sélectionné n'est pas disponible.",
+        "selectedCodingAgentUnavailable": "Échec de l'import : L'Agent de codage sélectionné n'est pas disponible.",
         "memberNameRequired": "Échec de l'import : Le nom du membre IA est obligatoire.",
         "memberNameInvalidChars": "Échec de l'import : Le nom ne peut contenir que des lettres, des chiffres, \"_\" ou \"-\".",
         "memberNameTooLong": "Échec de l'import : Le nom du membre IA ne peut pas dépasser {{max}} caractères.",
@@ -354,7 +377,8 @@
         "selectSessionFirst": "Veuillez d'abord sélectionner une session de chat.",
         "sessionArchived": "Cette session est archivée et en lecture seule.",
         "noAvailableCodingAgent": "Échec de l'import : Aucun agent de codage disponible pour importer ce preset.",
-        "failedToImportTeam": "Échec de l'importation du preset d'équipe."
+        "failedToImportTeam": "Échec de l'importation du preset d'équipe.",
+        "memberError": "{{member}} - {{message}}"
       }
     },
     "addMemberErrors": {
@@ -365,7 +389,7 @@
       "workspacePathMustBeAbsolute": "Échec de l'ajout : Le chemin de l'espace de travail doit être un chemin absolu.",
       "invalidWorkspacePath": "Échec de l'ajout : Chemin de l'espace de travail invalide.",
       "baseCodingAgentRequired": "Échec de l'ajout : L'agent de codage de base est obligatoire.",
-      "selectedCodingAgentUnavailable": "Échec de l'ajout : L'agent de codage sélectionné n'est pas disponible.",
+      "selectedCodingAgentUnavailable": "Échec de l'ajout : L'Agent de codage sélectionné n'est pas disponible.",
       "memberNameRequired": "Échec de l'ajout : Le nom du membre IA est obligatoire.",
       "memberNameInvalidChars": "Échec de l'ajout : Le nom ne peut contenir que des lettres, des chiffres, \"_\" ou \"-\".",
       "memberNameTooLong": "Échec de l'ajout : Le nom du membre IA ne peut pas dépasser {{max}} caractères.",
@@ -786,5 +810,273 @@
       "diffAction": "Diff",
       "openExplorerSuccess": "Ouvert dans le gestionnaire de fichiers."
     }
-  }
+  },
+  "workflow": {
+    "approvalCard": {
+      "title": "Approbation requise",
+      "approve": "Approuver",
+      "reject": "Rejeter"
+    },
+    "permissionCard": {
+      "title": "Demande de permission",
+      "grant": "Accorder",
+      "deny": "Refuser"
+    },
+    "continueCard": {
+      "title": "Continuer ?",
+      "confirm": "Continuer"
+    },
+    "inputCard": {
+      "title": "Saisie requise",
+      "placeholder": "Tapez votre réponse ici",
+      "submit": "Soumettre"
+    },
+    "inspector": {
+      "tabDetails": "Détails",
+      "tabLogs": "Journaux",
+      "noInstructions": "Aucune instruction de tâche n'a été fournie pour cette étape.",
+      "noSummary": "Aucun résumé n'a encore été généré pour cette étape.",
+      "loopPrefix": "Boucle : {{name}}",
+      "reviewPrefix": "Revue : {{label}}",
+      "instructionHeading": "Instruction",
+      "summaryHeading": "Résumé",
+      "feedbackHeading": "Retour",
+      "executionRecordHeading": "Sortie du journal d'exécution",
+      "loadingTranscript": "Chargement du journal...",
+      "noOutputEntries": "Aucune entrée de sortie pour cette étape.",
+      "errorHeading": "Erreur",
+      "loadingLogs": "Chargement des journaux...",
+      "thinkingProcess": "{{agentName}} - Processus de réflexion",
+      "expand": "Développer",
+      "collapse": "Réduire",
+      "noLogs": "Aucun journal pour cette étape.",
+      "closeChat": "Fermer le chat",
+      "openChat": "Ouvrir le chat",
+      "terminate": "Terminer"
+    },
+    "chatPanel": {
+      "title": "Conversation avec l'agent",
+      "approvalRequired": "Approbation requise",
+      "permissionRequest": "Demande de permission",
+      "continuePrompt": "Continuer ?",
+      "continueAction": "CONTINUER",
+      "approveAction": "APPROUVER",
+      "rejectAction": "REJETER",
+      "replyPlaceholder": "Répondre à l'agent...",
+      "readOnlyPlaceholder": "Réponse possible uniquement lorsque cette étape attend une saisie ou une revue."
+    },
+    "status": {
+      "recompiling": "Recompilation du plan...",
+      "completed": "Terminé - {{summary}}",
+      "completedDefault": "Toutes les étapes terminées",
+      "failed": "Échoué - {{error}}",
+      "failedDefault": "Erreur d'exécution",
+      "progress": "Progression {{percent}}% · {{completed}}/{{total}} étapes"
+    },
+    "controls": {
+      "executePlan": "Exécuter le plan",
+      "resume": "Reprendre",
+      "pauseAll": "Tout mettre en pause",
+      "stop": "Arrêter"
+    },
+    "reviewSettings": {
+      "title": "Paramètres de revue",
+      "description": "Choisissez qui doit réviser chaque résultat du workflow.",
+      "close": "Fermer les paramètres de revue",
+      "taskSteps": "Étapes de tâche",
+      "leadUserReview": "Revue Lead / Utilisateur",
+      "leadLabel": "Lead",
+      "userLabel": "Utilisateur",
+      "leadReviewOn": "Activer la revue de l'agent principal pour cette étape",
+      "leadReviewOff": "Désactiver la revue de l'agent principal pour cette étape",
+      "userReviewOn": "Activer la revue utilisateur pour cette étape",
+      "userReviewOff": "Désactiver la revue utilisateur pour cette étape",
+      "workflowLoops": "Boucles de workflow",
+      "userReviewOnly": "Revue utilisateur uniquement",
+      "loopUserReviewOn": "Activer la revue utilisateur pour cette boucle",
+      "loopUserReviewOff": "Désactiver la revue utilisateur pour cette boucle",
+      "cancel": "Annuler",
+      "saving": "Enregistrement...",
+      "saveChanges": "Enregistrer les modifications",
+      "executionFinishedError": "Les paramètres de revue ne peuvent pas être modifiés après la fin de l'exécution.",
+      "finishedMessage": "Les paramètres de revue ne peuvent pas être modifiés dans l'état actuel du workflow.",
+      "updateError": "Impossible de mettre à jour les paramètres de revue."
+    },
+    "notifications": {
+      "pendingReview": "Revue en attente",
+      "typeFinal": "Final",
+      "typeStep": "Étape",
+      "accept": "ACCEPTER",
+      "reject": "REJETER",
+      "approve": "APPROUVER",
+      "viewDetails": "VOIR DÉTAILS",
+      "finalReviewTitle": "Revue finale",
+      "reviewRequired": "Revue requise",
+      "pendingInput": "Saisie requise",
+      "typeInput": "Saisie",
+      "inputRequired": "Saisie requise",
+      "respond": "RÉPONDRE"
+    },
+    "card": {
+      "generatingPlan": "Génération du plan de workflow",
+      "stateLabels": {
+        "planGenerationFailed": "Échec de la génération du plan",
+        "generatingPlan": "Génération du plan",
+        "recompilingPlan": "Recompilation du plan",
+        "workItem": "Élément de travail",
+        "executionFailed": "Échec de l'exécution",
+        "planReady": "Plan prêt",
+        "planInvalid": "Plan invalide",
+        "actionRequired": "Action requise",
+        "paused": "En pause",
+        "preparing": "Préparation",
+        "workflowRunning": "Workflow en cours"
+      },
+      "badges": {
+        "failed": "Échoué",
+        "generating": "Génération"
+      },
+      "emptyGraph": {
+        "planGenerationFailed": "La génération du plan s'est arrêtée avant la création de l'aperçu. Réessayez pour générer un nouveau plan à partir du même objectif.",
+        "planGenerationPending": "Le système rédige un plan de workflow. Cette carte sera mise à jour lorsque l'aperçu sera prêt.",
+        "noGraph": "Aucun graphe de workflow disponible.",
+        "planDraft": "Brouillon du plan",
+        "workflow": "Workflow"
+      },
+      "buttons": {
+        "open": "Ouvrir",
+        "executePlan": "Exécuter le plan",
+        "pauseAll": "Tout mettre en pause",
+        "resume": "Reprendre",
+        "retrying": "Nouvelle tentative...",
+        "retryPlanGeneration": "Réessayer la génération"
+      },
+      "errors": {
+        "validationErrors": "Erreurs de validation",
+        "generationError": "Erreur de génération",
+        "retryRequestFailed": "Échec de la demande de réessai"
+      },
+      "finalDelivery": "Livraison finale"
+    },
+    "iterationFeedback": {
+      "round": "Tour {{round}}",
+      "steps": "Étapes",
+      "status": "Statut",
+      "running": "En cours",
+      "regeneratingPlan": "Régénération du plan en cours",
+      "idle": "Inactif",
+      "currentStep": "Étape actuelle",
+      "reviewRequired": "Revue requise",
+      "rejectWithFeedback": "Rejeter avec commentaire",
+      "whatWrongLabel": "Qu'est-ce qui n'a pas fonctionné ?",
+      "whatWrongPlaceholder": "Décrivez le problème...",
+      "expectedLabel": "Résultat attendu",
+      "expectedPlaceholder": "Que devait-il se passer ?",
+      "priorityLabel": "Priorité",
+      "priorityHigh": "Haute",
+      "priorityMedium": "Moyenne",
+      "priorityLow": "Basse",
+      "additionalNotesLabel": "Notes supplémentaires",
+      "additionalNotesPlaceholder": "Notes optionnelles...",
+      "validationError": "Le rejet nécessite une description du problème et du résultat attendu.",
+      "accept": "ACCEPTER",
+      "submitRejection": "SOUMETTRE LE REJET",
+      "reject": "REJETER",
+      "cancel": "ANNULER"
+    },
+    "pendingReview": {
+      "title": "Revue en attente",
+      "reviewTypes": {
+        "stepReview": "Revue d'étape",
+        "loopReview": "Revue de boucle",
+        "finalReview": "Revue finale"
+      },
+      "defaultMessage": "Veuillez examiner le résultat actuel.",
+      "context": "Contexte",
+      "feedbackLabel": "Commentaire",
+      "feedbackPlaceholder": "Veuillez fournir des commentaires spécifiques",
+      "validationError": "Le rejet nécessite un commentaire.",
+      "approve": "APPROUVER",
+      "submitReject": "SOUMETTRE LE REJET",
+      "reject": "REJETER"
+    },
+    "generatedText": {
+      "reviewLoop": "Veuillez réviser la boucle « {{loopKey}} ».",
+      "userApprovedStepResult": "L'utilisateur a approuvé le résultat de l'étape."
+    },
+    "finalReview": {
+      "title": "Revue finale",
+      "defaultMessage": "Tâche terminée. Accepter le résultat ?",
+      "accept": "ACCEPTER",
+      "reject": "REJETER"
+    },
+    "graph": {
+      "tip": "(Astuce : molette pour zoomer, glisser pour déplacer)",
+      "layoutWarning": "Avertissement de mise en page : utilisation de la disposition de secours",
+      "fitView": "Ajuster au canevas",
+      "leadFallback": "Lead"
+    },
+    "executionStatus": {
+      "running": "En cours",
+      "failed": "Échec",
+      "paused": "En pause",
+      "waiting": "En attente de révision",
+      "recompiling": "Régénération du plan",
+      "completed": "Terminé",
+      "pending": "Préparation"
+    },
+    "statusLabels": {
+      "interrupted": "Interrompu",
+      "stopRequested": "Arrêt demandé",
+      "waitingInput": "En attente d'entrée",
+      "reviewing": "En revue",
+      "preCompleted": "Pré-terminé",
+      "pending": "En attente",
+      "running": "En cours",
+      "ready": "Prêt",
+      "waitingReview": "En revue",
+      "waitingUser": "En attente de l'utilisateur",
+      "passed": "Réussi",
+      "completed": "Terminé",
+      "rejected": "Rejeté",
+      "failed": "Échoué",
+      "loop": "Boucle"
+    },
+    "reviewPhase": {
+      "executing": "En exécution",
+      "leadReview": "Revue du Lead",
+      "waitingUser": "En attente de l'utilisateur"
+    },
+    "reviewVerdict": {
+      "accepted": "Accepté",
+      "approved": "Approuvé",
+      "rejected": "Rejeté",
+      "reviewed": "Examiné"
+    },
+    "pendingInput": {
+      "title": "Saisie requise",
+      "defaultPrompt": "L’agent a besoin d’informations supplémentaires pour continuer.",
+      "placeholder": "Saisissez votre réponse ici",
+      "submit": "ENVOYER"
+    }
+  },
+  "leadAgent": {
+    "label": "Agent principal",
+    "switchError": "Échec du changement d'Agent principal. Veuillez réessayer.",
+    "switchDialog": {
+      "title": "Changer l'Agent principal",
+      "message": "Changer l'Agent principal de « {{currentLeadName}} » à « {{targetLeadName}} » ?",
+      "switching": "Changement…",
+      "confirm": "Confirmer"
+    }
+  },
+  "input_tabs": {
+    "workflow": "Workflow",
+    "chat": "Chat"
+  },
+  "workflow_plan_generation_unavailable": "La génération de plan de workflow n'est pas disponible pour cette session.",
+  "workflow_retry": "Réessayer",
+  "workflow_retry_task": "Réessayer la tâche",
+  "workflow_retry_review": "Réessayer la revue",
+  "workflow_retry_cancel": "Annuler"
 }

@@ -24,8 +24,9 @@ use deployment::Deployment;
 use git::{Commit, DiffTarget, GitCli, GitService};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use services::services::analytics_events::{
-    AnalyticsProjector, DomainEvent, extract_executor_profile_variant,
+use services::services::{
+    analytics_events::{AnalyticsProjector, DomainEvent},
+    workflow_analytics::{self, hash_user_id},
 };
 use sqlx::FromRow;
 use ts_rs::TS;
@@ -62,20 +63,15 @@ pub async fn create_session(
     Json(payload): Json<CreateChatSession>,
 ) -> Result<ResponseJson<ApiResponse<ChatSession>>, ApiError> {
     let session = ChatSession::create(&deployment.db().pool, &payload, Uuid::new_v4()).await?;
-
-    let analytics_projector = AnalyticsProjector::new(
-        &deployment.db().pool,
-        deployment.analytics().as_ref(),
-        deployment.analytics_enabled(),
+    let user_id_hash = hash_user_id(deployment.user_id());
+    workflow_analytics::track_session_created(
+        workflow_analytics::analytics_if_enabled(
+            deployment.analytics().as_ref(),
+            deployment.analytics_enabled(),
+        ),
+        session.id,
+        Some(&user_id_hash),
     );
-    let title_length = payload.title.as_ref().map(|t| t.len()).unwrap_or(0);
-    analytics_projector
-        .project_or_warn(DomainEvent::SessionCreated {
-            session_id: session.id,
-            actor_user_id: deployment.user_id().to_string(),
-            title_length,
-        })
-        .await;
 
     // Initialize session stats
     let _ = AnalyticsSessionStats::upsert(&deployment.db().pool, session.id, None).await;
@@ -88,6 +84,20 @@ pub async fn update_session(
     State(deployment): State<DeploymentImpl>,
     Json(payload): Json<UpdateChatSession>,
 ) -> Result<ResponseJson<ApiResponse<ChatSession>>, ApiError> {
+    // Validate lead_agent_id if provided
+    if let Some(Some(lead_agent_id)) = &payload.lead_agent_id {
+        let session_agents =
+            ChatSessionAgent::find_all_for_session(&deployment.db().pool, session.id).await?;
+        let agent_exists = session_agents
+            .iter()
+            .any(|sa| sa.agent_id == *lead_agent_id);
+        if !agent_exists {
+            return Err(ApiError::BadRequest(
+                "Agent is not a member of this session".to_string(),
+            ));
+        }
+    }
+
     let updated = ChatSession::update(&deployment.db().pool, session.id, &payload).await?;
     Ok(ResponseJson(ApiResponse::success(updated)))
 }
@@ -111,7 +121,10 @@ pub async fn delete_session(
 
     let analytics_projector = AnalyticsProjector::new(
         &deployment.db().pool,
-        deployment.analytics().as_ref(),
+        workflow_analytics::analytics_if_enabled(
+            deployment.analytics().as_ref(),
+            deployment.analytics_enabled(),
+        ),
         deployment.analytics_enabled(),
     );
     analytics_projector
@@ -1170,13 +1183,44 @@ pub async fn get_session_workspace_changes(
 ) -> Result<ResponseJson<ApiResponse<WorkspaceChangesResponse>>, ApiError> {
     let workspace_path = query.path.trim();
     let include_diff = query.include_diff.unwrap_or(true);
+    let user_id_hash = hash_user_id(deployment.user_id());
     if workspace_path.is_empty() {
+        workflow_analytics::track_api_failure(
+            workflow_analytics::analytics_if_enabled(
+                deployment.analytics().as_ref(),
+                deployment.analytics_enabled(),
+            ),
+            Some(session.id),
+            Some(&user_id_hash),
+            "chat.sessions.workspace_changes",
+            400,
+            "workspace_path_required",
+        );
         return Err(ApiError::BadRequest(
             "Workspace path is required.".to_string(),
         ));
     }
 
     if !session_has_workspace_path(&deployment.db().pool, session.id, workspace_path).await? {
+        workflow_analytics::track_permission_denied(
+            workflow_analytics::analytics_if_enabled(
+                deployment.analytics().as_ref(),
+                deployment.analytics_enabled(),
+            ),
+            session.id,
+            "workspace_path_not_in_session",
+        );
+        workflow_analytics::track_api_failure(
+            workflow_analytics::analytics_if_enabled(
+                deployment.analytics().as_ref(),
+                deployment.analytics_enabled(),
+            ),
+            Some(session.id),
+            Some(&user_id_hash),
+            "chat.sessions.workspace_changes",
+            400,
+            "workspace_path_not_in_session",
+        );
         return Err(ApiError::BadRequest(
             "Workspace path is not part of this session.".to_string(),
         ));
@@ -1191,7 +1235,41 @@ pub async fn get_session_workspace_changes(
         collect_workspace_changes(session_id, &workspace_path_owned, include_diff, runs)
     })
     .await
-    .map_err(|err| ApiError::BadRequest(format!("Failed to inspect workspace changes: {err}")))?;
+    .map_err(|err| {
+        workflow_analytics::track_api_failure(
+            workflow_analytics::analytics_if_enabled(
+                deployment.analytics().as_ref(),
+                deployment.analytics_enabled(),
+            ),
+            Some(session.id),
+            Some(&user_id_hash),
+            "chat.sessions.workspace_changes",
+            400,
+            "workspace_changes_task_failed",
+        );
+        ApiError::BadRequest(format!("Failed to inspect workspace changes: {err}"))
+    })?;
+
+    let diff_file_count = response
+        .changes
+        .as_ref()
+        .map(|changes| {
+            changes.modified.len()
+                + changes.added.len()
+                + changes.deleted.len()
+                + changes.untracked.len()
+        })
+        .unwrap_or(0);
+    workflow_analytics::track_diff_viewed(
+        workflow_analytics::analytics_if_enabled(
+            deployment.analytics().as_ref(),
+            deployment.analytics_enabled(),
+        ),
+        session.id,
+        Some(&user_id_hash),
+        None,
+        diff_file_count,
+    );
 
     Ok(ResponseJson(ApiResponse::success(response)))
 }
@@ -1283,22 +1361,17 @@ pub async fn create_session_agent(
     )
     .await?;
 
-    let analytics_projector = AnalyticsProjector::new(
-        &deployment.db().pool,
-        deployment.analytics().as_ref(),
-        deployment.analytics_enabled(),
+    let user_id_hash = hash_user_id(deployment.user_id());
+    workflow_analytics::track_agent_added(
+        workflow_analytics::analytics_if_enabled(
+            deployment.analytics().as_ref(),
+            deployment.analytics_enabled(),
+        ),
+        session.id,
+        Some(&user_id_hash),
+        Some(&agent.runner_type),
+        created.workspace_path.is_some(),
     );
-    analytics_projector
-        .project_or_warn(DomainEvent::AgentAdded {
-            session_id: session.id,
-            actor_user_id: deployment.user_id().to_string(),
-            agent_id: agent.id,
-            agent_name: agent.name.clone(),
-            runner_type: agent.runner_type.clone(),
-            executor_profile_variant: extract_executor_profile_variant(&agent.tools_enabled.0),
-            has_workspace: created.workspace_path.is_some(),
-        })
-        .await;
     Ok(ResponseJson(ApiResponse::success(created)))
 }
 
@@ -1381,12 +1454,33 @@ pub async fn delete_session_agent(
 
     let rows = ChatSessionAgent::delete(&deployment.db().pool, existing.id).await?;
     if rows == 0 {
-        Err(ApiError::BadRequest(
+        return Err(ApiError::BadRequest(
             "Chat session agent not found".to_string(),
-        ))
-    } else {
-        Ok(ResponseJson(ApiResponse::success(())))
+        ));
     }
+
+    // If the removed agent was the lead, reset lead_agent_id to the first remaining agent
+    if session.lead_agent_id == Some(existing.agent_id) {
+        let remaining_agents =
+            ChatSessionAgent::find_all_for_session(&deployment.db().pool, session.id).await?;
+        let new_lead_agent_id = remaining_agents.first().map(|sa| sa.agent_id);
+
+        let update = UpdateChatSession {
+            title: None,
+            status: None,
+            lead_agent_id: Some(new_lead_agent_id),
+            summary_text: None,
+            archive_ref: None,
+            last_seen_diff_key: None,
+            team_protocol: None,
+            team_protocol_enabled: None,
+            default_workspace_path: None,
+            chat_input_mode: None,
+        };
+        ChatSession::update(&deployment.db().pool, session.id, &update).await?;
+    }
+
+    Ok(ResponseJson(ApiResponse::success(())))
 }
 
 pub async fn archive_session(
@@ -1420,32 +1514,29 @@ pub async fn archive_session(
         &UpdateChatSession {
             title: None,
             status: Some(ChatSessionStatus::Archived),
+            lead_agent_id: None,
             summary_text: None,
             archive_ref: Some(archive_ref),
             last_seen_diff_key: None,
             team_protocol: None,
             team_protocol_enabled: None,
             default_workspace_path: None,
+            chat_input_mode: None,
         },
     )
     .await?;
 
-    if let Some(stats) = session_stats {
-        let analytics_projector = AnalyticsProjector::new(
-            &deployment.db().pool,
-            deployment.analytics().as_ref(),
-            deployment.analytics_enabled(),
+    if session_stats.is_some() {
+        let user_id_hash = hash_user_id(deployment.user_id());
+        workflow_analytics::track_session_archived(
+            workflow_analytics::analytics_if_enabled(
+                deployment.analytics().as_ref(),
+                deployment.analytics_enabled(),
+            ),
+            session.id,
+            Some(&user_id_hash),
+            false,
         );
-        let duration_seconds = (chrono::Utc::now() - session.created_at).num_seconds();
-        analytics_projector
-            .project_or_warn(DomainEvent::SessionArchived {
-                session_id: session.id,
-                actor_user_id: deployment.user_id().to_string(),
-                duration_seconds,
-                message_count: stats.message_count,
-                agent_count: stats.agent_count,
-            })
-            .await;
     }
 
     Ok(ResponseJson(ApiResponse::success(updated)))
@@ -1465,27 +1556,28 @@ pub async fn restore_session(
         &UpdateChatSession {
             title: None,
             status: Some(ChatSessionStatus::Active),
+            lead_agent_id: None,
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
             team_protocol: None,
             team_protocol_enabled: None,
             default_workspace_path: None,
+            chat_input_mode: None,
         },
     )
     .await?;
 
-    let analytics_projector = AnalyticsProjector::new(
-        &deployment.db().pool,
-        deployment.analytics().as_ref(),
-        deployment.analytics_enabled(),
+    let user_id_hash = hash_user_id(deployment.user_id());
+    workflow_analytics::track_session_archived(
+        workflow_analytics::analytics_if_enabled(
+            deployment.analytics().as_ref(),
+            deployment.analytics_enabled(),
+        ),
+        session.id,
+        Some(&user_id_hash),
+        true,
     );
-    analytics_projector
-        .project_or_warn(DomainEvent::SessionRestored {
-            session_id: session.id,
-            actor_user_id: deployment.user_id().to_string(),
-        })
-        .await;
 
     Ok(ResponseJson(ApiResponse::success(updated)))
 }
@@ -1499,6 +1591,14 @@ pub async fn stream_session_ws(
 
     Ok(ws.on_upgrade(move |socket| async move {
         if let Err(err) = handle_chat_stream_ws(socket, rx).await {
+            workflow_analytics::track_websocket_disconnected(
+                workflow_analytics::analytics_if_enabled(
+                    deployment.analytics().as_ref(),
+                    deployment.analytics_enabled(),
+                ),
+                session.id,
+                "chat_stream_closed",
+            );
             tracing::warn!("chat stream ws closed: {}", err);
         }
     }))
@@ -1718,12 +1818,14 @@ mod tests {
             id: Uuid::new_v4(),
             title: Some("Test Session".to_string()),
             status: ChatSessionStatus::Active,
+            lead_agent_id: None,
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
             team_protocol: None,
             team_protocol_enabled: false,
             default_workspace_path: default_workspace_path.map(str::to_string),
+            chat_input_mode: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
             archived_at: None,

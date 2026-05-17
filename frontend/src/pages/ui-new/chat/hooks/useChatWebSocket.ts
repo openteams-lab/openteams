@@ -26,7 +26,55 @@ type MentionAcknowledgedEvent = {
   status: MentionStatus;
 };
 
-type ChatStreamPayload = ChatStreamEvent | MentionAcknowledgedEvent;
+type WorkflowGraphUpdatedEvent = {
+  type: 'workflow_graph_updated';
+  session_id: string;
+  execution_id: string;
+  graph_version: string;
+  reason: string;
+  changed_step_ids: string[];
+};
+
+type WorkflowExecutionUpdatedEvent = {
+  type: 'workflow_execution_updated';
+  session_id: string;
+  execution_id: string;
+};
+
+export type WorkflowRuntimeLine = {
+  id: string;
+  executionId: string;
+  workflowAgentSessionId: string | null;
+  stepId: string;
+  stepKey: string;
+  agentId: string;
+  agentName: string;
+  streamType: 'assistant' | 'thinking' | 'error';
+  content: string;
+  createdAt: string;
+};
+
+type WorkflowRuntimeLineEvent = {
+  type: 'workflow_runtime_line';
+  line_id: string;
+  session_id: string;
+  execution_id: string;
+  workflow_agent_session_id: string | null;
+  step_id: string;
+  step_key: string;
+  agent_id: string;
+  agent_name: string;
+  stream_type: 'assistant' | 'thinking' | 'error';
+  content: string;
+  created_at: string;
+};
+
+type ChatStreamPayload =
+  | ChatStreamEvent
+  | MentionAcknowledgedEvent
+  | WorkflowGraphUpdatedEvent
+  | WorkflowExecutionUpdatedEvent
+  | WorkflowRuntimeLineEvent;
 type AgentDeltaPayload = Extract<ChatStreamEvent, { type: 'agent_delta' }> & {
   type: 'agent_delta';
   stream_type?: 'assistant' | 'thinking' | 'error';
@@ -249,6 +297,7 @@ function removeRunFromSession(
 export interface UseChatWebSocketResult {
   streamingRuns: Record<string, StreamRun>;
   streamingRunsBySession: StreamingRunsBySession;
+  workflowRuntimeLinesByExecution: Record<string, WorkflowRuntimeLine[]>;
   agentStates: Record<string, ChatSessionAgentState>;
   agentStateInfos: Record<string, AgentStateInfo>;
   runningAgentSessions: Map<string, string>;
@@ -278,10 +327,13 @@ export interface UseChatWebSocketResult {
 export function useChatWebSocket(
   activeSessionId: string | null,
   onMessageReceived: (message: ChatMessage) => void,
-  onWorkItemReceived: (workItem: ChatWorkItem) => void
+  onWorkItemReceived: (workItem: ChatWorkItem) => void,
+  onWorkflowProjectionRefresh?: (sessionId: string) => void
 ): UseChatWebSocketResult {
   const [streamingRunsBySession, setStreamingRunsBySession] =
     useState<StreamingRunsBySession>(() => readStreamingRunsCache());
+  const [workflowRuntimeLinesByExecution, setWorkflowRuntimeLinesByExecution] =
+    useState<Record<string, WorkflowRuntimeLine[]>>({});
   const [agentStates, setAgentStates] = useState<
     Record<string, ChatSessionAgentState>
   >({});
@@ -615,6 +667,52 @@ export function useChatWebSocket(
     });
   }, []);
 
+  const handleWorkflowRuntimeLine = useCallback(
+    (payload: WorkflowRuntimeLineEvent) => {
+      setWorkflowRuntimeLinesByExecution((prev) => {
+        const executionLines = prev[payload.execution_id] ?? [];
+        if (executionLines.some((line) => line.id === payload.line_id)) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [payload.execution_id]: [
+            ...executionLines,
+            {
+              id: payload.line_id,
+              executionId: payload.execution_id,
+              workflowAgentSessionId: payload.workflow_agent_session_id,
+              stepId: payload.step_id,
+              stepKey: payload.step_key,
+              agentId: payload.agent_id,
+              agentName: payload.agent_name,
+              streamType: payload.stream_type,
+              content: payload.content,
+              createdAt: payload.created_at,
+            },
+          ],
+        };
+      });
+    },
+    []
+  );
+
+  const handleWorkflowProjectionRefresh = useCallback(
+    async (sessionId: string) => {
+      if (!sessionId) return;
+      queryClient.invalidateQueries({ queryKey: ['chatMessages', sessionId] });
+      queryClient.invalidateQueries({
+        queryKey: ['workflowTranscripts', sessionId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['workflowStepTranscripts', sessionId],
+      });
+      onWorkflowProjectionRefresh?.(sessionId);
+    },
+    [onWorkflowProjectionRefresh, queryClient]
+  );
+
   useEffect(() => {
     setStreamingRunsBySession((prev) => pruneExpiredStreamingRuns(prev));
   }, [activeSessionId]);
@@ -665,6 +763,11 @@ export function useChatWebSocket(
             return;
           }
 
+          if (payload.type === 'message_updated') {
+            handleMessageNew(payload.message);
+            return;
+          }
+
           if (payload.type === 'work_item_new') {
             handleWorkItemNew(payload.work_item);
             return;
@@ -687,6 +790,21 @@ export function useChatWebSocket(
 
           if (payload.type === 'protocol_notice') {
             handleProtocolNotice(payload);
+            return;
+          }
+
+          if (payload.type === 'workflow_graph_updated') {
+            void handleWorkflowProjectionRefresh(payload.session_id);
+            return;
+          }
+
+          if (payload.type === 'workflow_execution_updated') {
+            void handleWorkflowProjectionRefresh(payload.session_id);
+            return;
+          }
+
+          if (payload.type === 'workflow_runtime_line') {
+            handleWorkflowRuntimeLine(payload);
             return;
           }
 
@@ -724,6 +842,8 @@ export function useChatWebSocket(
     handleAgentState,
     handleMentionAcknowledged,
     handleProtocolNotice,
+    handleWorkflowProjectionRefresh,
+    handleWorkflowRuntimeLine,
     handleMentionError,
   ]);
 
@@ -734,6 +854,7 @@ export function useChatWebSocket(
     setAgentStateInfos({});
     setMentionStatuses(new Map());
     setMentionErrors(new Map());
+    setWorkflowRuntimeLinesByExecution({});
     setCompressionWarning(null);
     setProtocolNotices([]);
   }, [activeSessionId, clearAllProtocolNoticeTimeouts]);
@@ -747,6 +868,7 @@ export function useChatWebSocket(
   return {
     streamingRuns,
     streamingRunsBySession,
+    workflowRuntimeLinesByExecution,
     agentStates,
     agentStateInfos,
     runningAgentSessions,

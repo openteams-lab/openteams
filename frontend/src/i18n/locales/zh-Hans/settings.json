@@ -745,7 +745,10 @@
           "namePlaceholder": "例如 全栈开发团队",
           "description": "描述",
           "descriptionPlaceholder": "该团队用于什么场景",
-          "members": "团队成员"
+          "members": "团队成员",
+          "leadAgent": "主Agent",
+          "leadAgentDescription": "负责在工作流模式下生成执行计划的成员。未设置时默认为第一个成员。",
+          "leadAgentDefault": "默认（第一个成员）"
         }
       }
     }
@@ -837,7 +840,10 @@
           "namePlaceholder": "例如：全栈开发团队",
           "description": "描述",
           "descriptionPlaceholder": "例如：端到端开发团队",
-          "members": "团队成员"
+          "members": "团队成员",
+          "leadAgent": "主Agent",
+          "leadAgentDescription": "负责在工作流模式下生成执行计划的成员。未设置时默认为第一个成员。",
+          "leadAgentDefault": "默认（第一个成员）"
         }
       }
     }

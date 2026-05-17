@@ -745,7 +745,10 @@
           "namePlaceholder": "p. ej., Equipo de desarrollo full-stack",
           "description": "Descripción",
           "descriptionPlaceholder": "Para qué es este equipo",
-          "members": "Miembros del equipo"
+          "members": "Miembros del equipo",
+          "leadAgent": "Agente principal",
+          "leadAgentDescription": "El miembro responsable de generar planes de ejecución en modo de flujo de trabajo. Por defecto es el primer miembro si no se establece.",
+          "leadAgentDefault": "Predeterminado (primer miembro)"
         }
       }
     }
@@ -837,7 +840,10 @@
           "namePlaceholder": "p. ej., Equipo de desarrollo full-stack",
           "description": "Descripción",
           "descriptionPlaceholder": "p. ej., Equipo de desarrollo end-to-end",
-          "members": "Miembros del equipo"
+          "members": "Miembros del equipo",
+          "leadAgent": "Agente principal",
+          "leadAgentDescription": "El miembro responsable de generar planes de ejecución en modo de flujo de trabajo. Por defecto es el primer miembro si no se establece.",
+          "leadAgentDefault": "Predeterminado (primer miembro)"
         }
       }
     }

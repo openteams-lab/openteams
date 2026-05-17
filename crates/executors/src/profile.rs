@@ -228,7 +228,7 @@ impl ExecutorConfigs {
         // Parse user overrides
         match serde_json::from_str::<Self>(&content) {
             Ok(mut user_overrides) => {
-                tracing::info!("Loaded user profile overrides from profiles.json");
+                // tracing::info!("Loaded user profile overrides from profiles.json");
                 user_overrides.canonicalise();
                 Self::merge_with_defaults(defaults, user_overrides)
             }

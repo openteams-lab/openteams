@@ -98,7 +98,30 @@
         "value": "現在の UI のビジュアルスタイルをレビューしてください。タイポグラフィ、色、余白、階層、インタラクションの一貫性について具体的に指摘し、最も効果の高い改善案を示してください。"
       }
     },
-    "mentionAgents": "エージェントをメンション",
+    "modeCards": {
+      "label": "作業モードの選択",
+      "workflow": {
+        "label": "ワークフローモード",
+        "description": "メインAgentと要件を確認し、方針を相談し、計画を生成してタスクを実行します。複雑なタスクに適しています。",
+        "detail": "ワークフローモードでは、メインAgentと対話し、メインAgentが計画を生成して他のメンバーにタスクを割り当てます。\nシステムは計画を視覚的なタスクノード図に変換し、自動的にスケジュールして実行するため、各タスクの進行を明確に追跡できます。\n正式な実行開始前であれば、ワークフロー計画は自由に変更できます。第1ラウンドの結果が期待に届かない場合は、新しいイテレーションを開始できます。\nAIメンバー一覧のメンバーカードをクリックすると、メインAgentを切り替えられます。"
+      },
+      "free": {
+        "label": "自由チャットモード",
+        "description": "@で任意のAgentと会話できます。Agent同士も自由にやり取りでき、簡単なタスクや日常的なグループチャットに適しています。",
+        "detail": "自由チャットモードでは、任意のメンバーを直接 @ してタスクを依頼できます。\nAgent同士はチームプロトコルに従いながら自由に議論し、協力できます。\n自由チャットモードでは、チームプロトコルによってメンバーの行動と協力を導き、より柔軟な協力方法を探索できます。"
+      },
+      "switchHint": "メッセージボックス下部の切り替えボタンで、いつでも作業モードを変更できます。切り替え後もコンテキストは共有されます。"
+    },
+    "mentionAgents": "@チームメンバー",
+    "chatModeName": "自由チャットモード",
+    "workflowModeName": "ワークフローモード",
+    "modeSwitchTooltip": "現在は{{currentMode}}、クリックして{{targetMode}}に切り替えます",
+    "switchToFreeMode": "自由チャットモードに切り替え",
+    "switchToWorkflowMode": "ワークフローモードに切り替え",
+    "freeModeDescription": "自由チャットモード: @ でメンバーにメッセージをルーティングします。",
+    "workflowModeDescription": "ワークフローモード: メッセージはメインAgentに集約されます。",
+    "workflowModeLabel": "- ワークフローモード",
+    "workflowPlaceholder": "メインAgentと方針を相談し、計画を生成して実行...",
     "mentionAllOption": "全員（@all）",
     "mentionAllSuggestion": "@全員",
     "mentionAllBadge": "@all",
@@ -345,7 +368,7 @@
         "invalidWorkspacePath": "インポート失敗：無効なワークスペースパスです。",
         "nothingToImport": "インポート失敗：このチームプリセットにはインポートする内容がありません。",
         "baseCodingAgentRequired": "インポート失敗：ベースコーディングエージェントが必要です。",
-        "selectedCodingAgentUnavailable": "インポート失敗：選択されたコーディングエージェントは利用できません。",
+        "selectedCodingAgentUnavailable": "インポート失敗：選択されたコーディングAgentは利用できません。",
         "memberNameRequired": "インポート失敗：AIメンバー名は必須です。",
         "memberNameInvalidChars": "インポート失敗：名前には文字、数字、\"_\" または \"-\" のみ使用できます。",
         "memberNameTooLong": "インポート失敗：AIメンバー名は {{max}} 文字を超えることはできません。",
@@ -354,7 +377,8 @@
         "selectSessionFirst": "まずチャットセッションを選択してください。",
         "sessionArchived": "このセッションはアーカイブされ、読み取り専用です。",
         "noAvailableCodingAgent": "インポート失敗：このプリセットをインポートする利用可能なコーディングエージェントがありません。",
-        "failedToImportTeam": "チームプリセットのインポートに失敗しました。"
+        "failedToImportTeam": "チームプリセットのインポートに失敗しました。",
+        "memberError": "{{member}} - {{message}}"
       }
     },
     "addMemberErrors": {
@@ -365,7 +389,7 @@
       "workspacePathMustBeAbsolute": "追加失敗：ワークスペースパスは絶対パスである必要があります。",
       "invalidWorkspacePath": "追加失敗：無効なワークスペースパスです。",
       "baseCodingAgentRequired": "追加失敗：ベースコーディングエージェントは必須です。",
-      "selectedCodingAgentUnavailable": "追加失敗：選択されたコーディングエージェントは利用できません。",
+      "selectedCodingAgentUnavailable": "追加失敗：選択されたコーディングAgentは利用できません。",
       "memberNameRequired": "追加失敗：AIメンバー名は必須です。",
       "memberNameInvalidChars": "追加失敗：名前には文字、数字、\"_\" または \"-\" のみ使用できます。",
       "memberNameTooLong": "追加失敗：AIメンバー名は {{max}} 文字を超えることはできません。",
@@ -786,5 +810,273 @@
       "diffAction": "差分",
       "openExplorerSuccess": "ファイルマネージャーで開きました。"
     }
-  }
+  },
+  "workflow": {
+    "approvalCard": {
+      "title": "承認が必要",
+      "approve": "承認",
+      "reject": "却下"
+    },
+    "permissionCard": {
+      "title": "権限リクエスト",
+      "grant": "許可",
+      "deny": "拒否"
+    },
+    "continueCard": {
+      "title": "続行しますか？",
+      "confirm": "続行"
+    },
+    "inputCard": {
+      "title": "入力が必要",
+      "placeholder": "ここに回答を入力してください",
+      "submit": "送信"
+    },
+    "inspector": {
+      "tabDetails": "詳細",
+      "tabLogs": "ログ",
+      "noInstructions": "このステップにはタスク指示が提供されていません。",
+      "noSummary": "このステップの要約はまだ生成されていません。",
+      "loopPrefix": "ループ：{{name}}",
+      "reviewPrefix": "レビュー：{{label}}",
+      "instructionHeading": "指示",
+      "summaryHeading": "要約",
+      "feedbackHeading": "フィードバック",
+      "executionRecordHeading": "実行記録出力",
+      "loadingTranscript": "記録を読み込み中...",
+      "noOutputEntries": "このステップの出力記録はまだありません。",
+      "errorHeading": "エラー",
+      "loadingLogs": "ログを読み込み中...",
+      "thinkingProcess": "{{agentName}} - 思考プロセス",
+      "expand": "展開",
+      "collapse": "折りたたむ",
+      "noLogs": "このステップのログはまだありません。",
+      "closeChat": "チャットを閉じる",
+      "openChat": "チャットを開く",
+      "terminate": "終了"
+    },
+    "chatPanel": {
+      "title": "エージェント会話",
+      "approvalRequired": "承認が必要",
+      "permissionRequest": "権限リクエスト",
+      "continuePrompt": "続行しますか？",
+      "continueAction": "続行",
+      "approveAction": "承認",
+      "rejectAction": "却下",
+      "replyPlaceholder": "エージェントに返信...",
+      "readOnlyPlaceholder": "このステップが入力待ちまたはレビュー待ちのときだけ返信できます。"
+    },
+    "status": {
+      "recompiling": "プランを再コンパイル中...",
+      "completed": "完了 - {{summary}}",
+      "completedDefault": "全ステップ完了",
+      "failed": "失敗 - {{error}}",
+      "failedDefault": "実行エラー",
+      "progress": "進捗 {{percent}}% · {{completed}}/{{total}} ステップ"
+    },
+    "controls": {
+      "executePlan": "プランを実行",
+      "resume": "再開",
+      "pauseAll": "すべて一時停止",
+      "stop": "停止"
+    },
+    "reviewSettings": {
+      "title": "レビュー設定",
+      "description": "各ワークフロー結果のレビュー担当者を選択します。",
+      "close": "レビュー設定を閉じる",
+      "taskSteps": "タスクステップ",
+      "leadUserReview": "リード / ユーザーレビュー",
+      "leadLabel": "リード",
+      "userLabel": "ユーザー",
+      "leadReviewOn": "このタスクステップのリードエージェントレビューを有効にする",
+      "leadReviewOff": "このタスクステップのリードエージェントレビューを無効にする",
+      "userReviewOn": "このタスクステップのユーザーレビューを有効にする",
+      "userReviewOff": "このタスクステップのユーザーレビューを無効にする",
+      "workflowLoops": "ワークフローループ",
+      "userReviewOnly": "ユーザーレビューのみ",
+      "loopUserReviewOn": "このワークフローループのユーザーレビューを有効にする",
+      "loopUserReviewOff": "このワークフローループのユーザーレビューを無効にする",
+      "cancel": "キャンセル",
+      "saving": "保存中...",
+      "saveChanges": "変更を保存",
+      "executionFinishedError": "実行完了後はレビュー設定を変更できません。",
+      "finishedMessage": "現在のワークフロー状態ではレビュー設定を変更できません。",
+      "updateError": "レビュー設定を更新できません。"
+    },
+    "notifications": {
+      "pendingReview": "レビュー待ち",
+      "typeFinal": "最終",
+      "typeStep": "ステップ",
+      "accept": "承認",
+      "reject": "却下",
+      "approve": "承認",
+      "viewDetails": "詳細を表示",
+      "finalReviewTitle": "最終レビュー",
+      "reviewRequired": "レビューが必要",
+      "pendingInput": "入力が必要",
+      "typeInput": "入力",
+      "inputRequired": "入力が必要です",
+      "respond": "返信"
+    },
+    "card": {
+      "generatingPlan": "ワークフロープランを生成中",
+      "stateLabels": {
+        "planGenerationFailed": "プラン生成失敗",
+        "generatingPlan": "プラン生成中",
+        "recompilingPlan": "プラン再コンパイル中",
+        "workItem": "ワークアイテム",
+        "executionFailed": "実行失敗",
+        "planReady": "プラン準備完了",
+        "planInvalid": "プラン無効",
+        "actionRequired": "アクションが必要",
+        "paused": "一時停止中",
+        "preparing": "準備中",
+        "workflowRunning": "ワークフロー実行中"
+      },
+      "badges": {
+        "failed": "失敗",
+        "generating": "生成中"
+      },
+      "emptyGraph": {
+        "planGenerationFailed": "プレビュー作成前にプラン生成が停止しました。同じ目標から新しいプランを生成するには再試行してください。",
+        "planGenerationPending": "システムがワークフロープランを作成中です。プレビューが準備できるとこのカードが更新されます。",
+        "noGraph": "ワークフローグラフはまだ利用できません。",
+        "planDraft": "プラン草案",
+        "workflow": "ワークフロー"
+      },
+      "buttons": {
+        "open": "開く",
+        "executePlan": "プランを実行",
+        "pauseAll": "すべて一時停止",
+        "resume": "再開",
+        "retrying": "再試行中...",
+        "retryPlanGeneration": "プラン生成を再試行"
+      },
+      "errors": {
+        "validationErrors": "バリデーションエラー",
+        "generationError": "生成エラー",
+        "retryRequestFailed": "再試行リクエスト失敗"
+      },
+      "finalDelivery": "最終成果物"
+    },
+    "iterationFeedback": {
+      "round": "ラウンド {{round}}",
+      "steps": "ステップ",
+      "status": "ステータス",
+      "running": "実行中",
+      "regeneratingPlan": "計画を再生成中",
+      "idle": "アイドル",
+      "currentStep": "現在のステップ",
+      "reviewRequired": "レビューが必要",
+      "rejectWithFeedback": "フィードバック付きで却下",
+      "whatWrongLabel": "何が問題でしたか？",
+      "whatWrongPlaceholder": "問題を説明してください...",
+      "expectedLabel": "期待される結果",
+      "expectedPlaceholder": "何が起こるべきでしたか？",
+      "priorityLabel": "優先度",
+      "priorityHigh": "高",
+      "priorityMedium": "中",
+      "priorityLow": "低",
+      "additionalNotesLabel": "追加メモ",
+      "additionalNotesPlaceholder": "任意のメモ...",
+      "validationError": "却下には問題の説明と期待される結果が必要です。",
+      "accept": "承認",
+      "submitRejection": "却下を送信",
+      "reject": "却下",
+      "cancel": "キャンセル"
+    },
+    "pendingReview": {
+      "title": "レビュー待ち",
+      "reviewTypes": {
+        "stepReview": "ステップレビュー",
+        "loopReview": "ループレビュー",
+        "finalReview": "最終レビュー"
+      },
+      "defaultMessage": "現在の結果をレビューしてください。",
+      "context": "コンテキスト",
+      "feedbackLabel": "フィードバック",
+      "feedbackPlaceholder": "具体的な修正意見を入力してください",
+      "validationError": "却下にはフィードバックが必要です。",
+      "approve": "承認",
+      "submitReject": "却下を送信",
+      "reject": "却下"
+    },
+    "generatedText": {
+      "reviewLoop": "ループ「{{loopKey}}」をレビューしてください。",
+      "userApprovedStepResult": "ユーザーがステップ結果を承認しました。"
+    },
+    "finalReview": {
+      "title": "最終レビュー",
+      "defaultMessage": "タスクが完了しました。結果を承認しますか？",
+      "accept": "承認",
+      "reject": "却下"
+    },
+    "graph": {
+      "tip": "（ヒント：スクロールでズーム、ドラッグで移動）",
+      "layoutWarning": "レイアウト警告：フォールバックレイアウトを使用中",
+      "fitView": "キャンバスに合わせる",
+      "leadFallback": "リード"
+    },
+    "executionStatus": {
+      "running": "実行中",
+      "failed": "失敗",
+      "paused": "一時停止中",
+      "waiting": "レビュー待ち",
+      "recompiling": "計画を再生成中",
+      "completed": "完了",
+      "pending": "準備中"
+    },
+    "statusLabels": {
+      "interrupted": "中断済み",
+      "stopRequested": "停止リクエスト中",
+      "waitingInput": "入力待ち",
+      "reviewing": "レビュー中",
+      "preCompleted": "事前完了",
+      "pending": "保留中",
+      "running": "実行中",
+      "ready": "準備完了",
+      "waitingReview": "レビュー中",
+      "waitingUser": "ユーザー待ち",
+      "passed": "合格",
+      "completed": "完了",
+      "rejected": "却下",
+      "failed": "失敗",
+      "loop": "ループ"
+    },
+    "reviewPhase": {
+      "executing": "実行中",
+      "leadReview": "リードレビュー",
+      "waitingUser": "ユーザー待ち"
+    },
+    "reviewVerdict": {
+      "accepted": "承認済み",
+      "approved": "承認済み",
+      "rejected": "却下済み",
+      "reviewed": "レビュー済み"
+    },
+    "pendingInput": {
+      "title": "入力が必要",
+      "defaultPrompt": "続行するにはエージェントに追加の入力が必要です。",
+      "placeholder": "ここに返信を入力",
+      "submit": "送信"
+    }
+  },
+  "leadAgent": {
+    "label": "リードエージェント",
+    "switchError": "リードエージェントの切り替えに失敗しました。もう一度お試しください。",
+    "switchDialog": {
+      "title": "リードエージェントを切り替え",
+      "message": "リードエージェントを「{{currentLeadName}}」から「{{targetLeadName}}」に切り替えますか？",
+      "switching": "切り替え中…",
+      "confirm": "確認"
+    }
+  },
+  "input_tabs": {
+    "workflow": "ワークフロー",
+    "chat": "チャット"
+  },
+  "workflow_plan_generation_unavailable": "このセッションではワークフロープラン生成を利用できません。",
+  "workflow_retry": "再試行",
+  "workflow_retry_task": "タスクを再試行",
+  "workflow_retry_review": "レビューを再試行",
+  "workflow_retry_cancel": "キャンセル"
 }

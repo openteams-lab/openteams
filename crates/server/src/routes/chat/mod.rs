@@ -5,6 +5,7 @@ pub mod runs;
 pub mod sessions;
 pub mod skills;
 pub mod work_items;
+pub mod workflow;
 
 use axum::{Router, extract::DefaultBodyLimit, middleware::from_fn_with_state, routing::get};
 
@@ -47,6 +48,70 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             get(messages::get_messages).post(messages::create_message),
         )
         .route("/work-items", get(work_items::get_work_items))
+        .route(
+            "/workflow/generate-plan-and-run",
+            axum::routing::post(workflow::generate_plan_and_run),
+        )
+        .route(
+            "/workflow/plans/{plan_id}/execute",
+            axum::routing::post(workflow::execute_plan),
+        )
+        .route(
+            "/workflow/plan-generations/{message_id}/retry",
+            axum::routing::post(workflow::retry_plan_generation),
+        )
+        .route(
+            "/workflow/executions/{execution_id}/resume",
+            axum::routing::post(workflow::resume_execution),
+        )
+        .route(
+            "/workflow/executions/{execution_id}/review-settings",
+            axum::routing::post(workflow::update_review_settings),
+        )
+        .route(
+            "/workflow/pause-all",
+            axum::routing::post(workflow::pause_all),
+        )
+        .route(
+            "/workflow-steps/{step_id}/transcripts",
+            get(workflow::get_step_transcripts),
+        )
+        .route(
+            "/workflow-steps/{step_id}/input",
+            axum::routing::post(workflow::submit_step_input),
+        )
+        .route(
+            "/workflow-steps/{step_id}/interrupt",
+            axum::routing::post(workflow::interrupt_step_by_step_id),
+        )
+        .route(
+            "/workflow-steps/{step_id}/stop",
+            axum::routing::post(workflow::stop_step),
+        )
+        .route(
+            "/workflow-steps/{step_id}/approve",
+            axum::routing::post(workflow::approve_step_action),
+        )
+        .route(
+            "/workflow-steps/{step_id}/resolve-permission",
+            axum::routing::post(workflow::resolve_step_permission),
+        )
+        .route(
+            "/workflow-steps/{step_id}/retry",
+            axum::routing::post(workflow::retry_step),
+        )
+        .route(
+            "/workflow/interrupt-step",
+            axum::routing::post(workflow::interrupt_step),
+        )
+        .route(
+            "/workflow/executions/{execution_id}/transcripts",
+            get(workflow::get_transcripts),
+        )
+        .route(
+            "/workflow/resolve-action",
+            axum::routing::post(workflow::resolve_approval),
+        )
         .route(
             "/messages/batch-delete",
             axum::routing::post(messages::delete_messages_batch),
@@ -101,10 +166,15 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route("/", get(agents::get_agents).post(agents::create_agent))
         .nest("/{agent_id}", agent_router);
 
-    let messages_router = Router::new().route(
-        "/{message_id}",
-        get(messages::get_message).delete(messages::delete_message),
-    );
+    let messages_router = Router::new()
+        .route(
+            "/{message_id}",
+            get(messages::get_message).delete(messages::delete_message),
+        )
+        .route(
+            "/{message_id}/workflow-card",
+            get(messages::get_workflow_card),
+        );
 
     // Skill CRUD routes
     let skills_router = Router::new()

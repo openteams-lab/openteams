@@ -1,7 +1,7 @@
 import React from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json, jsonParseLinter } from '@codemirror/lang-json';
-import { linter } from '@codemirror/lint';
+import { linter, type LintSource } from '@codemirror/lint';
 import { indentOnInput } from '@codemirror/language';
 import { EditorView } from '@codemirror/view';
 import { useTheme } from '@/components/ThemeProvider';
@@ -63,7 +63,7 @@ export const JSONEditor: React.FC<JSONEditorProps> = ({
         }}
         extensions={[
           json(),
-          linter(jsonParseLinter()),
+          linter(jsonParseLinter() as unknown as LintSource),
           indentOnInput(),
           EditorView.lineWrapping,
           disabled ? EditorView.editable.of(false) : [],

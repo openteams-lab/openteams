@@ -12,7 +12,6 @@ use db::{
         chat_message::{ChatMessage, ChatSenderType},
         chat_session::{ChatSession, ChatSessionStatus},
         chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
-        chat_skill::ChatSkill,
     },
 };
 use executors::executors::CancellationToken;
@@ -26,9 +25,8 @@ use uuid::Uuid;
 use super::{
     AgentProtocolError, AgentProtocolMessageType, ChatProtocolNoticeCode, ChatRunner,
     ChatStreamEvent, MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON, MAX_PROTOCOL_PARSE_RETRIES,
-    MessageAttachmentContext, PROTOCOL_OUTPUT_SCHEMA_JSON, ProtocolProcessResult,
-    RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE, RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE, ReferenceAttachment,
-    ReferenceContext, ResolvedPromptLanguage, RunCompletionStatus, SessionAgentSummary,
+    PROTOCOL_OUTPUT_SCHEMA_JSON, RUNS_MAX_TOTAL_BYTES_PER_WORKSPACE,
+    RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE, ResolvedPromptLanguage, RunCompletionStatus,
     TokenUsageInfo, runtime::RunLogForwarders,
 };
 use crate::services::config::UiLanguage;
@@ -63,28 +61,6 @@ fn test_agent(name: &str, system_prompt: &str) -> ChatAgent {
         system_prompt: system_prompt.to_string(),
         model_name: None,
         tools_enabled: sqlx::types::Json(json!({})),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-    }
-}
-
-fn test_skill(name: &str, description: &str, trigger_type: &str) -> ChatSkill {
-    ChatSkill {
-        id: Uuid::new_v4(),
-        name: name.to_string(),
-        description: description.to_string(),
-        content: String::new(),
-        trigger_type: trigger_type.to_string(),
-        trigger_keywords: sqlx::types::Json(Vec::new()),
-        enabled: true,
-        source: "local".to_string(),
-        source_url: None,
-        version: "1.0.0".to_string(),
-        author: None,
-        tags: sqlx::types::Json(Vec::new()),
-        category: None,
-        compatible_agents: sqlx::types::Json(Vec::new()),
-        download_count: 0,
         created_at: Utc::now(),
         updated_at: Utc::now(),
     }
@@ -130,6 +106,8 @@ async fn setup_chat_runner_db() -> DBService {
                 team_protocol TEXT DEFAULT '',
                 team_protocol_enabled INTEGER DEFAULT 0,
                 default_workspace_path TEXT,
+                chat_input_mode TEXT,
+                lead_agent_id TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 archived_at TEXT
@@ -200,7 +178,7 @@ async fn setup_chat_runner_db() -> DBService {
     DBService { pool }
 }
 
-async fn insert_test_chat_session(db: &DBService, session_id: Uuid) {
+async fn insert_test_chat_session(db: &DBService, session_id: Uuid) -> ChatSession {
     sqlx::query(
         r#"
         INSERT INTO chat_sessions (id, title, status)
@@ -213,6 +191,11 @@ async fn insert_test_chat_session(db: &DBService, session_id: Uuid) {
     .execute(&db.pool)
     .await
     .expect("insert chat session");
+
+    ChatSession::find_by_id(&db.pool, session_id)
+        .await
+        .expect("find inserted chat session")
+        .expect("inserted chat session exists")
 }
 
 async fn insert_test_chat_agent(db: &DBService, name: &str) -> ChatAgent {
@@ -270,6 +253,7 @@ async fn default_route_for_unmentioned_user_message_uses_first_session_agent() {
     let db = setup_chat_runner_db().await;
     let runner = ChatRunner::new(db.clone());
     let session_id = Uuid::new_v4();
+    let session = insert_test_chat_session(&db, session_id).await;
     let first_agent = insert_test_chat_agent(&db, "first").await;
     let second_agent = insert_test_chat_agent(&db, "second").await;
     insert_test_session_agent(&db, session_id, first_agent.id).await;
@@ -278,7 +262,7 @@ async fn default_route_for_unmentioned_user_message_uses_first_session_agent() {
     let message = test_message("please handle this", json!({}));
 
     let default_mention = runner
-        .resolve_default_mention_for_unmentioned_user_message(session_id, &message)
+        .resolve_default_mention_for_unmentioned_user_message(&session, &message)
         .await
         .expect("resolve default mention");
 
@@ -290,13 +274,14 @@ async fn default_route_ignores_messages_with_explicit_mentions() {
     let db = setup_chat_runner_db().await;
     let runner = ChatRunner::new(db.clone());
     let session_id = Uuid::new_v4();
+    let session = insert_test_chat_session(&db, session_id).await;
     let first_agent = insert_test_chat_agent(&db, "first").await;
     insert_test_session_agent(&db, session_id, first_agent.id).await;
     let mut message = test_message("@someone please handle this", json!({}));
     message.mentions = sqlx::types::Json(vec!["someone".to_string()]);
 
     let default_mention = runner
-        .resolve_default_mention_for_unmentioned_user_message(session_id, &message)
+        .resolve_default_mention_for_unmentioned_user_message(&session, &message)
         .await
         .expect("resolve default mention");
 
@@ -308,6 +293,7 @@ async fn default_route_ignores_unmentioned_agent_messages() {
     let db = setup_chat_runner_db().await;
     let runner = ChatRunner::new(db.clone());
     let session_id = Uuid::new_v4();
+    let session = insert_test_chat_session(&db, session_id).await;
     let first_agent = insert_test_chat_agent(&db, "first").await;
     insert_test_session_agent(&db, session_id, first_agent.id).await;
     let message = test_message_with_sender(
@@ -318,7 +304,7 @@ async fn default_route_ignores_unmentioned_agent_messages() {
     );
 
     let default_mention = runner
-        .resolve_default_mention_for_unmentioned_user_message(session_id, &message)
+        .resolve_default_mention_for_unmentioned_user_message(&session, &message)
         .await
         .expect("resolve default mention");
 
@@ -511,6 +497,23 @@ fn parse_agent_protocol_messages_rejects_empty_content() {
     let content = r#"[{"type":"conclusion","content":"   "}]"#;
     let err = ChatRunner::parse_agent_protocol_messages(content).expect_err("error");
     assert_eq!(err.code, ChatProtocolNoticeCode::EmptyMessage);
+}
+
+#[test]
+fn protocol_send_routing_blocks_agent_targets_in_workflow_mode() {
+    assert!(!ChatRunner::should_route_protocol_send(
+        true,
+        "backend-runtime"
+    ));
+    assert!(!ChatRunner::should_route_protocol_send(
+        true,
+        "@frontend-dev"
+    ));
+    assert!(ChatRunner::should_route_protocol_send(true, "you"));
+    assert!(ChatRunner::should_route_protocol_send(
+        false,
+        "backend-runtime"
+    ));
 }
 
 #[tokio::test]
@@ -984,7 +987,7 @@ async fn process_agent_protocol_output_requests_retry_for_first_json_shape_failu
         .expect("process protocol output");
 
     match result {
-        ProtocolProcessResult::RetryableParseFailure { code, .. } => {
+        super::ProtocolProcessResult::RetryableParseFailure { code, .. } => {
             assert_eq!(code, ChatProtocolNoticeCode::NotJsonArray);
         }
         other => panic!("expected retryable parse failure, got {other:?}"),
@@ -1027,7 +1030,10 @@ async fn process_agent_protocol_output_reports_error_after_retry_exhaustion() {
         .await
         .expect("process protocol output");
 
-    assert!(matches!(result, ProtocolProcessResult::ProtocolFailure));
+    assert!(matches!(
+        result,
+        super::ProtocolProcessResult::ProtocolFailure
+    ));
 
     let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
         .await
@@ -1164,136 +1170,6 @@ fn resolve_message_sender_identity_uses_agent_sender_label() {
     let sender = ChatRunner::resolve_message_sender_identity(&message);
     assert_eq!(sender.label, "architect");
     assert_eq!(sender.address, "agent:architect");
-}
-
-#[test]
-fn build_system_prompt_markdown_preserves_protocol_content() {
-    let current_agent = test_agent(
-        "product",
-        "You are the Product Manager.\nKeep scope testable.",
-    );
-    let other_agent_id = Uuid::new_v4();
-    let session_agents = vec![SessionAgentSummary {
-        session_agent_id: Uuid::new_v4(),
-        agent_id: other_agent_id,
-        name: "architect".to_string(),
-        runner_type: "codex".to_string(),
-        state: ChatSessionAgentState::Idle,
-        description: Some("You are the System Architect.".to_string()),
-        system_prompt: None,
-        tools_enabled: json!({}),
-        skills_used: vec!["agent-browser".to_string()],
-    }];
-    let skills = vec![test_skill(
-        "agent-browser",
-        "Browser automation CLI for AI agents.",
-        "always",
-    )];
-
-    let prompt = ChatRunner::build_system_prompt_markdown(
-        &current_agent,
-        &session_agents,
-        Path::new(r"E:\workspace\projectSS\MainPage2\.openteams\context\demo"),
-        &skills,
-        Some("Please analyze the page issue"),
-        ResolvedPromptLanguage {
-            setting: "simplified_chinese",
-            code: "zh-Hans",
-            instruction: "You MUST respond in Simplified Chinese.",
-        },
-        Some("Work through explicit handoffs."),
-    );
-
-    assert!(prompt.contains("# ChatGroup Protocol"));
-    assert!(prompt.contains("## agent.role"));
-    assert!(prompt.contains("### agent.skills.allowed item 1"));
-    assert!(prompt.contains("### group.members item 1"));
-    assert!(prompt.contains("## history.group_messages"));
-    assert!(prompt.contains("## output"));
-    assert!(prompt.contains("### output.message_types item 1"));
-    assert!(prompt.contains("## output.example"));
-    assert!(prompt.contains("## language"));
-    assert!(prompt.contains("## team.protocol"));
-    assert!(prompt.contains("Work through explicit handoffs."));
-    assert!(prompt.contains("- **PROTOCOL_VERSION**: chatgroup_markdown_v1"));
-    assert!(prompt.contains("- **allowed_targets**: [\"architect\",\"you\"]"));
-    assert!(prompt.contains("Return ONLY a valid JSON array."));
-    assert!(prompt.contains(
-        "Prioritize reading history when the new message implies continuation or refinement"
-    ));
-    assert!(prompt.contains(
-            "Before writing a record item, if you are unsure whether the fact was already captured, check this file first."
-        ));
-    assert!(
-        prompt
-            .contains("Use this file when you need to review what members have already completed.")
-    );
-    // Use PathBuf to build cross-platform expected path
-    let expected_path = Path::new(r"E:\workspace\projectSS\MainPage2\.openteams\context\demo")
-        .join("messages.jsonl");
-    assert!(prompt.contains(expected_path.to_str().unwrap()));
-    assert!(!prompt.contains("[agent.role]"));
-    assert!(!prompt.contains("PROTOCOL_VERSION ="));
-}
-
-#[test]
-fn build_user_prompt_markdown_preserves_reference_and_attachments() {
-    let agent = test_agent("product", "");
-    let message = test_message_with_sender(
-        ChatSenderType::Agent,
-        Some(Uuid::new_v4()),
-        "@product Please confirm the delivery scope",
-        json!({
-            "sender": {
-                "label": "architect",
-                "name": "architect"
-            }
-        }),
-    );
-    let reference = ReferenceContext {
-        message_id: Uuid::new_v4(),
-        sender_label: "user".to_string(),
-        sender_type: ChatSenderType::User,
-        created_at: "2026-03-10 08:00:00 UTC".to_string(),
-        content: "Referenced message".to_string(),
-        attachments: vec![ReferenceAttachment {
-            name: "spec.md".to_string(),
-            mime_type: Some("text/markdown".to_string()),
-            size_bytes: 128,
-            kind: "file".to_string(),
-            local_path: r"E:\workspace\projectSS\MainPage2\spec.md".to_string(),
-        }],
-    };
-    let message_attachments = MessageAttachmentContext {
-        attachments: vec![ReferenceAttachment {
-            name: "ui.png".to_string(),
-            mime_type: Some("image/png".to_string()),
-            size_bytes: 256,
-            kind: "image".to_string(),
-            local_path: r"E:\workspace\projectSS\MainPage2\ui.png".to_string(),
-        }],
-    };
-
-    let prompt = ChatRunner::build_user_prompt_markdown(
-        &agent,
-        &message,
-        Some(&message_attachments),
-        Some(&reference),
-    );
-
-    assert!(prompt.contains("## envelope"));
-    assert!(prompt.contains("## message"));
-    assert!(prompt.contains("### message.reference"));
-    assert!(prompt.contains("#### message.reference.attachments item 1"));
-    assert!(prompt.contains("### message.attachments item 1"));
-    assert!(prompt.contains("- **from**: agent:architect"));
-    assert!(prompt.contains("- **to**: agent:product"));
-    assert!(prompt.contains("```text\n@product Please confirm the delivery scope\n```"));
-    assert!(prompt.contains("```text\nReferenced message\n```"));
-    assert!(prompt.contains(r"- **local_path**: E:\workspace\projectSS\MainPage2\spec.md"));
-    assert!(prompt.contains(r"- **local_path**: E:\workspace\projectSS\MainPage2\ui.png"));
-    assert!(!prompt.contains("[message]"));
-    assert!(!prompt.contains("[message.reference]"));
 }
 
 #[test]
@@ -1508,7 +1384,7 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
     );
 
     // Verify key sections exist instead of exact string match
-    assert!(prompt.contains("# ChatGroup Message"));
+    assert!(prompt.contains("# Chat Message"));
     assert!(prompt.contains("## Input Message"));
     assert!(prompt.contains("- sender: you"));
     assert!(prompt.contains("@fullstack"));
@@ -1521,10 +1397,12 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
     assert!(prompt.contains("conclusion`: current-turn summary only"));
     assert!(prompt.contains(PROTOCOL_OUTPUT_SCHEMA_JSON));
     assert!(prompt.contains("### Example"));
+    assert!(!prompt.contains("`workflow_generate`"));
     assert!(prompt.contains("## Agent"));
     assert!(prompt.contains("- name: fullstack"));
     assert!(prompt.contains("Full-stack Engineer"));
-    assert!(prompt.contains("- language: simplified_chinese"));
+    assert!(prompt.contains("## Using language:"));
+    assert!(prompt.contains("simplified_chinese"));
     assert!(prompt.contains("## Team Protocol"));
     assert!(prompt.contains("Follow the team protocol."));
     assert!(prompt.contains("## Group Members"));
@@ -1541,12 +1419,121 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
         prompt_normalized
             .contains(".openteams/context/1475cda0-6f11-464e-a61a-7dc81217810e/work_records.jsonl")
     );
+    assert!(prompt.contains("## Current Turn"));
     assert!(prompt.contains("## Envelope"));
     assert!(prompt.contains("- session_id: 1475cda0-6f11-464e-a61a-7dc81217810e"));
     assert!(prompt.contains("- from: user:you"));
     assert!(prompt.contains("- to: agent:fullstack"));
     assert!(prompt.contains("- message_id: 88bd7b05-1ba3-407c-8ca3-a52f14c8aced"));
     assert!(prompt.contains("- timestamp: 2026-03-10 06:22:12.973 UTC"));
+    assert!(
+        prompt
+            .find("## Output Requirements")
+            .expect("output requirements section")
+            < prompt
+                .find("## Current Turn")
+                .expect("current turn section")
+    );
+    assert!(
+        prompt.find("## History").expect("history section")
+            < prompt
+                .find("## Current Turn")
+                .expect("current turn section")
+    );
+}
+
+#[test]
+fn build_exact_markdown_prompt_restricts_send_targets_in_workflow_mode() {
+    let agent = test_agent("planner", "Workflow lead");
+    let message = test_message(
+        "Generate a workflow plan",
+        json!({ "chat_input_mode": "workflow" }),
+    );
+
+    let prompt = ChatRunner::build_exact_markdown_prompt(
+        &agent,
+        &message,
+        Path::new(r"E:\workspace\projectSS\MainPage2\.openteams\context\demo"),
+        Path::new(r"E:\workspace\projectSS\MainPage2"),
+        &[],
+        None,
+        None,
+        &[],
+        ResolvedPromptLanguage {
+            setting: "simplified_chinese",
+            code: "zh-Hans",
+            instruction: "You MUST respond in Simplified Chinese.",
+        },
+        None,
+    );
+
+    assert!(prompt.contains("Workflow mode: `send.to` may only be `\"you\"`"));
+    assert!(prompt.contains("do not send workflow-mode messages to other agents"));
+    assert!(!prompt.contains("`send.to` must match a group member name"));
+    assert!(prompt.contains("`workflow_generate`"));
+    assert!(prompt.contains("plan_check"));
+    assert!(prompt.contains(
+        "Emit `workflow_generate` only when the user explicitly asks to start generating an execution plan."
+    ));
+    assert!(prompt.contains("`生成计划`, `开始执行`, `开始落实`, `进入执行`"));
+}
+
+#[test]
+fn build_exact_markdown_prompt_keeps_current_turn_after_stable_prefix() {
+    let agent = test_agent("planner", "Workflow lead");
+    let first_message = test_message(
+        "Generate a workflow plan for task A",
+        json!({ "chat_input_mode": "workflow" }),
+    );
+    let second_message = test_message(
+        "Generate a workflow plan for task B",
+        json!({ "chat_input_mode": "workflow" }),
+    );
+
+    let first_prompt = ChatRunner::build_exact_markdown_prompt(
+        &agent,
+        &first_message,
+        Path::new(r"E:\workspace\projectSS\MainPage2\.openteams\context\demo"),
+        Path::new(r"E:\workspace\projectSS\MainPage2"),
+        &[],
+        None,
+        None,
+        &[],
+        ResolvedPromptLanguage {
+            setting: "simplified_chinese",
+            code: "zh-Hans",
+            instruction: "You MUST respond in Simplified Chinese.",
+        },
+        None,
+    );
+    let second_prompt = ChatRunner::build_exact_markdown_prompt(
+        &agent,
+        &second_message,
+        Path::new(r"E:\workspace\projectSS\MainPage2\.openteams\context\demo"),
+        Path::new(r"E:\workspace\projectSS\MainPage2"),
+        &[],
+        None,
+        None,
+        &[],
+        ResolvedPromptLanguage {
+            setting: "simplified_chinese",
+            code: "zh-Hans",
+            instruction: "You MUST respond in Simplified Chinese.",
+        },
+        None,
+    );
+
+    let first_prefix = first_prompt
+        .split_once("## Current Turn")
+        .expect("current turn section")
+        .0;
+    let second_prefix = second_prompt
+        .split_once("## Current Turn")
+        .expect("current turn section")
+        .0;
+    assert_eq!(first_prefix, second_prefix);
+    assert!(first_prompt.contains("Generate a workflow plan for task A"));
+    assert!(second_prompt.contains("Generate a workflow plan for task B"));
 }
 
 #[test]
@@ -1766,12 +1753,14 @@ fn resolve_session_team_protocol_returns_enabled_session_content_only() {
         id: Uuid::new_v4(),
         title: Some("demo".to_string()),
         status: ChatSessionStatus::Active,
+        lead_agent_id: None,
         summary_text: None,
         archive_ref: None,
         last_seen_diff_key: None,
         team_protocol: Some("  Follow the team protocol.  ".to_string()),
         team_protocol_enabled: true,
         default_workspace_path: None,
+        chat_input_mode: None,
         created_at: now,
         updated_at: now,
         archived_at: None,
@@ -1790,12 +1779,14 @@ fn resolve_session_team_protocol_ignores_disabled_or_empty_session_content() {
         id: Uuid::new_v4(),
         title: Some("demo".to_string()),
         status: ChatSessionStatus::Active,
+        lead_agent_id: None,
         summary_text: None,
         archive_ref: None,
         last_seen_diff_key: None,
         team_protocol: Some("Follow the team protocol.".to_string()),
         team_protocol_enabled: false,
         default_workspace_path: None,
+        chat_input_mode: None,
         created_at: now,
         updated_at: now,
         archived_at: None,
@@ -1804,12 +1795,14 @@ fn resolve_session_team_protocol_ignores_disabled_or_empty_session_content() {
         id: Uuid::new_v4(),
         title: Some("demo".to_string()),
         status: ChatSessionStatus::Active,
+        lead_agent_id: None,
         summary_text: None,
         archive_ref: None,
         last_seen_diff_key: None,
         team_protocol: Some("   ".to_string()),
         team_protocol_enabled: true,
         default_workspace_path: None,
+        chat_input_mode: None,
         created_at: now,
         updated_at: now,
         archived_at: None,

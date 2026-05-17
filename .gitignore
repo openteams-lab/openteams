@@ -6,6 +6,8 @@ src-tauri/bin/
 binaries/
 openteams-cli/binaries/
 **/dist/
+.claude/
+.kiro/
 
 # Node.js
 node_modules/

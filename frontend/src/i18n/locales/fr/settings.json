@@ -745,7 +745,10 @@
           "namePlaceholder": "ex. Équipe de développement full-stack",
           "description": "Descriptif",
           "descriptionPlaceholder": "À quoi sert cette équipe",
-          "members": "Membres de l'équipe"
+          "members": "Membres de l'équipe",
+          "leadAgent": "Agent principal",
+          "leadAgentDescription": "Le membre responsable de la génération des plans d'exécution en mode workflow. Par défaut, le premier membre si non défini.",
+          "leadAgentDefault": "Par défaut (premier membre)"
         }
       }
     }
@@ -837,7 +840,10 @@
           "namePlaceholder": "ex. Équipe de développement full-stack",
           "description": "Descriptif",
           "descriptionPlaceholder": "ex. Équipe de développement end-to-end",
-          "members": "Membres de l'équipe"
+          "members": "Membres de l'équipe",
+          "leadAgent": "Agent principal",
+          "leadAgentDescription": "Le membre responsable de la génération des plans d'exécution en mode workflow. Par défaut, le premier membre si non défini.",
+          "leadAgentDefault": "Par défaut (premier membre)"
         }
       }
     }

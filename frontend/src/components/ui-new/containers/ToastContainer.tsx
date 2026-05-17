@@ -29,9 +29,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (message: string, type: 'success' | 'error' = 'success') => {
       const id = nextId++;
       setToasts((prev) => [...prev, { id, message, type }]);
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, 3000);
+      setTimeout(
+        () => {
+          setToasts((prev) => prev.filter((t) => t.id !== id));
+        },
+        type === 'error' ? 6000 : 3000
+      );
     },
     []
   );

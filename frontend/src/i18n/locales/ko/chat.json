@@ -98,7 +98,30 @@
         "value": "현재 UI의 비주얼 스타일을 검토하세요. 타이포그래피, 색상, 간격, 계층 구조, 상호작용 일관성에 대해 구체적으로 피드백하고 가장 영향력 큰 개선점을 제안해 주세요."
       }
     },
-    "mentionAgents": "에이전트 멘션",
+    "modeCards": {
+      "label": "작업 모드 옵션",
+      "workflow": {
+        "label": "워크플로 모드",
+        "description": "메인 Agent와 요구사항을 확인하고, 방안을 논의하며, 계획을 생성하고 작업을 실행합니다. 복잡한 작업에 적합합니다.",
+        "detail": "워크플로 모드에서는 메인 Agent와 대화하며, 메인 Agent가 계획을 생성하고 다른 멤버에게 작업을 배정합니다.\n시스템은 계획을 시각적인 작업 노드 그래프로 변환하고 자동으로 스케줄링하므로 각 작업의 실행 상황을 명확하게 추적할 수 있습니다.\n워크플로가 정식으로 실행되기 전에는 계획을 자유롭게 수정할 수 있습니다. 첫 번째 라운드 결과가 기대에 미치지 못하면 새 반복을 시작할 수 있습니다.\nAI 멤버 목록에서 멤버 정보 카드를 클릭해 메인 Agent를 전환할 수 있습니다."
+      },
+      "free": {
+        "label": "자유 채팅 모드",
+        "description": "@로 원하는 Agent와 대화할 수 있습니다. Agent끼리도 자유롭게 소통할 수 있어 간단한 작업이나 일상적인 그룹 채팅에 적합합니다.",
+        "detail": "자유 채팅 모드에서는 원하는 멤버를 직접 @하여 작업을 맡길 수 있습니다.\nAgent들은 팀 프로토콜을 지키면서 자유롭게 토론하고 협업할 수 있습니다.\n자유 채팅 모드는 팀 프로토콜로 멤버의 행동과 협업을 이끌어 더 다양한 협업 방식을 탐색할 수 있습니다."
+      },
+      "switchHint": "메시지 입력창 하단의 전환 버튼으로 언제든 작업 모드를 바꿀 수 있습니다. 전환 후에도 컨텍스트는 계속 공유됩니다."
+    },
+    "mentionAgents": "@팀 멤버",
+    "chatModeName": "자유 채팅 모드",
+    "workflowModeName": "워크플로 모드",
+    "modeSwitchTooltip": "현재 {{currentMode}}, 클릭하면 {{targetMode}}로 전환됩니다",
+    "switchToFreeMode": "자유 채팅 모드로 전환",
+    "switchToWorkflowMode": "워크플로 모드로 전환",
+    "freeModeDescription": "자유 채팅 모드: @로 메시지를 멤버에게 라우팅합니다.",
+    "workflowModeDescription": "워크플로 모드: 메시지가 메인 Agent로 라우팅됩니다.",
+    "workflowModeLabel": "- 워크플로 모드",
+    "workflowPlaceholder": "메인 Agent와 방안을 논의하고, 계획을 생성한 뒤 실행하세요...",
     "mentionAllOption": "모든 멤버 (@all)",
     "mentionAllSuggestion": "@모든 멤버",
     "mentionAllBadge": "@all",
@@ -345,7 +368,7 @@
         "invalidWorkspacePath": "가져오기 실패: 유효하지 않은 워크스페이스 경로입니다.",
         "nothingToImport": "가져오기 실패: 이 팀 프리셋에서 가져올 내용이 없습니다.",
         "baseCodingAgentRequired": "가져오기 실패: 기본 코딩 에이전트가 필요합니다.",
-        "selectedCodingAgentUnavailable": "가져오기 실패: 선택한 코딩 에이전트를 사용할 수 없습니다.",
+        "selectedCodingAgentUnavailable": "가져오기 실패: 선택한 코딩 Agent를 사용할 수 없습니다.",
         "memberNameRequired": "가져오기 실패: AI 멤버 이름은 필수입니다.",
         "memberNameInvalidChars": "가져오기 실패: 이름에는 문자, 숫자, \"_\" 또는 \"-\"만 사용할 수 있습니다.",
         "memberNameTooLong": "가져오기 실패: AI 멤버 이름은 {{max}}자를 초과할 수 없습니다.",
@@ -354,7 +377,8 @@
         "selectSessionFirst": "먼저 채팅 세션을 선택하세요.",
         "sessionArchived": "이 세션은 보관되었으며 읽기 전용입니다.",
         "noAvailableCodingAgent": "가져오기 실패: 이 프리셋을 가져올 사용 가능한 코딩 에이전트가 없습니다.",
-        "failedToImportTeam": "팀 프리셋 가져오기에 실패했습니다."
+        "failedToImportTeam": "팀 프리셋 가져오기에 실패했습니다.",
+        "memberError": "{{member}} - {{message}}"
       }
     },
     "addMemberErrors": {
@@ -365,7 +389,7 @@
       "workspacePathMustBeAbsolute": "추가 실패: 워크스페이스 경로는 절대 경로여야 합니다.",
       "invalidWorkspacePath": "추가 실패: 잘못된 워크스페이스 경로입니다.",
       "baseCodingAgentRequired": "추가 실패: 기본 코딩 에이전트는 필수입니다.",
-      "selectedCodingAgentUnavailable": "추가 실패: 선택한 코딩 에이전트를 사용할 수 없습니다.",
+      "selectedCodingAgentUnavailable": "추가 실패: 선택한 코딩 Agent를 사용할 수 없습니다.",
       "memberNameRequired": "추가 실패: AI 멤버 이름은 필수입니다.",
       "memberNameInvalidChars": "추가 실패: 이름에는 문자, 숫자, \"_\" 또는 \"-\"만 사용할 수 있습니다.",
       "memberNameTooLong": "추가 실패: AI 멤버 이름은 {{max}}자를 초과할 수 없습니다.",
@@ -786,5 +810,273 @@
       "diffAction": "Diff",
       "openExplorerSuccess": "파일 관리자에서 열었습니다."
     }
-  }
+  },
+  "workflow": {
+    "approvalCard": {
+      "title": "승인 필요",
+      "approve": "승인",
+      "reject": "거부"
+    },
+    "permissionCard": {
+      "title": "권한 요청",
+      "grant": "허용",
+      "deny": "거부"
+    },
+    "continueCard": {
+      "title": "계속하시겠습니까?",
+      "confirm": "계속"
+    },
+    "inputCard": {
+      "title": "입력 필요",
+      "placeholder": "여기에 응답을 입력하세요",
+      "submit": "제출"
+    },
+    "inspector": {
+      "tabDetails": "상세",
+      "tabLogs": "로그",
+      "noInstructions": "이 단계에 대한 작업 지침이 제공되지 않았습니다.",
+      "noSummary": "이 단계의 요약이 아직 생성되지 않았습니다.",
+      "loopPrefix": "루프: {{name}}",
+      "reviewPrefix": "리뷰: {{label}}",
+      "instructionHeading": "지침",
+      "summaryHeading": "요약",
+      "feedbackHeading": "피드백",
+      "executionRecordHeading": "실행 기록 출력",
+      "loadingTranscript": "기록 로딩 중...",
+      "noOutputEntries": "이 단계의 출력 기록이 아직 없습니다.",
+      "errorHeading": "오류",
+      "loadingLogs": "로그 로딩 중...",
+      "thinkingProcess": "{{agentName}} - 사고 과정",
+      "expand": "펼치기",
+      "collapse": "접기",
+      "noLogs": "이 단계의 로그가 아직 없습니다.",
+      "closeChat": "채팅 닫기",
+      "openChat": "채팅 열기",
+      "terminate": "종료"
+    },
+    "chatPanel": {
+      "title": "에이전트 대화",
+      "approvalRequired": "승인 필요",
+      "permissionRequest": "권한 요청",
+      "continuePrompt": "계속하시겠습니까?",
+      "continueAction": "계속",
+      "approveAction": "승인",
+      "rejectAction": "거부",
+      "replyPlaceholder": "에이전트에게 답장...",
+      "readOnlyPlaceholder": "이 단계가 입력 대기 또는 리뷰 대기일 때만 답장할 수 있습니다."
+    },
+    "status": {
+      "recompiling": "계획 재컴파일 중...",
+      "completed": "완료 - {{summary}}",
+      "completedDefault": "모든 단계 완료",
+      "failed": "실패 - {{error}}",
+      "failedDefault": "실행 오류",
+      "progress": "진행률 {{percent}}% · {{completed}}/{{total}} 단계"
+    },
+    "controls": {
+      "executePlan": "계획 실행",
+      "resume": "재개",
+      "pauseAll": "모두 일시정지",
+      "stop": "중지"
+    },
+    "reviewSettings": {
+      "title": "리뷰 설정",
+      "description": "각 워크플로 결과의 리뷰 담당자를 선택합니다.",
+      "close": "리뷰 설정 닫기",
+      "taskSteps": "작업 단계",
+      "leadUserReview": "리드 / 사용자 리뷰",
+      "leadLabel": "리드",
+      "userLabel": "사용자",
+      "leadReviewOn": "이 작업 단계의 리드 에이전트 리뷰 활성화",
+      "leadReviewOff": "이 작업 단계의 리드 에이전트 리뷰 비활성화",
+      "userReviewOn": "이 작업 단계의 사용자 리뷰 활성화",
+      "userReviewOff": "이 작업 단계의 사용자 리뷰 비활성화",
+      "workflowLoops": "워크플로 루프",
+      "userReviewOnly": "사용자 리뷰만",
+      "loopUserReviewOn": "이 워크플로 루프의 사용자 리뷰 활성화",
+      "loopUserReviewOff": "이 워크플로 루프의 사용자 리뷰 비활성화",
+      "cancel": "취소",
+      "saving": "저장 중...",
+      "saveChanges": "변경 사항 저장",
+      "executionFinishedError": "실행 완료 후에는 리뷰 설정을 변경할 수 없습니다.",
+      "finishedMessage": "현재 워크플로 상태에서는 리뷰 설정을 수정할 수 없습니다.",
+      "updateError": "리뷰 설정을 업데이트할 수 없습니다."
+    },
+    "notifications": {
+      "pendingReview": "리뷰 대기",
+      "typeFinal": "최종",
+      "typeStep": "단계",
+      "accept": "수락",
+      "reject": "거부",
+      "approve": "승인",
+      "viewDetails": "상세 보기",
+      "finalReviewTitle": "최종 리뷰",
+      "reviewRequired": "리뷰 필요",
+      "pendingInput": "입력 필요",
+      "typeInput": "입력",
+      "inputRequired": "입력이 필요합니다",
+      "respond": "응답"
+    },
+    "card": {
+      "generatingPlan": "워크플로 계획 생성 중",
+      "stateLabels": {
+        "planGenerationFailed": "계획 생성 실패",
+        "generatingPlan": "계획 생성 중",
+        "recompilingPlan": "계획 재컴파일 중",
+        "workItem": "작업 항목",
+        "executionFailed": "실행 실패",
+        "planReady": "계획 준비 완료",
+        "planInvalid": "계획 무효",
+        "actionRequired": "조치 필요",
+        "paused": "일시정지됨",
+        "preparing": "준비 중",
+        "workflowRunning": "워크플로 실행 중"
+      },
+      "badges": {
+        "failed": "실패",
+        "generating": "생성 중"
+      },
+      "emptyGraph": {
+        "planGenerationFailed": "미리보기 생성 전에 계획 생성이 중단되었습니다. 동일한 목표에서 새 계획을 생성하려면 재시도하세요.",
+        "planGenerationPending": "시스템이 워크플로 계획을 작성 중입니다. 미리보기가 준비되면 이 카드가 업데이트됩니다.",
+        "noGraph": "아직 사용 가능한 워크플로 그래프가 없습니다.",
+        "planDraft": "계획 초안",
+        "workflow": "워크플로"
+      },
+      "buttons": {
+        "open": "열기",
+        "executePlan": "계획 실행",
+        "pauseAll": "모두 일시정지",
+        "resume": "재개",
+        "retrying": "재시도 중...",
+        "retryPlanGeneration": "계획 생성 재시도"
+      },
+      "errors": {
+        "validationErrors": "유효성 검사 오류",
+        "generationError": "생성 오류",
+        "retryRequestFailed": "재시도 요청 실패"
+      },
+      "finalDelivery": "최종 산출물"
+    },
+    "iterationFeedback": {
+      "round": "라운드 {{round}}",
+      "steps": "단계",
+      "status": "상태",
+      "running": "실행 중",
+      "regeneratingPlan": "계획 재생성 중",
+      "idle": "대기",
+      "currentStep": "현재 단계",
+      "reviewRequired": "리뷰 필요",
+      "rejectWithFeedback": "피드백과 함께 거부",
+      "whatWrongLabel": "무엇이 잘못되었나요?",
+      "whatWrongPlaceholder": "문제를 설명하세요...",
+      "expectedLabel": "기대 결과",
+      "expectedPlaceholder": "무엇이 일어나야 했나요?",
+      "priorityLabel": "우선순위",
+      "priorityHigh": "높음",
+      "priorityMedium": "보통",
+      "priorityLow": "낮음",
+      "additionalNotesLabel": "추가 메모",
+      "additionalNotesPlaceholder": "선택적 메모...",
+      "validationError": "거부하려면 문제 설명과 기대 결과가 필요합니다.",
+      "accept": "수락",
+      "submitRejection": "거부 제출",
+      "reject": "거부",
+      "cancel": "취소"
+    },
+    "pendingReview": {
+      "title": "리뷰 대기",
+      "reviewTypes": {
+        "stepReview": "단계 리뷰",
+        "loopReview": "루프 리뷰",
+        "finalReview": "최종 리뷰"
+      },
+      "defaultMessage": "현재 결과를 리뷰해 주세요.",
+      "context": "컨텍스트",
+      "feedbackLabel": "피드백",
+      "feedbackPlaceholder": "구체적인 수정 의견을 입력하세요",
+      "validationError": "거부하려면 피드백이 필요합니다.",
+      "approve": "승인",
+      "submitReject": "거부 제출",
+      "reject": "거부"
+    },
+    "generatedText": {
+      "reviewLoop": "루프 \"{{loopKey}}\"를 검토하세요.",
+      "userApprovedStepResult": "사용자가 단계 결과를 승인했습니다."
+    },
+    "finalReview": {
+      "title": "최종 리뷰",
+      "defaultMessage": "작업이 완료되었습니다. 결과를 수락하시겠습니까?",
+      "accept": "수락",
+      "reject": "거부"
+    },
+    "graph": {
+      "tip": "(팁: 스크롤로 확대/축소, 드래그로 이동)",
+      "layoutWarning": "레이아웃 경고: 대체 레이아웃 사용 중",
+      "fitView": "캔버스에 맞추기",
+      "leadFallback": "리드"
+    },
+    "executionStatus": {
+      "running": "실행 중",
+      "failed": "실패",
+      "paused": "일시 중지됨",
+      "waiting": "검토 대기 중",
+      "recompiling": "계획 재생성 중",
+      "completed": "완료됨",
+      "pending": "준비 중"
+    },
+    "statusLabels": {
+      "interrupted": "중단됨",
+      "stopRequested": "중지 요청됨",
+      "waitingInput": "입력 대기",
+      "reviewing": "리뷰 중",
+      "preCompleted": "사전 완료",
+      "pending": "대기 중",
+      "running": "실행 중",
+      "ready": "준비 완료",
+      "waitingReview": "리뷰 중",
+      "waitingUser": "사용자 대기",
+      "passed": "통과",
+      "completed": "완료",
+      "rejected": "거부됨",
+      "failed": "실패",
+      "loop": "루프"
+    },
+    "reviewPhase": {
+      "executing": "실행 중",
+      "leadReview": "리드 리뷰",
+      "waitingUser": "사용자 대기"
+    },
+    "reviewVerdict": {
+      "accepted": "수락됨",
+      "approved": "승인됨",
+      "rejected": "거부됨",
+      "reviewed": "리뷰됨"
+    },
+    "pendingInput": {
+      "title": "입력 필요",
+      "defaultPrompt": "계속하려면 에이전트에 추가 입력이 필요합니다.",
+      "placeholder": "여기에 답변을 입력하세요",
+      "submit": "제출"
+    }
+  },
+  "leadAgent": {
+    "label": "리드 에이전트",
+    "switchError": "리드 에이전트 전환에 실패했습니다. 다시 시도해 주세요.",
+    "switchDialog": {
+      "title": "리드 에이전트 전환",
+      "message": "리드 에이전트를 \"{{currentLeadName}}\"에서 \"{{targetLeadName}}\"(으)로 전환하시겠습니까?",
+      "switching": "전환 중…",
+      "confirm": "확인"
+    }
+  },
+  "input_tabs": {
+    "workflow": "워크플로",
+    "chat": "채팅"
+  },
+  "workflow_plan_generation_unavailable": "이 세션에서는 워크플로 계획 생성을 사용할 수 없습니다.",
+  "workflow_retry": "다시 시도",
+  "workflow_retry_task": "작업 다시 시도",
+  "workflow_retry_review": "검토 다시 시도",
+  "workflow_retry_cancel": "취소"
 }

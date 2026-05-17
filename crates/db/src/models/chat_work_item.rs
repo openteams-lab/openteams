@@ -36,6 +36,21 @@ pub struct CreateChatWorkItem {
 }
 
 impl ChatWorkItem {
+    pub async fn find_by_run_id(pool: &SqlitePool, run_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as::<_, ChatWorkItem>(
+            r#"
+            SELECT id, session_id, run_id, session_agent_id, agent_id, item_type, content,
+                   created_at
+            FROM chat_work_items
+            WHERE run_id = ?
+            ORDER BY created_at ASC
+            "#,
+        )
+        .bind(run_id)
+        .fetch_all(pool)
+        .await
+    }
+
     pub async fn find_by_session_id(
         pool: &SqlitePool,
         session_id: Uuid,

@@ -153,6 +153,12 @@ impl Deployment for LocalDeployment {
             .await
             .map_err(|err| DeploymentError::Other(err.into()))?;
 
+        if let Err(err) =
+            services::services::workflow_runtime::run_workflow_retention_janitor(&db.pool).await
+        {
+            tracing::warn!(?err, "Workflow retention janitor failed during startup");
+        }
+
         let oauth_credentials = Arc::new(OAuthCredentials::new(credentials_path()));
         if let Err(e) = oauth_credentials.load().await {
             tracing::warn!(?e, "failed to load OAuth credentials");

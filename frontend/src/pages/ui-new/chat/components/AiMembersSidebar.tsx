@@ -32,6 +32,7 @@ import {
   TerminalIcon,
   TrendUpIcon,
   FloppyDiskIcon,
+  CrownSimple,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
@@ -81,6 +82,7 @@ import {
   SaveTeamPresetSnapshotModal,
   type SaveTeamPresetInitialValues,
 } from './SaveTeamPresetSnapshotModal';
+import { LeadAgentConfirmationDialog } from './LeadAgentConfirmationDialog';
 
 const truncateByChars = (value: string, maxChars: number): string => {
   const chars = Array.from(value);
@@ -433,6 +435,9 @@ export interface AiMembersSidebarProps {
   width: number;
   isPanelOpen: boolean;
   onTogglePanel: () => void;
+  // Lead Agent
+  leadAgentId: string | null;
+  isWorkflowMode: boolean;
   // Member form
   isAddMemberOpen: boolean;
   editingMember: SessionMember | null;
@@ -510,6 +515,8 @@ export function AiMembersSidebar({
   isArchived,
   width,
   onTogglePanel,
+  leadAgentId,
+  isWorkflowMode,
   isAddMemberOpen,
   editingMember,
   newMemberName,
@@ -599,6 +606,15 @@ export function AiMembersSidebar({
   const [importPromptEditorIndex, setImportPromptEditorIndex] = useState<
     number | null
   >(null);
+  // Lead Agent switch dialog state
+  const [isLeadSwitchDialogOpen, setIsLeadSwitchDialogOpen] = useState(false);
+  const [targetLeadAgentId, setTargetLeadAgentId] = useState<string | null>(
+    null
+  );
+  const [isLeadSwitching, setIsLeadSwitching] = useState(false);
+  // Effective lead agent: use explicit leadAgentId, or fall back to first member
+  const effectiveLeadAgentId =
+    leadAgentId ?? sessionMembers[0]?.agent.id ?? null;
   const workspacePathPlaceholder = getWorkspacePathExample();
   const teamBulletinTitle = t('members.teamBulletin.title');
   const saveTeamPresetTitle =
@@ -871,6 +887,48 @@ export function AiMembersSidebar({
     setTeamPresetSnapshotError(null);
     setIsTeamPresetSnapshotOpen(true);
   }, []);
+
+  const handleMemberCardClick = useCallback(
+    (member: SessionMember) => {
+      // Only handle lead switch in workflow mode
+      if (!isWorkflowMode) return;
+      // Do nothing if clicking the current lead
+      if (member.agent.id === effectiveLeadAgentId) return;
+      // Open confirmation dialog for non-lead member
+      setTargetLeadAgentId(member.agent.id);
+      setIsLeadSwitchDialogOpen(true);
+    },
+    [isWorkflowMode, effectiveLeadAgentId]
+  );
+
+  const handleLeadSwitchConfirm = useCallback(async () => {
+    if (!activeSessionId || !targetLeadAgentId) return;
+    setIsLeadSwitching(true);
+    try {
+      await chatApi.updateSessionLead(activeSessionId, targetLeadAgentId);
+      await queryClient.invalidateQueries({ queryKey: ['chatSessions'] });
+      setIsLeadSwitchDialogOpen(false);
+      setTargetLeadAgentId(null);
+    } catch (error) {
+      const errorMessage =
+        error instanceof ApiError && error.message
+          ? error.message
+          : t('leadAgent.switchError', {
+              defaultValue: 'Failed to switch Lead Agent. Please try again.',
+            });
+      toast(errorMessage);
+      setIsLeadSwitchDialogOpen(false);
+      setTargetLeadAgentId(null);
+    } finally {
+      setIsLeadSwitching(false);
+    }
+  }, [activeSessionId, targetLeadAgentId, queryClient, t, toast]);
+
+  const handleLeadSwitchCancel = useCallback(() => {
+    if (isLeadSwitching) return;
+    setIsLeadSwitchDialogOpen(false);
+    setTargetLeadAgentId(null);
+  }, [isLeadSwitching]);
 
   const renderPresetTab = () => (
     <div className="flex flex-col min-h-0 flex-1">
@@ -1247,7 +1305,10 @@ export function AiMembersSidebar({
   );
 
   const renderMemberFormPanel = () => (
-    <div className="chat-session-member-form-panel rounded-sm p-base space-y-half">
+    <div
+      className="chat-session-member-form-panel rounded-sm px-1 py-base space-y-half"
+      style={{ marginLeft: '-4px', marginRight: '-4px' }}
+    >
       {!editingMember && (
         <div className="chat-session-member-form-tabs flex gap-1 rounded-xl p-1">
           <button
@@ -1335,9 +1396,9 @@ export function AiMembersSidebar({
             ) : null}
           </div>
         </div>
-        <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto px-base pb-base pt-half space-y-base">
+        <div className="chat-session-members-list flex-1 min-h-0 overflow-y-auto px-1.5 pb-base pt-half space-y-base">
           {activeSessionId && (
-            <section className="mb-1 overflow-hidden rounded-[12px] border border-[#dce6f2] bg-[#fbfdff] shadow-[0_8px_18px_rgba(148,163,184,0.08)] dark:border-[#2A3445] dark:bg-[rgba(18,24,35,0.84)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
+            <section className="mb-1 overflow-hidden rounded-[12px] border border-[#dce6f2] bg-[#f8fafc] dark:border-[#2A3445] dark:bg-[#192233]">
               <button
                 type="button"
                 className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[#f3f8ff] dark:hover:bg-[rgba(94,162,255,0.08)]"
@@ -1454,8 +1515,29 @@ export function AiMembersSidebar({
             return (
               <div key={sessionAgent.id} className="space-y-half">
                 <div
-                  className="chat-session-member-card px-base py-half space-y-half"
+                  className={cn(
+                    'chat-session-member-card px-base py-half space-y-half',
+                    isWorkflowMode &&
+                      agent.id !== effectiveLeadAgentId &&
+                      !isArchived &&
+                      'cursor-pointer'
+                  )}
                   style={getAgentAvatarStyle(avatarSeed)}
+                  onClick={() => handleMemberCardClick({ agent, sessionAgent })}
+                  role={
+                    isWorkflowMode &&
+                    agent.id !== effectiveLeadAgentId &&
+                    !isArchived
+                      ? 'button'
+                      : undefined
+                  }
+                  tabIndex={
+                    isWorkflowMode &&
+                    agent.id !== effectiveLeadAgentId &&
+                    !isArchived
+                      ? 0
+                      : undefined
+                  }
                 >
                   <div className="chat-session-member-header">
                     <div className="chat-session-member-primary flex items-center gap-half min-w-0">
@@ -1475,12 +1557,27 @@ export function AiMembersSidebar({
                         />
                       </span>
                       <MemberNameWithTooltip name={agent.name} />
+                      {isWorkflowMode && agent.id === effectiveLeadAgentId && (
+                        <Tooltip
+                          content={t('leadAgent.label', {
+                            defaultValue: 'Lead Agent',
+                          })}
+                          side="bottom"
+                        >
+                          <span className="chat-session-member-lead-icon">
+                            <CrownSimple className="size-3.5" weight="fill" />
+                          </span>
+                        </Tooltip>
+                      )}
                     </div>
                     <div className="chat-session-member-actions flex items-center gap-half text-xs">
                       <button
                         type="button"
                         className="chat-session-member-action workspace"
-                        onClick={() => onOpenWorkspace(agent.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenWorkspace(agent.id);
+                        }}
                       >
                         {t('members.history')}
                       </button>
@@ -1490,7 +1587,10 @@ export function AiMembersSidebar({
                           'chat-session-member-action edit',
                           isArchived && 'pointer-events-none opacity-50'
                         )}
-                        onClick={() => onEditMember({ agent, sessionAgent })}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditMember({ agent, sessionAgent });
+                        }}
                         disabled={isArchived}
                       >
                         {t('members.edit')}
@@ -1501,7 +1601,10 @@ export function AiMembersSidebar({
                           'chat-session-member-action danger',
                           isArchived && 'pointer-events-none opacity-50'
                         )}
-                        onClick={() => onRemoveMember({ agent, sessionAgent })}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveMember({ agent, sessionAgent });
+                        }}
                         disabled={isArchived}
                       >
                         {t('members.remove')}
@@ -1608,6 +1711,20 @@ export function AiMembersSidebar({
         onExpandPromptEditor={setImportPromptEditorIndex}
         onConfirm={onConfirmTeamImport}
         onCancel={onCancelTeamImport}
+      />
+      <LeadAgentConfirmationDialog
+        isOpen={isLeadSwitchDialogOpen}
+        currentLeadName={
+          sessionMembers.find((m) => m.agent.id === effectiveLeadAgentId)?.agent
+            .name ?? ''
+        }
+        targetLeadName={
+          sessionMembers.find((m) => m.agent.id === targetLeadAgentId)?.agent
+            .name ?? ''
+        }
+        isLoading={isLeadSwitching}
+        onConfirm={handleLeadSwitchConfirm}
+        onCancel={handleLeadSwitchCancel}
       />
     </>
   );

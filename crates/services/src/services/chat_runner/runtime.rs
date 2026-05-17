@@ -3,7 +3,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use super::*;
+use super::{super::workflow_analytics, *};
 
 pub(super) struct ExitWatcherArgs {
     pub(super) child: command_group::AsyncGroupChild,
@@ -1313,6 +1313,18 @@ impl ChatRunner {
                                 &untracked_files,
                             )
                             .await;
+                        let diff_file_count = diff_info
+                            .as_ref()
+                            .map(|info| info.observed_paths.len())
+                            .unwrap_or(0)
+                            + untracked_files.len();
+                        if diff_file_count > 0 {
+                            workflow_analytics::track_diff_generated(
+                                runner.analytics_service(),
+                                session_id,
+                                diff_file_count,
+                            );
+                        }
                         let completion_status =
                             RunCompletionStatus::from_atomic(&completion_status);
                         let should_clear_agent_session = matches!(
@@ -1530,6 +1542,91 @@ impl ChatRunner {
                                 protocol_processing_failed = true;
                                 0
                             }
+                            Ok(ProtocolProcessResult::WorkflowGenerateDetected {
+                                send_count,
+                                plan_check,
+                                workflow_content,
+                                design_doc_paths,
+                            }) => {
+                                tracing::info!(
+                                    session_id = %session_id,
+                                    run_id = %run_id,
+                                    agent_id = %agent_id,
+                                    agent_name = %agent_name,
+                                    plan_check,
+                                    workflow_content_len = workflow_content.len(),
+                                    send_count,
+                                    "[chat_runner] workflow_generate detected; triggering plan generation pipeline"
+                                );
+
+                                if !plan_check {
+                                    let notice_content = "workflow_plan_generation_unavailable";
+                                    match chat::create_message(
+                                        &db.pool,
+                                        session_id,
+                                        ChatSenderType::System,
+                                        None,
+                                        notice_content.to_string(),
+                                        Some(serde_json::json!({
+                                            "type": "workflow_plan_generation_unavailable",
+                                            "i18n": {
+                                                "key": "chat.workflow_plan_generation_unavailable",
+                                                "params": {}
+                                            }
+                                        })),
+                                    )
+                                    .await
+                                    {
+                                        Ok(message) => runner.emit_message_new(session_id, message),
+                                        Err(err) => tracing::warn!(
+                                            session_id = %session_id,
+                                            error = %err,
+                                            "[chat_runner] failed to persist workflow plan unavailable notice"
+                                        ),
+                                    }
+                                } else {
+                                    runner.emit(
+                                        session_id,
+                                        ChatStreamEvent::WorkflowGenerateDetected {
+                                            session_id,
+                                            session_agent_id,
+                                            run_id,
+                                        },
+                                    );
+
+                                    let plan_runner = runner.clone();
+                                    let plan_session_id = session_id;
+                                    let plan_session_agent_id = session_agent_id;
+                                    let plan_agent_id = agent_id;
+                                    let plan_agent_name = agent_name.clone();
+                                    let plan_source_message_id = source_message_id;
+                                    tokio::spawn(async move {
+                                        if let Err(err) = plan_runner
+                                            .trigger_plan_generation(
+                                                plan_session_id,
+                                                plan_session_agent_id,
+                                                plan_agent_id,
+                                                &plan_agent_name,
+                                                plan_source_message_id,
+                                                &workflow_content,
+                                                None,
+                                                None,
+                                                design_doc_paths.as_deref(),
+                                            )
+                                            .await
+                                        {
+                                            tracing::error!(
+                                                session_id = %plan_session_id,
+                                                agent_name = %plan_agent_name,
+                                                error = %err,
+                                                "[chat_runner] plan generation pipeline failed"
+                                            );
+                                        }
+                                    });
+                                }
+
+                                send_count
+                            }
                             Ok(ProtocolProcessResult::RetryableParseFailure { code, detail }) => {
                                 if matches!(completion_status, RunCompletionStatus::Failed) {
                                     protocol_processing_failed = true;
@@ -1686,11 +1783,6 @@ impl ChatRunner {
                             .await;
 
                         if matches!(completion_status, RunCompletionStatus::Failed) {
-                            let error_message = if error_content.trim().is_empty() {
-                                "Agent run failed".to_string()
-                            } else {
-                                error_content.clone()
-                            };
                             runner
                                 .analytics_projector()
                                 .project_or_warn(DomainEvent::AgentRunErrored {
@@ -1700,9 +1792,19 @@ impl ChatRunner {
                                     error_type: Self::normalized_entry_error_name(
                                         error_type.as_ref(),
                                     ),
-                                    error_message,
+                                    error_code: Self::normalized_entry_error_name(
+                                        error_type.as_ref(),
+                                    ),
                                 })
                                 .await;
+                            workflow_analytics::track_agent_error(
+                                runner.analytics_service(),
+                                session_id,
+                                None,
+                                None,
+                                &Self::normalized_entry_error_name(error_type.as_ref()),
+                                None,
+                            );
                         }
 
                         if !(latest_assistant.is_empty() && visible_error_content.is_some()) {
@@ -1761,6 +1863,19 @@ impl ChatRunner {
                             state: final_state.clone(),
                             started_at: None,
                         });
+
+                        workflow_analytics::track_agent_state_changed(
+                            runner.analytics_service(),
+                            session_id,
+                            None,
+                            match final_state {
+                                ChatSessionAgentState::Idle => "idle",
+                                ChatSessionAgentState::Running => "running",
+                                ChatSessionAgentState::WaitingApproval => "waiting_approval",
+                                ChatSessionAgentState::Dead => "dead",
+                                ChatSessionAgentState::Stopping => "stopping",
+                            },
+                        );
 
                         if track_source_message && protocol_retry_request.is_none() {
                             // Emit MentionAcknowledged completed/failed event

@@ -1,11 +1,14 @@
-import { useMemo } from 'react';
-import WYSIWYGEditor from '@/components/ui/wysiwyg';
+import { useMemo, type MouseEvent } from 'react';
+import { Check, Clipboard } from 'lucide-react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import {
   fileHrefToPath,
   pathToFileHref,
   resolveLocalPathToAbsolutePath,
 } from '@/utils/readOnlyLinks';
+import { writeClipboardViaBridge } from '@/vscode/bridge';
 
 const FILE_PATH_RE =
   /(^|[\s([{"'])(?<path>(?:[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\){2,}[^\\\r\n<>:"|?*\s`"')\]}.,:;!?]+|[a-zA-Z]:\\(?:[^\\\r\n<>:"|?*]+\\)*[^\\\r\n<>:"|?*]+\.[a-zA-Z0-9]{1,16}|\/(?:[^/\r\n]+\/){2,}[^/\r\n\s`"')\]}.,:;!?]+|\/(?:[^/\r\n]+\/)*[^/\r\n]+\.[a-zA-Z0-9]{1,16}|(?:\.{1,2}[\\/])?(?:[^\\/\r\n\s`"')\]}.,:;!?]+[\\/])*[^\\/\r\n\s`"')\]}.,:;!?]+\.[a-zA-Z0-9]{1,16}))/g;
@@ -159,14 +162,16 @@ function linkifyFilePaths(
     .join('\n');
 }
 
+function isExternalHref(href: string): boolean {
+  return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(href) && !href.startsWith('file://');
+}
+
 export function ChatMarkdown({
   content,
   maxWidth = '800px',
   className,
   textClassName = 'text-sm',
-  workspaceId,
-  hideCopyButton,
-  allowFileLinks = false,
+  hideCopyButton = false,
   readOnlyLinkBasePath = null,
   onFilePath,
 }: ChatMarkdownProps) {
@@ -176,25 +181,308 @@ export function ChatMarkdown({
     [content, onFilePath, workspacePath]
   );
 
-  return (
-    <div className={className} style={{ maxWidth }}>
-      <WYSIWYGEditor
-        value={resolvedContent}
-        disabled
-        className={cn('whitespace-pre-wrap break-words', textClassName)}
-        taskAttemptId={workspaceId}
-        hideCopyButton={hideCopyButton}
-        allowFileLinks={allowFileLinks || !!onFilePath}
-        readOnlyLinkBasePath={readOnlyLinkBasePath}
-        onReadOnlyLinkClick={(resolvedHref, originalHref) => {
-          if (!onFilePath) return;
+  const handleCopy = async (event: MouseEvent<HTMLButtonElement>) => {
+    if (!content) return;
+    const copiedText = content.replace(/\\_/g, '_');
+    await writeClipboardViaBridge(copiedText);
+    const button = event.currentTarget;
+    button.dataset.copied = 'true';
+    button.title = 'Copied!';
+    button.setAttribute('aria-label', 'Copied!');
+    window.setTimeout(() => {
+      button.dataset.copied = 'false';
+      button.title = 'Copy as Markdown';
+      button.setAttribute('aria-label', 'Copy as Markdown');
+    }, 1200);
+  };
+
+  const components = useMemo<Components>(
+    () => ({
+      a({ href, children, className: linkClassName, ...props }) {
+        const resolvedHref = typeof href === 'string' ? href : '';
+        const external = isExternalHref(resolvedHref);
+
+        const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+          if (!onFilePath || !resolvedHref) return;
+
+          const originalHref = decodeURI(resolvedHref);
           const absPath =
             fileHrefToPath(resolvedHref) ??
             resolveLocalPathToAbsolutePath(originalHref, workspacePath);
           if (!absPath) return;
+
+          event.preventDefault();
           onFilePath(absPath, workspacePath ?? '');
-        }}
-      />
+        };
+
+        return (
+          <a
+            {...props}
+            href={resolvedHref}
+            className={cn(
+              'font-medium text-blue-600 underline decoration-blue-300 underline-offset-2 transition-colors hover:text-blue-700 hover:decoration-blue-500',
+              linkClassName
+            )}
+            target={external ? '_blank' : undefined}
+            rel={external ? 'noreferrer' : undefined}
+            onClick={handleClick}
+          >
+            {children}
+          </a>
+        );
+      },
+      p({ children, className: paragraphClassName, ...props }) {
+        return (
+          <p
+            {...props}
+            className={cn('my-2 first:mt-0 last:mb-0', paragraphClassName)}
+          >
+            {children}
+          </p>
+        );
+      },
+      h1({ children, className: headingClassName, ...props }) {
+        return (
+          <h1
+            {...props}
+            className={cn(
+              'mb-2 mt-3 text-base font-semibold leading-6 text-slate-900 first:mt-0',
+              headingClassName
+            )}
+          >
+            {children}
+          </h1>
+        );
+      },
+      h2({ children, className: headingClassName, ...props }) {
+        return (
+          <h2
+            {...props}
+            className={cn(
+              'mb-2 mt-3 text-[0.98em] font-semibold leading-6 text-slate-900 first:mt-0',
+              headingClassName
+            )}
+          >
+            {children}
+          </h2>
+        );
+      },
+      h3({ children, className: headingClassName, ...props }) {
+        return (
+          <h3
+            {...props}
+            className={cn(
+              'mb-1.5 mt-3 text-[0.95em] font-semibold leading-5 text-slate-800 first:mt-0',
+              headingClassName
+            )}
+          >
+            {children}
+          </h3>
+        );
+      },
+      h4({ children, className: headingClassName, ...props }) {
+        return (
+          <h4
+            {...props}
+            className={cn(
+              'mb-1.5 mt-2 text-[0.92em] font-semibold leading-5 text-slate-800 first:mt-0',
+              headingClassName
+            )}
+          >
+            {children}
+          </h4>
+        );
+      },
+      h5({ children, className: headingClassName, ...props }) {
+        return (
+          <h5
+            {...props}
+            className={cn(
+              'mb-1 mt-2 text-[0.9em] font-semibold leading-5 text-slate-700 first:mt-0',
+              headingClassName
+            )}
+          >
+            {children}
+          </h5>
+        );
+      },
+      h6({ children, className: headingClassName, ...props }) {
+        return (
+          <h6
+            {...props}
+            className={cn(
+              'mb-1 mt-2 text-[0.85em] font-semibold uppercase leading-5 tracking-normal text-slate-600 first:mt-0',
+              headingClassName
+            )}
+          >
+            {children}
+          </h6>
+        );
+      },
+      ul({ children, className: listClassName, ...props }) {
+        return (
+          <ul
+            {...props}
+            className={cn('my-2 list-disc space-y-1 pl-5', listClassName)}
+          >
+            {children}
+          </ul>
+        );
+      },
+      ol({ children, className: listClassName, ...props }) {
+        return (
+          <ol
+            {...props}
+            className={cn('my-2 list-decimal space-y-1 pl-5', listClassName)}
+          >
+            {children}
+          </ol>
+        );
+      },
+      li({ children, className: itemClassName, ...props }) {
+        return (
+          <li
+            {...props}
+            className={cn(
+              'pl-1 marker:text-slate-500 [&>p]:my-0',
+              itemClassName
+            )}
+          >
+            {children}
+          </li>
+        );
+      },
+      blockquote({ children, className: quoteClassName, ...props }) {
+        return (
+          <blockquote
+            {...props}
+            className={cn(
+              'my-3 rounded-r-lg border-l-4 border-slate-300 bg-slate-50 px-4 py-2 text-slate-600',
+              quoteClassName
+            )}
+          >
+            {children}
+          </blockquote>
+        );
+      },
+      code({ children, className: codeClassName, ...props }) {
+        return (
+          <code
+            {...props}
+            className={cn(
+              'rounded-md border border-slate-200/80 bg-slate-100 px-1.5 py-0.5 font-mono text-[0.92em] font-medium text-slate-800',
+              codeClassName
+            )}
+          >
+            {children}
+          </code>
+        );
+      },
+      pre({ children, className: preClassName, ...props }) {
+        return (
+          <pre
+            {...props}
+            className={cn(
+              'my-3 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950 p-3 text-xs leading-5 text-slate-100 shadow-inner',
+              '[&_code]:!border-0 [&_code]:!bg-transparent [&_code]:!p-0 [&_code]:!text-inherit',
+              preClassName
+            )}
+          >
+            {children}
+          </pre>
+        );
+      },
+      table({ children, className: tableClassName, ...props }) {
+        return (
+          <div className="my-3 overflow-x-auto rounded-lg border border-slate-200">
+            <table
+              {...props}
+              className={cn(
+                'w-full border-collapse text-left text-[0.95em]',
+                tableClassName
+              )}
+            >
+              {children}
+            </table>
+          </div>
+        );
+      },
+      th({ children, className: cellClassName, ...props }) {
+        return (
+          <th
+            {...props}
+            className={cn(
+              'border-b border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-700',
+              cellClassName
+            )}
+          >
+            {children}
+          </th>
+        );
+      },
+      td({ children, className: cellClassName, ...props }) {
+        return (
+          <td
+            {...props}
+            className={cn('border-t border-slate-100 px-3 py-2', cellClassName)}
+          >
+            {children}
+          </td>
+        );
+      },
+      hr({ className: hrClassName, ...props }) {
+        return (
+          <hr {...props} className={cn('my-4 border-slate-200', hrClassName)} />
+        );
+      },
+      img({ className: imageClassName, alt, ...props }) {
+        return (
+          <img
+            {...props}
+            alt={alt ?? ''}
+            className={cn(
+              'my-3 max-w-full rounded-lg border border-slate-200',
+              imageClassName
+            )}
+          />
+        );
+      },
+    }),
+    [onFilePath, workspacePath]
+  );
+
+  return (
+    <div
+      className={cn('group relative select-text', className)}
+      style={{ maxWidth }}
+    >
+      {!hideCopyButton && (
+        <div className="sticky top-0 right-2 z-10 h-0 pointer-events-none">
+          <div className="flex justify-end opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+            <button
+              type="button"
+              aria-label="Copy as Markdown"
+              title="Copy as Markdown"
+              onClick={handleCopy}
+              data-copied="false"
+              className="group/copy pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white/95 text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 data-[copied=true]:border-emerald-200 data-[copied=true]:text-emerald-600"
+            >
+              <Clipboard className="h-4 w-4 group-data-[copied=true]/copy:hidden" />
+              <Check className="hidden h-4 w-4 group-data-[copied=true]/copy:block" />
+            </button>
+          </div>
+        </div>
+      )}
+      <div
+        className={cn(
+          'wysiwyg min-w-0 whitespace-normal break-words select-text',
+          textClassName
+        )}
+      >
+        <ReactMarkdown components={components} remarkPlugins={[remarkGfm]}>
+          {resolvedContent}
+        </ReactMarkdown>
+      </div>
     </div>
   );
 }

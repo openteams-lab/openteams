@@ -20,6 +20,7 @@ pub mod images;
 pub mod scratch;
 pub mod tags;
 pub mod version;
+pub mod workflow;
 
 pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
     // Create routers with different middleware layers
@@ -33,6 +34,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .merge(events::router(&deployment))
         .merge(approvals::router())
         .merge(scratch::router(&deployment))
+        .merge(workflow::router())
         .merge(version::router())
         .merge(analytics::router())
         .nest("/images", images::routes())

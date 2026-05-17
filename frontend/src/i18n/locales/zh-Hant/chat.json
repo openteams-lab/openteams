@@ -98,7 +98,30 @@
         "value": "請評審目前 UI 的視覺風格，從排版、色彩、間距、層級和互動一致性方面給出具體建議，並指出最值得優先優化的部分。"
       }
     },
-    "mentionAgents": "提及 Agent",
+    "modeCards": {
+      "label": "工作模式選項",
+      "workflow": {
+        "label": "工作流模式",
+        "description": "與主Agent確認需求、討論方案、生成計畫和執行任務，適合複雜任務。",
+        "detail": "工作流模式下，您將與主Agent對話，由主Agent負責生成計畫並為其他成員分配任務。\n系統會將計畫轉換為視覺化任務節點圖，並自動調度運行，您能清楚追蹤每個任務的執行情況。\n工作流正式開始執行前可以任意修改計畫；如果第一輪計畫沒有達到預期結果，可以開啟新一輪迭代。\n您可以點擊AI成員列表中的成員資訊卡片來切換主Agent。"
+      },
+      "free": {
+        "label": "自由聊天模式",
+        "description": "使用@與任意Agent對話，Agent之間可以自由交流，適合簡單任務或日常群聊。",
+        "detail": "自由聊天模式下，您可以直接 @ 任意成員佈置任務。\n支援Agent與Agent之間在遵守團隊準則的基礎上自由討論和協作。\n自由聊天模式能透過團隊準則引導成員的行為和協作，進而探索更多有趣的協作方式。"
+      },
+      "switchHint": "使用訊息框底部切換按鈕可以隨時切換工作模式，切換後依然共享上下文。"
+    },
+    "mentionAgents": "@團隊成員",
+    "chatModeName": "自由聊天模式",
+    "workflowModeName": "工作流模式",
+    "modeSwitchTooltip": "目前{{currentMode}}，點擊切換到{{targetMode}}",
+    "switchToFreeMode": "切換到自由聊天模式",
+    "switchToWorkflowMode": "切換到工作流模式",
+    "freeModeDescription": "自由聊天模式：使用 @ 將訊息指派給成員。",
+    "workflowModeDescription": "工作流模式：訊息統一路由到主Agent。",
+    "workflowModeLabel": "- 工作流模式",
+    "workflowPlaceholder": "與主Agent討論方案，生成計畫並執行...",
     "mentionAllOption": "所有成員（@all）",
     "mentionAllSuggestion": "@所有成員",
     "mentionAllBadge": "@all",
@@ -345,7 +368,7 @@
         "invalidWorkspacePath": "匯入失敗：無效的工作區路徑。",
         "nothingToImport": "匯入失敗：該團隊預設沒有可匯入的內容。",
         "baseCodingAgentRequired": "匯入失敗：基礎編程代理為必填項。",
-        "selectedCodingAgentUnavailable": "匯入失敗：所選編程代理不可用。",
+        "selectedCodingAgentUnavailable": "匯入失敗：所選編碼Agent不可用。",
         "memberNameRequired": "匯入失敗：AI成員名稱為必填項。",
         "memberNameInvalidChars": "匯入失敗：名稱只能包含字母、數字、\"_\" 或 \"-\"。",
         "memberNameTooLong": "匯入失敗：AI成員名稱不能超過 {{max}} 個字元。",
@@ -354,7 +377,8 @@
         "selectSessionFirst": "請先選擇一個聊天會話。",
         "sessionArchived": "該會話已歸檔，唯讀。",
         "noAvailableCodingAgent": "匯入失敗：沒有可用的編程代理來匯入此預設。",
-        "failedToImportTeam": "匯入團隊預設失敗。"
+        "failedToImportTeam": "匯入團隊預設失敗。",
+        "memberError": "{{member}} - {{message}}"
       }
     },
     "addMemberErrors": {
@@ -365,7 +389,7 @@
       "workspacePathMustBeAbsolute": "新增失敗：工作區路徑必須是絕對路徑。",
       "invalidWorkspacePath": "新增失敗：無效的工作區路徑。",
       "baseCodingAgentRequired": "新增失敗：基礎編程代理為必填項。",
-      "selectedCodingAgentUnavailable": "新增失敗：所選編程代理不可用。",
+      "selectedCodingAgentUnavailable": "新增失敗：所選編碼Agent不可用。",
       "memberNameRequired": "新增失敗：AI成員名稱為必填項。",
       "memberNameInvalidChars": "新增失敗：名稱只能包含字母、數字、\"_\" 或 \"-\"。",
       "memberNameTooLong": "新增失敗：AI成員名稱不能超過 {{max}} 個字元。",
@@ -376,7 +400,7 @@
     "roleSettingsRequired": "角色設定為必填欄位。",
     "presetDisplay": {
       "members": {
-        "coordinator_pmo": "專案經理",
+        "coordinator_pmo": "項目經理",
         "product_manager": "產品經理",
         "system_architect": "系統架構師",
         "prompt_engineer": "提示工程師",
@@ -786,5 +810,273 @@
       "diffAction": "差異",
       "openExplorerSuccess": "已在檔案管理器中打開。"
     }
-  }
+  },
+  "workflow": {
+    "approvalCard": {
+      "title": "需要核准",
+      "approve": "核准",
+      "reject": "拒絕"
+    },
+    "permissionCard": {
+      "title": "權限請求",
+      "grant": "授權",
+      "deny": "拒絕"
+    },
+    "continueCard": {
+      "title": "是否繼續？",
+      "confirm": "繼續"
+    },
+    "inputCard": {
+      "title": "需要輸入",
+      "placeholder": "在此輸入您的回覆",
+      "submit": "提交"
+    },
+    "inspector": {
+      "tabDetails": "詳情",
+      "tabLogs": "日誌",
+      "noInstructions": "此步驟未提供任務指令。",
+      "noSummary": "此步驟尚未產生摘要。",
+      "loopPrefix": "迴圈：{{name}}",
+      "reviewPrefix": "審核：{{label}}",
+      "instructionHeading": "指令",
+      "summaryHeading": "摘要",
+      "feedbackHeading": "回饋",
+      "executionRecordHeading": "執行記錄輸出",
+      "loadingTranscript": "正在載入記錄...",
+      "noOutputEntries": "此步驟暫無輸出記錄。",
+      "errorHeading": "錯誤",
+      "loadingLogs": "正在載入日誌...",
+      "thinkingProcess": "{{agentName}} - 思考過程",
+      "expand": "展開",
+      "collapse": "收起",
+      "noLogs": "此步驟暫無日誌。",
+      "closeChat": "關閉對話",
+      "openChat": "開啟對話",
+      "terminate": "終止"
+    },
+    "chatPanel": {
+      "title": "Agent 對話",
+      "approvalRequired": "需要核准",
+      "permissionRequest": "權限請求",
+      "continuePrompt": "是否繼續？",
+      "continueAction": "繼續",
+      "approveAction": "核准",
+      "rejectAction": "拒絕",
+      "replyPlaceholder": "回覆 Agent...",
+      "readOnlyPlaceholder": "僅當此步驟等待輸入或審核時可回覆。"
+    },
+    "status": {
+      "recompiling": "正在重新編譯計畫...",
+      "completed": "已完成 - {{summary}}",
+      "completedDefault": "所有步驟已完成",
+      "failed": "失敗 - {{error}}",
+      "failedDefault": "執行錯誤",
+      "progress": "進度 {{percent}}% · {{completed}}/{{total}} 步"
+    },
+    "controls": {
+      "executePlan": "執行計畫",
+      "resume": "恢復",
+      "pauseAll": "全部暫停",
+      "stop": "停止"
+    },
+    "reviewSettings": {
+      "title": "審核設定",
+      "description": "選擇由誰審核每個工作流程結果。",
+      "close": "關閉審核設定",
+      "taskSteps": "任務步驟",
+      "leadUserReview": "主 Agent / 使用者審核",
+      "leadLabel": "主 Agent",
+      "userLabel": "使用者",
+      "leadReviewOn": "開啟此任務節點的主 Agent 審核",
+      "leadReviewOff": "關閉此任務節點的主 Agent 審核",
+      "userReviewOn": "開啟此任務節點的使用者審核",
+      "userReviewOff": "關閉此任務節點的使用者審核",
+      "workflowLoops": "工作流程迴圈",
+      "userReviewOnly": "僅使用者審核",
+      "loopUserReviewOn": "開啟此工作流程迴圈的使用者審核",
+      "loopUserReviewOff": "關閉此工作流程迴圈的使用者審核",
+      "cancel": "取消",
+      "saving": "儲存中...",
+      "saveChanges": "儲存變更",
+      "executionFinishedError": "執行完成後無法變更審核設定。",
+      "finishedMessage": "目前工作流程狀態不支援修改審核設定。",
+      "updateError": "無法更新審核設定。"
+    },
+    "notifications": {
+      "pendingReview": "待審核",
+      "typeFinal": "最終",
+      "typeStep": "步驟",
+      "accept": "接受",
+      "reject": "拒絕",
+      "approve": "核准",
+      "viewDetails": "檢視詳情",
+      "finalReviewTitle": "最終審核",
+      "reviewRequired": "需要審核",
+      "pendingInput": "需要輸入",
+      "typeInput": "輸入",
+      "inputRequired": "需要輸入",
+      "respond": "回覆"
+    },
+    "card": {
+      "generatingPlan": "正在產生工作流程計畫",
+      "stateLabels": {
+        "planGenerationFailed": "計畫產生失敗",
+        "generatingPlan": "正在產生計畫",
+        "recompilingPlan": "正在重新編譯計畫",
+        "workItem": "工作項目",
+        "executionFailed": "執行失敗",
+        "planReady": "計畫就緒",
+        "planInvalid": "計畫無效",
+        "actionRequired": "需要操作",
+        "paused": "已暫停",
+        "preparing": "準備中",
+        "workflowRunning": "工作流程執行中"
+      },
+      "badges": {
+        "failed": "失敗",
+        "generating": "產生中"
+      },
+      "emptyGraph": {
+        "planGenerationFailed": "計畫產生在預覽建立前停止。重試以從相同目標產生新計畫。",
+        "planGenerationPending": "系統正在起草工作流程計畫。預覽就緒後此佔位卡片將更新。",
+        "noGraph": "暫無可用的工作流程圖。",
+        "planDraft": "計畫草稿",
+        "workflow": "工作流程"
+      },
+      "buttons": {
+        "open": "開啟",
+        "executePlan": "執行計畫",
+        "pauseAll": "全部暫停",
+        "resume": "恢復",
+        "retrying": "重試中...",
+        "retryPlanGeneration": "重試計畫產生"
+      },
+      "errors": {
+        "validationErrors": "驗證錯誤",
+        "generationError": "產生錯誤",
+        "retryRequestFailed": "重試請求失敗"
+      },
+      "finalDelivery": "最終交付"
+    },
+    "iterationFeedback": {
+      "round": "第 {{round}} 輪",
+      "steps": "步驟",
+      "status": "狀態",
+      "running": "執行中",
+      "regeneratingPlan": "正在重新產生計劃",
+      "idle": "閒置",
+      "currentStep": "目前步驟",
+      "reviewRequired": "需要審核",
+      "rejectWithFeedback": "帶回饋拒絕",
+      "whatWrongLabel": "哪裡出了問題？",
+      "whatWrongPlaceholder": "描述問題...",
+      "expectedLabel": "期望結果",
+      "expectedPlaceholder": "應該發生什麼？",
+      "priorityLabel": "優先順序",
+      "priorityHigh": "高",
+      "priorityMedium": "中",
+      "priorityLow": "低",
+      "additionalNotesLabel": "補充說明",
+      "additionalNotesPlaceholder": "可選備註...",
+      "validationError": "拒絕需要填寫問題描述和期望結果。",
+      "accept": "接受",
+      "submitRejection": "提交拒絕",
+      "reject": "拒絕",
+      "cancel": "取消"
+    },
+    "pendingReview": {
+      "title": "待審核",
+      "reviewTypes": {
+        "stepReview": "步驟審核",
+        "loopReview": "迴圈審核",
+        "finalReview": "最終審核"
+      },
+      "defaultMessage": "請審核目前結果。",
+      "context": "上下文",
+      "feedbackLabel": "回饋",
+      "feedbackPlaceholder": "請填寫具體修改意見",
+      "validationError": "拒絕需要填寫回饋意見。",
+      "approve": "核准",
+      "submitReject": "提交拒絕",
+      "reject": "拒絕"
+    },
+    "generatedText": {
+      "reviewLoop": "請審核迴圈「{{loopKey}}」。",
+      "userApprovedStepResult": "使用者已批准步驟結果。"
+    },
+    "finalReview": {
+      "title": "最終審核",
+      "defaultMessage": "任務已完成，是否接受結果？",
+      "accept": "接受",
+      "reject": "拒絕"
+    },
+    "graph": {
+      "tip": "（提示：滾輪縮放，左鍵拖曳平移）",
+      "layoutWarning": "佈局警告：使用備用佈局",
+      "fitView": "適應畫布",
+      "leadFallback": "主 Agent"
+    },
+    "executionStatus": {
+      "running": "執行中",
+      "failed": "失敗",
+      "paused": "已暫停",
+      "waiting": "等待審核",
+      "recompiling": "正在重新產生計畫",
+      "completed": "已完成",
+      "pending": "準備中"
+    },
+    "statusLabels": {
+      "interrupted": "已中斷",
+      "stopRequested": "停止請求中",
+      "waitingInput": "等待輸入",
+      "reviewing": "審核中",
+      "preCompleted": "預完成",
+      "pending": "待處理",
+      "running": "執行中",
+      "ready": "就緒",
+      "waitingReview": "審核中",
+      "waitingUser": "等待使用者",
+      "passed": "已通過",
+      "completed": "已完成",
+      "rejected": "已拒絕",
+      "failed": "失敗",
+      "loop": "迴圈"
+    },
+    "reviewPhase": {
+      "executing": "執行中",
+      "leadReview": "主 Agent 審核",
+      "waitingUser": "等待使用者"
+    },
+    "reviewVerdict": {
+      "accepted": "已接受",
+      "approved": "已核准",
+      "rejected": "已拒絕",
+      "reviewed": "已審核"
+    },
+    "pendingInput": {
+      "title": "需要輸入",
+      "defaultPrompt": "Agent 需要更多輸入才能繼續。",
+      "placeholder": "在此輸入回覆",
+      "submit": "提交"
+    }
+  },
+  "leadAgent": {
+    "label": "主Agent",
+    "switchError": "切換主Agent 失敗，請重試。",
+    "switchDialog": {
+      "title": "切換主Agent",
+      "message": "將主Agent 從「{{currentLeadName}}」切換為「{{targetLeadName}}」？",
+      "switching": "切換中…",
+      "confirm": "確認"
+    }
+  },
+  "input_tabs": {
+    "workflow": "工作流程",
+    "chat": "聊天"
+  },
+  "workflow_plan_generation_unavailable": "目前會話未啟用工作流程計畫生成。",
+  "workflow_retry": "重試",
+  "workflow_retry_task": "重試任務",
+  "workflow_retry_review": "重試審核",
+  "workflow_retry_cancel": "取消"
 }

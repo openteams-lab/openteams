@@ -2024,3 +2024,10 @@ pub async fn install_skill_files_from_embedded(
 
     Ok(files_written)
 }
+
+pub fn find_builtin_skill_by_name(name: &str) -> Option<&'static RemoteSkillPackage> {
+    BUILTIN_SKILLS
+        .skills
+        .iter()
+        .find(|skill| skill.name == name && has_embedded_skill_files(&skill.name))
+}

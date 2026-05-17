@@ -56,6 +56,11 @@ import {
   SkillCategory,
   ChatRunRetentionInfo,
   CreatePresetSnapshotResponse,
+  ExecutePlanRequest,
+  UserIterationFeedbackRequest,
+  UserIterationFeedbackResponse,
+  UserReviewResponseRequest,
+  UserReviewResponseResponse,
 } from 'shared/types';
 import type {
   CliConfig,
@@ -69,6 +74,11 @@ import type {
   SyncToCliRequest,
   SyncToCliResponse,
 } from '@/types/cliConfig';
+import {
+  buildWorkflowCardUrl,
+  type WorkflowCardDetailLevel,
+} from '@/lib/workflowRequestPolicy';
+import type { WorkflowAnalyticsEventPayload } from '@/lib/workflowEventCore';
 
 export interface AgentInfo {
   id: string;
@@ -100,6 +110,212 @@ export interface CreatePresetSnapshotPayload {
   name: string | null;
   description: string | null;
   overwrite_strategy: 'fail_if_exists' | 'overwrite_custom';
+}
+
+export interface GeneratePlanAndRunResponse {
+  execution_id: string;
+  workflow_card_message: ChatMessage;
+}
+
+export interface ExecutePlanResponse {
+  execution_id: string;
+}
+
+export interface PauseAllResponse {
+  status: string;
+}
+
+export interface InterruptStepResponse {
+  status: string;
+}
+
+export interface WorkflowTranscriptEntry {
+  id: string;
+  execution_id: string;
+  round_id?: string | null;
+  workflow_agent_session_id?: string | null;
+  step_id?: string | null;
+  step_key?: string | null;
+  sender_type: string;
+  entry_type: string;
+  content: string;
+  meta_json?: string | null;
+  created_at: string;
+  agent_name?: string | null;
+}
+
+export interface WorkflowCardReviewData {
+  reviewer_type: string;
+  verdict: string;
+  feedback: string;
+  review_round: number;
+  created_at: string;
+}
+
+export interface WorkflowCardLoopData {
+  id: string;
+  loop_key: string;
+  status: string;
+  retry_count: number;
+  max_retry: number;
+  user_review_required: boolean;
+  rejection_reason: string | null;
+  member_step_ids: string[];
+  review_step_id: string;
+}
+
+export interface WorkflowPendingReviewData {
+  review_id: string;
+  review_type: string;
+  target_id: string;
+  target_title: string;
+  context_summary: string;
+  prompt_template: {
+    message: string;
+    fields: Array<{
+      key: string;
+      label: string;
+      field_type: string;
+      required: boolean;
+      placeholder?: string | null;
+      help_text?: string | null;
+    }>;
+    actions: Array<{
+      action: string;
+      label: string;
+      style: string;
+      requires_feedback: boolean;
+    }>;
+  };
+}
+
+export interface WorkflowPendingInputData {
+  input_id: string;
+  step_id: string;
+  step_key: string;
+  target_title: string;
+  prompt: string;
+  description?: string | null;
+  placeholder?: string | null;
+}
+
+export interface WorkflowIterationSummaryData {
+  round_index: number;
+  status: string;
+  user_feedback: string | null;
+  result_summary: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface WorkflowCardStepData {
+  id: string;
+  step_key: string;
+  title: string;
+  step_type: string;
+  status: string;
+  review_phase: string | null;
+  lead_review_required: boolean;
+  user_review_required: boolean;
+  retry_count: number;
+  max_retry: number;
+  loop_key: string | null;
+  latest_review: WorkflowCardReviewData | null;
+  agent_name?: string | null;
+  summary_text?: string | null;
+  content?: string | null;
+}
+
+export interface WorkflowCardPlanData {
+  nodes: Array<{
+    id: string;
+    position: { x: number; y: number };
+    data: {
+      stepType: string;
+      title: string;
+      instructions: string;
+      agentId?: string | null;
+      status?: string | null;
+      reviewScope?: string[] | null;
+      loopKey?: string | null;
+    };
+  }>;
+  edges: Array<{
+    id: string;
+    source: string;
+    target: string;
+  }>;
+  loops?: Array<{
+    loopKey: string;
+    memberSteps: string[];
+    reviewStep: string;
+    maxRetry?: number | null;
+    userReviewRequired?: boolean | null;
+    // Legacy aliases kept so archived workflow cards created before the
+    // camelCase protocol change can still render.
+    loop_key?: string;
+    member_step_keys?: string[];
+    review_step_key?: string;
+    review_scope_step_keys?: string[];
+    max_retry?: number;
+    user_review_required?: boolean;
+  }> | null;
+  viewport?: { x?: number; y?: number; zoom?: number };
+}
+
+export interface WorkflowRoundGraphData {
+  round_id: string;
+  round_index: number;
+  revision_id: string;
+  status: string;
+  plan: WorkflowCardPlanData;
+  steps: WorkflowCardStepData[];
+  loops: WorkflowCardLoopData[];
+}
+
+export interface WorkflowCardData {
+  execution_id?: string | null;
+  plan_id?: string;
+  revision_id?: string;
+  title: string;
+  goal: string;
+  state: string;
+  execution_status: string;
+  error_message?: string | null;
+  completed_step_count: number;
+  total_step_count: number;
+  result_summary?: string | null;
+  outputs: string[];
+  current_round: number;
+  loops: WorkflowCardLoopData[];
+  iteration_history: WorkflowIterationSummaryData[];
+  round_graphs?: WorkflowRoundGraphData[];
+  steps: WorkflowCardStepData[];
+  agents?: Array<{
+    session_agent_id: string;
+    workflow_agent_session_id?: string | null;
+    agent_id: string;
+    name: string;
+  }>;
+  plan: WorkflowCardPlanData;
+  pending_review?: WorkflowPendingReviewData | null;
+  pending_input?: WorkflowPendingInputData | null;
+  validation_errors?: string | null;
+  is_terminal?: boolean;
+  has_transcripts?: boolean | null;
+}
+
+export interface ResolveActionResponse {
+  status: string;
+}
+
+export interface ResumeExecutionResponse {
+  status: string;
+}
+
+export interface RetryWorkflowPlanGenerationResponse {
+  status: string;
+  message_id: string;
 }
 
 export class ApiError<E = unknown> extends Error {
@@ -625,8 +841,32 @@ export const versionApi = {
   },
 };
 
+const workflowAnalyticsCategory = (
+  eventName: WorkflowAnalyticsEventPayload['event_name']
+): 'user_action' | 'system' | 'conversion' => {
+  if (eventName.startsWith('risk.')) return 'system';
+  if (eventName.startsWith('quality.workflow_completed')) return 'conversion';
+  return 'user_action';
+};
+
 // Chat APIs
 export const chatApi = {
+  trackWorkflowEvent: async (
+    payload: WorkflowAnalyticsEventPayload
+  ): Promise<string> => {
+    const response = await makeRequest('/api/analytics/events', {
+      method: 'POST',
+      body: JSON.stringify({
+        event_type: payload.event_name,
+        event_category: workflowAnalyticsCategory(payload.event_name),
+        user_id: payload.user_id_hash,
+        session_id: payload.session_id,
+        properties: payload,
+      }),
+    });
+    return handleApiResponse<string>(response);
+  },
+
   listSessions: async (status?: ChatSessionStatus): Promise<ChatSession[]> => {
     const queryParam = status ? `?status=${encodeURIComponent(status)}` : '';
     const response = await makeRequest(`/api/chat/sessions${queryParam}`);
@@ -648,13 +888,30 @@ export const chatApi = {
 
   updateSession: async (
     sessionId: string,
-    data: UpdateChatSession
+    data: Partial<UpdateChatSession>
   ): Promise<ChatSession> => {
     const response = await makeRequest(`/api/chat/sessions/${sessionId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
     return handleApiResponse<ChatSession>(response);
+  },
+
+  updateSessionLead: async (
+    sessionId: string,
+    leadAgentId: string | null
+  ): Promise<ChatSession> => {
+    return chatApi.updateSession(sessionId, {
+      title: null,
+      status: null,
+      lead_agent_id: leadAgentId,
+      summary_text: null,
+      archive_ref: null,
+      last_seen_diff_key: null,
+      team_protocol: null,
+      team_protocol_enabled: null,
+      default_workspace_path: null,
+    });
   },
 
   markDiffSeen: async (
@@ -712,6 +969,7 @@ export const chatApi = {
       content?: string;
       referenceMessageId?: string;
       appLanguage?: string;
+      chatInputMode?: 'free' | 'workflow';
     }
   ): Promise<ChatMessage> => {
     const form = new FormData();
@@ -729,6 +987,9 @@ export const chatApi = {
     }
     if (options?.appLanguage) {
       form.append('app_language', options.appLanguage);
+    }
+    if (options?.chatInputMode === 'workflow') {
+      form.append('chat_input_mode', 'workflow');
     }
 
     const response = await fetch(
@@ -770,6 +1031,265 @@ export const chatApi = {
     return handleApiResponse<ChatWorkItem[]>(response);
   },
 
+  generatePlanAndRun: async (
+    sessionId: string,
+    userGoal?: string
+  ): Promise<GeneratePlanAndRunResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow/generate-plan-and-run`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          user_goal: userGoal ?? null,
+        }),
+      }
+    );
+    return handleApiResponse<GeneratePlanAndRunResponse>(response);
+  },
+
+  executePlan: async (
+    sessionId: string,
+    planId: string,
+    payload?: Partial<ExecutePlanRequest>
+  ): Promise<ExecutePlanResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow/plans/${planId}/execute`,
+      {
+        method: 'POST',
+        body: payload ? JSON.stringify(payload) : undefined,
+      }
+    );
+    return handleApiResponse<ExecutePlanResponse>(response);
+  },
+
+  updateWorkflowReviewSettings: async (
+    sessionId: string,
+    executionId: string,
+    payload: Pick<ExecutePlanRequest, 'stepReviewOverrides'>
+  ): Promise<WorkflowCardData> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow/executions/${executionId}/review-settings`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }
+    );
+    return handleApiResponse<WorkflowCardData>(response);
+  },
+
+  pauseAll: async (
+    sessionId: string,
+    executionId: string
+  ): Promise<PauseAllResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow/pause-all`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ execution_id: executionId }),
+      }
+    );
+    return handleApiResponse<PauseAllResponse>(response);
+  },
+
+  interruptStep: async (
+    sessionId: string,
+    executionId: string,
+    stepId: string
+  ): Promise<InterruptStepResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow/interrupt-step`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ execution_id: executionId, step_id: stepId }),
+      }
+    );
+    return handleApiResponse<InterruptStepResponse>(response);
+  },
+
+  resumeWorkflowExecution: async (
+    sessionId: string,
+    executionId: string
+  ): Promise<ResumeExecutionResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow/executions/${executionId}/resume`,
+      { method: 'POST' }
+    );
+    return handleApiResponse<ResumeExecutionResponse>(response);
+  },
+
+  retryWorkflowPlanGeneration: async (
+    sessionId: string,
+    messageId: string
+  ): Promise<RetryWorkflowPlanGenerationResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow/plan-generations/${messageId}/retry`,
+      { method: 'POST' }
+    );
+    return handleApiResponse<RetryWorkflowPlanGenerationResponse>(response);
+  },
+
+  getWorkflowStepTranscripts: async (
+    sessionId: string,
+    stepId: string,
+    filters?: {
+      stepKey?: string | null;
+      workflowAgentSessionId?: string | null;
+    }
+  ): Promise<WorkflowTranscriptEntry[]> => {
+    const params = new URLSearchParams();
+    if (filters?.stepKey) {
+      params.set('step_key', filters.stepKey);
+    }
+    if (filters?.workflowAgentSessionId) {
+      params.set('workflow_agent_session_id', filters.workflowAgentSessionId);
+    }
+    const queryString = params.toString();
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow-steps/${stepId}/transcripts${queryString ? `?${queryString}` : ''}`,
+      { method: 'GET' }
+    );
+    return handleApiResponse<WorkflowTranscriptEntry[]>(response);
+  },
+
+  submitWorkflowStepInput: async (
+    sessionId: string,
+    stepId: string,
+    inputText: string
+  ): Promise<ResolveActionResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow-steps/${stepId}/input`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ input_text: inputText }),
+      }
+    );
+    return handleApiResponse<ResolveActionResponse>(response);
+  },
+
+  interruptWorkflowStep: async (
+    sessionId: string,
+    stepId: string
+  ): Promise<InterruptStepResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow-steps/${stepId}/interrupt`,
+      { method: 'POST' }
+    );
+    return handleApiResponse<InterruptStepResponse>(response);
+  },
+
+  stopWorkflowStep: async (
+    sessionId: string,
+    stepId: string
+  ): Promise<InterruptStepResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow-steps/${stepId}/stop`,
+      { method: 'POST' }
+    );
+    return handleApiResponse<InterruptStepResponse>(response);
+  },
+
+  retryWorkflowStep: async (
+    sessionId: string,
+    stepId: string,
+    retryTarget?: 'task' | 'review'
+  ): Promise<ResolveActionResponse> => {
+    const params = retryTarget ? `?retry_target=${retryTarget}` : '';
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow-steps/${stepId}/retry${params}`,
+      { method: 'POST' }
+    );
+    return handleApiResponse<ResolveActionResponse>(response);
+  },
+
+  approveWorkflowStep: async (
+    sessionId: string,
+    stepId: string,
+    transcriptId: string,
+    action: string,
+    inputText?: string
+  ): Promise<ResolveActionResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow-steps/${stepId}/approve`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          transcript_id: transcriptId,
+          action,
+          input_text: inputText,
+        }),
+      }
+    );
+    return handleApiResponse<ResolveActionResponse>(response);
+  },
+
+  resolveWorkflowStepPermission: async (
+    sessionId: string,
+    stepId: string,
+    transcriptId: string,
+    action: string
+  ): Promise<ResolveActionResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow-steps/${stepId}/resolve-permission`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          transcript_id: transcriptId,
+          action,
+        }),
+      }
+    );
+    return handleApiResponse<ResolveActionResponse>(response);
+  },
+
+  getWorkflowTranscripts: async (
+    sessionId: string,
+    executionId: string,
+    filters?: {
+      stepId?: string | null;
+      stepKey?: string | null;
+      workflowAgentSessionId?: string | null;
+    }
+  ): Promise<WorkflowTranscriptEntry[]> => {
+    const params = new URLSearchParams();
+    if (filters?.stepId) {
+      params.set('step_id', filters.stepId);
+    }
+    if (filters?.stepKey) {
+      params.set('step_key', filters.stepKey);
+    }
+    if (filters?.workflowAgentSessionId) {
+      params.set('workflow_agent_session_id', filters.workflowAgentSessionId);
+    }
+    const queryString = params.toString();
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow/executions/${executionId}/transcripts${queryString ? `?${queryString}` : ''}`,
+      { method: 'GET' }
+    );
+    return handleApiResponse<WorkflowTranscriptEntry[]>(response);
+  },
+
+  resolveWorkflowAction: async (
+    sessionId: string,
+    executionId: string,
+    transcriptId: string,
+    action: string,
+    inputText?: string
+  ): Promise<ResolveActionResponse> => {
+    const response = await makeRequest(
+      `/api/chat/sessions/${sessionId}/workflow/resolve-action`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          execution_id: executionId,
+          transcript_id: transcriptId,
+          action,
+          input_text: inputText,
+        }),
+      }
+    );
+    return handleApiResponse<ResolveActionResponse>(response);
+  },
+
   createMessage: async (
     sessionId: string,
     data: CreateChatMessageRequest
@@ -789,6 +1309,41 @@ export const chatApi = {
       method: 'DELETE',
     });
     return handleApiResponse<void>(response);
+  },
+
+  getMessage: async (messageId: string): Promise<ChatMessage> => {
+    const response = await makeRequest(`/api/chat/messages/${messageId}`);
+    return handleApiResponse<ChatMessage>(response);
+  },
+
+  getWorkflowCard: async (
+    messageId: string,
+    options?: { detail?: WorkflowCardDetailLevel }
+  ): Promise<WorkflowCardData> => {
+    const response = await makeRequest(
+      buildWorkflowCardUrl(messageId, options?.detail ?? 'summary')
+    );
+    return handleApiResponse<WorkflowCardData>(response);
+  },
+
+  respondToWorkflowReview: async (
+    payload: UserReviewResponseRequest
+  ): Promise<UserReviewResponseResponse> => {
+    const response = await makeRequest('/api/workflow/review/respond', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return handleApiResponse<UserReviewResponseResponse>(response);
+  },
+
+  submitWorkflowIterationFeedback: async (
+    payload: UserIterationFeedbackRequest
+  ): Promise<UserIterationFeedbackResponse> => {
+    const response = await makeRequest('/api/workflow/iteration/feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return handleApiResponse<UserIterationFeedbackResponse>(response);
   },
 
   resendMessage: async (

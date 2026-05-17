@@ -22,6 +22,7 @@ use db::{
         chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
         chat_skill::ChatSkill,
         chat_work_item::{ChatWorkItem, ChatWorkItemType, CreateChatWorkItem},
+        workflow_types::{WorkflowPlanEdge, WorkflowPlanNode},
     },
 };
 use executors::{
@@ -59,12 +60,19 @@ use utils::{
 };
 use uuid::Uuid;
 
+#[cfg(test)]
+use crate::services::config::preset_loader::PresetLoader;
 use crate::services::{
     analytics::AnalyticsService,
     analytics_events::{AnalyticsProjector, DomainEvent},
-    chat::{self, ChatServiceError},
-    config::{self, UiLanguage, preset_loader::PresetLoader},
-    native_skills::{NativeSkillError, list_native_skills_for_runner},
+    chat::{self, ChatServiceError, is_workflow_chat_input_mode},
+    config::{self, UiLanguage},
+    native_skills::{
+        NativeSkillError, auto_allow_builtin_skills, ensure_builtin_skills_installed,
+        list_native_skills_for_runner,
+    },
+    workflow_analytics,
+    workflow_runtime::resolve_lead_agent,
 };
 
 const OPENTEAMS_HOME_DIR: &str = ".openteams";
@@ -76,25 +84,6 @@ const RUN_RECORDS_DIR_NAME: &str = "run_records";
 const SHARED_PROTOCOL_DIR_NAME: &str = "protocol";
 const SHARED_BLACKBOARD_FILE_NAME: &str = "shared_blackboard.jsonl";
 const WORK_RECORDS_FILE_NAME: &str = "work_records.jsonl";
-const MARKDOWN_PROTOCOL_RECORD_RULE: &str = "Write only long-lived shared facts to shared_blackboard.jsonl. Do not write process descriptions, temporary status, or blockers.";
-const MARKDOWN_PROTOCOL_ARTIFACT_RULE: &str =
-    "Write only deliverable outputs or their concrete paths to work_records.jsonl.";
-const MARKDOWN_PROTOCOL_CONCLUSION_RULE: &str = "Write only the current-turn work status to work_records.jsonl. Include completed work, blockers, or next steps. Do not write long-lived facts.";
-const HISTORY_GROUP_MESSAGES_INSTRUCTION: &str = concat!(
-    "If you need to understand the current group chat state, you MAY inspect this file yourself.\n",
-    "Reading history is optional. Do not assume you must read history before acting.\n",
-    "Prioritize reading history when the new message implies continuation or refinement, such as \"continue\", \"继续\", \"接着\", \"基于前文\", \"refine\", or \"update\".\n",
-    "If the current task can be completed independently, you do not need to read history.\n",
-);
-const HISTORY_SHARED_BLACKBOARD_INSTRUCTION: &str = concat!(
-    "You can search by member name to find shared messages published by a specific member.\n",
-    "Before writing a record item, if you are unsure whether the fact was already captured, check this file first.\n",
-);
-const HISTORY_WORK_RECORDS_INSTRUCTION: &str = concat!(
-    "You can search by member name to find a specific member's work outputs and status summaries.\n",
-    "Use this file when you need to review what members have already completed.\n",
-    "Before writing an artifact or conclusion item, if you are unsure whether similar work or status was already recorded, check this file first.\n",
-);
 const RESERVED_USER_HANDLE: &str = "you";
 const PROTOCOL_SEND_INTENT_VALUES: &[&str] = &["request", "reply", "notify", "blocker", "confirm"];
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
@@ -111,6 +100,66 @@ const OPENTEAMS_GITIGNORE_ENTRY: &str = ".openteams/";
 /// Only `InvalidJson` and `NotJsonArray` errors trigger a retry; semantic errors
 /// (e.g. `EmptyMessage`, `MissingSendTarget`) are not retried.
 const MAX_PROTOCOL_PARSE_RETRIES: u32 = 1;
+const PROTOCOL_OUTPUT_SCHEMA_JSON_WORKFLOW_PLAN: &str = r#"{
+  "type": "array",
+  "items": {
+    "anyOf": [
+      {
+        "type": "object",
+        "properties": {
+          "type": { "const": "send" },
+          "to": { "type": "string", "minLength": 1 },
+          "content": { "type": "string", "minLength": 1 },
+          "intent": {
+            "type": "string",
+            "enum": ["request", "reply", "notify", "blocker", "confirm"]
+          }
+        },
+        "required": ["type", "to", "content"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": { "const": "record" },
+          "content": { "type": "string", "minLength": 1 }
+        },
+        "required": ["type", "content"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": { "const": "artifact" },
+          "content": { "type": "string", "minLength": 1 }
+        },
+        "required": ["type", "content"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": { "const": "conclusion" },
+          "content": { "type": "string", "minLength": 1 }
+        },
+        "required": ["type", "content"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "type": { "const": "workflow_generate" },
+          "plan_check": { "type": "boolean" },
+          "content": { "type": "string" },
+          "design_doc_path": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["type", "plan_check", "content"],
+        "additionalProperties": false
+      }
+    ]
+  },
+  "minItems": 1
+}"#;
 const PROTOCOL_OUTPUT_SCHEMA_JSON: &str = r#"{
   "type": "array",
   "items": {
@@ -165,7 +214,11 @@ const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
   {"type": "record", "content": "The metrics are `latency_p95_ms` and `success_rate`."},
   {"type": "conclusion", "content": "Finished metric definition. Next: wire collection into runner."}
 ]"#;
-
+const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON_WORKFLOW_PLAN: &str = r#"[
+  {"type": "send", "to": "you", "intent": "request", "content": "I have finished the implementation"},
+  {"type": "record", "content": "The metrics are `latency_p95_ms` and `success_rate`."},
+  {"type": "workflow_generate", "plan_check": true, "content": "Generate a workflow plan to implement the following task: ...", "design_doc_path": ["path/to/design_doc1.md", "path/to/design_doc2.md"]}
+]"#;
 struct DiffInfo {
     _truncated: bool,
     observed_paths: Vec<String>,
@@ -241,6 +294,7 @@ enum AgentProtocolMessageType {
     #[serde(alias = "artiface", alias = "artefact")]
     Artifact,
     Conclusion,
+    WorkflowGenerate,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -252,7 +306,11 @@ struct AgentProtocolMessage {
     #[serde(default)]
     intent: Option<String>,
     #[serde(default)]
+    plan_check: Option<bool>,
+    #[serde(default)]
     content: String,
+    #[serde(default)]
+    design_doc_path: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -278,6 +336,19 @@ pub(super) enum ProtocolProcessResult {
     RetryableParseFailure {
         code: ChatProtocolNoticeCode,
         detail: Option<String>,
+    },
+    /// A `workflow_generate` control signal was detected in the agent output.
+    /// The caller should trigger the plan generation pipeline after processing
+    /// any co-occurring `send`/`artifact`/`record`/`conclusion` messages.
+    WorkflowGenerateDetected {
+        /// Number of `send` messages created alongside the workflow_generate.
+        send_count: usize,
+        /// Whether a finalized plan exists and plan generation should proceed.
+        plan_check: bool,
+        /// The content field from the workflow_generate message (may be empty).
+        workflow_content: String,
+        /// Optional paths to design documents referenced in the workflow_generate message.
+        design_doc_paths: Option<Vec<String>>,
     },
 }
 
@@ -495,6 +566,9 @@ pub enum ChatStreamEvent {
     MessageNew {
         message: ChatMessage,
     },
+    MessageUpdated {
+        message: ChatMessage,
+    },
     WorkItemNew {
         work_item: ChatWorkItem,
     },
@@ -543,6 +617,42 @@ pub enum ChatStreamEvent {
         agent_id: Option<Uuid>,
         reason: String,
     },
+    WorkflowGenerateDetected {
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        run_id: Uuid,
+    },
+    WorkflowPlanPreviewReady {
+        session_id: Uuid,
+        plan_id: Uuid,
+        workflow_card_message: ChatMessage,
+    },
+    WorkflowExecutionUpdated {
+        session_id: Uuid,
+        execution_id: Uuid,
+    },
+    WorkflowGraphUpdated {
+        session_id: Uuid,
+        execution_id: Uuid,
+        graph_version: String,
+        reason: String,
+        nodes: Vec<WorkflowPlanNode>,
+        edges: Vec<WorkflowPlanEdge>,
+        changed_step_ids: Vec<String>,
+    },
+    WorkflowRuntimeLine {
+        line_id: Uuid,
+        session_id: Uuid,
+        execution_id: Uuid,
+        workflow_agent_session_id: Option<Uuid>,
+        step_id: Uuid,
+        step_key: String,
+        agent_id: Uuid,
+        agent_name: String,
+        stream_type: ChatStreamDeltaType,
+        content: String,
+        created_at: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -558,6 +668,8 @@ pub enum ChatStreamDeltaType {
 pub enum ChatRunnerError {
     #[error("chat agent not found: {0}")]
     AgentNotFound(String),
+    #[error("session not found: {0}")]
+    SessionNotFound(Uuid),
     #[error("unknown runner type: {0}")]
     UnknownRunnerType(String),
     #[error(transparent)]
@@ -572,6 +684,8 @@ pub enum ChatRunnerError {
     ChatService(#[from] ChatServiceError),
     #[error(transparent)]
     NativeSkills(#[from] NativeSkillError),
+    #[error("invalid workflow plan: {0}")]
+    InvalidWorkflowPlan(String),
 }
 
 /// Pending message to be processed by an agent
@@ -666,6 +780,13 @@ impl ChatRunner {
         }
     }
 
+    pub fn analytics_service(&self) -> Option<&AnalyticsService> {
+        workflow_analytics::analytics_if_enabled(
+            self.analytics.as_ref(),
+            self.analytics_enabled.load(Ordering::Relaxed),
+        )
+    }
+
     fn analytics_projector(&self) -> AnalyticsProjector<'_> {
         AnalyticsProjector::new(
             &self.db.pool,
@@ -753,8 +874,79 @@ impl ChatRunner {
         self.emit(session_id, ChatStreamEvent::MessageNew { message });
     }
 
+    pub fn emit_message_updated(&self, session_id: Uuid, message: ChatMessage) {
+        self.emit(session_id, ChatStreamEvent::MessageUpdated { message });
+    }
+
     pub fn emit_work_item_new(&self, session_id: Uuid, work_item: ChatWorkItem) {
         self.emit(session_id, ChatStreamEvent::WorkItemNew { work_item });
+    }
+
+    pub fn emit_workflow_execution_updated(&self, session_id: Uuid, execution_id: Uuid) {
+        self.emit(
+            session_id,
+            ChatStreamEvent::WorkflowExecutionUpdated {
+                session_id,
+                execution_id,
+            },
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn emit_workflow_graph_updated(
+        &self,
+        session_id: Uuid,
+        execution_id: Uuid,
+        graph_version: String,
+        reason: String,
+        nodes: Vec<WorkflowPlanNode>,
+        edges: Vec<WorkflowPlanEdge>,
+        changed_step_ids: Vec<String>,
+    ) {
+        self.emit(
+            session_id,
+            ChatStreamEvent::WorkflowGraphUpdated {
+                session_id,
+                execution_id,
+                graph_version,
+                reason,
+                nodes,
+                edges,
+                changed_step_ids,
+            },
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn emit_workflow_runtime_line(
+        &self,
+        session_id: Uuid,
+        execution_id: Uuid,
+        workflow_agent_session_id: Option<Uuid>,
+        step_id: Uuid,
+        step_key: String,
+        agent_id: Uuid,
+        agent_name: String,
+        stream_type: ChatStreamDeltaType,
+        content: String,
+        created_at: String,
+    ) {
+        self.emit(
+            session_id,
+            ChatStreamEvent::WorkflowRuntimeLine {
+                line_id: Uuid::new_v4(),
+                session_id,
+                execution_id,
+                workflow_agent_session_id,
+                step_id,
+                step_key,
+                agent_id,
+                agent_name,
+                stream_type,
+                content,
+                created_at,
+            },
+        );
     }
 
     /// Update the mention_statuses field in a message's meta
@@ -959,7 +1151,7 @@ impl ChatRunner {
         let mut mentions = message.mentions.0.clone();
         if mentions.is_empty() {
             match self
-                .resolve_default_mention_for_unmentioned_user_message(session_id, message)
+                .resolve_default_mention_for_unmentioned_user_message(session, message)
                 .await
             {
                 Ok(Some(default_mention)) => {
@@ -1016,7 +1208,7 @@ impl ChatRunner {
 
     async fn resolve_default_mention_for_unmentioned_user_message(
         &self,
-        session_id: Uuid,
+        session: &ChatSession,
         message: &ChatMessage,
     ) -> Result<Option<String>, ChatRunnerError> {
         if message.sender_type != ChatSenderType::User || !message.mentions.0.is_empty() {
@@ -1024,22 +1216,43 @@ impl ChatRunner {
         }
 
         let session_agents =
-            ChatSessionAgent::find_all_for_session(&self.db.pool, session_id).await?;
+            ChatSessionAgent::find_all_for_session(&self.db.pool, session.id).await?;
         if session_agents.is_empty() {
             return Ok(None);
         }
 
         let agents = ChatAgent::find_all(&self.db.pool).await?;
-        let agent_map: HashMap<Uuid, ChatAgent> =
-            agents.into_iter().map(|agent| (agent.id, agent)).collect();
 
-        for session_agent in session_agents {
+        // In workflow mode, route to the designated lead agent (falls back to first if none set).
+        // In free mode, route to the first session agent (original behaviour).
+        let is_workflow_mode = message
+            .meta
+            .get("chat_input_mode")
+            .and_then(|v| v.as_str())
+            .map(|v| v == "workflow")
+            .unwrap_or(false);
+
+        if is_workflow_mode {
+            tracing::debug!(
+                session_id = %session.id,
+                message_id = %message.id,
+                "attempting to resolve lead agent for workflow mode message"
+            );
+            match resolve_lead_agent(session, &session_agents, &agents) {
+                Ok((lead_agent, _)) => return Ok(Some(lead_agent.name.clone())),
+                Err(_) => return Ok(None),
+            }
+        }
+
+        // Free mode: first available agent
+        let agent_map: std::collections::HashMap<Uuid, &ChatAgent> =
+            agents.iter().map(|a| (a.id, a)).collect();
+        for session_agent in &session_agents {
             if let Some(agent) = agent_map.get(&session_agent.agent_id) {
                 return Ok(Some(agent.name.clone()));
             }
-
             tracing::warn!(
-                session_id = %session_id,
+                session_id = %session.id,
                 session_agent_id = %session_agent.id,
                 agent_id = %session_agent.agent_id,
                 "default route skipped session agent with missing backing agent"
@@ -1368,7 +1581,7 @@ impl ChatRunner {
             return Ok(());
         }
 
-        let session_agent = if session_agent.state != ChatSessionAgentState::Running {
+        let mut session_agent = if session_agent.state != ChatSessionAgentState::Running {
             ChatSessionAgent::update_state(
                 &self.db.pool,
                 session_agent.id,
@@ -1395,6 +1608,13 @@ impl ChatRunner {
                 state: ChatSessionAgentState::Running,
                 started_at: Some(session_agent.updated_at),
             },
+        );
+
+        workflow_analytics::track_agent_state_changed(
+            self.analytics_service(),
+            session_id,
+            None,
+            "running",
         );
 
         if track_source_message {
@@ -1497,9 +1717,14 @@ impl ChatRunner {
             let session_agents = self.build_session_agent_summaries(session_id).await?;
             let session = ChatSession::find_by_id(&self.db.pool, session_id).await?;
 
-            // Resolve the enabled native skills allowed for this session member.
+            // Resolve builtin + user-configured skills for this agent.
+            let prompt_context = if is_workflow_chat_input_mode(&source_message.meta.0) {
+                crate::services::agent_skill_policy::AgentPromptContext::WorkflowChat
+            } else {
+                crate::services::agent_skill_policy::AgentPromptContext::FreeChat
+            };
             let agent_skills = self
-                .resolve_session_agent_skills(&session_agent, &agent)
+                .prepare_and_resolve_agent_skills(&mut session_agent, &agent, prompt_context)
                 .await?;
 
             // Load UI language setting for agent response language
@@ -1672,9 +1897,17 @@ impl ChatRunner {
                         agent_id,
                         run_id,
                         error_type: "startup_failure".to_string(),
-                        error_message: err.to_string(),
+                        error_code: "agent_startup_failed".to_string(),
                     })
                     .await;
+                workflow_analytics::track_agent_error(
+                    self.analytics_service(),
+                    session_id,
+                    None,
+                    None,
+                    "agent_startup_failed",
+                    None,
+                );
                 if track_source_message {
                     self.report_mention_failure(
                         session_id,
@@ -1700,6 +1933,12 @@ impl ChatRunner {
                     state: ChatSessionAgentState::Dead,
                     started_at: None,
                 },
+            );
+            workflow_analytics::track_agent_state_changed(
+                self.analytics_service(),
+                session_id,
+                None,
+                "dead",
             );
         }
 

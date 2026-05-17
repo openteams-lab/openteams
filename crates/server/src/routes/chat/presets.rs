@@ -63,6 +63,7 @@ pub struct CreatePresetSnapshotResponse {
 #[derive(Debug, Clone, FromRow)]
 struct SessionPresetMemberRow {
     session_agent_id: Uuid,
+    agent_id: Uuid,
     agent_name: String,
     runner_type: String,
     system_prompt: String,
@@ -104,12 +105,14 @@ pub async fn update_team_protocol(
         &UpdateChatSession {
             title: None,
             status: None,
+            lead_agent_id: None,
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
             team_protocol: Some(content),
             team_protocol_enabled: Some(effective.enabled),
             default_workspace_path: None,
+            chat_input_mode: None,
         },
     )
     .await?;
@@ -174,6 +177,7 @@ async fn list_session_preset_member_rows(
     sqlx::query_as::<_, SessionPresetMemberRow>(
         r#"
         SELECT session_agents.id AS session_agent_id,
+               session_agents.agent_id AS agent_id,
                agents.name AS agent_name,
                agents.runner_type AS runner_type,
                agents.system_prompt AS system_prompt,
@@ -249,8 +253,17 @@ fn build_preset_snapshot(
     let replaceable_member_ids: HashSet<String> = existing_team_index
         .map(|index| presets.teams[index].member_ids.iter().cloned().collect())
         .unwrap_or_default();
-    let members = build_member_presets(session, &team_id, rows);
+    let members = build_member_presets(session, &team_id, rows.clone());
     validate_member_id_conflicts(presets, &members, &replaceable_member_ids)?;
+
+    // Resolve lead_member_id: find the member preset that corresponds to the session's lead agent.
+    let lead_member_id = session.lead_agent_id.and_then(|lead_agent_id| {
+        // Find the row index whose agent_id matches the session's lead_agent_id
+        rows.iter()
+            .position(|row| row.agent_id == lead_agent_id)
+            .and_then(|index| members.get(index))
+            .map(|member| member.id.clone())
+    });
 
     let member_ids = members
         .iter()
@@ -272,6 +285,7 @@ fn build_preset_snapshot(
         name: team_name,
         description,
         member_ids,
+        lead_member_id,
         team_protocol,
         is_builtin: false,
         enabled: true,
@@ -492,12 +506,14 @@ mod tests {
             id: Uuid::new_v4(),
             title: Some("Delivery Team".to_string()),
             status: ChatSessionStatus::Active,
+            lead_agent_id: None,
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
             team_protocol: Some("Follow the team protocol.".to_string()),
             team_protocol_enabled,
             default_workspace_path: Some("/workspace/default".to_string()),
+            chat_input_mode: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
             archived_at: None,
@@ -515,6 +531,7 @@ mod tests {
     fn test_row(name: &str) -> SessionPresetMemberRow {
         SessionPresetMemberRow {
             session_agent_id: Uuid::new_v4(),
+            agent_id: Uuid::new_v4(),
             agent_name: name.to_string(),
             runner_type: "codex".to_string(),
             system_prompt: format!("You are {name}."),
@@ -778,6 +795,7 @@ mod tests {
             name: "Built-in".to_string(),
             description: "Built-in team".to_string(),
             member_ids: vec![],
+            lead_member_id: None,
             team_protocol: String::new(),
             is_builtin: true,
             enabled: true,
@@ -816,6 +834,7 @@ mod tests {
             name: "Old team".to_string(),
             description: "Old team".to_string(),
             member_ids: vec!["delivery_backend".to_string()],
+            lead_member_id: None,
             team_protocol: "old".to_string(),
             is_builtin: false,
             enabled: true,

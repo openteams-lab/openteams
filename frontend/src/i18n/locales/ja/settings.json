@@ -745,7 +745,10 @@
           "namePlaceholder": "例: フルスタック開発チーム",
           "description": "説明",
           "descriptionPlaceholder": "このチームの用途",
-          "members": "チームメンバー"
+          "members": "チームメンバー",
+          "leadAgent": "リードエージェント",
+          "leadAgentDescription": "ワークフローモードで実行プランを生成する担当メンバー。未設定の場合は最初のメンバーがデフォルトになります。",
+          "leadAgentDefault": "デフォルト（最初のメンバー）"
         }
       }
     }
@@ -837,7 +840,10 @@
           "namePlaceholder": "例: フルスタック開発チーム",
           "description": "説明",
           "descriptionPlaceholder": "例: エンドツーエンド開発チーム",
-          "members": "チームメンバー"
+          "members": "チームメンバー",
+          "leadAgent": "リードエージェント",
+          "leadAgentDescription": "ワークフローモードで実行プランを生成する担当メンバー。未設定の場合は最初のメンバーがデフォルトになります。",
+          "leadAgentDefault": "デフォルト（最初のメンバー）"
         }
       }
     }

@@ -968,7 +968,10 @@ export function CliSettings() {
         headerAction={
           <button
             type="button"
-            className={settingsSecondaryButtonClassName}
+            className={cn(
+              settingsSecondaryButtonClassName,
+              'preset-action-primary'
+            )}
             onClick={handleCreateCustomProvider}
           >
             <Plus className="h-4 w-4" />

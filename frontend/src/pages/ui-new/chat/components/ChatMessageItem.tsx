@@ -54,12 +54,40 @@ import {
   extractErrorFromMeta,
 } from '../utils';
 import { formatTokenUsage } from '@/utils/string';
+import {
+  ChatWorkflowCard,
+  extractWorkflowCardProjection,
+  isWorkflowCardMessageMeta,
+  type WorkflowCardProjection,
+} from './ChatWorkflowCard';
+import { type WorkflowFinalReviewActionData } from './WorkflowFinalReviewCard';
 
 const SUPPRESSED_PROTOCOL_ERROR_CODES = new Set([
   'invalid_json',
   'not_json_array',
   'empty_message',
 ]);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const extractMessageI18nMeta = (
+  meta: unknown
+): { key: string; params: Record<string, unknown> } | null => {
+  if (!isRecord(meta) || !isRecord(meta.i18n)) {
+    return null;
+  }
+
+  const key = meta.i18n.key;
+  if (typeof key !== 'string' || key.trim() === '') {
+    return null;
+  }
+
+  return {
+    key,
+    params: isRecord(meta.i18n.params) ? meta.i18n.params : {},
+  };
+};
 
 const isInteractiveTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) {
@@ -110,6 +138,40 @@ export interface ChatMessageItemProps {
   isCleanupMode: boolean;
   isSelected: boolean;
   onToggleSelect: () => void;
+  // Workflow controls
+  onExecutePlan?: (projection: WorkflowCardProjection) => void;
+  onPauseAll?: (executionId: string) => void;
+  onResumeWorkflow?: (
+    executionId: string,
+    projection: WorkflowCardProjection
+  ) => void;
+  onRetryWorkflowStep?: (
+    stepId: string,
+    retryTarget?: 'task' | 'review'
+  ) => void;
+  onOpenWorkflowWindow?: (projection: unknown) => void;
+  onRetryWorkflowPlanGeneration?: (messageId: string) => void;
+  workflowPlanGenerationRetryPending?: boolean;
+  workflowPlanGenerationRetryError?: string | null;
+  workflowCardProjection?: WorkflowCardProjection | null;
+  workflowFinalReviewAction?: WorkflowFinalReviewActionData | null;
+  onRespondPendingReview?: (
+    reviewId: string,
+    action: 'approve' | 'reject',
+    feedback?: string
+  ) => void;
+  onSubmitWorkflowStepInput?: (stepId: string, inputText: string) => void;
+  onSubmitWorkflowIterationFeedback?: (payload: {
+    executionId: string;
+    action: 'accept' | 'reject';
+    feedback?: {
+      what_wrong: string;
+      expected: string;
+      priority: 'high' | 'medium' | 'low';
+      additional_notes?: string;
+    };
+  }) => void;
+  pendingWorkflowActionId?: string | null;
 }
 
 export function ChatMessageItem({
@@ -134,6 +196,20 @@ export function ChatMessageItem({
   isCleanupMode,
   isSelected,
   onToggleSelect,
+  onExecutePlan,
+  onPauseAll,
+  onResumeWorkflow,
+  onRetryWorkflowStep,
+  onOpenWorkflowWindow,
+  onRetryWorkflowPlanGeneration,
+  workflowPlanGenerationRetryPending,
+  workflowPlanGenerationRetryError,
+  workflowCardProjection: workflowCardProjectionOverride,
+  workflowFinalReviewAction,
+  onRespondPendingReview,
+  onSubmitWorkflowStepInput,
+  onSubmitWorkflowIterationFeedback,
+  pendingWorkflowActionId,
 }: ChatMessageItemProps) {
   const { t } = useTranslation('chat');
   const { t: tCommon } = useTranslation('common');
@@ -213,6 +289,12 @@ export function ChatMessageItem({
   }, [message.id]);
 
   const protocolError = extractProtocolErrorMeta(message.meta);
+  const workflowCardProjection =
+    workflowCardProjectionOverride !== undefined
+      ? workflowCardProjectionOverride
+      : extractWorkflowCardProjection(message.meta);
+  const isWorkflowCardMessage = isWorkflowCardMessageMeta(message.meta);
+  const messageI18nMeta = extractMessageI18nMeta(message.meta);
   const errorInfo = extractErrorFromMeta(message.meta);
   const apiError =
     isAgent && !errorInfo
@@ -259,6 +341,85 @@ export function ChatMessageItem({
 
   // System messages
   if (message.sender_type === ChatSenderType.system) {
+    if (isWorkflowCardMessage) {
+      return (
+        <div className="chat-session-message-row is-system flex items-start gap-base">
+          {isCleanupMode && (
+            <button
+              type="button"
+              className="flex-shrink-0 mt-1"
+              onClick={onToggleSelect}
+            >
+              {isSelected ? (
+                <CheckSquareIcon
+                  className="size-icon text-brand"
+                  weight="fill"
+                />
+              ) : (
+                <SquareIcon className="size-icon text-low" />
+              )}
+            </button>
+          )}
+          <div
+            className={cn('relative w-full', isCleanupMode && 'cursor-pointer')}
+            onClick={handleCleanupCardClick}
+            onKeyDown={handleCleanupCardKeyDown}
+            role={isCleanupMode ? 'checkbox' : undefined}
+            aria-checked={isCleanupMode ? isSelected : undefined}
+            tabIndex={isCleanupMode ? 0 : undefined}
+          >
+            <div className="flex w-full flex-col gap-3">
+              {workflowCardProjection ? (
+                <ChatWorkflowCard
+                  message={message}
+                  projection={workflowCardProjection}
+                  onExecute={onExecutePlan}
+                  onPauseAll={onPauseAll}
+                  onResume={onResumeWorkflow}
+                  onRetryStep={onRetryWorkflowStep}
+                  finalReviewAction={workflowFinalReviewAction}
+                  onRespondPendingReview={onRespondPendingReview}
+                  onSubmitStepInput={onSubmitWorkflowStepInput}
+                  onSubmitIterationFeedback={onSubmitWorkflowIterationFeedback}
+                  pendingActionId={pendingWorkflowActionId}
+                  onRetryPlanGeneration={onRetryWorkflowPlanGeneration}
+                  retryPlanGenerationPending={
+                    workflowPlanGenerationRetryPending
+                  }
+                  retryPlanGenerationError={workflowPlanGenerationRetryError}
+                  onOpenWindow={
+                    onOpenWorkflowWindow
+                      ? () => {
+                          const proj = workflowCardProjection;
+                          if (proj) onOpenWorkflowWindow(proj);
+                        }
+                      : undefined
+                  }
+                />
+              ) : (
+                <div className="w-full max-w-[640px] rounded-[24px] border border-[#D8E2F0] bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#64748B]">
+                    <ArrowClockwiseIcon
+                      className="size-icon-sm animate-spin text-[#2563EB]"
+                      weight="bold"
+                    />
+                    <span>
+                      {t('workflow.card.loading', {
+                        defaultValue: 'Loading Workflow',
+                      })}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-[20px] font-semibold leading-tight text-[#0F172A]">
+                    {message.content || 'Workflow execution'}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     if (shouldSuppressProtocolErrorCard) {
       return null;
     }
@@ -380,6 +541,8 @@ export function ChatMessageItem({
             ) : (
               <ChatSystemMessage
                 content={message.content}
+                i18nKey={messageI18nMeta?.key}
+                i18nParams={messageI18nMeta?.params}
                 expanded
                 textClassName={bubbleTextClassName}
               />
@@ -490,7 +653,7 @@ export function ChatMessageItem({
               'chat-session-message-header',
               isUser && 'hidden'
             )}
-            bodyClassName="chat-session-message-body"
+            bodyClassName="chat-session-message-body select-text"
             style={
               isUser
                 ? {

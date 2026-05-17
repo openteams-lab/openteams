@@ -37,6 +37,11 @@ use ts_rs::TS;
 use utils::{assets::config_path, log_msg::LogMsg, msg_store::MsgStore, utf8::Utf8LossyDecoder};
 use uuid::Uuid;
 
+use super::{
+    analytics::AnalyticsService,
+    workflow_analytics::{self, hash_user_id},
+};
+
 #[derive(Debug, Error)]
 pub enum ChatServiceError {
     #[error(transparent)]
@@ -230,6 +235,76 @@ pub fn parse_agent_send_mentions(meta: &Value) -> Vec<String> {
         .collect()
 }
 
+pub fn is_workflow_chat_input_mode(meta: &Value) -> bool {
+    meta.get("chat_input_mode")
+        .and_then(Value::as_str)
+        .is_some_and(|mode| mode.trim() == "workflow")
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MessageAnalyticsMetrics {
+    pub message_length_bucket: &'static str,
+    pub mention_count: usize,
+    pub attachment_count: usize,
+    pub attachment_total_size_bytes: u64,
+}
+
+pub fn build_message_analytics_metrics(message: &ChatMessage) -> MessageAnalyticsMetrics {
+    let attachments = extract_attachments(&message.meta.0);
+    let attachment_total_size_bytes = attachments
+        .iter()
+        .map(|attachment| attachment.size_bytes.max(0) as u64)
+        .sum::<u64>();
+
+    MessageAnalyticsMetrics {
+        message_length_bucket: workflow_analytics::message_length_bucket(message.content.len()),
+        mention_count: message.mentions.0.len(),
+        attachment_count: attachments.len(),
+        attachment_total_size_bytes,
+    }
+}
+
+pub fn emit_user_message_workflow_analytics(
+    analytics: Option<&AnalyticsService>,
+    session_id: Uuid,
+    user_id: Option<&str>,
+    message: &ChatMessage,
+) {
+    if !matches!(message.sender_type, ChatSenderType::User) {
+        return;
+    }
+
+    let metrics = build_message_analytics_metrics(message);
+    let user_id_hash = user_id.map(hash_user_id);
+
+    workflow_analytics::track_message_sent(
+        analytics,
+        session_id,
+        user_id_hash.as_deref(),
+        message.content.len(),
+        metrics.mention_count,
+        metrics.attachment_count,
+    );
+
+    if metrics.mention_count > 0 {
+        workflow_analytics::track_agent_mentioned(
+            analytics,
+            session_id,
+            metrics.mention_count,
+            None,
+        );
+    }
+
+    if metrics.attachment_count > 0 {
+        workflow_analytics::track_attachment_added(
+            analytics,
+            session_id,
+            metrics.attachment_count,
+            metrics.attachment_total_size_bytes,
+        );
+    }
+}
+
 pub async fn create_message(
     pool: &SqlitePool,
     session_id: Uuid,
@@ -279,6 +354,7 @@ pub async fn create_message_with_id(
     }
     let mentions = match sender_type {
         ChatSenderType::Agent => parse_agent_send_mentions(&meta),
+        ChatSenderType::User if is_workflow_chat_input_mode(&meta) => Vec::new(),
         _ => parse_mentions(&content),
     };
     if content.trim().is_empty() && !has_attachments(&meta) {
@@ -1798,6 +1874,7 @@ pub async fn compress_messages_if_needed(
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
     use db::models::{
         chat_agent::{ChatAgent, CreateChatAgent},
         chat_message::{ChatMessage, ChatSenderType},
@@ -1808,10 +1885,11 @@ mod tests {
     use uuid::Uuid;
 
     use super::{
-        CompressionType, SimplifiedMessage, all_agents_running, compress_messages_if_needed,
-        create_message, is_protocol_notice_history_message, limit_summary_input_messages,
-        parse_agent_send_mentions, parse_mentions, prioritize_summary_agents,
-        select_messages_to_compress_by_token, should_include_message_in_history,
+        CompressionType, SimplifiedMessage, all_agents_running, build_message_analytics_metrics,
+        compress_messages_if_needed, create_message, is_protocol_notice_history_message,
+        is_workflow_chat_input_mode, limit_summary_input_messages, parse_agent_send_mentions,
+        parse_mentions, prioritize_summary_agents, select_messages_to_compress_by_token,
+        should_include_message_in_history,
     };
 
     #[test]
@@ -1875,6 +1953,46 @@ mod tests {
         assert!(mentions.is_empty());
     }
 
+    #[test]
+    fn build_message_analytics_metrics_uses_buckets_counts_and_attachment_sizes() {
+        let message = ChatMessage {
+            id: Uuid::new_v4(),
+            session_id: Uuid::new_v4(),
+            sender_type: ChatSenderType::User,
+            sender_id: None,
+            content: "hello @planner with file".to_string(),
+            mentions: sqlx::types::Json(vec!["planner".to_string()]),
+            meta: sqlx::types::Json(serde_json::json!({
+                "attachments": [
+                    {
+                        "id": Uuid::new_v4(),
+                        "name": "a.txt",
+                        "mime_type": "text/plain",
+                        "size_bytes": 12,
+                        "kind": "file",
+                        "relative_path": "chat/session_x/attachments/y/a.txt"
+                    },
+                    {
+                        "id": Uuid::new_v4(),
+                        "name": "b.txt",
+                        "mime_type": "text/plain",
+                        "size_bytes": 30,
+                        "kind": "file",
+                        "relative_path": "chat/session_x/attachments/y/b.txt"
+                    }
+                ]
+            })),
+            created_at: Utc::now(),
+        };
+
+        let metrics = build_message_analytics_metrics(&message);
+
+        assert_eq!(metrics.message_length_bucket, "short");
+        assert_eq!(metrics.mention_count, 1);
+        assert_eq!(metrics.attachment_count, 2);
+        assert_eq!(metrics.attachment_total_size_bytes, 42);
+    }
+
     async fn setup_chat_message_pool() -> SqlitePool {
         let pool = SqlitePool::connect("sqlite::memory:")
             .await
@@ -1894,6 +2012,8 @@ mod tests {
                 team_protocol TEXT DEFAULT '',
                 team_protocol_enabled INTEGER DEFAULT 0,
                 default_workspace_path TEXT,
+                chat_input_mode TEXT,
+                lead_agent_id TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 archived_at TEXT
@@ -1981,6 +2101,73 @@ mod tests {
         .expect("create user message");
 
         assert_eq!(message.mentions.0, vec!["backend"]);
+    }
+
+    #[test]
+    fn workflow_chat_input_mode_is_read_from_meta() {
+        assert!(is_workflow_chat_input_mode(&serde_json::json!({
+            "chat_input_mode": "workflow"
+        })));
+        assert!(!is_workflow_chat_input_mode(&serde_json::json!({
+            "chat_input_mode": "free"
+        })));
+        assert!(!is_workflow_chat_input_mode(&serde_json::json!({})));
+    }
+
+    #[tokio::test]
+    async fn create_message_skips_user_mentions_in_workflow_mode() {
+        let pool = setup_chat_message_pool().await;
+        let session = create_active_session(&pool).await;
+
+        let message = create_message(
+            &pool,
+            session.id,
+            ChatSenderType::User,
+            None,
+            "@backend please review".to_string(),
+            Some(serde_json::json!({ "chat_input_mode": "workflow" })),
+        )
+        .await
+        .expect("create workflow user message");
+
+        assert!(message.mentions.0.is_empty());
+        assert_eq!(
+            message
+                .meta
+                .0
+                .get("chat_input_mode")
+                .and_then(serde_json::Value::as_str),
+            Some("workflow")
+        );
+    }
+
+    #[tokio::test]
+    async fn create_attachment_message_skips_user_mentions_in_workflow_mode() {
+        let pool = setup_chat_message_pool().await;
+        let session = create_active_session(&pool).await;
+
+        let message = create_message(
+            &pool,
+            session.id,
+            ChatSenderType::User,
+            None,
+            "@backend see attached".to_string(),
+            Some(serde_json::json!({
+                "chat_input_mode": "workflow",
+                "attachments": [{
+                    "id": Uuid::new_v4(),
+                    "name": "notes.txt",
+                    "mime_type": "text/plain",
+                    "size_bytes": 12,
+                    "kind": "file",
+                    "relative_path": "chat/session/demo/attachments/message/notes.txt"
+                }]
+            })),
+        )
+        .await
+        .expect("create workflow attachment message");
+
+        assert!(message.mentions.0.is_empty());
     }
 
     #[tokio::test]

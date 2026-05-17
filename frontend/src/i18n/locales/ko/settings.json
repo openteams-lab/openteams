@@ -745,7 +745,10 @@
           "namePlaceholder": "예: 풀스택 개발 팀",
           "description": "설명",
           "descriptionPlaceholder": "이 팀의 용도",
-          "members": "팀 멤버"
+          "members": "팀 멤버",
+          "leadAgent": "리드 에이전트",
+          "leadAgentDescription": "워크플로 모드에서 실행 계획을 생성하는 담당 멤버입니다. 설정하지 않으면 첫 번째 멤버가 기본값입니다.",
+          "leadAgentDefault": "기본값 (첫 번째 멤버)"
         }
       }
     }
@@ -837,7 +840,10 @@
           "namePlaceholder": "예: 풀스택 개발 팀",
           "description": "설명",
           "descriptionPlaceholder": "예: 엔드투엔드 개발 팀",
-          "members": "팀 멤버"
+          "members": "팀 멤버",
+          "leadAgent": "리드 에이전트",
+          "leadAgentDescription": "워크플로 모드에서 실행 계획을 생성하는 담당 멤버입니다. 설정하지 않으면 첫 번째 멤버가 기본값입니다.",
+          "leadAgentDefault": "기본값 (첫 번째 멤버)"
         }
       }
     }

@@ -140,7 +140,7 @@ impl ChatRunner {
             .map_err(|_| ChatRunnerError::UnknownRunnerType(raw.to_string()))
     }
 
-    pub(super) async fn resolve_session_agent_skills(
+    pub(crate) async fn resolve_session_agent_skills(
         &self,
         session_agent: &ChatSessionAgent,
         agent: &ChatAgent,
@@ -165,6 +165,55 @@ impl ChatRunner {
             .filter(|item| allowed_skill_ids.contains(&item.skill.id.to_string()))
             .map(|item| item.skill)
             .collect();
+
+        Ok(skills)
+    }
+
+    pub(crate) async fn ensure_and_allow_builtin_skills(
+        &self,
+        session_agent: &mut ChatSessionAgent,
+        agent: &ChatAgent,
+        skill_names: &[&str],
+    ) -> Result<(), ChatRunnerError> {
+        let runner_type = self.parse_runner_type(agent)?;
+
+        ensure_builtin_skills_installed(&self.db.pool, runner_type, skill_names).await?;
+        auto_allow_builtin_skills(&self.db.pool, session_agent, runner_type, skill_names).await?;
+
+        Ok(())
+    }
+
+    /// Unified entry point before running any agent prompt.
+    /// 1. Installs and allows builtin skills required by the given context.
+    /// 2. Resolves all authorized skills for the session agent.
+    ///
+    /// Returns the list of resolved skills for prompt injection.
+    pub(crate) async fn prepare_and_resolve_agent_skills(
+        &self,
+        session_agent: &mut ChatSessionAgent,
+        agent: &ChatAgent,
+        context: crate::services::agent_skill_policy::AgentPromptContext,
+    ) -> Result<Vec<db::models::chat_skill::ChatSkill>, ChatRunnerError> {
+        let skills = self
+            .resolve_session_agent_skills(session_agent, agent)
+            .await?;
+        let mut required_installed_skills =
+            crate::services::agent_skill_policy::required_builtin_skills(context).to_vec();
+        for skill in &skills {
+            let name = skill.name.trim();
+            if !name.is_empty()
+                && !required_installed_skills
+                    .iter()
+                    .any(|existing| existing.eq_ignore_ascii_case(name))
+            {
+                required_installed_skills.push(name);
+            }
+        }
+
+        if !required_installed_skills.is_empty() {
+            self.ensure_and_allow_builtin_skills(session_agent, agent, &required_installed_skills)
+                .await?;
+        }
 
         Ok(skills)
     }
@@ -742,338 +791,6 @@ impl ChatRunner {
             .replace('\r', "\\r")
             .replace('\t', "\\t")
     }
-    #[cfg_attr(not(test), allow(dead_code))]
-    /// Build the system prompt using Markdown sections while preserving all protocol fields.
-    pub(super) fn build_system_prompt_markdown(
-        agent: &ChatAgent,
-        session_agents: &[SessionAgentSummary],
-        context_dir: &Path,
-        skills: &[ChatSkill],
-        user_message_content: Option<&str>,
-        prompt_language: ResolvedPromptLanguage,
-        team_protocol: Option<&str>,
-    ) -> String {
-        let mut markdown = String::new();
-        let messages_path = context_dir.join("messages.jsonl");
-        let shared_blackboard_path = context_dir.join(SHARED_BLACKBOARD_FILE_NAME);
-        let work_records_path = context_dir.join(WORK_RECORDS_FILE_NAME);
-        let visible_members = session_agents
-            .iter()
-            .filter(|member| member.agent_id != agent.id)
-            .collect::<Vec<_>>();
-
-        Self::push_markdown_section(&mut markdown, 1, "ChatGroup Protocol");
-        Self::push_markdown_field(&mut markdown, "PROTOCOL_VERSION", "chatgroup_markdown_v1");
-
-        Self::push_markdown_section(&mut markdown, 2, "agent.role");
-        Self::push_markdown_field(&mut markdown, "name", &agent.name);
-        let normalized_system_prompt =
-            Self::strip_embedded_team_protocol_from_system_prompt(&agent.system_prompt);
-        if !normalized_system_prompt.is_empty() {
-            Self::push_markdown_block_field(
-                &mut markdown,
-                "role",
-                &normalized_system_prompt,
-                "text",
-            );
-        }
-
-        let active_skills = Self::filter_active_skills(skills, user_message_content);
-        Self::push_markdown_section(&mut markdown, 2, "agent.skills");
-        if active_skills.is_empty() {
-            Self::push_markdown_field(
-                &mut markdown,
-                "restriction",
-                "You have no skills enabled. Do not attempt to use any skill.",
-            );
-        } else {
-            Self::push_markdown_block_field(
-                &mut markdown,
-                "restriction",
-                concat!(
-                    "Skills are available as local files in ~/.agents/skills and companion directories.\n",
-                    "You can ONLY use the skills listed below. Do not invent or use unlisted skills.\n",
-                ),
-                "text",
-            );
-            for (index, skill) in active_skills.iter().enumerate() {
-                Self::push_markdown_section(
-                    &mut markdown,
-                    3,
-                    &format!("agent.skills.allowed item {}", index + 1),
-                );
-                Self::push_markdown_field(&mut markdown, "name", &skill.name);
-                Self::push_markdown_field(&mut markdown, "description", &skill.description);
-            }
-        }
-
-        Self::push_markdown_section(&mut markdown, 2, "group");
-        Self::push_markdown_field(
-            &mut markdown,
-            "members_description",
-            "Other AI members currently in this group",
-        );
-        if visible_members.is_empty() {
-            markdown.push_str("_No other AI members._\n\n");
-        } else {
-            for (index, member) in visible_members.iter().enumerate() {
-                Self::push_markdown_section(
-                    &mut markdown,
-                    3,
-                    &format!("group.members item {}", index + 1),
-                );
-                Self::push_markdown_field(&mut markdown, "name", &member.name);
-                let responsibility = member.description.as_deref().unwrap_or("AI assistant");
-                Self::push_markdown_field(&mut markdown, "responsibility", responsibility);
-                Self::push_markdown_field(&mut markdown, "state", &format!("{:?}", member.state));
-                Self::push_markdown_json_field(&mut markdown, "skills_used", &member.skills_used);
-            }
-        }
-
-        Self::push_markdown_section(&mut markdown, 2, "history.group_messages");
-        Self::push_markdown_field(&mut markdown, "path", &messages_path.to_string_lossy());
-        Self::push_markdown_field(&mut markdown, "format", "jsonl");
-        Self::push_markdown_field(
-            &mut markdown,
-            "description",
-            "Group chat history. Each line is a JSON message record containing sender and content, consistent with messages.jsonl history.",
-        );
-        Self::push_markdown_bool_field(&mut markdown, "optional", true);
-        Self::push_markdown_block_field(
-            &mut markdown,
-            "instruction",
-            HISTORY_GROUP_MESSAGES_INSTRUCTION,
-            "text",
-        );
-
-        Self::push_markdown_section(&mut markdown, 2, "history.shared_blackboard");
-        Self::push_markdown_field(
-            &mut markdown,
-            "path",
-            &shared_blackboard_path.to_string_lossy(),
-        );
-        Self::push_markdown_field(&mut markdown, "format", "jsonl");
-        Self::push_markdown_field(
-            &mut markdown,
-            "description",
-            "Persisted shared messages generated from record items.",
-        );
-        Self::push_markdown_field(
-            &mut markdown,
-            "instruction",
-            HISTORY_SHARED_BLACKBOARD_INSTRUCTION,
-        );
-
-        Self::push_markdown_section(&mut markdown, 2, "history.work_records");
-        Self::push_markdown_field(&mut markdown, "path", &work_records_path.to_string_lossy());
-        Self::push_markdown_field(&mut markdown, "format", "jsonl");
-        Self::push_markdown_field(
-            &mut markdown,
-            "description",
-            "Persisted work outputs and summaries generated from artifact/conclusion items.",
-        );
-        Self::push_markdown_field(
-            &mut markdown,
-            "instruction",
-            HISTORY_WORK_RECORDS_INSTRUCTION,
-        );
-
-        Self::push_markdown_section(&mut markdown, 2, "output");
-        Self::push_markdown_bool_field(&mut markdown, "required", true);
-        Self::push_markdown_field(&mut markdown, "format", "json");
-        Self::push_markdown_field(&mut markdown, "container", "list");
-        Self::push_markdown_bool_field(&mut markdown, "only_send_items_enter_group_history", true);
-        Self::push_markdown_block_field(
-            &mut markdown,
-            "instruction",
-            concat!(
-                "Return ONLY a valid JSON array.\n",
-                "Do not wrap the JSON array in prose or markdown unless your runner forces code fences.\n",
-                "Your final reply MUST be parseable by a standard JSON parser.\n",
-                "Escape all double quotes, backslashes, and newlines inside JSON string values.\n",
-                "Before sending, verify that every `content` value is still a valid JSON string after escaping.\n",
-                "Only send items will be turned into visible group chat messages and written into group history.\n",
-                "The current agent is always recorded as the sender automatically. Do not impersonate other senders.\n",
-                "Do not discuss anything unrelated to the assigned work. Keep every reply concise, precise, and free of filler.\n",
-                "Use `to = \\\"you\\\"` when sending a message to the user. Here `you` refers to the human user.\n",
-                "For send items to another agent, `request`, `reply`, and `notify` will execute the receiver.\n",
-                "Use `notify` only for informational handoffs; the receiver must not send a reply or acknowledgment for notify messages.\n",
-            ),
-            "text",
-        );
-        let mut allowed_targets: Vec<&str> = visible_members
-            .iter()
-            .map(|member| member.name.as_str())
-            .collect();
-        allowed_targets.push(RESERVED_USER_HANDLE);
-        Self::push_markdown_json_field(&mut markdown, "allowed_targets", &allowed_targets);
-
-        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 1");
-        Self::push_markdown_field(&mut markdown, "type", "send");
-        Self::push_markdown_json_field(
-            &mut markdown,
-            "required_fields",
-            &["type", "to", "content"],
-        );
-        Self::push_markdown_json_field(&mut markdown, "optional_fields", &["intent"]);
-        Self::push_markdown_block_field(
-            &mut markdown,
-            "rules",
-            concat!(
-                "- A send item targets exactly one receiver.\n",
-                "- Use concise language with a clear goal.\n",
-                "- Content may be empty.\n",
-                "- Use `intent` for machine-readable routing semantics.\n",
-                "- Optional `intent` values for send items: `request` = ask for work or information; `reply` = the receiver should reply; `notify` = informational only, no reply should be sent; `blocker` = report a blocking issue; `confirm` = explicit confirmation is required.\n",
-                "- The system will render the final group message as `@receiver content`; `request`, `reply`, and `notify` send items are routed to another agent.\n",
-                "- When you receive a `notify` message, do not send a reply or acknowledgment to the sender.\n",
-            ),
-            "text",
-        );
-
-        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 2");
-        Self::push_markdown_field(&mut markdown, "type", "record");
-        Self::push_markdown_bool_field(&mut markdown, "required", false);
-        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_RECORD_RULE);
-
-        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 3");
-        Self::push_markdown_field(&mut markdown, "type", "artifact");
-        Self::push_markdown_bool_field(&mut markdown, "required", false);
-        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_ARTIFACT_RULE);
-
-        Self::push_markdown_section(&mut markdown, 3, "output.message_types item 4");
-        Self::push_markdown_field(&mut markdown, "type", "conclusion");
-        Self::push_markdown_bool_field(&mut markdown, "required", false);
-        Self::push_markdown_json_field(&mut markdown, "required_fields", &["type", "content"]);
-        Self::push_markdown_field(&mut markdown, "rules", MARKDOWN_PROTOCOL_CONCLUSION_RULE);
-
-        Self::push_markdown_section(&mut markdown, 2, "output.example");
-        Self::push_markdown_block_field(
-            &mut markdown,
-            "json",
-            MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON,
-            "json",
-        );
-
-        Self::push_markdown_section(&mut markdown, 2, "language");
-        Self::push_markdown_field(&mut markdown, "setting", prompt_language.setting);
-        Self::push_markdown_field(&mut markdown, "instruction", prompt_language.instruction);
-
-        Self::set_trailing_newlines(&mut markdown, 3);
-        Self::push_markdown_section(&mut markdown, 2, "team.protocol");
-        Self::push_markdown_bool_field(
-            &mut markdown,
-            "configured",
-            team_protocol.is_some_and(|content| !content.trim().is_empty()),
-        );
-        Self::push_markdown_block_field(
-            &mut markdown,
-            "guidelines",
-            &Self::resolve_team_protocol_guidelines(team_protocol),
-            "text",
-        );
-
-        markdown
-    }
-
-    /// Build the user message prompt using Markdown sections while preserving all protocol fields.
-    #[allow(dead_code)]
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn build_user_prompt_markdown(
-        agent: &ChatAgent,
-        message: &ChatMessage,
-        message_attachments: Option<&MessageAttachmentContext>,
-        reference: Option<&ReferenceContext>,
-    ) -> String {
-        let mut markdown = String::new();
-        let sender = Self::resolve_message_sender_identity(message);
-
-        Self::push_markdown_section(&mut markdown, 2, "envelope");
-        Self::push_markdown_field(&mut markdown, "session_id", &message.session_id.to_string());
-        Self::push_markdown_field(&mut markdown, "from", &sender.address);
-        Self::push_markdown_field(&mut markdown, "to", &format!("agent:{}", agent.name));
-        Self::push_markdown_field(&mut markdown, "message_id", &message.id.to_string());
-        Self::push_markdown_field(&mut markdown, "timestamp", &message.created_at.to_string());
-
-        Self::push_markdown_section(&mut markdown, 2, "message");
-        Self::push_markdown_field(&mut markdown, "sender", &sender.label);
-        Self::push_markdown_block_field(&mut markdown, "content", message.content.trim(), "text");
-
-        if let Some(reference) = reference {
-            Self::push_markdown_section(&mut markdown, 3, "message.reference");
-            Self::push_markdown_field(
-                &mut markdown,
-                "note",
-                "User referenced the following historical message. Prioritize it.",
-            );
-            Self::push_markdown_field(
-                &mut markdown,
-                "message_id",
-                &reference.message_id.to_string(),
-            );
-            Self::push_markdown_field(&mut markdown, "sender", &reference.sender_label);
-            Self::push_markdown_field(
-                &mut markdown,
-                "sender_type",
-                &format!("{:?}", reference.sender_type),
-            );
-            Self::push_markdown_field(&mut markdown, "created_at", &reference.created_at);
-            Self::push_markdown_block_field(
-                &mut markdown,
-                "content",
-                reference.content.trim(),
-                "text",
-            );
-
-            for (index, attachment) in reference.attachments.iter().enumerate() {
-                Self::push_markdown_section(
-                    &mut markdown,
-                    4,
-                    &format!("message.reference.attachments item {}", index + 1),
-                );
-                Self::push_markdown_field(&mut markdown, "name", &attachment.name);
-                Self::push_markdown_field(&mut markdown, "kind", &attachment.kind);
-                Self::push_markdown_number_field(
-                    &mut markdown,
-                    "size_bytes",
-                    attachment.size_bytes,
-                );
-                Self::push_markdown_field(
-                    &mut markdown,
-                    "mime_type",
-                    attachment.mime_type.as_deref().unwrap_or("unknown"),
-                );
-                Self::push_markdown_field(&mut markdown, "local_path", &attachment.local_path);
-            }
-        }
-
-        if let Some(attachments_ctx) = message_attachments {
-            for (index, attachment) in attachments_ctx.attachments.iter().enumerate() {
-                Self::push_markdown_section(
-                    &mut markdown,
-                    3,
-                    &format!("message.attachments item {}", index + 1),
-                );
-                Self::push_markdown_field(&mut markdown, "name", &attachment.name);
-                Self::push_markdown_field(&mut markdown, "kind", &attachment.kind);
-                Self::push_markdown_number_field(
-                    &mut markdown,
-                    "size_bytes",
-                    attachment.size_bytes,
-                );
-                Self::push_markdown_field(
-                    &mut markdown,
-                    "mime_type",
-                    attachment.mime_type.as_deref().unwrap_or("unknown"),
-                );
-                Self::push_markdown_field(&mut markdown, "local_path", &attachment.local_path);
-            }
-        }
-
-        markdown
-    }
 
     #[allow(clippy::too_many_arguments)]
     pub(super) fn build_exact_markdown_prompt(
@@ -1108,9 +825,169 @@ impl ChatRunner {
         let work_records_rel = pathdiff::diff_paths(&work_records_path, workspace_path)
             .unwrap_or_else(|| work_records_path.clone());
 
-        markdown.push_str("# ChatGroup Message\n\n");
+        let is_workflow_mode = chat::is_workflow_chat_input_mode(&message.meta.0);
 
-        markdown.push_str("## Input Message\n");
+        markdown.push_str("# Chat Message\n\n");
+        markdown.push_str("## Output Requirements\n");
+        markdown.push_str("Return **only a JSON array** matching the following schema.\n\n");
+
+        markdown.push_str("### Rules\n");
+        markdown.push_str("1. Output only content directly related to the current task.\n");
+        markdown.push_str(
+            "2. Keep messages concise. Put complex content into files instead of long text.\n",
+        );
+        if is_workflow_mode {
+            markdown.push_str(
+                "3. Workflow mode: `send.to` may only be `\"you\"` (the user). Do not send direct group-chat messages to other agents; workflow orchestration will dispatch agent work through the workflow plan.\n",
+            );
+        } else {
+            markdown
+                .push_str("3. `send.to` must match a group member name or `\"you\"` (the user).\n");
+        }
+        markdown.push_str("4. `record`: long-lived shared facts only. Written to `");
+        markdown.push_str(&shared_blackboard_rel.to_string_lossy());
+        markdown.push_str("`.\n");
+        markdown.push_str("5. `artifact`: deliverables or file paths only. Written to `");
+        markdown.push_str(&work_records_rel.to_string_lossy());
+        markdown.push_str("`.\n");
+        markdown.push_str(
+            "6. `conclusion`: current-turn summary only (completed work, blockers, next steps). Max 3 sentences. Written to `",
+        );
+        markdown.push_str(&work_records_rel.to_string_lossy());
+        markdown.push_str("`.\n");
+        if is_workflow_mode {
+            markdown.push_str("7. `workflow_generate`: \n");
+            markdown.push_str(
+                "- Emit `workflow_generate` only when the user explicitly asks to start generating an execution plan.\n",
+            );
+            markdown.push_str(
+                "- Treat explicit trigger phrases such as `生成计划`, `开始执行`, `开始落实`, `进入执行`, `generate plan`, or `start execution`, and close equivalents, as valid start-plan requests.\n",
+            );
+            markdown.push_str(
+                "- Review the chat history first and confirm that a final implementation plan has already been discussed and agreed on.\n",
+            );
+            markdown.push_str(
+                "- If no final plan is confirmed, emit `workflow_generate` with `plan_check: false` and also send a `send` message to `\"you\"` explaining the current planning status; do not send workflow-mode messages to other agents.\n",
+            );
+            markdown.push_str(
+                "- If a final plan is confirmed, emit `workflow_generate` with `plan_check: true`; its `content` must be a concise plan-generation brief that includes the essential plan summary, relevant plan files, participating members, and other execution-defining context.\n",
+            );
+            markdown.push_str(
+                "- `design_doc_path` (optional, array of strings): file paths to design documents that were discussed and confirmed. If the chat history references design document files, include their paths here so the plan generator can read them for context. Leave empty or omit if no design documents are available.\n\n",
+            );
+        }
+
+        if is_workflow_mode {
+            markdown.push_str("### Schema\n");
+            markdown.push_str("```json\n");
+            markdown.push_str(PROTOCOL_OUTPUT_SCHEMA_JSON_WORKFLOW_PLAN);
+            markdown.push_str("\n```\n\n");
+        } else {
+            markdown.push_str("### Schema\n");
+            markdown.push_str("```json\n");
+            markdown.push_str(PROTOCOL_OUTPUT_SCHEMA_JSON);
+            markdown.push_str("\n```\n\n");
+        }
+
+        if is_workflow_mode {
+            markdown.push_str("### Example\n");
+            markdown.push_str("```json\n");
+            markdown.push_str(MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON_WORKFLOW_PLAN);
+            markdown.push_str("\n```\n\n");
+        } else {
+            markdown.push_str("### Example\n");
+            markdown.push_str("```json\n");
+            markdown.push_str(MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON);
+            markdown.push_str("\n```\n\n");
+        }
+
+        if !is_protocol_retry {
+            markdown.push_str("## Agent\n");
+            markdown.push_str("- name: ");
+            markdown.push_str(&agent.name);
+            markdown.push('\n');
+            let normalized_system_prompt =
+                Self::strip_embedded_team_protocol_from_system_prompt(&agent.system_prompt);
+            if !normalized_system_prompt.is_empty() {
+                markdown.push_str("- role define: ");
+                markdown.push_str("\n```\n");
+                markdown.push_str(&normalized_system_prompt);
+                markdown.push_str("\n```\n");
+            }
+
+            if !is_workflow_mode {
+                markdown.push_str("## Team Protocol\n");
+                if let Some(protocol) = team_protocol {
+                    if !protocol.trim().is_empty() {
+                        markdown.push_str("\n````\n");
+                        markdown.push_str(protocol.trim());
+                        markdown.push_str("\n````\n");
+                    } else {
+                        markdown.push_str("No team protocol configured.\n");
+                    }
+                } else {
+                    markdown.push_str("No team protocol configured.\n");
+                }
+                markdown.push('\n');
+            }
+        }
+
+        markdown.push_str("## Group Members\n");
+        if visible_members.is_empty() {
+            markdown.push_str("_None_\n\n");
+        } else {
+            for member in visible_members {
+                markdown.push_str("- ");
+                markdown.push_str(&member.name);
+                if let Some(desc) = &member.description {
+                    markdown.push_str(": ");
+                    markdown.push_str(desc);
+                }
+                markdown.push('\n');
+            }
+            markdown.push('\n');
+        }
+
+        markdown.push_str("## History\n");
+        markdown.push_str("Read history only when the task clearly depends on continuation, refinement, or prior context.  \n");
+        markdown.push_str("Available files:\n");
+        markdown.push_str("- `");
+        markdown.push_str(&messages_rel.to_string_lossy());
+        markdown.push_str("`\n");
+        markdown.push_str("- `");
+        markdown.push_str(&shared_blackboard_rel.to_string_lossy());
+        markdown.push_str("`\n");
+        markdown.push_str("- `");
+        markdown.push_str(&work_records_rel.to_string_lossy());
+        markdown.push_str("`\n\n");
+
+        markdown.push_str("## Using language: \n");
+        markdown.push_str(prompt_language.setting);
+        markdown.push_str("\n\n");
+
+        if !is_protocol_retry {
+            markdown.push_str("\n## Turn Skills\n");
+            if active_skills.is_empty() {
+                markdown.push_str("- No skills enabled for this turn. Do not use any skills.\n");
+            } else {
+                markdown.push_str("- Enabled skills: ");
+                let skill_names: Vec<&str> =
+                    active_skills.iter().map(|s| s.name.as_str()).collect();
+                markdown.push_str(&skill_names.join(", "));
+                markdown.push('\n');
+            }
+        }
+
+        if is_workflow_mode {
+            markdown.push_str("\n## Workflow Mode\n");
+            markdown.push_str("**Currently in workflow mode**, you are the lead agent in this mode, responsible for confirming requirements with the user, discussing solution details, and generating an execution plan.\n");
+            markdown.push_str("You MUST use the `brainstorming` skill to complete the solution design. no implementation work is allowed.\n");
+            markdown.push_str("After the solution is confirmed, please prompt the user to decide if they want to proceed with generating the plan.\n");
+        }
+
+        markdown.push_str("## Current Turn\n");
+
+        markdown.push_str("\n### Input Message\n");
         markdown.push_str("- sender: ");
         markdown.push_str(&sender.label);
         markdown.push('\n');
@@ -1159,7 +1036,7 @@ impl ChatRunner {
             markdown.push_str("```\n");
 
             for (index, attachment) in reference.attachments.iter().enumerate() {
-                markdown.push_str(&format!("\n#### Attachment {}\n", index + 1));
+                markdown.push_str(&format!("\n#### Reference Attachment {}\n", index + 1));
                 markdown.push_str("- name: ");
                 markdown.push_str(&attachment.name);
                 markdown.push('\n');
@@ -1199,107 +1076,6 @@ impl ChatRunner {
             }
         }
 
-        markdown.push_str("\n## Output Requirements\n");
-        markdown.push_str("Return **only a JSON array** matching the following schema.\n\n");
-
-        markdown.push_str("### Rules\n");
-        markdown.push_str("1. Output only content directly related to the current task.\n");
-        markdown.push_str(
-            "2. Keep messages concise. Put complex content into files instead of long text.\n",
-        );
-        markdown.push_str("3. `send.to` must match a group member name or `\"you\"` (the user).\n");
-        markdown.push_str("4. `record`: long-lived shared facts only. Written to `");
-        markdown.push_str(&shared_blackboard_rel.to_string_lossy());
-        markdown.push_str("`.\n");
-        markdown.push_str("5. `artifact`: deliverables or file paths only. Written to `");
-        markdown.push_str(&work_records_rel.to_string_lossy());
-        markdown.push_str("`.\n");
-        markdown.push_str(
-            "6. `conclusion`: current-turn summary only (completed work, blockers, next steps). Max 3 sentences. Written to `",
-        );
-        markdown.push_str(&work_records_rel.to_string_lossy());
-        markdown.push_str("`.\n\n");
-
-        markdown.push_str("### Schema\n");
-        markdown.push_str("```json\n");
-        markdown.push_str(PROTOCOL_OUTPUT_SCHEMA_JSON);
-        markdown.push_str("\n```\n\n");
-
-        markdown.push_str("### Example\n");
-        markdown.push_str("```json\n");
-        markdown.push_str(MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON);
-        markdown.push_str("\n```\n\n");
-
-        if !is_protocol_retry {
-            markdown.push_str("## Agent\n");
-            markdown.push_str("- name: ");
-            markdown.push_str(&agent.name);
-            markdown.push('\n');
-            let normalized_system_prompt =
-                Self::strip_embedded_team_protocol_from_system_prompt(&agent.system_prompt);
-            markdown.push_str("- role: ");
-            markdown.push_str(&normalized_system_prompt);
-            markdown.push('\n');
-
-            if active_skills.is_empty() {
-                markdown.push_str("- skills: No skills enabled. Do not use any skills.\n");
-            } else {
-                markdown.push_str("- skills: ");
-                let skill_names: Vec<&str> =
-                    active_skills.iter().map(|s| s.name.as_str()).collect();
-                markdown.push_str(&skill_names.join(", "));
-                markdown.push('\n');
-            }
-
-            markdown.push_str("- language: ");
-            markdown.push_str(prompt_language.setting);
-            markdown.push_str("\n\n");
-
-            markdown.push_str("## Team Protocol\n");
-            if let Some(protocol) = team_protocol {
-                if !protocol.trim().is_empty() {
-                    markdown.push_str(protocol.trim());
-                    if !protocol.trim().ends_with('\n') {
-                        markdown.push('\n');
-                    }
-                } else {
-                    markdown.push_str("No team protocol configured.\n");
-                }
-            } else {
-                markdown.push_str("No team protocol configured.\n");
-            }
-            markdown.push('\n');
-        }
-
-        markdown.push_str("## Group Members\n");
-        if visible_members.is_empty() {
-            markdown.push_str("_None_\n\n");
-        } else {
-            for member in visible_members {
-                markdown.push_str("- ");
-                markdown.push_str(&member.name);
-                if let Some(desc) = &member.description {
-                    markdown.push_str(": ");
-                    markdown.push_str(desc);
-                }
-                markdown.push('\n');
-            }
-            markdown.push('\n');
-        }
-
-        markdown.push_str("## History\n");
-        markdown.push_str("Read history only when the task clearly depends on continuation, refinement, or prior context.  \n");
-        markdown.push_str("Available files:\n");
-        markdown.push_str("- `");
-        markdown.push_str(&messages_rel.to_string_lossy());
-        markdown.push_str("`\n");
-        markdown.push_str("- `");
-        markdown.push_str(&shared_blackboard_rel.to_string_lossy());
-        markdown.push_str("`\n");
-        markdown.push_str("- `");
-        markdown.push_str(&work_records_rel.to_string_lossy());
-        markdown.push_str("`\n\n");
-
         markdown.push_str("## Envelope\n");
         markdown.push_str("- session_id: ");
         markdown.push_str(&message.session_id.to_string());
@@ -1320,6 +1096,7 @@ impl ChatRunner {
         markdown
     }
 
+    #[allow(dead_code)]
     pub(super) fn push_markdown_section(markdown: &mut String, level: usize, title: &str) {
         let heading_level = level.clamp(1, 6);
         markdown.push_str(&"#".repeat(heading_level));
@@ -1328,6 +1105,7 @@ impl ChatRunner {
         markdown.push_str("\n\n");
     }
 
+    #[allow(dead_code)]
     pub(super) fn push_markdown_field(markdown: &mut String, label: &str, value: &str) {
         if value.contains('\n') {
             Self::push_markdown_block_field(markdown, label, value, "text");
@@ -1340,6 +1118,7 @@ impl ChatRunner {
         markdown.push('\n');
     }
 
+    #[allow(dead_code)]
     pub(super) fn push_markdown_bool_field(markdown: &mut String, label: &str, value: bool) {
         markdown.push_str("- **");
         markdown.push_str(label);
@@ -1348,6 +1127,7 @@ impl ChatRunner {
         markdown.push('\n');
     }
 
+    #[allow(dead_code)]
     pub(super) fn push_markdown_number_field(markdown: &mut String, label: &str, value: i64) {
         markdown.push_str("- **");
         markdown.push_str(label);
@@ -1356,6 +1136,7 @@ impl ChatRunner {
         markdown.push('\n');
     }
 
+    #[allow(dead_code)]
     pub(super) fn push_markdown_json_field<T>(markdown: &mut String, label: &str, value: &T)
     where
         T: Serialize + ?Sized,
@@ -1392,6 +1173,7 @@ impl ChatRunner {
         markdown.push_str("\n\n");
     }
 
+    #[allow(dead_code)]
     pub(super) fn set_trailing_newlines(markdown: &mut String, newline_count: usize) {
         while markdown.ends_with('\n') {
             markdown.pop();
@@ -2077,6 +1859,7 @@ impl ChatRunner {
             "record" => Some("record"),
             "artifact" | "artiface" | "artefact" => Some("artifact"),
             "conclusion" => Some("conclusion"),
+            "workflow_generate" => Some("workflow_generate"),
             _ => None,
         }
     }
@@ -2131,7 +1914,9 @@ impl ChatRunner {
                         message_type: AgentProtocolMessageType::Send,
                         to: Some(target),
                         intent,
+                        plan_check: None,
                         content: message.content.trim().to_string(),
+                        design_doc_path: None,
                     });
                 }
                 AgentProtocolMessageType::Record
@@ -2149,7 +1934,31 @@ impl ChatRunner {
                         message_type: message.message_type,
                         to: None,
                         intent: None,
+                        plan_check: None,
                         content,
+                        design_doc_path: None,
+                    });
+                }
+                AgentProtocolMessageType::WorkflowGenerate => {
+                    let plan_check = message.plan_check.unwrap_or(false);
+                    let content = message.content.trim().to_string();
+                    if plan_check && content.is_empty() {
+                        return Err(AgentProtocolError {
+                            code: ChatProtocolNoticeCode::EmptyMessage,
+                            target: None,
+                            detail: Some(
+                                "`workflow_generate.content` is required when `plan_check` is true."
+                                    .to_string(),
+                            ),
+                        });
+                    }
+                    validated.push(AgentProtocolMessage {
+                        message_type: AgentProtocolMessageType::WorkflowGenerate,
+                        to: None,
+                        intent: None,
+                        plan_check: Some(plan_check),
+                        content,
+                        design_doc_path: message.design_doc_path.clone(),
                     });
                 }
             }
@@ -2547,6 +2356,7 @@ impl ChatRunner {
         toml
     }
 
+    #[cfg(test)]
     pub(super) fn resolve_team_protocol_guidelines(team_protocol: Option<&str>) -> String {
         let normalized_protocol = team_protocol.map(str::trim).unwrap_or_default();
         if normalized_protocol.is_empty() {

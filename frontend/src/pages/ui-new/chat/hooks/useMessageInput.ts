@@ -47,7 +47,8 @@ const createEmptySessionMessageInputState = (): SessionMessageInputState => ({
 
 export function useMessageInput(
   activeSessionId: string | null,
-  mentionAgents: ChatAgent[]
+  mentionAgents: ChatAgent[],
+  mentionsEnabled = true
 ): UseMessageInputResult {
   const inputRef = useRef<HTMLTextAreaElement>(null!);
   const [draft, setDraft] = useState('');
@@ -141,6 +142,11 @@ export function useMessageInput(
   const handleDraftChange = useCallback(
     (value: string, cursorPosition?: number | null) => {
       setDraft(value);
+      if (!mentionsEnabled) {
+        setMentionQuery(null);
+        setHighlightedMentionIndex(0);
+        return;
+      }
       const activeMentionMatch = getActiveMentionMatch(value, cursorPosition);
       if (activeMentionMatch) {
         setMentionQuery(activeMentionMatch.query);
@@ -151,11 +157,12 @@ export function useMessageInput(
       setMentionQuery(null);
       setHighlightedMentionIndex(0);
     },
-    [getActiveMentionMatch]
+    [getActiveMentionMatch, mentionsEnabled]
   );
 
   const handleMentionSelect = useCallback(
     (name: string) => {
+      if (!mentionsEnabled) return;
       setDraft((prev) => {
         const textarea = inputRef.current;
         const selectionStart = textarea?.selectionStart ?? prev.length;
@@ -195,13 +202,13 @@ export function useMessageInput(
       setMentionQuery(null);
       inputRef.current?.focus();
     },
-    [getActiveMentionMatch]
+    [getActiveMentionMatch, mentionsEnabled]
   );
 
   const handleReplySelect = useCallback(
     (message: ChatMessage, mentionHandle: string | null) => {
       setReplyToMessage(message);
-      if (mentionHandle) {
+      if (mentionHandle && mentionsEnabled) {
         setDraft((prev) => {
           const mentions = extractMentions(prev);
           if (mentions.has(mentionHandle)) return prev;
@@ -216,18 +223,20 @@ export function useMessageInput(
       }
       inputRef.current?.focus();
     },
-    []
+    [mentionsEnabled]
   );
 
   const visibleMentionSuggestions = useMemo(() => {
+    if (!mentionsEnabled) return [];
     if (mentionQuery === null) return [];
     const query = mentionQuery.toLowerCase();
     return mentionAgents.filter((agent) =>
       agent.name.toLowerCase().includes(query)
     );
-  }, [mentionAgents, mentionQuery]);
+  }, [mentionAgents, mentionQuery, mentionsEnabled]);
 
   const showMentionAllSuggestion = useMemo(() => {
+    if (!mentionsEnabled) return false;
     if (mentionQuery === null) return false;
     const query = mentionQuery.trim().toLowerCase();
     if (!query) return true;
@@ -238,12 +247,13 @@ export function useMessageInput(
       isMentionAllAlias(query) ||
       mentionAllKeyword.startsWith(query)
     );
-  }, [mentionQuery]);
+  }, [mentionQuery, mentionsEnabled]);
 
   // Handle keyboard navigation for mention suggestions
   // Returns true if the event was handled (should prevent default behavior)
   const handleMentionKeyDown = useCallback(
     (event: React.KeyboardEvent): boolean => {
+      if (!mentionsEnabled) return false;
       // Only handle when mention suggestions are visible
       const totalSuggestionCount =
         visibleMentionSuggestions.length + (showMentionAllSuggestion ? 1 : 0);
@@ -297,6 +307,7 @@ export function useMessageInput(
       showMentionAllSuggestion,
       highlightedMentionIndex,
       handleMentionSelect,
+      mentionsEnabled,
     ]
   );
 
@@ -310,6 +321,13 @@ export function useMessageInput(
   );
 
   // Sync selected mentions with available agents
+  useEffect(() => {
+    if (!mentionsEnabled) {
+      setMentionQuery(null);
+      setHighlightedMentionIndex(0);
+    }
+  }, [mentionsEnabled]);
+
   useEffect(() => {
     if (mentionAgents.length === 0) {
       setSelectedMentions([]);

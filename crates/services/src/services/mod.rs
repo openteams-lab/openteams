@@ -1,3 +1,4 @@
+pub mod agent_skill_policy;
 pub mod analytics;
 pub mod analytics_events;
 pub mod approvals;
@@ -27,5 +28,13 @@ pub mod queued_message;
 pub mod remote_client;
 pub mod repo;
 pub mod skill_registry;
+pub mod workflow_analytics;
+pub mod workflow_compiler;
+pub mod workflow_iteration;
+pub mod workflow_loop_executor;
+pub mod workflow_orchestrator;
+pub mod workflow_review;
+pub mod workflow_runtime;
+pub mod workflow_validator;
 pub mod workspace_manager;
 pub mod worktree_manager;

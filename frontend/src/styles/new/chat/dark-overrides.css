@@ -73,11 +73,7 @@
   .new-design.dark .chat-session-work-item-card,
   .dark .new-design .chat-session-work-item-card {
     border-color: #2a3445;
-    background: linear-gradient(
-      180deg,
-      rgba(25, 34, 51, 0.96) 0%,
-      rgba(18, 24, 35, 0.98) 100%
-    );
+    background: #192233;
     box-shadow:
       inset 0 1px 0 rgba(148, 163, 184, 0.06),
       0 16px 36px rgba(0, 0, 0, 0.2);
@@ -297,6 +293,18 @@
     color: #3a4556;
   }
 
+  .new-design.dark .chat-session-input-icon-btn-active,
+  .dark .new-design .chat-session-input-icon-btn-active {
+    border-color: rgba(94, 162, 255, 0.36);
+    background: rgba(94, 162, 255, 0.18);
+    color: #93c5fd;
+  }
+
+  .new-design.dark .chat-session-workflow-mode-label,
+  .dark .new-design .chat-session-workflow-mode-label {
+    color: #93c5fd;
+  }
+
   .new-design.dark .chat-session-input-status,
   .dark .new-design .chat-session-input-status {
     color: var(--chat-session-text-tertiary);
@@ -417,9 +425,7 @@
   .dark .new-design .chat-session-empty-state-template-card {
     border-color: #2a3445;
     background: rgba(25, 34, 51, 0.92);
-    box-shadow:
-      0 10px 24px rgba(0, 0, 0, 0.15),
-      inset 0 1px 0 rgba(148, 163, 184, 0.04);
+    box-shadow: none;
   }
 
   .new-design.dark .chat-session-empty-state-template-card:hover,
@@ -427,9 +433,26 @@
   .new-design.dark .chat-session-empty-state-template-card:focus-visible,
   .dark .new-design .chat-session-empty-state-template-card:focus-visible {
     border-color: rgba(94, 162, 255, 0.24);
-    box-shadow:
-      0 14px 28px rgba(94, 162, 255, 0.06),
-      0 6px 14px rgba(0, 0, 0, 0.15);
+    background: rgba(34, 44, 61, 0.94);
+  }
+
+  .new-design.dark .chat-session-empty-state-template-card.is-selected,
+  .dark .new-design .chat-session-empty-state-template-card.is-selected {
+    border-color: rgba(94, 162, 255, 0.72);
+    background: rgba(30, 60, 94, 0.5);
+    box-shadow: 0 0 0 1px rgba(94, 162, 255, 0.72);
+  }
+
+  .new-design.dark .chat-session-empty-state-template-icon.is-workflow,
+  .dark .new-design .chat-session-empty-state-template-icon.is-workflow {
+    background: rgba(79, 70, 229, 0.18);
+    color: #a5b4fc;
+  }
+
+  .new-design.dark .chat-session-empty-state-template-icon.is-free,
+  .dark .new-design .chat-session-empty-state-template-icon.is-free {
+    background: rgba(22, 163, 74, 0.16);
+    color: #86efac;
   }
 
   .new-design.dark .chat-session-empty-state-template-title,
@@ -440,6 +463,22 @@
   .new-design.dark .chat-session-empty-state-template-description,
   .dark .new-design .chat-session-empty-state-template-description {
     color: var(--chat-session-text-tertiary);
+  }
+
+  .new-design.dark .chat-session-empty-state-mode-detail,
+  .dark .new-design .chat-session-empty-state-mode-detail {
+    border-color: #2a3445;
+    background: rgba(25, 34, 51, 0.58);
+  }
+
+  .new-design.dark .chat-session-empty-state-mode-detail p,
+  .dark .new-design .chat-session-empty-state-mode-detail p {
+    color: var(--chat-session-text-secondary);
+  }
+
+  .new-design.dark .chat-session-empty-state-mode-detail span,
+  .dark .new-design .chat-session-empty-state-mode-detail span {
+    color: #7db6ff;
   }
 
   /* Members panel */
@@ -496,29 +535,20 @@
   .new-design.dark .chat-session-member-preset-card,
   .dark .new-design .chat-session-member-preset-card {
     border-color: #2a3445;
-    background: linear-gradient(
-      180deg,
-      rgba(25, 34, 51, 0.96) 0%,
-      rgba(18, 24, 35, 1) 100%
-    ) !important;
-    box-shadow:
-      inset 0 1px 0 rgba(148, 163, 184, 0.04),
-      0 6px 14px rgba(0, 0, 0, 0.12);
+    background: #192233 !important;
+    box-shadow: none;
   }
 
   .new-design.dark .chat-session-member-preset-card.team,
   .dark .new-design .chat-session-member-preset-card.team {
-    border-color: rgba(94, 162, 255, 0.18);
-    background: linear-gradient(
-      180deg,
-      rgba(94, 162, 255, 0.08) 0%,
-      rgba(18, 24, 35, 1) 100%
-    ) !important;
+    border-color: #2a3445;
+    background: #192233 !important;
   }
 
   .new-design.dark .chat-session-member-preset-card:hover:not(:disabled),
   .dark .new-design .chat-session-member-preset-card:hover:not(:disabled) {
-    border-color: rgba(148, 163, 184, 0.2);
+    border-color: rgba(94, 162, 255, 0.4);
+    background: rgba(94, 162, 255, 0.24) !important;
     box-shadow: 0 18px 32px rgba(0, 0, 0, 0.2);
   }
 
@@ -597,17 +627,23 @@
 
   .new-design.dark .chat-session-member-import-card,
   .dark .new-design .chat-session-member-import-card {
+    border-color: #2a3445;
     background: #192233;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .new-design.dark .chat-session-member-import-card:hover,
+  .dark .new-design .chat-session-member-import-card:hover {
+    border-color: rgba(94, 162, 255, 0.4);
+    background: rgba(94, 162, 255, 0.24);
   }
 
   .new-design.dark .chat-session-member-card,
   .dark .new-design .chat-session-member-card {
     border-color: #2a3445;
-    background: linear-gradient(
-      135deg,
-      rgba(25, 34, 51, 0.98) 0%,
-      rgba(22, 49, 79, 0.42) 100%
-    ) !important;
+    background: #192233 !important;
     box-shadow:
       inset 0 1px 0 rgba(148, 163, 184, 0.05),
       0 12px 28px rgba(0, 0, 0, 0.22);
@@ -633,6 +669,12 @@
   .new-design.dark .chat-session-agent-avatar-logo,
   .dark .new-design .chat-session-agent-avatar-logo {
     filter: brightness(1.02) saturate(1.02);
+  }
+
+  .new-design.dark .chat-session-member-lead-icon,
+  .dark .new-design .chat-session-member-lead-icon {
+    color: #fbbf24;
+    filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.4));
   }
 
   .new-design.dark .chat-session-member-card:hover,
@@ -1469,5 +1511,301 @@
     background: #f9fafb !important;
     background-clip: content-box !important;
     box-shadow: inset 0 0 0 1px rgba(214, 220, 228, 0.98);
+  }
+}
+
+@layer components {
+  .new-design.dark .workflow-card-surface,
+  .dark .new-design .workflow-card-surface,
+  .new-design.dark .workflow-window-root,
+  .dark .new-design .workflow-window-root,
+  .new-design.dark .workflow-review-settings-dialog,
+  .dark .new-design .workflow-review-settings-dialog,
+  .new-design.dark .workflow-pending-review-card,
+  .dark .new-design .workflow-pending-review-card,
+  .new-design.dark .workflow-pending-input-card,
+  .dark .new-design .workflow-pending-input-card,
+  .new-design.dark .workflow-iteration-feedback-card,
+  .dark .new-design .workflow-iteration-feedback-card {
+    background-color: #121823 !important;
+    border-color: #2a3445 !important;
+    color: #f3f6fb !important;
+  }
+
+  .new-design.dark .workflow-graph-board,
+  .dark .new-design .workflow-graph-board {
+    --workflow-board-bg: #0b1017;
+    --workflow-loop-bg: rgba(18, 24, 35, 0.88);
+    --workflow-loop-shadow:
+      0 14px 36px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(148, 163, 184, 0.08);
+    --workflow-edge-color: #475569;
+    --workflow-edge-hover-color: #7db6ff;
+    color: #f3f6fb;
+  }
+
+  .new-design.dark .workflow-card-surface .bg-white,
+  .dark .new-design .workflow-card-surface .bg-white,
+  .new-design.dark .workflow-window-root .bg-white,
+  .dark .new-design .workflow-window-root .bg-white,
+  .new-design.dark .workflow-review-settings-dialog .bg-white,
+  .dark .new-design .workflow-review-settings-dialog .bg-white,
+  .new-design.dark .workflow-pending-review-card .bg-white,
+  .dark .new-design .workflow-pending-review-card .bg-white,
+  .new-design.dark .workflow-pending-input-card .bg-white,
+  .dark .new-design .workflow-pending-input-card .bg-white,
+  .new-design.dark .workflow-iteration-feedback-card .bg-white,
+  .dark .new-design .workflow-iteration-feedback-card .bg-white {
+    background-color: #192233 !important;
+  }
+
+  .new-design.dark .workflow-card-surface .bg-slate-50,
+  .dark .new-design .workflow-card-surface .bg-slate-50,
+  .new-design.dark .workflow-card-surface .bg-slate-100,
+  .dark .new-design .workflow-card-surface .bg-slate-100,
+  .new-design.dark .workflow-window-root .bg-slate-50,
+  .dark .new-design .workflow-window-root .bg-slate-50,
+  .new-design.dark .workflow-window-root .bg-slate-100,
+  .dark .new-design .workflow-window-root .bg-slate-100,
+  .new-design.dark .workflow-review-settings-dialog .bg-slate-50,
+  .dark .new-design .workflow-review-settings-dialog .bg-slate-50,
+  .new-design.dark .workflow-review-settings-dialog .bg-slate-100,
+  .dark .new-design .workflow-review-settings-dialog .bg-slate-100,
+  .new-design.dark .workflow-pending-review-card .bg-slate-50,
+  .dark .new-design .workflow-pending-review-card .bg-slate-50,
+  .new-design.dark .workflow-pending-input-card .bg-slate-50,
+  .dark .new-design .workflow-pending-input-card .bg-slate-50,
+  .new-design.dark .workflow-iteration-feedback-card .bg-slate-50,
+  .dark .new-design .workflow-iteration-feedback-card .bg-slate-50,
+  .new-design.dark .workflow-iteration-feedback-card .bg-slate-100,
+  .dark .new-design .workflow-iteration-feedback-card .bg-slate-100 {
+    background-color: #1a2433 !important;
+  }
+
+  .new-design.dark .workflow-card-surface .bg-white\/80,
+  .dark .new-design .workflow-card-surface .bg-white\/80,
+  .new-design.dark .workflow-window-root .bg-white\/80,
+  .dark .new-design .workflow-window-root .bg-white\/80,
+  .new-design.dark .workflow-pending-input-card .bg-white\/80,
+  .dark .new-design .workflow-pending-input-card .bg-white\/80 {
+    background-color: rgba(25, 34, 51, 0.84) !important;
+  }
+
+  .new-design.dark .workflow-card-surface .bg-blue-50,
+  .dark .new-design .workflow-card-surface .bg-blue-50,
+  .new-design.dark .workflow-window-root .bg-blue-50,
+  .dark .new-design .workflow-window-root .bg-blue-50 {
+    background-color: rgba(80, 148, 251, 0.14) !important;
+  }
+
+  .new-design.dark .workflow-card-surface .bg-indigo-50,
+  .dark .new-design .workflow-card-surface .bg-indigo-50,
+  .new-design.dark .workflow-window-root .bg-indigo-50,
+  .dark .new-design .workflow-window-root .bg-indigo-50,
+  .new-design.dark .workflow-pending-input-card,
+  .dark .new-design .workflow-pending-input-card {
+    background-color: rgba(79, 70, 229, 0.14) !important;
+  }
+
+  .new-design.dark .workflow-card-surface .bg-emerald-50,
+  .dark .new-design .workflow-card-surface .bg-emerald-50,
+  .new-design.dark .workflow-window-root .bg-emerald-50,
+  .dark .new-design .workflow-window-root .bg-emerald-50 {
+    background-color: rgba(16, 185, 129, 0.14) !important;
+  }
+
+  .new-design.dark .workflow-card-surface .bg-amber-50,
+  .dark .new-design .workflow-card-surface .bg-amber-50,
+  .new-design.dark .workflow-window-root .bg-amber-50,
+  .dark .new-design .workflow-window-root .bg-amber-50,
+  .new-design.dark .workflow-pending-review-card .bg-amber-50,
+  .dark .new-design .workflow-pending-review-card .bg-amber-50 {
+    background-color: rgba(245, 158, 11, 0.14) !important;
+  }
+
+  .new-design.dark .workflow-card-surface .bg-yellow-50,
+  .dark .new-design .workflow-card-surface .bg-yellow-50,
+  .new-design.dark .workflow-window-root .bg-yellow-50,
+  .dark .new-design .workflow-window-root .bg-yellow-50 {
+    background-color: rgba(234, 179, 8, 0.14) !important;
+  }
+
+  .new-design.dark .workflow-card-surface .bg-violet-50,
+  .dark .new-design .workflow-card-surface .bg-violet-50,
+  .new-design.dark .workflow-window-root .bg-violet-50,
+  .dark .new-design .workflow-window-root .bg-violet-50 {
+    background-color: rgba(139, 92, 246, 0.14) !important;
+  }
+
+  .new-design.dark .workflow-card-surface .bg-rose-50,
+  .dark .new-design .workflow-card-surface .bg-rose-50,
+  .new-design.dark .workflow-window-root .bg-rose-50,
+  .dark .new-design .workflow-window-root .bg-rose-50,
+  .new-design.dark .workflow-pending-review-card .bg-rose-50,
+  .dark .new-design .workflow-pending-review-card .bg-rose-50,
+  .new-design.dark .workflow-iteration-feedback-card .bg-rose-50,
+  .dark .new-design .workflow-iteration-feedback-card .bg-rose-50 {
+    background-color: rgba(244, 63, 94, 0.14) !important;
+  }
+
+  .new-design.dark .workflow-card-surface [class*='bg-[#F8FAFC]'],
+  .dark .new-design .workflow-card-surface [class*='bg-[#F8FAFC]'],
+  .new-design.dark .workflow-window-root [class*='bg-[#F8FAFC]'],
+  .dark .new-design .workflow-window-root [class*='bg-[#F8FAFC]'] {
+    background-color: #0b1017 !important;
+  }
+
+  .new-design.dark .workflow-card-surface [class*='bg-[#F1F5F9]'],
+  .dark .new-design .workflow-card-surface [class*='bg-[#F1F5F9]'],
+  .new-design.dark .workflow-window-root [class*='bg-[#F1F5F9]'],
+  .dark .new-design .workflow-window-root [class*='bg-[#F1F5F9]'] {
+    background-color: #1a2433 !important;
+  }
+
+  .new-design.dark .workflow-card-surface [class*='bg-[#EEF4FF]'],
+  .dark .new-design .workflow-card-surface [class*='bg-[#EEF4FF]'],
+  .new-design.dark .workflow-window-root [class*='bg-[#EEF4FF]'],
+  .dark .new-design .workflow-window-root [class*='bg-[#EEF4FF]'] {
+    background-color: rgba(80, 148, 251, 0.16) !important;
+  }
+
+  .new-design.dark .workflow-card-surface .border-slate-100,
+  .dark .new-design .workflow-card-surface .border-slate-100,
+  .new-design.dark .workflow-card-surface .border-slate-200,
+  .dark .new-design .workflow-card-surface .border-slate-200,
+  .new-design.dark .workflow-card-surface .border-slate-300,
+  .dark .new-design .workflow-card-surface .border-slate-300,
+  .new-design.dark .workflow-window-root .border-slate-100,
+  .dark .new-design .workflow-window-root .border-slate-100,
+  .new-design.dark .workflow-window-root .border-slate-200,
+  .dark .new-design .workflow-window-root .border-slate-200,
+  .new-design.dark .workflow-window-root .border-slate-300,
+  .dark .new-design .workflow-window-root .border-slate-300,
+  .new-design.dark .workflow-review-settings-dialog .border-slate-100,
+  .dark .new-design .workflow-review-settings-dialog .border-slate-100,
+  .new-design.dark .workflow-review-settings-dialog .border-slate-200,
+  .dark .new-design .workflow-review-settings-dialog .border-slate-200,
+  .new-design.dark .workflow-pending-review-card .border-slate-200,
+  .dark .new-design .workflow-pending-review-card .border-slate-200,
+  .new-design.dark .workflow-iteration-feedback-card .border-slate-100,
+  .dark .new-design .workflow-iteration-feedback-card .border-slate-100,
+  .new-design.dark .workflow-iteration-feedback-card .border-slate-200,
+  .dark .new-design .workflow-iteration-feedback-card .border-slate-200 {
+    border-color: #2a3445 !important;
+  }
+
+  .new-design.dark .workflow-card-surface [class*='border-[#D8E2F0]'],
+  .dark .new-design .workflow-card-surface [class*='border-[#D8E2F0]'],
+  .new-design.dark .workflow-card-surface [class*='border-[#E2E8F0]'],
+  .dark .new-design .workflow-card-surface [class*='border-[#E2E8F0]'],
+  .new-design.dark .workflow-card-surface [class*='border-[#CBD5E1]'],
+  .dark .new-design .workflow-card-surface [class*='border-[#CBD5E1]'],
+  .new-design.dark .workflow-window-root [class*='border-[#D8E2F0]'],
+  .dark .new-design .workflow-window-root [class*='border-[#D8E2F0]'],
+  .new-design.dark .workflow-window-root [class*='border-[#E2E8F0]'],
+  .dark .new-design .workflow-window-root [class*='border-[#E2E8F0]'],
+  .new-design.dark .workflow-window-root [class*='border-[#CBD5E1]'],
+  .dark .new-design .workflow-window-root [class*='border-[#CBD5E1]'] {
+    border-color: #2a3445 !important;
+  }
+
+  .new-design.dark .workflow-card-surface .text-slate-900,
+  .dark .new-design .workflow-card-surface .text-slate-900,
+  .new-design.dark .workflow-card-surface .text-slate-800,
+  .dark .new-design .workflow-card-surface .text-slate-800,
+  .new-design.dark .workflow-card-surface .text-slate-700,
+  .dark .new-design .workflow-card-surface .text-slate-700,
+  .new-design.dark .workflow-window-root .text-slate-900,
+  .dark .new-design .workflow-window-root .text-slate-900,
+  .new-design.dark .workflow-window-root .text-slate-800,
+  .dark .new-design .workflow-window-root .text-slate-800,
+  .new-design.dark .workflow-window-root .text-slate-700,
+  .dark .new-design .workflow-window-root .text-slate-700,
+  .new-design.dark .workflow-review-settings-dialog .text-slate-900,
+  .dark .new-design .workflow-review-settings-dialog .text-slate-900,
+  .new-design.dark .workflow-review-settings-dialog .text-slate-800,
+  .dark .new-design .workflow-review-settings-dialog .text-slate-800,
+  .new-design.dark .workflow-review-settings-dialog .text-slate-700,
+  .dark .new-design .workflow-review-settings-dialog .text-slate-700,
+  .new-design.dark .workflow-pending-review-card .text-slate-700,
+  .dark .new-design .workflow-pending-review-card .text-slate-700,
+  .new-design.dark .workflow-pending-input-card .text-slate-700,
+  .dark .new-design .workflow-pending-input-card .text-slate-700,
+  .new-design.dark .workflow-iteration-feedback-card .text-slate-700,
+  .dark .new-design .workflow-iteration-feedback-card .text-slate-700 {
+    color: #f3f6fb !important;
+  }
+
+  .new-design.dark .workflow-card-surface [class*='text-[#0F172A]'],
+  .dark .new-design .workflow-card-surface [class*='text-[#0F172A]'],
+  .new-design.dark .workflow-card-surface [class*='text-[#111827]'],
+  .dark .new-design .workflow-card-surface [class*='text-[#111827]'],
+  .new-design.dark .workflow-window-root [class*='text-[#0F172A]'],
+  .dark .new-design .workflow-window-root [class*='text-[#0F172A]'],
+  .new-design.dark .workflow-window-root [class*='text-[#111827]'],
+  .dark .new-design .workflow-window-root [class*='text-[#111827]'] {
+    color: #f3f6fb !important;
+  }
+
+  .new-design.dark .workflow-card-surface .text-slate-600,
+  .dark .new-design .workflow-card-surface .text-slate-600,
+  .new-design.dark .workflow-card-surface .text-slate-500,
+  .dark .new-design .workflow-card-surface .text-slate-500,
+  .new-design.dark .workflow-card-surface .text-slate-400,
+  .dark .new-design .workflow-card-surface .text-slate-400,
+  .new-design.dark .workflow-window-root .text-slate-600,
+  .dark .new-design .workflow-window-root .text-slate-600,
+  .new-design.dark .workflow-window-root .text-slate-500,
+  .dark .new-design .workflow-window-root .text-slate-500,
+  .new-design.dark .workflow-window-root .text-slate-400,
+  .dark .new-design .workflow-window-root .text-slate-400,
+  .new-design.dark .workflow-review-settings-dialog .text-slate-600,
+  .dark .new-design .workflow-review-settings-dialog .text-slate-600,
+  .new-design.dark .workflow-review-settings-dialog .text-slate-500,
+  .dark .new-design .workflow-review-settings-dialog .text-slate-500,
+  .new-design.dark .workflow-review-settings-dialog .text-slate-400,
+  .dark .new-design .workflow-review-settings-dialog .text-slate-400,
+  .new-design.dark .workflow-pending-review-card .text-slate-600,
+  .dark .new-design .workflow-pending-review-card .text-slate-600,
+  .new-design.dark .workflow-pending-review-card .text-slate-500,
+  .dark .new-design .workflow-pending-review-card .text-slate-500,
+  .new-design.dark .workflow-pending-input-card .text-slate-600,
+  .dark .new-design .workflow-pending-input-card .text-slate-600,
+  .new-design.dark .workflow-iteration-feedback-card .text-slate-600,
+  .dark .new-design .workflow-iteration-feedback-card .text-slate-600,
+  .new-design.dark .workflow-iteration-feedback-card .text-slate-500,
+  .dark .new-design .workflow-iteration-feedback-card .text-slate-500,
+  .new-design.dark .workflow-iteration-feedback-card .text-slate-400,
+  .dark .new-design .workflow-iteration-feedback-card .text-slate-400 {
+    color: #bac4d6 !important;
+  }
+
+  .new-design.dark .workflow-card-surface [class*='text-[#475569]'],
+  .dark .new-design .workflow-card-surface [class*='text-[#475569]'],
+  .new-design.dark .workflow-card-surface [class*='text-[#64748B]'],
+  .dark .new-design .workflow-card-surface [class*='text-[#64748B]'],
+  .new-design.dark .workflow-window-root [class*='text-[#475569]'],
+  .dark .new-design .workflow-window-root [class*='text-[#475569]'],
+  .new-design.dark .workflow-window-root [class*='text-[#64748B]'],
+  .dark .new-design .workflow-window-root [class*='text-[#64748B]'] {
+    color: #bac4d6 !important;
+  }
+
+  .new-design.dark .workflow-card-surface textarea,
+  .dark .new-design .workflow-card-surface textarea,
+  .new-design.dark .workflow-window-root textarea,
+  .dark .new-design .workflow-window-root textarea,
+  .new-design.dark .workflow-window-root select,
+  .dark .new-design .workflow-window-root select,
+  .new-design.dark .workflow-pending-review-card textarea,
+  .dark .new-design .workflow-pending-review-card textarea,
+  .new-design.dark .workflow-pending-input-card textarea,
+  .dark .new-design .workflow-pending-input-card textarea,
+  .new-design.dark .workflow-iteration-feedback-card textarea,
+  .dark .new-design .workflow-iteration-feedback-card textarea,
+  .new-design.dark .workflow-iteration-feedback-card select,
+  .dark .new-design .workflow-iteration-feedback-card select {
+    background-color: #192233 !important;
+    border-color: #2a3445 !important;
+    color: #f3f6fb !important;
   }
 }

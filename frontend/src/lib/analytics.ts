@@ -259,6 +259,135 @@ const EVENT_DEFINITIONS = {
       days_since_last_visit: numberProperty(),
     },
   },
+  workflow_plan_executed: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      plan_id: idProperty,
+      execution_id: idProperty,
+    },
+  },
+  workflow_execution_paused: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      execution_id: idProperty,
+    },
+  },
+  workflow_execution_resumed: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      execution_id: idProperty,
+    },
+  },
+  workflow_plan_generation_retried: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      message_id: idProperty,
+    },
+  },
+  workflow_step_selected: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      step_id: idProperty,
+      step_key: stringProperty(64),
+    },
+  },
+  workflow_step_retried: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      step_id: idProperty,
+      retry_target: enumProperty(['task', 'review']),
+    },
+  },
+  workflow_graph_fit_view: {
+    category: 'user_action',
+    version: 1,
+    properties: {},
+  },
+  workflow_review_responded: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      review_id: idProperty,
+      action: enumProperty(['approve', 'reject']),
+    },
+  },
+  workflow_input_submitted: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      step_id: idProperty,
+      input_length: integerProperty(),
+    },
+  },
+  workflow_iteration_feedback_submitted: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      execution_id: idProperty,
+      action: enumProperty(['accept', 'reject']),
+      feedback_length: integerProperty(),
+    },
+  },
+  workflow_round_selected: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      round_index: integerProperty(),
+    },
+  },
+  workflow_window_opened: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      source: enumProperty(['card_button']),
+    },
+  },
+  workflow_window_closed: {
+    category: 'user_action',
+    version: 1,
+    properties: {},
+  },
+  workflow_transcript_tab_switched: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      tab: enumProperty(['DETAILS', 'LOGS']),
+    },
+  },
+  workflow_inspector_chat_opened: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      step_id: idProperty,
+    },
+  },
+  workflow_review_settings_updated: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      execution_id: idProperty,
+    },
+  },
+  workflow_step_interrupted: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      step_id: idProperty,
+    },
+  },
+  workflow_step_stopped: {
+    category: 'user_action',
+    version: 1,
+    properties: {
+      step_id: idProperty,
+    },
+  },
 } as const satisfies Record<string, EventDefinition>;
 
 export type AnalyticsEventName = keyof typeof EVENT_DEFINITIONS;
@@ -620,6 +749,121 @@ class AnalyticsService {
   trackReturningUser(_userId: string, daysSinceLastVisit: number) {
     this.track('returning_user', {
       days_since_last_visit: daysSinceLastVisit,
+    });
+  }
+
+  trackWorkflowPlanExecuted(planId: string, executionId: string) {
+    this.track('workflow_plan_executed', {
+      plan_id: planId,
+      execution_id: executionId,
+    });
+  }
+
+  trackWorkflowExecutionPaused(executionId: string) {
+    this.track('workflow_execution_paused', {
+      execution_id: executionId,
+    });
+  }
+
+  trackWorkflowExecutionResumed(executionId: string) {
+    this.track('workflow_execution_resumed', {
+      execution_id: executionId,
+    });
+  }
+
+  trackWorkflowPlanGenerationRetried(messageId: string) {
+    this.track('workflow_plan_generation_retried', {
+      message_id: messageId,
+    });
+  }
+
+  trackWorkflowStepSelected(stepId: string, stepKey: string) {
+    this.track('workflow_step_selected', {
+      step_id: stepId,
+      step_key: stepKey,
+    });
+  }
+
+  trackWorkflowStepRetried(stepId: string, retryTarget: 'task' | 'review') {
+    this.track('workflow_step_retried', {
+      step_id: stepId,
+      retry_target: retryTarget,
+    });
+  }
+
+  trackWorkflowGraphFitView() {
+    this.track('workflow_graph_fit_view', {});
+  }
+
+  trackWorkflowReviewResponded(reviewId: string, action: 'approve' | 'reject') {
+    this.track('workflow_review_responded', {
+      review_id: reviewId,
+      action,
+    });
+  }
+
+  trackWorkflowInputSubmitted(stepId: string, inputLength: number) {
+    this.track('workflow_input_submitted', {
+      step_id: stepId,
+      input_length: inputLength,
+    });
+  }
+
+  trackWorkflowIterationFeedbackSubmitted(
+    executionId: string,
+    action: 'accept' | 'reject',
+    feedbackLength?: number
+  ) {
+    this.track('workflow_iteration_feedback_submitted', {
+      execution_id: executionId,
+      action,
+      feedback_length: feedbackLength,
+    });
+  }
+
+  trackWorkflowRoundSelected(roundIndex: number) {
+    this.track('workflow_round_selected', {
+      round_index: roundIndex,
+    });
+  }
+
+  trackWorkflowWindowOpened(source: 'card_button') {
+    this.track('workflow_window_opened', {
+      source,
+    });
+  }
+
+  trackWorkflowWindowClosed() {
+    this.track('workflow_window_closed', {});
+  }
+
+  trackWorkflowTranscriptTabSwitched(tab: 'DETAILS' | 'LOGS') {
+    this.track('workflow_transcript_tab_switched', {
+      tab,
+    });
+  }
+
+  trackWorkflowInspectorChatOpened(stepId: string) {
+    this.track('workflow_inspector_chat_opened', {
+      step_id: stepId,
+    });
+  }
+
+  trackWorkflowReviewSettingsUpdated(executionId: string) {
+    this.track('workflow_review_settings_updated', {
+      execution_id: executionId,
+    });
+  }
+
+  trackWorkflowStepInterrupted(stepId: string) {
+    this.track('workflow_step_interrupted', {
+      step_id: stepId,
+    });
+  }
+
+  trackWorkflowStepStopped(stepId: string) {
+    this.track('workflow_step_stopped', {
+      step_id: stepId,
     });
   }
 

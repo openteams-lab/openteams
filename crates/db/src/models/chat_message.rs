@@ -104,6 +104,50 @@ impl ChatMessage {
         }
     }
 
+    pub async fn find_by_session_id_lightweight(
+        pool: &SqlitePool,
+        session_id: Uuid,
+        limit: Option<i64>,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        let base_sql = r#"
+            SELECT id, session_id, sender_type, sender_id, content, mentions,
+                CASE
+                    WHEN json_valid(meta)
+                         AND json_extract(meta, '$.card_type') IN ('workflow_execution', 'workflow_plan_generation')
+                         AND json_extract(meta, '$.workflow_card') IS NOT NULL
+                    THEN json_insert(
+                        json_remove(meta, '$.workflow_card'),
+                        '$.workflow_card_summary',
+                        json_object(
+                            'execution_id', json_extract(meta, '$.workflow_card.execution_id'),
+                            'state', json_extract(meta, '$.workflow_card.state'),
+                            'is_terminal', json_extract(meta, '$.workflow_card.is_terminal'),
+                            'has_transcripts', json_extract(meta, '$.workflow_card.has_transcripts'),
+                            'execution_status', json_extract(meta, '$.workflow_card.execution_status'),
+                            'error_message', json_extract(meta, '$.workflow_card.error_message')
+                        )
+                    )
+                    ELSE meta
+                END as meta,
+                created_at
+            FROM chat_messages
+            WHERE session_id = ?
+            ORDER BY created_at ASC"#;
+        if let Some(limit) = limit {
+            let sql = format!("{base_sql} LIMIT ?");
+            sqlx::query_as::<_, ChatMessage>(&sql)
+                .bind(session_id)
+                .bind(limit)
+                .fetch_all(pool)
+                .await
+        } else {
+            sqlx::query_as::<_, ChatMessage>(base_sql)
+                .bind(session_id)
+                .fetch_all(pool)
+                .await
+        }
+    }
+
     pub async fn create(
         pool: &SqlitePool,
         data: &CreateChatMessage,
@@ -156,5 +200,25 @@ impl ChatMessage {
             .execute(pool)
             .await?;
         Ok(result.rows_affected())
+    }
+
+    pub async fn update_content_and_meta(
+        pool: &SqlitePool,
+        id: Uuid,
+        content: &str,
+        meta: serde_json::Value,
+    ) -> Result<Self, sqlx::Error> {
+        let meta_str = serde_json::to_string(&meta).unwrap_or_default();
+        sqlx::query_as::<_, ChatMessage>(
+            r#"UPDATE chat_messages
+               SET content = ?1, meta = ?2
+               WHERE id = ?3
+               RETURNING id, session_id, sender_type, sender_id, content, mentions, meta, created_at"#,
+        )
+        .bind(content)
+        .bind(meta_str)
+        .bind(id)
+        .fetch_one(pool)
+        .await
     }
 }

@@ -115,7 +115,7 @@ pub enum DomainEvent {
         agent_id: Uuid,
         run_id: Uuid,
         error_type: String,
-        error_message: String,
+        error_code: String,
     },
 }
 
@@ -363,7 +363,7 @@ impl DomainEvent {
                 agent_id,
                 run_id,
                 error_type,
-                error_message,
+                error_code,
             } => AnalyticsProjection {
                 ingest_path: "/chat/runs/{run_id}/error",
                 event_type: "agent_run_error",
@@ -374,7 +374,7 @@ impl DomainEvent {
                     "agent_id": agent_id.to_string(),
                     "run_id": run_id.to_string(),
                     "error_type": error_type,
-                    "error_message": error_message
+                    "error_code": error_code
                 }),
             },
         }
@@ -524,7 +524,7 @@ mod tests {
             agent_id,
             run_id,
             error_type: "rate_limit_exceeded".to_string(),
-            error_message: "429 from provider".to_string(),
+            error_code: "rate_limit_exceeded".to_string(),
         }
         .into_projection();
 
@@ -541,6 +541,11 @@ mod tests {
             projection.properties["error_type"],
             json!("rate_limit_exceeded")
         );
+        assert_eq!(
+            projection.properties["error_code"],
+            json!("rate_limit_exceeded")
+        );
+        assert!(projection.properties.get("error_message").is_none());
     }
 
     #[test]

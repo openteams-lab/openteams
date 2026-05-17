@@ -254,6 +254,17 @@ pub fn forward_analytics_record_to_posthog(
     }
 }
 
+pub fn track_workflow_event(
+    analytics: Option<&AnalyticsService>,
+    distinct_id: &str,
+    event_name: &str,
+    properties: serde_json::Map<String, Value>,
+) {
+    if let Some(analytics) = analytics {
+        analytics.track_distinct_event(distinct_id, event_name, Some(Value::Object(properties)));
+    }
+}
+
 fn build_capture_payload(
     api_key: &str,
     distinct_id: &str,

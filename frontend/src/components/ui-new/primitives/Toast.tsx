@@ -22,7 +22,7 @@ export function ToastList({ toasts }: ToastListProps) {
         <div
           key={t.id}
           className={cn(
-            'pointer-events-auto flex items-center gap-2 rounded-lg px-4 py-3 text-sm shadow-lg',
+            'pointer-events-auto flex max-w-[420px] items-start gap-2 rounded-lg px-4 py-3 text-sm shadow-lg',
             'animate-in fade-in-0 slide-in-from-top-2 duration-200',
             t.type === 'success' &&
               'border border-[#BBF7D0] bg-[#F0FDF4] text-[#15803D] dark:border-[rgba(52,211,153,0.24)] dark:bg-[rgba(34,197,94,0.12)] dark:text-[#86EFAC]',
@@ -36,7 +36,7 @@ export function ToastList({ toasts }: ToastListProps) {
           {t.type === 'error' && (
             <XIcon className="shrink-0" size={16} weight="bold" />
           )}
-          <span>{t.message}</span>
+          <span className="min-w-0 break-words leading-5">{t.message}</span>
         </div>
       ))}
     </div>

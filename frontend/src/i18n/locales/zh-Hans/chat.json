@@ -88,7 +88,16 @@
     "emptyAction": "开始输入"
   },
   "input": {
-    "mentionAgents": "提及 Agent",
+    "mentionAgents": "@团队成员",
+    "chatModeName": "自由聊天模式",
+    "workflowModeName": "工作流模式",
+    "modeSwitchTooltip": "当前{{currentMode}}，点击切换到{{targetMode}}",
+    "switchToFreeMode": "切换到自由聊天模式",
+    "switchToWorkflowMode": "切换到工作流模式",
+    "freeModeDescription": "自由聊天模式：使用 @ 将消息指派给成员。",
+    "workflowModeDescription": "工作流模式：消息统一路由到主Agent。",
+    "workflowModeLabel": "- 工作流模式",
+    "workflowPlaceholder": "与主Agent讨论方案，生成计划并执行...",
     "mentionAllOption": "所有成员（@all）",
     "mentionAllSuggestion": "@所有成员",
     "mentionAllBadge": "@all",
@@ -120,6 +129,20 @@
         "label": "视觉风格评审",
         "value": "请评审当前 UI 的视觉风格，从排版、色彩、间距、层级和交互一致性方面给出具体建议，并指出最值得优先优化的部分。"
       }
+    },
+    "modeCards": {
+      "label": "工作模式选项",
+      "workflow": {
+        "label": "工作流模式",
+        "description": "与主Agent确认需求、讨论方案、生成计划和执行任务，适合复杂任务。",
+        "detail": "工作流模式下，您将与主Agent对话，由主Agent负责生成计划并为其他成员分配任务。\n系统会将计划转换为可视化任务节点图，并自动调度运行，您能清晰地跟踪每个任务的执行情况。\n工作流在正式开始执行前可以任意修改计划；如果第一轮计划没有达到预期结果可以开启新一轮迭代。\n您可以通过点击AI成员列表中的成员信息卡片来切换主Agent。"
+      },
+      "free": {
+        "label": "自由聊天模式",
+        "description": "使用@与任意Agent对话，Agent之间可以自由交流，适合简单任务或日常群聊。",
+        "detail": "自由聊天模式下，您可以直接 @ 任意成员布置任务。\n支持Agent与Agent之间在遵守团队准则的基础上进行自由讨论和协作。\n自由聊天模式能通过团队准则来引导成员的行为和协作，进而探索出更多好玩的协作方式。"
+      },
+      "switchHint": "使用消息框底部切换按钮可以随时切换工作模式，切换后依然共享上下文。"
     }
   },
   "message": {
@@ -350,7 +373,7 @@
         "invalidWorkspacePath": "导入失败：无效的工作区路径。",
         "nothingToImport": "导入失败：该团队预设没有可导入的内容。",
         "baseCodingAgentRequired": "导入失败：基础编程代理为必填项。",
-        "selectedCodingAgentUnavailable": "导入失败：所选编程代理不可用。",
+        "selectedCodingAgentUnavailable": "导入失败：所选编码Agent不可用。",
         "memberNameRequired": "导入失败：AI成员名称为必填项。",
         "memberNameInvalidChars": "导入失败：名称只能包含字母、数字、\"_\" 或 \"-\"。",
         "memberNameTooLong": "导入失败：AI成员名称不能超过 {{max}} 个字符。",
@@ -359,7 +382,8 @@
         "selectSessionFirst": "请先选择一个聊天会话。",
         "sessionArchived": "该会话已归档，只读。",
         "noAvailableCodingAgent": "导入失败：没有可用的编程代理来导入此预设。",
-        "failedToImportTeam": "导入团队预设失败。"
+        "failedToImportTeam": "导入团队预设失败。",
+        "memberError": "{{member}} - {{message}}"
       }
     },
     "addMemberErrors": {
@@ -370,7 +394,7 @@
       "workspacePathMustBeAbsolute": "添加失败：工作区路径必须是绝对路径。",
       "invalidWorkspacePath": "添加失败：无效的工作区路径。",
       "baseCodingAgentRequired": "添加失败：基础编程代理为必填项。",
-      "selectedCodingAgentUnavailable": "添加失败：所选编程代理不可用。",
+      "selectedCodingAgentUnavailable": "添加失败：所选编码Agent不可用。",
       "memberNameRequired": "添加失败：AI成员名称为必填项。",
       "memberNameInvalidChars": "添加失败：名称只能包含字母、数字、\"_\" 或 \"-\"。",
       "memberNameTooLong": "添加失败：AI成员名称不能超过 {{max}} 个字符。",
@@ -381,7 +405,7 @@
     "roleSettingsRequired": "角色设定为必填项。",
     "presetDisplay": {
       "members": {
-        "coordinator_pmo": "专案经理",
+        "coordinator_pmo": "项目经理",
         "product_manager": "产品经理",
         "system_architect": "系统架构师",
         "prompt_engineer": "提示工程师",
@@ -786,5 +810,273 @@
       "diffAction": "差异",
       "openExplorerSuccess": "已在文件管理器中打开。"
     }
-  }
+  },
+  "workflow": {
+    "approvalCard": {
+      "title": "需要审批",
+      "approve": "批准",
+      "reject": "拒绝"
+    },
+    "permissionCard": {
+      "title": "权限请求",
+      "grant": "授权",
+      "deny": "拒绝"
+    },
+    "continueCard": {
+      "title": "是否继续？",
+      "confirm": "继续"
+    },
+    "inputCard": {
+      "title": "需要输入",
+      "placeholder": "在此输入您的回复",
+      "submit": "提交"
+    },
+    "inspector": {
+      "tabDetails": "详情",
+      "tabLogs": "日志",
+      "noInstructions": "此步骤未提供任务指令。",
+      "noSummary": "此步骤尚未生成摘要。",
+      "loopPrefix": "循环：{{name}}",
+      "reviewPrefix": "审核：{{label}}",
+      "instructionHeading": "指令",
+      "summaryHeading": "摘要",
+      "feedbackHeading": "反馈",
+      "executionRecordHeading": "执行记录输出",
+      "loadingTranscript": "正在加载记录...",
+      "noOutputEntries": "此步骤暂无输出记录。",
+      "errorHeading": "错误",
+      "loadingLogs": "正在加载日志...",
+      "thinkingProcess": "{{agentName}} - 思考过程",
+      "expand": "展开",
+      "collapse": "收起",
+      "noLogs": "此步骤暂无日志。",
+      "closeChat": "关闭对话",
+      "openChat": "打开对话",
+      "terminate": "终止"
+    },
+    "chatPanel": {
+      "title": "Agent 对话",
+      "approvalRequired": "需要审批",
+      "permissionRequest": "权限请求",
+      "continuePrompt": "是否继续？",
+      "continueAction": "继续",
+      "approveAction": "批准",
+      "rejectAction": "拒绝",
+      "replyPlaceholder": "回复 Agent...",
+      "readOnlyPlaceholder": "仅当此步骤等待输入或审核时可回复。"
+    },
+    "status": {
+      "recompiling": "正在重新编译计划...",
+      "completed": "已完成 - {{summary}}",
+      "completedDefault": "所有步骤已完成",
+      "failed": "失败 - {{error}}",
+      "failedDefault": "执行错误",
+      "progress": "进度 {{percent}}% · {{completed}}/{{total}} 步"
+    },
+    "controls": {
+      "executePlan": "执行计划",
+      "resume": "恢复",
+      "pauseAll": "全部暂停",
+      "stop": "停止"
+    },
+    "reviewSettings": {
+      "title": "审核设置",
+      "description": "选择由谁审核每个工作流结果。",
+      "close": "关闭审核设置",
+      "taskSteps": "任务步骤",
+      "leadUserReview": "主 Agent / 用户审核",
+      "leadLabel": "主 Agent",
+      "userLabel": "用户",
+      "leadReviewOn": "开启此任务节点的主 Agent 审核",
+      "leadReviewOff": "关闭此任务节点的主 Agent 审核",
+      "userReviewOn": "开启此任务节点的用户审核",
+      "userReviewOff": "关闭此任务节点的用户审核",
+      "workflowLoops": "工作流循环",
+      "userReviewOnly": "仅用户审核",
+      "loopUserReviewOn": "开启此工作流循环的用户审核",
+      "loopUserReviewOff": "关闭此工作流循环的用户审核",
+      "cancel": "取消",
+      "saving": "保存中...",
+      "saveChanges": "保存更改",
+      "executionFinishedError": "执行完成后无法更改审核设置。",
+      "finishedMessage": "当前工作流状态不支持修改审核设置。",
+      "updateError": "无法更新审核设置。"
+    },
+    "notifications": {
+      "pendingReview": "待审核",
+      "typeFinal": "最终",
+      "typeStep": "步骤",
+      "accept": "接受",
+      "reject": "拒绝",
+      "approve": "批准",
+      "viewDetails": "查看详情",
+      "finalReviewTitle": "最终审核",
+      "reviewRequired": "需要审核",
+      "pendingInput": "需要输入",
+      "typeInput": "输入",
+      "inputRequired": "需要输入",
+      "respond": "回复"
+    },
+    "card": {
+      "generatingPlan": "正在生成工作流计划",
+      "stateLabels": {
+        "planGenerationFailed": "计划生成失败",
+        "generatingPlan": "正在生成计划",
+        "recompilingPlan": "正在重新编译计划",
+        "workItem": "工作项",
+        "executionFailed": "执行失败",
+        "planReady": "计划就绪",
+        "planInvalid": "计划无效",
+        "actionRequired": "需要操作",
+        "paused": "已暂停",
+        "preparing": "准备中",
+        "workflowRunning": "工作流运行中"
+      },
+      "badges": {
+        "failed": "失败",
+        "generating": "生成中"
+      },
+      "emptyGraph": {
+        "planGenerationFailed": "计划生成在预览创建前停止。重试以从相同目标生成新计划。",
+        "planGenerationPending": "系统正在起草工作流计划。预览就绪后此占位卡片将更新。",
+        "noGraph": "暂无可用的工作流图。",
+        "planDraft": "计划草稿",
+        "workflow": "工作流"
+      },
+      "buttons": {
+        "open": "打开",
+        "executePlan": "执行计划",
+        "pauseAll": "全部暂停",
+        "resume": "恢复",
+        "retrying": "重试中...",
+        "retryPlanGeneration": "重试计划生成"
+      },
+      "errors": {
+        "validationErrors": "验证错误",
+        "generationError": "生成错误",
+        "retryRequestFailed": "重试请求失败"
+      },
+      "finalDelivery": "最终交付"
+    },
+    "iterationFeedback": {
+      "round": "第 {{round}} 轮",
+      "steps": "步骤",
+      "status": "状态",
+      "running": "运行中",
+      "regeneratingPlan": "正在重新生成计划",
+      "idle": "空闲",
+      "currentStep": "当前步骤",
+      "reviewRequired": "需要审核",
+      "rejectWithFeedback": "带反馈拒绝",
+      "whatWrongLabel": "哪里出了问题？",
+      "whatWrongPlaceholder": "描述问题...",
+      "expectedLabel": "期望结果",
+      "expectedPlaceholder": "应该发生什么？",
+      "priorityLabel": "优先级",
+      "priorityHigh": "高",
+      "priorityMedium": "中",
+      "priorityLow": "低",
+      "additionalNotesLabel": "补充说明",
+      "additionalNotesPlaceholder": "可选备注...",
+      "validationError": "拒绝需要填写问题描述和期望结果。",
+      "accept": "接受",
+      "submitRejection": "提交拒绝",
+      "reject": "拒绝",
+      "cancel": "取消"
+    },
+    "pendingReview": {
+      "title": "待审核",
+      "reviewTypes": {
+        "stepReview": "步骤审核",
+        "loopReview": "循环审核",
+        "finalReview": "最终审核"
+      },
+      "defaultMessage": "请审核当前结果。",
+      "context": "上下文",
+      "feedbackLabel": "反馈",
+      "feedbackPlaceholder": "请填写具体修改意见",
+      "validationError": "拒绝需要填写反馈意见。",
+      "approve": "批准",
+      "submitReject": "提交拒绝",
+      "reject": "拒绝"
+    },
+    "generatedText": {
+      "reviewLoop": "请审核循环“{{loopKey}}”。",
+      "userApprovedStepResult": "用户已批准步骤结果。"
+    },
+    "finalReview": {
+      "title": "最终审核",
+      "defaultMessage": "任务已完成，是否接受结果？",
+      "accept": "接受",
+      "reject": "拒绝"
+    },
+    "graph": {
+      "tip": "（提示：滚轮缩放，左键拖拽平移）",
+      "layoutWarning": "布局警告：使用备用布局",
+      "fitView": "适应画布",
+      "leadFallback": "主 Agent"
+    },
+    "executionStatus": {
+      "running": "运行中",
+      "failed": "失败",
+      "paused": "已暂停",
+      "waiting": "等待审核",
+      "recompiling": "正在重新生成计划",
+      "completed": "已完成",
+      "pending": "准备中"
+    },
+    "statusLabels": {
+      "interrupted": "已中断",
+      "stopRequested": "停止请求中",
+      "waitingInput": "等待输入",
+      "reviewing": "审核中",
+      "preCompleted": "预完成",
+      "pending": "待处理",
+      "running": "运行中",
+      "ready": "就绪",
+      "waitingReview": "审核中",
+      "waitingUser": "等待用户",
+      "passed": "已通过",
+      "completed": "已完成",
+      "rejected": "已拒绝",
+      "failed": "失败",
+      "loop": "循环"
+    },
+    "reviewPhase": {
+      "executing": "执行中",
+      "leadReview": "主 Agent 审核",
+      "waitingUser": "等待用户"
+    },
+    "reviewVerdict": {
+      "accepted": "已接受",
+      "approved": "已批准",
+      "rejected": "已拒绝",
+      "reviewed": "已审核"
+    },
+    "pendingInput": {
+      "title": "需要输入",
+      "defaultPrompt": "Agent 需要更多输入才能继续。",
+      "placeholder": "在此输入回复",
+      "submit": "提交"
+    }
+  },
+  "leadAgent": {
+    "label": "主Agent",
+    "switchError": "切换主Agent 失败，请重试。",
+    "switchDialog": {
+      "title": "切换主Agent",
+      "message": "将主Agent 从「{{currentLeadName}}」切换为「{{targetLeadName}}」？",
+      "switching": "切换中…",
+      "confirm": "确认"
+    }
+  },
+  "input_tabs": {
+    "workflow": "工作流",
+    "chat": "聊天"
+  },
+  "workflow_plan_generation_unavailable": "当前会话未开启工作流计划生成。",
+  "workflow_retry": "重试",
+  "workflow_retry_task": "重试任务",
+  "workflow_retry_review": "重试审核",
+  "workflow_retry_cancel": "取消"
 }

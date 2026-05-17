@@ -88,7 +88,16 @@
     "emptyAction": "Start typing"
   },
   "input": {
-    "mentionAgents": "Mention agents",
+    "mentionAgents": "@Team members",
+    "chatModeName": "free chat mode",
+    "workflowModeName": "workflow mode",
+    "modeSwitchTooltip": "Current {{currentMode}}, click to switch to {{targetMode}}",
+    "switchToFreeMode": "Switch to free chat mode",
+    "switchToWorkflowMode": "Switch to workflow mode",
+    "freeModeDescription": "Free chat mode: use @ to route messages to members.",
+    "workflowModeDescription": "Workflow mode: messages route to the lead agent.",
+    "workflowModeLabel": "- Workflow mode",
+    "workflowPlaceholder": "Discuss the approach with the lead agent, generate a plan, and execute it...",
     "mentionAllOption": "All members (@all)",
     "mentionAllSuggestion": "@All members",
     "mentionAllBadge": "@all",
@@ -120,6 +129,20 @@
         "label": "Review visual style",
         "value": "Review the current UI visual style. Give concrete feedback on typography, color, spacing, hierarchy, and interaction consistency, then suggest the highest-impact improvements."
       }
+    },
+    "modeCards": {
+      "label": "Work mode options",
+      "workflow": {
+        "label": "Workflow mode",
+        "description": "Confirm requirements, discuss the approach, generate a plan, and execute tasks with the lead agent. Suitable for complex tasks.",
+        "detail": "In workflow mode, you chat with the lead agent, who generates the plan and assigns tasks to other members.\nThe system converts the plan into a visual task node graph and schedules it automatically, so you can track each task clearly.\nBefore execution starts, the workflow plan can be modified freely; if the first round does not meet expectations, you can start another iteration.\nYou can switch the lead agent by clicking a member card in the AI member list."
+      },
+      "free": {
+        "label": "Free chat mode",
+        "description": "Use @ to talk with any agent. Agents can communicate freely with each other, suitable for simple tasks or everyday group chat.",
+        "detail": "In free chat mode, you can directly @ any member to assign work.\nAgents can freely discuss and collaborate while following the team protocol.\nFree chat mode can guide member behavior and collaboration through the team protocol, enabling more exploratory collaboration patterns."
+      },
+      "switchHint": "Use the switch button at the bottom of the message box to change work modes at any time. Context remains shared after switching."
     }
   },
   "message": {
@@ -351,7 +374,7 @@
         "invalidWorkspacePath": "Import failed: Invalid workspace path.",
         "nothingToImport": "Import failed: Nothing to import from this team preset.",
         "baseCodingAgentRequired": "Import failed: Base coding agent is required.",
-        "selectedCodingAgentUnavailable": "Import failed: Selected coding agent is unavailable.",
+        "selectedCodingAgentUnavailable": "Import failed: Selected coding Agent is unavailable.",
         "memberNameRequired": "Import failed: AI member name is required.",
         "memberNameInvalidChars": "Import failed: Name can only include letters, numbers, \"_\" or \"-\".",
         "memberNameTooLong": "Import failed: AI member name cannot exceed {{max}} characters.",
@@ -360,7 +383,8 @@
         "selectSessionFirst": "Please select a chat session first.",
         "sessionArchived": "This session is archived and read-only.",
         "noAvailableCodingAgent": "Import failed: No available coding agent to import this preset.",
-        "failedToImportTeam": "Failed to import team preset."
+        "failedToImportTeam": "Failed to import team preset.",
+        "memberError": "{{member}} - {{message}}"
       }
     },
     "addMemberErrors": {
@@ -371,7 +395,7 @@
       "workspacePathMustBeAbsolute": "Add failed: Workspace path must be an absolute path.",
       "invalidWorkspacePath": "Add failed: Invalid workspace path.",
       "baseCodingAgentRequired": "Add failed: Base coding agent is required.",
-      "selectedCodingAgentUnavailable": "Add failed: Selected coding agent is unavailable.",
+      "selectedCodingAgentUnavailable": "Add failed: Selected coding Agent is unavailable.",
       "memberNameRequired": "Add failed: AI member name is required.",
       "memberNameInvalidChars": "Add failed: Name can only include letters, numbers, \"_\" or \"-\".",
       "memberNameTooLong": "Add failed: AI member name cannot exceed {{max}} characters.",
@@ -786,5 +810,273 @@
       "diffAction": "Diff",
       "openExplorerSuccess": "Opened in file manager."
     }
-  }
+  },
+  "workflow": {
+    "approvalCard": {
+      "title": "Approval Required",
+      "approve": "Approve",
+      "reject": "Reject"
+    },
+    "permissionCard": {
+      "title": "Permission Request",
+      "grant": "Grant",
+      "deny": "Deny"
+    },
+    "continueCard": {
+      "title": "Continue?",
+      "confirm": "Continue"
+    },
+    "inputCard": {
+      "title": "Input Required",
+      "placeholder": "Type your response here",
+      "submit": "Submit"
+    },
+    "inspector": {
+      "tabDetails": "Details",
+      "tabLogs": "Logs",
+      "noInstructions": "No task instructions were provided for this step.",
+      "noSummary": "No summary has been generated for this step yet.",
+      "loopPrefix": "Loop: {{name}}",
+      "reviewPrefix": "Review: {{label}}",
+      "instructionHeading": "Instruction",
+      "summaryHeading": "Summary",
+      "feedbackHeading": "Feedback",
+      "executionRecordHeading": "Execution Record Output",
+      "loadingTranscript": "Loading transcript...",
+      "noOutputEntries": "No output entries for this step yet.",
+      "errorHeading": "Error",
+      "loadingLogs": "Loading logs...",
+      "thinkingProcess": "{{agentName}} - Thinking Process",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "noLogs": "No logs for this step yet.",
+      "closeChat": "Close Chat",
+      "openChat": "Open Chat",
+      "terminate": "Terminate"
+    },
+    "chatPanel": {
+      "title": "Agent Conversation",
+      "approvalRequired": "Approval Required",
+      "permissionRequest": "Permission Request",
+      "continuePrompt": "Continue?",
+      "continueAction": "CONTINUE",
+      "approveAction": "APPROVE",
+      "rejectAction": "REJECT",
+      "replyPlaceholder": "Reply to agent...",
+      "readOnlyPlaceholder": "Read-only until this step is waiting for input or review."
+    },
+    "status": {
+      "recompiling": "Recompiling plan...",
+      "completed": "Completed - {{summary}}",
+      "completedDefault": "All steps finished",
+      "failed": "Failed - {{error}}",
+      "failedDefault": "Execution error",
+      "progress": "Progress {{percent}}% · {{completed}}/{{total}} steps"
+    },
+    "controls": {
+      "executePlan": "Execute Plan",
+      "resume": "Resume",
+      "pauseAll": "Pause All",
+      "stop": "Stop"
+    },
+    "reviewSettings": {
+      "title": "Review Settings",
+      "description": "Choose who should review each workflow result.",
+      "close": "Close review settings",
+      "taskSteps": "Task Steps",
+      "leadUserReview": "Lead / User review",
+      "leadLabel": "Lead",
+      "userLabel": "User",
+      "leadReviewOn": "Enable lead agent review for this task step",
+      "leadReviewOff": "Disable lead agent review for this task step",
+      "userReviewOn": "Enable user review for this task step",
+      "userReviewOff": "Disable user review for this task step",
+      "workflowLoops": "Workflow Loops",
+      "userReviewOnly": "User review only",
+      "loopUserReviewOn": "Enable user review for this workflow loop",
+      "loopUserReviewOff": "Disable user review for this workflow loop",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "saveChanges": "Save Changes",
+      "executionFinishedError": "Review settings cannot be changed after execution has finished.",
+      "finishedMessage": "Review settings cannot be modified in the current workflow state.",
+      "updateError": "Unable to update review settings."
+    },
+    "notifications": {
+      "pendingReview": "Pending Review",
+      "typeFinal": "Final",
+      "typeStep": "Step",
+      "accept": "ACCEPT",
+      "reject": "REJECT",
+      "approve": "APPROVE",
+      "viewDetails": "VIEW DETAILS",
+      "finalReviewTitle": "Final Review",
+      "reviewRequired": "Review required",
+      "pendingInput": "Input Required",
+      "typeInput": "Input",
+      "inputRequired": "Input required",
+      "respond": "RESPOND"
+    },
+    "card": {
+      "generatingPlan": "Generating workflow plan",
+      "stateLabels": {
+        "planGenerationFailed": "Plan Generation Failed",
+        "generatingPlan": "Generating Plan",
+        "recompilingPlan": "Recompiling Plan",
+        "workItem": "Work Item",
+        "executionFailed": "Execution Failed",
+        "planReady": "Plan Ready",
+        "planInvalid": "Plan Invalid",
+        "actionRequired": "Action Required",
+        "paused": "Paused",
+        "preparing": "Preparing",
+        "workflowRunning": "Workflow Running"
+      },
+      "badges": {
+        "failed": "Failed",
+        "generating": "Generating"
+      },
+      "emptyGraph": {
+        "planGenerationFailed": "Plan generation stopped before the preview was created. Retry to generate a fresh plan from the same goal.",
+        "planGenerationPending": "The system is drafting a workflow plan. This placeholder card will update when the preview is ready.",
+        "noGraph": "No workflow graph is available yet.",
+        "planDraft": "Plan Draft",
+        "workflow": "Workflow"
+      },
+      "buttons": {
+        "open": "Open",
+        "executePlan": "Execute Plan",
+        "pauseAll": "Pause All",
+        "resume": "Resume",
+        "retrying": "Retrying...",
+        "retryPlanGeneration": "Retry Plan Generation"
+      },
+      "errors": {
+        "validationErrors": "Validation Errors",
+        "generationError": "Generation Error",
+        "retryRequestFailed": "Retry Request Failed"
+      },
+      "finalDelivery": "Final Delivery"
+    },
+    "iterationFeedback": {
+      "round": "Round {{round}}",
+      "steps": "Steps",
+      "status": "Status",
+      "running": "Running",
+      "regeneratingPlan": "Regenerating plan",
+      "idle": "Idle",
+      "currentStep": "Current Step",
+      "reviewRequired": "Review Required",
+      "rejectWithFeedback": "Reject with Feedback",
+      "whatWrongLabel": "What went wrong?",
+      "whatWrongPlaceholder": "Describe the issue...",
+      "expectedLabel": "Expected outcome",
+      "expectedPlaceholder": "What should have happened?",
+      "priorityLabel": "Priority",
+      "priorityHigh": "High",
+      "priorityMedium": "Medium",
+      "priorityLow": "Low",
+      "additionalNotesLabel": "Additional Notes",
+      "additionalNotesPlaceholder": "Optional notes...",
+      "validationError": "Reject requires what_wrong and expected.",
+      "accept": "ACCEPT",
+      "submitRejection": "SUBMIT REJECTION",
+      "reject": "REJECT",
+      "cancel": "CANCEL"
+    },
+    "pendingReview": {
+      "title": "Pending Review",
+      "reviewTypes": {
+        "stepReview": "Step Review",
+        "loopReview": "Loop Review",
+        "finalReview": "Final Review"
+      },
+      "defaultMessage": "Please review the current result.",
+      "context": "Context",
+      "feedbackLabel": "Feedback",
+      "feedbackPlaceholder": "Please provide specific revision comments",
+      "validationError": "Reject requires feedback.",
+      "approve": "APPROVE",
+      "submitReject": "SUBMIT REJECT",
+      "reject": "REJECT"
+    },
+    "generatedText": {
+      "reviewLoop": "Please review loop \"{{loopKey}}\".",
+      "userApprovedStepResult": "User approved the step result."
+    },
+    "finalReview": {
+      "title": "Final Review",
+      "defaultMessage": "Task completed. Accept the result?",
+      "accept": "ACCEPT",
+      "reject": "REJECT"
+    },
+    "graph": {
+      "tip": "(Tip: Scroll to zoom, drag to pan)",
+      "layoutWarning": "Layout warning: using fallback layout",
+      "fitView": "Fit to canvas",
+      "leadFallback": "Lead"
+    },
+    "executionStatus": {
+      "running": "Running",
+      "failed": "Failed",
+      "paused": "Paused",
+      "waiting": "Waiting Review",
+      "recompiling": "Regenerating plan",
+      "completed": "Completed",
+      "pending": "Preparing"
+    },
+    "statusLabels": {
+      "interrupted": "Interrupted",
+      "stopRequested": "Stop Requested",
+      "waitingInput": "Waiting Input",
+      "reviewing": "Reviewing",
+      "preCompleted": "Pre-Completed",
+      "pending": "Pending",
+      "running": "Running",
+      "ready": "Ready",
+      "waitingReview": "Reviewing",
+      "waitingUser": "Waiting User",
+      "passed": "Passed",
+      "completed": "Completed",
+      "rejected": "Rejected",
+      "failed": "Failed",
+      "loop": "Loop"
+    },
+    "reviewPhase": {
+      "executing": "Executing",
+      "leadReview": "Lead Review",
+      "waitingUser": "Waiting User"
+    },
+    "reviewVerdict": {
+      "accepted": "Accepted",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "reviewed": "Reviewed"
+    },
+    "pendingInput": {
+      "title": "Input Required",
+      "defaultPrompt": "The agent needs more input to continue.",
+      "placeholder": "Type your response here",
+      "submit": "SUBMIT"
+    }
+  },
+  "leadAgent": {
+    "label": "Lead Agent",
+    "switchError": "Failed to switch Lead Agent. Please try again.",
+    "switchDialog": {
+      "title": "Switch Lead Agent",
+      "message": "Switch Lead Agent from \"{{currentLeadName}}\" to \"{{targetLeadName}}\"?",
+      "switching": "Switching…",
+      "confirm": "Confirm"
+    }
+  },
+  "input_tabs": {
+    "workflow": "Workflow",
+    "chat": "Chat"
+  },
+  "workflow_plan_generation_unavailable": "Workflow plan generation is unavailable for this session.",
+  "workflow_retry": "Retry",
+  "workflow_retry_task": "Retry Task",
+  "workflow_retry_review": "Retry Review",
+  "workflow_retry_cancel": "Cancel"
 }

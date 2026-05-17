@@ -1,8 +1,7 @@
 import {
   ArrowRightIcon,
-  CodeIcon,
-  FileTextIcon,
-  PaintBrushIcon,
+  ChatCircleDotsIcon,
+  GitBranchIcon,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
@@ -12,11 +11,13 @@ const CHAT_EMPTY_STATE_LOGO_PATH: string | null = '/openteams-brand-logo.png';
 // to replace the built-in placeholder mark.
 
 export type ChatEmptyStateVariant = 'no-members' | 'empty-messages';
+type ChatInputMode = 'free' | 'workflow';
 
 interface ChatEmptyStateIndicatorProps {
   variant: ChatEmptyStateVariant;
   onAction: () => void;
-  onTemplateSelect?: (templateValue: string) => void;
+  selectedMode?: ChatInputMode;
+  onModeSelect?: (mode: ChatInputMode) => void;
   disabled?: boolean;
   className?: string;
 }
@@ -24,7 +25,8 @@ interface ChatEmptyStateIndicatorProps {
 export function ChatEmptyStateIndicator({
   variant,
   onAction,
-  onTemplateSelect,
+  selectedMode = 'workflow',
+  onModeSelect,
   disabled = false,
   className,
 }: ChatEmptyStateIndicatorProps) {
@@ -33,31 +35,33 @@ export function ChatEmptyStateIndicator({
   const isNoMembers = variant === 'no-members';
   const eyebrow = t('emptyState.emptyEyebrow');
   const actionLabel = t('emptyState.noMembersAction');
-  const promptTemplates = isNoMembers
+  const modeCards = isNoMembers
     ? []
     : [
         {
-          id: 'optimize-architecture',
-          label: t('input.templates.optimizeArchitecture.label'),
-          value: t('input.templates.optimizeArchitecture.value'),
-          icon: CodeIcon,
-          tone: 'architecture',
+          id: 'workflow' as const,
+          label: t('input.modeCards.workflow.label'),
+          description: t('input.modeCards.workflow.description'),
+          detail: t('input.modeCards.workflow.detail'),
+          icon: GitBranchIcon,
+          tone: 'workflow',
         },
         {
-          id: 'generate-docs',
-          label: t('input.templates.generateDocs.label'),
-          value: t('input.templates.generateDocs.value'),
-          icon: FileTextIcon,
-          tone: 'docs',
-        },
-        {
-          id: 'review-visual-style',
-          label: t('input.templates.reviewVisualStyle.label'),
-          value: t('input.templates.reviewVisualStyle.value'),
-          icon: PaintBrushIcon,
-          tone: 'visual',
+          id: 'free' as const,
+          label: t('input.modeCards.free.label'),
+          description: t('input.modeCards.free.description'),
+          detail: t('input.modeCards.free.detail'),
+          icon: ChatCircleDotsIcon,
+          tone: 'free',
         },
       ];
+  const selectedModeCard =
+    modeCards.find((modeCard) => modeCard.id === selectedMode) ?? modeCards[0];
+  const selectedModeDetailItems =
+    selectedModeCard?.detail
+      .split(/\r?\n/)
+      .map((item) => item.replace(/^[-*]\s*/, '').trim())
+      .filter(Boolean) ?? [];
 
   return (
     <div
@@ -118,43 +122,65 @@ export function ChatEmptyStateIndicator({
         <p className="chat-session-empty-state-eyebrow">{eyebrow}</p>
       </div>
 
-      {!isNoMembers && onTemplateSelect ? (
-        <div
-          className="chat-session-empty-state-templates"
-          aria-label={t('input.templates.label')}
-        >
-          {promptTemplates.map((template) => {
-            const Icon = template.icon;
+      {!isNoMembers && onModeSelect ? (
+        <>
+          <div
+            className="chat-session-empty-state-templates"
+            aria-label={t('input.modeCards.label')}
+          >
+            {modeCards.map((modeCard) => {
+              const Icon = modeCard.icon;
+              const isSelected = modeCard.id === selectedMode;
 
-            return (
-              <button
-                key={template.id}
-                type="button"
-                className="chat-session-empty-state-template-card"
-                onClick={() => onTemplateSelect(template.value)}
-                disabled={disabled}
-              >
-                <span
+              return (
+                <button
+                  key={modeCard.id}
+                  type="button"
                   className={cn(
-                    'chat-session-empty-state-template-icon',
-                    `is-${template.tone}`
+                    'chat-session-empty-state-template-card',
+                    isSelected && 'is-selected'
                   )}
-                  aria-hidden="true"
+                  onClick={() => onModeSelect(modeCard.id)}
+                  disabled={disabled}
+                  aria-pressed={isSelected}
                 >
-                  <Icon className="size-icon-sm" weight="fill" />
-                </span>
-                <span className="chat-session-empty-state-template-copy">
-                  <span className="chat-session-empty-state-template-title">
-                    {template.label}
+                  <span
+                    className={cn(
+                      'chat-session-empty-state-template-icon',
+                      `is-${modeCard.tone}`
+                    )}
+                    aria-hidden="true"
+                  >
+                    <Icon className="size-icon-sm" weight="fill" />
                   </span>
-                  <span className="chat-session-empty-state-template-description">
-                    {template.value}
+                  <span className="chat-session-empty-state-template-copy">
+                    <span className="chat-session-empty-state-template-title">
+                      {modeCard.label}
+                    </span>
+                    <span className="chat-session-empty-state-template-description">
+                      {modeCard.description}
+                    </span>
                   </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedModeCard ? (
+            <div className="chat-session-empty-state-mode-detail">
+              {selectedModeDetailItems.length > 1 ? (
+                <ul>
+                  {selectedModeDetailItems.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>{selectedModeCard.detail}</p>
+              )}
+              <span>{t('input.modeCards.switchHint')}</span>
+            </div>
+          ) : null}
+        </>
       ) : null}
     </div>
   );

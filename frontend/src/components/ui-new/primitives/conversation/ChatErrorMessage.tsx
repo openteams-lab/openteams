@@ -22,16 +22,18 @@ export function ChatErrorMessage({
   return (
     <div
       className={cn(
-        'flex items-start gap-base text-sm cursor-pointer',
+        'flex items-start gap-base text-sm select-text',
+        onToggle ? 'cursor-pointer' : 'cursor-text',
         isWarning ? 'text-warning' : 'text-error',
         className
       )}
       onClick={onToggle}
-      role="button"
+      role={onToggle ? 'button' : undefined}
     >
       <Icon className="shrink-0 size-icon-base mt-0.5" />
       <span
         className={cn(
+          'select-text',
           !expanded && 'truncate',
           expanded && 'whitespace-pre-wrap break-all'
         )}
