@@ -7,6 +7,8 @@ PRAGMA foreign_keys = OFF;
 -- sqlx workaround due to lack of `-- no-transaction` in sqlx-sqlite.
 COMMIT TRANSACTION;
 
+PRAGMA foreign_keys = OFF;
+
 BEGIN TRANSACTION;
 
 PRAGMA legacy_alter_table = ON;
