@@ -28,8 +28,7 @@ use db::models::{
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use services::services::{
-    config,
-    workflow_analytics,
+    config, workflow_analytics,
     workflow_compiler::WorkflowCompiler,
     workflow_orchestrator::WorkflowOrchestrator,
     workflow_runtime::{
@@ -776,13 +775,7 @@ pub async fn get_step_transcripts(
     let (_step, execution) = load_step_for_session(pool, &session, step_id).await?;
     let mut scoped_query = query;
     scoped_query.step_id = Some(step_id);
-    list_transcript_response(
-        pool,
-        &session,
-        execution.id,
-        scoped_query,
-    )
-    .await
+    list_transcript_response(pool, &session, execution.id, scoped_query).await
 }
 
 pub async fn submit_step_input(

@@ -834,9 +834,7 @@ impl ChatRunner {
         markdown.push_str("### Rules\n");
         markdown.push_str("1. Output only content directly related to the current task.\n");
         if is_workflow_mode {
-            markdown.push_str(
-                "2. Keep messages concise.\n",
-            );
+            markdown.push_str("2. Keep messages concise.\n");
             markdown.push_str(
                 "3. Workflow mode: `send.to` may only be `\"you\"` (the user). Do not send direct group-chat messages to other agents; workflow orchestration will dispatch agent work through the workflow plan.\n",
             );

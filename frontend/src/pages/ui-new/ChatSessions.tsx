@@ -2359,12 +2359,7 @@ export function ChatSessions() {
       setWorkflowWindowCardMessageId(cardMsgId);
       setWorkflowWindowOpen(true);
     },
-    [
-      activeSessionId,
-      messages,
-      recordWorkflowEvent,
-      workflowCardProjectionByMessageId,
-    ]
+    [messages, workflowCardProjectionByMessageId]
   );
 
   const resolveWorkflowContextForStep = useCallback(
