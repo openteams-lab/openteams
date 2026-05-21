@@ -141,9 +141,9 @@ Instead of asking agents to run in a loose chain, **openteams** turns the work i
 
 openteams is under active development. Here is where we are heading:
 
-- [ ] **Expert AI workers** — 
-- [ ] **Productive AI team** — 
-- [ ] **Integrate more agents** — 
+- [ ] **Expert AI workers** — Launch more AI workers with deep domain knowledge that can solve specialized problems.
+- [ ] **High-output AI teams** — Compose efficient expert AI workers into teams that can customize production workflows for specific business needs and turn requirements into deliverables end to end.
+- [ ] **Integrate more agents** — Add support for more commonly used agents, such as Kilo code, hermes-agent, openclaw, and others.
 
 ***Vision: Transform token consumption into real productivity.***
 
