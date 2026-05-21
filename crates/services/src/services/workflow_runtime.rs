@@ -1093,6 +1093,7 @@ pub fn build_plan_generation_prompt(
 You are generating an executable workflow plan from a confirmed implementation brief.
 The output source of truth is React Flow compatible workflow JSON. Do not output Markdown, YAML, comments, explanations, or prose outside the JSON object.
 
+
 ## Stable Output Contract
 
 Return exactly one workflow plan JSON object.

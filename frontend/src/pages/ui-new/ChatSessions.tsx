@@ -2358,28 +2358,6 @@ export function ChatSessions() {
       setWorkflowWindowFallbackProjection(projection);
       setWorkflowWindowCardMessageId(cardMsgId);
       setWorkflowWindowOpen(true);
-      recordWorkflowEvent('engagement.workflow_card_opened', {
-        session_id: activeSessionId,
-        workflow_id: projection.execution_id ?? undefined,
-        plan_id: projection.plan_id ?? undefined,
-      });
-      recordWorkflowEvent(
-        'engagement.transcript_opened',
-        {
-          session_id: activeSessionId,
-          workflow_id: projection.execution_id ?? undefined,
-          plan_id: projection.plan_id ?? undefined,
-        },
-        {
-          metadata: {
-            action_key:
-              cardMsgId ??
-              projection.execution_id ??
-              projection.plan_id ??
-              'window_open',
-          },
-        }
-      );
     },
     [
       activeSessionId,

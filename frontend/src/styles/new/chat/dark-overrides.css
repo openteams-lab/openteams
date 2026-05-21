@@ -55,20 +55,6 @@
     border-color: rgba(94, 162, 255, 0.3);
   }
 
-  .new-design.dark .chat-session-message-copy-success,
-  .dark .new-design .chat-session-message-copy-success {
-    border-color: #2a3445;
-    background: #192233;
-    color: #cfe3ff;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
-  }
-
-  .new-design.dark .chat-session-message-copy-success::after,
-  .dark .new-design .chat-session-message-copy-success::after {
-    border-color: #192233 transparent transparent;
-    filter: drop-shadow(0 1px 0 #2a3445);
-  }
-
   /* Work item cards */
   .new-design.dark .chat-session-work-item-card,
   .dark .new-design .chat-session-work-item-card {

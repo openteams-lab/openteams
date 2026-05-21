@@ -13,8 +13,6 @@ export type WorkflowEventName =
   | 'collaboration.handoff_completed'
   | 'engagement.message_sent'
   | 'engagement.attachment_added'
-  | 'engagement.workflow_card_opened'
-  | 'engagement.transcript_opened'
   | 'engagement.diff_viewed'
   | 'engagement.session_archived'
   | 'quality.workflow_completed'

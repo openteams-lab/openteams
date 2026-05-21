@@ -1,11 +1,15 @@
 <div align="center">
-  <img src="../frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="200">
+  <img src="../frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="100">
 </div>
 
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 10px; margin-bottom: 10px;">
-  
-  <p><strong>Faites fonctionner les agents comme une seule équipe et multipliez votre efficacité à l'ère de l'IA.</strong></p>
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="200" style="margin-top: 10px; margin-bottom: 10px;">
+
+  <h5>Construisez avec votre équipe IA</h5>
+
+  <p>
+    openteams est un espace de travail open source pour la collaboration multi-agent : créez des équipes IA, exécutez des agents de code en local et coordonnez le travail par chat ou workflows structurés, le tout au même endroit.
+  </p>
 
   <p>
     <a href="https://www.npmjs.com/package/openteams-web"><img alt="npm" src="https://img.shields.io/npm/v/openteams-web?style=flat-square" /></a>
@@ -32,184 +36,198 @@
 </div>
 
 ---
+![Interface produit OpenTeams montrant un workspace avec plusieurs agents IA à gauche, une conversation partagée et un graphe de workflow au centre, ainsi que des panneaux de revue et d'artefacts à droite.](images/hero.mp4)
 
-![OpenTeams Demo](images/demo.gif)
+## Qu'est-ce qu'openteams
 
-**Guide de prise en main en une minute**
+**openteams** est un workspace open source de collaboration multi-agent. Il rassemble plusieurs agents IA de code, comme Claude Code, Codex, Gemini CLI et d'autres, dans une session partagée où ils peuvent communiquer, partager le contexte et travailler ensemble comme une équipe. Vous pouvez collaborer avec les agents via un Free Chat léger, ou orchestrer des tâches complexes avec des Workflows structurés, des plans visibles, un contrôle étape par étape et une revue intégrée. Tout s'exécute localement dans votre propre workspace.
 
-1. Importez une équipe prédéfinie et choisissez l'Agent de base pour chaque membre.
-2. Configurez un espace de travail pour chaque membre de l'équipe.
-3. Envoyez un message à un membre précis avec `@member`.
+## Pourquoi openteams
 
----
-## 🔥 *Nouveautés :*
-### Aperçu des fonctionnalités
-Dans la version v0.4.0, nous introduirons une mise à jour majeure :
-- État actuel : le modèle actuel de collaboration libre basé sur les @mentions est trop ouvert. Comme les sorties des Agents sont intrinsèquement incertaines, la collaboration peut devenir instable et la chaîne de collaboration peut se rompre à certains moments.
-- Amélioration : nous voulons introduire un mode workflow afin d'améliorer l'efficacité de la collaboration. Ce mode utilise une architecture de communication centralisée, similaire aux Agent Teams de Claude. Chaque tâche devient un noeud de workflow, et tous les noeuds forment ensemble un DAG de flux de tâches. Un planificateur indépendant gère les transitions d'état du workflow. Pour les tâches complexes, une seule phase de planification peut ne pas suffire à satisfaire entièrement les besoins ; le workflow doit donc prendre en charge une deuxième, voire une troisième itération. Pour cela, les workflows incluront un nombre d'itérations configurable et permettront de consulter l'historique des itérations.
-- Nous pensons que ce changement améliorera fortement l'utilité pratique d'OpenTeams. Restez à l'écoute.
+Les agents IA deviennent de plus en plus forts pour planifier, coder, relire et tester. Mais davantage de sortie d'agent ne devient pas automatiquement du travail livré.
 
-<img width="1100" height="546" alt="Image" src="https://github.com/user-attachments/assets/be065bc4-f736-47a8-a989-05e5142264f8" />
+**Gérer plusieurs agents est épuisant.** Vous passez d'un terminal à l'autre, vous réexpliquez le contexte à chaque nouvel agent, vous copiez les sorties d'un prompt vers le suivant et vous réconciliez des diffs contradictoires. Votre attention est absorbée par le chaos de la coordination multi-agent.
 
-### *Mises à jour majeures*
-- **2026.05.07 (v0.3.22)**
-  - Prise en charge de l'enregistrement en un clic des membres d'une session de discussion de groupe comme équipe prédéfinie
-- **2026.04.14 (v0.3.15)**
-  - Visualiseur des modifications de fichiers de l'espace de travail
-- **2026.04.06 (v0.3.12)**
-  - Activation du mode interface sombre
-  - Correction des problèmes de concurrence d'openteams-cli
-- **2026.04.02 (v0.3.10)**
-  - Mise en place des mises à jour intégrées à l'application
-  - Le site de documentation est désormais en ligne.
-- **2026.03.24 (v0.3.7)**: 
-  - Ajout de l'Agent openteams-CLI intégré, supprimant la dépendance à une installation locale d'Agent.
-  - Correction d'une fuite mémoire dans l'exécuteur.
----
+**L'exécution des agents est invisible et difficile à contrôler.** Vous demandez à Claude Code de « construire la fonctionnalité ». Il tourne pendant 15 minutes. Vous ne savez pas quelles sous-tâches il a essayées, lesquelles ont réussi, ni lesquelles il a abandonnées en silence. La plupart des agents de code traitent aujourd'hui une tâche complexe comme une seule exécution monolithique : aucun plan visible avant l'exécution, aucun moyen d'approuver ou de rejeter une étape en cours de route, aucun moyen de relancer uniquement l'étape qui a échoué. Quand quelque chose casse, vous recommencez.
+
+**openteams** résout ces deux problèmes. Les agents **partagent le même contexte**, donc le travail ne se perd pas entre les relais. Les tâches complexes deviennent des **workflows visibles et contrôlables** : vous affinez le plan avant qu'il ne s'exécute, vous observez chaque étape, et vous pouvez intervenir sur n'importe quel noeud pour approuver, rejeter, relancer ou rediriger.
+
+> Le vrai levier n'est pas d'avoir plus d'agents. C'est de les orchestrer avec un plan complexe que vous pouvez voir et des étapes que vous pouvez contrôler.
 
 ## Démarrage rapide
-
-### Option A : Lancer avec npx
-**Cette méthode d'installation est recommandée sur Mac et Linux.**
+### Installation
+#### npx
 
 ```bash
-# web
 npx openteams-web
 ```
 
-### Option B : Télécharger l'application desktop
+#### Application desktop
+
+Téléchargez la dernière version pour votre plateforme depuis GitHub Releases.
 
 [![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/openteams-lab/openteams/releases/latest)
 [![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest)
 
-### Prérequis
+### Configurer les fournisseurs
 
-**À partir de la v0.3.7, openteams-cli est intégré ; il n'est donc plus nécessaire d'installer un AI Agent séparément. Vous pouvez configurer votre API dans la page « Settings -> Service Providers ».**
+**openteams** inclut un agent openteams CLI intégré. Configurez vos fournisseurs de modèles dans l'application via `menu->setting->provider config->add provider`.
 
-⚙️ [Consultez la documentation de configuration des fournisseurs.](https://doc.openteams-lab.com/fr/advanced-usage/custom-provider)
+⚙️ [Configuration des fournisseurs](https://doc.openteams-lab.com/advanced-usage/custom-provider)
 
-Vous pouvez aussi choisir n'importe quel Agent dans la liste des Agents pris en charge.
+Vous pouvez aussi connecter des agents de code pris en charge :
 
-| Agent | Installation |
-|-------|---------|
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm i -g @anthropic-ai/claude-code` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @google/gemini-cli` |
-| [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex` |
-| [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code` |
-| [OpenCode](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g opencode-ai` |
+| Agent | Exemple d'installation |
+| --- | --- |
+| Claude Code | `npm i -g @anthropic-ai/claude-code` |
+| Gemini CLI | `npm i -g @google/gemini-cli` |
+| Codex | `npm i -g @openai/codex` |
+| Qwen Code | `npm i -g @qwen-code/qwen-code` |
+| OpenCode | `npm i -g opencode-ai` |
 
-📚 [Plus de guides d'installation d'Agent](https://doc.openteams-lab.com/getting-started)
+📚 [Autres guides d'installation d'agents](https://doc.openteams-lab.com/getting-started)
 
----
+### Démarrer en 30 secondes
+**Prérequis : configurez un fournisseur de service API ou installez n'importe quel Code Agent pris en charge.**
 
-## Fonctionnalités
+*étape 1.* Créez une session de chat de groupe. Ajoutez un ou plusieurs membres, puis assignez à chacun un modèle et un rôle.
 
-| Fonctionnalité | Ce que vous obtenez |
-|--|--|
-| **Agents pris en charge** | Prise en charge de 10 runtimes d'Agents de code, dont `Claude Code`, `Gemini CLI`, `Codex`, `Qwen Code`, `Amp`, `Cursor Agent`, `Copilot`, `Droid`, `Kimi Code` et `OpenCode`. D'autres Agents sont en cours d'intégration.|
-| **Contexte de chat de groupe partagé** | Tous les participants travaillent à partir du même historique de conversation, sans avoir à copier-coller des prompts entre plusieurs fenêtres. |
-| **Exécution parallèle** | Plusieurs Agents peuvent traiter la même tâche en parallèle dans une session partagée. Chaque Agent prend en charge la partie qu'il maîtrise le mieux. |
-| **Collaboration autonome** | Les Agents peuvent se `@mention`, se passer le relais et se coordonner directement dans le chat. |
-| **Membres IA intégrés** | Commencez immédiatement avec plus de 160 membres IA intégrés couvrant l'ingénierie, le marketing, la rédaction, la recherche et la production de contenu. |
-| **Préréglages d'équipes IA intégrés** | 8 préréglages d'équipe prêts à l'emploi sont fournis pour les workflows les plus courants. |
-| **Règles de collaboration d'équipe** | Vous pouvez définir qui pilote, qui peut parler à qui et comment la collaboration doit fonctionner. Adaptez votre équipe IA et ses règles à votre manière de travailler. |
-| **Bibliothèque de compétences** | Équipez vos Agents avec plus de 1000 compétences intégrées et importez vos propres compétences si nécessaire. |
-| **Exécution entièrement locale** | Les Agents s'exécutent directement dans votre espace de travail local, et les artefacts d'exécution restent dans `.openteams/` à l'intérieur de cet espace. Vous n'avez donc pas à vous soucier de la confidentialité des données. |
+*étape 2.* En mode Free Chat, utilisez `@` pour envoyer un message ou assigner une tâche à un membre.
 
-### Exécution parallèle des Agents
+*étape 3.* Passez en mode Workflow. Discutez des exigences avec le lead agent, affinez la solution et générez un plan d'exécution.
 
-*Lancez plusieurs Agents dans le même contexte partagé et laissez-les travailler en parallèle pour accélérer la livraison.*
+*étape 4.* Lancez l'exécution et relisez le résultat de chaque noeud de tâche lorsqu'il se termine.
 
-![OpenTeams parallel](images/parallel.gif)
+## Modes de travail
 
-### Collaboration autonome des Agents
+**openteams** prend en charge deux modes de collaboration, car toutes les tâches n'exigent pas le même niveau de structure. Pensez-y comme aux modes **Plan et Build de Claude Code**, mais pour des équipes multi-agents : choisissez la collaboration libre lorsque vous voulez que les agents explorent et discutent ouvertement, et les workflows structurés lorsque vous avez besoin d'une exécution fiable et prévisible.
 
-*OpenTeams permet aux Agents de s'envoyer des messages directement, sans imposer un workflow fixe. Si vous souhaitez davantage de structure, vous pouvez ajouter des règles d'équipe pour contrôler la communication, désigner un Agent leader, ou laisser tout le monde collaborer librement. Le mode de communication dépend entièrement de votre cas d'usage.*
+### Free Chat
 
-![OpenTeams collaborate](images/collaborate.gif)
+En mode chat libre, vous utilisez `@` pour envoyer une tâche à n'importe quel agent, et les agents peuvent se transmettre librement des messages. La collaboration est régie par un protocole d'équipe que vous définissez : qui fait quoi, comment les relais se passent et quelles normes suivre.
 
-### Membres IA
+**free chat mode** convient aux petites corrections, aux revues rapides et aux discussions exploratoires pour lesquelles un workflow complet serait excessif.
 
-*OpenTeams inclut plus de 160 membres IA intégrés, couvrant l'ingénierie, le marketing, la rédaction, la production de contenu et bien plus encore. Vous pouvez les combiner dans différentes équipes, les personnaliser et construire des combinaisons de rôles adaptées à votre façon de travailler. Nous continuerons à enrichir et améliorer cette bibliothèque de membres.*
+![](images/free_chat.png)
 
-![OpenTeams members](images/members.gif)
+### Workflow
 
-### Équipes IA
+Le mode Workflow est conçu pour les tâches complexes qui doivent être décomposées en sous-tâches, avec une progression observable et une exécution contrôlable à chaque étape.
 
-*OpenTeams est livré avec 8 préréglages d'équipe conçus pour les workflows courants, ce qui vous permet de démarrer immédiatement. Nous vous recommandons de définir les règles d'équipe au moment de la création afin que la collaboration reste alignée avec votre manière souhaitée de faire fonctionner le groupe.*
+Un lead agent pilote la phase de planification : clarification des exigences, conception de l'approche, définition du plan d'exécution et affectation des tâches aux bons agents. Le résultat est un workflow visible avec étapes, dépendances, revues, relances et points d'acceptation.
 
-![OpenTeams team](images/team.gif)
+![](images/openteams-workflow.png)
 
-### Bibliothèque de compétences
+Au lieu de laisser les agents s'enchaîner de façon lâche, **openteams** transforme le travail en graphe d'exécution avec état.
 
-*OpenTeams inclut plus de 1000 compétences intégrées que vous pouvez combiner et attribuer à différents membres IA. Vous pouvez aussi importer les compétences que vous créez vous-même et les appliquer directement à vos Agents. Nous continuerons à enrichir la bibliothèque en privilégiant les capacités réellement solides en environnement de production.*
+**Remarque : le mode Workflow consomme plus de tokens. Assurez-vous que votre solde de tokens est suffisant.**
 
-![OpenTeams skills](images/skills.gif)
+## Mises à jour majeures
+- **2026.05.20 (v0.4.4)**
+  - Version beta du mode Workflow
+- **2026.05.07 (v0.3.22)**
+  - Possibilité d'enregistrer en un clic les membres d'une session de chat de groupe comme équipe prédéfinie
+- **2026.04.14 (v0.3.15)**
+  - Visualiseur des changements de fichiers du workspace
+- **2026.04.06 (v0.3.12)**
+  - Activation du mode UI sombre
+  - Correction des problèmes de concurrence d'openteams-cli
+- **2026.04.02 (v0.3.10)**
+  - Mise en place de la mise à jour de version dans l'application
+  - Le site de documentation est désormais en ligne
 
----
+## Feuille de route
 
-## Pourquoi OpenTeams va plus loin
+openteams est en développement actif. Voici la direction que nous prenons :
 
-Légende : ✅ Prise en charge complète | 🟡 Prise en charge partielle | ❌ Non pris en charge
+- [ ] **Travailleurs IA experts** — Lancer davantage de travailleurs IA dotés de connaissances métier spécialisées, capables de résoudre des problèmes experts.
+- [ ] **Équipes IA à haut rendement** — Composer des équipes de travailleurs IA experts efficaces, capables de personnaliser des workflows de production pour des besoins métier précis et de transformer les exigences en livrables de bout en bout.
+- [ ] **Intégrer davantage d'agents** — Intégrer davantage d'agents couramment utilisés, comme Kilo code, hermes-agent, openclaw, etc.
 
-| **Capacité** | Agent unique traditionnel | Workflow multi-fenêtres | Claude Code Agent Team | openteams |
-|--|--|--|--|--|
-| **Parallélisme**| ❌ Non, uniquement séquentiel | 🟡 Partiel, manuel | ✅ Oui, sous-agents Claude | ✅ Oui, automatique |
-| **Contexte partagé** | ❌ Non | ❌ Non, copier-coller requis | 🟡 Partiel, contextes de sous-agents séparés | ✅ Oui, toujours synchronisé |
-| **Collaboration multi-modèles** | ❌ Non | 🟡 Partiel, changement manuel | ❌ Non, Claude uniquement | ✅ Oui, Claude + Gemini + Codex + autres |
-| **Relais entre Agents** | ❌ Non | ❌ Non, orchestration manuelle | 🟡 Partiel, délégation dans Claude | ✅ Oui, `@mentions` directs |
-| **Membres IA prédéfinis** | ❌ Non | ❌ Non | ❌ Non | ✅ Oui, 160+ membres |
-| **Gestion de l'équipe** | ❌ Non | ❌ Non | ❌ Non | ✅ Oui, règles d'équipe personnalisables |
-| **Votre effort** | 🔴 Élevé | 🔴 Très élevé | 🟠 Moyen | 🟢 Faible |
+***Vision : transformer la consommation de tokens en productivité réelle.***
 
----
+Vous avez une demande de fonctionnalité ou souhaitez contribuer à l'orientation du projet ? [Ouvrez une discussion](https://github.com/openteams-lab/openteams/discussions).
+
+## Fonctionnalités clés
+
+| Fonctionnalité | Ce que cela signifie |
+| --- | --- |
+| Employés IA et équipes IA | Transformez les tokens en productivité réelle. Chaque employé IA ou équipe possède une expertise de domaine qui transforme les modèles généralistes en spécialistes prêts à livrer du travail, pas seulement à générer du texte. |
+| Workspace multi-agent | Faites entrer plusieurs agents IA dans une même session partagée au lieu de jongler entre des fenêtres séparées. |
+| Contexte partagé | Les agents travaillent à partir de la même conversation et du même contexte projet. |
+| Free Chat | Utilisez `@` pour une collaboration directe et légère avec les agents. |
+| Mode Workflow | Convertissez les tâches complexes en étapes structurées, dépendances, revues, relances et acceptation. |
+| Exécution visible | Voyez ce que fait chaque agent et où le travail est bloqué. |
+| Revue et relance | Relisez une étape, relancez la bonne tâche et évitez de redémarrer tout le projet. |
+| Artefacts et traces | Conservez les logs, diffs, transcriptions et artefacts générés attachés au travail. |
+| Exécution locale dans le workspace | Les agents travaillent sur votre workspace configuré, avec les enregistrements d'exécution conservés sous `.openteams/`. |
+
+## À qui cela s'adresse
+
+openteams s'adresse à :
+
+- des développeurs qui utilisent déjà plusieurs agents de code
+- des builders indépendants qui veulent plus de levier sans plus de coordination manuelle
+- de petites équipes d'ingénierie qui adoptent des workflows AI-first
+- des leads techniques qui ont besoin d'exécutions d'agents relisibles et répétables
+- des équipes qui veulent à la fois un chat léger et une orchestration de workflow structurée
+
+Ce n'est pas seulement un endroit pour rassembler plus d'agents. C'est une façon de transformer des agents en véritable équipe de travail.
+
+## Cas d'usage courants
+
+Vous tapez : « Ajouter la synchronisation des issues GitHub au workspace. »
+
+
+1. **Le lead agent clarifie les exigences :** il demande le sens de synchronisation (unidirectionnel ou bidirectionnel ?), la gestion des conflits (ignorer, écraser ou journaliser ?) et les champs d'issue à mapper. Vous confirmez : pull unidirectionnel, conflits journalisés, mapping title/body/labels/status.
+2. **Le lead agent conçoit l'approche et construit le plan d'exécution :** le plan montre 5 étapes : `Backend: OAuth + GitHub API` → `Backend: Sync Engine` → `Frontend: Sync Status UI` → `Integration Tests` → `Final Review`. Chaque étape a un périmètre clair, un agent assigné et des critères d'acceptation.
+3. **Vous relisez et approuvez le plan :** vous pouvez ajuster les étapes, réordonner les dépendances ou réassigner les agents avant que le moindre code ne s'exécute.
+4. **Les agents exécutent, vous observez la progression en temps réel :** `Backend: OAuth` s'exécute d'abord. Une fois terminé, `Sync Engine` et `Frontend: Sync Status UI` démarrent en parallèle. Chaque étape affiche son statut, son diff et ses logs sur le graphe de workflow.
+5. **Vous relisez et approuvez chaque étape terminée :** `Backend: OAuth` se termine. Vous inspectez le diff, voyez la logique de rafraîchissement du token et approuvez. Les étapes suivantes continuent.
+6. **Une étape échoue, vous ne relancez que cette étape :** `Integration Tests` échoue parce que le moteur de sync renvoie des timestamps bruts au lieu du format ISO. Vous consultez le log d'erreur et relancez uniquement l'étape `Integration Tests`. Le reste du workflow reste intact.
+7. **Revue finale et acceptation :** toutes les étapes passent. Vous relisez le diff complet, les artefacts et les résultats de test, puis acceptez.
+8. **Suivi via Free Chat :** deux jours plus tard, un utilisateur signale que le badge de statut de sync clignote pendant le polling. Vous ouvrez Free Chat : `@Frontend Agent the sync status badge flickers when polling — debounce the state update`. Corrigé en un tour, sans workflow.
 
 ## Stack technique
 
 | Couche | Technologie |
-|-------|-----------|
-| Frontend | React + TypeScript + Vite + Tailwind CSS |
+| --- | --- |
+| Frontend | React, TypeScript, Vite, Tailwind CSS |
 | Backend | Rust |
 | Desktop | Tauri |
+| Database | SQLx-managed relational schema |
+| Workflow UI | React Flow |
 
 ## Développement local
 
-#### Mac/Linux
+### Prérequis
+
+- **Rust** >= 1.75
+- **Node.js** >= 18
+- **pnpm** >= 8
+
+### Mac/Linux
 
 ```bash
-# 1. Cloner le dépôt
+# Clone the repository
 git clone https://github.com/openteams-lab/openteams.git
 cd openteams
-
-# 2. Installer les dépendances
 pnpm i
-
-# 3. Lancer le serveur de développement (backend Rust + frontend React)
 pnpm run dev
-
-# 4. Compiler le frontend
+# build
 pnpm --filter frontend build
-
-# 5. Compiler l'application desktop
 pnpm desktop:build
 ```
 
-#### Windows (PowerShell) : démarrer le backend et le frontend séparément
+### Windows (PowerShell) : démarrer le backend et le frontend séparément
 
-`pnpm run dev` ne fonctionne pas dans Windows PowerShell. Utilisez les commandes ci-dessous pour démarrer le backend et le frontend séparément.
+`pnpm run dev` ne peut pas s'exécuter dans Windows PowerShell. Utilisez les commandes suivantes pour lancer séparément le backend et le frontend.
 
-```bash
-# 1. Cloner le dépôt
+```powershell
 git clone https://github.com/openteams-lab/openteams.git
 cd openteams
-
-# 2. Installer les dépendances
 pnpm i
-
-# 3. Générer les types TypeScript
 pnpm run generate-types
-
-# 4. Exécuter les migrations de base de données
 pnpm run prepare-db
 ```
 
@@ -225,93 +243,49 @@ cargo run --bin server
 **Terminal B (frontend)**
 
 ```powershell
-$env:FRONTEND_PORT = <port frontend généré depuis le terminal A>
-$env:BACKEND_PORT = <port backend généré depuis le terminal A>
+$env:FRONTEND_PORT = <frontend port generated from terminal A>
+$env:BACKEND_PORT = <backend port generated from terminal A>
 cd frontend
 pnpm dev -- --port $env:FRONTEND_PORT --host
 ```
 
 Ouvrez le frontend à `http://localhost:<FRONTEND_PORT>` (exemple : `http://localhost:3001`).
 
-#### Compiler `openteams-cli` en local
+### Compiler `openteams-cli` localement
 
-Si vous devez compiler le binaire local `openteams-cli` au lieu d'utiliser la version intégrée ou publiée, utilisez les commandes suivantes.
+Utilisez les commandes suivantes si vous devez compiler le binaire local `openteams-cli` au lieu d'utiliser la version intégrée ou publiée.
 Les artefacts de build seront placés dans le répertoire binaries.
 
 ```bash
-# Depuis la racine du dépôt
+# From the repository root
 bun run ./scripts/build-openteams-cli.ts
 ```
 
-## Notes de version et feuille de route
-
-### V0.2
-
-- [x] Chat multi-Agent avec contexte partagé
-- [x] Exécution parallèle des Agents
-- [x] `@mention` entre Agents et collaboration autonome
-- [x] Prise en charge de 10 runtimes d'Agents de code (Claude Code, Gemini CLI, Codex, Qwen Code, Amp, Cursor Agent, Copilot, Droid, Kimi Code, OpenCode)
-- [x] Applications desktop (Windows, macOS, Linux)
-- [x] Application web utilisable via npx
-- [x] Support multilingue (EN, ZH, JA, KO, FR, ES)
-
-### V0.3
-- [x] Refonte complète de l'interface frontend
-- [x] 160+ membres IA intégrés
-- [x] 8 préréglages d'équipes IA intégrés
-- [x] Configuration des règles d'équipe
-- [x] 1000+ compétences intégrées
-- [x] Exécution entièrement locale avec isolation de l'espace de travail
-- [x] Redéfinition du protocole d'entrée
-
-### Feuille de route
-- [x] Backend Code Agent optimisé pour les usages OpenTeams —— v0.3.7
-- [x] Développement de plusieurs palettes frontend —— v0.3.11
-- [ ] Mise en place d'un framework de collaboration d'équipe à haute efficacité
-- [ ] Intégration de plus d'Agents (Kilo Code, OpenClaw, etc.)
-- [ ] Ajout de davantage d'équipes IA prêtes à l'emploi
-- [ ] Ajout de compétences plus puissantes
-- [ ] Proposition d'une version hautement optimisée et personnalisée
-
-
 ## Contribution
 
-Les contributions sont les bienvenues. Consultez [Issues](https://github.com/StarterraAI/OpenTeams/issues) pour voir ce qui est attendu, ou ouvrez une [Discussion](https://github.com/StarterraAI/OpenTeams/discussions).
+Les contributions sont les bienvenues. Voici comment commencer :
 
-1. Fork -> créer une branche feature -> ouvrir une PR
-2. Merci d'ouvrir une issue avant les changements importants
-3. Merci de respecter notre [Code of Conduct](../CODE_OF_CONDUCT.md)
-
-### Formatage du code
-
-Avant d'envoyer une PR, assurez-vous que le code est correctement formaté.
+1. **Trouver une issue** — Consultez les [Good First Issues](https://github.com/openteams-lab/openteams/labels/good%20first%20issue) pour des tâches accessibles aux débutants, ou parcourez les issues ouvertes.
+2. **Discuter avant de construire** — Avant d'ouvrir une grosse pull request, ouvrez une issue ou une discussion afin d'aligner la direction.
+3. **Respecter le style de code** — Exécutez ce qui suit avant de soumettre :
 
 ```bash
-# Formater frontend et backend
 pnpm run format
-
-# Vérifier le format sans modifier les fichiers
-pnpm run format:check
-
-# Formater uniquement le frontend
-pnpm run frontend:format
-
-# Formater uniquement le backend (Rust)
-pnpm run backend:format
+pnpm run check
+pnpm run lint
 ```
 
-**Remarque :** la CI échouera si le formatage du code n'est pas correct. Exécutez toujours `pnpm run format:check` avant de pousser.
+4. **Soumettre une PR** — Décrivez ce que vous avez changé et pourquoi. Liez l'issue associée le cas échéant.
+
+Consultez [CONTRIBUTING.md](../CONTRIBUTING.md) pour le guide complet.
 
 ## Communauté
 
-| | |
-|--|--|
-| **Signalement de bugs** | [GitHub Issues](https://github.com/openteams-lab/openteams/issues) |
-| **Discussions** | [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions) |
-| **Chat communautaire** | [Discord](https://discord.gg/MbgNFJeWDc) |
+- [GitHub Issues](https://github.com/openteams-lab/openteams/issues) : bugs et demandes de fonctionnalités
+- [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions) : idées produit et questions
+- [Discord](https://discord.gg/openteams) : chat communautaire
+- QQ:
 
-## Remerciements
+## Licence
 
-Ce projet s'appuie sur [Vibe Kanban](https://www.vibekanban.com/) ; merci à leur équipe pour cette excellente base open source.
-
-Merci également à [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) pour avoir contribué à structurer l'écosystème de compétences intégré, ainsi qu'à [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) pour l'inspiration autour de la conception des rôles d'Agent et de la composition d'équipe.
+Apache-2.0

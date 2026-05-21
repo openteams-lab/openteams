@@ -13,8 +13,6 @@ import {
 const dedupCache = new Map<string, number>();
 const DEDUP_INTERVAL_MS = 5000;
 const DEDUP_EVENT_NAMES: ReadonlySet<WorkflowEventName> = new Set([
-  'engagement.workflow_card_opened',
-  'engagement.transcript_opened',
   'engagement.diff_viewed',
 ]);
 

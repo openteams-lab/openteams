@@ -1,11 +1,15 @@
 <div align="center">
-  <img src="../frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="200">
+  <img src="../frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="100">
 </div>
 
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 10px; margin-bottom: 10px;">
-  
-  <p><strong>让 Agent 以一个团队的方式运行，在 AI 时代成倍提升你的效率。</strong></p>
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="200" style="margin-top: 10px; margin-bottom: 10px;">
+
+  <h5>携AI之师，造世间万物</h5>
+
+  <p>
+    openteams 是一款开源的多智能体协作应用：你可以在这里组建AI团队、运行本地编程智能体，并在同一个上下文中通过聊天或结构化工作流来完成工作。
+  </p>
 
   <p>
     <a href="https://www.npmjs.com/package/openteams-web"><img alt="npm" src="https://img.shields.io/npm/v/openteams-web?style=flat-square" /></a>
@@ -32,26 +36,95 @@
 </div>
 
 ---
+![](images/hero.mp4)
 
-![OpenTeams Demo](images/demo.gif)
+## 什么是 openteams
 
-**一分钟快速上手指南**
+**openteams** 是一款开源的多智能体协作应用。它支持把 Claude Code、Codex、Gemini CLI 等多个 AI 编程智能体带入同一个共享会话，让它们可以交流、共享上下文，并像团队一样协同工作。你可以通过轻量的自由聊天模式与智能体进行对话式协作，也可以通过结构化的工作流图表来编排复杂任务，做到计划可视化、任务级控制和可追溯审查等。所有内容都在你自己的本地工作区中运行，无需担心隐私问题。
 
-1. 导入一个预设团队，并为每位成员选择基础 Agent。
-2. 为团队中的每位成员设置工作区。
-3. 使用 `@member` 向指定成员发送消息。
+## 为什么选择 openteams
 
----
-## 🔥 *最新动态：*
-### 功能预览
-在 v0.4.0 中，我们将引入一次重大更新：
-- 现状：当前基于 @mention 的自由协作模式过于开放。由于 Agent 输出天然存在不确定性，协作过程容易不稳定，协作链也可能在某些节点断裂。
-- 改进：我们希望引入工作流模式来提升协作效率。该模式采用类似 Claude Agent Teams 的中心化通信架构：每个任务都是一个工作流节点，所有节点共同组成任务流 DAG，并由独立调度器管理工作流状态流转。对于复杂任务，单轮规划可能无法完全满足需求，因此工作流需要支持第二轮甚至第三轮迭代。为此，工作流会提供可配置的迭代次数，并支持查看迭代历史。
-- 我们相信这次改动会显著提升 OpenTeams 的实用性，敬请期待~
+AI 智能体已经越来越擅长规划、编码、审查和测试。但更多智能体输出，并不意味着会自动变成真正交付的工作。
 
-<img width="1100" height="546" alt="Image" src="https://github.com/user-attachments/assets/be065bc4-f736-47a8-a989-05e5142264f8" />
+**管理多个 Agent 令人疲惫。** 你在终端之间反复切换，每换一个 Agent 都要重新交代背景，把上一个 Agent 的输出手动搬到下一个的提示词里，还要人肉合并相互矛盾的 diff。你的注意力在多个 Agent 的混乱切换中被消耗殆尽。
 
-### *重要更新*
+**Agent 的执行过程既看不见，也控不住。** 你让 Claude Code「把这个功能做完」，它跑了 15 分钟。你完全不知道它拆了哪些子任务、哪些跑通了、哪些被它悄悄跳过了。当前大多数编程 Agent 把复杂任务当作一次性的黑盒执行——执行前没有可见计划，执行中无法逐步审批或否决，失败了也没法只重试出问题的那一步。一旦出错，只能从头再来。
+
+**openteams** 同时解决这两个问题。所有Agent在同一个会话总**共享同一份上下文**，你再也不用反复在多个Agent中进行来回切换倒腾了。复杂任务会变成**可见、可控的工作流图表**——你可以在执行前审阅和调整计划，实时观察每个步骤的进展，并随时介入任意节点：批准、拒绝、重试或重新指派。
+
+> 真正的生产力杠杆不在于拥有更多 Agent，而在于用一份看得见的计划和一组控得住的步骤来编排指挥它们。
+
+## 快速开始
+### 安装
+#### npx
+
+```bash
+npx openteams-web
+```
+
+#### 桌面应用
+
+请从 GitHub Releases 下载适合你平台的最新版本。
+
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/openteams-lab/openteams/releases/latest)
+[![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest)
+
+### 配置提供商
+
+**openteams** 内置 openteams CLI 智能体。你可以在应用中通过 `menu->setting->provider config->add provider` 配置模型提供商。参考文档：
+
+⚙️ [提供商配置](https://doc.openteams-lab.com/advanced-usage/custom-provider)
+
+你也可以连接以下openteams支持的编程智能体：
+
+| Agent | 安装示例 |
+| --- | --- |
+| Claude Code | `npm i -g @anthropic-ai/claude-code` |
+| Gemini CLI | `npm i -g @google/gemini-cli` |
+| Codex | `npm i -g @openai/codex` |
+| Qwen Code | `npm i -g @qwen-code/qwen-code` |
+| OpenCode | `npm i -g opencode-ai` |
+
+📚 [更多智能体安装指南](https://doc.openteams-lab.com/getting-started)
+
+### 30 秒上手
+**前置条件：配置一个 API 服务提供商，或安装任意一个openteams支持的 Code Agent。**
+
+*第 1 步。* 创建一个群聊会话。添加一个或多个成员，并为每个成员分配模型和角色。
+
+*第 2 步。* 在自由聊天模式中，用 `@` 提及任意成员来发送消息或分配任务。
+
+*第 3 步。* 切换到工作流模式。与主agent讨论需求、细化方案，并生成执行计划。
+
+*第 4 步。* 启动执行，并在每个任务节点完成时审查结果。
+
+## 工作模式
+
+**openteams** 提供两种协作模式，因为不是所有任务都需要同样的结构化程度。可以类比 **Claude Code 的 Plan 与 Build 模式**，但这里是面向多 Agent 团队的：想让 Agent 自由探索讨论时用自由聊天模式，需要可靠、可预期的执行时用工作流模式。
+
+### 自由聊天模式
+
+在自由聊天模式中，你用 `@` 给任意 Agent 发送任务，Agent 之间也可以自由传递消息。协作规则由你定义的团队协议约束——谁负责什么、如何交接、遵循哪些标准。
+
+**自由聊天模式**适合小修复、快速审查，以及不值得启动完整工作流的探索性讨论。
+
+![](images/free_chat.png)
+
+### 工作流模式
+
+工作流模式专为复杂任务设计——当任务需要拆分为多个子任务，且你需要全程观察进度、在每一步保持可控执行时，它就是最佳选择。
+
+主 Agent 负责驱动规划阶段：澄清需求、设计方案、制定执行计划，并将任务分配给合适的 Agent。最终生成一张可视化的工作流图，包含步骤、依赖关系、审查节点、重试机制和验收点。
+
+![](images/openteams-workflow.png)
+
+工作流模式不会让 Agent 松散地串联运行，而是把工作转化为有状态的执行图。
+
+**注意：工作流模式会消耗更多 token。请确保你的 token 余额充足。**
+
+## 重要更新
+- **2026.05.20 (v0.4.4)**
+  - 工作流模式 beta 版
 - **2026.05.07 (v0.3.22)**
   - 支持一键将群聊会话中的成员保存为预设团队
 - **2026.04.14 (v0.3.15)**
@@ -61,155 +134,100 @@
   - 修复 openteams-cli 并发问题
 - **2026.04.02 (v0.3.10)**
   - 实现应用内版本更新
-  - 文档网站现已上线。
-- **2026.03.24 (v0.3.7)**: 
-  - 新增内置的 openteams-CLI Agent，不再依赖本地安装 Agent。
-  - 修复执行器中的内存泄漏问题。
----
+  - 文档网站已上线
 
-## 快速开始
+## 路线图
 
-### 方案 A：使用 npx 运行
-**推荐 Mac 和 Linux 使用这种安装方式。**
+openteams 正在积极开发中。接下来我们会朝这些方向推进：
 
-```bash
-# web
-npx openteams-web
-```
+- [ ] **专家型的AI员工** — 推出更多拥有专业领域知识，能解决专业问题的AI员工。
+- [ ] **高产出的AI团队** — 由高效的专家AI员工组成，可针对特定业务定制化生产工作流程，端到端将需求转换为产出结果。
+- [ ] **集成更多智能体** — 集成更多常用Agent，如Kilo code, hermes-agent, openclaw等。
 
-### 方案 B：下载桌面应用
+***愿景：把 token 消耗转化为真正的生产力。***
 
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/openteams-lab/openteams/releases/latest)
-[![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest)
+有功能建议，或想参与塑造产品方向？欢迎[发起讨论](https://github.com/openteams-lab/openteams/discussions)。
 
-### 环境要求
+## 核心功能
 
-**从 v0.3.7 开始，我们已内置 openteams-cli，因此不再需要安装 AI Agent。你可以前往“Settings -> Service Providers”页面配置你的 API。**
+| 功能 | 含义 |
+| --- | --- |
+| AI 员工与 AI 团队 | 把 token 直接转化为生产力。每个 AI 员工或团队都拥有特定领域的专业知识，能将通用模型提升为领域专家——不只是生成文本，而是真正产出可交付的工作成果。 |
+| 多智能体工作区 | 把多个 AI 智能体带入同一个共享会话，不再在多个窗口之间来回切换。 |
+| 共享上下文 | 智能体基于同一份对话和项目上下文工作。 |
+| 自由聊天模式 | 使用 `@` 进行直接、轻量的智能体协作。 |
+| 工作流模式 | 将复杂任务转换为结构化步骤、依赖、审查、重试和验收。 |
+| 可见执行 | 看到每个智能体正在做什么，以及工作卡在哪里。 |
+| 审查与重试 | 审查某一步的结果，精确重试失败的任务，无需重启整个项目。 |
+| 产物与轨迹 | 将日志、diff、转录和生成的产物附加到工作上。 |
+| 本地工作区执行 | 智能体在你配置的工作区中工作，运行记录保存在 `.openteams/` 下。 |
 
-⚙️ [查看模型供应商配置文档。](https://doc.openteams-lab.com/zh-Hans/advanced-usage/custom-provider)
+## 适合谁
 
-你也可以从支持的 Agent 列表中任选一个：
+openteams 适合：
 
-| Agent | 安装方式 |
-|-------|---------|
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm i -g @anthropic-ai/claude-code` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @google/gemini-cli` |
-| [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex` |
-| [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code` |
-| [OpenCode](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g opencode-ai` |
+- 已经在使用多个编程智能体的开发者
+- 希望获得更多杠杆、减少手动协调的独立构建者
+- 正在采用 AI-first 工作流的小型工程团队
+- 需要可审查、可重复智能体执行的技术负责人
+- 同时需要轻量聊天和结构化工作流编排的团队
 
-📚 [更多 Agent 安装指南](https://doc.openteams-lab.com/getting-started)
+它不只是一个收纳更多 Agent 的容器，而是把 Agent 变成真正能协作交付的工作团队。
 
----
+## 常见使用场景
 
-## 功能特性
+你输入：“给工作区增加 GitHub issue 同步功能。”
 
-| 功能 | 你将获得什么 |
-|--|--|
-| **支持的 Agent** | 支持 10 种编程 Agent 运行时，包括 `Claude Code`、`Gemini CLI`、`Codex`、`Qwen Code`、`Amp`、`Cursor Agent`、`Copilot`、`Droid`、`Kimi Code` 和 `OpenCode`。目前也正在集成更多 Agent。|
-| **共享群聊上下文** | 每位参与者都基于同一份对话历史工作，不必在多个窗口之间来回复制粘贴提示词。 |
-| **并行执行** | 多个 Agent 可以在同一个共享会话中同时处理同一项任务，不同 Agent 负责各自最擅长的部分。 |
-| **自主协作** | Agent 可以彼此 `@mention`、交接工作，并直接在聊天中协同。 |
-| **内置 AI 成员** | 开箱即用提供 160+ 内置 AI 成员，覆盖工程、营销、写作、研究和内容生产。 |
-| **内置 AI 团队预设** | 提供 8 个开箱即用的团队预设，适配常见工作流。 |
-| **团队协作准则** | 你可以定义谁负责主导、谁可以与谁沟通，以及协作应如何进行。按你的方式定制 AI 团队与团队准则。 |
-| **技能库** | 为 Agent 配备 1000+ 内置技能，并在需要时导入你自己的技能。 |
-| **完全本地执行** | Agent 直接在你的本地工作区运行，运行产物保存在该工作区内的 `.openteams/` 目录下，因此无需担心数据隐私。 |
 
-### 并行 Agent 执行
-
-*让多个 Agent 在同一个共享上下文中并行执行，以加快交付速度。*
-
-![OpenTeams parallel](images/parallel.gif)
-
-### 自主 Agent 协作
-
-*OpenTeams 允许 Agent 直接互相发送消息，而不强制固定工作流。如果你希望有更多结构，可以通过团队准则控制沟通方式、指定主导 Agent，或者让所有成员自由协作。沟通模式完全取决于你的使用场景。*
-
-![OpenTeams collaborate](images/collaborate.gif)
-
-### AI 成员
-
-*OpenTeams 内置 160+ AI 成员，覆盖工程、营销、写作、内容生产等多个领域。你可以自由组合成不同团队、按需自定义，并构建符合你工作方式的角色组合。我们也会持续扩充并优化这一成员库。*
-
-![OpenTeams members](images/members.gif)
-
-### AI 团队
-
-*OpenTeams 内置 8 个适用于常见工作流的团队预设，让你可以立即开始使用。我们建议你在创建团队时定义团队准则，以便让协作方式始终符合你的目标。*
-
-![OpenTeams team](images/team.gif)
-
-### 技能库
-
-*OpenTeams 内置 1000+ 技能，你可以将它们组合后分配给不同的 AI 成员。你也可以导入自己创建的技能，并直接应用到 Agent 身上。我们会继续扩展技能库，重点投入那些能够在真实生产环境中稳定发挥作用的能力。*
-
-![OpenTeams skills](images/skills.gif)
-
----
-
-## 为什么我们更强
-
-图例：✅ 完整支持 | 🟡 部分支持 | ❌ 不支持
-
-| **能力** | 传统单 Agent | 多窗口工作流 | Claude Code Agent Team | openteams |
-|--|--|--|--|--|
-| **并行能力**| ❌ 不支持，只能串行 | 🟡 部分支持，需手动操作 | ✅ 支持，Claude 子代理 | ✅ 支持，自动完成 |
-| **共享上下文** | ❌ 不支持 | ❌ 不支持，需要复制粘贴 | 🟡 部分支持，子代理上下文彼此分离 | ✅ 支持，始终同步 |
-| **多模型协作** | ❌ 不支持 | 🟡 部分支持，需手动切换 | ❌ 不支持，仅限 Claude | ✅ 支持，Claude + Gemini + Codex + 更多 |
-| **Agent 交接** | ❌ 不支持 | ❌ 不支持，需要你自己编排 | 🟡 部分支持，在 Claude 内部委派 | ✅ 支持，直接 `@mentions` |
-| **预定义 AI 成员** | ❌ 不支持 | ❌ 不支持 | ❌ 不支持 | ✅ 支持，160+ 成员 |
-| **团队管理** | ❌ 不支持 | ❌ 不支持 | ❌ 不支持 | ✅ 支持，自定义团队准则 |
-| **你的投入** | 🔴 高 | 🔴 非常高 | 🟠 中等 | 🟢 低 |
-
----
+1. **主 Agent 澄清需求：** 它会询问同步方向（单向还是双向？）、冲突处理方式（跳过、覆盖还是记录？），以及要映射哪些 issue 字段。你确认：单向拉取、记录冲突、映射 title/body/labels/status。
+2. **主 agent 设计方案并生成执行计划：** 计划显示 5 个步骤：`Backend: OAuth + GitHub API` → `Backend: Sync Engine` → `Frontend: Sync Status UI` → `Integration Tests` → `Final Review`。每一步都有明确范围、分配的智能体和验收标准。
+3. **你审查并批准计划：** 在任何代码运行前，你可以调整步骤、重排依赖或重新分配智能体。
+4. **智能体执行，你实时观察进度：** `Backend: OAuth` 先运行。完成后，`Sync Engine` 和 `Frontend: Sync Status UI` 并行启动。每个步骤都会在工作流图上显示状态、diff 和日志。
+5. **你审查并批准每个完成的步骤：** `Backend: OAuth` 完成后，你检查 diff，看到 token refresh 逻辑，然后批准。后续步骤继续推进。
+6. **某一步失败，你只重试该步骤：** `Integration Tests` 失败，因为同步引擎返回了原始时间戳而不是 ISO 格式。你查看错误日志，然后只重试 `Integration Tests` 这一步。其余工作流保持不变。
+7. **最终审查与验收：** 所有步骤通过。你审查完整 diff、产物和测试结果，然后接受。
+8. **通过自由聊天模式跟进：** 两天后，用户反馈同步状态徽标在轮询时闪烁。你打开自由聊天模式：`@Frontend Agent 的同步状态标志在轮询时会闪烁 —— 请对状态更新进行防抖处理。`。一轮修复完成，不需要启动工作流。
 
 ## 技术栈
 
-| 层级 | 技术 |
-|-------|-----------|
-| 前端 | React + TypeScript + Vite + Tailwind CSS |
+| 层 | 技术 |
+| --- | --- |
+| 前端 | React, TypeScript, Vite, Tailwind CSS |
 | 后端 | Rust |
 | 桌面端 | Tauri |
+| 数据库 | SQLx 管理的关系型 schema |
+| 工作流 UI | React Flow |
 
 ## 本地开发
 
-#### Mac/Linux
+### 前置条件
+
+- **Rust** >= 1.75
+- **Node.js** >= 18
+- **pnpm** >= 8
+
+### Mac/Linux
 
 ```bash
-# 1. 克隆仓库
+# Clone the repository
 git clone https://github.com/openteams-lab/openteams.git
 cd openteams
-
-# 2. 安装依赖
 pnpm i
-
-# 3. 启动开发服务器（运行 Rust 后端 + React 前端）
 pnpm run dev
-
-# 4. 构建前端
+# build
 pnpm --filter frontend build
-
-# 5. 构建桌面应用
 pnpm desktop:build
 ```
 
-#### Windows（PowerShell）：分别启动后端和前端
+### Windows (PowerShell)：分别启动后端和前端
 
 `pnpm run dev` 无法在 Windows PowerShell 中运行。请使用以下命令分别启动后端和前端。
 
-```bash
-# 1. 克隆仓库
+```powershell
 git clone https://github.com/openteams-lab/openteams.git
 cd openteams
-
-# 2. 安装依赖
 pnpm i
-
-# 3. 生成 TypeScript 类型
 pnpm run generate-types
-
-# 4. 运行数据库迁移
 pnpm run prepare-db
 ```
 
@@ -225,93 +243,49 @@ cargo run --bin server
 **终端 B（前端）**
 
 ```powershell
-$env:FRONTEND_PORT = <终端 A 生成的 frontend 端口>
-$env:BACKEND_PORT = <终端 A 生成的 backend 端口>
+$env:FRONTEND_PORT = <terminal A generated frontend port>
+$env:BACKEND_PORT = <terminal A generated backend port>
 cd frontend
 pnpm dev -- --port $env:FRONTEND_PORT --host
 ```
 
 在 `http://localhost:<FRONTEND_PORT>` 打开前端页面（例如：`http://localhost:3001`）。
 
-#### 在本地构建 `openteams-cli`
+### 本地构建 `openteams-cli`
 
-如果你需要编译本地的 `openteams-cli` 二进制，而不是使用内置版本或已发布的构建，请使用以下命令。
+如果你需要编译本地 `openteams-cli` 二进制文件，而不是使用内置或已发布的构建，请使用以下命令。
 构建产物会放在 binaries 目录中。
 
 ```bash
-# 在仓库根目录执行
+# From the repository root
 bun run ./scripts/build-openteams-cli.ts
 ```
 
-## 发布说明与路线图
-
-### V0.2
-
-- [x] 支持共享上下文的多 Agent 群聊
-- [x] 并行 Agent 执行
-- [x] Agent `@mention` 与自主协作
-- [x] 支持 10 种编程 Agent 运行时（Claude Code、Gemini CLI、Codex、Qwen Code、Amp、Cursor Agent、Copilot、Droid、Kimi Code、OpenCode）
-- [x] 桌面应用（Windows、macOS、Linux）
-- [x] 可通过 npx 运行的 Web 应用
-- [x] 多语言支持（EN、ZH、JA、KO、FR、ES）
-
-### V0.3
-- [x] 前端界面已完成全面重构。
-- [x] 160+ 内置 AI 成员
-- [x] 8 个内置 AI 团队预设
-- [x] 团队规则配置
-- [x] 1000+ 内置技能
-- [x] 完全本地执行与工作区隔离
-- [x] 重新定义输入协议
-
-### 路线图
-- [x] 为 OpenTeams 使用场景优化 Code Agent 后端 —— v0.3.7
-- [x] 开发多套前端配色方案 —— v0.3.11
-- [ ] 建立高效率团队协作框架
-- [ ] 集成更多 Agent（Kilo Code、OpenClaw 等）
-- [ ] 提供更多强大的开箱即用 AI 团队
-- [ ] 增加更强大的技能
-- [ ] 提供高度优化的定制版本
-
-
 ## 贡献
 
-欢迎贡献！你可以在 [Issues](https://github.com/StarterraAI/OpenTeams/issues) 查看当前需要的内容，或发起 [Discussion](https://github.com/StarterraAI/OpenTeams/discussions)。
+欢迎贡献。你可以这样开始：
 
-1. Fork -> 新建 feature 分支 -> 提交 PR
-2. 大型改动请先开 issue 沟通
-3. 请遵守我们的 [Code of Conduct](../CODE_OF_CONDUCT.md)
-
-### 代码格式化
-
-提交 PR 前，请确保代码已正确格式化：
+1. **寻找 issue** — 查看 [Good First Issues](https://github.com/openteams-lab/openteams/labels/good%20first%20issue) 寻找适合新手的任务，或浏览开放 issue。
+2. **开发前先讨论** — 在提交大型 PR 前，请先开启 issue 或 discussion，以便对齐方向。
+3. **遵循代码风格** — 提交前请运行：
 
 ```bash
-# 同时格式化前端和后端
 pnpm run format
-
-# 检查格式但不修改文件
-pnpm run format:check
-
-# 仅格式化前端
-pnpm run frontend:format
-
-# 仅格式化后端（Rust）
-pnpm run backend:format
+pnpm run check
+pnpm run lint
 ```
 
-**注意：** 如果代码格式不正确，CI 会失败。推送前请始终运行 `pnpm run format:check`。
+4. **提交 PR** — 说明你改了什么以及为什么改。如有相关 issue，请一并链接。
+
+完整指南请见 [CONTRIBUTING.md](../CONTRIBUTING.md)。
 
 ## 社区
 
-| | |
-|--|--|
-| **Bug 反馈** | [GitHub Issues](https://github.com/StarterraAI/OpenTeams/issues) |
-| **讨论交流** | [GitHub Discussions](https://github.com/StarterraAI/OpenTeams/discussions) |
-| **社区聊天** | [Discord](https://discord.gg/MbgNFJeWDc) |
+- [GitHub Issues](https://github.com/openteams-lab/openteams/issues)：bug 报告和功能请求
+- [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions)：产品想法和问题
+- [Discord](https://discord.gg/openteams)：社区聊天
+- QQ:
 
-## 致谢
+## 许可证
 
-本项目构建于 [Vibe Kanban](https://www.vibekanban.com/) 之上，感谢他们的团队提供了优秀的开源基础。
-
-同时也感谢 [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) 帮助塑造了内置技能生态，以及 [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) 在 Agent 角色设计和团队组合方面带来的启发。
+Apache-2.0

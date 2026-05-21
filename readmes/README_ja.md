@@ -1,11 +1,15 @@
 <div align="center">
-  <img src="../frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="200">
+  <img src="../frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="100">
 </div>
 
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="320" style="margin-top: 10px; margin-bottom: 10px;">
-  
-  <p><strong>エージェントを1つのチームとして動かし、AI時代の効率を何倍にも高めましょう。</strong></p>
+  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="200" style="margin-top: 10px; margin-bottom: 10px;">
+
+  <h5>あなたの AI チームと一緒に構築する</h5>
+
+  <p>
+    openteams は、マルチエージェント協業のためのオープンソースワークスペースです。AI チームを編成し、ローカルのコーディングエージェントを実行し、チャットまたは構造化されたワークフローで作業を一箇所から調整できます。
+  </p>
 
   <p>
     <a href="https://www.npmjs.com/package/openteams-web"><img alt="npm" src="https://img.shields.io/npm/v/openteams-web?style=flat-square" /></a>
@@ -32,188 +36,202 @@
 </div>
 
 ---
+![複数の AI エージェント、共有会話、ワークフローグラフ、レビューと成果物パネルを表示する OpenTeams の製品 UI。](images/hero.mp4)
 
-![OpenTeams Demo](images/demo.gif)
+## openteams とは
 
-**1分でわかるクイックスタートガイド**
+**openteams** は、オープンソースのマルチエージェント協業ワークスペースです。Claude Code、Codex、Gemini CLI など複数の AI コーディングエージェントを一つの共有セッションに集め、会話し、コンテキストを共有し、チームとして一緒に作業できるようにします。軽量な Free Chat でエージェントと協業することも、見える計画、ステップ単位の制御、組み込みレビューを備えた構造化 Workflows で複雑なタスクを編成することもできます。すべてはあなた自身のローカルワークスペースで実行されます。
 
-1. プリセットチームをインポートし、各メンバーのベース Agent を選びます。
-2. チーム内の各メンバーにワークスペースを設定します。
-3. `@member` を使って特定のメンバーにメッセージを送ります。
+## openteams が必要な理由
 
----
-## 🔥 *最新情報：*
-### 機能プレビュー
-v0.4.0 では、大きなアップデートを導入する予定です。
-- 現状: 現在の @mention ベースの自由な協調モデルは自由度が高すぎます。Agent の出力には本質的に不確実性があるため、協調が不安定になりやすく、途中で協調チェーンが途切れることがあります。
-- 改善: 協調効率を高めるために、ワークフローモードを導入したいと考えています。このモードでは、Claude の Agent Teams に似た集中型コミュニケーション構成を採用します。各タスクはワークフローノードとなり、すべてのノードがタスクフロー DAG を構成し、独立したスケジューラーがワークフローの状態遷移を管理します。複雑なタスクでは、1 回の計画だけでは要件を完全に満たせない場合があるため、ワークフローは 2 回目、場合によっては 3 回目の反復にも対応する必要があります。そのため、反復回数を設定でき、反復履歴も確認できるようにします。
-- この変更により OpenTeams の実用性は大きく向上すると考えています。ぜひご期待ください。
+AI エージェントは、計画、コーディング、レビュー、テストにおいてますます強力になっています。しかし、エージェントの出力が増えたからといって、それが自動的に出荷できる成果になるわけではありません。
 
-<img width="1100" height="546" alt="Image" src="https://github.com/user-attachments/assets/be065bc4-f736-47a8-a989-05e5142264f8" />
+**複数のエージェントを管理するのは大変です。** ターミナルを行き来し、新しいエージェントごとにコンテキストを説明し直し、あるプロンプトの出力を次のプロンプトへコピーし、衝突する diff を調整する必要があります。複数エージェントをさばく混乱に、あなたの集中力が削られていきます。
 
-### *重要アップデート*
-- **2026.05.07 (v0.3.22)**
-  - グループチャットセッションのメンバーをワンクリックでプリセットチームとして保存できるようになりました
-- **2026.04.14 (v0.3.15)**
-  - ワークスペースのファイル変更ビューアー
-- **2026.04.06 (v0.3.12)**
-  - ダーク UI モードを有効化
-  - openteams-cli の並行実行に関する問題を修正
-- **2026.04.02 (v0.3.10)**
-  - アプリ内アップデートを実装
-  - ドキュメントサイトを公開
-- **2026.03.24 (v0.3.7)**: 
-  - 内蔵の openteams-CLI Agent を追加し、ローカルに Agent をインストールする必要をなくしました。
-  - エグゼキューターのメモリリーク問題を修正しました。
----
+**エージェントの実行は見えにくく、制御しにくいものです。** Claude Code に「この機能を作って」と指示すると、15 分走り続けます。その間、どのサブタスクを試したのか、どれが通ったのか、どれを黙って諦めたのかは分かりません。現在の多くのコーディングエージェントは、複雑なタスクを一つの巨大な実行として扱います。実行前に見える計画はなく、途中で個別ステップを承認または却下する方法もなく、失敗したステップだけを再試行する方法もありません。何かが壊れたら、最初からやり直すことになります。
+
+**openteams** は、この二つの問題を解決します。エージェントは**同じコンテキストを共有**するため、引き継ぎで作業が失われません。複雑なタスクは**見える、制御できるワークフロー**になります。実行前に計画を調整し、各ステップの実行を見守り、任意のノードで承認、却下、再試行、リダイレクトできます。
+
+> 本当のレバレッジは、エージェントの数を増やすことではありません。見える複雑な計画と、制御できるステップによって、それらをオーケストレーションすることです。
 
 ## クイックスタート
-
-### オプション A: npx で実行
-**このインストール方法は Mac と Linux におすすめです。**
+### インストール
+#### npx
 
 ```bash
-# web
 npx openteams-web
 ```
 
-### オプション B: デスクトップアプリをダウンロード
+#### デスクトップアプリ
+
+GitHub Releases から、お使いのプラットフォーム向けの最新リリースをダウンロードしてください。
 
 [![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/openteams-lab/openteams/releases/latest)
 [![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest)
 
-### 動作要件
+### プロバイダー設定
 
-**v0.3.7 以降は openteams-cli が内蔵されているため、AI Agent を別途インストールする必要はありません。「Settings -> Service Providers」ページで API を設定できます。**
+**openteams** には、組み込みの openteams CLI エージェントが含まれています。アプリ内の `menu->setting->provider config->add provider` からモデルプロバイダーを設定できます。
 
-⚙️ [プロバイダー設定のドキュメントを参照してください。](https://doc.openteams-lab.com/ja/advanced-usage/custom-provider)
+⚙️ [プロバイダー設定](https://doc.openteams-lab.com/advanced-usage/custom-provider)
 
-また、対応 Agent の一覧から好きなものを選んで使うこともできます。
+次のような対応コーディングエージェントも接続できます。
 
-| Agent | インストール方法 |
-|-------|---------|
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm i -g @anthropic-ai/claude-code` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @google/gemini-cli` |
-| [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex` |
-| [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g @qwen-code/qwen-code` |
-| [OpenCode](https://qwenlm.github.io/qwen-code-docs/en/users/overview/) | `npm i -g opencode-ai` |
+| Agent | インストール例 |
+| --- | --- |
+| Claude Code | `npm i -g @anthropic-ai/claude-code` |
+| Gemini CLI | `npm i -g @google/gemini-cli` |
+| Codex | `npm i -g @openai/codex` |
+| Qwen Code | `npm i -g @qwen-code/qwen-code` |
+| OpenCode | `npm i -g opencode-ai` |
 
-📚 [その他の Agent インストールガイド](https://doc.openteams-lab.com/getting-started)
+📚 [その他のエージェントインストールガイド](https://doc.openteams-lab.com/getting-started)
 
----
+### 30 秒で始める
+**前提条件: API サービスプロバイダーを設定するか、対応している Code Agent をインストールしてください。**
 
-## 機能
+*step 1.* グループチャットセッションを作成します。1 人以上のメンバーを追加し、それぞれにモデルと役割を割り当てます。
 
-| 機能 | 得られるもの |
-|--|--|
-| **対応 Agent** | `Claude Code`、`Gemini CLI`、`Codex`、`Qwen Code`、`Amp`、`Cursor Agent`、`Copilot`、`Droid`、`Kimi Code`、`OpenCode` を含む 10 種類のコーディング Agent ランタイムに対応しています。さらに多くの Agent も統合中です。|
-| **共有グループチャットコンテキスト** | すべての参加者が同じ会話履歴をもとに作業できるため、別ウィンドウ間でプロンプトをコピーして回す必要がありません。 |
-| **並列実行** | 複数の Agent が同じ共有セッションの中で同時に同じタスクへ取り組めます。各 Agent が得意な部分を担当します。 |
-| **自律的な協調** | Agent 同士が `@mention` し、作業を引き継ぎ、チャットの中で直接連携できます。 |
-| **内蔵 AI メンバー** | エンジニアリング、マーケティング、ライティング、リサーチ、コンテンツ制作を含む 160+ の内蔵 AI メンバーをすぐに利用できます。 |
-| **内蔵 AI チームプリセット** | 一般的なワークフロー向けに、すぐ使える 8 つのチームプリセットを用意しています。 |
-| **チーム運用ガイドライン** | 誰が主導するか、誰と誰が会話できるか、どのように協力を進めるかを定義できます。自分のやり方に合わせて AI チームとガイドラインを調整できます。 |
-| **スキルライブラリ** | 1000+ の内蔵スキルを Agent に割り当てられ、必要に応じて自作スキルも取り込めます。 |
-| **完全ローカル実行** | Agent はあなたのローカルワークスペース上で動作し、実行成果物はそのワークスペース内の `.openteams/` に保存されます。データプライバシーを心配する必要はありません。 |
+*step 2.* Free Chat モードで、`@` を使って任意のメンバーにメッセージまたはタスクを送ります。
 
-### 並列 Agent 実行
+*step 3.* Workflow モードに切り替えます。lead agent と要件を話し合い、解決策を調整し、実行計画を生成します。
 
-*複数の Agent を同じ共有コンテキストで並列に動かし、作業の完了をより速くします。*
+*step 4.* 実行を開始し、各タスクノードが完了するたびに結果をレビューします。
 
-![OpenTeams parallel](images/parallel.gif)
+## 作業モード
 
-### 自律的な Agent 協調
+**openteams** は二つの協業モードをサポートします。すべてのタスクが同じレベルの構造を必要とするわけではないからです。これは **Claude Code の Plan モードと Build モード**をマルチエージェントチーム向けにしたもの、と考えると分かりやすいでしょう。自由に探索や議論をしたいときは自由協業を、信頼できる予測可能な実行が必要なときは構造化ワークフローを選びます。
 
-*OpenTeams では、固定ワークフローを強制することなく、Agent 同士が直接メッセージを送り合えます。より構造化したい場合は、チームガイドラインを追加してコミュニケーションを制御したり、リード Agent を指定したり、全員を自由に協調させたりできます。コミュニケーションの形は、あなたのユースケース次第です。*
+### Free Chat
 
-![OpenTeams collaborate](images/collaborate.gif)
+自由チャットモードでは、`@` で任意のエージェントにタスクを送り、エージェント同士も自由にメッセージをやり取りできます。協業は、あなたが定義するチームプロトコルによって管理されます。誰が何を担当するか、どのように引き継ぐか、どの基準に従うかを定められます。
 
-### AI メンバー
+**free chat mode** は、小さな修正、簡単なレビュー、完全なワークフローを使うほどではない探索的な議論に向いています。
 
-*OpenTeams には、エンジニアリング、マーケティング、ライティング、コンテンツ制作など、160+ の内蔵 AI メンバーが用意されています。自由に組み合わせてチームを作り、必要に応じて調整し、自分の働き方に合った役割構成を組み立てられます。今後もこのラインナップを継続的に拡充・改善していきます。*
+![](images/free_chat.png)
 
-![OpenTeams members](images/members.gif)
+### Workflow
 
-### AI チーム
+Workflow モードは、複雑なタスクをサブタスクに分解し、進捗を観察し、各ステップで実行を制御したい場合に向いています。
 
-*OpenTeams には、一般的なワークフロー向けの 8 つのチームプリセットが最初から含まれており、すぐに使い始められます。チームを作成する際には、協力の進め方があなたの目的に沿うよう、チームガイドラインを定義することをおすすめします。*
+Lead agent が計画フェーズを進めます。要件を明確にし、アプローチを設計し、実行計画を定義し、適切なエージェントにタスクを割り当てます。その結果、ステップ、依存関係、レビュー、再試行、受け入れポイントを持つ見えるワークフローが得られます。
 
-![OpenTeams team](images/team.gif)
+![](images/openteams-workflow.png)
 
-### スキルライブラリ
+エージェントを緩いチェーンで実行させるのではなく、**openteams** は作業を状態を持つ実行グラフに変換します。
 
-*OpenTeams には 1000+ のスキルが内蔵されており、さまざまな AI メンバーに組み合わせて割り当てられます。自分で作成したスキルをインポートして Agent に直接適用することもできます。スキルライブラリは、実運用でしっかり機能する能力を重視して今後も拡張していきます。*
+**注意: Workflow モードはより多くの token を消費します。token 残高が十分であることを確認してください。**
 
-![OpenTeams skills](images/skills.gif)
+## 主な更新
+- **2026.05.20 (v0.4.4)**
+  - Workflow モード beta 版
+- **2026.05.07 (v0.3.22)**
+  - グループチャットセッションのメンバーを、ワンクリックでプリセットチームとして保存できるようにしました
+- **2026.04.14 (v0.3.15)**
+  - Workspace File Change Viewer
+- **2026.04.06 (v0.3.12)**
+  - ダーク UI モードを有効化
+  - openteams-cli の並行処理の問題を修正
+- **2026.04.02 (v0.3.10)**
+  - アプリ内バージョン更新を実装
+  - ドキュメントサイトを公開
 
----
+## ロードマップ
 
-## なぜ OpenTeams が優れているのか
+openteams は活発に開発されています。今後は次の方向へ進んでいきます。
 
-凡例：✅ フルサポート | 🟡 一部サポート | ❌ 非対応
+- [ ] **専門性を持つ AI workers** — 専門領域の知識を持ち、専門的な課題を解決できる AI workers をさらに提供します。
+- [ ] **高いアウトプットを出す AI team** — 効率的な専門 AI workers で構成され、特定のビジネス向けに生産ワークフローをカスタマイズし、要件をエンドツーエンドで成果物へ変換します。
+- [ ] **より多くのエージェント統合** — Kilo code、hermes-agent、openclaw など、よく使われる Agent をさらに統合します。
 
-| **能力** | 従来の単一 Agent | マルチウィンドウ運用 | Claude Code Agent Team | openteams |
-|--|--|--|--|--|
-| **並列性**| ❌ 非対応、逐次実行のみ | 🟡 一部対応、手動 | ✅ 対応、Claude サブエージェント | ✅ 対応、自動 |
-| **共有コンテキスト** | ❌ 非対応 | ❌ 非対応、コピー＆ペーストが必要 | 🟡 一部対応、サブエージェントごとに分断 | ✅ 対応、常に同期 |
-| **マルチモデル協調** | ❌ 非対応 | 🟡 一部対応、手動切り替え | ❌ 非対応、Claude のみ | ✅ 対応、Claude + Gemini + Codex + その他 |
-| **Agent の引き継ぎ** | ❌ 非対応 | ❌ 非対応、自分でオーケストレーション | 🟡 一部対応、Claude 内で委譲 | ✅ 対応、直接 `@mentions` |
-| **定義済み AI メンバー** | ❌ 非対応 | ❌ 非対応 | ❌ 非対応 | ✅ 対応、160+ メンバー |
-| **チーム運用管理** | ❌ 非対応 | ❌ 非対応 | ❌ 非対応 | ✅ 対応、チームガイドラインをカスタマイズ |
-| **必要な手間** | 🔴 高い | 🔴 非常に高い | 🟠 中程度 | 🟢 低い |
+***ビジョン: token 消費を本当の生産性へ変える。***
 
----
+機能リクエストや方向性への提案がある場合は、[ディスカッションを開いてください](https://github.com/openteams-lab/openteams/discussions)。
+
+## コア機能
+
+| 機能 | 意味 |
+| --- | --- |
+| AI 従業員と AI チーム | token を本当の生産性へ変えます。各 AI 従業員やチームは分野固有の専門性を持ち、汎用モデルを専門家へ高めます。単にテキストを生成するのではなく、成果を出す準備ができています。 |
+| マルチエージェントワークスペース | 複数の AI エージェントを一つの共有セッションに集め、別々のウィンドウを行き来する必要をなくします。 |
+| 共有コンテキスト | エージェントは同じ会話とプロジェクトコンテキストをもとに作業します。 |
+| Free Chat | `@` を使って、直接かつ軽量にエージェントと協業できます。 |
+| Workflow モード | 複雑なタスクを、構造化されたステップ、依存関係、レビュー、再試行、受け入れに変換します。 |
+| 見える実行 | 各エージェントが何をしているか、どこで作業が止まっているかを確認できます。 |
+| レビューと再試行 | ステップをレビューし、必要なタスクだけを再試行し、プロジェクト全体のやり直しを避けます。 |
+| 成果物とトレース | ログ、diff、トランスクリプト、生成された成果物を作業に紐づけて保持します。 |
+| ローカルワークスペース実行 | エージェントは設定済みのワークスペースに対して作業し、実行記録は `.openteams/` 配下に保存されます。 |
+
+## 対象ユーザー
+
+openteams は次のような人やチームに向いています。
+
+- すでに複数のコーディングエージェントを使っている開発者
+- 手作業の調整を増やさず、より大きなレバレッジを得たい個人開発者
+- AI-first ワークフローを採用している小規模エンジニアリングチーム
+- レビュー可能で再現性のあるエージェント実行を必要とする技術リード
+- 軽量チャットと構造化ワークフロー編成の両方を求めるチーム
+
+これは単にエージェントを集める場所ではありません。エージェントを機能するチームに変える方法です。
+
+## よくあるユースケース
+
+あなたが「ワークスペースに GitHub issue 同期を追加して」と入力します。
+
+
+1. **Lead agent が要件を明確にします:** 同期方向（一方向か双方向か）、競合処理（スキップ、上書き、ログ記録）、マッピングする issue フィールドを質問します。あなたは、一方向 pull、競合はログ記録、title/body/labels/status をマッピング、と確認します。
+2. **Lead agent がアプローチを設計し、実行計画を作ります:** 計画には 5 つのステップが表示されます。`Backend: OAuth + GitHub API` → `Backend: Sync Engine` → `Frontend: Sync Status UI` → `Integration Tests` → `Final Review`。各ステップには明確な範囲、担当エージェント、受け入れ基準があります。
+3. **あなたが計画をレビューして承認します:** コードが実行される前に、ステップを調整し、依存関係を並べ替え、担当エージェントを変更できます。
+4. **エージェントが実行し、あなたは進捗をリアルタイムで確認します:** `Backend: OAuth` が最初に実行されます。完了すると、`Sync Engine` と `Frontend: Sync Status UI` が並列で開始されます。各ステップはワークフローグラフ上で状態、diff、ログを表示します。
+5. **完了した各ステップをレビューして承認します:** `Backend: OAuth` が完了します。diff を確認し、token refresh ロジックを見て承認します。次のステップが進みます。
+6. **ステップが失敗したら、そのステップだけを再試行します:** `Integration Tests` は、同期エンジンが ISO 形式ではなく生の timestamp を返したため失敗します。エラーログを確認し、`Integration Tests` ステップだけを再試行します。他のワークフローはそのままです。
+7. **最終レビューと受け入れ:** すべてのステップが通ります。全体の diff、成果物、テスト結果を確認して受け入れます。
+8. **Free Chat でフォローアップ:** 2 日後、ユーザーが同期ステータスバッジの点滅を報告します。Free Chat を開き、`@Frontend Agent the sync status badge flickers when polling — debounce the state update` と送ります。ワークフローなしで 1 ターンで修正されます。
 
 ## 技術スタック
 
 | レイヤー | 技術 |
-|-------|-----------|
-| フロントエンド | React + TypeScript + Vite + Tailwind CSS |
-| バックエンド | Rust |
-| デスクトップ | Tauri |
+| --- | --- |
+| Frontend | React, TypeScript, Vite, Tailwind CSS |
+| Backend | Rust |
+| Desktop | Tauri |
+| Database | SQLx-managed relational schema |
+| Workflow UI | React Flow |
 
 ## ローカル開発
 
-#### Mac/Linux
+### 前提条件
+
+- **Rust** >= 1.75
+- **Node.js** >= 18
+- **pnpm** >= 8
+
+### Mac/Linux
 
 ```bash
-# 1. リポジトリをクローン
+# Clone the repository
 git clone https://github.com/openteams-lab/openteams.git
 cd openteams
-
-# 2. 依存関係をインストール
 pnpm i
-
-# 3. 開発サーバーを起動（Rust バックエンド + React フロントエンド）
 pnpm run dev
-
-# 4. フロントエンドをビルド
+# build
 pnpm --filter frontend build
-
-# 5. デスクトップアプリをビルド
 pnpm desktop:build
 ```
 
-#### Windows（PowerShell）：バックエンドとフロントエンドを別々に起動
+### Windows (PowerShell): backend と frontend を別々に起動する
 
-`pnpm run dev` は Windows PowerShell では実行できません。以下のコマンドを使ってバックエンドとフロントエンドを別々に起動してください。
+`pnpm run dev` は Windows PowerShell では実行できません。以下のコマンドで backend と frontend を別々に起動してください。
 
-```bash
-# 1. リポジトリをクローン
+```powershell
 git clone https://github.com/openteams-lab/openteams.git
 cd openteams
-
-# 2. 依存関係をインストール
 pnpm i
-
-# 3. TypeScript 型を生成
 pnpm run generate-types
-
-# 4. データベースマイグレーションを実行
 pnpm run prepare-db
 ```
 
-**ターミナル A（バックエンド）**
+**Terminal A (backend)**
 
 ```powershell
 $env:FRONTEND_PORT = node scripts/setup-dev-environment.js frontend
@@ -222,96 +240,52 @@ $env:RUST_LOG = "debug"
 cargo run --bin server
 ```
 
-**ターミナル B（フロントエンド）**
+**Terminal B (frontend)**
 
 ```powershell
-$env:FRONTEND_PORT = <ターミナル A で生成された frontend ポート>
-$env:BACKEND_PORT = <ターミナル A で生成された backend ポート>
+$env:FRONTEND_PORT = <frontend port generated from terminal A>
+$env:BACKEND_PORT = <backend port generated from terminal A>
 cd frontend
 pnpm dev -- --port $env:FRONTEND_PORT --host
 ```
 
-`http://localhost:<FRONTEND_PORT>` でフロントエンドを開きます（例：`http://localhost:3001`）。
+frontend は `http://localhost:<FRONTEND_PORT>` で開けます（例: `http://localhost:3001`）。
 
-#### `openteams-cli` をローカルでビルド
+### `openteams-cli` をローカルでビルドする
 
-内蔵版や公開済みビルドではなく、ローカルの `openteams-cli` バイナリをビルドしたい場合は、以下のコマンドを使ってください。
+組み込み版または公開済みビルドではなく、ローカルの `openteams-cli` バイナリをコンパイルしたい場合は、次のコマンドを使ってください。
 ビルド成果物は binaries ディレクトリに配置されます。
 
 ```bash
-# リポジトリのルートで実行
+# From the repository root
 bun run ./scripts/build-openteams-cli.ts
 ```
 
-## リリースノートとロードマップ
+## コントリビューション
 
-### V0.2
+コントリビューションを歓迎します。始め方は次の通りです。
 
-- [x] 共有コンテキスト付きマルチ Agent グループチャット
-- [x] 並列 Agent 実行
-- [x] Agent `@mention` と自律的な協調
-- [x] 10 種類のコーディング Agent ランタイム対応（Claude Code、Gemini CLI、Codex、Qwen Code、Amp、Cursor Agent、Copilot、Droid、Kimi Code、OpenCode）
-- [x] デスクトップアプリ（Windows、macOS、Linux）
-- [x] npx で使える Web アプリ
-- [x] 多言語対応（EN、ZH、JA、KO、FR、ES）
-
-### V0.3
-- [x] フロントエンド UI の全面刷新
-- [x] 160+ の内蔵 AI メンバー
-- [x] 8 つの内蔵 AI チームプリセット
-- [x] チームルール設定
-- [x] 1000+ の内蔵スキル
-- [x] 完全ローカル実行とワークスペース分離
-- [x] 入力プロトコルの再定義
-
-### ロードマップ
-- [x] OpenTeams 向けに最適化した Code Agent バックエンド —— v0.3.7
-- [x] 複数のフロントエンド配色を開発 —— v0.3.11
-- [ ] 高効率なチーム協調フレームワークの構築
-- [ ] より多くの Agent 統合（Kilo Code、OpenClaw など）
-- [ ] より強力ですぐ使える AI チームの追加
-- [ ] より強力なスキルの追加
-- [ ] 高度に最適化されたカスタム版の提供
-
-
-## コントリビュート
-
-コントリビューションを歓迎します。必要な内容は [Issues](https://github.com/StarterraAI/OpenTeams/issues) を確認するか、[Discussion](https://github.com/StarterraAI/OpenTeams/discussions) を始めてください。
-
-1. Fork -> feature ブランチを作成 -> PR を送る
-2. 大きな変更の前には issue を立ててください
-3. [Code of Conduct](../CODE_OF_CONDUCT.md) を守ってください
-
-### コード整形
-
-PR を送る前に、コードが正しく整形されていることを確認してください。
+1. **issue を探す** — 初心者向けのタスクは [Good First Issues](https://github.com/openteams-lab/openteams/labels/good%20first%20issue) を確認するか、open issue を見てください。
+2. **実装前に相談する** — 大きな pull request を開く前に、方向性を合わせるため issue または discussion を開いてください。
+3. **コードスタイルに従う** — 提出前に次を実行してください。
 
 ```bash
-# フロントエンドとバックエンドを両方整形
 pnpm run format
-
-# ファイルを変更せずに整形状態を確認
-pnpm run format:check
-
-# フロントエンドのみ整形
-pnpm run frontend:format
-
-# バックエンドのみ整形（Rust）
-pnpm run backend:format
+pnpm run check
+pnpm run lint
 ```
 
-**注意：** コード整形が正しくないと CI は失敗します。push 前に必ず `pnpm run format:check` を実行してください。
+4. **PR を送る** — 何を、なぜ変更したのかを書いてください。関連 issue があればリンクしてください。
+
+完全なガイドは [CONTRIBUTING.md](../CONTRIBUTING.md) を参照してください。
 
 ## コミュニティ
 
-| | |
-|--|--|
-| **バグ報告** | [GitHub Issues](https://github.com/openteams-lab/openteams/issues) |
-| **ディスカッション** | [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions) |
-| **コミュニティチャット** | [Discord](https://discord.gg/MbgNFJeWDc) |
+- [GitHub Issues](https://github.com/openteams-lab/openteams/issues): バグ報告と機能リクエスト
+- [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions): プロダクトのアイデアと質問
+- [Discord](https://discord.gg/openteams): コミュニティチャット
+- QQ:
 
-## 謝辞
+## ライセンス
 
-本プロジェクトは [Vibe Kanban](https://www.vibekanban.com/) をベースに構築されています。優れたオープンソース基盤を提供してくれたチームに感謝します。
-
-また、内蔵スキルエコシステムの形成を後押ししてくれた [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) と、Agent の役割設計やチーム構成に関する着想を与えてくれた [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) にも感謝します。
+Apache-2.0

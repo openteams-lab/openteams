@@ -293,8 +293,6 @@ pub enum WorkflowAnalyticsEvent {
     // 3. User engagement
     MessageSent,
     AttachmentAdded,
-    WorkflowCardOpened,
-    TranscriptOpened,
     DiffViewed,
     SessionArchived,
 
@@ -334,8 +332,6 @@ impl WorkflowAnalyticsEvent {
 
             Self::MessageSent => "engagement.message_sent",
             Self::AttachmentAdded => "engagement.attachment_added",
-            Self::WorkflowCardOpened => "engagement.workflow_card_opened",
-            Self::TranscriptOpened => "engagement.transcript_opened",
             Self::DiffViewed => "engagement.diff_viewed",
             Self::SessionArchived => "engagement.session_archived",
 
@@ -373,8 +369,6 @@ impl WorkflowAnalyticsEvent {
 
             Self::MessageSent
             | Self::AttachmentAdded
-            | Self::WorkflowCardOpened
-            | Self::TranscriptOpened
             | Self::DiffViewed
             | Self::SessionArchived => "engagement",
 
@@ -636,68 +630,6 @@ pub fn track_agent_added(
     meta.insert("has_workspace".to_string(), json!(has_workspace));
 
     record_workflow_analytics_event(analytics, WorkflowAnalyticsEvent::AgentAdded, &ctx, meta);
-}
-
-/// Emit workflow card opened event (engagement).
-pub fn track_workflow_card_opened(
-    analytics: Option<&AnalyticsService>,
-    session_id: Uuid,
-    workflow_id: Option<Uuid>,
-    user_id_hash: Option<&str>,
-    detail_level: &str,
-) {
-    let mut ctx = WorkflowEventContext::new("backend")
-        .with_session(session_id)
-        .with_status("opened");
-    if let Some(hash) = user_id_hash {
-        ctx = ctx.with_user_id_hash(hash);
-    }
-    if let Some(workflow_id) = workflow_id {
-        ctx = ctx.with_workflow(workflow_id);
-    }
-
-    let mut meta = serde_json::Map::new();
-    meta.insert("detail_level".to_string(), json!(detail_level));
-
-    record_workflow_analytics_event(
-        analytics,
-        WorkflowAnalyticsEvent::WorkflowCardOpened,
-        &ctx,
-        meta,
-    );
-}
-
-/// Emit transcript opened event (engagement).
-pub fn track_transcript_opened(
-    analytics: Option<&AnalyticsService>,
-    session_id: Uuid,
-    execution_id: Uuid,
-    user_id_hash: Option<&str>,
-    step_id: Option<Uuid>,
-    transcript_count: usize,
-    transcript_scope: &str,
-) {
-    let mut ctx = WorkflowEventContext::new("backend")
-        .with_session(session_id)
-        .with_workflow(execution_id)
-        .with_status("opened");
-    if let Some(hash) = user_id_hash {
-        ctx = ctx.with_user_id_hash(hash);
-    }
-    if let Some(step_id) = step_id {
-        ctx = ctx.with_task(step_id);
-    }
-
-    let mut meta = serde_json::Map::new();
-    meta.insert("transcript_count".to_string(), json!(transcript_count));
-    meta.insert("transcript_scope".to_string(), json!(transcript_scope));
-
-    record_workflow_analytics_event(
-        analytics,
-        WorkflowAnalyticsEvent::TranscriptOpened,
-        &ctx,
-        meta,
-    );
 }
 
 /// Emit diff viewed event (engagement).
@@ -1989,8 +1921,6 @@ mod tests {
         track_handoff_completed(None, nil, nil, nil);
         track_session_created(None, nil, None);
         track_agent_added(None, nil, None, Some("codex"), true);
-        track_workflow_card_opened(None, nil, Some(nil), None, "full");
-        track_transcript_opened(None, nil, nil, None, Some(nil), 3, "step");
         track_diff_viewed(None, nil, None, Some("ws1"), 2);
         track_api_failure(
             None,

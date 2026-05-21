@@ -5,6 +5,7 @@ import {
   PaperclipIcon,
   EyeIcon,
   ArrowSquareUpRightIcon,
+  CheckIcon,
   CheckSquareIcon,
   SquareIcon,
   CopyIcon,
@@ -1049,7 +1050,10 @@ export function ChatMessageItem({
             >
               <button
                 type="button"
-                className="relative p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors"
+                className={cn(
+                  'relative p-1.5 rounded text-low hover:bg-[rgba(168,201,255,0.16)] transition-colors',
+                  copySuccessVisible && 'text-success'
+                )}
                 title={
                   copySuccessVisible
                     ? tCommon('actions.copied')
@@ -1062,14 +1066,10 @@ export function ChatMessageItem({
                 }
                 onClick={() => void handleCopyMessage()}
               >
-                <CopyIcon className="size-icon-xs" />
-                {copySuccessVisible && (
-                  <span
-                    className="chat-session-message-copy-success"
-                    role="status"
-                  >
-                    {tCommon('actions.copied')}
-                  </span>
+                {copySuccessVisible ? (
+                  <CheckIcon className="size-icon-xs" weight="bold" />
+                ) : (
+                  <CopyIcon className="size-icon-xs" />
                 )}
               </button>
               {isUser && (

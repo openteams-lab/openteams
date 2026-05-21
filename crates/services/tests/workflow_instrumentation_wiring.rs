@@ -54,7 +54,6 @@ fn workflow_and_message_routes_wire_engagement_and_risk_events() {
     let plan_control =
         read_repo_file("crates/services/src/services/workflow_orchestrator/plan_control.rs");
 
-    assert!(workflow_route.contains("workflow_analytics::track_transcript_opened("));
     assert!(workflow_route.contains("workflow_analytics::track_approval_timeout("));
     assert!(workflow_route.contains("workflow_analytics::track_plan_generated("));
     assert!(workflow_route.contains("workflow_analytics::track_plan_executed("));
@@ -79,7 +78,6 @@ fn workflow_and_message_routes_wire_engagement_and_risk_events() {
 
     assert!(!message_route.contains("DomainEvent::MessageSent"));
     assert!(message_route.contains("emit_user_message_workflow_analytics("));
-    assert!(message_route.contains("workflow_analytics::track_workflow_card_opened("));
     assert!(message_route.contains("workflow_analytics::analytics_if_enabled("));
 }
 

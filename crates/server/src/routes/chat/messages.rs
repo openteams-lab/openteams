@@ -23,7 +23,7 @@ use deployment::Deployment;
 use serde::Deserialize;
 use services::services::{
     chat::{ChatAttachmentMeta, emit_user_message_workflow_analytics},
-    workflow_analytics::{self, hash_user_id},
+    workflow_analytics,
     workflow_runtime::{
         WorkflowCardProjection, WorkflowCardState, WorkflowCardStep,
         build_workflow_card_projection, build_workflow_card_projection_lightweight,
@@ -452,22 +452,6 @@ pub async fn get_workflow_card(
             ));
         }
     };
-
-    let execution_id = projection
-        .execution_id
-        .as_deref()
-        .and_then(|value| Uuid::parse_str(value).ok());
-    let user_id_hash = hash_user_id(deployment.user_id());
-    workflow_analytics::track_workflow_card_opened(
-        workflow_analytics::analytics_if_enabled(
-            deployment.analytics().as_ref(),
-            deployment.analytics_enabled(),
-        ),
-        message.session_id,
-        execution_id,
-        Some(&user_id_hash),
-        if is_lightweight { "light" } else { "full" },
-    );
 
     Ok(ResponseJson(ApiResponse::success(projection)))
 }
