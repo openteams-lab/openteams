@@ -38,9 +38,9 @@
 ---
 
 <div align="center">
-  <a href="https://github.com/openteams-lab/openteams/raw/refs/heads/main/readmes/images/hero.mp4">
-    <img src="./readmes/images/hero.png" alt="Watch the OpenTeams hero video" width="100%">
-  </a>
+  <video src="https://github.com/user-attachments/assets/441c8b42-d376-43ef-8af2-d88c55ccfff7" controls width="100%">
+    <a href="https://github.com/user-attachments/assets/441c8b42-d376-43ef-8af2-d88c55ccfff7">Watch the hero video</a>
+  </video>
 </div>
 
 ## What is openteam
