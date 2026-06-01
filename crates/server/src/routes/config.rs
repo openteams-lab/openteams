@@ -32,7 +32,8 @@ use serde_json::{Value, json};
 use services::services::{
     cli_config::{
         CliConfig, CustomProviderEntry, CustomProviderOptions, OllamaConfig, OpenTeamsCliConfig,
-        OpenTeamsCliProviderConfig, OpenTeamsCliProviderOptions, ProviderCredentials,
+        OpenTeamsCliModelConfig, OpenTeamsCliProviderConfig, OpenTeamsCliProviderOptions,
+        ProviderCredentials,
     },
     config::{
         Config, ConfigError, SoundFile,
@@ -623,7 +624,7 @@ fn sync_requested_provider_to_cli_config(
     sync_builtin_provider_to_cli_config(
         cli_providers,
         "minimax",
-        build_builtin_provider_config(app_config.provider.minimax.as_ref()),
+        build_minimax_provider_config(app_config.provider.minimax.as_ref()),
     );
     sync_builtin_provider_to_cli_config(
         cli_providers,
@@ -694,6 +695,29 @@ fn build_builtin_provider_config(
         whitelist: None,
         blacklist: None,
     })
+}
+
+fn build_minimax_provider_config(
+    credentials: Option<&ProviderCredentials>,
+) -> Option<OpenTeamsCliProviderConfig> {
+    let mut provider = build_builtin_provider_config(credentials)?;
+    provider.models = Some(HashMap::from([(
+        "MiniMax-M3".to_string(),
+        OpenTeamsCliModelConfig {
+            name: Some("MiniMax-M3".into()),
+            modalities: Some(services::services::cli_config::ModelModalities {
+                input: Some(vec!["text".into()]),
+                output: Some(vec!["text".into()]),
+            }),
+            options: None,
+            limit: Some(services::services::cli_config::ModelLimits {
+                context: Some(204800),
+                output: Some(131072),
+            }),
+            variants: None,
+        },
+    )]));
+    Some(provider)
 }
 
 fn build_ollama_provider_config(
@@ -1185,6 +1209,28 @@ fn dedupe_model_infos(models: Vec<ModelInfo>) -> Vec<ModelInfo> {
         .collect()
 }
 
+fn builtin_provider_model_overrides(provider: &str) -> Vec<ModelInfo> {
+    match provider {
+        "minimax" => vec![ModelInfo {
+            id: "MiniMax-M3".into(),
+            name: "MiniMax-M3".into(),
+        }],
+        _ => Vec::new(),
+    }
+}
+
+fn merge_builtin_provider_model_overrides(
+    provider: &str,
+    models: Vec<ModelInfo>,
+) -> Vec<ModelInfo> {
+    let overrides = builtin_provider_model_overrides(provider);
+    if overrides.is_empty() {
+        return models;
+    }
+
+    dedupe_model_infos(overrides.into_iter().chain(models).collect())
+}
+
 fn parse_openai_style_models(value: Value) -> Vec<ModelInfo> {
     value
         .get("data")
@@ -1409,14 +1455,21 @@ fn resolve_provider_models_result(
     catalog_result: Result<Vec<ModelInfo>, String>,
 ) -> Result<Vec<ModelInfo>, String> {
     match live_result {
-        Ok(models) => Ok(models),
+        Ok(models) => Ok(merge_builtin_provider_model_overrides(provider, models)),
         Err(live_error) => match catalog_result {
-            Ok(models) => Ok(models),
-            Err(catalog_error) => Err(provider_models_failure_message(
-                provider,
-                &live_error,
-                &catalog_error,
-            )),
+            Ok(models) => Ok(merge_builtin_provider_model_overrides(provider, models)),
+            Err(catalog_error) => {
+                let overrides = builtin_provider_model_overrides(provider);
+                if !overrides.is_empty() {
+                    return Ok(overrides);
+                }
+
+                Err(provider_models_failure_message(
+                    provider,
+                    &live_error,
+                    &catalog_error,
+                ))
+            }
         },
     }
 }
@@ -3226,6 +3279,35 @@ mod tests {
     }
 
     #[test]
+    fn provider_model_listing_includes_builtin_minimax_overrides() {
+        let result = resolve_provider_models_result(
+            "minimax",
+            Err("live discovery unsupported".into()),
+            Ok(vec![ModelInfo {
+                id: "MiniMax-M2.5".into(),
+                name: "MiniMax-M2.5".into(),
+            }]),
+        )
+        .expect("minimax catalog models should merge with builtin overrides");
+
+        assert_eq!(result[0].id, "MiniMax-M3");
+        assert!(result.iter().any(|model| model.id == "MiniMax-M2.5"));
+    }
+
+    #[test]
+    fn provider_model_listing_can_fall_back_to_builtin_minimax_overrides() {
+        let result = resolve_provider_models_result(
+            "minimax",
+            Err("live discovery unsupported".into()),
+            Err("catalog unavailable".into()),
+        )
+        .expect("minimax should have builtin fallback models");
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "MiniMax-M3");
+    }
+
+    #[test]
     fn method_not_allowed_on_custom_url_is_treated_as_reachable() {
         let req = ValidateProviderRequest {
             api_key: None,
@@ -3349,6 +3431,40 @@ mod tests {
             Some(DEFAULT_ANTHROPIC_ENDPOINT)
         );
         assert!(!providers.contains_key("custom"));
+    }
+
+    #[test]
+    fn sync_requested_provider_to_cli_config_adds_minimax_m3_model_override() {
+        let mut cli_config = OpenTeamsCliConfig::default();
+        let mut app_config = CliConfig::default_config();
+        app_config.provider.default = "minimax".into();
+        app_config.provider.minimax = Some(services::services::cli_config::ProviderCredentials {
+            api_key: Some("minimax-secret".into()),
+            endpoint: Some(DEFAULT_MINIMAX_ENDPOINT.into()),
+        });
+
+        sync_requested_provider_to_cli_config(&mut cli_config, &app_config, None);
+
+        let minimax = cli_config
+            .provider
+            .as_ref()
+            .and_then(|providers| providers.get("minimax"))
+            .expect("minimax provider should be synced");
+        let m3 = minimax
+            .models
+            .as_ref()
+            .and_then(|models| models.get("MiniMax-M3"))
+            .expect("MiniMax-M3 should be registered as a provider model override");
+
+        assert_eq!(m3.name.as_deref(), Some("MiniMax-M3"));
+        assert_eq!(
+            m3.limit.as_ref().and_then(|limit| limit.context),
+            Some(204800)
+        );
+        assert_eq!(
+            m3.limit.as_ref().and_then(|limit| limit.output),
+            Some(131072)
+        );
     }
 
     fn build_test_openteams_cli_config(
