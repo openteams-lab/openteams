@@ -17,6 +17,8 @@
     <a href="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml/badge.svg" /></a>
     <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
     <a href="https://discord.gg/MbgNFJeWDc"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
+    <a href="./readmes/images/openteams-wechat-community.png"><img alt="WeChat" src="https://img.shields.io/badge/WeChat-Join%20Group-07C160?style=flat-square&logo=wechat&logoColor=white" /></a>
+    <a href="./readmes/images/openteams-feishu-community.png"><img alt="Feishu/Lark" src="https://img.shields.io/badge/Feishu%2FLark-Join%20Group-3370FF?style=flat-square" /></a>
     <a href="https://doc.openteams-lab.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
   </p>
 
@@ -169,6 +171,19 @@ openteams is under active development. Here is where we are heading:
 Have a feature request or want to help shape the direction? [Open a discussion](https://github.com/openteams-lab/openteams/discussions).
 
 
+## Community
+
+- [GitHub Issues](https://github.com/openteams-lab/openteams/issues): bug reports and feature requests
+- [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions): product ideas and questions
+- [Discord](https://discord.gg/openteams): community chat
+- [Linux.do](https://linux.do): friendly link; thanks for providing community discussion support
+- Community groups:
+
+<p>
+  <a href="./readmes/images/openteams-wechat-community.png"><img alt="OpenTeams WeChat community group QR code" src="./readmes/images/openteams-wechat-community.png" width="260"></a>
+  <a href="./readmes/images/openteams-feishu-community.png"><img alt="OpenTeams Feishu/Lark community group QR code" src="./readmes/images/openteams-feishu-community.png" width="260"></a>
+</p>
+
 ## Core Features
 
 | Feature | What it means |
@@ -283,14 +298,6 @@ pnpm run lint
 4. **Submit a PR** — Describe what you changed and why. Link the related issue if applicable.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
-
-## Community
-
-- [GitHub Issues](https://github.com/openteams-lab/openteams/issues): bug reports and feature requests
-- [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions): product ideas and questions
-- [Discord](https://discord.gg/openteams): community chat
-- [Linux.do](https://linux.do): friendly link; thanks for providing community discussion support
-
 
 ## License
 

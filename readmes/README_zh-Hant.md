@@ -16,6 +16,8 @@
     <a href="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml/badge.svg" /></a>
     <a href="../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
     <a href="https://discord.gg/MbgNFJeWDc"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
+    <a href="images/openteams-wechat-community.png"><img alt="WeChat" src="https://img.shields.io/badge/WeChat-Join%20Group-07C160?style=flat-square&logo=wechat&logoColor=white" /></a>
+    <a href="images/openteams-feishu-community.png"><img alt="Feishu/Lark" src="https://img.shields.io/badge/Feishu%2FLark-Join%20Group-3370FF?style=flat-square" /></a>
     <a href="https://doc.openteams-lab.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
   </p>
 
@@ -166,6 +168,19 @@ openteams 正在積極開發中。接下來我們會朝這些方向推進：
 
 有功能建議，或想參與塑造產品方向？歡迎[發起討論](https://github.com/openteams-lab/openteams/discussions)。
 
+## 社區
+
+- [GitHub Issues](https://github.com/openteams-lab/openteams/issues)：bug 報告和功能請求
+- [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions)：產品想法和問題
+- [Discord](https://discord.gg/openteams)：社區聊天
+- [Linux.do](https://linux.do)：友情連結，感謝提供社群交流支援
+- 社區群：
+
+<p>
+  <a href="images/openteams-wechat-community.png"><img alt="openteams 微信交流群二維碼" src="images/openteams-wechat-community.png" width="260"></a>
+  <a href="images/openteams-feishu-community.png"><img alt="openteams 飛書交流群二維碼" src="images/openteams-feishu-community.png" width="260"></a>
+</p>
+
 ## 核心功能
 
 | 功能 | 含義 |
@@ -279,14 +294,6 @@ pnpm run lint
 4. **提交 PR** — 說明你改了什麼以及爲什麼改。如有相關 issue，請一併鏈接。
 
 完整指南請見 [CONTRIBUTING.md](../CONTRIBUTING.md)。
-
-## 社區
-
-- [GitHub Issues](https://github.com/openteams-lab/openteams/issues)：bug 報告和功能請求
-- [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions)：產品想法和問題
-- [Discord](https://discord.gg/openteams)：社區聊天
-- [Linux.do](https://linux.do)：友情連結，感謝提供社群交流支援
-- QQ:
 
 ## 許可證
 

@@ -16,6 +16,8 @@
     <a href="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml/badge.svg" /></a>
     <a href="../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
     <a href="https://discord.gg/MbgNFJeWDc"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
+    <a href="images/openteams-wechat-community.png"><img alt="WeChat" src="https://img.shields.io/badge/WeChat-Join%20Group-07C160?style=flat-square&logo=wechat&logoColor=white" /></a>
+    <a href="images/openteams-feishu-community.png"><img alt="Feishu/Lark" src="https://img.shields.io/badge/Feishu%2FLark-Join%20Group-3370FF?style=flat-square" /></a>
     <a href="https://doc.openteams-lab.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
   </p>
 
@@ -166,6 +168,19 @@ openteams est en développement actif. Voici la direction que nous prenons :
 
 Vous avez une demande de fonctionnalité ou souhaitez contribuer à l'orientation du projet ? [Ouvrez une discussion](https://github.com/openteams-lab/openteams/discussions).
 
+## Communauté
+
+- [GitHub Issues](https://github.com/openteams-lab/openteams/issues) : bugs et demandes de fonctionnalités
+- [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions) : idées produit et questions
+- [Discord](https://discord.gg/openteams) : chat communautaire
+- [Linux.do](https://linux.do) : lien ami ; merci pour le soutien aux échanges de la communauté
+- Groupes communautaires :
+
+<p>
+  <a href="images/openteams-wechat-community.png"><img alt="QR code du groupe communautaire WeChat OpenTeams" src="images/openteams-wechat-community.png" width="260"></a>
+  <a href="images/openteams-feishu-community.png"><img alt="QR code du groupe communautaire Feishu/Lark OpenTeams" src="images/openteams-feishu-community.png" width="260"></a>
+</p>
+
 ## Fonctionnalités clés
 
 | Fonctionnalité | Ce que cela signifie |
@@ -279,14 +294,6 @@ pnpm run lint
 4. **Soumettre une PR** — Décrivez ce que vous avez changé et pourquoi. Liez l'issue associée le cas échéant.
 
 Consultez [CONTRIBUTING.md](../CONTRIBUTING.md) pour le guide complet.
-
-## Communauté
-
-- [GitHub Issues](https://github.com/openteams-lab/openteams/issues) : bugs et demandes de fonctionnalités
-- [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions) : idées produit et questions
-- [Discord](https://discord.gg/openteams) : chat communautaire
-- [Linux.do](https://linux.do) : lien ami ; merci pour le soutien aux échanges de la communauté
-- QQ:
 
 ## Licence
 

@@ -16,6 +16,8 @@
     <a href="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml"><img alt="Build" src="https://github.com/openteams-lab/openteams/actions/workflows/pre-release.yml/badge.svg" /></a>
     <a href="../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" /></a>
     <a href="https://discord.gg/MbgNFJeWDc"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
+    <a href="images/openteams-wechat-community.png"><img alt="WeChat" src="https://img.shields.io/badge/WeChat-Join%20Group-07C160?style=flat-square&logo=wechat&logoColor=white" /></a>
+    <a href="images/openteams-feishu-community.png"><img alt="Feishu/Lark" src="https://img.shields.io/badge/Feishu%2FLark-Join%20Group-3370FF?style=flat-square" /></a>
     <a href="https://doc.openteams-lab.com/getting-started"><img alt="Platforms" src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-2EA44F?style=flat-square" /></a>
   </p>
 
@@ -166,6 +168,19 @@ openteams는 활발히 개발 중입니다. 앞으로 다음 방향으로 나아
 
 기능 요청이 있거나 방향성에 참여하고 싶다면 [토론을 열어 주세요](https://github.com/openteams-lab/openteams/discussions).
 
+## 커뮤니티
+
+- [GitHub Issues](https://github.com/openteams-lab/openteams/issues): 버그 리포트와 기능 요청
+- [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions): 제품 아이디어와 질문
+- [Discord](https://discord.gg/openteams): 커뮤니티 채팅
+- [Linux.do](https://linux.do): 친구 링크, 커뮤니티 교류 지원에 감사드립니다
+- 커뮤니티 그룹:
+
+<p>
+  <a href="images/openteams-wechat-community.png"><img alt="OpenTeams WeChat 커뮤니티 그룹 QR 코드" src="images/openteams-wechat-community.png" width="260"></a>
+  <a href="images/openteams-feishu-community.png"><img alt="OpenTeams Feishu/Lark 커뮤니티 그룹 QR 코드" src="images/openteams-feishu-community.png" width="260"></a>
+</p>
+
 ## 핵심 기능
 
 | 기능 | 의미 |
@@ -279,14 +294,6 @@ pnpm run lint
 4. **PR 제출** — 무엇을 왜 변경했는지 설명하세요. 관련 issue가 있다면 링크해 주세요.
 
 전체 가이드는 [CONTRIBUTING.md](../CONTRIBUTING.md)를 참고하세요.
-
-## 커뮤니티
-
-- [GitHub Issues](https://github.com/openteams-lab/openteams/issues): 버그 리포트와 기능 요청
-- [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions): 제품 아이디어와 질문
-- [Discord](https://discord.gg/openteams): 커뮤니티 채팅
-- [Linux.do](https://linux.do): 친구 링크, 커뮤니티 교류 지원에 감사드립니다
-- QQ:
 
 ## 라이선스
 
