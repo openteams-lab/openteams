@@ -46,6 +46,13 @@ const settingsSource = readFileSync(
 const apiSource = readFileSync(new URL("../lib/api.ts", import.meta.url), "utf8");
 const activityPanelIndex = messageContentSource.indexOf("<AgentActivityPanel");
 const markdownIndex = messageContentSource.indexOf("<AgentMarkdown");
+const composerQuoteIndex = source.indexOf("{quotedMessage && (");
+const composerAttachmentIndex = source.indexOf(
+  'className="mb-2 flex flex-wrap gap-2"',
+);
+const composerInputIndex = source.indexOf(
+  'className="relative rounded-md border border-[var(--hairline-strong)]',
+);
 
 check(
   "uses a narrower related-files default width",
@@ -221,6 +228,13 @@ check(
     source.includes("removeAttachedFile(index)") &&
     source.includes("attachedFiles.length > 0"),
   source,
+);
+check(
+  "composer attachments render above the input with quote previews",
+  composerQuoteIndex >= 0 &&
+    composerAttachmentIndex > composerQuoteIndex &&
+    composerAttachmentIndex < composerInputIndex,
+  { composerQuoteIndex, composerAttachmentIndex, composerInputIndex },
 );
 check(
   "attachment send uses backend multipart upload with quote reference id",

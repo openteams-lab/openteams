@@ -1070,6 +1070,41 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                 </button>
               </div>
             )}
+            {attachedFiles.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {attachedFiles.map((file, index) => {
+                  const AttachmentIcon = isImageAttachment(file)
+                    ? ImageIcon
+                    : FileText;
+                  return (
+                    <div
+                      key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                      className="flex max-w-full items-center gap-2 rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2 text-[11px] text-[var(--ink-muted)]"
+                    >
+                      <AttachmentIcon className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+                      <span
+                        className="max-w-[180px] truncate font-medium text-[var(--ink)]"
+                        title={file.name}
+                      >
+                        {file.name}
+                      </span>
+                      <span className="shrink-0 font-mono text-[10px] text-[var(--ink-tertiary)]">
+                        {formatFileSize(file.size)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachedFile(index)}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+                        title={t("attachment.remove")}
+                        aria-label={t("attachment.remove")}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div
               onClick={() => inputRef.current?.focus()}
               className="relative rounded-md border border-[var(--hairline-strong)] bg-[var(--surface-1)] focus-within:border-[var(--primary)] p-3.5 transition-all flex flex-col gap-3 min-h-[95px]"
@@ -1082,42 +1117,6 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                 accept={CHAT_ATTACHMENT_ACCEPT}
                 onChange={handleAttachmentInputChange}
               />
-              {attachedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {attachedFiles.map((file, index) => {
-                    const AttachmentIcon = isImageAttachment(file)
-                      ? ImageIcon
-                      : FileText;
-                    return (
-                      <div
-                        key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
-                        className="flex max-w-full items-center gap-2 rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] px-2 py-1 text-[11px] text-[var(--ink-muted)]"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <AttachmentIcon className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
-                        <span
-                          className="max-w-[180px] truncate font-medium text-[var(--ink)]"
-                          title={file.name}
-                        >
-                          {file.name}
-                        </span>
-                        <span className="shrink-0 font-mono text-[10px] text-[var(--ink-tertiary)]">
-                          {formatFileSize(file.size)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeAttachedFile(index)}
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
-                          title={t("attachment.remove")}
-                          aria-label={t("attachment.remove")}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
               {/* Text Area */}
               <textarea
                 ref={inputRef}
