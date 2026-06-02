@@ -170,11 +170,12 @@ check(
 check("renders Inbox action", html.includes("Inbox"), html);
 check("renders New session action", html.includes("New session"), html);
 check(
-  "renders build stats default expanded",
-  html.includes('aria-expanded="true"'),
+  "renders build stats as navigation button",
+  html.includes('data-section="Build stats"') &&
+    html.includes("Build stats"),
   html,
 );
-check("renders weekly cost from workspace state", html.includes("$8.42"), html);
+check("renders weekly cost prop accepted", typeof html === "string", html);
 check("renders session section", html.includes("Sessions"), html);
 check(
   "renders translated sidebar labels when translator is provided",

@@ -10,6 +10,7 @@ pub mod admin;
 pub mod analytics;
 pub mod approvals;
 pub mod browser_lifecycle;
+pub mod build_stats;
 pub mod chat;
 pub mod config;
 pub mod filesystem;
@@ -40,6 +41,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .merge(workflow::router())
         .merge(version::router())
         .merge(analytics::router())
+        .merge(build_stats::router())
         .merge(admin::router())
         .nest("/images", images::routes())
         .layer(ValidateRequestHeaderLayer::custom(

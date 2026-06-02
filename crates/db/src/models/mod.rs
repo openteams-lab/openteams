@@ -15,6 +15,8 @@ pub mod execution_process_logs;
 pub mod execution_process_repo_state;
 pub mod image;
 pub mod merge;
+pub mod model_price_cache;
+pub mod model_pricing;
 pub mod project;
 pub mod project_delivery_event;
 pub mod project_member;

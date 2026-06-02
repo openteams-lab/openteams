@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
+    "@unovis/react": "1.4.4",
+    "@unovis/ts": "1.4.4",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "lucide-react": "^0.546.0",

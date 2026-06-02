@@ -125,7 +125,8 @@ export type SidebarNavigationTarget =
   | 'routing'
   | 'github'
   | 'providers'
-  | 'tokens';
+  | 'tokens'
+  | 'build-stats';
 
 export interface SidebarProjectDisplay {
   id: string;
@@ -794,3 +795,77 @@ export type RoutingStrategyId =
   | 'strat-3'
   | 'strat-4'
   | 'strat-5';
+
+
+// =============================================================================
+// BUILD STATISTICS types
+// -----------------------------------------------------------------------------
+// Data interfaces for the Build Statistics page. These mirror the backend API
+// response shapes for daily token consumption, session tokens, activity counts,
+// and model pricing management.
+// =============================================================================
+
+export interface DailyTokenDataPoint {
+  date: string; // YYYY-MM-DD
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+}
+
+export interface DailyTokensResponse {
+  days: DailyTokenDataPoint[];
+}
+
+export interface SessionCostEntry {
+  session_id: string;
+  title: string;
+  total_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+}
+
+export interface SessionTokensResponse {
+  sessions: SessionCostEntry[];
+}
+
+export interface ActivityResponse {
+  days: ActivityDataPoint[];
+}
+
+export interface ActivityDataPoint {
+  date: string;
+  bugs_fixed: number;
+  features_delivered: number;
+}
+
+export interface ModelPriceRow {
+  model_id: string;
+  model_name: string;
+  input_price_per_1m: number;
+  output_price_per_1m: number;
+  custom_input_price: number | null;
+  custom_output_price: number | null;
+  price_source: string;
+  price_updated_at: string;
+}
+
+export interface ModelPricingResponse {
+  models: ModelUsageRow[];
+}
+
+export interface ModelUsageRow {
+  model_id: string;
+  model_name: string;
+  total_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+  input_price_per_1m: number;
+  output_price_per_1m: number;
+  estimated_cost: number;
+  price_source: string;
+}
+
+export interface UpdateModelPricingRequest {
+  custom_input_price?: number | null;
+  custom_output_price?: number | null;
+}

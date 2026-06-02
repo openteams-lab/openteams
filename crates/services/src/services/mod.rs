@@ -27,6 +27,7 @@ pub mod project_member;
 pub mod project_migration;
 pub mod project_path;
 pub mod project_stats;
+pub mod model_pricing_sync;
 #[cfg(feature = "qa-mode")]
 pub mod qa_repos;
 pub mod queued_message;

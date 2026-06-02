@@ -75,9 +75,11 @@ import {
   makeRequest,
   qs,
 } from "./apiCore";
+import { buildStatsApi } from "./buildStatsApi";
 import { cliConfigApi } from "./cliConfigApi";
 
 export { ApiError } from "./apiCore";
+export { buildStatsApi } from "./buildStatsApi";
 export { cliConfigApi } from "./cliConfigApi";
 
 // -----------------------------------------------------------------------------
@@ -920,4 +922,5 @@ export const api = {
   projects: projectApi,
   workflow: workflowApi,
   cliConfig: cliConfigApi,
+  buildStats: buildStatsApi,
 };

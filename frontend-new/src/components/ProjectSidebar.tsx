@@ -361,6 +361,24 @@ export function ProjectSidebar({
     return value;
   };
 
+  const openBuildStatsPage = () => {
+    onNavigate({
+      id: "build-stats",
+      label: buildStats?.title ?? "Build stats",
+      icon: "activity",
+      helper: "Open build statistics",
+      targetPage: "build-stats",
+    });
+  };
+
+  const handleBuildStatsCardKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    openBuildStatsPage();
+  };
+
   const loadWorkspaceDirectory = useCallback(async (path?: string) => {
     setWorkspaceBrowserLoading(true);
     setWorkspaceBrowserError(null);
@@ -1209,38 +1227,58 @@ export function ProjectSidebar({
         </section>
 
         <section
-          className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)]"
+          className={`rounded-lg border bg-[var(--surface-1)] ${
+            activePage === "build-stats"
+              ? "border-[var(--hairline-strong)]"
+              : "border-[var(--hairline)]"
+          }`}
           data-section="Build stats"
         >
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 px-2.5 py-2 text-left"
-            onClick={() => setBuildStatsVisible((visible) => !visible)}
-            aria-expanded={buildStatsVisible}
-            aria-controls="project-sidebar-build-stats"
-          >
-            <Activity className="h-3.5 w-3.5 shrink-0 text-[var(--primary)]" />
-            <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--ink)]">
-              {translate(
-                "sidebar.buildStats.title",
-                buildStats?.title ?? "Build stats",
+          <div className="flex items-center gap-1 px-2.5 py-2">
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm text-left outline-none transition hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+              onClick={openBuildStatsPage}
+              title={translate(
+                "sidebar.buildStats.open",
+                "Open build statistics",
               )}
-            </span>
-            <span className="font-mono text-[10px] text-[var(--ink-tertiary)]">
-              {buildStatsVisible
-                ? translate("sidebar.hide", "Hide")
-                : translate("sidebar.show", "Show")}
-            </span>
-            <ChevronRight
-              className={`h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)] transition ${
-                buildStatsVisible ? "rotate-90" : ""
-              }`}
-            />
-          </button>
+            >
+              <Activity className="h-3.5 w-3.5 shrink-0 text-[var(--primary)]" />
+              <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--ink)]">
+                {translate(
+                  "sidebar.buildStats.title",
+                  buildStats?.title ?? "Build stats",
+                )}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="flex shrink-0 cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 font-mono text-[10px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+              onClick={() => setBuildStatsVisible((visible) => !visible)}
+              aria-expanded={buildStatsVisible}
+              aria-controls="project-sidebar-build-stats"
+            >
+              <span>
+                {buildStatsVisible
+                  ? translate("sidebar.hide", "Hide")
+                  : translate("sidebar.show", "Show")}
+              </span>
+              <ChevronRight
+                className={`h-3.5 w-3.5 shrink-0 transition ${
+                  buildStatsVisible ? "rotate-90" : ""
+                }`}
+              />
+            </button>
+          </div>
           {buildStatsVisible && (
             <div
+              role="button"
+              tabIndex={0}
               id="project-sidebar-build-stats"
-              className="space-y-2 border-t border-[var(--hairline)] px-2.5 py-2"
+              className="block w-full cursor-pointer space-y-2 border-t border-[var(--hairline)] px-2.5 py-2 text-left transition hover:bg-[var(--surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+              onClick={openBuildStatsPage}
+              onKeyDown={handleBuildStatsCardKeyDown}
             >
               <p className="text-[12px] leading-[1.4] text-[var(--ink-tertiary)]">
                 {translate(
