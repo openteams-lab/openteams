@@ -7,7 +7,7 @@ CREATE TABLE model_pricing (
     output_price_per_1m REAL NOT NULL DEFAULT 0.0,
     custom_input_price REAL,
     custom_output_price REAL,
-    price_source TEXT NOT NULL DEFAULT 'seed',
+    price_source TEXT NOT NULL DEFAULT 'custom',
     price_updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
@@ -26,7 +26,7 @@ CREATE TABLE model_price_cache (
     litellm_output_price REAL,
     openrouter_input_price REAL,
     openrouter_output_price REAL,
-    source TEXT NOT NULL DEFAULT 'seed',
+    source TEXT NOT NULL DEFAULT 'external',
     last_fetched_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
 );

@@ -12,8 +12,10 @@ pub struct ModelPricing {
     pub model_name: String,
     pub input_price_per_1m: f64,
     pub output_price_per_1m: f64,
+    pub cache_read_price_per_1m: Option<f64>,
     pub custom_input_price: Option<f64>,
     pub custom_output_price: Option<f64>,
+    pub custom_cache_read_price: Option<f64>,
     #[ts(type = "Date")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "Date")]

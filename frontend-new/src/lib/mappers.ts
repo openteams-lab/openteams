@@ -15,6 +15,7 @@ import type {
   BackendChatMessage,
   BackendChatSession,
   BackendChatSessionAgent,
+  ChatAttachment,
   ChatSessionAgentState,
   JsonValue,
   Member,
@@ -100,6 +101,60 @@ const runIdFromMeta = (meta: JsonValue | undefined): string | undefined => {
   return typeof runId === 'string' ? runId : undefined;
 };
 
+const sessionAgentIdFromMeta = (
+  meta: JsonValue | undefined,
+): string | undefined => {
+  const obj = jsonObject(meta);
+  const sessionAgentId = obj?.session_agent_id;
+  return typeof sessionAgentId === 'string' ? sessionAgentId : undefined;
+};
+
+const referenceMessageIdFromMeta = (
+  meta: JsonValue | undefined,
+): string | undefined => {
+  const obj = jsonObject(meta);
+  const reference = jsonObject(obj?.reference);
+  const messageId = reference?.message_id ?? obj?.reference_message_id;
+  return typeof messageId === 'string' ? messageId : undefined;
+};
+
+const attachmentsFromMeta = (
+  meta: JsonValue | undefined,
+): ChatAttachment[] | undefined => {
+  const obj = jsonObject(meta);
+  const attachments = obj?.attachments;
+  if (!Array.isArray(attachments)) return undefined;
+
+  const normalized: ChatAttachment[] = [];
+  for (const attachment of attachments) {
+    if (
+      !attachment ||
+      typeof attachment !== 'object' ||
+      Array.isArray(attachment)
+    ) {
+      continue;
+    }
+
+    const raw = attachment as Record<string, JsonValue>;
+    const id = raw.id;
+    const name = raw.name;
+    if (typeof id !== 'string' || typeof name !== 'string') continue;
+
+    normalized.push({
+      id,
+      name,
+      mime_type: typeof raw.mime_type === 'string' ? raw.mime_type : null,
+      size_bytes:
+        typeof raw.size_bytes === 'number' ? raw.size_bytes : undefined,
+      kind: typeof raw.kind === 'string' ? raw.kind : undefined,
+      relative_path:
+        typeof raw.relative_path === 'string' ? raw.relative_path : undefined,
+    });
+  }
+
+  return normalized.length > 0 ? normalized : undefined;
+};
+
 interface MapMessageOptions {
   /** Lookup table of agent_id -> agent name (for sender label/avatar). */
   agentNamesById?: Record<string, string>;
@@ -147,7 +202,10 @@ export const mapMessage = (
     text: backend.content,
     isUser: isUser || undefined,
     model,
+    referenceMessageId: referenceMessageIdFromMeta(backend.meta),
+    attachments: attachmentsFromMeta(backend.meta),
     runId: runIdFromMeta(backend.meta),
+    sessionAgentId: sessionAgentIdFromMeta(backend.meta),
   };
 };
 

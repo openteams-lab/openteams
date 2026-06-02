@@ -1004,6 +1004,8 @@ async fn apply_project_centric_backend_schema_migration_shim(
             test_count     INTEGER DEFAULT 0,
             input_tokens   BIGINT DEFAULT 0,
             output_tokens  BIGINT DEFAULT 0,
+            cache_read_tokens BIGINT DEFAULT 0,
+            reasoning_output_tokens BIGINT DEFAULT 0,
             total_tokens   BIGINT DEFAULT 0,
             cost_total     DECIMAL,
             updated_at     TIMESTAMPTZ NOT NULL DEFAULT (datetime('now', 'subsec'))
@@ -1458,6 +1460,8 @@ mod tests {
             0,
             0,
             0,
+            0,
+            0,
             Some(0.0),
         )
         .await
@@ -1821,6 +1825,8 @@ mod tests {
             3,
             100,
             200,
+            0,
+            0,
             300,
             Some(1.25),
         )
@@ -1838,6 +1844,8 @@ mod tests {
             6,
             400,
             500,
+            0,
+            0,
             900,
             Some(2.5),
         )

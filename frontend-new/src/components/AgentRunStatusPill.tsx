@@ -6,7 +6,7 @@ interface AgentRunStatusPillProps {
 }
 
 export const AgentRunStatusPill: React.FC<AgentRunStatusPillProps> = ({
-  label = "Agent努力执行任务中",
+  label = "正在执行",
 }) => (
   <div className="inline-flex items-center gap-1.5 rounded-md bg-[var(--primary-tint)] px-2 py-1 text-[var(--primary)]">
     <Loader2 className="h-3 w-3 animate-spin" />

@@ -7,7 +7,10 @@ use executors::{
     model_sync,
 };
 use server::{DeploymentImpl, npx_browser_lifecycle, routes};
-use services::services::{container::ContainerService, project_migration::ProjectMigrationService};
+use services::services::{
+    container::ContainerService, model_pricing_sync::ModelPricingSyncService,
+    project_migration::ProjectMigrationService,
+};
 use sqlx::Error as SqlxError;
 use strip_ansi_escapes::strip;
 use thiserror::Error;
@@ -164,6 +167,23 @@ async fn main() -> Result<(), OpenTeamsError> {
     } else {
         tracing::info!("Automatic legacy project migration disabled by configuration");
     }
+    // Keep model pricing sourced from external registries instead of local defaults.
+    let pricing_pool = deployment.db().pool.clone();
+    tokio::spawn(async move {
+        let pricing_sync = ModelPricingSyncService::new();
+        if let Err(err) = pricing_sync.sync_prices(&pricing_pool).await {
+            tracing::warn!("Failed to sync model pricing: {err}");
+        }
+
+        let mut ticker = tokio::time::interval(Duration::from_secs(24 * 60 * 60));
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            if let Err(err) = pricing_sync.sync_prices(&pricing_pool).await {
+                tracing::warn!("Failed to sync model pricing: {err}");
+            }
+        }
+    });
     // Keep executor profiles in sync with agent model listings.
     let model_refresh_dir = std::env::current_dir().unwrap_or_else(|_| asset_dir());
     let model_refresh_env = ExecutionEnv::new(RepoContext::default(), false, String::new());

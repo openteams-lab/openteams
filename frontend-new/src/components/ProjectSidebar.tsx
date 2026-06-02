@@ -38,6 +38,7 @@ import {
 import type {
   DirectoryEntry,
   Session,
+  SidebarBuildStats,
   SidebarNavigationItem,
   SidebarNavigationTarget,
   SidebarPrimaryAction,
@@ -45,6 +46,9 @@ import type {
 } from "@/types";
 import { DropdownSelect, type DropdownSelectOption } from "./DropdownSelect";
 import { filesystemApi } from "@/lib/api";
+import { buildStatsApi } from "@/lib/buildStatsApi";
+import { onBuildStatsUpdated } from "@/lib/buildStatsEvents";
+import { formatNumber } from "@/lib/buildStatsUtils";
 import {
   projectDisplayDescription,
   projectDisplayName,
@@ -290,6 +294,9 @@ export function ProjectSidebar({
     useState<SidebarProjectDisplay | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteInFlight, setDeleteInFlight] = useState(false);
+  const [realBuildStats, setRealBuildStats] =
+    useState<SidebarBuildStats | null>(null);
+  const [buildStatsRefreshVersion, setBuildStatsRefreshVersion] = useState(0);
   const displayedProjects = useMemo(
     () =>
       projects.length > 0
@@ -315,7 +322,7 @@ export function ProjectSidebar({
         : undefined,
     [displayedProjects, projectActionMenu],
   );
-  const buildStats = shellOptions?.buildStats;
+  const buildStats = realBuildStats ?? shellOptions?.buildStats;
   const hasOverflowSessions = sessions.length > visibleSessionLimit;
   const visibleSessions = sessionsExpanded
     ? sessions
@@ -357,9 +364,97 @@ export function ProjectSidebar({
       );
 
   const statValue = (statId: string, value: string) => {
-    if (statId === "weekly-spend") return `$${weeklyCost.toFixed(2)}`;
+    if (!realBuildStats && statId === "weekly-spend") {
+      return `$${weeklyCost.toFixed(2)}`;
+    }
     return value;
   };
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setRealBuildStats(null);
+      return;
+    }
+
+    let cancelled = false;
+    setRealBuildStats(null);
+    const loadSidebarBuildStats = async () => {
+      try {
+        const [activity, modelPricing] = await Promise.all([
+          buildStatsApi.getActivity(selectedProjectId, "7d"),
+          buildStatsApi.getModelPricing(selectedProjectId, "7d"),
+        ]);
+        if (cancelled) return;
+
+        const activityDays = Array.isArray(activity?.days)
+          ? activity.days
+          : [];
+        const featuresDelivered = activityDays.reduce(
+          (sum, day) => sum + Number(day.features_delivered || 0),
+          0,
+        );
+        const bugsFixed = activityDays.reduce(
+          (sum, day) => sum + Number(day.bugs_fixed || 0),
+          0,
+        );
+        const modelCost = (modelPricing?.models ?? []).reduce(
+          (sum, model) => sum + Number(model.estimated_cost || 0),
+          0,
+        );
+
+        setRealBuildStats({
+          title: "Build stats",
+          defaultExpanded: shellOptions?.buildStats?.defaultExpanded ?? true,
+          summary: "",
+          stats: [
+            {
+              id: "features",
+              label: "Features shipped",
+              value: formatNumber(featuresDelivered),
+              helper: "Real feature delivery events in the last 7 days.",
+              tone: "success",
+            },
+            {
+              id: "bugs-fixed",
+              label: "Bugs fixed",
+              value: formatNumber(bugsFixed),
+              helper: "Real bugfix delivery events in the last 7 days.",
+              tone: "accent",
+            },
+            {
+              id: "weekly-spend",
+              label: "Weekly spend",
+              value: `$${modelCost.toFixed(2)}`,
+              helper: "Real 7-day model cost in USD from non-estimated token usage.",
+              tone: "warning",
+            },
+          ],
+        });
+      } catch {
+        if (!cancelled) {
+          setRealBuildStats(null);
+        }
+      }
+    };
+
+    void loadSidebarBuildStats();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedProjectId,
+    shellOptions?.buildStats?.defaultExpanded,
+    buildStatsRefreshVersion,
+  ]);
+
+  useEffect(() => {
+    if (!selectedProjectId) return undefined;
+    return onBuildStatsUpdated((projectId) => {
+      if (projectId === selectedProjectId) {
+        setBuildStatsRefreshVersion((version) => version + 1);
+      }
+    });
+  }, [selectedProjectId]);
 
   const openBuildStatsPage = () => {
     onNavigate({
@@ -1280,13 +1375,6 @@ export function ProjectSidebar({
               onClick={openBuildStatsPage}
               onKeyDown={handleBuildStatsCardKeyDown}
             >
-              <p className="text-[12px] leading-[1.4] text-[var(--ink-tertiary)]">
-                {translate(
-                  "sidebar.buildStats.summary",
-                  buildStats?.summary ??
-                    "Local UI placeholder for project activity.",
-                )}
-              </p>
               <div className="space-y-1">
                 {(buildStats?.stats ?? []).map((stat) => (
                   <div

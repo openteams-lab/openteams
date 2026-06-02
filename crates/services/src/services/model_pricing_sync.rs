@@ -29,68 +29,36 @@ const MODEL_ID_ALIASES: &[(&str, &[&str])] = &[
         "gemini-1.5-pro",
         &["gemini-1.5-pro-latest", "google/gemini-pro-1.5"],
     ),
-    ("claude-3-haiku", &["claude-3-haiku-20240307", "anthropic/claude-3-haiku"]),
-    ("gpt-4o-mini", &["gpt-4o-mini-2024-07-18", "openai/gpt-4o-mini"]),
+    (
+        "claude-3-haiku",
+        &["claude-3-haiku-20240307", "anthropic/claude-3-haiku"],
+    ),
+    (
+        "gpt-4o-mini",
+        &["gpt-4o-mini-2024-07-18", "openai/gpt-4o-mini"],
+    ),
     (
         "gemini-1.5-flash",
         &["gemini-1.5-flash-latest", "google/gemini-flash-1.5"],
     ),
     ("qwen-2.5-coder", &["qwen/qwen-2.5-coder-32b-instruct"]),
+    ("gpt-5-codex", &["openai/gpt-5-codex"]),
+    ("gpt-5.1-codex", &["openai/gpt-5.1-codex"]),
+    ("gpt-5.1-codex-max", &["openai/gpt-5.1-codex-max"]),
+    ("gpt-5.2-codex", &["openai/gpt-5.2-codex"]),
+    ("gpt-5.3-codex", &["openai/gpt-5.3-codex"]),
+    ("gpt-5.1-codex-mini", &["openai/gpt-5.1-codex-mini"]),
+    (
+        "glm-5.1",
+        &[
+            "GLM-5.1",
+            "z-ai/glm-5.1",
+            "zai/glm-5.1",
+            "zhipu/glm-5.1",
+            "bigmodel/glm-5.1",
+        ],
+    ),
 ];
-
-/// Seed data used as fallback when price sync fails or hasn't run yet.
-const SEED_DATA: &[SeedModel] = &[
-    SeedModel {
-        model_id: "claude-3.5-sonnet",
-        model_name: "Claude 3.5 Sonnet",
-        input_price_per_1m: 3.0,
-        output_price_per_1m: 15.0,
-    },
-    SeedModel {
-        model_id: "claude-3-haiku",
-        model_name: "Claude 3 Haiku",
-        input_price_per_1m: 0.25,
-        output_price_per_1m: 1.25,
-    },
-    SeedModel {
-        model_id: "gpt-4o",
-        model_name: "GPT-4o",
-        input_price_per_1m: 2.5,
-        output_price_per_1m: 10.0,
-    },
-    SeedModel {
-        model_id: "gpt-4o-mini",
-        model_name: "GPT-4o mini",
-        input_price_per_1m: 0.15,
-        output_price_per_1m: 0.6,
-    },
-    SeedModel {
-        model_id: "gemini-1.5-pro",
-        model_name: "Gemini 1.5 Pro",
-        input_price_per_1m: 1.25,
-        output_price_per_1m: 5.0,
-    },
-    SeedModel {
-        model_id: "gemini-1.5-flash",
-        model_name: "Gemini 1.5 Flash",
-        input_price_per_1m: 0.075,
-        output_price_per_1m: 0.3,
-    },
-    SeedModel {
-        model_id: "qwen-2.5-coder",
-        model_name: "Qwen 2.5 Coder",
-        input_price_per_1m: 0.14,
-        output_price_per_1m: 0.28,
-    },
-];
-
-/// A seed model entry with hardcoded pricing.
-struct SeedModel {
-    model_id: &'static str,
-    model_name: &'static str,
-    input_price_per_1m: f64,
-    output_price_per_1m: f64,
-}
 
 /// Raw price data extracted from a single source.
 #[derive(Debug, Clone)]
@@ -99,6 +67,7 @@ pub struct RawModelPrice {
     pub model_name: String,
     pub input_price_per_1m: f64,
     pub output_price_per_1m: f64,
+    pub cache_read_price_per_1m: Option<f64>,
     pub source: String,
 }
 
@@ -109,10 +78,13 @@ pub struct MergedModelPrice {
     pub model_name: String,
     pub input_price_per_1m: f64,
     pub output_price_per_1m: f64,
+    pub cache_read_price_per_1m: Option<f64>,
     pub litellm_input_price: Option<f64>,
     pub litellm_output_price: Option<f64>,
+    pub litellm_cache_read_price: Option<f64>,
     pub openrouter_input_price: Option<f64>,
     pub openrouter_output_price: Option<f64>,
+    pub openrouter_cache_read_price: Option<f64>,
     pub source: String,
 }
 
@@ -133,6 +105,7 @@ struct OpenRouterModel {
 struct OpenRouterPricing {
     prompt: Option<String>,
     completion: Option<String>,
+    input_cache_read: Option<String>,
 }
 
 /// LiteLLM model entry shape (only the fields we need)
@@ -140,6 +113,7 @@ struct OpenRouterPricing {
 struct LiteLLMModelEntry {
     input_cost_per_token: Option<f64>,
     output_cost_per_token: Option<f64>,
+    cache_read_input_token_cost: Option<f64>,
 }
 
 /// Service responsible for syncing model pricing from external sources
@@ -152,10 +126,11 @@ impl ModelPricingSyncService {
         Self
     }
 
-    /// Execute daily price sync: fetch latest prices from LiteLLM and OpenRouter,
+    /// Execute price sync: fetch latest prices from LiteLLM and OpenRouter,
     /// merge them, and update the model_price_cache table.
-    /// Falls back to seed data if both fetches fail.
     pub async fn sync_prices(&self, pool: &SqlitePool) -> Result<()> {
+        self.remove_legacy_seed_prices(pool).await?;
+
         let litellm_result = self.fetch_litellm_prices().await;
         let openrouter_result = self.fetch_openrouter_prices().await;
 
@@ -181,14 +156,32 @@ impl ModelPricingSyncService {
             }
         };
 
-        let merged = if litellm_prices.is_empty() && openrouter_prices.is_empty() {
-            warn!("Both price sources failed, using seed data as fallback");
-            self.get_seed_data()
-        } else {
-            self.merge_prices(litellm_prices, openrouter_prices)
-        };
+        if litellm_prices.is_empty() && openrouter_prices.is_empty() {
+            warn!(
+                "Both price sources failed or returned no prices; keeping existing model_price_cache"
+            );
+            return Ok(());
+        }
 
+        let merged = self.merge_prices(litellm_prices, openrouter_prices);
         self.update_cache(pool, merged).await?;
+        Ok(())
+    }
+
+    /// Refresh prices only when the cache is empty.
+    pub async fn sync_prices_if_cache_empty(&self, pool: &SqlitePool) -> Result<()> {
+        let count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM model_price_cache WHERE source NOT IN ('seed', 'default')",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or((0,));
+
+        if count.0 == 0 {
+            info!("model_price_cache is empty; fetching model prices from external sources");
+            self.sync_prices(pool).await?;
+        }
+
         Ok(())
     }
 
@@ -220,13 +213,17 @@ impl ModelPricingSyncService {
 
             let input_cost = entry.input_cost_per_token.unwrap_or(0.0);
             let output_cost = entry.output_cost_per_token.unwrap_or(0.0);
+            let cache_read_price_per_1m = price_per_1m_optional(entry.cache_read_input_token_cost);
 
             // Convert from per-token to per-1M tokens
             let input_price_per_1m = input_cost * 1_000_000.0;
             let output_price_per_1m = output_cost * 1_000_000.0;
 
             // Validate prices
-            if !is_valid_price(input_price_per_1m) || !is_valid_price(output_price_per_1m) {
+            if !is_valid_price(input_price_per_1m)
+                || !is_valid_price(output_price_per_1m)
+                || !is_valid_optional_price(cache_read_price_per_1m)
+            {
                 continue;
             }
 
@@ -240,6 +237,7 @@ impl ModelPricingSyncService {
                 model_name: model_id.clone(),
                 input_price_per_1m,
                 output_price_per_1m,
+                cache_read_price_per_1m,
                 source: "litellm".to_string(),
             });
         }
@@ -283,13 +281,18 @@ impl ModelPricingSyncService {
                 .unwrap_or("0")
                 .parse()
                 .unwrap_or(0.0);
+            let cache_read_price_per_1m =
+                price_per_1m_optional(parse_optional_price_string(pricing.input_cache_read));
 
             // Convert from per-token to per-1M tokens
             let input_price_per_1m = input_cost * 1_000_000.0;
             let output_price_per_1m = output_cost * 1_000_000.0;
 
             // Validate prices
-            if !is_valid_price(input_price_per_1m) || !is_valid_price(output_price_per_1m) {
+            if !is_valid_price(input_price_per_1m)
+                || !is_valid_price(output_price_per_1m)
+                || !is_valid_optional_price(cache_read_price_per_1m)
+            {
                 continue;
             }
 
@@ -305,6 +308,7 @@ impl ModelPricingSyncService {
                 model_name,
                 input_price_per_1m,
                 output_price_per_1m,
+                cache_read_price_per_1m,
                 source: "openrouter".to_string(),
             });
         }
@@ -314,7 +318,8 @@ impl ModelPricingSyncService {
 
     /// Merge prices from LiteLLM and OpenRouter sources.
     /// For the same model (matched via canonical ID or alias mapping),
-    /// take the **lower** price when both sources have data.
+    /// OpenRouter is the authoritative source; LiteLLM is used only when
+    /// OpenRouter has no matching model, or to fill a missing cache-read price.
     pub fn merge_prices(
         &self,
         litellm: Vec<RawModelPrice>,
@@ -347,56 +352,76 @@ impl ModelPricingSyncService {
             let litellm_entry = litellm_map.get(&canonical_id);
             let openrouter_entry = openrouter_map.get(&canonical_id);
 
-            let (input_price, output_price, source, litellm_input, litellm_output, or_input, or_output, model_name) =
-                match (litellm_entry, openrouter_entry) {
-                    (Some(l), Some(o)) => {
-                        // Both sources: take lower price for each direction
-                        let input = l.input_price_per_1m.min(o.input_price_per_1m);
-                        let output = l.output_price_per_1m.min(o.output_price_per_1m);
-                        (
-                            input,
-                            output,
-                            "merged".to_string(),
-                            Some(l.input_price_per_1m),
-                            Some(l.output_price_per_1m),
-                            Some(o.input_price_per_1m),
-                            Some(o.output_price_per_1m),
-                            // Prefer OpenRouter name as it's usually more human-readable
-                            o.model_name.clone(),
-                        )
-                    }
-                    (Some(l), None) => (
-                        l.input_price_per_1m,
-                        l.output_price_per_1m,
-                        "litellm".to_string(),
-                        Some(l.input_price_per_1m),
-                        Some(l.output_price_per_1m),
-                        None,
-                        None,
-                        l.model_name.clone(),
-                    ),
-                    (None, Some(o)) => (
+            let (
+                input_price,
+                output_price,
+                cache_read,
+                source,
+                litellm_input,
+                litellm_output,
+                litellm_cache_read,
+                or_input,
+                or_output,
+                or_cache_read,
+                model_name,
+            ) = match (litellm_entry, openrouter_entry) {
+                (Some(l), Some(o)) => {
+                    (
                         o.input_price_per_1m,
                         o.output_price_per_1m,
+                        o.cache_read_price_per_1m.or(l.cache_read_price_per_1m),
                         "openrouter".to_string(),
-                        None,
-                        None,
+                        Some(l.input_price_per_1m),
+                        Some(l.output_price_per_1m),
+                        l.cache_read_price_per_1m,
                         Some(o.input_price_per_1m),
                         Some(o.output_price_per_1m),
+                        o.cache_read_price_per_1m,
+                        // Prefer OpenRouter name as it's usually more human-readable
                         o.model_name.clone(),
-                    ),
-                    (None, None) => continue,
-                };
+                    )
+                }
+                (Some(l), None) => (
+                    l.input_price_per_1m,
+                    l.output_price_per_1m,
+                    l.cache_read_price_per_1m,
+                    "litellm".to_string(),
+                    Some(l.input_price_per_1m),
+                    Some(l.output_price_per_1m),
+                    l.cache_read_price_per_1m,
+                    None,
+                    None,
+                    None,
+                    l.model_name.clone(),
+                ),
+                (None, Some(o)) => (
+                    o.input_price_per_1m,
+                    o.output_price_per_1m,
+                    o.cache_read_price_per_1m,
+                    "openrouter".to_string(),
+                    None,
+                    None,
+                    None,
+                    Some(o.input_price_per_1m),
+                    Some(o.output_price_per_1m),
+                    o.cache_read_price_per_1m,
+                    o.model_name.clone(),
+                ),
+                (None, None) => continue,
+            };
 
             merged.push(MergedModelPrice {
                 model_id: canonical_id,
                 model_name,
                 input_price_per_1m: input_price,
                 output_price_per_1m: output_price,
+                cache_read_price_per_1m: cache_read,
                 litellm_input_price: litellm_input,
                 litellm_output_price: litellm_output,
+                litellm_cache_read_price: litellm_cache_read,
                 openrouter_input_price: or_input,
                 openrouter_output_price: or_output,
+                openrouter_cache_read_price: or_cache_read,
                 source,
             });
         }
@@ -418,20 +443,26 @@ impl ModelPricingSyncService {
                 r#"
                 INSERT OR REPLACE INTO model_price_cache (
                     model_id, model_name, input_price_per_1m, output_price_per_1m,
+                    cache_read_price_per_1m,
                     litellm_input_price, litellm_output_price,
+                    litellm_cache_read_price,
                     openrouter_input_price, openrouter_output_price,
+                    openrouter_cache_read_price,
                     source, last_fetched_at, updated_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
                 "#,
             )
             .bind(&price.model_id)
             .bind(&price.model_name)
             .bind(price.input_price_per_1m)
             .bind(price.output_price_per_1m)
+            .bind(price.cache_read_price_per_1m)
             .bind(price.litellm_input_price)
             .bind(price.litellm_output_price)
+            .bind(price.litellm_cache_read_price)
             .bind(price.openrouter_input_price)
             .bind(price.openrouter_output_price)
+            .bind(price.openrouter_cache_read_price)
             .bind(&price.source)
             .bind(&now)
             .bind(&now)
@@ -444,38 +475,11 @@ impl ModelPricingSyncService {
         Ok(())
     }
 
-    /// Get seed data as MergedModelPrice entries (used as fallback).
-    pub fn get_seed_data(&self) -> Vec<MergedModelPrice> {
-        SEED_DATA
-            .iter()
-            .map(|seed| MergedModelPrice {
-                model_id: seed.model_id.to_string(),
-                model_name: seed.model_name.to_string(),
-                input_price_per_1m: seed.input_price_per_1m,
-                output_price_per_1m: seed.output_price_per_1m,
-                litellm_input_price: None,
-                litellm_output_price: None,
-                openrouter_input_price: None,
-                openrouter_output_price: None,
-                source: "seed".to_string(),
-            })
-            .collect()
-    }
-
-    /// Ensure seed data exists in the cache table.
-    /// Called on startup to guarantee the cache is never empty.
-    pub async fn ensure_seed_data(&self, pool: &SqlitePool) -> Result<()> {
-        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM model_price_cache")
-            .fetch_one(pool)
+    async fn remove_legacy_seed_prices(&self, pool: &SqlitePool) -> Result<()> {
+        sqlx::query("DELETE FROM model_price_cache WHERE source IN ('seed', 'default')")
+            .execute(pool)
             .await
-            .unwrap_or((0,));
-
-        if count.0 == 0 {
-            info!("model_price_cache is empty, inserting seed data");
-            let seed = self.get_seed_data();
-            self.update_cache(pool, seed).await?;
-        }
-
+            .context("Failed to remove legacy seed model prices")?;
         Ok(())
     }
 }
@@ -486,21 +490,35 @@ fn is_valid_price(price: f64) -> bool {
     price >= 0.0 && price < MAX_PRICE_PER_1M
 }
 
+fn is_valid_optional_price(price: Option<f64>) -> bool {
+    price.is_none_or(is_valid_price)
+}
+
+fn price_per_1m_optional(cost_per_token: Option<f64>) -> Option<f64> {
+    cost_per_token.map(|cost| cost * 1_000_000.0)
+}
+
+fn parse_optional_price_string(value: Option<String>) -> Option<f64> {
+    value.and_then(|item| item.parse::<f64>().ok())
+}
+
 /// Resolve a model ID to its canonical form using the alias mapping.
 /// If the ID matches any alias, returns the canonical ID.
 /// Otherwise returns the input unchanged.
 pub fn resolve_canonical_id(model_id: &str) -> String {
+    let trimmed = model_id.trim();
+    let normalized = trimmed.to_ascii_lowercase();
     for (canonical, aliases) in MODEL_ID_ALIASES {
-        if *canonical == model_id {
+        if *canonical == normalized {
             return canonical.to_string();
         }
         for alias in *aliases {
-            if *alias == model_id {
+            if alias.to_ascii_lowercase() == normalized {
                 return canonical.to_string();
             }
         }
     }
-    model_id.to_string()
+    trimmed.to_string()
 }
 
 #[cfg(test)]
@@ -509,7 +527,10 @@ mod tests {
 
     #[test]
     fn test_resolve_canonical_id_exact_match() {
-        assert_eq!(resolve_canonical_id("claude-3.5-sonnet"), "claude-3.5-sonnet");
+        assert_eq!(
+            resolve_canonical_id("claude-3.5-sonnet"),
+            "claude-3.5-sonnet"
+        );
         assert_eq!(resolve_canonical_id("gpt-4o"), "gpt-4o");
     }
 
@@ -533,6 +554,13 @@ mod tests {
             resolve_canonical_id("google/gemini-pro-1.5"),
             "gemini-1.5-pro"
         );
+        assert_eq!(resolve_canonical_id("GLM-5.1"), "glm-5.1");
+        assert_eq!(resolve_canonical_id("z-ai/glm-5.1"), "glm-5.1");
+        assert_eq!(resolve_canonical_id("openai/gpt-5-codex"), "gpt-5-codex");
+        assert_eq!(
+            resolve_canonical_id("openai/gpt-5.3-codex"),
+            "gpt-5.3-codex"
+        );
     }
 
     #[test]
@@ -554,14 +582,15 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_prices_takes_lower_when_both_sources() {
+    fn test_merge_prices_prefers_openrouter_when_both_sources() {
         let service = ModelPricingSyncService::new();
 
         let litellm = vec![RawModelPrice {
             model_id: "gpt-4o".to_string(),
             model_name: "gpt-4o".to_string(),
-            input_price_per_1m: 3.0,
-            output_price_per_1m: 12.0,
+            input_price_per_1m: 1.0,
+            output_price_per_1m: 2.0,
+            cache_read_price_per_1m: Some(0.3),
             source: "litellm".to_string(),
         }];
 
@@ -570,6 +599,7 @@ mod tests {
             model_name: "GPT-4o".to_string(),
             input_price_per_1m: 2.5,
             output_price_per_1m: 10.0,
+            cache_read_price_per_1m: Some(0.25),
             source: "openrouter".to_string(),
         }];
 
@@ -578,10 +608,11 @@ mod tests {
         assert_eq!(merged.len(), 1);
         let entry = &merged[0];
         assert_eq!(entry.model_id, "gpt-4o");
-        assert_eq!(entry.input_price_per_1m, 2.5); // lower of 3.0 and 2.5
-        assert_eq!(entry.output_price_per_1m, 10.0); // lower of 12.0 and 10.0
-        assert_eq!(entry.source, "merged");
-        assert_eq!(entry.litellm_input_price, Some(3.0));
+        assert_eq!(entry.input_price_per_1m, 2.5);
+        assert_eq!(entry.output_price_per_1m, 10.0);
+        assert_eq!(entry.cache_read_price_per_1m, Some(0.25));
+        assert_eq!(entry.source, "openrouter");
+        assert_eq!(entry.litellm_input_price, Some(1.0));
         assert_eq!(entry.openrouter_input_price, Some(2.5));
     }
 
@@ -594,6 +625,7 @@ mod tests {
             model_name: "claude-3.5-sonnet".to_string(),
             input_price_per_1m: 3.0,
             output_price_per_1m: 15.0,
+            cache_read_price_per_1m: Some(0.3),
             source: "litellm".to_string(),
         }];
 
@@ -606,6 +638,7 @@ mod tests {
         assert_eq!(entry.model_id, "claude-3.5-sonnet");
         assert_eq!(entry.input_price_per_1m, 3.0);
         assert_eq!(entry.output_price_per_1m, 15.0);
+        assert_eq!(entry.cache_read_price_per_1m, Some(0.3));
         assert_eq!(entry.source, "litellm");
         assert_eq!(entry.openrouter_input_price, None);
     }
@@ -621,6 +654,7 @@ mod tests {
             model_name: "Claude 3.5 Sonnet".to_string(),
             input_price_per_1m: 3.0,
             output_price_per_1m: 15.0,
+            cache_read_price_per_1m: None,
             source: "openrouter".to_string(),
         }];
 
@@ -634,30 +668,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_seed_data() {
-        let service = ModelPricingSyncService::new();
-        let seed = service.get_seed_data();
-
-        assert_eq!(seed.len(), 7);
-
-        let claude = seed.iter().find(|s| s.model_id == "claude-3.5-sonnet").unwrap();
-        assert_eq!(claude.model_name, "Claude 3.5 Sonnet");
-        assert_eq!(claude.input_price_per_1m, 3.0);
-        assert_eq!(claude.output_price_per_1m, 15.0);
-        assert_eq!(claude.source, "seed");
-
-        let gpt4o = seed.iter().find(|s| s.model_id == "gpt-4o").unwrap();
-        assert_eq!(gpt4o.model_name, "GPT-4o");
-        assert_eq!(gpt4o.input_price_per_1m, 2.5);
-        assert_eq!(gpt4o.output_price_per_1m, 10.0);
-
-        let gemini = seed.iter().find(|s| s.model_id == "gemini-1.5-pro").unwrap();
-        assert_eq!(gemini.model_name, "Gemini 1.5 Pro");
-        assert_eq!(gemini.input_price_per_1m, 1.25);
-        assert_eq!(gemini.output_price_per_1m, 5.0);
-    }
-
-    #[test]
     fn test_merge_prices_alias_matching_across_sources() {
         let service = ModelPricingSyncService::new();
 
@@ -667,6 +677,7 @@ mod tests {
             model_name: "claude-3-5-sonnet-20241022".to_string(),
             input_price_per_1m: 3.5,
             output_price_per_1m: 15.0,
+            cache_read_price_per_1m: None,
             source: "litellm".to_string(),
         }];
 
@@ -676,6 +687,7 @@ mod tests {
             model_name: "Claude 3.5 Sonnet".to_string(),
             input_price_per_1m: 3.0,
             output_price_per_1m: 15.0,
+            cache_read_price_per_1m: None,
             source: "openrouter".to_string(),
         }];
 
@@ -685,13 +697,13 @@ mod tests {
         assert_eq!(merged.len(), 1);
         let entry = &merged[0];
         assert_eq!(entry.model_id, "claude-3.5-sonnet");
-        assert_eq!(entry.input_price_per_1m, 3.0); // lower of 3.5 and 3.0
-        assert_eq!(entry.output_price_per_1m, 15.0); // same
-        assert_eq!(entry.source, "merged");
+        assert_eq!(entry.input_price_per_1m, 3.0);
+        assert_eq!(entry.output_price_per_1m, 15.0);
+        assert_eq!(entry.source, "openrouter");
     }
 
     #[tokio::test]
-    async fn test_update_cache_and_ensure_seed() {
+    async fn test_update_cache_removes_legacy_seed_prices() {
         let pool = SqlitePool::connect("sqlite::memory:")
             .await
             .expect("create sqlite memory pool");
@@ -703,11 +715,14 @@ mod tests {
                 model_name TEXT NOT NULL,
                 input_price_per_1m REAL NOT NULL DEFAULT 0.0,
                 output_price_per_1m REAL NOT NULL DEFAULT 0.0,
+                cache_read_price_per_1m REAL,
                 litellm_input_price REAL,
                 litellm_output_price REAL,
+                litellm_cache_read_price REAL,
                 openrouter_input_price REAL,
                 openrouter_output_price REAL,
-                source TEXT NOT NULL DEFAULT 'seed',
+                openrouter_cache_read_price REAL,
+                source TEXT NOT NULL DEFAULT 'external',
                 last_fetched_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
             )
@@ -719,21 +734,58 @@ mod tests {
 
         let service = ModelPricingSyncService::new();
 
-        // Ensure seed data populates empty cache
-        service.ensure_seed_data(&pool).await.expect("ensure seed data");
+        service
+            .update_cache(
+                &pool,
+                vec![MergedModelPrice {
+                    model_id: "openrouter-model".to_string(),
+                    model_name: "OpenRouter Model".to_string(),
+                    input_price_per_1m: 1.0,
+                    output_price_per_1m: 2.0,
+                    cache_read_price_per_1m: Some(0.1),
+                    litellm_input_price: None,
+                    litellm_output_price: None,
+                    litellm_cache_read_price: None,
+                    openrouter_input_price: Some(1.0),
+                    openrouter_output_price: Some(2.0),
+                    openrouter_cache_read_price: Some(0.1),
+                    source: "openrouter".to_string(),
+                }],
+            )
+            .await
+            .expect("update cache");
+
+        sqlx::query(
+            r#"
+            INSERT INTO model_price_cache (
+                model_id,
+                model_name,
+                input_price_per_1m,
+                output_price_per_1m,
+                source
+            )
+            VALUES ('seed-model', 'Seed Model', 1.0, 2.0, 'seed')
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("insert legacy seed row");
+
+        service
+            .remove_legacy_seed_prices(&pool)
+            .await
+            .expect("remove legacy seed prices");
 
         let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM model_price_cache")
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count.0, 7);
+        assert_eq!(count.0, 1);
 
-        // Ensure seed data doesn't duplicate when called again
-        service.ensure_seed_data(&pool).await.expect("ensure seed data again");
-        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM model_price_cache")
+        let remaining: (String,) = sqlx::query_as("SELECT model_id FROM model_price_cache")
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count.0, 7);
+        assert_eq!(remaining.0, "openrouter-model");
     }
 }

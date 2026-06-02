@@ -27,10 +27,22 @@ const t = (key: string) => {
   return map[key] ?? key;
 };
 
+const session = (
+  item: Pick<
+    SessionCostEntry,
+    'session_id' | 'title' | 'total_tokens' | 'input_tokens' | 'output_tokens'
+  >,
+): SessionCostEntry => ({
+  ...item,
+  cache_read_tokens: 0,
+  reasoning_output_tokens: 0,
+  estimated_cost: 0,
+});
+
 const sessions: SessionCostEntry[] = [
-  { session_id: 's1', title: 'Short title', total_tokens: 500, input_tokens: 200, output_tokens: 300 },
-  { session_id: 's2', title: 'Highest usage session', total_tokens: 12345678, input_tokens: 5000000, output_tokens: 7345678 },
-  { session_id: 's3', title: 'Medium session', total_tokens: 5000, input_tokens: 2000, output_tokens: 3000 },
+  session({ session_id: 's1', title: 'Short title', total_tokens: 500, input_tokens: 200, output_tokens: 300 }),
+  session({ session_id: 's2', title: 'Highest usage session', total_tokens: 12345678, input_tokens: 5000000, output_tokens: 7345678 }),
+  session({ session_id: 's3', title: 'Medium session', total_tokens: 5000, input_tokens: 2000, output_tokens: 3000 }),
 ];
 
 console.log('SessionCostList');
@@ -92,7 +104,7 @@ check('has overflow-y-auto for scrolling', htmlNormal.includes('overflow-y-auto'
 // --- Title truncation ---
 const longTitle = 'A'.repeat(80);
 const sessionsWithLong: SessionCostEntry[] = [
-  { session_id: 'long', title: longTitle, total_tokens: 100, input_tokens: 50, output_tokens: 50 },
+  session({ session_id: 'long', title: longTitle, total_tokens: 100, input_tokens: 50, output_tokens: 50 }),
 ];
 const htmlLong = renderToStaticMarkup(
   <SessionCostList sessions={sessionsWithLong} loading={false} t={t} />,
@@ -104,7 +116,7 @@ check('visible text is truncated (ellipsis present)', htmlLong.includes('\u2026'
 
 // --- Zero token count ---
 const sessionsWithZero: SessionCostEntry[] = [
-  { session_id: 'zero', title: 'Zero session', total_tokens: 0, input_tokens: 0, output_tokens: 0 },
+  session({ session_id: 'zero', title: 'Zero session', total_tokens: 0, input_tokens: 0, output_tokens: 0 }),
 ];
 const htmlZero = renderToStaticMarkup(
   <SessionCostList sessions={sessionsWithZero} loading={false} t={t} />,

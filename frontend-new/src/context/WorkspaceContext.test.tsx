@@ -82,11 +82,31 @@ check(
   source,
 );
 check(
+  'stream token usage messages notify build stats refresh',
+  source.includes('notifyBuildStatsUsageUpdated(projectId)') &&
+    source.includes('hasRealCompleteTokenUsage(parsed.message)') &&
+    source.includes("tokenUsage.is_estimated === true"),
+  source,
+);
+check(
   'real sends insert an immediate pending agent placeholder',
   pendingPlaceholderIndex >= 0 &&
     source.includes('PENDING_AGENT_MESSAGE_PREFIX') &&
     pendingPlaceholderIndex < sendApiIndex,
   { pendingPlaceholderIndex, sendApiIndex },
+);
+check(
+  'quoted messages are sent through backend reference meta instead of message content',
+  source.includes('options: SendMessageOptions = {}') &&
+    source.includes('quotedMessage: options.quotedMessage') &&
+    source.includes('referenceMessageId: options.quotedMessage?.id') &&
+    source.includes('meta.reference = { message_id: options.quotedMessage.id }') &&
+    source.includes('resolveQuotedMessageReferences') &&
+    source.includes('content: text') &&
+    !source.includes('reference_message_id: options.quotedMessage') &&
+    !source.includes('meta.quoted_message') &&
+    !source.includes('> ${quotedMessage.sender}:'),
+  source,
 );
 check(
   'message refresh preserves running placeholders until stream replacement',
@@ -100,7 +120,16 @@ check(
     source.includes('hydrateRunningAgentPlaceholders') &&
     source.includes('chatRunsApi.listSessionRetention') &&
     source.includes('.getActivity(run.run_id') &&
+    source.includes('sessionAgentId: sessionAgent.id') &&
     source.includes("activityLoadState: 'idle'"),
+  source,
+);
+check(
+  'running placeholders carry session agent ids for stop controls',
+  source.includes('sessionAgentId: fallbackMember?.id') &&
+    source.includes('sessionAgentId: line.session_agent_id') &&
+    source.includes('sessionAgentId: event.session_agent_id') &&
+    source.includes('carriedSessionAgentId'),
   source,
 );
 check(

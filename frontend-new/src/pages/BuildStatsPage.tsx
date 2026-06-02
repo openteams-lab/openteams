@@ -17,6 +17,7 @@ import {
   formatNumber,
   formatPrice,
 } from '@/lib/buildStatsUtils';
+import { notifyBuildStatsPricingUpdated } from '@/lib/buildStatsEvents';
 
 type TimeRange = '7d' | '30d' | '90d';
 
@@ -35,26 +36,30 @@ const normalizeDailyTokenDays = (value: unknown): DailyTokenDataPoint[] =>
     const raw = item as DailyTokenDataPoint & {
       inputTokens?: unknown;
       outputTokens?: unknown;
+      cacheReadTokens?: unknown;
+      reasoningOutputTokens?: unknown;
       totalTokens?: unknown;
+      estimatedCost?: unknown;
     };
     const inputTokens = asNumber(raw.input_tokens ?? raw.inputTokens);
     const outputTokens = asNumber(raw.output_tokens ?? raw.outputTokens);
+    const cacheReadTokens = asNumber(
+      raw.cache_read_tokens ?? raw.cacheReadTokens,
+    );
+    const reasoningOutputTokens = asNumber(
+      raw.reasoning_output_tokens ?? raw.reasoningOutputTokens,
+    );
     const totalTokens = asNumber(raw.total_tokens ?? raw.totalTokens);
     return {
       date: String(raw.date ?? ''),
       input_tokens: inputTokens,
       output_tokens: outputTokens,
+      cache_read_tokens: cacheReadTokens,
+      reasoning_output_tokens: reasoningOutputTokens,
       total_tokens: totalTokens > 0 ? totalTokens : inputTokens + outputTokens,
+      estimated_cost: asNumber(raw.estimated_cost ?? raw.estimatedCost),
     };
   });
-
-const hasTokenData = (days: DailyTokenDataPoint[]): boolean =>
-  days.some(
-    (item) =>
-      asNumber(item.total_tokens) > 0 ||
-      asNumber(item.input_tokens) > 0 ||
-      asNumber(item.output_tokens) > 0,
-  );
 
 const normalizeActivityDays = (value: unknown): ActivityDataPoint[] =>
   asArray(value as ActivityDataPoint[]).map((item) => {
@@ -70,13 +75,6 @@ const normalizeActivityDays = (value: unknown): ActivityDataPoint[] =>
       ),
     };
   });
-
-const hasActivityData = (days: ActivityDataPoint[]): boolean =>
-  days.some(
-    (item) =>
-      asNumber(item.bugs_fixed) > 0 ||
-      asNumber(item.features_delivered) > 0,
-  );
 
 const timeRangeDays: Record<TimeRange, number> = {
   '7d': 7,
@@ -105,7 +103,10 @@ const mockDailyTokens = (range: TimeRange): DailyTokenDataPoint[] => {
       date: isoDateNDaysAgo(age),
       input_tokens: Math.max(0, input),
       output_tokens: Math.max(0, output),
+      cache_read_tokens: 0,
+      reasoning_output_tokens: 0,
       total_tokens: Math.max(0, input + output),
+      estimated_cost: 0,
     };
   });
 };
@@ -125,35 +126,50 @@ const mockSessions: SessionCostEntry[] = [
     title: '修复登录流程中的 OAuth 回调问题',
     input_tokens: 48200,
     output_tokens: 19400,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 67600,
+    estimated_cost: 0,
   },
   {
     session_id: 'mock-session-2',
     title: '构建项目级构建统计 Dashboard',
     input_tokens: 42100,
     output_tokens: 17250,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 59350,
+    estimated_cost: 0,
   },
   {
     session_id: 'mock-session-3',
     title: '重构容器服务与本地部署状态同步',
     input_tokens: 31840,
     output_tokens: 11820,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 43660,
+    estimated_cost: 0,
   },
   {
     session_id: 'mock-session-4',
     title: '补齐模型价格同步与展示逻辑',
     input_tokens: 24600,
     output_tokens: 9400,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 34000,
+    estimated_cost: 0,
   },
   {
     session_id: 'mock-session-5',
     title: '前端空状态与错误兜底验证',
     input_tokens: 15320,
     output_tokens: 6110,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 21430,
+    estimated_cost: 0,
   },
 ];
 
@@ -164,49 +180,70 @@ const mockScrollableSessions: SessionCostEntry[] = [
     title: 'Stabilize build statistics hover state',
     input_tokens: 12420,
     output_tokens: 3980,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 16400,
+    estimated_cost: 0,
   },
   {
     session_id: 'mock-session-7',
     title: 'Audit pricing cache sync behavior',
     input_tokens: 10840,
     output_tokens: 2860,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 13700,
+    estimated_cost: 0,
   },
   {
     session_id: 'mock-session-8',
     title: 'Polish chart responsive layout',
     input_tokens: 9120,
     output_tokens: 2440,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 11560,
+    estimated_cost: 0,
   },
   {
     session_id: 'mock-session-9',
     title: 'Validate project scoped analytics query',
     input_tokens: 7800,
     output_tokens: 2180,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 9980,
+    estimated_cost: 0,
   },
   {
     session_id: 'mock-session-10',
     title: 'Repair fallback data normalization',
     input_tokens: 6400,
     output_tokens: 1720,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 8120,
+    estimated_cost: 0,
   },
   {
     session_id: 'mock-session-11',
     title: 'Review session token sorting',
     input_tokens: 5200,
     output_tokens: 1420,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 6620,
+    estimated_cost: 0,
   },
   {
     session_id: 'mock-session-12',
     title: 'Tune compact number formatting',
     input_tokens: 3980,
     output_tokens: 980,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 4960,
+    estimated_cost: 0,
   },
 ];
 
@@ -216,55 +253,75 @@ const mockModels: ModelUsageRow[] = [
     model_name: 'GPT-5.4',
     input_tokens: 84500,
     output_tokens: 32900,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 117400,
     input_price_per_1m: 1.25,
     output_price_per_1m: 10,
+    cache_read_price_per_1m: 0,
     estimated_cost: 0.4356,
     price_source: 'mock',
+    cache_price_source: 'mock',
   },
   {
     model_id: 'claude-sonnet-4-6',
     model_name: 'Claude Sonnet 4.6',
     input_tokens: 61200,
     output_tokens: 22800,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 84000,
     input_price_per_1m: 3,
     output_price_per_1m: 15,
+    cache_read_price_per_1m: 0,
     estimated_cost: 0.5256,
     price_source: 'mock',
+    cache_price_source: 'mock',
   },
   {
     model_id: 'gpt-5.4-mini',
     model_name: 'GPT-5.4 mini',
     input_tokens: 53100,
     output_tokens: 18700,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 71800,
     input_price_per_1m: 0.15,
     output_price_per_1m: 0.6,
+    cache_read_price_per_1m: 0,
     estimated_cost: 0.0192,
     price_source: 'mock',
+    cache_price_source: 'mock',
   },
   {
     model_id: 'gemini-3-pro',
     model_name: 'Gemini 3 Pro',
     input_tokens: 38200,
     output_tokens: 14100,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 52300,
     input_price_per_1m: 1.25,
     output_price_per_1m: 10,
+    cache_read_price_per_1m: 0,
     estimated_cost: 0.1888,
     price_source: 'mock',
+    cache_price_source: 'mock',
   },
   {
     model_id: 'kimi-k2.6',
     model_name: 'Kimi K2.6',
     input_tokens: 29500,
     output_tokens: 9900,
+    cache_read_tokens: 0,
+    reasoning_output_tokens: 0,
     total_tokens: 39400,
     input_price_per_1m: 0.6,
     output_price_per_1m: 2.5,
+    cache_read_price_per_1m: 0,
     estimated_cost: 0.0425,
     price_source: 'mock',
+    cache_price_source: 'mock',
   },
 ];
 
@@ -310,10 +367,10 @@ export function BuildStatsPage() {
     try {
       const res = await buildStatsApi.getDailyTokens(selectedProjectId, timeRange);
       const days = normalizeDailyTokenDays(res?.days);
-      setDailyTokens(hasTokenData(days) ? days : mockDailyTokens(timeRange));
+      setDailyTokens(days);
     } catch {
-      setDailyTokens(mockDailyTokens(timeRange));
-      setDailyTokensError(null);
+      setDailyTokens([]);
+      setDailyTokensError(t('buildStats.error.fetchFailed'));
     } finally {
       setDailyTokensLoading(false);
     }
@@ -332,7 +389,7 @@ export function BuildStatsPage() {
       const res = await buildStatsApi.getActivity(selectedProjectId, timeRange);
       if (Array.isArray(res?.days)) {
         const days = normalizeActivityDays(res.days);
-        setActivityDays(hasActivityData(days) ? days : mockActivityDays(timeRange));
+        setActivityDays(days);
       } else {
         const legacy = res as unknown as {
           bugs_fixed?: number;
@@ -345,13 +402,11 @@ export function BuildStatsPage() {
             features_delivered: asNumber(legacy?.features_delivered),
           },
         ];
-        setActivityDays(
-          hasActivityData(legacyDays) ? legacyDays : mockActivityDays(timeRange),
-        );
+        setActivityDays(legacyDays);
       }
     } catch {
-      setActivityDays(mockActivityDays(timeRange));
-      setActivityError(null);
+      setActivityDays([]);
+      setActivityError(t('buildStats.error.fetchFailed'));
     } finally {
       setActivityLoading(false);
     }
@@ -369,10 +424,10 @@ export function BuildStatsPage() {
     try {
       const res = await buildStatsApi.getSessionTokens(selectedProjectId);
       const sessions = asArray(res?.sessions);
-      setSessions(sessions.length > 0 ? sessions : mockScrollableSessions);
+      setSessions(sessions);
     } catch {
-      setSessions(mockScrollableSessions);
-      setSessionsError(null);
+      setSessions([]);
+      setSessionsError(t('buildStats.error.fetchFailed'));
     } finally {
       setSessionsLoading(false);
     }
@@ -388,16 +443,23 @@ export function BuildStatsPage() {
     setModelsLoading(true);
     setModelsError(null);
     try {
-      const res = await buildStatsApi.getModelPricing(selectedProjectId);
+      const res = await buildStatsApi.getModelPricing(selectedProjectId, timeRange);
       const models = asArray(res?.models);
-      setModels(models.length > 0 ? models : mockModels);
+      setModels(models);
     } catch {
-      setModels(mockModels);
-      setModelsError(null);
+      setModels([]);
+      setModelsError(t('buildStats.error.fetchFailed'));
     } finally {
       setModelsLoading(false);
     }
-  }, [selectedProjectId, t]);
+  }, [selectedProjectId, timeRange, t]);
+
+  const refreshCostData = useCallback(async () => {
+    await Promise.all([fetchDailyTokens(), fetchSessions(), fetchModels()]);
+    if (selectedProjectId) {
+      notifyBuildStatsPricingUpdated(selectedProjectId);
+    }
+  }, [fetchDailyTokens, fetchSessions, fetchModels, selectedProjectId]);
 
   useEffect(() => {
     void fetchDailyTokens();
@@ -460,7 +522,7 @@ export function BuildStatsPage() {
           value={formatNumber(totals.featuresDelivered)}
         />
         <MetricTile
-          label={text('buildStats.topModelCost', 'Top model cost')}
+          label={text('buildStats.modelCost', 'Model cost')}
           value={formatPrice(totals.modelCost)}
         />
       </div>
@@ -519,12 +581,14 @@ export function BuildStatsPage() {
           />
         </Panel>
 
-        <Panel title={text('buildStats.topModels', 'Top 5 model usage')}>
+        <Panel title={text('buildStats.modelUsage', 'Model usage')}>
           <ModelPricingTable
             models={models}
             loading={modelsLoading}
             error={modelsError}
             onRetry={() => void fetchModels()}
+            projectId={selectedProjectId}
+            onPricingUpdated={refreshCostData}
             t={t}
           />
         </Panel>

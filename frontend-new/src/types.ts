@@ -43,12 +43,32 @@ export interface Message {
   text: string;
   cost?: string;
   model?: string;
+  quotedMessage?: QuotedMessageReference;
+  referenceMessageId?: string;
+  attachments?: ChatAttachment[];
   isUser?: boolean;
   isThinking?: boolean;
   isAgentRunning?: boolean;
   runId?: string;
+  sessionAgentId?: string;
   activityLines?: ChatRunActivityLine[];
   activityLoadState?: ActivityLoadState;
+}
+
+export interface QuotedMessageReference {
+  id: string;
+  sender: string;
+  content: string;
+  summary: string;
+}
+
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  mime_type?: string | null;
+  size_bytes?: number;
+  kind?: string;
+  relative_path?: string;
 }
 
 export type ActivityLoadState =
@@ -809,7 +829,10 @@ export interface DailyTokenDataPoint {
   date: string; // YYYY-MM-DD
   input_tokens: number;
   output_tokens: number;
+  cache_read_tokens: number;
+  reasoning_output_tokens: number;
   total_tokens: number;
+  estimated_cost: number;
 }
 
 export interface DailyTokensResponse {
@@ -822,6 +845,9 @@ export interface SessionCostEntry {
   total_tokens: number;
   input_tokens: number;
   output_tokens: number;
+  cache_read_tokens: number;
+  reasoning_output_tokens: number;
+  estimated_cost: number;
 }
 
 export interface SessionTokensResponse {
@@ -843,8 +869,10 @@ export interface ModelPriceRow {
   model_name: string;
   input_price_per_1m: number;
   output_price_per_1m: number;
+  cache_read_price_per_1m?: number | null;
   custom_input_price: number | null;
   custom_output_price: number | null;
+  custom_cache_read_price?: number | null;
   price_source: string;
   price_updated_at: string;
 }
@@ -859,13 +887,18 @@ export interface ModelUsageRow {
   total_tokens: number;
   input_tokens: number;
   output_tokens: number;
+  cache_read_tokens: number;
+  reasoning_output_tokens: number;
   input_price_per_1m: number;
   output_price_per_1m: number;
+  cache_read_price_per_1m?: number | null;
   estimated_cost: number;
   price_source: string;
+  cache_price_source?: string;
 }
 
 export interface UpdateModelPricingRequest {
   custom_input_price?: number | null;
   custom_output_price?: number | null;
+  custom_cache_read_price?: number | null;
 }

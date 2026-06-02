@@ -560,27 +560,27 @@ export const mockShellOptions: ShellOptionsMock = {
   buildStats: {
     title: 'Build stats',
     defaultExpanded: true,
-    summary: 'Local UI placeholder for current project activity.',
+    summary: '',
     stats: [
       {
         id: 'features',
         label: 'Features shipped',
         value: '5',
-        helper: 'Mock count for sidebar display.',
+        helper: 'Feature delivery events in the last 7 days.',
         tone: 'success',
       },
       {
         id: 'bugs-fixed',
         label: 'Bugs fixed',
         value: '12',
-        helper: 'Mock count for sidebar display.',
+        helper: 'Bugfix delivery events in the last 7 days.',
         tone: 'accent',
       },
       {
         id: 'weekly-spend',
         label: 'Weekly spend',
         value: '$8.42',
-        helper: 'Uses local WorkspaceContext weekly cost when rendered.',
+        helper: '7-day model cost in USD from token usage.',
         tone: 'warning',
       },
     ],

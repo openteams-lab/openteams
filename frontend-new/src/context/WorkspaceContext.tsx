@@ -18,12 +18,14 @@ import {
   BackendChatSessionAgent,
   ChatRunActivityLine,
   ChatRunRetentionInfo,
+  QuotedMessageReference,
   Provider,
   Strategy,
   BackendChatSkill,
   Config,
   WorkflowCardProjection,
   WorkspaceChangesResponse,
+  JsonValue,
 } from '@/types';
 import { i18nDict } from '@/i18n';
 import { mockFrontendApi } from '@/lib/mockFrontendApi';
@@ -56,8 +58,13 @@ import {
   initialAsync,
   succeed,
 } from '@/lib/asyncResource';
+import { notifyBuildStatsUsageUpdated } from '@/lib/buildStatsEvents';
 
 type ListUpdater<T> = T[] | ((prev: T[]) => T[]);
+
+interface SendMessageOptions {
+  quotedMessage?: QuotedMessageReference;
+}
 
 type ChatStreamEvent =
   | {
@@ -118,6 +125,41 @@ const isPendingAgentPlaceholder = (message: Message): boolean =>
     message.id.startsWith(PENDING_AGENT_MESSAGE_PREFIX),
   );
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const hasNonNegativeNumberField = (
+  value: Record<string, unknown>,
+  fieldNames: string[],
+): boolean =>
+  fieldNames.some((fieldName) => {
+    const raw = value[fieldName];
+    return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0;
+  });
+
+const hasCompleteTokenUsageBreakdown = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+  return (
+    hasNonNegativeNumberField(value, ['input_tokens', 'snapshot_input_tokens']) &&
+    hasNonNegativeNumberField(value, [
+      'output_tokens',
+      'snapshot_output_tokens',
+    ])
+  );
+};
+
+const hasRealCompleteTokenUsage = (message: BackendChatMessage): boolean => {
+  if (message.sender_type !== 'agent' || !isRecord(message.meta)) return false;
+  const tokenUsage = message.meta.token_usage;
+  if (!isRecord(tokenUsage)) return false;
+  if (tokenUsage.is_estimated === true) return false;
+  return (
+    hasCompleteTokenUsageBreakdown(tokenUsage) ||
+    hasCompleteTokenUsageBreakdown(tokenUsage.last_token_usage) ||
+    hasCompleteTokenUsageBreakdown(tokenUsage.total_token_usage)
+  );
+};
+
 const extractAgentMentions = (text: string): string[] =>
   Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
     match[1].toLowerCase(),
@@ -151,9 +193,40 @@ const makePendingAgentPlaceholder = (
     text: '',
     isThinking: true,
     isAgentRunning: true,
+    sessionAgentId: fallbackMember?.id,
     activityLines: [],
     activityLoadState: 'loaded',
   };
+};
+
+const summarizeQuotedContent = (content: string): string => {
+  const normalized = content.trim().replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  return normalized.length > 140
+    ? `${normalized.slice(0, 137)}...`
+    : normalized;
+};
+
+const resolveQuotedMessageReferences = (messages: Message[]): Message[] => {
+  const messagesById = new Map(messages.map((message) => [message.id, message]));
+  return messages.map((message) => {
+    if (message.quotedMessage || !message.referenceMessageId) {
+      return message;
+    }
+
+    const referenced = messagesById.get(message.referenceMessageId);
+    if (!referenced) return message;
+
+    return {
+      ...message,
+      quotedMessage: {
+        id: referenced.id,
+        sender: referenced.isUser ? 'You' : referenced.sender,
+        content: referenced.text,
+        summary: summarizeQuotedContent(referenced.text),
+      },
+    };
+  });
 };
 
 const mergePersistedWithRunningPlaceholders = (
@@ -240,6 +313,7 @@ const hydrateRunningAgentPlaceholders = async (
         isThinking: true,
         isAgentRunning: true,
         runId: run.run_id,
+        sessionAgentId: sessionAgent.id,
         activityLines,
         activityLoadState: 'idle',
       };
@@ -304,7 +378,7 @@ interface WorkspaceContextProps {
   setIsAddProviderModalOpen: (b: boolean) => void;
 
   // Active Simulation Utilities
-  sendMessage: (text: string) => void;
+  sendMessage: (text: string, options?: SendMessageOptions) => void;
   addNewTask: (title: string, details: string, chosenMembers: string[]) => void;
   retryWorkflowFromStep3: () => void;
   addMemberToOrganization: (name: string, model: string) => void;
@@ -684,10 +758,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         retention.runs,
       );
       setAllMessages((prev) => {
-        const next = mergePersistedWithRunningPlaceholders(mapped, [
-          ...(prev[sid] ?? []),
-          ...runningPlaceholders,
-        ]);
+        const next = resolveQuotedMessageReferences(
+          mergePersistedWithRunningPlaceholders(mapped, [
+            ...(prev[sid] ?? []),
+            ...runningPlaceholders,
+          ]),
+        );
         setMessagesAsync(succeed(next));
         return { ...prev, [sid]: next };
       });
@@ -841,6 +917,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         const current = prev[sid] || [];
         let carriedLines: ChatRunActivityLine[] | undefined;
         let carriedState = incoming.activityLoadState;
+        let carriedSessionAgentId = incoming.sessionAgentId;
         const hasMatchingRun = Boolean(
           incoming.runId &&
           current.some(
@@ -862,6 +939,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           if (isMatchingRun || isPendingRun) {
             carriedLines = message.activityLines;
             carriedState = message.activityLoadState ?? 'loaded';
+            carriedSessionAgentId =
+              carriedSessionAgentId ?? message.sessionAgentId;
             removedPendingPlaceholder =
               removedPendingPlaceholder || isPendingRun;
             return false;
@@ -872,6 +951,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           ...incoming,
           activityLines: carriedLines ?? incoming.activityLines,
           activityLoadState: carriedState,
+          sessionAgentId: carriedSessionAgentId,
           isAgentRunning: undefined,
           isThinking: undefined,
         };
@@ -884,7 +964,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
                 index === existingIndex ? nextMessage : message,
               )
             : [...withoutPlaceholder, nextMessage];
-        return { ...prev, [sid]: next };
+        return { ...prev, [sid]: resolveQuotedMessageReferences(next) };
       });
     },
     [],
@@ -932,6 +1012,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         isThinking: true,
         isAgentRunning: true,
         runId: line.run_id,
+        sessionAgentId: line.session_agent_id,
         activityLines: [line],
         activityLoadState: 'idle',
       };
@@ -966,6 +1047,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           isThinking: true,
           isAgentRunning: true,
           runId: event.run_id,
+          sessionAgentId: event.session_agent_id,
           activityLines: [],
           activityLoadState: 'idle',
         };
@@ -1023,6 +1105,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         (parsed.type === 'message_new' || parsed.type === 'message_updated') &&
         parsed.message.session_id === sid
       ) {
+        if (hasRealCompleteTokenUsage(parsed.message)) {
+          const projectId = selectedProjectIdRef.current;
+          if (projectId) {
+            notifyBuildStatsUsageUpdated(projectId);
+          }
+        }
         upsertStreamedMessage(sid, mapBackendChatMessage(parsed.message));
         return;
       }
@@ -1173,7 +1261,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     }, 600);
   };
 
-  const sendMessage = (text: string) => {
+  const sendMessage = (text: string, options: SendMessageOptions = {}) => {
     if (!text.trim()) return;
 
     const sid = activeSessionIdRef.current;
@@ -1185,6 +1273,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       time: 'just now',
       text,
       isUser: true,
+      quotedMessage: options.quotedMessage,
+      referenceMessageId: options.quotedMessage?.id,
     };
     const pendingAgentMsg =
       sessionsAsync.source === 'api'
@@ -1212,12 +1302,20 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       .split(/\s+/)
       .filter((w) => w.startsWith('@'))
       .map((m) => m.slice(1).toLowerCase());
+    const meta: { [key: string]: JsonValue } = {};
+    if (mentions.length > 0) {
+      meta.mentions = mentions;
+    }
+    if (options.quotedMessage) {
+      meta.reference = { message_id: options.quotedMessage.id };
+    }
+
     chatMessagesApi
       .send(sid, {
         sender_type: 'user',
         sender_id: null,
         content: text,
-        meta: mentions.length > 0 ? { mentions } : null,
+        meta: Object.keys(meta).length > 0 ? meta : null,
       })
       .then(() => {
         void refreshMessages();

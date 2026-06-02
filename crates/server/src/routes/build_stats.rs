@@ -1,18 +1,18 @@
-﻿use axum::{
+use axum::{
     Router,
     extract::{Path, Query, State},
     response::Json as ResponseJson,
     routing::{delete, get, put},
 };
 use chrono::{NaiveDate, Utc};
+use deployment::Deployment;
 use serde::{Deserialize, Serialize};
+use services::services::token_cost_stats::TokenCostStatsService;
 use ts_rs::TS;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError};
-
-use deployment::Deployment;
 
 // 鈹€鈹€鈹€ Query Parameters 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
@@ -56,7 +56,10 @@ pub struct DailyTokenDataPoint {
     pub date: String,
     pub input_tokens: i64,
     pub output_tokens: i64,
+    pub cache_read_tokens: i64,
+    pub reasoning_output_tokens: i64,
     pub total_tokens: i64,
+    pub estimated_cost: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize, TS)]
@@ -71,6 +74,9 @@ pub struct SessionTokenEntry {
     pub total_tokens: i64,
     pub input_tokens: i64,
     pub output_tokens: i64,
+    pub cache_read_tokens: i64,
+    pub reasoning_output_tokens: i64,
+    pub estimated_cost: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize, TS)]
@@ -95,12 +101,14 @@ pub struct ActivityResponse {
 #[derive(Debug, Deserialize)]
 pub struct ModelPricingQuery {
     pub project_id: Uuid,
+    pub period: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateModelPricingRequest {
     pub custom_input_price: Option<Option<f64>>,
     pub custom_output_price: Option<Option<f64>>,
+    pub custom_cache_read_price: Option<Option<f64>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -110,10 +118,14 @@ pub struct ModelUsageRow {
     pub total_tokens: i64,
     pub input_tokens: i64,
     pub output_tokens: i64,
+    pub cache_read_tokens: i64,
+    pub reasoning_output_tokens: i64,
     pub input_price_per_1m: f64,
     pub output_price_per_1m: f64,
+    pub cache_read_price_per_1m: f64,
     pub estimated_cost: f64,
     pub price_source: String,
+    pub cache_price_source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -122,8 +134,10 @@ pub struct ModelPriceRow {
     pub model_name: String,
     pub input_price_per_1m: f64,
     pub output_price_per_1m: f64,
+    pub cache_read_price_per_1m: Option<f64>,
     pub custom_input_price: Option<f64>,
     pub custom_output_price: Option<f64>,
+    pub custom_cache_read_price: Option<f64>,
     pub price_source: String,
     pub price_updated_at: String,
 }
@@ -141,8 +155,14 @@ pub fn router() -> Router<DeploymentImpl> {
         .route("/build-stats/session-tokens", get(get_session_tokens))
         .route("/build-stats/activity", get(get_activity))
         .route("/build-stats/model-pricing", get(get_model_pricing))
-        .route("/build-stats/model-pricing/{model_id}", put(update_model_pricing))
-        .route("/build-stats/model-pricing/{model_id}/custom", delete(reset_model_pricing))
+        .route(
+            "/build-stats/model-pricing/{model_id}",
+            put(update_model_pricing),
+        )
+        .route(
+            "/build-stats/model-pricing/{model_id}/custom",
+            delete(reset_model_pricing),
+        )
 }
 
 // 鈹€鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
@@ -170,10 +190,8 @@ pub fn fill_zero_days(
     use std::collections::HashMap;
 
     // Build a lookup map from date string to data point
-    let data_map: HashMap<String, &DailyTokenDataPoint> = sparse_data
-        .iter()
-        .map(|dp| (dp.date.clone(), dp))
-        .collect();
+    let data_map: HashMap<String, &DailyTokenDataPoint> =
+        sparse_data.iter().map(|dp| (dp.date.clone(), dp)).collect();
 
     let mut result = Vec::with_capacity(num_days as usize);
     for i in 0..num_days {
@@ -187,7 +205,10 @@ pub fn fill_zero_days(
                 date: date_str,
                 input_tokens: 0,
                 output_tokens: 0,
+                cache_read_tokens: 0,
+                reasoning_output_tokens: 0,
                 total_tokens: 0,
+                estimated_cost: 0.0,
             });
         }
     }
@@ -202,10 +223,8 @@ fn fill_zero_activity_days(
 ) -> Vec<ActivityDataPoint> {
     use std::collections::HashMap;
 
-    let data_map: HashMap<String, &ActivityDataPoint> = sparse_data
-        .iter()
-        .map(|dp| (dp.date.clone(), dp))
-        .collect();
+    let data_map: HashMap<String, &ActivityDataPoint> =
+        sparse_data.iter().map(|dp| (dp.date.clone(), dp)).collect();
 
     let mut result = Vec::with_capacity(num_days as usize);
     for i in 0..num_days {
@@ -237,41 +256,20 @@ async fn get_daily_tokens(
 
     let today = Utc::now().date_naive();
     let start_date = today - chrono::Duration::days(num_days - 1);
-    let start_timestamp = start_date.format("%Y-%m-%d").to_string();
+    let end_date = today;
 
-    let rows = sqlx::query_as::<_, DailyTokenRow>(
-        r#"
-        SELECT
-            date(ae.timestamp) as date,
-            COALESCE(SUM(json_extract(ae.properties, '$.input_tokens')), 0) as input_tokens,
-            COALESCE(SUM(json_extract(ae.properties, '$.output_tokens')), 0) as output_tokens,
-            COALESCE(SUM(json_extract(ae.properties, '$.total_tokens')), 0) as total_tokens
-        FROM analytics_events ae
-        JOIN chat_sessions cs
-          ON ae.session_id = CAST(cs.id AS TEXT)
-          OR replace(lower(ae.session_id), '-', '') = lower(hex(cs.id))
-        WHERE ae.event_type = 'token_usage'
-          AND (
-            cs.project_id = ?1
-            OR replace(lower(CAST(cs.project_id AS TEXT)), '-', '') = lower(hex(?1))
-          )
-          AND ae.timestamp >= ?2
-        GROUP BY date(ae.timestamp)
-        ORDER BY date(ae.timestamp) ASC
-        "#,
-    )
-    .bind(params.project_id)
-    .bind(&start_timestamp)
-    .fetch_all(pool)
-    .await?;
-
-    let sparse_data: Vec<DailyTokenDataPoint> = rows
+    let sparse_data: Vec<DailyTokenDataPoint> = TokenCostStatsService::new()
+        .daily_tokens(pool, params.project_id, start_date, end_date)
+        .await?
         .into_iter()
-        .map(|row| DailyTokenDataPoint {
-            date: row.date,
-            input_tokens: row.input_tokens,
-            output_tokens: row.output_tokens,
-            total_tokens: row.total_tokens,
+        .map(|stats| DailyTokenDataPoint {
+            date: stats.date,
+            input_tokens: stats.input_tokens,
+            output_tokens: stats.output_tokens,
+            cache_read_tokens: stats.cache_read_tokens,
+            reasoning_output_tokens: stats.reasoning_output_tokens,
+            total_tokens: stats.total_tokens,
+            estimated_cost: stats.estimated_cost,
         })
         .collect();
 
@@ -283,23 +281,6 @@ async fn get_daily_tokens(
 }
 // 鈹€鈹€鈹€ Internal Types 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
-#[derive(Debug, sqlx::FromRow)]
-struct DailyTokenRow {
-    date: String,
-    input_tokens: i64,
-    output_tokens: i64,
-    total_tokens: i64,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct SessionTokenRow {
-    session_id: String,
-    title: String,
-    input_tokens: i64,
-    output_tokens: i64,
-    total_tokens: i64,
-}
-
 // 鈹€鈹€鈹€ Session Tokens Handler 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 async fn get_session_tokens(
@@ -307,43 +288,21 @@ async fn get_session_tokens(
     Query(params): Query<SessionTokensQuery>,
 ) -> Result<ResponseJson<ApiResponse<SessionTokensResponse>>, ApiError> {
     let pool = &deployment.db().pool;
-    let limit = params.limit.unwrap_or(50).min(50) as i64;
+    let limit = params.limit.unwrap_or(50).min(50);
 
-    let rows = sqlx::query_as::<_, SessionTokenRow>(
-        r#"
-        SELECT
-            ae.session_id as session_id,
-            COALESCE(cs.title, '') as title,
-            COALESCE(SUM(json_extract(ae.properties, '$.input_tokens')), 0) as input_tokens,
-            COALESCE(SUM(json_extract(ae.properties, '$.output_tokens')), 0) as output_tokens,
-            COALESCE(SUM(json_extract(ae.properties, '$.total_tokens')), 0) as total_tokens
-        FROM analytics_events ae
-        JOIN chat_sessions cs
-          ON ae.session_id = CAST(cs.id AS TEXT)
-          OR replace(lower(ae.session_id), '-', '') = lower(hex(cs.id))
-        WHERE ae.event_type = 'token_usage'
-          AND (
-            cs.project_id = ?1
-            OR replace(lower(CAST(cs.project_id AS TEXT)), '-', '') = lower(hex(?1))
-          )
-        GROUP BY ae.session_id, cs.title
-        ORDER BY total_tokens DESC
-        LIMIT ?2
-        "#,
-    )
-    .bind(params.project_id)
-    .bind(limit)
-    .fetch_all(pool)
-    .await?;
-
-    let sessions: Vec<SessionTokenEntry> = rows
+    let sessions: Vec<SessionTokenEntry> = TokenCostStatsService::new()
+        .session_tokens(pool, params.project_id, limit)
+        .await?
         .into_iter()
-        .map(|row| SessionTokenEntry {
-            session_id: row.session_id,
-            title: row.title,
-            total_tokens: row.total_tokens,
-            input_tokens: row.input_tokens,
-            output_tokens: row.output_tokens,
+        .map(|stats| SessionTokenEntry {
+            session_id: stats.session_id,
+            title: stats.title,
+            total_tokens: stats.total_tokens,
+            input_tokens: stats.input_tokens,
+            output_tokens: stats.output_tokens,
+            cache_read_tokens: stats.cache_read_tokens,
+            reasoning_output_tokens: stats.reasoning_output_tokens,
+            estimated_cost: stats.estimated_cost,
         })
         .collect();
 
@@ -403,7 +362,9 @@ async fn get_activity(
         .collect();
     let days = fill_zero_activity_days(sparse_data, start_date, num_days);
 
-    Ok(ResponseJson(ApiResponse::success(ActivityResponse { days })))
+    Ok(ResponseJson(ApiResponse::success(ActivityResponse {
+        days,
+    })))
 }
 // 鈹€鈹€鈹€ Price Validation 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
@@ -426,82 +387,42 @@ pub fn validate_price(value: f64) -> Result<(), String> {
 
 // 鈹€鈹€鈹€ Model Pricing Handlers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
-#[derive(Debug, sqlx::FromRow)]
-struct ModelUsageQueryRow {
-    model_id: String,
-    model_name: String,
-    total_tokens: i64,
-    input_tokens: i64,
-    output_tokens: i64,
-    input_price_per_1m: f64,
-    output_price_per_1m: f64,
-    source: String,
-}
-
 async fn get_model_pricing(
     State(deployment): State<DeploymentImpl>,
     Query(params): Query<ModelPricingQuery>,
 ) -> Result<ResponseJson<ApiResponse<ModelPricingResponse>>, ApiError> {
     let pool = &deployment.db().pool;
 
-    let rows = sqlx::query_as::<_, ModelUsageQueryRow>(
-        r#"
-        WITH model_usage AS (
-            SELECT
-                COALESCE(json_extract(ae.properties, '$.model'), 'unknown') as model_id,
-                COALESCE(SUM(json_extract(ae.properties, '$.input_tokens')), 0) as input_tokens,
-                COALESCE(SUM(json_extract(ae.properties, '$.output_tokens')), 0) as output_tokens,
-                COALESCE(SUM(json_extract(ae.properties, '$.total_tokens')), 0) as total_tokens
-            FROM analytics_events ae
-            JOIN chat_sessions cs
-              ON ae.session_id = CAST(cs.id AS TEXT)
-              OR replace(lower(ae.session_id), '-', '') = lower(hex(cs.id))
-            WHERE ae.event_type = 'token_usage'
-              AND (
-                cs.project_id = ?1
-                OR replace(lower(CAST(cs.project_id AS TEXT)), '-', '') = lower(hex(?1))
-              )
-              AND COALESCE(json_extract(ae.properties, '$.model'), '') != ''
-            GROUP BY model_id
-        )
-        SELECT
-            mu.model_id,
-            COALESCE(mpc.model_name, mu.model_id) as model_name,
-            mu.total_tokens,
-            mu.input_tokens,
-            mu.output_tokens,
-            COALESCE(mp.custom_input_price, mpc.input_price_per_1m, 0.0) as input_price_per_1m,
-            COALESCE(mp.custom_output_price, mpc.output_price_per_1m, 0.0) as output_price_per_1m,
-            COALESCE(mpc.source, 'usage') as source
-        FROM model_usage mu
-        LEFT JOIN model_price_cache mpc ON mpc.model_id = mu.model_id
-        LEFT JOIN model_pricing mp
-            ON mp.model_id = mu.model_id
-            AND mp.project_id = ?1
-        ORDER BY mu.total_tokens DESC
-        LIMIT 5
-        "#,
-    )
-    .bind(params.project_id)
-    .fetch_all(pool)
-    .await?;
+    let service = TokenCostStatsService::new();
+    let model_stats = if let Some(period) = params.period.as_deref() {
+        let num_days = parse_period_days(period)?;
+        let today = Utc::now().date_naive();
+        let start_date = today - chrono::Duration::days(num_days - 1);
+        service
+            .model_usage_for_period(pool, params.project_id, start_date, today, u32::MAX)
+            .await?
+    } else {
+        service
+            .model_usage(pool, params.project_id, u32::MAX)
+            .await?
+    };
 
-    let models = rows
+    let models = model_stats
         .into_iter()
-        .map(|row| {
-            let estimated_cost = (row.input_tokens as f64 / 1_000_000.0) * row.input_price_per_1m
-                + (row.output_tokens as f64 / 1_000_000.0) * row.output_price_per_1m;
-            ModelUsageRow {
-                model_id: row.model_id,
-                model_name: row.model_name,
-                total_tokens: row.total_tokens,
-                input_tokens: row.input_tokens,
-                output_tokens: row.output_tokens,
-                input_price_per_1m: row.input_price_per_1m,
-                output_price_per_1m: row.output_price_per_1m,
-                estimated_cost,
-                price_source: row.source,
-            }
+        .map(|stats| ModelUsageRow {
+            model_id: stats.model_id,
+            model_name: stats.model_name,
+            total_tokens: stats.total_tokens,
+            input_tokens: stats.input_tokens,
+            output_tokens: stats.output_tokens,
+            cache_read_tokens: stats.cache_read_tokens,
+            reasoning_output_tokens: stats.reasoning_output_tokens,
+            input_price_per_1m: stats.input_price_per_1m,
+            output_price_per_1m: stats.output_price_per_1m,
+            cache_read_price_per_1m: stats.cache_read_price_per_1m,
+            estimated_cost: stats.estimated_cost,
+            price_source: stats.price_source,
+            cache_price_source: stats.cache_price_source,
         })
         .collect();
 
@@ -519,16 +440,28 @@ async fn update_model_pricing(
 
     // Validate prices if provided
     if let Some(Some(price)) = &body.custom_input_price {
-        validate_price(*price).map_err(|e| ApiError::BadRequest(format!("custom_input_price: {}", e)))?;
+        validate_price(*price)
+            .map_err(|e| ApiError::BadRequest(format!("custom_input_price: {}", e)))?;
     }
     if let Some(Some(price)) = &body.custom_output_price {
-        validate_price(*price).map_err(|e| ApiError::BadRequest(format!("custom_output_price: {}", e)))?;
+        validate_price(*price)
+            .map_err(|e| ApiError::BadRequest(format!("custom_output_price: {}", e)))?;
+    }
+    if let Some(Some(price)) = &body.custom_cache_read_price {
+        validate_price(*price)
+            .map_err(|e| ApiError::BadRequest(format!("custom_cache_read_price: {}", e)))?;
     }
 
-    // Verify the model exists in the cache
-    let cache_row = sqlx::query_as::<_, (String, String, f64, f64, String, String)>(
+    let cache_row = sqlx::query_as::<_, (String, String, f64, f64, Option<f64>, String, String)>(
         r#"
-        SELECT model_id, model_name, input_price_per_1m, output_price_per_1m, source, updated_at
+        SELECT
+            model_id,
+            model_name,
+            input_price_per_1m,
+            output_price_per_1m,
+            cache_read_price_per_1m,
+            source,
+            updated_at
         FROM model_price_cache
         WHERE model_id = ?1
         "#,
@@ -537,21 +470,54 @@ async fn update_model_pricing(
     .fetch_optional(pool)
     .await?;
 
-    let (_, model_name, input_price, output_price, source, price_updated_at) = cache_row
-        .ok_or_else(|| ApiError::BadRequest(format!("Model '{}' not found", model_id)))?;
-
     // Determine the custom prices to set
     // If the field is Some(value), use that value (which may be Some(price) or None to clear)
     // If the field is None (not provided), keep existing value
-    let existing = sqlx::query_as::<_, (Option<f64>, Option<f64>)>(
-        "SELECT custom_input_price, custom_output_price FROM model_pricing WHERE project_id = ?1 AND model_id = ?2",
+    let existing = sqlx::query_as::<_, (Option<f64>, Option<f64>, Option<f64>, Option<String>)>(
+        "SELECT custom_input_price, custom_output_price, custom_cache_read_price, model_name FROM model_pricing WHERE project_id = ?1 AND model_id = ?2",
     )
     .bind(params.project_id)
     .bind(&model_id)
     .fetch_optional(pool)
     .await?;
 
-    let (existing_input, existing_output) = existing.unwrap_or((None, None));
+    let (existing_input, existing_output, existing_cache_read, existing_model_name) =
+        existing.unwrap_or((None, None, None, None));
+
+    let (model_name, input_price, output_price, cache_read_price, source, price_updated_at) =
+        cache_row
+            .map(
+                |(
+                    _,
+                    model_name,
+                    input_price,
+                    output_price,
+                    cache_read_price,
+                    source,
+                    updated_at,
+                )| {
+                    (
+                        model_name,
+                        input_price,
+                        output_price,
+                        cache_read_price,
+                        source,
+                        updated_at,
+                    )
+                },
+            )
+            .unwrap_or_else(|| {
+                (
+                    existing_model_name
+                        .filter(|name| !name.trim().is_empty())
+                        .unwrap_or_else(|| model_id.clone()),
+                    0.0,
+                    0.0,
+                    None,
+                    "custom".to_string(),
+                    Utc::now().to_rfc3339(),
+                )
+            });
 
     let new_input_price = match body.custom_input_price {
         Some(val) => val,
@@ -561,16 +527,42 @@ async fn update_model_pricing(
         Some(val) => val,
         None => existing_output,
     };
+    let new_cache_read_price = match body.custom_cache_read_price {
+        Some(val) => val,
+        None => existing_cache_read,
+    };
 
     // Upsert into model_pricing (INSERT OR REPLACE)
     let new_id = Uuid::new_v4();
     sqlx::query(
         r#"
-        INSERT INTO model_pricing (id, project_id, model_id, model_name, input_price_per_1m, output_price_per_1m, custom_input_price, custom_output_price, price_source, price_updated_at, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now', 'subsec'), datetime('now', 'subsec'))
+        INSERT INTO model_pricing (
+            id,
+            project_id,
+            model_id,
+            model_name,
+            input_price_per_1m,
+            output_price_per_1m,
+            cache_read_price_per_1m,
+            custom_input_price,
+            custom_output_price,
+            custom_cache_read_price,
+            price_source,
+            price_updated_at,
+            created_at,
+            updated_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, datetime('now', 'subsec'), datetime('now', 'subsec'))
         ON CONFLICT(project_id, model_id) DO UPDATE SET
+            model_name = excluded.model_name,
+            input_price_per_1m = excluded.input_price_per_1m,
+            output_price_per_1m = excluded.output_price_per_1m,
+            cache_read_price_per_1m = excluded.cache_read_price_per_1m,
             custom_input_price = excluded.custom_input_price,
             custom_output_price = excluded.custom_output_price,
+            custom_cache_read_price = excluded.custom_cache_read_price,
+            price_source = excluded.price_source,
+            price_updated_at = excluded.price_updated_at,
             updated_at = datetime('now', 'subsec')
         "#,
     )
@@ -580,8 +572,10 @@ async fn update_model_pricing(
     .bind(&model_name)
     .bind(input_price)
     .bind(output_price)
+    .bind(cache_read_price)
     .bind(new_input_price)
     .bind(new_output_price)
+    .bind(new_cache_read_price)
     .bind(&source)
     .bind(&price_updated_at)
     .execute(pool)
@@ -592,8 +586,10 @@ async fn update_model_pricing(
         model_name,
         input_price_per_1m: input_price,
         output_price_per_1m: output_price,
+        cache_read_price_per_1m: cache_read_price,
         custom_input_price: new_input_price,
         custom_output_price: new_output_price,
+        custom_cache_read_price: new_cache_read_price,
         price_source: source,
         price_updated_at,
     })))
@@ -606,10 +602,16 @@ async fn reset_model_pricing(
 ) -> Result<ResponseJson<ApiResponse<ModelPriceRow>>, ApiError> {
     let pool = &deployment.db().pool;
 
-    // Verify the model exists in the cache
-    let cache_row = sqlx::query_as::<_, (String, String, f64, f64, String, String)>(
+    let cache_row = sqlx::query_as::<_, (String, String, f64, f64, Option<f64>, String, String)>(
         r#"
-        SELECT model_id, model_name, input_price_per_1m, output_price_per_1m, source, updated_at
+        SELECT
+            model_id,
+            model_name,
+            input_price_per_1m,
+            output_price_per_1m,
+            cache_read_price_per_1m,
+            source,
+            updated_at
         FROM model_price_cache
         WHERE model_id = ?1
         "#,
@@ -618,14 +620,59 @@ async fn reset_model_pricing(
     .fetch_optional(pool)
     .await?;
 
-    let (_, model_name, input_price, output_price, source, price_updated_at) = cache_row
-        .ok_or_else(|| ApiError::BadRequest(format!("Model '{}' not found", model_id)))?;
+    let existing_model_name = sqlx::query_as::<_, (Option<String>,)>(
+        "SELECT model_name FROM model_pricing WHERE project_id = ?1 AND model_id = ?2",
+    )
+    .bind(params.project_id)
+    .bind(&model_id)
+    .fetch_optional(pool)
+    .await?
+    .and_then(|row| row.0);
+
+    let (model_name, input_price, output_price, cache_read_price, source, price_updated_at) =
+        cache_row
+            .map(
+                |(
+                    _,
+                    model_name,
+                    input_price,
+                    output_price,
+                    cache_read_price,
+                    source,
+                    updated_at,
+                )| {
+                    (
+                        model_name,
+                        input_price,
+                        output_price,
+                        cache_read_price,
+                        source,
+                        updated_at,
+                    )
+                },
+            )
+            .unwrap_or_else(|| {
+                (
+                    existing_model_name
+                        .filter(|name| !name.trim().is_empty())
+                        .unwrap_or_else(|| model_id.clone()),
+                    0.0,
+                    0.0,
+                    None,
+                    "custom".to_string(),
+                    Utc::now().to_rfc3339(),
+                )
+            });
 
     // Reset custom prices to NULL
     sqlx::query(
         r#"
         UPDATE model_pricing
-        SET custom_input_price = NULL, custom_output_price = NULL, updated_at = datetime('now', 'subsec')
+        SET
+            custom_input_price = NULL,
+            custom_output_price = NULL,
+            custom_cache_read_price = NULL,
+            updated_at = datetime('now', 'subsec')
         WHERE project_id = ?1 AND model_id = ?2
         "#,
     )
@@ -639,8 +686,10 @@ async fn reset_model_pricing(
         model_name,
         input_price_per_1m: input_price,
         output_price_per_1m: output_price,
+        cache_read_price_per_1m: cache_read_price,
         custom_input_price: None,
         custom_output_price: None,
+        custom_cache_read_price: None,
         price_source: source,
         price_updated_at,
     })))
@@ -650,8 +699,9 @@ async fn reset_model_pricing(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::NaiveDate;
+
+    use super::*;
 
     #[test]
     fn test_parse_period_days_valid() {
@@ -715,7 +765,10 @@ mod tests {
             assert_eq!(dp.date, expected_date);
             assert_eq!(dp.input_tokens, 0);
             assert_eq!(dp.output_tokens, 0);
+            assert_eq!(dp.cache_read_tokens, 0);
+            assert_eq!(dp.reasoning_output_tokens, 0);
             assert_eq!(dp.total_tokens, 0);
+            assert_eq!(dp.estimated_cost, 0.0);
         }
     }
 
@@ -727,13 +780,19 @@ mod tests {
                 date: "2025-01-02".to_string(),
                 input_tokens: 100,
                 output_tokens: 200,
+                cache_read_tokens: 10,
+                reasoning_output_tokens: 0,
                 total_tokens: 300,
+                estimated_cost: 0.5,
             },
             DailyTokenDataPoint {
                 date: "2025-01-05".to_string(),
                 input_tokens: 50,
                 output_tokens: 75,
+                cache_read_tokens: 0,
+                reasoning_output_tokens: 0,
                 total_tokens: 125,
+                estimated_cost: 0.2,
             },
         ];
 
@@ -747,6 +806,8 @@ mod tests {
         assert_eq!(result[1].date, "2025-01-02");
         assert_eq!(result[1].input_tokens, 100);
         assert_eq!(result[1].output_tokens, 200);
+        assert_eq!(result[1].cache_read_tokens, 10);
+        assert_eq!(result[1].estimated_cost, 0.5);
         assert_eq!(result[1].total_tokens, 300);
         // Day 3 (Jan 3) - zero
         assert_eq!(result[2].date, "2025-01-03");
@@ -765,19 +826,28 @@ mod tests {
                 date: "2025-06-01".to_string(),
                 input_tokens: 10,
                 output_tokens: 20,
+                cache_read_tokens: 0,
+                reasoning_output_tokens: 0,
                 total_tokens: 30,
+                estimated_cost: 0.0,
             },
             DailyTokenDataPoint {
                 date: "2025-06-02".to_string(),
                 input_tokens: 40,
                 output_tokens: 50,
+                cache_read_tokens: 0,
+                reasoning_output_tokens: 0,
                 total_tokens: 90,
+                estimated_cost: 0.0,
             },
             DailyTokenDataPoint {
                 date: "2025-06-03".to_string(),
                 input_tokens: 70,
                 output_tokens: 80,
+                cache_read_tokens: 0,
+                reasoning_output_tokens: 0,
                 total_tokens: 150,
+                estimated_cost: 0.0,
             },
         ];
 
@@ -792,14 +862,15 @@ mod tests {
     #[test]
     fn test_fill_zero_days_preserves_order() {
         let start = NaiveDate::from_ymd_opt(2025, 3, 28).unwrap();
-        let sparse = vec![
-            DailyTokenDataPoint {
-                date: "2025-03-30".to_string(),
-                input_tokens: 5,
-                output_tokens: 10,
-                total_tokens: 15,
-            },
-        ];
+        let sparse = vec![DailyTokenDataPoint {
+            date: "2025-03-30".to_string(),
+            input_tokens: 5,
+            output_tokens: 10,
+            cache_read_tokens: 0,
+            reasoning_output_tokens: 0,
+            total_tokens: 15,
+            estimated_cost: 0.0,
+        }];
 
         let result = fill_zero_days(sparse, start, 5);
 
@@ -812,8 +883,3 @@ mod tests {
         assert_eq!(result[4].date, "2025-04-01");
     }
 }
-
-
-
-
-

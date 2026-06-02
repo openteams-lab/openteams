@@ -9,9 +9,6 @@ export interface DailyTokenChartProps {
   t: (key: string, replacements?: Record<string, string | number>) => string;
 }
 
-const defaultInputPricePer1m = 1.25;
-const defaultOutputPricePer1m = 10;
-
 const numberValue = (value: unknown): number =>
   typeof value === 'number' && Number.isFinite(value)
     ? value
@@ -20,8 +17,7 @@ const numberValue = (value: unknown): number =>
       : 0;
 
 const estimateDailyCost = (datum: DailyTokenDataPoint): number =>
-  (numberValue(datum.input_tokens) / 1_000_000) * defaultInputPricePer1m +
-  (numberValue(datum.output_tokens) / 1_000_000) * defaultOutputPricePer1m;
+  numberValue(datum.estimated_cost);
 
 export function DailyTokenChart({ data, loading, t }: DailyTokenChartProps) {
   const label = (key: string, fallback: string) => {
@@ -55,14 +51,30 @@ export function DailyTokenChart({ data, loading, t }: DailyTokenChartProps) {
           value: (datum) => datum.output_tokens,
         },
       ]}
-      tooltipRows={(datum) => [
-        {
-          id: 'estimated-cost',
-          label: label('buildStats.cost', 'Cost'),
-          value: formatPrice(estimateDailyCost(datum)),
-          color: '#8a63d2',
-        },
-      ]}
+      tooltipRows={(datum) => {
+        const cache = numberValue(datum.cache_read_tokens);
+        return [
+          ...(cache > 0
+            ? [
+                {
+                  id: 'cache',
+                  label: label(
+                    'buildStats.cacheInputTokens',
+                    'Cache input tokens',
+                  ),
+                  value: formatCompactNumber(cache),
+                  color: '#6f7c8e',
+                },
+              ]
+            : []),
+          {
+            id: 'estimated-cost',
+            label: label('buildStats.cost', 'Cost'),
+            value: formatPrice(estimateDailyCost(datum)),
+            color: '#8a63d2',
+          },
+        ];
+      }}
     />
   );
 }

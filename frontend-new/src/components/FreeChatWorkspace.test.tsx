@@ -43,6 +43,7 @@ const settingsSource = readFileSync(
   new URL("./SettingsWorkspace.tsx", import.meta.url),
   "utf8",
 );
+const apiSource = readFileSync(new URL("../lib/api.ts", import.meta.url), "utf8");
 const activityPanelIndex = messageContentSource.indexOf("<AgentActivityPanel");
 const markdownIndex = messageContentSource.indexOf("<AgentMarkdown");
 
@@ -85,10 +86,10 @@ check(
 );
 check(
   "renders agent model inline after the agent name",
-  source.includes("!msg.isUser && msg.model") &&
-    source.includes("·") &&
+  source.includes("{msg.model && (") &&
     source.includes("{msg.model}") &&
-    source.includes("text-[11px] font-mono text-[var(--ink-tertiary)]"),
+    source.includes("rounded-full bg-[var(--surface-3)]") &&
+    source.includes("text-[9px] font-mono text-[var(--ink-muted)]"),
   source,
 );
 check(
@@ -99,8 +100,8 @@ check(
   { activityPanelIndex, markdownIndex },
 );
 check(
-  "thinking process toggle title uses 13px type",
-  messageContentSource.includes("text-[13px]") &&
+  "thinking process toggle title uses compact type",
+  messageContentSource.includes("text-[12px]") &&
     messageContentSource.includes('t("agentActivity.toggle")'),
   messageContentSource,
 );
@@ -160,13 +161,89 @@ check(
   { source, messageContentSource, settingsSource },
 );
 check(
+  "uses the configured chat message font size for sender names",
+  source.includes('className="font-semibold text-[var(--ink)]"') &&
+    source.includes("style={{ fontSize: `${chatMessageFontSize}px` }}") &&
+    source.includes('{msg.isUser ? t("you") : msg.sender}'),
+  source,
+);
+check(
   "running pill uses the required copy and reused visual tokens",
-  runStatusSource.includes("Agent努力执行任务中") &&
+  runStatusSource.includes("正在执行") &&
     runStatusSource.includes("Loader2") &&
-    runStatusSource.includes("border-[var(--hairline)]") &&
-    runStatusSource.includes("bg-[var(--surface-1)]") &&
+    runStatusSource.includes("bg-[var(--primary-tint)]") &&
     runStatusSource.includes("text-[var(--primary)]"),
   runStatusSource,
+);
+check(
+  "agent messages expose hover copy and quote actions",
+  source.includes("handleCopyAgentMessage") &&
+    source.includes("handleQuoteAgentMessage") &&
+    source.includes("copiedMessageId === msg.id") &&
+    source.includes("group-hover/message:opacity-100") &&
+    source.includes('title={t("message.copy")}') &&
+    source.includes('title={t("message.quote")}'),
+  source,
+);
+check(
+  "running agent messages expose a stop action wired to the backend",
+  source.includes("sessionAgentsApi.stop(activeSessionId, sessionAgentId)") &&
+    source.includes("handleStopAgentMessage") &&
+    source.includes("msg.isAgentRunning") &&
+    source.includes("msg.sessionAgentId") &&
+    source.includes('title={t("agent.stop")}') &&
+    source.includes("stoppingSessionAgentIds"),
+  source,
+);
+check(
+  "quoted agent message summary is shown above the composer",
+  source.includes("quotedMessage") &&
+    source.includes("message.quotePrefix") &&
+    source.includes("message.dismissQuote") &&
+    source.includes("summarizeMessage") &&
+    source.includes("content: text") &&
+    source.includes("sendMessage(") &&
+    source.includes("quotedMessage ? { quotedMessage } : undefined") &&
+    source.includes("msg.quotedMessage") &&
+    !source.includes("> ${quotedMessage.sender}:"),
+  source,
+);
+check(
+  "composer supports text/image attachments and clipboard image paste",
+  source.includes("CHAT_ATTACHMENT_ACCEPT") &&
+    source.includes("allowedAttachmentExtensions") &&
+    source.includes("getClipboardFiles(event.clipboardData)") &&
+    source.includes("onPaste={handlePaste}") &&
+    source.includes("fileInputRef") &&
+    source.includes("attachedFiles") &&
+    source.includes("ImageIcon") &&
+    source.includes("FileText") &&
+    source.includes("removeAttachedFile(index)") &&
+    source.includes("attachedFiles.length > 0"),
+  source,
+);
+check(
+  "attachment send uses backend multipart upload with quote reference id",
+  source.includes("chatMessagesApi.uploadAttachment(activeSessionId, attachedFiles") &&
+    source.includes("content: trimmedInput || undefined") &&
+    source.includes("referenceMessageId: quotedMessage?.id") &&
+    source.includes("await refreshMessages()") &&
+    apiSource.includes('form.append("file", file, file.name)') &&
+    apiSource.includes('form.append("content", options.content)') &&
+    apiSource.includes(
+      'form.append("reference_message_id", options.referenceMessageId)',
+    ),
+  { source, apiSource },
+);
+check(
+  "renders backend file and image attachments from message meta",
+  source.includes("msg.attachments && msg.attachments.length > 0") &&
+    source.includes("chatMessagesApi.attachmentUrl(") &&
+    source.includes("isImageChatAttachment(attachment)") &&
+    source.includes("<img") &&
+    source.includes("formatFileSize(attachment.size_bytes)") &&
+    apiSource.includes("attachmentUrl: ("),
+  { source, apiSource },
 );
 check(
   "activity panel uses compact Codex-like line rows",

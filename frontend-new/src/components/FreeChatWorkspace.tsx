@@ -11,15 +11,25 @@ import {
   ArrowUp,
   Mic,
   AtSign,
+  Check,
   PanelRightClose,
   PanelRightOpen,
   ChevronsLeft,
+  Copy,
+  Quote,
+  Square,
+  X,
+  Paperclip,
+  Image as ImageIcon,
+  FileText,
 } from "lucide-react";
 import { ResourceStateNotice } from "@/components/ResourceState";
 import { ScrollArea } from "@/components/ScrollArea";
 import { AgentMessageContent } from "@/components/AgentMessageContent";
+import { chatMessagesApi, sessionAgentsApi } from "@/lib/api";
 import { mockFrontendApi } from "@/lib/mockFrontendApi";
 import { mockSessionWorkspaceChanges } from "@/mockSessionWorkspaceChanges";
+import type { ChatAttachment, QuotedMessageReference } from "@/types";
 
 interface FreeChatWorkspaceProps {
   embedded?: boolean;
@@ -74,6 +84,120 @@ const getSessionFileChanges = (sessionId: string): RelatedFileChange[] => {
 };
 
 const hasLineStat = (value?: number) => typeof value === "number" && value > 0;
+
+const allowedTextAttachmentExtensions = [
+  ".txt",
+  ".csv",
+  ".md",
+  ".json",
+  ".xml",
+  ".yaml",
+  ".yml",
+  ".html",
+  ".htm",
+  ".css",
+  ".js",
+  ".ts",
+  ".jsx",
+  ".tsx",
+  ".py",
+  ".java",
+  ".c",
+  ".cpp",
+  ".h",
+  ".hpp",
+  ".rb",
+  ".php",
+  ".go",
+  ".rs",
+  ".sql",
+  ".sh",
+  ".bash",
+  ".svg",
+];
+
+const allowedImageAttachmentExtensions = [
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".bmp",
+];
+
+const allowedAttachmentExtensions = [
+  ...allowedTextAttachmentExtensions,
+  ...allowedImageAttachmentExtensions,
+];
+
+const CHAT_ATTACHMENT_ACCEPT = [
+  "text/*",
+  "image/*",
+  ...allowedAttachmentExtensions,
+].join(",");
+
+const isImageAttachment = (file: File) =>
+  file.type.startsWith("image/") ||
+  allowedImageAttachmentExtensions.some((ext) =>
+    file.name.toLowerCase().endsWith(ext),
+  );
+
+const isTextAttachment = (file: File) =>
+  file.type.startsWith("text/") ||
+  allowedTextAttachmentExtensions.some((ext) =>
+    file.name.toLowerCase().endsWith(ext),
+  );
+
+const isAllowedAttachment = (file: File) =>
+  isImageAttachment(file) || isTextAttachment(file);
+
+const isImageChatAttachment = (attachment: ChatAttachment) =>
+  attachment.kind === "image" ||
+  attachment.mime_type?.startsWith("image/") ||
+  allowedImageAttachmentExtensions.some((ext) =>
+    attachment.name.toLowerCase().endsWith(ext),
+  );
+
+const fallbackClipboardFileName = (file: File, index: number) => {
+  if (file.name.trim()) return file.name;
+
+  const extension = file.type.startsWith("image/")
+    ? (file.type.split("/")[1] ?? "png")
+    : file.type === "text/plain"
+      ? "txt"
+      : "dat";
+
+  return `pasted-attachment-${Date.now()}-${index + 1}.${extension}`;
+};
+
+const normalizeClipboardFile = (file: File, index: number) =>
+  file.name.trim()
+    ? file
+    : new File([file], fallbackClipboardFileName(file, index), {
+        type: file.type,
+        lastModified: file.lastModified || Date.now(),
+      });
+
+const getClipboardFiles = (clipboardData: DataTransfer) => {
+  const itemFiles = Array.from(clipboardData.items)
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file));
+
+  const files =
+    itemFiles.length > 0 ? itemFiles : Array.from(clipboardData.files);
+
+  return files.map(normalizeClipboardFile);
+};
+
+const attachmentIdentity = (file: File) =>
+  `${file.name}:${file.size}:${file.lastModified}`;
+
+const formatFileSize = (size: number) => {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 interface TruncatedFileNameProps {
   path: string;
@@ -187,13 +311,23 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   const [isMemberRailExpanded, setIsMemberRailExpanded] = useState(false);
   const [memberRailWidth, setMemberRailWidth] = useState(0);
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [stoppingSessionAgentIds, setStoppingSessionAgentIds] = useState<
+    Set<string>
+  >(() => new Set());
+  const [quotedMessage, setQuotedMessage] =
+    useState<QuotedMessageReference | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [relatedFilesWidth, setRelatedFilesWidth] = useState(
     RELATED_FILES_DEFAULT_WIDTH,
   );
   const workspaceGridRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const memberRailRef = useRef<HTMLDivElement>(null);
+  const copiedResetTimerRef = useRef<number | null>(null);
   const relatedFileChanges = useMemo(
     () => getSessionFileChanges(activeSessionId),
     [activeSessionId],
@@ -345,21 +479,201 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     }
   }, [hasSidebarMemberOverflow, isMemberRailExpanded]);
 
-  // Auto scroll messages to bottom
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  // Keep the latest message anchored before paint so session switches do not
+  // visibly animate through older scroll positions.
+  useLayoutEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+  }, [activeSessionId, messages]);
 
-  const handleSend = () => {
-    if (!inputText.trim()) return;
-    sendMessage(inputText);
+  useEffect(
+    () => () => {
+      if (copiedResetTimerRef.current !== null) {
+        window.clearTimeout(copiedResetTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    setCopiedMessageId(null);
+    setQuotedMessage(null);
+    setAttachedFiles([]);
+    setStoppingSessionAgentIds(new Set());
+  }, [activeSessionId]);
+
+  const summarizeMessage = (text: string) => {
+    const normalized = text.trim().replace(/\s+/g, " ");
+    if (!normalized) return t("message.quoteEmpty");
+    return normalized.length > 140
+      ? `${normalized.slice(0, 137)}...`
+      : normalized;
+  };
+
+  const handleCopyAgentMessage = async (messageId: string, text: string) => {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable");
+      }
+
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageId(messageId);
+
+      if (copiedResetTimerRef.current !== null) {
+        window.clearTimeout(copiedResetTimerRef.current);
+      }
+
+      copiedResetTimerRef.current = window.setTimeout(() => {
+        setCopiedMessageId((current) =>
+          current === messageId ? null : current,
+        );
+        copiedResetTimerRef.current = null;
+      }, 1400);
+    } catch {
+      showToast(t("message.copyFailed"));
+    }
+  };
+
+  const handleQuoteAgentMessage = (
+    messageId: string,
+    sender: string,
+    text: string,
+  ) => {
+    setQuotedMessage({
+      id: messageId,
+      sender,
+      content: text,
+      summary: summarizeMessage(text),
+    });
+    inputRef.current?.focus();
+  };
+
+  const handleStopAgentMessage = async (sessionAgentId: string) => {
+    if (stoppingSessionAgentIds.has(sessionAgentId)) return;
+
+    setStoppingSessionAgentIds((current) => {
+      const next = new Set(current);
+      next.add(sessionAgentId);
+      return next;
+    });
+
+    try {
+      await sessionAgentsApi.stop(activeSessionId, sessionAgentId);
+      showToast(t("agent.stopRequested"));
+      void refreshMembers();
+    } catch {
+      setStoppingSessionAgentIds((current) => {
+        const next = new Set(current);
+        next.delete(sessionAgentId);
+        return next;
+      });
+      showToast(t("agent.stopFailed"));
+    }
+  };
+
+  const addAttachedFiles = (files: FileList | File[]) => {
+    if (sessionsAsync.source !== "api") {
+      showToast(t("attachment.requiresApi"));
+      return;
+    }
+
+    const list = Array.from(files);
+    if (list.length === 0) return;
+
+    const allowedFiles = list.filter((file) => isAllowedAttachment(file));
+    const rejectedCount = list.length - allowedFiles.length;
+
+    if (rejectedCount > 0) {
+      showToast(t("attachment.unsupported", { count: rejectedCount }));
+    }
+
+    if (allowedFiles.length === 0) return;
+
+    setAttachedFiles((current) => {
+      const existing = new Set(current.map(attachmentIdentity));
+      const next = [...current];
+      for (const file of allowedFiles) {
+        const identity = attachmentIdentity(file);
+        if (!existing.has(identity)) {
+          existing.add(identity);
+          next.push(file);
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleAttachmentInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    if (event.target.files) {
+      addAttachedFiles(event.target.files);
+    }
+    event.target.value = "";
+  };
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = getClipboardFiles(event.clipboardData);
+    if (files.length === 0) return;
+
+    event.preventDefault();
+    addAttachedFiles(files);
+  };
+
+  const removeAttachedFile = (fileIndex: number) => {
+    setAttachedFiles((current) =>
+      current.filter((_, index) => index !== fileIndex),
+    );
+  };
+
+  const openAttachmentPicker = () => {
+    if (sessionsAsync.source !== "api") {
+      showToast(t("attachment.requiresApi"));
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleSend = async () => {
+    const trimmedInput = inputText.trim();
+    if (!trimmedInput && attachedFiles.length === 0) return;
+    if (isUploadingAttachments) return;
+
+    if (attachedFiles.length > 0) {
+      if (sessionsAsync.source !== "api") {
+        showToast(t("attachment.requiresApi"));
+        return;
+      }
+
+      setIsUploadingAttachments(true);
+      try {
+        await chatMessagesApi.uploadAttachment(activeSessionId, attachedFiles, {
+          content: trimmedInput || undefined,
+          referenceMessageId: quotedMessage?.id,
+        });
+        setInputText("");
+        setQuotedMessage(null);
+        setAttachedFiles([]);
+        await refreshMessages();
+      } catch {
+        showToast(t("attachment.uploadFailed"));
+      } finally {
+        setIsUploadingAttachments(false);
+      }
+      return;
+    }
+
+    sendMessage(
+      trimmedInput,
+      quotedMessage ? { quotedMessage } : undefined,
+    );
     setInputText("");
+    setQuotedMessage(null);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
@@ -427,6 +741,9 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   const mentionedMembers = members.filter((member) =>
     mentionedMemberNames.has(member.name.toLowerCase()),
   );
+  const canSend =
+    (Boolean(inputText.trim()) || attachedFiles.length > 0) &&
+    !isUploadingAttachments;
 
   const formatMessageTime = (time: string) => {
     if (time === "just now") return t("justNow");
@@ -549,10 +866,10 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex gap-3 items-start rounded-md ${
+                className={`group/message relative flex gap-3 items-start rounded-md ${
                   msg.isUser
                     ? "border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2.5"
-                    : "px-1 py-2"
+                    : "px-1 py-2 pb-8"
                 }`}
               >
                 {msg.isUser ? (
@@ -567,7 +884,10 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-[11px] font-semibold text-[var(--ink)]">
+                    <span
+                      className="font-semibold text-[var(--ink)]"
+                      style={{ fontSize: `${chatMessageFontSize}px` }}
+                    >
                       {msg.isUser ? t("you") : msg.sender}
                     </span>
                     {msg.model && (
@@ -579,6 +899,22 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                       {formatMessageTime(msg.time)}
                     </span>
                   </div>
+
+                  {msg.quotedMessage && (
+                    <div className="mb-2 flex items-start gap-2 rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] px-2.5 py-1.5 text-[11px] text-[var(--ink-muted)]">
+                      <Quote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold text-[var(--ink)]">
+                          {t("message.quotePrefix", {
+                            sender: msg.quotedMessage.sender,
+                          })}
+                        </div>
+                        <div className="truncate font-mono text-[10px] text-[var(--ink-tertiary)]">
+                          {msg.quotedMessage.summary}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {msg.isUser ? (
                     <div
@@ -595,12 +931,114 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                     />
                   )}
 
+                  {msg.attachments && msg.attachments.length > 0 && (
+                    <div className="mt-2 flex flex-col gap-2">
+                      {msg.attachments.map((attachment) => {
+                        const url = chatMessagesApi.attachmentUrl(
+                          activeSessionId,
+                          msg.id,
+                          attachment.id,
+                        );
+                        const isImage = isImageChatAttachment(attachment);
+                        return (
+                          <a
+                            key={attachment.id}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="group/attachment max-w-md rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] p-2 text-[11px] text-[var(--ink-muted)] transition hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)]"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <div className="flex min-w-0 items-center gap-2">
+                              {isImage ? (
+                                <ImageIcon className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+                              ) : (
+                                <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+                              )}
+                              <span
+                                className="min-w-0 flex-1 truncate font-medium text-[var(--ink)]"
+                                title={attachment.name}
+                              >
+                                {attachment.name}
+                              </span>
+                              {attachment.size_bytes ? (
+                                <span className="shrink-0 font-mono text-[10px] text-[var(--ink-tertiary)]">
+                                  {formatFileSize(attachment.size_bytes)}
+                                </span>
+                              ) : null}
+                            </div>
+                            {isImage && (
+                              <img
+                                src={url}
+                                alt={attachment.name}
+                                className="mt-2 max-h-44 max-w-full rounded-sm border border-[var(--hairline)] object-contain"
+                                loading="lazy"
+                              />
+                            )}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {msg.cost && (
                     <div className="mt-1 text-[10px] font-mono text-[var(--ink-tertiary)]">
                       {msg.cost}
                     </div>
                   )}
                 </div>
+
+                {!msg.isUser && (
+                  <div className="pointer-events-none absolute bottom-1 right-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/message:pointer-events-auto group-hover/message:opacity-100 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100">
+                    {msg.isAgentRunning &&
+                      msg.sessionAgentId &&
+                      sessionsAsync.source === "api" && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleStopAgentMessage(msg.sessionAgentId!);
+                          }}
+                          disabled={stoppingSessionAgentIds.has(
+                            msg.sessionAgentId,
+                          )}
+                          className="flex h-6 w-6 items-center justify-center rounded-sm text-rose-500 transition hover:bg-rose-500/10 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+                          title={t("agent.stop")}
+                          aria-label={t("agent.stop")}
+                        >
+                          <Square className="h-3 w-3 fill-current" />
+                        </button>
+                      )}
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleCopyAgentMessage(msg.id, msg.text);
+                      }}
+                      className="flex h-6 w-6 items-center justify-center rounded-sm text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink-subtle)]"
+                      title={t("message.copy")}
+                      aria-label={t("message.copy")}
+                    >
+                      {copiedMessageId === msg.id ? (
+                        <Check className="h-3 w-3 text-[var(--success)]" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleQuoteAgentMessage(msg.id, msg.sender, msg.text);
+                      }}
+                      className="flex h-6 w-6 items-center justify-center rounded-sm text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink-subtle)]"
+                      title={t("message.quote")}
+                      aria-label={t("message.quote")}
+                    >
+                      <Quote className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             <div ref={chatEndRef} />
@@ -608,10 +1046,78 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
 
           {/* Chat discussion input styled in GPT-4 style with space */}
           <div className="shrink-0 pt-4 pb-0">
+            {quotedMessage && (
+              <div className="mb-2 flex items-start gap-2 rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2 text-[11px] text-[var(--ink-muted)]">
+                <Quote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold text-[var(--ink)]">
+                    {t("message.quotePrefix", {
+                      sender: quotedMessage.sender,
+                    })}
+                  </div>
+                  <div className="truncate font-mono text-[10px] text-[var(--ink-tertiary)]">
+                    {quotedMessage.summary}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setQuotedMessage(null)}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+                  title={t("message.dismissQuote")}
+                  aria-label={t("message.dismissQuote")}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
             <div
               onClick={() => inputRef.current?.focus()}
               className="relative rounded-md border border-[var(--hairline-strong)] bg-[var(--surface-1)] focus-within:border-[var(--primary)] p-3.5 transition-all flex flex-col gap-3 min-h-[95px]"
             >
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                accept={CHAT_ATTACHMENT_ACCEPT}
+                onChange={handleAttachmentInputChange}
+              />
+              {attachedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {attachedFiles.map((file, index) => {
+                    const AttachmentIcon = isImageAttachment(file)
+                      ? ImageIcon
+                      : FileText;
+                    return (
+                      <div
+                        key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                        className="flex max-w-full items-center gap-2 rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] px-2 py-1 text-[11px] text-[var(--ink-muted)]"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <AttachmentIcon className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+                        <span
+                          className="max-w-[180px] truncate font-medium text-[var(--ink)]"
+                          title={file.name}
+                        >
+                          {file.name}
+                        </span>
+                        <span className="shrink-0 font-mono text-[10px] text-[var(--ink-tertiary)]">
+                          {formatFileSize(file.size)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeAttachedFile(index)}
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+                          title={t("attachment.remove")}
+                          aria-label={t("attachment.remove")}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {/* Text Area */}
               <textarea
                 ref={inputRef}
@@ -620,6 +1126,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
                 onClick={(e) => e.stopPropagation()}
                 placeholder={t("discussPlaceholder")}
               />
@@ -631,11 +1138,20 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                   {/* Plus symbol */}
                   <button
                     type="button"
-                    onClick={() => showToast(t("toast.attachmentReady"))}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openAttachmentPicker();
+                    }}
+                    disabled={isUploadingAttachments}
                     className="p-1 rounded-full hover:bg-[var(--surface-3)] text-[var(--ink-subtle)] hover:text-[var(--ink)] transition-colors cursor-pointer"
                     title={t("uploadFile")}
+                    aria-label={t("uploadFile")}
                   >
-                    <Plus className="h-4 w-4" />
+                    {attachedFiles.length > 0 ? (
+                      <Paperclip className="h-4 w-4" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
                   </button>
 
                   <button
@@ -736,13 +1252,18 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                   {/* Send action on the right */}
                   <button
                     type="button"
-                    onClick={handleSend}
-                    disabled={!inputText.trim()}
+                    onClick={() => void handleSend()}
+                    disabled={!canSend}
                     className={`p-1.5 rounded-full transition-all flex items-center justify-center shrink-0 ${
-                      inputText.trim()
+                      canSend
                         ? "bg-[var(--primary)] text-white hover:opacity-95 cursor-pointer hover:scale-105"
                         : "bg-[var(--surface-3)] text-[var(--ink-tertiary)] cursor-not-allowed"
                     }`}
+                    title={
+                      isUploadingAttachments
+                        ? t("attachment.uploading")
+                        : undefined
+                    }
                   >
                     <ArrowUp className="h-3.5 w-3.5" />
                   </button>

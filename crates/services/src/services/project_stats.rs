@@ -7,6 +7,8 @@ use db::models::{
 use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
 
+use super::token_cost_stats::TokenCostStatsService;
+
 #[derive(Clone, Default)]
 pub struct ProjectStatsService;
 
@@ -75,6 +77,10 @@ impl ProjectStatsService {
             }
         }
 
+        let token_totals = TokenCostStatsService::new()
+            .project_period_totals(pool, project_id, period_start, period_end)
+            .await?;
+
         Ok(ProjectStats::upsert(
             pool,
             project_id,
@@ -83,10 +89,12 @@ impl ProjectStatsService {
             feature_count,
             bugfix_count,
             test_count,
-            0,
-            0,
-            0,
-            Some(0.0),
+            token_totals.input_tokens,
+            token_totals.output_tokens,
+            token_totals.cache_read_tokens,
+            token_totals.reasoning_output_tokens,
+            token_totals.total_tokens,
+            Some(token_totals.cost_total),
         )
         .await?)
     }
@@ -131,6 +139,8 @@ mod tests {
                 test_count INTEGER DEFAULT 0,
                 input_tokens BIGINT DEFAULT 0,
                 output_tokens BIGINT DEFAULT 0,
+                cache_read_tokens BIGINT DEFAULT 0,
+                reasoning_output_tokens BIGINT DEFAULT 0,
                 total_tokens BIGINT DEFAULT 0,
                 cost_total DECIMAL,
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
@@ -139,6 +149,60 @@ mod tests {
             r#"
             CREATE UNIQUE INDEX idx_project_stats_project_period
             ON project_stats(project_id, period_start, period_end)
+            "#,
+            r#"
+            CREATE TABLE chat_sessions (
+                id BLOB PRIMARY KEY,
+                title TEXT,
+                project_id BLOB,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+            r#"
+            CREATE TABLE chat_agents (
+                id BLOB PRIMARY KEY,
+                name TEXT NOT NULL,
+                runner_type TEXT NOT NULL,
+                model_name TEXT
+            )
+            "#,
+            r#"
+            CREATE TABLE chat_messages (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                sender_type TEXT NOT NULL,
+                sender_id BLOB,
+                content TEXT NOT NULL,
+                meta TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+            r#"
+            CREATE TABLE model_price_cache (
+                model_id TEXT PRIMARY KEY,
+                model_name TEXT NOT NULL,
+                input_price_per_1m REAL NOT NULL DEFAULT 0.0,
+                output_price_per_1m REAL NOT NULL DEFAULT 0.0,
+                cache_read_price_per_1m REAL,
+                source TEXT NOT NULL DEFAULT 'external'
+            )
+            "#,
+            r#"
+            CREATE TABLE model_pricing (
+                id BLOB PRIMARY KEY,
+                project_id BLOB NOT NULL,
+                model_id TEXT NOT NULL,
+                model_name TEXT NOT NULL DEFAULT '',
+                input_price_per_1m REAL NOT NULL DEFAULT 0.0,
+                output_price_per_1m REAL NOT NULL DEFAULT 0.0,
+                cache_read_price_per_1m REAL,
+                custom_input_price REAL,
+                custom_output_price REAL,
+                custom_cache_read_price REAL,
+                price_source TEXT NOT NULL DEFAULT 'custom',
+                UNIQUE(project_id, model_id)
+            )
             "#,
         ] {
             sqlx::query(statement)
@@ -151,10 +215,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn refresh_stats_counts_delivery_events_and_zeroes_usage() {
+    async fn refresh_stats_counts_delivery_events_and_token_cost() {
         let pool = setup_pool().await;
         let service = ProjectStatsService::new();
         let project_id = Uuid::new_v4();
+        let session_id = Uuid::new_v4();
+        let agent_id = Uuid::new_v4();
 
         service
             .record_delivery_event(
@@ -177,6 +243,65 @@ mod tests {
             .await
             .expect("record bugfix");
 
+        sqlx::query("INSERT INTO chat_sessions (id, title, project_id) VALUES (?1, ?2, ?3)")
+            .bind(session_id)
+            .bind("Session")
+            .bind(project_id)
+            .execute(&pool)
+            .await
+            .expect("insert session");
+        sqlx::query(
+            "INSERT INTO chat_agents (id, name, runner_type, model_name) VALUES (?1, ?2, ?3, ?4)",
+        )
+        .bind(agent_id)
+        .bind("Agent")
+        .bind("codex")
+        .bind("gpt-4o")
+        .execute(&pool)
+        .await
+        .expect("insert agent");
+        sqlx::query(
+            r#"
+            INSERT INTO model_price_cache (
+                model_id,
+                model_name,
+                input_price_per_1m,
+                output_price_per_1m,
+                cache_read_price_per_1m,
+                source
+            ) VALUES ('gpt-4o', 'GPT-4o', 2.0, 4.0, 0.2, 'openrouter')
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("insert price");
+        sqlx::query(
+            r#"
+            INSERT INTO chat_messages (id, session_id, sender_type, sender_id, content, meta)
+            VALUES (?1, ?2, 'agent', ?3, 'done', ?4)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(session_id)
+        .bind(agent_id)
+        .bind(
+            serde_json::json!({
+                "run_id": Uuid::new_v4().to_string(),
+                "token_usage": {
+                    "input_tokens": 1_000_000,
+                    "output_tokens": 500_000,
+                    "cache_read_tokens": 1_000_000,
+                    "reasoning_output_tokens": 100,
+                    "total_tokens": 1_500_000,
+                    "is_estimated": false
+                }
+            })
+            .to_string(),
+        )
+        .execute(&pool)
+        .await
+        .expect("insert token message");
+
         let stats = service
             .refresh_stats(
                 &pool,
@@ -190,8 +315,12 @@ mod tests {
         assert_eq!(stats.feature_count, 1);
         assert_eq!(stats.bugfix_count, 1);
         assert_eq!(stats.test_count, 0);
-        assert_eq!(stats.total_tokens, 0);
-        assert_eq!(stats.cost_total, Some(0.0));
+        assert_eq!(stats.input_tokens, 1_000_000);
+        assert_eq!(stats.output_tokens, 500_000);
+        assert_eq!(stats.cache_read_tokens, 1_000_000);
+        assert_eq!(stats.reasoning_output_tokens, 100);
+        assert_eq!(stats.total_tokens, 1_500_000);
+        assert_eq!(stats.cost_total, Some(4.2));
     }
 
     #[tokio::test]
@@ -215,6 +344,8 @@ mod tests {
         assert_eq!(stats.test_count, 0);
         assert_eq!(stats.input_tokens, 0);
         assert_eq!(stats.output_tokens, 0);
+        assert_eq!(stats.cache_read_tokens, 0);
+        assert_eq!(stats.reasoning_output_tokens, 0);
         assert_eq!(stats.total_tokens, 0);
         assert_eq!(stats.cost_total, Some(0.0));
     }

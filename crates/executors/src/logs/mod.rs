@@ -133,12 +133,31 @@ pub struct TokenUsageInfo {
     pub input_tokens: Option<u32>,
     #[serde(default)]
     pub output_tokens: Option<u32>,
+    #[serde(default)]
+    pub reasoning_output_tokens: Option<u32>,
     /// Tokens served from cache (Claude: cache_read_input_tokens, Codex: cached_input_tokens)
     #[serde(default)]
     pub cache_read_tokens: Option<u32>,
-    /// Tokens written into cache this turn (Claude: cache_creation_input_tokens)
     #[serde(default)]
-    pub cache_write_tokens: Option<u32>,
+    pub runtime_agent: Option<String>,
+    #[serde(default)]
+    pub runtime_model_id: Option<String>,
+    #[serde(default)]
+    pub provider_id: Option<String>,
+    #[serde(default)]
+    pub runtime_thread_id: Option<String>,
+    #[serde(default)]
+    pub usage_scope: Option<String>,
+    #[serde(default)]
+    pub snapshot_total_tokens: Option<u32>,
+    #[serde(default)]
+    pub snapshot_input_tokens: Option<u32>,
+    #[serde(default)]
+    pub snapshot_output_tokens: Option<u32>,
+    #[serde(default)]
+    pub snapshot_reasoning_output_tokens: Option<u32>,
+    #[serde(default)]
+    pub snapshot_cache_read_tokens: Option<u32>,
     #[serde(default)]
     pub is_estimated: bool,
 }

@@ -290,16 +290,33 @@ export const chatMessagesApi = {
   },
   uploadAttachment: async (
     sessionId: string,
-    file: File,
+    files: File | File[],
+    options?: { content?: string; referenceMessageId?: string },
   ): Promise<BackendChatMessage> => {
     const form = new FormData();
-    form.append("file", file);
+    for (const file of Array.isArray(files) ? files : [files]) {
+      form.append("file", file, file.name);
+    }
+    if (options?.content) {
+      form.append("content", options.content);
+    }
+    if (options?.referenceMessageId) {
+      form.append("reference_message_id", options.referenceMessageId);
+    }
     const r = await makeRequest(
       `/api/chat/sessions/${encodeURIComponent(sessionId)}/messages/upload`,
       { method: "POST", body: form },
     );
     return handleApiResponse<BackendChatMessage>(r);
   },
+  attachmentUrl: (
+    sessionId: string,
+    messageId: string,
+    attachmentId: string,
+  ): string =>
+    `/api/chat/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(
+      messageId,
+    )}/attachments/${encodeURIComponent(attachmentId)}`,
   getWorkflowCard: async (
     messageId: string,
     detail?: "summary" | "full",

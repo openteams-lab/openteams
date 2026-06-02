@@ -27,6 +27,10 @@ pub enum OpencodeExecutorEvent {
         output_tokens: Option<u32>,
         #[serde(default)]
         cache_read_tokens: Option<u32>,
+        #[serde(default)]
+        provider_id: Option<String>,
+        #[serde(default)]
+        runtime_model_id: Option<String>,
     },
     ApprovalResponse {
         tool_call_id: String,

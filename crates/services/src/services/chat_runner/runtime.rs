@@ -593,6 +593,20 @@ impl ChatRunner {
         RunLogForwarders { stdout, stderr }
     }
 
+    fn u32_field(value: &serde_json::Value, name: &str) -> Option<u32> {
+        value
+            .get(name)
+            .and_then(|v| v.as_u64())
+            .and_then(|v| u32::try_from(v).ok())
+    }
+
+    fn string_field(value: &serde_json::Value, name: &str) -> Option<String> {
+        value
+            .get(name)
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+    }
+
     pub(super) fn parse_token_usage_from_stdout_line(line: &str) -> Option<TokenUsageInfo> {
         let value: serde_json::Value = serde_json::from_str(line).ok()?;
         let value_obj = value.as_object()?;
@@ -600,37 +614,44 @@ impl ChatRunner {
         // Format: {"type":"token_usage","total_tokens":N,"model_context_window":N,...}
         // Used by: Gemini CLI, QWen Coder (may include input/output breakdown)
         if value_obj.get("type").and_then(|v| v.as_str()) == Some("token_usage") {
-            let total_tokens = value_obj
-                .get("total_tokens")
-                .and_then(|v| v.as_u64())
-                .and_then(|v| u32::try_from(v).ok())?;
-            let model_context_window = value_obj
-                .get("model_context_window")
-                .and_then(|v| v.as_u64())
-                .and_then(|v| u32::try_from(v).ok())?;
-            let input_tokens = value_obj
-                .get("input_tokens")
-                .and_then(|v| v.as_u64())
-                .and_then(|v| u32::try_from(v).ok());
-            let output_tokens = value_obj
-                .get("output_tokens")
-                .and_then(|v| v.as_u64())
-                .and_then(|v| u32::try_from(v).ok());
-            let cache_read_tokens = value_obj
-                .get("cache_read_tokens")
-                .and_then(|v| v.as_u64())
-                .and_then(|v| u32::try_from(v).ok());
-            let cache_write_tokens = value_obj
-                .get("cache_write_tokens")
-                .and_then(|v| v.as_u64())
-                .and_then(|v| u32::try_from(v).ok());
+            let model_context_window = Self::u32_field(&value, "model_context_window")?;
+            let input_tokens = Self::u32_field(&value, "input_tokens");
+            let output_tokens = Self::u32_field(&value, "output_tokens");
+            let total_tokens = Self::u32_field(&value, "total_tokens")
+                .or_else(|| match (input_tokens, output_tokens) {
+                    (Some(input), Some(output)) => Some(input + output),
+                    _ => None,
+                })
+                .or_else(|| Self::u32_field(&value, "snapshot_total_tokens"))?;
+            let reasoning_output_tokens = Self::u32_field(&value, "reasoning_output_tokens");
+            let cache_read_tokens = Self::u32_field(&value, "cache_read_tokens")
+                .or_else(|| Self::u32_field(&value, "cached_input_tokens"));
             return Some(TokenUsageInfo {
                 total_tokens,
                 model_context_window,
                 input_tokens,
                 output_tokens,
+                reasoning_output_tokens,
                 cache_read_tokens,
-                cache_write_tokens,
+                runtime_agent: Self::string_field(&value, "runtime_agent"),
+                runtime_model_id: Self::string_field(&value, "runtime_model_id")
+                    .or_else(|| Self::string_field(&value, "model_id"))
+                    .or_else(|| Self::string_field(&value, "model")),
+                provider_id: Self::string_field(&value, "provider_id"),
+                runtime_thread_id: Self::string_field(&value, "runtime_thread_id"),
+                usage_scope: Self::string_field(&value, "usage_scope")
+                    .or_else(|| Some("turn_delta".to_string())),
+                snapshot_total_tokens: Self::u32_field(&value, "snapshot_total_tokens"),
+                snapshot_input_tokens: Self::u32_field(&value, "snapshot_input_tokens"),
+                snapshot_output_tokens: Self::u32_field(&value, "snapshot_output_tokens"),
+                snapshot_reasoning_output_tokens: Self::u32_field(
+                    &value,
+                    "snapshot_reasoning_output_tokens",
+                ),
+                snapshot_cache_read_tokens: Self::u32_field(
+                    &value,
+                    "snapshot_cache_read_tokens",
+                ),
                 is_estimated: false,
             });
         }
@@ -647,36 +668,77 @@ impl ChatRunner {
             .and_then(|v| v.get("info"))?;
 
         let last = info.get("last_token_usage")?;
-        let total_tokens = last
-            .get("total_tokens")
-            .and_then(|v| v.as_u64())
-            .and_then(|v| u32::try_from(v).ok())?;
+        let input_tokens = Self::u32_field(last, "input_tokens");
+        let output_tokens = Self::u32_field(last, "output_tokens");
+        let total_tokens = match (input_tokens, output_tokens) {
+            (Some(input), Some(output)) => input + output,
+            _ => Self::u32_field(last, "total_tokens")?,
+        };
         let model_context_window = info
             .get("model_context_window")
             .and_then(|v| v.as_u64())
             .and_then(|v| u32::try_from(v).ok())
             .unwrap_or(0);
-        let input_tokens = last
-            .get("input_tokens")
-            .and_then(|v| v.as_u64())
-            .and_then(|v| u32::try_from(v).ok());
-        let output_tokens = last
-            .get("output_tokens")
-            .and_then(|v| v.as_u64())
-            .and_then(|v| u32::try_from(v).ok());
+        let reasoning_output_tokens = Self::u32_field(last, "reasoning_output_tokens");
         // Codex calls it cached_input_tokens
-        let cache_read_tokens = last
-            .get("cached_input_tokens")
-            .and_then(|v| v.as_u64())
-            .and_then(|v| u32::try_from(v).ok());
+        let cache_read_tokens = Self::u32_field(last, "cached_input_tokens");
+        let total = info.get("total_token_usage");
+        let runtime_model_id = Self::string_field(info, "runtime_model_id")
+            .or_else(|| Self::string_field(info, "model_id"))
+            .or_else(|| Self::string_field(info, "model"))
+            .or_else(|| {
+                value
+                    .get("params")
+                    .and_then(|params| params.get("msg"))
+                    .and_then(|msg| {
+                        Self::string_field(msg, "runtime_model_id")
+                            .or_else(|| Self::string_field(msg, "model_id"))
+                            .or_else(|| Self::string_field(msg, "model"))
+                    })
+            })
+            .or_else(|| Self::string_field(&value, "model"));
+        let provider_id = Self::string_field(info, "provider_id")
+            .or_else(|| {
+                value
+                    .get("params")
+                    .and_then(|params| params.get("msg"))
+                    .and_then(|msg| {
+                        Self::string_field(msg, "provider_id")
+                            .or_else(|| Self::string_field(msg, "modelProvider"))
+                            .or_else(|| Self::string_field(msg, "model_provider"))
+                    })
+            })
+            .or_else(|| Self::string_field(&value, "provider_id"));
+        let runtime_thread_id = Self::string_field(info, "runtime_thread_id").or_else(|| {
+            value
+                .get("params")
+                .and_then(|params| params.get("msg"))
+                .and_then(|msg| {
+                    Self::string_field(msg, "runtime_thread_id")
+                        .or_else(|| Self::string_field(msg, "thread_id"))
+                        .or_else(|| Self::string_field(msg, "threadId"))
+                })
+        });
 
         Some(TokenUsageInfo {
             total_tokens,
             model_context_window,
             input_tokens,
             output_tokens,
+            reasoning_output_tokens,
             cache_read_tokens,
-            cache_write_tokens: None,
+            runtime_agent: Some("codex".to_string()),
+            runtime_model_id,
+            provider_id: provider_id.or_else(|| Some("openai".to_string())),
+            runtime_thread_id,
+            usage_scope: Some("turn_delta".to_string()),
+            snapshot_total_tokens: total.and_then(|value| Self::u32_field(value, "total_tokens")),
+            snapshot_input_tokens: total.and_then(|value| Self::u32_field(value, "input_tokens")),
+            snapshot_output_tokens: total.and_then(|value| Self::u32_field(value, "output_tokens")),
+            snapshot_reasoning_output_tokens: total
+                .and_then(|value| Self::u32_field(value, "reasoning_output_tokens")),
+            snapshot_cache_read_tokens: total
+                .and_then(|value| Self::u32_field(value, "cached_input_tokens")),
             is_estimated: false,
         })
     }
@@ -1479,8 +1541,18 @@ impl ChatRunner {
                                 model_context_window: 0,
                                 input_tokens: Some(estimated_input),
                                 output_tokens: Some(estimated_output),
+                                reasoning_output_tokens: None,
                                 cache_read_tokens: None,
-                                cache_write_tokens: None,
+                                runtime_agent: None,
+                                runtime_model_id: None,
+                                provider_id: None,
+                                runtime_thread_id: None,
+                                usage_scope: None,
+                                snapshot_total_tokens: None,
+                                snapshot_input_tokens: None,
+                                snapshot_output_tokens: None,
+                                snapshot_reasoning_output_tokens: None,
+                                snapshot_cache_read_tokens: None,
                                 is_estimated: true,
                             }
                         };
@@ -1530,8 +1602,18 @@ impl ChatRunner {
                             "model_context_window": token_usage.model_context_window,
                             "input_tokens": token_usage.input_tokens,
                             "output_tokens": token_usage.output_tokens,
+                            "reasoning_output_tokens": token_usage.reasoning_output_tokens,
                             "cache_read_tokens": token_usage.cache_read_tokens,
-                            "cache_write_tokens": token_usage.cache_write_tokens,
+                            "runtime_agent": token_usage.runtime_agent,
+                            "runtime_model_id": token_usage.runtime_model_id,
+                            "provider_id": token_usage.provider_id,
+                            "runtime_thread_id": token_usage.runtime_thread_id,
+                            "usage_scope": token_usage.usage_scope,
+                            "snapshot_total_tokens": token_usage.snapshot_total_tokens,
+                            "snapshot_input_tokens": token_usage.snapshot_input_tokens,
+                            "snapshot_output_tokens": token_usage.snapshot_output_tokens,
+                            "snapshot_reasoning_output_tokens": token_usage.snapshot_reasoning_output_tokens,
+                            "snapshot_cache_read_tokens": token_usage.snapshot_cache_read_tokens,
                             "is_estimated": token_usage.is_estimated,
                         });
 

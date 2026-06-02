@@ -76,6 +76,8 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     input_tokens,
                     output_tokens,
                     cache_read_tokens,
+                    provider_id,
+                    runtime_model_id,
                 } => {
                     add_normalized_entry(
                         &msg_store,
@@ -87,8 +89,18 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                                 model_context_window,
                                 input_tokens,
                                 output_tokens,
+                                reasoning_output_tokens: None,
                                 cache_read_tokens,
-                                cache_write_tokens: None,
+                                runtime_agent: Some("openteams_cli".to_string()),
+                                runtime_model_id,
+                                provider_id,
+                                runtime_thread_id: None,
+                                usage_scope: Some("turn_delta".to_string()),
+                                snapshot_total_tokens: None,
+                                snapshot_input_tokens: None,
+                                snapshot_output_tokens: None,
+                                snapshot_reasoning_output_tokens: None,
+                                snapshot_cache_read_tokens: None,
                                 is_estimated: false,
                             }),
                             content: format!(

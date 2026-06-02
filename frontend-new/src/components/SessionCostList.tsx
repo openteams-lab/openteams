@@ -104,6 +104,11 @@ export function SessionCostList({
           </span>
           <span className="font-mono text-[12px] text-[var(--ink-tertiary)]">
             in {formatNumber(numberValue(session.input_tokens))}
+            {numberValue(session.cache_read_tokens) > 0
+              ? ` / cache ${formatNumber(
+                  numberValue(session.cache_read_tokens),
+                )}`
+              : ''}
           </span>
           <span className="font-mono text-[12px] font-medium text-[var(--ink)]">
             {formatNumber(numberValue(session.total_tokens))}

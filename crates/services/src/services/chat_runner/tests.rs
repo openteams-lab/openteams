@@ -327,6 +327,16 @@ fn parse_token_usage_from_codex_token_count_line() {
 }
 
 #[test]
+fn parse_token_usage_from_codex_token_count_line_keeps_model() {
+    let line = r#"{"method":"codex/event/token_count","params":{"msg":{"model":"gpt-5-codex","provider_id":"openai","thread_id":"thread-1","info":{"last_token_usage":{"input_tokens":100,"output_tokens":50},"model_context_window":258400}}}}"#;
+    let usage = ChatRunner::parse_token_usage_from_stdout_line(line).expect("usage");
+    assert_eq!(usage.total_tokens, 150);
+    assert_eq!(usage.runtime_model_id.as_deref(), Some("gpt-5-codex"));
+    assert_eq!(usage.provider_id.as_deref(), Some("openai"));
+    assert_eq!(usage.runtime_thread_id.as_deref(), Some("thread-1"));
+}
+
+#[test]
 fn parse_token_usage_from_plain_token_usage_line() {
     let line = r#"{"type":"token_usage","total_tokens":14596,"model_context_window":258400}"#;
     let usage = ChatRunner::parse_token_usage_from_stdout_line(line).expect("usage");
@@ -1180,8 +1190,18 @@ fn build_protocol_send_message_meta_includes_token_usage() {
         model_context_window: 128000,
         input_tokens: Some(1536),
         output_tokens: Some(512),
+        reasoning_output_tokens: None,
         cache_read_tokens: Some(256),
-        cache_write_tokens: None,
+        runtime_agent: Some("codex".to_string()),
+        runtime_model_id: Some("gpt-5".to_string()),
+        provider_id: Some("openai".to_string()),
+        runtime_thread_id: Some("thread-1".to_string()),
+        usage_scope: Some("turn_delta".to_string()),
+        snapshot_total_tokens: None,
+        snapshot_input_tokens: None,
+        snapshot_output_tokens: None,
+        snapshot_reasoning_output_tokens: None,
+        snapshot_cache_read_tokens: None,
         is_estimated: false,
     };
 

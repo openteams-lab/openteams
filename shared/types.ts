@@ -36,7 +36,7 @@ export type UpdateProjectPath = { path: string | null, label: string | null, kin
 
 export type CreateProjectRepo = { display_name: string, git_repo_path: string, };
 
-export type ProjectStats = { id: string, project_id: string, period_start: string | null, period_end: string | null, feature_count: bigint, bugfix_count: bigint, test_count: bigint, input_tokens: bigint, output_tokens: bigint, total_tokens: bigint, cost_total: number | null, updated_at: Date, };
+export type ProjectStats = { id: string, project_id: string, period_start: string | null, period_end: string | null, feature_count: bigint, bugfix_count: bigint, test_count: bigint, input_tokens: bigint, output_tokens: bigint, cache_read_tokens: bigint, reasoning_output_tokens: bigint, total_tokens: bigint, cost_total: number | null, updated_at: Date, };
 
 export type ProjectDeliveryEvent = { id: string, project_id: string, session_id: string | null, workflow_execution_id: string | null, step_id: string | null, event_type: ProjectDeliveryEventType, title: string | null, source: string | null, created_at: Date, };
 
@@ -1026,15 +1026,11 @@ export type TokenUsageInfo = {
 /**
  * Billable tokens: input + output (cache_read excluded, it's billed at ~1/10 rate)
  */
-total_tokens: number, model_context_window: number, input_tokens: number | null, output_tokens: number | null, 
+total_tokens: number, model_context_window: number, input_tokens: number | null, output_tokens: number | null, reasoning_output_tokens: number | null, 
 /**
  * Tokens served from cache (Claude: cache_read_input_tokens, Codex: cached_input_tokens)
  */
-cache_read_tokens: number | null, 
-/**
- * Tokens written into cache this turn (Claude: cache_creation_input_tokens)
- */
-cache_write_tokens: number | null, is_estimated: boolean, };
+cache_read_tokens: number | null, runtime_agent: string | null, runtime_model_id: string | null, provider_id: string | null, runtime_thread_id: string | null, usage_scope: string | null, snapshot_total_tokens: number | null, snapshot_input_tokens: number | null, snapshot_output_tokens: number | null, snapshot_reasoning_output_tokens: number | null, snapshot_cache_read_tokens: number | null, is_estimated: boolean, };
 
 export type FileChange = { "action": "write", content: string, } | { "action": "delete" } | { "action": "rename", new_path: string, } | { "action": "edit", 
 /**

@@ -117,7 +117,23 @@ const agentMsg: BackendChatMessage = {
   sender_type: 'agent',
   sender_id: 'agent-1',
   content: 'reply',
-  meta: { run_id: 'run-1' },
+  meta: {
+    run_id: 'run-1',
+    session_agent_id: 'sa-1',
+    reference: {
+      message_id: 'm1',
+    },
+    attachments: [
+      {
+        id: 'att-1',
+        name: 'screenshot.png',
+        mime_type: 'image/png',
+        size_bytes: 2048,
+        kind: 'image',
+        relative_path: 'chat/session_x/attachments/m2/screenshot.png',
+      },
+    ],
+  },
   created_at: '2025-12-31T23:59:30Z',
 };
 const a = mapMessage(agentMsg, {
@@ -130,6 +146,14 @@ eq('agent avatar derived', a.avatar, 'FR');
 eq('agent model carried through', a.model, 'Claude 3.5 Sonnet');
 eq('agent not isUser', a.isUser, undefined);
 eq('agent run id mapped from meta', a.runId, 'run-1');
+eq('agent session agent id mapped from meta', a.sessionAgentId, 'sa-1');
+eq('agent reference message id mapped from meta', a.referenceMessageId, 'm1');
+eq('agent attachment id mapped from meta', a.attachments?.[0]?.id, 'att-1');
+eq(
+  'agent attachment name mapped from meta',
+  a.attachments?.[0]?.name,
+  'screenshot.png',
+);
 eq('relative time 30s', a.time, '30s ago');
 
 eq(
