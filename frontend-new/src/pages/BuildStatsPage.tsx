@@ -249,8 +249,8 @@ const mockScrollableSessions: SessionCostEntry[] = [
 
 const mockModels: ModelUsageRow[] = [
   {
-    model_id: 'gpt-5.4',
-    model_name: 'GPT-5.4',
+    model_id: 'gpt-5.2-codex',
+    model_name: 'GPT-5.2 Codex',
     input_tokens: 84500,
     output_tokens: 32900,
     cache_read_tokens: 0,
@@ -264,8 +264,8 @@ const mockModels: ModelUsageRow[] = [
     cache_price_source: 'mock',
   },
   {
-    model_id: 'claude-sonnet-4-6',
-    model_name: 'Claude Sonnet 4.6',
+    model_id: 'sonnet',
+    model_name: 'Claude Sonnet',
     input_tokens: 61200,
     output_tokens: 22800,
     cache_read_tokens: 0,
@@ -279,8 +279,8 @@ const mockModels: ModelUsageRow[] = [
     cache_price_source: 'mock',
   },
   {
-    model_id: 'gpt-5.4-mini',
-    model_name: 'GPT-5.4 mini',
+    model_id: 'gpt-5.2',
+    model_name: 'GPT-5.2',
     input_tokens: 53100,
     output_tokens: 18700,
     cache_read_tokens: 0,

@@ -72,6 +72,7 @@ export function filterRuntimeRunners(
       runner.run_mode,
       runner.version ?? "",
       runner.last_error ?? "",
+      runner.discovered_models.join(" "),
       runner.env_summary.map((entry) => entry.key).join(" "),
     ]
       .join(" ")

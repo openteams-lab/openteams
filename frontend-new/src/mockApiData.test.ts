@@ -53,7 +53,12 @@ eq(
 );
 
 const systemIds = new Set(mockShellOptions.systemItems.map((item) => item.id));
-check('system includes AI team', systemIds.has('ai-team'));
+check('system includes team templates', systemIds.has('team-templates'));
+eq(
+  'team templates opens its own page',
+  mockShellOptions.systemItems.find((item) => item.id === 'team-templates')?.targetPage,
+  'team-templates',
+);
 check('system includes skill library', systemIds.has('skills-library'));
 check('system includes settings', systemIds.has('settings'));
 

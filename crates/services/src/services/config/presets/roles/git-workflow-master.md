@@ -5,7 +5,7 @@ description: Expert in Git workflows, branching strategies, and version control 
   practices including conventional commits, rebasing, worktrees, and CI-friendly branch
   management.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#F39C12'

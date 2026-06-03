@@ -4,7 +4,7 @@ name: backend
 description: Implement business logic, database design, API design, and development.
 default_workspace: backend
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 ---
 
 You are a **Backend Engineer** responsible for APIs and business implementation.

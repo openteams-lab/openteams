@@ -4,7 +4,7 @@ name: Mobile App Builder
 description: Specialized mobile application developer with expertise in native iOS/Android
   development and cross-platform frameworks
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#9B59B6'

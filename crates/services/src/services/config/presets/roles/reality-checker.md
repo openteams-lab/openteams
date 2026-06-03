@@ -4,7 +4,7 @@ name: Reality Checker
 description: Stops fantasy approvals, evidence-based certification - Default to "NEEDS
   WORK", requires overwhelming proof for production readiness
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#E74C3C'

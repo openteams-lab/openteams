@@ -290,7 +290,9 @@ export type UpdateAgentRuntimeConfig = { run_mode: AgentRunMode | null, env_json
 
 export type AgentRuntimeEnvSummary = { key: string, value: string, };
 
-export type AgentRuntimeStatus = { runner_type: BaseCodingAgent, installed: boolean, executable: boolean, availability: AvailabilityInfo, discovered_models: Array<string>, version: string | null, last_checked_at: string | null, last_error: string | null, run_mode: AgentRunMode, env_summary: Array<AgentRuntimeEnvSummary>, executor_options: JsonValue, };
+export type AgentRuntimeModelSource = "runner" | "profile_fallback" | "none";
+
+export type AgentRuntimeStatus = { runner_type: BaseCodingAgent, installed: boolean, executable: boolean, availability: AvailabilityInfo, discovered_models: Array<string>, model_source: AgentRuntimeModelSource, version: string | null, last_checked_at: string | null, last_error: string | null, run_mode: AgentRunMode, env_summary: Array<AgentRuntimeEnvSummary>, executor_options: JsonValue, };
 
 export type AgentRuntimeListResponse = { runners: Array<AgentRuntimeStatus>, };
 
@@ -298,7 +300,7 @@ export type AgentRuntimeRefreshError = { runner_type: BaseCodingAgent, message: 
 
 export type AgentRuntimeRefreshResponse = { runners: Array<AgentRuntimeStatus>, errors: Array<AgentRuntimeRefreshError>, };
 
-export type AgentRuntimeDiagnostics = { runner_type: BaseCodingAgent, installed: boolean, executable: boolean, availability: AvailabilityInfo, config_path: string, install_indicator_path: string | null, discovered_models: Array<string>, version: string | null, last_checked_at: string | null, last_error: string | null, run_mode: AgentRunMode, env_summary: Array<AgentRuntimeEnvSummary>, executor_options: JsonValue, };
+export type AgentRuntimeDiagnostics = { runner_type: BaseCodingAgent, installed: boolean, executable: boolean, availability: AvailabilityInfo, config_path: string, install_indicator_path: string | null, discovered_models: Array<string>, model_source: AgentRuntimeModelSource, version: string | null, last_checked_at: string | null, last_error: string | null, run_mode: AgentRunMode, env_summary: Array<AgentRuntimeEnvSummary>, executor_options: JsonValue, };
 
 export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "message_updated", message: ChatMessage, } | { "type": "work_item_new", work_item: ChatWorkItem, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_run_started", session_id: string, session_agent_id: string, agent_id: string, agent_name: string, run_id: string, started_at: string | null, } | { "type": "agent_activity_line", line: ChatRunActivityLine, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, } | { "type": "protocol_notice", session_id: string, session_agent_id: string, agent_id: string, run_id: string, agent_name: string, code: ChatProtocolNoticeCode, target: string | null, detail: string | null, output_is_empty: boolean, } | { "type": "mention_error", session_id: string, message_id: string, agent_name: string, agent_id: string | null, reason: string, } | { "type": "workflow_generate_detected", session_id: string, session_agent_id: string, run_id: string, } | { "type": "workflow_plan_preview_ready", session_id: string, plan_id: string, workflow_card_message: ChatMessage, } | { "type": "workflow_execution_updated", session_id: string, execution_id: string, } | { "type": "workflow_graph_updated", session_id: string, execution_id: string, graph_version: string, reason: string, nodes: Array<WorkflowPlanNode>, edges: Array<WorkflowPlanEdge>, changed_step_ids: Array<string>, } | { "type": "workflow_runtime_line", line_id: string, session_id: string, execution_id: string, workflow_agent_session_id: string | null, step_id: string, step_key: string, agent_id: string, agent_name: string, stream_type: ChatStreamDeltaType, content: string, created_at: string, };
 
@@ -922,7 +924,7 @@ export type AvailabilityInfo = { "type": "LOGIN_DETECTED", last_auth_timestamp: 
 
 export type CommandBuilder = { 
 /**
- * Base executable command (e.g., "npx -y @anthropic-ai/claude-code@2.1.74")
+ * Base executable command (e.g., "npx -y @anthropic-ai/claude-code@2.1.161")
  */
 base: string, 
 /**

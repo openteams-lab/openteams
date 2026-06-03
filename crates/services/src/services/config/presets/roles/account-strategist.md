@@ -6,7 +6,7 @@ description: Expert post-sale account strategist specializing in land-and-expand
   into long-term platform relationships through systematic expansion planning and
   multi-threaded account development.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

@@ -4,7 +4,7 @@ name: UX Architect
 description: Technical architecture and UX specialist who provides developers with
   solid foundations, CSS systems, and clear implementation guidance
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#9B59B6'

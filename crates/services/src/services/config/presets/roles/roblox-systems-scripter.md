@@ -5,7 +5,7 @@ description: Roblox platform engineering specialist - Masters Luau, the client-s
   security model, RemoteEvents/RemoteFunctions, DataStore, and module architecture
   for scalable Roblox experiences
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F43F5E'

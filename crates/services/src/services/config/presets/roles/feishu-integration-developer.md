@@ -7,7 +7,7 @@ description: Full-stack integration expert specializing in the Feishu (Lark) Ope
   and workflow automation, building enterprise-grade collaboration and automation
   solutions within the Feishu ecosystem.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#3498DB'

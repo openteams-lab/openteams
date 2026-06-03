@@ -4,7 +4,7 @@ name: Senior Developer
 description: Premium implementation specialist - Masters Laravel/Livewire/FluxUI,
   advanced CSS, Three.js integration
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#2ECC71'

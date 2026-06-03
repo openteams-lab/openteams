@@ -4,7 +4,7 @@ name: XR Cockpit Interaction Specialist
 description: Specialist in designing and developing immersive cockpit-based control
   systems for XR environments
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

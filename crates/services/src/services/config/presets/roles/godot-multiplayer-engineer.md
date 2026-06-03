@@ -4,7 +4,7 @@ name: Godot Multiplayer Engineer
 description: Godot 4 networking specialist - Masters the MultiplayerAPI, scene replication,
   ENet/WebRTC transport, RPCs, and authority models for real-time multiplayer games
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#8B5CF6'

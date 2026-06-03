@@ -5,7 +5,7 @@ description: Operates a shared identity graph that multiple AI agents resolve ag
   Ensures every agent in a multi-agent system gets the same canonical answer for "who
   is this entity?" - deterministically, even under concurrent writes.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

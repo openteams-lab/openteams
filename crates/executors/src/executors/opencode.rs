@@ -80,10 +80,20 @@ impl Drop for OpencodeServer {
     }
 }
 
+impl OpencodeServer {
+    async fn shutdown(mut self) {
+        if let Some(mut child) = self.child.take() {
+            if let Err(err) = workspace_utils::process::kill_process_group(&mut child).await {
+                tracing::warn!("Failed to stop OpenCode discovery server: {}", err);
+            }
+        }
+    }
+}
+
 type ServerPassword = String;
 
 impl Opencode {
-    const BASE_COMMAND: &'static str = "npx -y opencode-ai@1.2.24";
+    const BASE_COMMAND: &'static str = "npx -y opencode-ai@1.15.13";
 
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
         let builder = CommandBuilder::new(Self::BASE_COMMAND)
@@ -105,24 +115,30 @@ impl Opencode {
     ) -> Result<Vec<String>, ExecutorError> {
         let server = self.spawn_server(current_dir, env).await?;
         let directory = current_dir.to_string_lossy().to_string();
-        let client = reqwest::Client::builder()
-            .default_headers(build_default_headers(&directory, &server.server_password))
-            .build()
-            .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
-        wait_for_health(&client, &server.base_url).await?;
-        let providers = list_providers(&client, &server.base_url, &directory).await?;
-        let mut models = Vec::new();
+        let result = async {
+            let client = reqwest::Client::builder()
+                .default_headers(build_default_headers(&directory, &server.server_password))
+                .build()
+                .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
+            wait_for_health(&client, &server.base_url).await?;
+            let providers = list_providers(&client, &server.base_url, &directory).await?;
+            let mut models = Vec::new();
 
-        for provider in providers.all {
-            for model_id in provider.models.keys() {
-                models.push(format!("{}/{}", provider.id, model_id));
+            for provider in providers.all {
+                for model_id in provider.models.keys() {
+                    models.push(format!("{}/{}", provider.id, model_id));
+                }
             }
-        }
 
-        models.sort();
-        models.dedup();
-        Ok(models)
+            models.sort();
+            models.dedup();
+            Ok(models)
+        }
+        .await;
+
+        server.shutdown().await;
+        result
     }
 
     /// Common boilerplate for spawning an OpenCode server process.
@@ -345,6 +361,16 @@ async fn wait_for_server_url(
 impl StandardCodingAgentExecutor for Opencode {
     fn use_approvals(&mut self, approvals: Arc<dyn ExecutorApprovalService>) {
         self.approvals = Some(approvals);
+    }
+
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        Opencode::list_models(self, current_dir, env)
+            .await
+            .map(Some)
     }
 
     async fn available_slash_commands(

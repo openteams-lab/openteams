@@ -5,7 +5,7 @@ description: Unity editor automation specialist - Masters custom EditorWindows, 
   AssetPostprocessors, ScriptedImporters, and pipeline automation that saves teams
   hours per week
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

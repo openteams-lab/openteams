@@ -197,15 +197,15 @@ fn complete_chat_presets_with_builtins(chat_presets: &mut ChatPresetsConfig) {
     let defaults = default_chat_presets();
     let legacy_default_team_protocol = PresetLoader::load_team_protocol();
     let default_workspace_path = Some(home_directory().to_string_lossy().to_string());
-    let default_builtin_selected_skill_ids: HashMap<String, Vec<String>> = defaults
+    let default_builtin_members: HashMap<String, ChatMemberPreset> = defaults
         .members
         .iter()
-        .map(|preset| {
-            (
-                preset.id.clone(),
-                normalize_selected_skill_ids(&preset.selected_skill_ids),
-            )
-        })
+        .map(|preset| (preset.id.clone(), preset.clone()))
+        .collect();
+    let default_builtin_teams: HashMap<String, ChatTeamPreset> = defaults
+        .teams
+        .iter()
+        .map(|preset| (preset.id.clone(), preset.clone()))
         .collect();
 
     let builtin_member_ids: HashSet<&str> = defaults
@@ -232,10 +232,29 @@ fn complete_chat_presets_with_builtins(chat_presets: &mut ChatPresetsConfig) {
         preset.selected_skill_ids = normalize_selected_skill_ids(&preset.selected_skill_ids);
         preset.default_workspace_path = default_workspace_path.clone();
         if preset.is_builtin
-            && let Some(default_selected_skill_ids) =
-                default_builtin_selected_skill_ids.get(&preset.id)
+            && let Some(default_preset) = default_builtin_members.get(&preset.id)
         {
-            preset.selected_skill_ids = default_selected_skill_ids.clone();
+            preset.name = default_preset.name.clone();
+            preset.description = default_preset.description.clone();
+            preset.runner_type = default_preset.runner_type.clone();
+            preset.recommended_model = default_preset.recommended_model.clone();
+            preset.system_prompt = default_preset.system_prompt.clone();
+            preset.selected_skill_ids =
+                normalize_selected_skill_ids(&default_preset.selected_skill_ids);
+            preset.tools_enabled = default_preset.tools_enabled.clone();
+            preset.enabled = default_preset.enabled;
+        }
+    }
+
+    for preset in &mut chat_presets.teams {
+        if preset.is_builtin
+            && let Some(default_preset) = default_builtin_teams.get(&preset.id)
+        {
+            preset.name = default_preset.name.clone();
+            preset.description = default_preset.description.clone();
+            preset.member_ids = default_preset.member_ids.clone();
+            preset.lead_member_id = default_preset.lead_member_id.clone();
+            preset.enabled = default_preset.enabled;
         }
     }
 
@@ -467,6 +486,32 @@ mod tests {
             Some(expected_workspace.as_str())
         );
         assert!(builtin.selected_skill_ids.is_empty());
+    }
+
+    #[test]
+    fn complete_chat_presets_refreshes_builtin_catalog_fields() {
+        let mut chat_presets = default_chat_presets();
+        let builtin = chat_presets
+            .members
+            .iter_mut()
+            .find(|preset| preset.id == "frontend_engineer")
+            .expect("frontend preset should exist");
+        builtin.name = "Custom Frontend".to_string();
+        builtin.runner_type = Some("CLAUDE_CODE".to_string());
+        builtin.recommended_model = Some("gpt-5.4".to_string());
+        builtin.system_prompt = "old prompt".to_string();
+
+        complete_chat_presets_with_builtins(&mut chat_presets);
+
+        let builtin = chat_presets
+            .members
+            .iter()
+            .find(|preset| preset.id == "frontend_engineer")
+            .expect("frontend preset should exist");
+        assert_eq!(builtin.name, "frontend");
+        assert_eq!(builtin.runner_type.as_deref(), Some("CODEX"));
+        assert_eq!(builtin.recommended_model.as_deref(), Some("gpt-5.2-codex"));
+        assert_ne!(builtin.system_prompt, "old prompt");
     }
 
     #[test]

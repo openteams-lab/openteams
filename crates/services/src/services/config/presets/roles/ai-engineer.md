@@ -6,7 +6,7 @@ description: Expert AI/ML engineer specializing in machine learning model develo
   features, data pipelines, and AI-powered applications with emphasis on practical,
   scalable solutions.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#3498DB'

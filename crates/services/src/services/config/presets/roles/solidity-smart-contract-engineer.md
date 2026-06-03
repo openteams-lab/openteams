@@ -5,7 +5,7 @@ description: Expert Solidity developer specializing in EVM smart contract archit
   gas optimization, upgradeable proxy patterns, DeFi protocol development, and security-first
   contract design across Ethereum and L2 chains.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

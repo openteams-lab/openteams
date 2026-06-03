@@ -44,6 +44,7 @@ import {
 } from '@/lib/api';
 import type { CreateProjectRequest, Project } from '../../../shared/types';
 import {
+  effectiveSessionAgentModelName,
   mapMessage,
   mapMessages,
   monogramFromName,
@@ -307,7 +308,7 @@ const hydrateRunningAgentPlaceholders = async (
         id: `run-${run.run_id}`,
         avatar: monogramFromName(agentName),
         sender: asAgentHandle(agentName),
-        model: agent?.model_name ?? undefined,
+        model: effectiveSessionAgentModelName(agent, sessionAgent) ?? undefined,
         time: 'just now',
         text: '',
         isThinking: true,
@@ -742,9 +743,18 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         ]);
       const agentNamesById: Record<string, string> = {};
       const agentModelsById: Record<string, string | null> = {};
+      const sessionAgentByAgentId = new Map(
+        sessionAgents.map((sessionAgent) => [
+          sessionAgent.agent_id,
+          sessionAgent,
+        ]),
+      );
       for (const a of backendAgents) {
         agentNamesById[a.id] = a.name;
-        agentModelsById[a.id] = a.model_name;
+        agentModelsById[a.id] = effectiveSessionAgentModelName(
+          a,
+          sessionAgentByAgentId.get(a.id),
+        );
       }
       agentNamesByIdRef.current = agentNamesById;
       agentModelsByIdRef.current = agentModelsById;
@@ -789,8 +799,20 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       agentNamesByIdRef.current = Object.fromEntries(
         agents.map((agent) => [agent.id, agent.name]),
       );
+      const sessionAgentByAgentId = new Map(
+        sessionAgents.map((sessionAgent) => [
+          sessionAgent.agent_id,
+          sessionAgent,
+        ]),
+      );
       agentModelsByIdRef.current = Object.fromEntries(
-        agents.map((agent) => [agent.id, agent.model_name]),
+        agents.map((agent) => [
+          agent.id,
+          effectiveSessionAgentModelName(
+            agent,
+            sessionAgentByAgentId.get(agent.id),
+          ),
+        ]),
       );
       const mapped = mapSessionAgentsToMembers(sessionAgents, agents);
       setMembersAsync(succeed(mapped));

@@ -5,7 +5,7 @@ description: Expert financial analyst and controller specializing in financial p
   budget management, and business performance analysis. Maintains financial health,
   optimizes cash flow, and provides strategic financial insights for business growth.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#2ECC71'

@@ -6,7 +6,7 @@ description: Expert photography prompt engineer specializing in crafting detaile
   concepts into precise language that produces stunning, professional-quality photography
   through generative AI tools.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F59E0B'

@@ -604,11 +604,11 @@ export const mockShellOptions: ShellOptionsMock = {
   ],
   systemItems: [
     {
-      id: 'ai-team',
-      label: 'AI team',
-      icon: 'bot',
-      helper: 'Review available agents and routing behavior.',
-      targetPage: 'team',
+      id: 'team-templates',
+      label: 'Team templates',
+      icon: 'users',
+      helper: 'Review reusable team templates.',
+      targetPage: 'team-templates',
     },
     {
       id: 'skills-library',

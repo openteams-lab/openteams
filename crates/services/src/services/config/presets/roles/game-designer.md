@@ -4,7 +4,7 @@ name: Game Designer
 description: Systems and mechanics architect - Masters GDD authorship, player psychology,
   economy balancing, and gameplay loop design across all engines and genres
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#EAB308'

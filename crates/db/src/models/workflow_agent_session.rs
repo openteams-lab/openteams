@@ -139,4 +139,30 @@ impl WorkflowAgentSession {
         .fetch_one(pool)
         .await
     }
+
+    pub async fn clear_runtime_ids_for_project_member(
+        pool: &SqlitePool,
+        project_member_id: Uuid,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE chat_workflow_agent_sessions
+            SET agent_session_id = NULL,
+                agent_message_id = NULL,
+                updated_at = datetime('now', 'subsec')
+            WHERE session_agent_id IN (
+                SELECT id
+                FROM chat_session_agents
+                WHERE project_member_id = ?1
+                  AND state IN ('idle', 'dead')
+            )
+              AND state NOT IN ('running', 'interrupt_requested')
+              AND (agent_session_id IS NOT NULL OR agent_message_id IS NOT NULL)
+            "#,
+        )
+        .bind(project_member_id)
+        .execute(pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
 }

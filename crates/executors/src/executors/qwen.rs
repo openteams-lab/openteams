@@ -18,6 +18,9 @@ use crate::{
         AppendPrompt, AvailabilityInfo, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
         gemini::AcpAgentHarness,
     },
+    model_discovery::{
+        ProviderKind, cli_model_commands, discover_from_sources, runner_config_paths,
+    },
 };
 
 #[derive(Derivative, Clone, Serialize, Deserialize, TS, JsonSchema)]
@@ -44,7 +47,7 @@ pub struct QwenCode {
 }
 
 impl QwenCode {
-    const BASE_COMMAND: &'static str = "npx -y @qwen-code/qwen-code@0.12.1";
+    const BASE_COMMAND: &'static str = "npx -y @qwen-code/qwen-code@0.17.0";
     const MAX_RESUME_PROMPT_BYTES: usize = 160 * 1024;
 
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
@@ -129,6 +132,27 @@ async fn write_internal_settings(
 impl StandardCodingAgentExecutor for QwenCode {
     fn use_approvals(&mut self, approvals: Arc<dyn ExecutorApprovalService>) {
         self.approvals = Some(approvals);
+    }
+
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        let config_paths = runner_config_paths([
+            self.default_mcp_config_path(),
+            dirs::home_dir().map(|home| home.join(".qwen").join("settings.jsonc")),
+        ]);
+        discover_from_sources(
+            current_dir,
+            env,
+            &self.cmd,
+            self.model.as_deref(),
+            config_paths,
+            cli_model_commands(Self::BASE_COMMAND, &self.cmd),
+            &[ProviderKind::OpenAiCompatible],
+        )
+        .await
     }
 
     async fn spawn(
@@ -220,5 +244,32 @@ impl StandardCodingAgentExecutor for QwenCode {
         } else {
             AvailabilityInfo::NotFound
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn command_builder_uses_current_acp_flag() {
+        let qwen = QwenCode {
+            append_prompt: AppendPrompt::default(),
+            model: Some("qwen3-coder-plus".to_string()),
+            thinking_effort: None,
+            yolo: Some(true),
+            cmd: CmdOverrides::default(),
+            approvals: None,
+        };
+
+        let (_program, args) = qwen
+            .build_command_builder()
+            .expect("build command")
+            .build_initial()
+            .expect("build initial")
+            .into_parts_for_test();
+
+        assert!(args.iter().any(|arg| arg == "--acp"));
+        assert!(!args.iter().any(|arg| arg == "--experimental-acp"));
     }
 }

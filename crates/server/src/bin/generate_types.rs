@@ -124,6 +124,7 @@ fn generate_types_content() -> String {
         services::services::agent_runtime::AgentRuntimeConfig::decl(),
         services::services::agent_runtime::UpdateAgentRuntimeConfig::decl(),
         services::services::agent_runtime::AgentRuntimeEnvSummary::decl(),
+        services::services::agent_runtime::AgentRuntimeModelSource::decl(),
         services::services::agent_runtime::AgentRuntimeStatus::decl(),
         services::services::agent_runtime::AgentRuntimeListResponse::decl(),
         services::services::agent_runtime::AgentRuntimeRefreshError::decl(),

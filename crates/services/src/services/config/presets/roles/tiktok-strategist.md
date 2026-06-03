@@ -5,7 +5,7 @@ description: Expert TikTok marketing specialist focused on viral content creatio
   algorithm optimization, and community building. Masters TikTok's unique culture
   and features for brand growth.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

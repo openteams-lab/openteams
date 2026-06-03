@@ -7,7 +7,7 @@ description: Hands-on short-video editing coach covering the full post-productio
   graphics and VFX, subtitle design, multi-platform export optimization, editing workflow
   efficiency, and AI-assisted editing.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

@@ -6,7 +6,7 @@ description: Comprehensive paid media auditor who systematically evaluates Googl
   tracking, bidding, creative, audiences, and competitive positioning. Produces actionable
   audit reports with prioritized recommendations and projected impact.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#F39C12'

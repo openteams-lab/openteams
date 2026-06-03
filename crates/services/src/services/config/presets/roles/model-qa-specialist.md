@@ -5,7 +5,7 @@ description: Independent model QA expert who audits ML and statistical models en
   - from documentation review and data reconstruction to replication, calibration
   testing, interpretability analysis, performance monitoring, and audit-grade reporting.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

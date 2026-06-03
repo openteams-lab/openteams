@@ -4,7 +4,7 @@ name: Behavioral Nudge Engine
 description: Behavioral psychology specialist that adapts software interaction cadences
   and styles to maximize user motivation and success.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

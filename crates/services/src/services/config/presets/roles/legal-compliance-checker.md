@@ -5,7 +5,7 @@ description: Expert legal and compliance specialist ensuring business operations
   data handling, and content creation comply with relevant laws, regulations, and
   industry standards across multiple jurisdictions.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#E74C3C'

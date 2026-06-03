@@ -5,7 +5,7 @@ description: Expert document creation specialist who generates professional PDF,
   DOCX, and XLSX files using code-based approaches with proper formatting, charts,
   and data visualization.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#3498DB'

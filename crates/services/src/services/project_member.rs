@@ -4,6 +4,7 @@ use db::models::{
     chat_session_agent::ChatSessionAgent,
     member_execution_config::MemberExecutionConfig,
     project_member::{ProjectMember, ProjectMemberType, UpdateProjectMember},
+    workflow_agent_session::WorkflowAgentSession,
 };
 use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
@@ -120,10 +121,26 @@ impl ProjectMemberService {
                 member.execution_config.0.clone(),
             )
             .await?;
+            let synced_unlinked = if let Some(agent_id) = member.agent_id {
+                ChatSessionAgent::sync_execution_config_for_unlinked_project_agent(
+                    pool,
+                    member.project_id,
+                    agent_id,
+                    member.id,
+                    member.execution_config.0.clone(),
+                )
+                .await?
+            } else {
+                0
+            };
+            let cleared_workflow_sessions =
+                WorkflowAgentSession::clear_runtime_ids_for_project_member(pool, member.id).await?;
             tracing::info!(
                 project_member_id = %member.id,
                 synced_session_agents = synced,
-                "Synced member execution config to idle session agents"
+                synced_unlinked_session_agents = synced_unlinked,
+                cleared_workflow_agent_sessions = cleared_workflow_sessions,
+                "Synced member execution config to inactive session agents"
             );
         }
 
@@ -304,6 +321,16 @@ mod tests {
             )
             "#,
             r#"
+            CREATE TABLE chat_sessions (
+                id BLOB PRIMARY KEY,
+                title TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                project_id BLOB,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+            r#"
             CREATE TABLE chat_session_agents (
                 id BLOB PRIMARY KEY,
                 session_id BLOB NOT NULL,
@@ -316,6 +343,19 @@ mod tests {
                 project_member_id BLOB,
                 execution_config TEXT NOT NULL DEFAULT '{}',
                 allowed_skill_ids TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+            r#"
+            CREATE TABLE chat_workflow_agent_sessions (
+                id BLOB PRIMARY KEY,
+                workflow_execution_id BLOB NOT NULL,
+                session_agent_id BLOB NOT NULL,
+                role TEXT NOT NULL DEFAULT 'worker',
+                agent_session_id TEXT,
+                agent_message_id TEXT,
+                state TEXT NOT NULL DEFAULT 'idle',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
             )
@@ -399,7 +439,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn update_member_syncs_execution_config_to_unstarted_session_members() {
+    async fn update_member_syncs_execution_config_to_inactive_session_members() {
         let pool = setup_pool().await;
         let service = ProjectMemberService::new();
         let project_id = Uuid::new_v4();
@@ -424,10 +464,26 @@ mod tests {
         let synced_session_agent_id = Uuid::new_v4();
         let running_session_agent_id = Uuid::new_v4();
         let resumed_session_agent_id = Uuid::new_v4();
+        let dead_session_agent_id = Uuid::new_v4();
+        let active_workflow_session_agent_id = Uuid::new_v4();
+        let legacy_project_session_id = Uuid::new_v4();
+        let other_project_session_id = Uuid::new_v4();
+        let unlinked_project_session_agent_id = Uuid::new_v4();
+        let unlinked_other_project_session_agent_id = Uuid::new_v4();
         for (id, state, agent_session_id) in [
             (synced_session_agent_id, "idle", None),
             (running_session_agent_id, "running", None),
             (resumed_session_agent_id, "idle", Some("upstream-session")),
+            (
+                dead_session_agent_id,
+                "dead",
+                Some("failed-upstream-session"),
+            ),
+            (
+                active_workflow_session_agent_id,
+                "idle",
+                Some("active-chat-upstream"),
+            ),
         ] {
             sqlx::query(
                 r#"
@@ -453,6 +509,97 @@ mod tests {
             .expect("insert session agent");
         }
 
+        for (session_id, linked_project_id) in [
+            (legacy_project_session_id, project_id),
+            (other_project_session_id, Uuid::new_v4()),
+        ] {
+            sqlx::query(
+                r#"
+                INSERT INTO chat_sessions (id, title, status, project_id)
+                VALUES (?1, 'session', 'active', ?2)
+                "#,
+            )
+            .bind(session_id)
+            .bind(linked_project_id)
+            .execute(&pool)
+            .await
+            .expect("insert chat session");
+        }
+        for (id, session_id, agent_session_id) in [
+            (
+                unlinked_project_session_agent_id,
+                legacy_project_session_id,
+                "legacy-upstream-session",
+            ),
+            (
+                unlinked_other_project_session_agent_id,
+                other_project_session_id,
+                "other-upstream-session",
+            ),
+        ] {
+            sqlx::query(
+                r#"
+                INSERT INTO chat_session_agents (
+                    id,
+                    session_id,
+                    agent_id,
+                    state,
+                    agent_session_id
+                )
+                VALUES (?1, ?2, ?3, 'idle', ?4)
+                "#,
+            )
+            .bind(id)
+            .bind(session_id)
+            .bind(agent.id)
+            .bind(agent_session_id)
+            .execute(&pool)
+            .await
+            .expect("insert unlinked session agent");
+        }
+
+        let idle_workflow_session_id = Uuid::new_v4();
+        let running_workflow_session_id = Uuid::new_v4();
+        for (id, session_agent_id, state, agent_session_id, agent_message_id) in [
+            (
+                idle_workflow_session_id,
+                resumed_session_agent_id,
+                "idle",
+                "workflow-upstream",
+                "workflow-message",
+            ),
+            (
+                running_workflow_session_id,
+                active_workflow_session_agent_id,
+                "running",
+                "active-workflow-upstream",
+                "active-workflow-message",
+            ),
+        ] {
+            sqlx::query(
+                r#"
+                INSERT INTO chat_workflow_agent_sessions (
+                    id,
+                    workflow_execution_id,
+                    session_agent_id,
+                    state,
+                    agent_session_id,
+                    agent_message_id
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                "#,
+            )
+            .bind(id)
+            .bind(Uuid::new_v4())
+            .bind(session_agent_id)
+            .bind(state)
+            .bind(agent_session_id)
+            .bind(agent_message_id)
+            .execute(&pool)
+            .await
+            .expect("insert workflow session");
+        }
+
         service
             .update_member(
                 &pool,
@@ -465,7 +612,7 @@ mod tests {
                     allowed_skill_ids: None,
                     execution_config: Some(MemberExecutionConfig {
                         runner_type: Some(executors::executors::BaseCodingAgent::Codex),
-                        model_name: Some("gpt-5.4".to_string()),
+                        model_name: Some("gpt-5.2-codex".to_string()),
                         thinking_effort: Some("high".to_string()),
                         model_variant: None,
                     }),
@@ -492,10 +639,119 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .expect("read resumed config");
+        let dead_config: String =
+            sqlx::query_scalar("SELECT execution_config FROM chat_session_agents WHERE id = ?1")
+                .bind(dead_session_agent_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read dead config");
+        let dead_runtime_ids: (Option<String>, Option<String>) = sqlx::query_as(
+            r#"
+            SELECT agent_session_id, agent_message_id
+            FROM chat_session_agents
+            WHERE id = ?1
+            "#,
+        )
+        .bind(dead_session_agent_id)
+        .fetch_one(&pool)
+        .await
+        .expect("read dead runtime ids");
+        let resumed_runtime_ids: (Option<String>, Option<String>) = sqlx::query_as(
+            r#"
+            SELECT agent_session_id, agent_message_id
+            FROM chat_session_agents
+            WHERE id = ?1
+            "#,
+        )
+        .bind(resumed_session_agent_id)
+        .fetch_one(&pool)
+        .await
+        .expect("read resumed runtime ids");
+        let active_workflow_config: String =
+            sqlx::query_scalar("SELECT execution_config FROM chat_session_agents WHERE id = ?1")
+                .bind(active_workflow_session_agent_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read active workflow config");
+        let unlinked_project_config: String =
+            sqlx::query_scalar("SELECT execution_config FROM chat_session_agents WHERE id = ?1")
+                .bind(unlinked_project_session_agent_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read unlinked project config");
+        let unlinked_project_row: (Option<Uuid>, Option<String>, Option<String>) = sqlx::query_as(
+            r#"
+            SELECT project_member_id, agent_session_id, agent_message_id
+            FROM chat_session_agents
+            WHERE id = ?1
+            "#,
+        )
+        .bind(unlinked_project_session_agent_id)
+        .fetch_one(&pool)
+        .await
+        .expect("read unlinked project runtime ids");
+        let unlinked_other_project_config: String =
+            sqlx::query_scalar("SELECT execution_config FROM chat_session_agents WHERE id = ?1")
+                .bind(unlinked_other_project_session_agent_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read unlinked other project config");
+        let unlinked_other_project_row: (Option<Uuid>, Option<String>) = sqlx::query_as(
+            r#"
+            SELECT project_member_id, agent_session_id
+            FROM chat_session_agents
+            WHERE id = ?1
+            "#,
+        )
+        .bind(unlinked_other_project_session_agent_id)
+        .fetch_one(&pool)
+        .await
+        .expect("read unlinked other project runtime ids");
+        let idle_workflow_runtime_ids: (Option<String>, Option<String>) = sqlx::query_as(
+            r#"
+            SELECT agent_session_id, agent_message_id
+            FROM chat_workflow_agent_sessions
+            WHERE id = ?1
+            "#,
+        )
+        .bind(idle_workflow_session_id)
+        .fetch_one(&pool)
+        .await
+        .expect("read idle workflow runtime ids");
+        let running_workflow_runtime_ids: (Option<String>, Option<String>) = sqlx::query_as(
+            r#"
+            SELECT agent_session_id, agent_message_id
+            FROM chat_workflow_agent_sessions
+            WHERE id = ?1
+            "#,
+        )
+        .bind(running_workflow_session_id)
+        .fetch_one(&pool)
+        .await
+        .expect("read running workflow runtime ids");
 
-        assert!(synced_config.contains("gpt-5.4"));
+        assert!(synced_config.contains("gpt-5.2-codex"));
         assert_eq!(running_config, "{}");
-        assert_eq!(resumed_config, "{}");
+        assert!(resumed_config.contains("gpt-5.2-codex"));
+        assert_eq!(resumed_runtime_ids, (None, None));
+        assert!(dead_config.contains("gpt-5.2-codex"));
+        assert_eq!(dead_runtime_ids, (None, None));
+        assert_eq!(active_workflow_config, "{}");
+        assert!(unlinked_project_config.contains("gpt-5.2-codex"));
+        assert_eq!(unlinked_project_row, (Some(member.id), None, None));
+        assert_eq!(unlinked_other_project_config, "{}");
+        assert_eq!(
+            unlinked_other_project_row,
+            (None, Some("other-upstream-session".to_string()))
+        );
+        assert_eq!(idle_workflow_runtime_ids, (None, None));
+        assert_eq!(
+            running_workflow_runtime_ids,
+            (
+                Some("active-workflow-upstream".to_string()),
+                Some("active-workflow-message".to_string())
+            )
+        );
     }
 
     #[tokio::test]

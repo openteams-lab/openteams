@@ -6,7 +6,7 @@ description: Full-spectrum operations expert for Sina Weibo, with deep expertise
   fan economy strategies, and Weibo advertising, helping brands achieve viral reach
   and sustained growth on China's leading public discourse platform.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

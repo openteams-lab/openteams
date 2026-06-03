@@ -4,7 +4,7 @@ name: Rapid Prototyper
 description: Specialized in ultra-fast proof-of-concept development and MVP creation
   using efficient tools and frameworks
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#2ECC71'

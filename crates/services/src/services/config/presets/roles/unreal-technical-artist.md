@@ -5,7 +5,7 @@ description: Unreal Engine visual pipeline specialist - Masters the Material Edi
   Niagara VFX, Procedural Content Generation, and the art-to-engine pipeline for UE5
   projects
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

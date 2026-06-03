@@ -75,7 +75,6 @@ struct TokenMessageRow {
 #[derive(Debug, FromRow)]
 struct PriceRow {
     model_id: String,
-    model_name: String,
     input_price_per_1m: f64,
     output_price_per_1m: f64,
     cache_read_price_per_1m: Option<f64>,
@@ -146,7 +145,6 @@ struct TokenUsageRecord {
 
 #[derive(Debug, Clone)]
 struct EffectivePrice {
-    model_name: String,
     input_price_per_1m: f64,
     output_price_per_1m: f64,
     cache_read_price_per_1m: Option<f64>,
@@ -211,7 +209,7 @@ impl TokenCostStatsService {
         let mut by_day: HashMap<String, TokenAccumulator> = HashMap::new();
 
         for record in &records {
-            let resolved = resolve_usage_price(record, prices.get(&record.model_id));
+            let resolved = resolve_usage_price(record, find_effective_price(&prices, record));
             let estimated_cost = estimated_cost_for_record(record, &resolved);
             by_day
                 .entry(record.date.clone())
@@ -248,7 +246,7 @@ impl TokenCostStatsService {
         let mut by_session: HashMap<String, (String, TokenAccumulator)> = HashMap::new();
 
         for record in &records {
-            let resolved = resolve_usage_price(record, prices.get(&record.model_id));
+            let resolved = resolve_usage_price(record, find_effective_price(&prices, record));
             let estimated_cost = estimated_cost_for_record(record, &resolved);
             let entry = by_session
                 .entry(record.session_id.clone())
@@ -316,7 +314,7 @@ impl TokenCostStatsService {
 
         let mut totals = ProjectTokenCostTotals::default();
         for record in &records {
-            let resolved = resolve_usage_price(record, prices.get(&record.model_id));
+            let resolved = resolve_usage_price(record, find_effective_price(&prices, record));
             totals.input_tokens += record.input_tokens;
             totals.output_tokens += record.output_tokens;
             totals.cache_read_tokens += record.cache_read_tokens;
@@ -383,7 +381,6 @@ impl TokenCostStatsService {
             r#"
             SELECT
                 mpc.model_id AS model_id,
-                mpc.model_name AS model_name,
                 mpc.input_price_per_1m AS input_price_per_1m,
                 mpc.output_price_per_1m AS output_price_per_1m,
                 mpc.cache_read_price_per_1m AS cache_read_price_per_1m,
@@ -401,7 +398,6 @@ impl TokenCostStatsService {
             UNION ALL
             SELECT
                 mp.model_id AS model_id,
-                COALESCE(NULLIF(mp.model_name, ''), mp.model_id) AS model_name,
                 0.0 AS input_price_per_1m,
                 0.0 AS output_price_per_1m,
                 NULL AS cache_read_price_per_1m,
@@ -435,7 +431,6 @@ impl TokenCostStatsService {
             prices.insert(
                 row.model_id,
                 EffectivePrice {
-                    model_name: row.model_name,
                     input_price_per_1m: row.custom_input_price.unwrap_or(row.input_price_per_1m),
                     output_price_per_1m: row.custom_output_price.unwrap_or(row.output_price_per_1m),
                     cache_read_price_per_1m: row
@@ -527,13 +522,8 @@ fn parse_usage_candidate(row: TokenMessageRow, order: usize) -> Option<TokenUsag
 
     let usage_scope =
         string_value(token_usage, &["usage_scope"]).unwrap_or_else(|| "turn_delta".to_string());
-    let raw_model_id = string_value(
-        token_usage,
-        &["runtime_model_id", "model_id", "model", "model_name"],
-    )
-    .or(row.model_name)
-    .unwrap_or_else(|| "unknown".to_string());
-    let model_id = resolve_canonical_id(&raw_model_id);
+    let raw_model_id = runtime_model_value(token_usage, row.model_name);
+    let model_id = normalize_runtime_model_id(&raw_model_id, row.runner_type.as_deref());
     let runtime_thread_id = string_value(token_usage, &["runtime_thread_id"])
         .or_else(|| string_value(&meta, &["agent_session_id"]))
         .or_else(|| string_value(&meta, &["agent_message_id"]))
@@ -651,6 +641,119 @@ fn string_value(value: &Value, names: &[&str]) -> Option<String> {
     None
 }
 
+fn runtime_model_value(token_usage: &Value, agent_model_name: Option<String>) -> String {
+    let runtime_model = string_value(
+        token_usage,
+        &["runtime_model_id", "model_id", "model", "model_name"],
+    );
+
+    if runtime_model
+        .as_deref()
+        .is_some_and(|model| !is_default_model_id(model))
+    {
+        return runtime_model.unwrap();
+    }
+
+    if agent_model_name
+        .as_deref()
+        .is_some_and(|model| !is_default_model_id(model))
+    {
+        return agent_model_name.unwrap();
+    }
+
+    runtime_model
+        .or(agent_model_name)
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn normalize_executor_model_id(model_id: &str) -> String {
+    let trimmed = model_id.trim();
+    if trimmed.is_empty() {
+        "unknown".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn is_default_model_id(model_id: &str) -> bool {
+    model_id.trim().eq_ignore_ascii_case("default")
+}
+
+fn normalize_runtime_model_id(model_id: &str, runner_type: Option<&str>) -> String {
+    let normalized = normalize_executor_model_id(model_id);
+    if !is_default_model_id(&normalized) {
+        return normalized;
+    }
+
+    match runner_type.map(|runner| runner.replace(['-', ' '], "_").to_ascii_uppercase()) {
+        Some(runner) if runner == "CODEX" => "gpt-5-codex".to_string(),
+        _ => "default".to_string(),
+    }
+}
+
+fn bare_model_id(model_id: &str) -> String {
+    normalize_executor_model_id(model_id)
+        .rsplit_once('/')
+        .map_or_else(
+            || normalize_executor_model_id(model_id),
+            |(_, bare_model_id)| normalize_executor_model_id(bare_model_id),
+        )
+        .to_ascii_lowercase()
+}
+
+fn canonical_lookup_id(model_id: &str) -> String {
+    resolve_canonical_id(model_id).to_ascii_lowercase()
+}
+
+fn find_effective_price<'a>(
+    prices: &'a HashMap<String, EffectivePrice>,
+    record: &TokenUsageRecord,
+) -> Option<&'a EffectivePrice> {
+    if let Some(price) = prices.get(&record.model_id) {
+        return Some(price);
+    }
+
+    let lower_model_id = record.model_id.to_ascii_lowercase();
+    if lower_model_id != record.model_id {
+        if let Some(price) = prices.get(&lower_model_id) {
+            return Some(price);
+        }
+    }
+
+    let canonical_model_id = resolve_canonical_id(&record.model_id);
+    if canonical_model_id != record.model_id {
+        if let Some(price) = prices.get(&canonical_model_id) {
+            return Some(price);
+        }
+    }
+
+    let canonical_lower_model_id = canonical_model_id.to_ascii_lowercase();
+    if canonical_lower_model_id != canonical_model_id && canonical_lower_model_id != lower_model_id
+    {
+        if let Some(price) = prices.get(&canonical_lower_model_id) {
+            return Some(price);
+        }
+    }
+
+    let target_bare = bare_model_id(&record.model_id);
+    if target_bare != lower_model_id {
+        if let Some(price) = prices.get(&target_bare) {
+            return Some(price);
+        }
+    }
+
+    let target_canonical = canonical_lookup_id(&record.model_id);
+    prices.iter().find_map(|(price_model_id, price)| {
+        if bare_model_id(price_model_id) == target_bare
+            || canonical_lookup_id(price_model_id) == target_canonical
+        {
+            Some(price)
+        } else {
+            None
+        }
+    })
+}
+
 fn date_in_range(date: &str, start: Option<&str>, end: Option<&str>) -> bool {
     start.is_none_or(|start| date >= start) && end.is_none_or(|end| date <= end)
 }
@@ -691,9 +794,7 @@ fn resolve_usage_price(
     let source = price
         .map(|item| item.source.clone())
         .unwrap_or_else(|| "missing".to_string());
-    let model_name = price
-        .map(|item| item.model_name.clone())
-        .unwrap_or_else(|| record.model_id.clone());
+    let model_name = record.model_id.clone();
 
     let cache_read_price = price
         .and_then(|item| item.cache_read_price_per_1m)
@@ -732,7 +833,7 @@ fn model_usage_from_records(
 ) -> Vec<ModelUsageStats> {
     let mut by_model: HashMap<String, (TokenAccumulator, ResolvedUsagePrice)> = HashMap::new();
     for record in &records {
-        let resolved = resolve_usage_price(record, prices.get(&record.model_id));
+        let resolved = resolve_usage_price(record, find_effective_price(&prices, record));
         let estimated_cost = estimated_cost_for_record(record, &resolved);
         let entry = by_model
             .entry(record.model_id.clone())
@@ -895,7 +996,56 @@ mod tests {
         );
 
         assert_eq!(records.len(), 1);
+        assert_eq!(records[0].model_id, "openai/gpt-5-codex");
+    }
+
+    #[test]
+    fn maps_codex_default_to_runtime_default_model() {
+        let records = real_usage_records_from_rows(
+            vec![row(
+                "m1",
+                "run-1",
+                "codex",
+                Some("default"),
+                serde_json::json!({
+                    "token_usage": {
+                        "input_tokens": 100,
+                        "output_tokens": 50,
+                        "is_estimated": false
+                    }
+                }),
+            )],
+            None,
+            None,
+        );
+
+        assert_eq!(records.len(), 1);
         assert_eq!(records[0].model_id, "gpt-5-codex");
+    }
+
+    #[test]
+    fn runtime_default_prefers_explicit_agent_model_name() {
+        let records = real_usage_records_from_rows(
+            vec![row(
+                "m1",
+                "run-1",
+                "codex",
+                Some("openai/gpt-5.5"),
+                serde_json::json!({
+                    "token_usage": {
+                        "runtime_model_id": "default",
+                        "input_tokens": 100,
+                        "output_tokens": 50,
+                        "is_estimated": false
+                    }
+                }),
+            )],
+            None,
+            None,
+        );
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].model_id, "openai/gpt-5.5");
     }
 
     #[test]
@@ -964,7 +1114,6 @@ mod tests {
         prices.insert(
             "gpt-4o".to_string(),
             EffectivePrice {
-                model_name: "GPT-4o".to_string(),
                 input_price_per_1m: 1.0,
                 output_price_per_1m: 2.0,
                 cache_read_price_per_1m: Some(0.25),
@@ -978,6 +1127,7 @@ mod tests {
         assert_eq!(models.len(), 1);
         assert_eq!(models[0].price_source, "custom");
         assert_eq!(models[0].cache_price_source, "custom");
+        assert_eq!(models[0].model_name, "gpt-4o");
         assert!((models[0].estimated_cost - 2.25).abs() < f64::EPSILON);
     }
 
@@ -1009,7 +1159,7 @@ mod tests {
             date: "2026-06-01".to_string(),
             session_id: "session-1".to_string(),
             title: "Session".to_string(),
-            model_id: resolve_canonical_id("z-ai/glm-5.1"),
+            model_id: "z-ai/glm-5.1".to_string(),
             input_tokens: 1_000_000,
             output_tokens: 1_000_000,
             cache_read_tokens: 0,
@@ -1020,7 +1170,6 @@ mod tests {
         prices.insert(
             "glm-5.1".to_string(),
             EffectivePrice {
-                model_name: "Z.ai: GLM 5.1".to_string(),
                 input_price_per_1m: 0.98,
                 output_price_per_1m: 3.08,
                 cache_read_price_per_1m: Some(0.182),
@@ -1032,10 +1181,121 @@ mod tests {
         let models = model_usage_from_records(records, prices, 5);
 
         assert_eq!(models.len(), 1);
-        assert_eq!(models[0].model_id, "glm-5.1");
-        assert_eq!(models[0].model_name, "Z.ai: GLM 5.1");
+        assert_eq!(models[0].model_id, "z-ai/glm-5.1");
+        assert_eq!(models[0].model_name, "z-ai/glm-5.1");
         assert_eq!(models[0].price_source, "openrouter");
         assert!((models[0].estimated_cost - 4.06).abs() < 1e-9);
+    }
+
+    #[test]
+    fn model_usage_falls_back_to_bare_price_model_id() {
+        let records = vec![TokenUsageRecord {
+            date: "2026-06-01".to_string(),
+            session_id: "session-1".to_string(),
+            title: "Session".to_string(),
+            model_id: "openai/some-new-model".to_string(),
+            input_tokens: 1_000_000,
+            output_tokens: 1_000_000,
+            cache_read_tokens: 0,
+            reasoning_output_tokens: 0,
+            total_tokens: 2_000_000,
+        }];
+        let mut prices = HashMap::new();
+        prices.insert(
+            "some-new-model".to_string(),
+            EffectivePrice {
+                input_price_per_1m: 1.5,
+                output_price_per_1m: 2.5,
+                cache_read_price_per_1m: None,
+                source: "litellm".to_string(),
+                cache_source: "missing".to_string(),
+            },
+        );
+
+        let models = model_usage_from_records(records, prices, 5);
+
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].model_id, "openai/some-new-model");
+        assert_eq!(models[0].model_name, "openai/some-new-model");
+        assert_eq!(models[0].price_source, "litellm");
+        assert!((models[0].estimated_cost - 4.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn model_usage_falls_back_between_provider_prefixed_model_ids() {
+        let records = vec![TokenUsageRecord {
+            date: "2026-06-01".to_string(),
+            session_id: "session-1".to_string(),
+            title: "Session".to_string(),
+            model_id: "custom_provider/gpt-5.5".to_string(),
+            input_tokens: 1_000_000,
+            output_tokens: 1_000_000,
+            cache_read_tokens: 0,
+            reasoning_output_tokens: 0,
+            total_tokens: 2_000_000,
+        }];
+        let mut prices = HashMap::new();
+        prices.insert(
+            "openai/gpt-5.5".to_string(),
+            EffectivePrice {
+                input_price_per_1m: 3.0,
+                output_price_per_1m: 4.0,
+                cache_read_price_per_1m: None,
+                source: "openrouter".to_string(),
+                cache_source: "missing".to_string(),
+            },
+        );
+
+        let models = model_usage_from_records(records, prices, 5);
+
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].model_id, "custom_provider/gpt-5.5");
+        assert_eq!(models[0].model_name, "custom_provider/gpt-5.5");
+        assert_eq!(models[0].price_source, "openrouter");
+        assert!((models[0].estimated_cost - 7.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn model_usage_prefers_exact_price_before_bare_fallback() {
+        let records = vec![TokenUsageRecord {
+            date: "2026-06-01".to_string(),
+            session_id: "session-1".to_string(),
+            title: "Session".to_string(),
+            model_id: "openai/some-new-model".to_string(),
+            input_tokens: 1_000_000,
+            output_tokens: 1_000_000,
+            cache_read_tokens: 0,
+            reasoning_output_tokens: 0,
+            total_tokens: 2_000_000,
+        }];
+        let mut prices = HashMap::new();
+        prices.insert(
+            "some-new-model".to_string(),
+            EffectivePrice {
+                input_price_per_1m: 1.0,
+                output_price_per_1m: 1.0,
+                cache_read_price_per_1m: None,
+                source: "litellm".to_string(),
+                cache_source: "missing".to_string(),
+            },
+        );
+        prices.insert(
+            "openai/some-new-model".to_string(),
+            EffectivePrice {
+                input_price_per_1m: 3.0,
+                output_price_per_1m: 4.0,
+                cache_read_price_per_1m: None,
+                source: "openrouter".to_string(),
+                cache_source: "missing".to_string(),
+            },
+        );
+
+        let models = model_usage_from_records(records, prices, 5);
+
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].model_name, "openai/some-new-model");
+        assert_eq!(models[0].price_source, "openrouter");
+        assert!((models[0].estimated_cost - 7.0).abs() < f64::EPSILON);
     }
 
     #[tokio::test]

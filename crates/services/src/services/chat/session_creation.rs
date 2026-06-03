@@ -226,7 +226,7 @@ mod session_creation_tests {
             true,
             Some("/agent/workspace"),
             r#"["shell"]"#,
-            r#"{"runner_type":"CODEX","model_name":"gpt-5.4","thinking_effort":"high"}"#,
+            r#"{"runner_type":"CODEX","model_name":"gpt-5.2-codex","thinking_effort":"high"}"#,
         )
         .await;
         insert_project_member(
@@ -276,7 +276,7 @@ mod session_creation_tests {
         assert_eq!(session_agents[0].project_member_id.is_some(), true);
         assert_eq!(
             session_agents[0].execution_config.0.model_name.as_deref(),
-            Some("gpt-5.4")
+            Some("gpt-5.2-codex")
         );
         assert_eq!(
             session_agents[0].execution_config.0.thinking_effort.as_deref(),

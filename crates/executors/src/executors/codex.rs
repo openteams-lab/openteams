@@ -5,7 +5,7 @@ pub mod review;
 pub mod session;
 pub mod slash_commands;
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     env,
     path::{Path, PathBuf},
     sync::Arc,
@@ -54,6 +54,10 @@ use crate::{
         SpawnedChild, StandardCodingAgentExecutor,
     },
     logs::utils::patch,
+    model_discovery::{
+        ProviderKind, cli_model_commands, discover_from_sources, fetch_model_slugs_from_json_url,
+        runner_config_paths,
+    },
     skill_config::NativeSkillConfigBackend,
     stdout_dup::create_stdout_pipe_writer,
 };
@@ -201,6 +205,44 @@ impl StandardCodingAgentExecutor for Codex {
         })))
     }
 
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        let config_paths = runner_config_paths([
+            self.default_mcp_config_path(),
+            codex_home().map(|home| home.join("config.json")),
+        ]);
+        let mut models = BTreeSet::new();
+        if let Some(discovered) = discover_from_sources(
+            current_dir,
+            env,
+            &self.cmd,
+            self.model.as_deref(),
+            config_paths,
+            cli_model_commands(Self::BASE_COMMAND, &self.cmd),
+            &[ProviderKind::OpenAiCompatible],
+        )
+        .await?
+        {
+            models.extend(discovered);
+        }
+
+        match fetch_model_slugs_from_json_url(Self::MODELS_JSON_URL).await {
+            Ok(slugs) => models.extend(slugs),
+            Err(err) => {
+                tracing::debug!("Failed to fetch Codex models manager JSON: {err}");
+            }
+        }
+
+        if models.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(models.into_iter().collect()))
+        }
+    }
+
     async fn spawn(
         &self,
         current_dir: &Path,
@@ -293,7 +335,8 @@ impl StandardCodingAgentExecutor for Codex {
 }
 
 impl Codex {
-    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.125.0";
+    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.136.0";
+    const MODELS_JSON_URL: &'static str = "https://raw.githubusercontent.com/openai/codex/refs/heads/main/codex-rs/models-manager/models.json";
 
     pub fn base_command() -> &'static str {
         Self::BASE_COMMAND

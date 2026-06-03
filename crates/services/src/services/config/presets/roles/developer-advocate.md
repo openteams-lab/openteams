@@ -6,7 +6,7 @@ description: Expert developer advocate specializing in building developer commun
   driving platform adoption through authentic engineering engagement. Bridges product
   and engineering teams with external developers.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#9B59B6'

@@ -55,14 +55,15 @@ async fn discover_models(
             continue;
         }
 
-        if let CodingAgent::Opencode(opencode) = base {
-            match opencode.list_models(current_dir, env).await {
-                Ok(models) => {
+        match base.list_models(current_dir, env).await {
+            Ok(Some(models)) => {
+                if !models.is_empty() {
                     updates.insert(*executor, models);
                 }
-                Err(err) => {
-                    tracing::debug!("Failed to list models for {executor}: {err}");
-                }
+            }
+            Ok(None) => {}
+            Err(err) => {
+                tracing::debug!("Failed to list models for {executor}: {err}");
             }
         }
     }
@@ -300,11 +301,7 @@ fn parse_droid_reasoning_effort(value: &str) -> Option<DroidReasoningEffort> {
 }
 
 fn auto_variant_key(model: &str) -> String {
-    format!(
-        "{}{}",
-        AUTO_MODEL_VARIANT_PREFIX,
-        canonical_variant_key(model)
-    )
+    canonical_variant_key(model)
 }
 
 #[cfg(test)]
@@ -337,6 +334,35 @@ mod tests {
     }
 
     #[test]
+    fn auto_model_variant_keys_do_not_use_legacy_prefix() {
+        assert_eq!(
+            super::auto_variant_key("opencode/glm-5-free"),
+            "opencode/glm-5-free"
+        );
+        assert_eq!(super::auto_variant_key("gpt-5.2-codex"), "GPT_5.2_CODEX");
+    }
+
+    #[test]
+    fn model_sync_replaces_legacy_auto_model_prefix_keys() {
+        let mut config = crate::profile::ExecutorConfig::new_with_default(agent_from_json(
+            serde_json::json!({ "OPENCODE": {} }),
+        ));
+        let legacy_key = "AUTO_MODEL_opencode/glm-5-free".to_string();
+        let base = config.get_default().unwrap().clone();
+        config.configurations.insert(
+            legacy_key.clone(),
+            super::with_model(&base, "opencode/glm-5-free").unwrap(),
+        );
+
+        let changed =
+            super::upsert_model_variants(&mut config, &["opencode/glm-5-free".to_string()]);
+
+        assert!(changed);
+        assert!(!config.configurations.contains_key(&legacy_key));
+        assert!(config.configurations.contains_key("opencode/glm-5-free"));
+    }
+
+    #[test]
     fn member_overrides_map_thinking_to_supported_executors() {
         let claude = with_member_execution_overrides(
             &agent_from_json(serde_json::json!({ "CLAUDE_CODE": {} })),
@@ -352,14 +378,14 @@ mod tests {
 
         let codex = with_member_execution_overrides(
             &agent_from_json(serde_json::json!({ "CODEX": {} })),
-            Some("gpt-5.4-codex"),
+            Some("gpt-5.2-codex"),
             Some("xhigh"),
             None,
         );
         let CodingAgent::Codex(codex) = codex else {
             panic!("expected Codex");
         };
-        assert_eq!(codex.model.as_deref(), Some("gpt-5.4-codex"));
+        assert_eq!(codex.model.as_deref(), Some("gpt-5.2-codex"));
         assert!(codex.model_reasoning_effort.is_some());
 
         let droid = with_member_execution_overrides(
@@ -375,14 +401,14 @@ mod tests {
 
         let opencode = with_member_execution_overrides(
             &agent_from_json(serde_json::json!({ "OPENCODE": {} })),
-            Some("openai/gpt-5.4"),
+            Some("openai/gpt-5.2-codex"),
             Some("ignored-effort"),
             Some("thinking-high"),
         );
         let CodingAgent::Opencode(opencode) = opencode else {
             panic!("expected Opencode");
         };
-        assert_eq!(opencode.model.as_deref(), Some("openai/gpt-5.4"));
+        assert_eq!(opencode.model.as_deref(), Some("openai/gpt-5.2-codex"));
         assert_eq!(opencode.variant.as_deref(), Some("thinking-high"));
 
         let gemini = with_member_execution_overrides(

@@ -4,7 +4,7 @@ name: Data Consolidation Agent
 description: AI agent that consolidates extracted sales data into live reporting dashboards
   with territory, rep, and pipeline summaries
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

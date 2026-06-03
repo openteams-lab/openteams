@@ -79,6 +79,43 @@ impl AcpAgentHarness {
         self
     }
 
+    fn token_usage_line_from_prompt_meta(
+        meta: Option<&serde_json::Map<String, serde_json::Value>>,
+    ) -> Option<String> {
+        let quota = meta?.get("quota")?;
+        let token_count = quota.get("token_count")?;
+        let input_tokens = token_count_value(token_count, &["input_tokens", "inputTokens"])?;
+        let output_tokens = token_count_value(token_count, &["output_tokens", "outputTokens"])?;
+        let total_tokens = input_tokens.saturating_add(output_tokens);
+        let runtime_model_id = quota
+            .get("model_usage")
+            .and_then(|value| value.as_array())
+            .and_then(|models| {
+                if models.len() == 1 {
+                    models[0]
+                        .get("model")
+                        .or_else(|| models[0].get("model_id"))
+                        .or_else(|| models[0].get("modelId"))
+                        .and_then(|value| value.as_str())
+                } else {
+                    None
+                }
+            });
+
+        serde_json::to_string(&serde_json::json!({
+            "type": "token_usage",
+            "total_tokens": total_tokens,
+            "model_context_window": 0,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "runtime_agent": "gemini",
+            "runtime_model_id": runtime_model_id,
+            "provider_id": "google",
+            "usage_scope": "turn_delta",
+        }))
+        .ok()
+    }
+
     pub async fn spawn_with_command(
         &self,
         current_dir: &Path,
@@ -486,6 +523,12 @@ impl AcpAgentHarness {
 
                             match prompt_result {
                                 Ok(resp) => {
+                                    if let Some(line) =
+                                        Self::token_usage_line_from_prompt_meta(resp.meta.as_ref())
+                                    {
+                                        let _ = log_tx.send(line);
+                                    }
+
                                     // Emit done with stop_reason
                                     let stop_reason = serde_json::to_string(&resp.stop_reason)
                                         .unwrap_or_default();
@@ -570,5 +613,77 @@ impl AcpAgentHarness {
         });
 
         Ok(())
+    }
+}
+
+fn token_count_value(value: &serde_json::Value, names: &[&str]) -> Option<u64> {
+    for name in names {
+        if let Some(raw) = value.get(*name).and_then(|value| value.as_u64()) {
+            return Some(raw);
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn token_usage_line_from_gemini_prompt_meta() {
+        let meta = serde_json::json!({
+            "quota": {
+                "token_count": {
+                    "input_tokens": 123,
+                    "output_tokens": 45
+                },
+                "model_usage": [
+                    {
+                        "model": "gemini-3-pro-preview",
+                        "token_count": {
+                            "input_tokens": 123,
+                            "output_tokens": 45
+                        }
+                    }
+                ]
+            }
+        });
+        let meta = meta.as_object().expect("object");
+
+        let line = AcpAgentHarness::token_usage_line_from_prompt_meta(Some(meta)).expect("line");
+        let parsed: serde_json::Value = serde_json::from_str(&line).expect("json");
+
+        assert_eq!(parsed["type"], "token_usage");
+        assert_eq!(parsed["total_tokens"], 168);
+        assert_eq!(parsed["input_tokens"], 123);
+        assert_eq!(parsed["output_tokens"], 45);
+        assert_eq!(parsed["runtime_agent"], "gemini");
+        assert_eq!(parsed["runtime_model_id"], "gemini-3-pro-preview");
+        assert_eq!(parsed["provider_id"], "google");
+        assert_eq!(parsed["usage_scope"], "turn_delta");
+        assert_eq!(parsed["model_context_window"], 0);
+    }
+
+    #[test]
+    fn token_usage_line_omits_model_for_multi_model_prompt_meta() {
+        let meta = serde_json::json!({
+            "quota": {
+                "token_count": {
+                    "input_tokens": 10,
+                    "output_tokens": 20
+                },
+                "model_usage": [
+                    { "model": "gemini-2.5-flash" },
+                    { "model": "gemini-3-pro-preview" }
+                ]
+            }
+        });
+        let meta = meta.as_object().expect("object");
+
+        let line = AcpAgentHarness::token_usage_line_from_prompt_meta(Some(meta)).expect("line");
+        let parsed: serde_json::Value = serde_json::from_str(&line).expect("json");
+
+        assert_eq!(parsed["total_tokens"], 30);
+        assert!(parsed["runtime_model_id"].is_null());
     }
 }

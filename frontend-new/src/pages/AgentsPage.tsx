@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   Bot,
   Gauge,
+  Plus,
   RefreshCw,
   Save,
   Search,
@@ -173,6 +174,9 @@ const hiddenConfigFields = new Set([
   "profile",
 ]);
 const nullOptionId = "__openteams_null__";
+const runtimeBackgroundRefreshPollDelaysMs = [
+  1500, 4000, 8000, 16000, 32000, 64000,
+] as const;
 
 const isHiddenConfigField = (
   runner: BaseCodingAgent,
@@ -236,6 +240,21 @@ const getRuntimeExecutorOptions = (
   return isObjectRecord(options)
     ? { ...(options as Record<string, JsonValue>) }
     : {};
+};
+
+const getModelSourceLabel = (
+  source: AgentRuntimeStatus["model_source"],
+  t: TranslateFn,
+): string => {
+  switch (source) {
+    case "runner":
+      return t("agents.model.source.runner");
+    case "profile_fallback":
+      return t("agents.model.source.profileFallback");
+    case "none":
+    default:
+      return t("agents.model.source.none");
+  }
 };
 
 const createStatusFilterOptions = (t: TranslateFn): DropdownSelectOption[] =>
@@ -696,6 +715,197 @@ function ConfigSchemaField({
   );
 }
 
+function ModelConfigField({
+  runner,
+  models,
+  modelSource,
+  value,
+  onChange,
+  onModelSaved,
+  t,
+}: {
+  runner: BaseCodingAgent;
+  models: string[];
+  modelSource: AgentRuntimeStatus["model_source"];
+  value: JsonValue | undefined;
+  onChange: (key: string, value: JsonValue | undefined) => void;
+  onModelSaved: (model: string) => Promise<void>;
+  t: TranslateFn;
+}) {
+  const selectedModel = typeof value === "string" ? value : "";
+  const modelFieldId = `agent-model-options-${runner}`;
+  const sourceLabel = getModelSourceLabel(modelSource, t);
+  const [modelFormMode, setModelFormMode] = useState<"add" | "edit" | null>(
+    null,
+  );
+  const [editingModelName, setEditingModelName] = useState("");
+  const [newModelName, setNewModelName] = useState("");
+  const [savingModel, setSavingModel] = useState(false);
+  const [addModelError, setAddModelError] = useState<string | null>(null);
+  const [customModels, setCustomModels] = useState<string[]>([]);
+  const modelOptions = useMemo<DropdownSelectOption[]>(() => {
+    const uniqueModels = new Set<string>();
+    for (const model of [...models, ...customModels, selectedModel]) {
+      const trimmed = model.trim();
+      if (trimmed) uniqueModels.add(trimmed);
+    }
+
+    return [...uniqueModels].sort().map((model) => ({
+      id: model,
+      label: model,
+    }));
+  }, [customModels, models, selectedModel]);
+
+  useEffect(() => {
+    setModelFormMode(null);
+    setEditingModelName("");
+    setNewModelName("");
+    setAddModelError(null);
+    setCustomModels([]);
+  }, [runner]);
+
+  const handleSaveModel = async () => {
+    const trimmed = newModelName.trim();
+    if (!trimmed) {
+      setAddModelError(t("agents.model.add.empty"));
+      return;
+    }
+
+    setSavingModel(true);
+    setAddModelError(null);
+    try {
+      if (modelFormMode === "edit") {
+        await agentRuntimeApi.renameModel(runner, editingModelName, trimmed);
+        setCustomModels((current) => {
+          const next = current.filter((model) => model !== editingModelName);
+          return next.includes(trimmed) ? next : [...next, trimmed];
+        });
+      } else {
+        await agentRuntimeApi.addModel(runner, trimmed);
+        setCustomModels((current) =>
+          current.includes(trimmed) ? current : [...current, trimmed],
+        );
+      }
+      await onModelSaved(trimmed);
+      setEditingModelName("");
+      setNewModelName("");
+      setModelFormMode(null);
+    } catch (error) {
+      setAddModelError(
+        error instanceof Error ? error.message : t("agents.model.add.failed"),
+      );
+    } finally {
+      setSavingModel(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="space-y-1">
+        <label className="text-[14px] font-medium leading-none text-[var(--ink)]">
+          {t("agents.model.field.label")}
+        </label>
+        <p className="text-[14px] leading-[1.5] text-[var(--ink-subtle)]">
+          {models.length > 0
+            ? t("agents.model.field.description", { source: sourceLabel })
+            : t("agents.model.field.emptyDescription")}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <DropdownSelect
+          value={selectedModel}
+          options={modelOptions}
+          placeholder={t("agents.model.field.placeholder")}
+          searchPlaceholder={t("agents.model.field.searchPlaceholder")}
+          emptyLabel={t("agents.model.field.noMatch")}
+          className="min-w-0 flex-1 [&>button]:h-9 [&>button]:bg-[var(--surface-3)] [&>button]:py-0 [&>button]:font-mono"
+          maxPanelHeightClassName="max-h-[280px]"
+          onChange={(nextValue) => {
+            const trimmed = nextValue.trim();
+            onChange("model", trimmed ? trimmed : null);
+            if (trimmed) {
+              setModelFormMode("edit");
+              setEditingModelName(trimmed);
+              setNewModelName(trimmed);
+              setAddModelError(null);
+            } else {
+              setModelFormMode(null);
+              setEditingModelName("");
+              setNewModelName("");
+              setAddModelError(null);
+            }
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            setModelFormMode("add");
+            setEditingModelName("");
+            setNewModelName("");
+            setAddModelError(null);
+          }}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-3)] text-[var(--ink-muted)] transition-colors hover:border-[var(--hairline-strong)] hover:text-[var(--ink)]"
+          title={t("agents.model.add.button")}
+          aria-label={t("agents.model.add.button")}
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {modelFormMode && (
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSaveModel();
+          }}
+        >
+          <input
+            id={`${modelFieldId}-new`}
+            value={newModelName}
+            onChange={(event) => {
+              setNewModelName(event.target.value);
+              setAddModelError(null);
+            }}
+            spellCheck={false}
+            placeholder={t("agents.model.add.placeholder")}
+            className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-3)] px-3 font-mono text-[14px] text-[var(--ink)] outline-none transition-all placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+          />
+          <button
+            type="submit"
+            disabled={savingModel}
+            className="inline-flex h-10 min-w-[104px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[8px] bg-[var(--primary)] px-5 text-[14px] font-semibold text-white transition-all hover:bg-[var(--primary-hover)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+          >
+            {savingModel ? (
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            {savingModel
+              ? t("agents.model.add.saving")
+              : t("agents.model.add.save")}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setModelFormMode(null);
+              setEditingModelName("");
+              setNewModelName("");
+              setAddModelError(null);
+            }}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-3)] text-[var(--ink-muted)] transition-colors hover:border-[var(--hairline-strong)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/50"
+            aria-label={t("agents.save.cancel")}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </form>
+      )}
+      {addModelError && (
+        <p className="font-mono text-[14px] text-red-400">{addModelError}</p>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Embedded agent configuration sidebar ---------- */
 
 function AgentConfigSidebar({
@@ -751,6 +961,9 @@ function AgentConfigSidebar({
     : (currentDiagnostics?.version ??
       runner.version ??
       t("agents.details.notReported"));
+  const modelOptions =
+    currentDiagnostics?.discovered_models ?? runner.discovered_models;
+  const modelSource = currentDiagnostics?.model_source ?? runner.model_source;
   const isDirty =
     envDirty || JSON.stringify(formData) !== JSON.stringify(initialFormData);
   const envSummaryText = useMemo(
@@ -772,6 +985,7 @@ function AgentConfigSidebar({
             executable: runner.executable,
             availability: runner.availability,
             discovered_models: runner.discovered_models,
+            model_source: runner.model_source,
             version: runner.version,
             last_checked_at: runner.last_checked_at,
             last_error: runner.last_error,
@@ -831,6 +1045,16 @@ function AgentConfigSidebar({
       }
       return next;
     });
+  };
+
+  const handleModelSaved = async (model: string) => {
+    const nextFormData = { ...formData, model };
+    setFormData(nextFormData);
+    await onSave(
+      runner.runner_type,
+      nextFormData,
+      envDirty ? parseEnvText(envText) : null,
+    );
   };
 
   return (
@@ -917,11 +1141,26 @@ function AgentConfigSidebar({
 
           <div className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] p-4">
             {schemaFields.length === 0 ? (
-              <p className="py-2 text-center text-[14px] text-[var(--ink-tertiary)]">
-                {t("agents.config.empty")}
-              </p>
+              <ModelConfigField
+                runner={runner.runner_type}
+                models={modelOptions}
+                modelSource={modelSource}
+                value={formData.model}
+                onChange={handleConfigFieldChange}
+                onModelSaved={handleModelSaved}
+                t={t}
+              />
             ) : (
               <div className="space-y-6">
+                <ModelConfigField
+                  runner={runner.runner_type}
+                  models={modelOptions}
+                  modelSource={modelSource}
+                  value={formData.model}
+                  onChange={handleConfigFieldChange}
+                  onModelSaved={handleModelSaved}
+                  t={t}
+                />
                 {schemaFields.map(([fieldKey, property]) => (
                   <ConfigSchemaField
                     key={fieldKey}
@@ -952,7 +1191,7 @@ function AgentConfigSidebar({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-[6px] border border-[var(--hairline-strong)] bg-[var(--surface-2)] px-4 py-2 text-[14px] font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+              className="h-10 rounded-[8px] border border-[var(--hairline-strong)] bg-[var(--surface-3)] px-5 text-[14px] font-medium text-[var(--ink-muted)] transition-all hover:bg-[var(--surface-4)] hover:text-[var(--ink)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30"
             >
               {t("agents.save.cancel")}
             </button>
@@ -966,7 +1205,7 @@ function AgentConfigSidebar({
                   envDirty ? parseEnvText(envText) : null,
                 )
               }
-              className="inline-flex items-center gap-2 rounded-[6px] bg-[var(--primary)] px-4 py-2 text-[14px] font-medium text-white transition-colors hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[var(--primary)] px-6 text-[14px] font-semibold text-white transition-all hover:bg-[var(--primary-hover)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
             >
               {saving ? (
                 <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -1031,23 +1270,64 @@ export function AgentsPage() {
     [filter, query, runners],
   );
 
-  const loadRuntime = async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const response = await agentRuntimeApi.list();
-      setRunners(response.runners);
-    } catch (error) {
-      setLoadError(
-        error instanceof Error ? error.message : t("agents.load.failed"),
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadRuntime = useCallback(
+    async (options?: { showLoading?: boolean }) => {
+      const showLoading = options?.showLoading ?? true;
+      if (showLoading) setLoading(true);
+      if (showLoading) setLoadError(null);
+      try {
+        const response = await agentRuntimeApi.list();
+        setRunners(response.runners);
+        setLoadError(null);
+      } catch (error) {
+        if (showLoading) {
+          setLoadError(
+            error instanceof Error ? error.message : t("agents.load.failed"),
+          );
+        }
+      } finally {
+        if (showLoading) setLoading(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     void loadRuntime();
+  }, [loadRuntime]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timeoutIds: number[] = [];
+
+    const poll = (index: number) => {
+      const delay = runtimeBackgroundRefreshPollDelaysMs[index];
+      if (delay == null) return;
+
+      const timeoutId = window.setTimeout(() => {
+        void (async () => {
+          if (cancelled) return;
+          try {
+            const response = await agentRuntimeApi.list();
+            if (!cancelled) {
+              setRunners(response.runners);
+              setLoadError(null);
+            }
+          } catch (error) {
+            console.warn("Failed to poll agent runtime discovery", error);
+          }
+          if (!cancelled) poll(index + 1);
+        })();
+      }, delay);
+      timeoutIds.push(timeoutId);
+    };
+
+    poll(0);
+
+    return () => {
+      cancelled = true;
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    };
   }, []);
 
   useEffect(() => {
@@ -1056,6 +1336,16 @@ export function AgentsPage() {
       setAutoSelectedRunner(true);
     }
   }, [autoSelectedRunner, filteredRunners, selectedRunner]);
+
+  useEffect(() => {
+    setSelectedRunner((current) => {
+      if (!current) return current;
+      return (
+        runners.find((runner) => runner.runner_type === current.runner_type) ??
+        current
+      );
+    });
+  }, [runners]);
 
   useEffect(() => {
     if (!notice) return;
@@ -1101,6 +1391,7 @@ export function AgentsPage() {
                 executable: diagnostics.executable,
                 availability: diagnostics.availability,
                 discovered_models: diagnostics.discovered_models,
+                model_source: diagnostics.model_source,
                 version: diagnostics.version,
                 last_checked_at: diagnostics.last_checked_at,
                 last_error: diagnostics.last_error,

@@ -8,7 +8,7 @@ description: Expert in healthcare marketing compliance in China, proficient in t
   control, platform rule interpretation, and patient privacy protection, helping enterprises
   conduct effective health marketing within legal boundaries.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

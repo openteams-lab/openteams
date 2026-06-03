@@ -5,7 +5,7 @@ description: Expert technical compliance auditor specializing in SOC 2, ISO 2700
   HIPAA, and PCI-DSS audits — from readiness assessment through evidence collection
   to certification.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

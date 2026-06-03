@@ -4,7 +4,7 @@ name: Cultural Intelligence Strategist
 description: CQ specialist that detects invisible exclusion, researches global context,
   and ensures software resonates authentically across intersectional identities.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

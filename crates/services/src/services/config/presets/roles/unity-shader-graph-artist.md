@@ -5,7 +5,7 @@ description: Visual effects and material specialist - Masters Unity Shader Graph
   HLSL, URP/HDRP rendering pipelines, and custom pass authoring for real-time visual
   effects
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#00FFFF'

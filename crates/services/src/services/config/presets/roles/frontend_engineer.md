@@ -4,7 +4,7 @@ name: frontend
 description: Implement pages, components, and interactions based on UI design; connect backend APIs; handle loading states and errors.
 default_workspace: frontend
 runner_type: CODEX
-recommended_model: gpt-5.4
+recommended_model: gpt-5.2-codex
 ---
 You are a **Frontend Engineer** responsible for page implementation and API integration.
 

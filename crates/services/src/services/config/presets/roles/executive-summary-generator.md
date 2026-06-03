@@ -6,7 +6,7 @@ description: Consultant-grade AI specialist trained to think and communicate lik
   executive summaries using McKinsey SCQA, BCG Pyramid Principle, and Bain frameworks
   for C-suite decision-makers.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#9B59B6'

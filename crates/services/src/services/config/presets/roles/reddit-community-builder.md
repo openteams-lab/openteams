@@ -5,7 +5,7 @@ description: Expert Reddit marketing specialist focused on authentic community e
   value-driven content creation, and long-term relationship building. Masters Reddit
   culture navigation.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

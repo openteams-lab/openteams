@@ -5,7 +5,7 @@ description: Expert WeChat Mini Program developer specializing in 小程序 deve
   with WXML/WXSS/WXS, WeChat API integration, payment systems, subscription messaging,
   and the full WeChat ecosystem.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#2ECC71'

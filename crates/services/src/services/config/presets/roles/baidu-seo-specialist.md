@@ -5,7 +5,7 @@ description: Expert Baidu search optimization specialist focused on Chinese sear
   engine ranking, Baidu ecosystem integration, ICP compliance, Chinese keyword research,
   and mobile-first indexing for the China market.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#3498DB'

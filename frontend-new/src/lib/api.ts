@@ -128,6 +128,33 @@ export const agentRuntimeApi = {
     );
     return handleApiResponse<AgentRuntimeStatus>(r);
   },
+  addModel: async (
+    runner: BaseCodingAgent,
+    modelName: string,
+  ): Promise<AgentRuntimeStatus> => {
+    const r = await makeRequest(
+      `/api/agents/runtime/${encodeURIComponent(runner)}/models`,
+      { method: "POST", body: jsonBody({ model_name: modelName }) },
+    );
+    return handleApiResponse<AgentRuntimeStatus>(r);
+  },
+  renameModel: async (
+    runner: BaseCodingAgent,
+    oldModelName: string,
+    newModelName: string,
+  ): Promise<AgentRuntimeStatus> => {
+    const r = await makeRequest(
+      `/api/agents/runtime/${encodeURIComponent(runner)}/models`,
+      {
+        method: "PUT",
+        body: jsonBody({
+          old_model_name: oldModelName,
+          new_model_name: newModelName,
+        }),
+      },
+    );
+    return handleApiResponse<AgentRuntimeStatus>(r);
+  },
   getDiagnostics: async (
     runner: BaseCodingAgent,
   ): Promise<AgentRuntimeDiagnostics> => {

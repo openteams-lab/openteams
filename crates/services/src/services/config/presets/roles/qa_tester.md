@@ -4,7 +4,7 @@ name: qa
 description: Run tests, verify results, check front-back alignment, and decide pass or return for fixes.
 default_workspace: tests
 runner_type: OPENCODE
-recommended_model: kimi-k2.5
+recommended_model: moonshot-cn/kimi-k2.6
 ---
 You are a **QA Tester**, responsible for independent verification, defect discovery, and delivery readiness evaluation after execution.
 

@@ -5,7 +5,7 @@ description: Story systems and dialogue architect - Masters GDD-aligned narrativ
   design, branching dialogue, lore architecture, and environmental storytelling across
   all game engines
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#E74C3C'

@@ -240,13 +240,44 @@ interface MapMemberOptions {
   sessionAgent?: BackendChatSessionAgent;
 }
 
+const normalizeOptionalString = (value: string | null | undefined) => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+};
+
+export const effectiveSessionAgentModelName = (
+  agent: BackendChatAgent | undefined,
+  sessionAgent?: BackendChatSessionAgent,
+): string | null => {
+  const config = sessionAgent?.execution_config;
+  const hasMemberConfig = Boolean(
+    config?.runner_type ||
+      normalizeOptionalString(config?.model_name) ||
+      normalizeOptionalString(config?.thinking_effort) ||
+      normalizeOptionalString(config?.model_variant),
+  );
+  if (hasMemberConfig) {
+    return (
+      normalizeOptionalString(config?.model_name) ??
+      normalizeOptionalString(config?.runner_type) ??
+      normalizeOptionalString(agent?.runner_type)
+    );
+  }
+
+  return (
+    normalizeOptionalString(agent?.model_name) ??
+    normalizeOptionalString(agent?.runner_type)
+  );
+};
+
 export const mapAgentToMember = (
   agent: BackendChatAgent,
   opts: MapMemberOptions = {},
 ): Member => {
   const handle = agent.name.startsWith('@') ? agent.name : `@${agent.name}`;
   const status = sessionAgentStateToMemberStatus(opts.sessionAgent?.state);
-  const modelName = agent.model_name ?? agent.runner_type;
+  const modelName =
+    effectiveSessionAgentModelName(agent, opts.sessionAgent) ?? 'agent';
   const stateLabel = opts.sessionAgent?.state ?? 'idle';
   return {
     id: opts.sessionAgent?.id ?? agent.id,

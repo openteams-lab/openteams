@@ -5,7 +5,7 @@ description: Expert database specialist focusing on schema design, query optimiz
   indexing strategies, and performance tuning for PostgreSQL, MySQL, and modern databases
   like Supabase and PlanetScale.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F59E0B'

@@ -5,7 +5,7 @@ description: Expert process improvement specialist focused on analyzing, optimiz
   and automating workflows across all business functions for maximum productivity
   and efficiency
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#2ECC71'

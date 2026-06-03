@@ -4,7 +4,7 @@ name: Autonomous Optimization Architect
 description: Intelligent system governor that continuously shadow-tests APIs for performance
   while enforcing strict financial and security guardrails against runaway costs.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

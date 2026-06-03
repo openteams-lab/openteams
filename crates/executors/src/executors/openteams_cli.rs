@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeSet,
     io,
     path::{Path, PathBuf},
     sync::Arc,
@@ -36,10 +37,13 @@ mod slash_commands;
 mod types;
 
 use sdk::{
-    LogWriter, RunConfig, build_default_headers, generate_server_password, list_providers,
-    run_session, run_slash_command, wait_for_health,
+    ConfigProvidersResponse, LogWriter, ProviderListResponse, RunConfig, build_default_headers,
+    config_get, generate_server_password, list_config_providers, list_providers, run_session,
+    run_slash_command, wait_for_health,
 };
 use slash_commands::{OpenTeamsCliSlashCommand, hardcoded_slash_commands};
+
+const FREE_MODEL_PROVIDER_ID: &str = "opencode";
 
 #[derive(Derivative, Clone, Serialize, Deserialize, TS, JsonSchema)]
 #[derivative(Debug, PartialEq)]
@@ -80,6 +84,16 @@ impl Drop for OpenTeamsCliServer {
             tokio::spawn(async move {
                 let _ = workspace_utils::process::kill_process_group(&mut child).await;
             });
+        }
+    }
+}
+
+impl OpenTeamsCliServer {
+    async fn shutdown(mut self) {
+        if let Some(mut child) = self.child.take() {
+            if let Err(err) = workspace_utils::process::kill_process_group(&mut child).await {
+                tracing::warn!("Failed to stop OpenTeams CLI discovery server: {}", err);
+            }
         }
     }
 }
@@ -196,24 +210,30 @@ impl OpenTeamsCli {
     ) -> Result<Vec<String>, ExecutorError> {
         let server = self.spawn_server(current_dir, env).await?;
         let directory = current_dir.to_string_lossy().to_string();
-        let client = reqwest::Client::builder()
-            .default_headers(build_default_headers(&directory, &server.server_password))
-            .build()
-            .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
-        wait_for_health(&client, &server.base_url).await?;
-        let providers = list_providers(&client, &server.base_url, &directory).await?;
-        let mut models = Vec::new();
-
-        for provider in providers.all {
-            for model_id in provider.models.keys() {
-                models.push(format!("{}/{}", provider.id, model_id));
-            }
+        let result = async {
+            let client = reqwest::Client::builder()
+                .default_headers(build_default_headers(&directory, &server.server_password))
+                .build()
+                .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
+            wait_for_health(&client, &server.base_url).await?;
+            let providers = list_providers(&client, &server.base_url, &directory).await?;
+            let config_providers =
+                list_config_providers(&client, &server.base_url, &directory).await?;
+            let config_model = config_get(&client, &server.base_url, &directory)
+                .await
+                .ok()
+                .and_then(|config| config.model);
+            Ok(collect_discoverable_models(
+                &providers,
+                &config_providers,
+                config_model.as_deref(),
+            ))
         }
+        .await;
 
-        models.sort();
-        models.dedup();
-        Ok(models)
+        server.shutdown().await;
+        result
     }
 
     async fn spawn_server_process(
@@ -456,6 +476,16 @@ impl StandardCodingAgentExecutor for OpenTeamsCli {
         self.approvals = Some(approvals);
     }
 
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        OpenTeamsCli::list_models(self, current_dir, env)
+            .await
+            .map(Some)
+    }
+
     async fn available_slash_commands(
         &self,
         current_dir: &Path,
@@ -569,6 +599,77 @@ fn default_to_true() -> bool {
     true
 }
 
+fn collect_discoverable_models(
+    provider_list: &ProviderListResponse,
+    config_providers: &ConfigProvidersResponse,
+    config_model: Option<&str>,
+) -> Vec<String> {
+    let mut models = BTreeSet::new();
+
+    for provider in &provider_list.all {
+        if provider.id == FREE_MODEL_PROVIDER_ID {
+            insert_provider_models(
+                &mut models,
+                &provider.id,
+                provider
+                    .models
+                    .keys()
+                    .filter(|model_id| is_opencode_free_model(model_id)),
+            );
+        }
+    }
+
+    for provider in &config_providers.providers {
+        insert_provider_models(&mut models, &provider.id, provider.models.keys());
+    }
+
+    for (provider_id, model_id) in &config_providers.default {
+        if let Some(model) = model_from_provider(provider_id, model_id) {
+            models.insert(model);
+        }
+    }
+
+    if let Some(model) = config_model.and_then(configured_model_id) {
+        models.insert(model);
+    }
+
+    models.into_iter().collect()
+}
+
+fn is_opencode_free_model(model_id: &str) -> bool {
+    model_id.trim().ends_with("-free")
+}
+
+fn insert_provider_models<'a>(
+    models: &mut BTreeSet<String>,
+    provider_id: &str,
+    model_ids: impl Iterator<Item = &'a String>,
+) {
+    for model_id in model_ids {
+        if let Some(model) = model_from_provider(provider_id, model_id) {
+            models.insert(model);
+        }
+    }
+}
+
+fn model_from_provider(provider_id: &str, model_id: &str) -> Option<String> {
+    let provider_id = provider_id.trim();
+    let model_id = model_id.trim();
+    if provider_id.is_empty() || model_id.is_empty() {
+        return None;
+    }
+    Some(format!("{provider_id}/{model_id}"))
+}
+
+fn configured_model_id(model_id: &str) -> Option<String> {
+    let model_id = model_id.trim();
+    if model_id.is_empty() {
+        None
+    } else {
+        Some(model_id.to_string())
+    }
+}
+
 fn setup_permissions_env(auto_approve: bool, env: &ExecutionEnv) -> ExecutionEnv {
     let mut env = env.clone();
 
@@ -625,4 +726,75 @@ fn merge_compaction_config(existing_json: Option<&str>) -> String {
     config.insert("compaction".to_string(), Value::Object(compaction));
 
     serde_json::to_string(&config).unwrap_or_else(|_| r#"{"compaction":{"auto":true}}"#.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use serde_json::json;
+
+    use super::{
+        collect_discoverable_models,
+        sdk::{ConfigProvidersResponse, ProviderInfo, ProviderListResponse},
+    };
+
+    fn provider(id: &str, models: &[&str]) -> ProviderInfo {
+        ProviderInfo {
+            id: id.to_string(),
+            name: id.to_string(),
+            models: models
+                .iter()
+                .map(|model| (model.to_string(), json!({})))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn openteams_cli_model_discovery_filters_to_free_and_configured_models() {
+        let provider_list = ProviderListResponse {
+            all: vec![
+                provider(
+                    "opencode",
+                    &["qwen3-coder-free", "kimi-k2-free", "free-model", "gpt-5"],
+                ),
+                provider("openrouter", &["paid-model"]),
+                provider("github-models", &["openai/gpt-4"]),
+            ],
+            default: HashMap::new(),
+            connected: vec![],
+        };
+        let config_providers = ConfigProvidersResponse {
+            providers: vec![
+                provider("cpa", &["gpt-5.2-codex"]),
+                provider("zAI", &["glm-5"]),
+            ],
+            default: HashMap::from([
+                ("cpa".to_string(), "sonnet".to_string()),
+                ("github-models".to_string(), "openai/gpt-4".to_string()),
+            ]),
+        };
+
+        let models = collect_discoverable_models(
+            &provider_list,
+            &config_providers,
+            Some("LiteLLM/gpt-5.2-codex"),
+        );
+
+        assert_eq!(
+            models,
+            vec![
+                "LiteLLM/gpt-5.2-codex",
+                "cpa/gpt-5.2-codex",
+                "cpa/sonnet",
+                "github-models/openai/gpt-4",
+                "opencode/kimi-k2-free",
+                "opencode/qwen3-coder-free",
+                "zAI/glm-5",
+            ]
+        );
+        assert!(!models.iter().any(|model| model.starts_with("openrouter/")));
+        assert!(!models.contains(&"opencode/free-model".to_string()));
+        assert!(!models.contains(&"opencode/gpt-5".to_string()));
+    }
 }

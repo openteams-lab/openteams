@@ -220,6 +220,7 @@ check(
   "imports non-session pages from pages directory",
   source.includes("@/pages/GitHubRepositoryPage") &&
     source.includes("@/pages/TeamPage") &&
+    source.includes("@/pages/TeamTemplatesPage") &&
     source.includes("@/pages/SettingsPage"),
   source,
 );
@@ -234,6 +235,12 @@ check(
   "renders GitHub repository placeholder page",
   source.includes('case "github"') &&
     source.includes("<GitHubRepositoryPage />"),
+  source,
+);
+check(
+  "renders team templates as a standalone page",
+  source.includes('case "team-templates"') &&
+    source.includes("<TeamTemplatesPage />"),
   source,
 );
 check(

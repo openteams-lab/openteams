@@ -5,7 +5,7 @@ description: Expert social media strategist for LinkedIn, Twitter, and professio
   platforms. Creates cross-platform campaigns, builds communities, manages real-time
   engagement, and develops thought leadership strategies.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#3498DB'

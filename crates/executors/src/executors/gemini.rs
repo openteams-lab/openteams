@@ -18,6 +18,9 @@ use crate::{
     executors::{
         AppendPrompt, AvailabilityInfo, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
     },
+    model_discovery::{
+        ProviderKind, cli_model_commands, discover_from_sources, runner_config_paths,
+    },
     skill_config::NativeSkillConfigBackend,
 };
 
@@ -47,7 +50,7 @@ pub struct Gemini {
 }
 
 impl Gemini {
-    const BASE_COMMAND: &'static str = "npx -y @google/gemini-cli@0.33.0";
+    const BASE_COMMAND: &'static str = "npx -y @google/gemini-cli@0.45.0";
     const MAX_RESUME_PROMPT_BYTES: usize = 160 * 1024;
     const OPENTEAMS_MODEL_ALIAS: &'static str = "openteams-member";
 
@@ -65,7 +68,7 @@ impl Gemini {
             builder = builder.extend_params(["--allowed-tools", "run_shell_command"]);
         }
 
-        builder = builder.extend_params(["--experimental-acp"]);
+        builder = builder.extend_params(["--acp"]);
 
         apply_overrides(builder, &self.cmd)
     }
@@ -155,6 +158,27 @@ async fn write_internal_settings(
 impl StandardCodingAgentExecutor for Gemini {
     fn use_approvals(&mut self, approvals: Arc<dyn ExecutorApprovalService>) {
         self.approvals = Some(approvals);
+    }
+
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        let config_paths = runner_config_paths([
+            self.default_mcp_config_path(),
+            dirs::home_dir().map(|home| home.join(".gemini").join("settings.jsonc")),
+        ]);
+        discover_from_sources(
+            current_dir,
+            env,
+            &self.cmd,
+            self.model.as_deref(),
+            config_paths,
+            cli_model_commands(Self::BASE_COMMAND, &self.cmd),
+            &[ProviderKind::Google],
+        )
+        .await
     }
 
     async fn spawn(
@@ -264,5 +288,32 @@ impl StandardCodingAgentExecutor for Gemini {
         } else {
             AvailabilityInfo::NotFound
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn command_builder_uses_current_acp_flag() {
+        let gemini = Gemini {
+            append_prompt: AppendPrompt::default(),
+            model: Some("gemini-3-pro-preview".to_string()),
+            thinking_effort: None,
+            yolo: Some(true),
+            cmd: CmdOverrides::default(),
+            approvals: None,
+        };
+
+        let (_program, args) = gemini
+            .build_command_builder()
+            .expect("build command")
+            .build_initial()
+            .expect("build initial")
+            .into_parts_for_test();
+
+        assert!(args.iter().any(|arg| arg == "--acp"));
+        assert!(!args.iter().any(|arg| arg == "--experimental-acp"));
     }
 }

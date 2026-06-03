@@ -4,7 +4,7 @@ name: Agents Orchestrator
 description: Autonomous pipeline manager that orchestrates the entire development
   workflow. You are the leader of this process.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#00FFFF'

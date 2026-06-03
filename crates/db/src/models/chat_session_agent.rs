@@ -308,13 +308,60 @@ impl ChatSessionAgent {
             r#"
             UPDATE chat_session_agents
             SET execution_config = ?2,
+                agent_session_id = NULL,
+                agent_message_id = NULL,
                 updated_at = datetime('now', 'subsec')
             WHERE project_member_id = ?1
-              AND state = 'idle'
-              AND agent_session_id IS NULL
-              AND agent_message_id IS NULL
+              AND state IN ('idle', 'dead')
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM chat_workflow_agent_sessions was
+                  WHERE was.session_agent_id = chat_session_agents.id
+                    AND was.state IN ('running', 'interrupt_requested')
+              )
             "#,
         )
+        .bind(project_member_id)
+        .bind(Json(execution_config.normalized()))
+        .execute(pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn sync_execution_config_for_unlinked_project_agent(
+        pool: &SqlitePool,
+        project_id: Uuid,
+        agent_id: Uuid,
+        project_member_id: Uuid,
+        execution_config: MemberExecutionConfig,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE chat_session_agents
+            SET project_member_id = ?3,
+                execution_config = ?4,
+                agent_session_id = NULL,
+                agent_message_id = NULL,
+                updated_at = datetime('now', 'subsec')
+            WHERE project_member_id IS NULL
+              AND agent_id = ?2
+              AND state IN ('idle', 'dead')
+              AND EXISTS (
+                  SELECT 1
+                  FROM chat_sessions sessions
+                  WHERE sessions.id = chat_session_agents.session_id
+                    AND sessions.project_id = ?1
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM chat_workflow_agent_sessions was
+                  WHERE was.session_agent_id = chat_session_agents.id
+                    AND was.state IN ('running', 'interrupt_requested')
+              )
+            "#,
+        )
+        .bind(project_id)
+        .bind(agent_id)
         .bind(project_member_id)
         .bind(Json(execution_config.normalized()))
         .execute(pool)

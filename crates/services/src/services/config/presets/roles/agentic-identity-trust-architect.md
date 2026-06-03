@@ -5,7 +5,7 @@ description: Designs identity, authentication, and trust verification systems fo
   autonomous AI agents operating in multi-agent environments. Ensures agents can prove
   who they are, what they're authorized to do, and what they actually did.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

@@ -114,6 +114,7 @@ impl AppServerClient {
                 },
                 capabilities: Some(InitializeCapabilities {
                     experimental_api: true,
+                    request_attestation: false,
                     opt_out_notification_methods: None,
                 }),
             },
@@ -213,6 +214,7 @@ impl AppServerClient {
                 cursor,
                 limit: None,
                 detail: None,
+                thread_id: None,
             },
         };
         self.send_request(request, "mcpServerStatus/list").await
@@ -412,6 +414,15 @@ impl AppServerClient {
                     request_id,
                     -32000,
                     "chatgpt auth token refresh is not supported by this executor",
+                )
+                .await
+            }
+            ServerRequest::AttestationGenerate { request_id, .. } => {
+                send_server_error(
+                    peer,
+                    request_id,
+                    -32000,
+                    "attestation generation is not supported by this executor",
                 )
                 .await
             }
@@ -1040,7 +1051,7 @@ fn is_sensitive_log_key(key: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use codex_app_server_protocol::{
-        JSONRPCNotification, Turn, TurnCompletedNotification, TurnStatus,
+        JSONRPCNotification, Turn, TurnCompletedNotification, TurnItemsView, TurnStatus,
     };
     use tokio::io::sink;
     use tokio_util::sync::CancellationToken;
@@ -1095,6 +1106,7 @@ mod tests {
             turn: Turn {
                 id: "turn-1".to_string(),
                 items: Vec::new(),
+                items_view: TurnItemsView::Full,
                 status: TurnStatus::Completed,
                 error: None,
                 started_at: None,
@@ -1124,6 +1136,7 @@ mod tests {
             turn: Turn {
                 id: "turn-1".to_string(),
                 items: Vec::new(),
+                items_view: TurnItemsView::Full,
                 status: TurnStatus::InProgress,
                 error: None,
                 started_at: None,

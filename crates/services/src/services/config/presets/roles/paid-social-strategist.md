@@ -6,7 +6,7 @@ description: Cross-platform paid social advertising specialist covering Meta (Fa
   from prospecting through retargeting with platform-specific creative and audience
   strategies.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#F39C12'

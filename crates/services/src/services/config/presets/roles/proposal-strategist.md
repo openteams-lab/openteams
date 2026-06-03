@@ -6,7 +6,7 @@ description: Strategic proposal architect who transforms RFPs and sales opportun
   positioning, executive summary craft, and building proposals that persuade rather
   than merely comply.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

@@ -4,7 +4,7 @@ name: Sales Data Extraction Agent
 description: AI agent specialized in monitoring Excel files and extracting key sales
   metrics (MTD, YTD, Year End) for internal live reporting
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

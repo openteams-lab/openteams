@@ -50,7 +50,7 @@ use crate::{
 };
 
 const CLAUDE_CODE_ROUTER_BASE_COMMAND: &str = "npx -y @musistudio/claude-code-router@2.0.0 code";
-const CLAUDE_CODE_BASE_COMMAND: &str = "npx -y @anthropic-ai/claude-code@2.1.74";
+const CLAUDE_CODE_BASE_COMMAND: &str = "npx -y @anthropic-ai/claude-code@2.1.161";
 
 fn base_command(claude_code_router: bool) -> &'static str {
     if claude_code_router {
@@ -194,6 +194,14 @@ impl ClaudeCode {
 impl StandardCodingAgentExecutor for ClaudeCode {
     fn use_approvals(&mut self, approvals: Arc<dyn ExecutorApprovalService>) {
         self.approvals_service = Some(approvals);
+    }
+
+    async fn list_models(
+        &self,
+        _current_dir: &Path,
+        _env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        Ok(None)
     }
 
     async fn spawn(

@@ -248,6 +248,14 @@ pub trait StandardCodingAgentExecutor {
         })))
     }
 
+    async fn list_models(
+        &self,
+        _current_dir: &Path,
+        _env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        Ok(None)
+    }
+
     async fn spawn(
         &self,
         current_dir: &Path,

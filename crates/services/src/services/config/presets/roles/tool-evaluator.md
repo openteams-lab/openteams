@@ -5,7 +5,7 @@ description: Expert technology assessment specialist focused on evaluating, test
   and recommending tools, software, and platforms for business use and productivity
   optimization
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#008080'

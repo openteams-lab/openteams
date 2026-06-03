@@ -5,7 +5,7 @@ description: Expert accessibility specialist who audits interfaces against WCAG 
   tests with assistive technologies, and ensures inclusive design. Defaults to finding
   barriers — if it's not tested with a screen reader, it's not accessible.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

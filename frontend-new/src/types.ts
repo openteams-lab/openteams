@@ -141,6 +141,7 @@ export type SidebarPrimaryActionId = 'inbox' | 'new-session';
 export type SidebarNavigationTarget =
   | 'workspace'
   | 'team'
+  | 'team-templates'
   | 'tasks'
   | 'routing'
   | 'github'
@@ -313,6 +314,13 @@ export type ChatSessionAgentState =
   | 'waitingapproval'
   | 'dead';
 
+export interface MemberExecutionConfig {
+  runner_type?: BaseCodingAgent | null;
+  model_name?: string | null;
+  thinking_effort?: string | null;
+  model_variant?: string | null;
+}
+
 export interface BackendChatSessionAgent {
   id: string;
   session_id: string;
@@ -322,6 +330,8 @@ export interface BackendChatSessionAgent {
   pty_session_key: string | null;
   agent_session_id: string | null;
   agent_message_id: string | null;
+  project_member_id?: string | null;
+  execution_config?: MemberExecutionConfig;
   allowed_skill_ids: string[];
   created_at: string;
   updated_at: string;
@@ -431,6 +441,8 @@ export type AvailabilityInfo =
 
 export type AgentRunMode = 'auto' | 'local' | 'disabled';
 
+export type AgentRuntimeModelSource = 'runner' | 'profile_fallback' | 'none';
+
 export interface UpdateAgentRuntimeConfig {
   run_mode: AgentRunMode | null;
   env_json: Record<string, string> | null;
@@ -448,6 +460,7 @@ export interface AgentRuntimeStatus {
   executable: boolean;
   availability: AvailabilityInfo;
   discovered_models: string[];
+  model_source: AgentRuntimeModelSource;
   version: string | null;
   last_checked_at: string | null;
   last_error: string | null;
@@ -479,6 +492,7 @@ export interface AgentRuntimeDiagnostics {
   config_path: string;
   install_indicator_path: string | null;
   discovered_models: string[];
+  model_source: AgentRuntimeModelSource;
   version: string | null;
   last_checked_at: string | null;
   last_error: string | null;

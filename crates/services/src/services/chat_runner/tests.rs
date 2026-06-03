@@ -349,6 +349,24 @@ fn parse_token_usage_from_plain_token_usage_line() {
 }
 
 #[test]
+fn parse_token_usage_from_gemini_acp_quota_line() {
+    let line = r#"{"type":"token_usage","total_tokens":168,"model_context_window":0,"input_tokens":123,"output_tokens":45,"runtime_agent":"gemini","runtime_model_id":"gemini-3-pro-preview","provider_id":"google","usage_scope":"turn_delta"}"#;
+    let usage = ChatRunner::parse_token_usage_from_stdout_line(line).expect("usage");
+    assert_eq!(usage.total_tokens, 168);
+    assert_eq!(usage.model_context_window, 0);
+    assert_eq!(usage.input_tokens, Some(123));
+    assert_eq!(usage.output_tokens, Some(45));
+    assert_eq!(usage.runtime_agent.as_deref(), Some("gemini"));
+    assert_eq!(
+        usage.runtime_model_id.as_deref(),
+        Some("gemini-3-pro-preview")
+    );
+    assert_eq!(usage.provider_id.as_deref(), Some("google"));
+    assert_eq!(usage.usage_scope.as_deref(), Some("turn_delta"));
+    assert!(!usage.is_estimated);
+}
+
+#[test]
 fn select_workspace_path_prefers_session_agent_override() {
     let resolved = ChatRunner::select_workspace_path(
         Some("/tmp/session-agent"),

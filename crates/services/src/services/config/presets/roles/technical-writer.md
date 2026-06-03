@@ -5,7 +5,7 @@ description: Expert technical writer specializing in developer documentation, AP
   references, README files, and tutorials. Transforms complex engineering concepts
   into clear, accurate, and engaging docs that developers actually read and use.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#008080'

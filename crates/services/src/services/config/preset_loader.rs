@@ -1006,7 +1006,7 @@ selected_skill_ids:
   - skill_a
   - skill_b
 runner_type: codex
-recommended_model: gpt-5.3-codex
+recommended_model: gpt-5.2-codex
 tools_enabled:
   shell: true
 ---
@@ -1055,7 +1055,7 @@ Coordinate with design before shipping."#
             vec!["skill_a".to_string(), "skill_b".to_string()]
         );
         assert_eq!(parsed.runner_type.as_deref(), Some("codex"));
-        assert_eq!(parsed.recommended_model.as_deref(), Some("gpt-5.3-codex"));
+        assert_eq!(parsed.recommended_model.as_deref(), Some("gpt-5.2-codex"));
         assert_eq!(parsed.tools_enabled, serde_json::json!({ "shell": true }));
     }
 

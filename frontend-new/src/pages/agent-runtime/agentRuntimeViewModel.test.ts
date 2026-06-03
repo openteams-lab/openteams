@@ -32,7 +32,8 @@ const baseRunner = {
   installed: true,
   executable: true,
   availability: { type: "INSTALLATION_FOUND" },
-  discovered_models: ["gpt-5.3-codex"],
+  discovered_models: ["gpt-5.2-codex"],
+  model_source: "runner",
   version: "1.2.3",
   last_checked_at: "2026-06-02T00:00:00Z",
   last_error: null,
@@ -88,6 +89,15 @@ check(
       (runner) => runner.runner_type,
     ),
     ["GEMINI"],
+  ),
+);
+check(
+  "filters by discovered model name",
+  same(
+    filterRuntimeRunners(runners, "gpt-5.2-codex", "all").map(
+      (runner) => runner.runner_type,
+    ),
+    ["CODEX"],
   ),
 );
 check(

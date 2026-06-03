@@ -5,7 +5,7 @@ description: Expert Bilibili marketing specialist focused on UP主 growth, danma
   mastery, B站 algorithm optimization, community building, and branded content strategy
   for China's leading video community platform.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#E84393'

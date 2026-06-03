@@ -502,9 +502,9 @@ fn parse_optional_price_string(value: Option<String>) -> Option<f64> {
     value.and_then(|item| item.parse::<f64>().ok())
 }
 
-/// Resolve a model ID to its canonical form using the alias mapping.
-/// If the ID matches any alias, returns the canonical ID.
-/// Otherwise returns the input unchanged.
+/// Resolve a model ID to its canonical form using explicit aliases.
+/// Unknown model IDs are left intact so price lookup can first try the exact
+/// executor-reported model ID before applying prefix-insensitive fallback.
 pub fn resolve_canonical_id(model_id: &str) -> String {
     let trimmed = model_id.trim();
     let normalized = trimmed.to_ascii_lowercase();
@@ -518,6 +518,7 @@ pub fn resolve_canonical_id(model_id: &str) -> String {
             }
         }
     }
+
     trimmed.to_string()
 }
 
@@ -568,6 +569,22 @@ mod tests {
         assert_eq!(
             resolve_canonical_id("some-unknown-model"),
             "some-unknown-model"
+        );
+    }
+
+    #[test]
+    fn test_resolve_canonical_id_preserves_unknown_provider_prefixed_model() {
+        assert_eq!(
+            resolve_canonical_id("openai/some-new-model"),
+            "openai/some-new-model"
+        );
+        assert_eq!(
+            resolve_canonical_id("custom-provider/nested/new-model"),
+            "custom-provider/nested/new-model"
+        );
+        assert_eq!(
+            resolve_canonical_id("Provider/Mixed-Case-Model"),
+            "Provider/Mixed-Case-Model"
         );
     }
 
@@ -700,6 +717,44 @@ mod tests {
         assert_eq!(entry.input_price_per_1m, 3.0);
         assert_eq!(entry.output_price_per_1m, 15.0);
         assert_eq!(entry.source, "openrouter");
+    }
+
+    #[test]
+    fn test_merge_prices_preserves_unknown_provider_prefixed_models() {
+        let service = ModelPricingSyncService::new();
+
+        let litellm = vec![RawModelPrice {
+            model_id: "some-new-model".to_string(),
+            model_name: "some-new-model".to_string(),
+            input_price_per_1m: 1.0,
+            output_price_per_1m: 2.0,
+            cache_read_price_per_1m: Some(0.1),
+            source: "litellm".to_string(),
+        }];
+
+        let openrouter = vec![RawModelPrice {
+            model_id: "openai/some-new-model".to_string(),
+            model_name: "Some New Model".to_string(),
+            input_price_per_1m: 1.5,
+            output_price_per_1m: 2.5,
+            cache_read_price_per_1m: None,
+            source: "openrouter".to_string(),
+        }];
+
+        let merged = service.merge_prices(litellm, openrouter);
+
+        assert_eq!(merged.len(), 2);
+        assert!(
+            merged
+                .iter()
+                .any(|entry| entry.model_id == "some-new-model" && entry.source == "litellm")
+        );
+        assert!(
+            merged
+                .iter()
+                .any(|entry| entry.model_id == "openai/some-new-model"
+                    && entry.source == "openrouter")
+        );
     }
 
     #[tokio::test]

@@ -31,6 +31,9 @@ use crate::{
         NormalizedEntry, NormalizedEntryType, plain_text_processor::PlainTextLogProcessor,
         stderr_processor::normalize_stderr_logs, utils::EntryIndexProvider,
     },
+    model_discovery::{
+        ProviderKind, cli_model_commands, discover_from_sources, runner_config_paths,
+    },
     stdout_dup::{self, StdoutAppender},
 };
 
@@ -55,7 +58,7 @@ pub struct Copilot {
 }
 
 impl Copilot {
-    const BASE_COMMAND: &'static str = "npx -y @github/copilot@1.0.4";
+    const BASE_COMMAND: &'static str = "npx -y @github/copilot@1.0.59";
 
     fn build_command_builder(&self, log_dir: &str) -> Result<CommandBuilder, CommandBuildError> {
         let mut builder = CommandBuilder::new(Self::BASE_COMMAND).params([
@@ -100,6 +103,28 @@ impl Copilot {
 
 #[async_trait]
 impl StandardCodingAgentExecutor for Copilot {
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        let config_paths = runner_config_paths([
+            self.default_mcp_config_path(),
+            dirs::home_dir().map(|home| home.join(".copilot").join("config.json")),
+            dirs::home_dir().map(|home| home.join(".copilot").join("settings.json")),
+        ]);
+        discover_from_sources(
+            current_dir,
+            env,
+            &self.cmd,
+            self.model.as_deref(),
+            config_paths,
+            cli_model_commands(Self::BASE_COMMAND, &self.cmd),
+            &[ProviderKind::OpenAiCompatible],
+        )
+        .await
+    }
+
     async fn spawn(
         &self,
         current_dir: &Path,

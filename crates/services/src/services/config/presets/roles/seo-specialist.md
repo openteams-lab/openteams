@@ -5,7 +5,7 @@ description: Expert search engine optimization strategist specializing in techni
   SEO, content optimization, link authority building, and organic search growth. Drives
   sustainable traffic through data-driven search strategies.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

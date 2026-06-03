@@ -11,6 +11,7 @@ import { TasksPage } from "@/pages/TasksPage";
 import { BuildStatsPage } from "@/pages/BuildStatsPage";
 import { AgentsPage } from "@/pages/AgentsPage";
 import { TeamPage } from "@/pages/TeamPage";
+import { TeamTemplatesPage } from "@/pages/TeamTemplatesPage";
 import {
   Activity,
   BookOpen,
@@ -58,7 +59,8 @@ const pageTabConfig: Record<
   { label: string; icon: LucideIcon }
 > = {
   workspace: { label: "Workspace", icon: Network },
-  team: { label: "AI team", icon: Users },
+  team: { label: "Members", icon: Users },
+  "team-templates": { label: "Team templates", icon: Users },
   tasks: { label: "Action center", icon: SquareCheckBig },
   routing: { label: "Routing engine", icon: Route },
   github: { label: "GitHub", icon: Github },
@@ -226,6 +228,8 @@ function WorkspaceLayout() {
     switch (activeAppPage) {
       case "team":
         return <TeamPage />;
+      case "team-templates":
+        return <TeamTemplatesPage />;
       case "tasks":
         return <TasksPage />;
       case "routing":

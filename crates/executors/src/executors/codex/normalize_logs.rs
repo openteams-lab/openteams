@@ -14,13 +14,12 @@ use codex_protocol::{
     openai_models::ReasoningEffort,
     plan_tool::{StepStatus, UpdatePlanArgs},
     protocol::{
-        AgentMessageDeltaEvent, AgentMessageEvent, AgentReasoningDeltaEvent, AgentReasoningEvent,
-        AgentReasoningSectionBreakEvent, ApplyPatchApprovalRequestEvent, BackgroundEventEvent,
-        ErrorEvent, EventMsg, ExecApprovalRequestEvent, ExecCommandBeginEvent, ExecCommandEndEvent,
-        ExecCommandOutputDeltaEvent, ExecOutputStream, FileChange as CodexProtoFileChange,
-        McpInvocation, McpToolCallBeginEvent, McpToolCallEndEvent, PatchApplyBeginEvent,
-        PatchApplyEndEvent, StreamErrorEvent, ViewImageToolCallEvent, WarningEvent,
-        WebSearchBeginEvent, WebSearchEndEvent,
+        AgentMessageEvent, AgentReasoningEvent, AgentReasoningSectionBreakEvent,
+        ApplyPatchApprovalRequestEvent, ErrorEvent, EventMsg, ExecApprovalRequestEvent,
+        ExecCommandBeginEvent, ExecCommandEndEvent, ExecCommandOutputDeltaEvent, ExecOutputStream,
+        FileChange as CodexProtoFileChange, McpInvocation, McpToolCallBeginEvent,
+        McpToolCallEndEvent, PatchApplyBeginEvent, PatchApplyEndEvent, StreamErrorEvent,
+        ViewImageToolCallEvent, WarningEvent, WebSearchBeginEvent, WebSearchEndEvent,
     },
 };
 use futures::StreamExt;
@@ -636,19 +635,9 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                         &entry_index,
                     );
                 }
-                EventMsg::AgentMessageDelta(AgentMessageDeltaEvent { delta }) => {
-                    state.thinking = None;
-                    let (entry, index, is_new) = state.assistant_message_append(delta);
-                    upsert_normalized_entry(&msg_store, index, entry, is_new);
-                }
                 EventMsg::AgentMessageContentDelta(event) => {
                     state.thinking = None;
                     let (entry, index, is_new) = state.assistant_message_append(event.delta);
-                    upsert_normalized_entry(&msg_store, index, entry, is_new);
-                }
-                EventMsg::AgentReasoningDelta(AgentReasoningDeltaEvent { delta }) => {
-                    state.assistant = None;
-                    let (entry, index, is_new) = state.thinking_append(delta);
                     upsert_normalized_entry(&msg_store, index, entry, is_new);
                 }
                 EventMsg::ReasoningContentDelta(event) => {
@@ -723,6 +712,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     changes,
                     reason: _,
                     grant_root: _,
+                    ..
                 }) => {
                     state.assistant = None;
                     state.thinking = None;
@@ -792,6 +782,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     source: _,
                     interaction_input: _,
                     process_id: _,
+                    ..
                 }) => {
                     state.assistant = None;
                     state.thinking = None;
@@ -866,18 +857,6 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             command_state.to_normalized_entry(),
                         );
                     }
-                }
-                EventMsg::BackgroundEvent(BackgroundEventEvent { message }) => {
-                    add_normalized_entry(
-                        &msg_store,
-                        &entry_index,
-                        NormalizedEntry {
-                            timestamp: None,
-                            entry_type: NormalizedEntryType::SystemMessage,
-                            content: format!("Background event: {message}"),
-                            metadata: None,
-                        },
-                    );
                 }
                 EventMsg::StreamError(StreamErrorEvent {
                     message,
@@ -1257,24 +1236,38 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     );
                 }
                 EventMsg::AgentReasoningRawContent(..)
-                | EventMsg::AgentReasoningRawContentDelta(..)
+                | EventMsg::ThreadSettingsApplied(..)
+                | EventMsg::ThreadGoalUpdated(..)
                 | EventMsg::ThreadRolledBack(..)
                 | EventMsg::TurnStarted(..)
                 | EventMsg::UserMessage(..)
                 | EventMsg::TurnDiff(..)
-                | EventMsg::GetHistoryEntryResponse(..)
-                | EventMsg::McpListToolsResponse(..)
                 | EventMsg::McpStartupComplete(..)
                 | EventMsg::McpStartupUpdate(..)
+                | EventMsg::GuardianWarning(..)
+                | EventMsg::GuardianAssessment(..)
+                | EventMsg::ModelReroute(..)
+                | EventMsg::ModelVerification(..)
+                | EventMsg::RealtimeConversationStarted(..)
+                | EventMsg::RealtimeConversationRealtime(..)
+                | EventMsg::RealtimeConversationClosed(..)
+                | EventMsg::RealtimeConversationSdp(..)
+                | EventMsg::RealtimeConversationListVoicesResponse(..)
+                | EventMsg::RequestPermissions(..)
+                | EventMsg::RequestUserInput(..)
+                | EventMsg::DynamicToolCallRequest(..)
+                | EventMsg::DynamicToolCallResponse(..)
+                | EventMsg::ImageGenerationBegin(..)
+                | EventMsg::ImageGenerationEnd(..)
+                | EventMsg::PatchApplyUpdated(..)
                 | EventMsg::DeprecationNotice(..)
-                | EventMsg::UndoCompleted(..)
-                | EventMsg::UndoStarted(..)
                 | EventMsg::RawResponseItem(..)
                 | EventMsg::ItemStarted(..)
                 | EventMsg::ItemCompleted(..)
+                | EventMsg::HookStarted(..)
+                | EventMsg::HookCompleted(..)
+                | EventMsg::PlanDelta(..)
                 | EventMsg::ReasoningRawContentDelta(..)
-                | EventMsg::ListSkillsResponse(..)
-                | EventMsg::SkillsUpdateAvailable
                 | EventMsg::TurnAborted(..)
                 | EventMsg::ShutdownComplete
                 | EventMsg::EnteredReviewMode(..)
@@ -1289,10 +1282,9 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 | EventMsg::CollabWaitingBegin(..)
                 | EventMsg::CollabWaitingEnd(..)
                 | EventMsg::CollabCloseBegin(..)
-                | EventMsg::CollabCloseEnd(..) => {}
-                _ => {
-                    // Handle any new or untracked event types silently
-                }
+                | EventMsg::CollabCloseEnd(..)
+                | EventMsg::CollabResumeBegin(..)
+                | EventMsg::CollabResumeEnd(..) => {}
             }
         }
     });
@@ -1351,7 +1343,8 @@ fn handle_jsonrpc_request(
         | ServerRequest::McpServerElicitationRequest { .. }
         | ServerRequest::PermissionsRequestApproval { .. }
         | ServerRequest::DynamicToolCall { .. }
-        | ServerRequest::ChatgptAuthTokensRefresh { .. } => {}
+        | ServerRequest::ChatgptAuthTokensRefresh { .. }
+        | ServerRequest::AttestationGenerate { .. } => {}
     }
 }
 
@@ -2504,6 +2497,7 @@ mod tests {
             "params": {
                 "threadId": "thread-1",
                 "turnId": "turn-1",
+                "startedAtMs": 0,
                 "item": {
                     "type": "fileChange",
                     "id": "patch-1",

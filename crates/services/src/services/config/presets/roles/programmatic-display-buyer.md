@@ -6,7 +6,7 @@ description: Display advertising and programmatic media buying specialist coveri
   media (newsletters, sponsored content), and ABM display strategies via platforms
   like Demandbase and 6Sense.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#F39C12'

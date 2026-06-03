@@ -197,6 +197,38 @@ check(
   member.roleDetail.includes('running'),
   member.roleDetail,
 );
+const memberWithExecutionOverride = mapAgentToMember(agentB, {
+  sessionAgent: {
+    ...sessAgentB,
+    execution_config: {
+      runner_type: 'CODEX',
+      model_name: 'gpt-5.2-codex',
+      thinking_effort: null,
+      model_variant: null,
+    },
+  },
+});
+eq(
+  'member modelName prefers session execution config',
+  memberWithExecutionOverride.modelName,
+  'gpt-5.2-codex',
+);
+const memberWithRunnerOverride = mapAgentToMember(agentB, {
+  sessionAgent: {
+    ...sessAgentB,
+    execution_config: {
+      runner_type: 'CODEX',
+      model_name: null,
+      thinking_effort: null,
+      model_variant: null,
+    },
+  },
+});
+eq(
+  'member runner override does not fall back to old agent model',
+  memberWithRunnerOverride.modelName,
+  'CODEX',
+);
 
 const membersJoined = mapSessionAgentsToMembers(
   [sessAgentB, { ...sessAgentB, id: 'sa-2', agent_id: 'missing' }],

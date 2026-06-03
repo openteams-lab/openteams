@@ -4,7 +4,7 @@ name: Frontend Developer
 description: Expert frontend developer specializing in modern web technologies, React/Vue/Angular
   frameworks, UI implementation, and performance optimization
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#00FFFF'

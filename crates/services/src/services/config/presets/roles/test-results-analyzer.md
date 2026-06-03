@@ -5,7 +5,7 @@ description: Expert test analysis specialist focused on comprehensive test resul
   evaluation, quality metrics analysis, and actionable insight generation from testing
   activities
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6366F1'

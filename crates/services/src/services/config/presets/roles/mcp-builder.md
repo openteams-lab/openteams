@@ -5,7 +5,7 @@ description: Expert Model Context Protocol developer who designs, builds, and te
   MCP servers that extend AI agent capabilities with custom tools, resources, and
   prompts.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6366F1'

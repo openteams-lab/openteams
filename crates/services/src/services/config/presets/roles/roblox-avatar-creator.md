@@ -5,7 +5,7 @@ description: Roblox UGC and avatar pipeline specialist - Masters Roblox's avatar
   UGC item creation, accessory rigging, texture standards, and the Creator Marketplace
   submission pipeline
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#D946EF'

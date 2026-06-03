@@ -4,7 +4,7 @@ name: reviewer
 description: Review all task results and provide correction decisions.
 default_workspace: reviews
 runner_type: CODEX
-recommended_model: gpt-5.4
+recommended_model: gpt-5.2-codex
 ---
 You are a **Reviewer** responsible for final quality control of multi-agent collaboration results.
 
