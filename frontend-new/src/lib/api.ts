@@ -40,6 +40,8 @@ import type {
   GeneratePlanAndRunResponse,
   InstalledNativeSkill,
   InterruptStepResponse,
+  JsonValue,
+  McpConfig,
   OpenInExplorerResponse,
   PauseAllResponse,
   ProfilesContent,
@@ -163,6 +165,35 @@ export const agentRuntimeApi = {
       { cache: "no-store" },
     );
     return handleApiResponse<AgentRuntimeDiagnostics>(r);
+  },
+};
+
+export interface McpConfigResponse {
+  mcp_config: McpConfig;
+  config_path: string;
+}
+
+export interface UpdateMcpServersBody {
+  servers: Record<string, JsonValue>;
+}
+
+export const mcpServersApi = {
+  load: async (runner: BaseCodingAgent): Promise<McpConfigResponse> => {
+    const r = await makeRequest(
+      `/api/mcp-config${qs({ executor: runner })}`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<McpConfigResponse>(r);
+  },
+  save: async (
+    runner: BaseCodingAgent,
+    data: UpdateMcpServersBody,
+  ): Promise<string> => {
+    const r = await makeRequest(
+      `/api/mcp-config${qs({ executor: runner })}`,
+      { method: "POST", body: jsonBody(data) },
+    );
+    return handleApiResponse<string>(r);
   },
 };
 
@@ -1010,6 +1041,7 @@ export const projectApi = {
 export const api = {
   system: systemApi,
   agentRuntime: agentRuntimeApi,
+  mcpServers: mcpServersApi,
   filesystem: filesystemApi,
   chatSessions: chatSessionsApi,
   chatMessages: chatMessagesApi,

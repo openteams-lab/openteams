@@ -116,6 +116,13 @@ impl ProjectMember {
         .await
     }
 
+    pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as::<_, ProjectMember>(&format!("{PROJECT_MEMBER_SELECT}\nWHERE id = ?1"))
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub async fn create(
         pool: &SqlitePool,
@@ -250,6 +257,39 @@ impl ProjectMember {
         .bind(is_default)
         .fetch_one(pool)
         .await
+    }
+
+    pub async fn set_only_project_lead(
+        pool: &SqlitePool,
+        id: Uuid,
+        fallback_role: &str,
+    ) -> Result<Self, sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE project_members
+            SET role = CASE
+                    WHEN id = ?1 THEN 'lead'
+                    WHEN role = 'lead' THEN ?2
+                    ELSE role
+                END,
+                updated_at = datetime('now', 'subsec')
+            WHERE project_id = (
+                    SELECT project_id
+                    FROM project_members
+                    WHERE id = ?1
+                )
+              AND member_type = 'agent'
+              AND (id = ?1 OR role = 'lead')
+            "#,
+        )
+        .bind(id)
+        .bind(fallback_role)
+        .execute(pool)
+        .await?;
+
+        Self::find_by_id(pool, id)
+            .await?
+            .ok_or(sqlx::Error::RowNotFound)
     }
 
     pub async fn delete(pool: &SqlitePool, id: Uuid) -> Result<u64, sqlx::Error> {

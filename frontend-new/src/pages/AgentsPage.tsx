@@ -175,9 +175,6 @@ const hiddenConfigFields = new Set([
   "profile",
 ]);
 const nullOptionId = "__openteams_null__";
-const runtimeBackgroundRefreshPollDelaysMs = [
-  1500, 4000, 8000, 16000, 32000, 64000,
-] as const;
 
 const isHiddenConfigField = (
   runner: BaseCodingAgent,
@@ -942,6 +939,7 @@ function ModelConfigField({
 
 function AgentConfigSidebar({
   runner,
+  refreshKey,
   saving,
   saveError,
   onClose,
@@ -950,6 +948,7 @@ function AgentConfigSidebar({
   t,
 }: {
   runner: AgentRuntimeStatus;
+  refreshKey: number;
   saving: boolean;
   saveError: string | null;
   onClose: () => void;
@@ -1066,7 +1065,12 @@ function AgentConfigSidebar({
     return () => {
       active = false;
     };
-  }, [diagnosticsFailedLabel, onDiagnosticsLoaded, runner.runner_type]);
+  }, [
+    diagnosticsFailedLabel,
+    onDiagnosticsLoaded,
+    refreshKey,
+    runner.runner_type,
+  ]);
 
   const handleConfigFieldChange = (
     key: string,
@@ -1289,7 +1293,7 @@ export function AgentsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedRunner, setSelectedRunner] =
     useState<AgentRuntimeStatus | null>(null);
-  const [autoSelectedRunner, setAutoSelectedRunner] = useState(false);
+  const [diagnosticsRefreshKey, setDiagnosticsRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const discoveryRefreshedNotice = t("agents.notice.discoveryRefreshed");
@@ -1400,47 +1404,6 @@ export function AgentsPage() {
   }, [loadRuntime]);
 
   useEffect(() => {
-    let cancelled = false;
-    const timeoutIds: number[] = [];
-
-    const poll = (index: number) => {
-      const delay = runtimeBackgroundRefreshPollDelaysMs[index];
-      if (delay == null) return;
-
-      const timeoutId = window.setTimeout(() => {
-        void (async () => {
-          if (cancelled) return;
-          try {
-            const response = await agentRuntimeApi.list();
-            if (!cancelled) {
-              updateRuntimeRunners(response.runners, { notifyErrors: true });
-              setLoadError(null);
-            }
-          } catch (error) {
-            console.warn("Failed to poll agent runtime discovery", error);
-          }
-          if (!cancelled) poll(index + 1);
-        })();
-      }, delay);
-      timeoutIds.push(timeoutId);
-    };
-
-    poll(0);
-
-    return () => {
-      cancelled = true;
-      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
-    };
-  }, [updateRuntimeRunners]);
-
-  useEffect(() => {
-    if (!autoSelectedRunner && !selectedRunner && filteredRunners[0]) {
-      setSelectedRunner(filteredRunners[0]);
-      setAutoSelectedRunner(true);
-    }
-  }, [autoSelectedRunner, filteredRunners, selectedRunner]);
-
-  useEffect(() => {
     setSelectedRunner((current) => {
       if (!current) return current;
       return (
@@ -1461,33 +1424,19 @@ export function AgentsPage() {
     return () => window.clearTimeout(timeoutId);
   }, [autoDismissNotices, notice]);
 
-  const refreshRuntimeStatus = useCallback(
-    async (options?: RuntimeRunnerUpdateOptions & { showNotice?: boolean }) => {
-      const response = await agentRuntimeApi.refresh();
-      updateRuntimeRunners(response.runners, {
-        notifyErrors: options?.notifyErrors ?? true,
-      });
-
-      if (options?.showNotice) {
-        setNotice(
-          response.errors.length > 0
-            ? t("agents.notice.refreshFailedCount", {
-                count: response.errors.length,
-              })
-            : discoveryRefreshedNotice,
-        );
-      }
-
-      return response;
-    },
-    [discoveryRefreshedNotice, t, updateRuntimeRunners],
-  );
-
   const handleRefresh = async () => {
     setRefreshing(true);
     setNotice(null);
     try {
-      await refreshRuntimeStatus({ notifyErrors: true, showNotice: true });
+      const response = await agentRuntimeApi.refresh();
+      updateRuntimeRunners(response.runners, { notifyErrors: true });
+      setNotice(
+        response.errors.length > 0
+          ? t("agents.notice.refreshFailedCount", {
+              count: response.errors.length,
+            })
+          : discoveryRefreshedNotice,
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : t("agents.refresh.failed");
@@ -1555,13 +1504,9 @@ export function AgentsPage() {
     (runner: AgentRuntimeStatus) => {
       setSelectedRunner(runner);
       setSaveError(null);
-      void refreshRuntimeStatus({ notifyErrors: true }).catch((error) => {
-        showToast(
-          error instanceof Error ? error.message : t("agents.refresh.failed"),
-        );
-      });
+      setDiagnosticsRefreshKey((current) => current + 1);
     },
-    [refreshRuntimeStatus, showToast, t],
+    [],
   );
 
   return (
@@ -1689,6 +1634,7 @@ export function AgentsPage() {
               {selectedRunner ? (
                 <AgentConfigSidebar
                   runner={selectedRunner}
+                  refreshKey={diagnosticsRefreshKey}
                   saving={saving}
                   saveError={saveError}
                   onClose={() => setSelectedRunner(null)}

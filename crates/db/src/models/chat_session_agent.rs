@@ -328,6 +328,26 @@ impl ChatSessionAgent {
         Ok(result.rows_affected())
     }
 
+    pub async fn sync_allowed_skill_ids_for_project_member(
+        pool: &SqlitePool,
+        project_member_id: Uuid,
+        allowed_skill_ids: Vec<String>,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE chat_session_agents
+            SET allowed_skill_ids = ?2,
+                updated_at = datetime('now', 'subsec')
+            WHERE project_member_id = ?1
+            "#,
+        )
+        .bind(project_member_id)
+        .bind(Json(allowed_skill_ids))
+        .execute(pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
     pub async fn sync_execution_config_for_unlinked_project_agent(
         pool: &SqlitePool,
         project_id: Uuid,
@@ -364,6 +384,38 @@ impl ChatSessionAgent {
         .bind(agent_id)
         .bind(project_member_id)
         .bind(Json(execution_config.normalized()))
+        .execute(pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn sync_allowed_skill_ids_for_unlinked_project_agent(
+        pool: &SqlitePool,
+        project_id: Uuid,
+        agent_id: Uuid,
+        project_member_id: Uuid,
+        allowed_skill_ids: Vec<String>,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            UPDATE chat_session_agents
+            SET project_member_id = ?3,
+                allowed_skill_ids = ?4,
+                updated_at = datetime('now', 'subsec')
+            WHERE project_member_id IS NULL
+              AND agent_id = ?2
+              AND EXISTS (
+                  SELECT 1
+                  FROM chat_sessions sessions
+                  WHERE sessions.id = chat_session_agents.session_id
+                    AND sessions.project_id = ?1
+              )
+            "#,
+        )
+        .bind(project_id)
+        .bind(agent_id)
+        .bind(project_member_id)
+        .bind(Json(allowed_skill_ids))
         .execute(pool)
         .await?;
         Ok(result.rows_affected())

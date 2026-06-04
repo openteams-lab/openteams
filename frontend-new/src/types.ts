@@ -521,6 +521,14 @@ export interface ProfilesContent {
   path: string;
 }
 
+export interface McpConfig {
+  servers: Record<string, JsonValue | undefined>;
+  servers_path: string[];
+  template: JsonValue;
+  preconfigured: JsonValue;
+  is_toml_config: boolean;
+}
+
 // ----- Workflow --------------------------------------------------------------
 
 export type WorkflowCardState =

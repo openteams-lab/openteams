@@ -24,6 +24,7 @@
   --primary: #5e6ad2;
   --primary-hover: #828fff;
   --primary-focus: #5e69d1;
+  --on-primary: #ffffff;
   --primary-tint: rgba(94, 106, 210, 0.12);
   --success: #27a644;
   --mono-bg: #18191a;
@@ -47,6 +48,7 @@ body[data-mode="light"] {
   --primary: #5e6ad2;
   --primary-hover: #4853c0;
   --primary-focus: #5e69d1;
+  --on-primary: #ffffff;
   --primary-tint: rgba(94, 106, 210, 0.08);
   --success: #1b8c35;
   --mono-bg: #f0f1f4;

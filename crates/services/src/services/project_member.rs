@@ -96,8 +96,10 @@ impl ProjectMemberService {
         id: Uuid,
         input: ProjectMemberUpdateInput,
     ) -> Result<ProjectMember> {
+        let promote_to_lead = input.role.as_deref() == Some("lead");
         let should_sync_execution_config = input.execution_config.is_some();
-        let member = ProjectMember::update(
+        let should_sync_allowed_skill_ids = input.allowed_skill_ids.is_some();
+        let mut member = ProjectMember::update(
             pool,
             id,
             &UpdateProjectMember {
@@ -113,6 +115,10 @@ impl ProjectMemberService {
             },
         )
         .await?;
+
+        if promote_to_lead && member.member_type == ProjectMemberType::Agent {
+            member = ProjectMember::set_only_project_lead(pool, member.id, "member").await?;
+        }
 
         if should_sync_execution_config {
             let synced = ChatSessionAgent::sync_execution_config_for_project_member(
@@ -141,6 +147,33 @@ impl ProjectMemberService {
                 synced_unlinked_session_agents = synced_unlinked,
                 cleared_workflow_agent_sessions = cleared_workflow_sessions,
                 "Synced member execution config to inactive session agents"
+            );
+        }
+
+        if should_sync_allowed_skill_ids {
+            let synced = ChatSessionAgent::sync_allowed_skill_ids_for_project_member(
+                pool,
+                member.id,
+                member.allowed_skill_ids.0.clone(),
+            )
+            .await?;
+            let synced_unlinked = if let Some(agent_id) = member.agent_id {
+                ChatSessionAgent::sync_allowed_skill_ids_for_unlinked_project_agent(
+                    pool,
+                    member.project_id,
+                    agent_id,
+                    member.id,
+                    member.allowed_skill_ids.0.clone(),
+                )
+                .await?
+            } else {
+                0
+            };
+            tracing::info!(
+                project_member_id = %member.id,
+                synced_session_agents = synced,
+                synced_unlinked_session_agents = synced_unlinked,
+                "Synced member allowed skills to session agents"
             );
         }
 
@@ -439,7 +472,83 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn update_member_syncs_execution_config_to_inactive_session_members() {
+    async fn update_member_promoting_lead_demotes_other_project_agent_leads() {
+        let pool = setup_pool().await;
+        let service = ProjectMemberService::new();
+        let project_id = Uuid::new_v4();
+        let first_agent = create_named_agent(&pool, "first").await;
+        let second_agent = create_named_agent(&pool, "second").await;
+        let first_member = service
+            .add_member(
+                &pool,
+                project_id,
+                ProjectMemberType::Agent,
+                None,
+                Some(first_agent.id),
+                Some("lead".to_string()),
+                1,
+                None,
+                Vec::new(),
+                true,
+                MemberExecutionConfig::default(),
+            )
+            .await
+            .expect("create first lead member");
+        let second_member = service
+            .add_member(
+                &pool,
+                project_id,
+                ProjectMemberType::Agent,
+                None,
+                Some(second_agent.id),
+                Some("member".to_string()),
+                2,
+                None,
+                Vec::new(),
+                true,
+                MemberExecutionConfig::default(),
+            )
+            .await
+            .expect("create second member");
+
+        let promoted = service
+            .update_member(
+                &pool,
+                second_member.id,
+                super::ProjectMemberUpdateInput {
+                    role: Some("lead".to_string()),
+                    display_order: None,
+                    default_workspace_path: None,
+                    is_default: None,
+                    allowed_skill_ids: None,
+                    execution_config: None,
+                },
+            )
+            .await
+            .expect("promote second member");
+
+        let members = service
+            .list_members(&pool, project_id)
+            .await
+            .expect("list members");
+        let lead_members = members
+            .iter()
+            .filter(|member| member.role.as_deref() == Some("lead"))
+            .collect::<Vec<_>>();
+        let demoted_first = members
+            .iter()
+            .find(|member| member.id == first_member.id)
+            .expect("first member still exists");
+
+        assert_eq!(promoted.id, second_member.id);
+        assert_eq!(promoted.role.as_deref(), Some("lead"));
+        assert_eq!(lead_members.len(), 1);
+        assert_eq!(lead_members[0].id, second_member.id);
+        assert_eq!(demoted_first.role.as_deref(), Some("member"));
+    }
+
+    #[tokio::test]
+    async fn update_member_syncs_runtime_fields_to_session_members() {
         let pool = setup_pool().await;
         let service = ProjectMemberService::new();
         let project_id = Uuid::new_v4();
@@ -609,7 +718,7 @@ mod tests {
                     display_order: None,
                     default_workspace_path: None,
                     is_default: None,
-                    allowed_skill_ids: None,
+                    allowed_skill_ids: Some(vec!["skill-a".to_string(), "skill-b".to_string()]),
                     execution_config: Some(MemberExecutionConfig {
                         runner_type: Some(executors::executors::BaseCodingAgent::Codex),
                         model_name: Some("gpt-5.2-codex".to_string()),
@@ -707,6 +816,36 @@ mod tests {
         .fetch_one(&pool)
         .await
         .expect("read unlinked other project runtime ids");
+        let synced_skills: String =
+            sqlx::query_scalar("SELECT allowed_skill_ids FROM chat_session_agents WHERE id = ?1")
+                .bind(synced_session_agent_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read synced skills");
+        let running_skills: String =
+            sqlx::query_scalar("SELECT allowed_skill_ids FROM chat_session_agents WHERE id = ?1")
+                .bind(running_session_agent_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read running skills");
+        let active_workflow_skills: String =
+            sqlx::query_scalar("SELECT allowed_skill_ids FROM chat_session_agents WHERE id = ?1")
+                .bind(active_workflow_session_agent_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read active workflow skills");
+        let unlinked_project_skills: String =
+            sqlx::query_scalar("SELECT allowed_skill_ids FROM chat_session_agents WHERE id = ?1")
+                .bind(unlinked_project_session_agent_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read unlinked project skills");
+        let unlinked_other_project_skills: String =
+            sqlx::query_scalar("SELECT allowed_skill_ids FROM chat_session_agents WHERE id = ?1")
+                .bind(unlinked_other_project_session_agent_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read unlinked other project skills");
         let idle_workflow_runtime_ids: (Option<String>, Option<String>) = sqlx::query_as(
             r#"
             SELECT agent_session_id, agent_message_id
@@ -740,6 +879,11 @@ mod tests {
         assert!(unlinked_project_config.contains("gpt-5.2-codex"));
         assert_eq!(unlinked_project_row, (Some(member.id), None, None));
         assert_eq!(unlinked_other_project_config, "{}");
+        assert_eq!(synced_skills, r#"["skill-a","skill-b"]"#);
+        assert_eq!(running_skills, r#"["skill-a","skill-b"]"#);
+        assert_eq!(active_workflow_skills, r#"["skill-a","skill-b"]"#);
+        assert_eq!(unlinked_project_skills, r#"["skill-a","skill-b"]"#);
+        assert_eq!(unlinked_other_project_skills, "[]");
         assert_eq!(
             unlinked_other_project_row,
             (None, Some("other-upstream-session".to_string()))

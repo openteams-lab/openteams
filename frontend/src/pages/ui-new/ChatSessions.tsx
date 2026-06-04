@@ -5327,7 +5327,7 @@ export function ChatSessions() {
 
     const name = newMemberName.trim();
     const runnerType = newMemberRunnerType.trim();
-    const prompt = newMemberPrompt.trim().length > 0 ? newMemberPrompt : ' ';
+    const prompt = newMemberPrompt.trim().length > 0 ? newMemberPrompt : '';
     const workspacePathVal = newMemberWorkspace.trim();
     const selectedVariant = newMemberVariant.trim() || 'DEFAULT';
     const normalizedSelectedSkillIds =
@@ -5467,7 +5467,7 @@ export function ChatSessions() {
         if (
           updatePayload.name ||
           updatePayload.runner_type ||
-          updatePayload.system_prompt ||
+          promptChanged ||
           updatePayload.tools_enabled
         ) {
           await chatApi.updateAgent(agentId, updatePayload);

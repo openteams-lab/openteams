@@ -211,8 +211,10 @@ check(
   source,
 );
 check(
-  "settings page fills the rounded content frame",
+  "frame-filling pages use the rounded content frame directly",
   source.includes('activeAppPage === "providers"') &&
+    source.includes('activeAppPage === "agents"') &&
+    source.includes('activeAppPage === "team"') &&
     source.includes("overflow-hidden p-0"),
   source,
 );
