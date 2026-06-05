@@ -150,12 +150,25 @@ async fn try_summarize_with_agents(
         return None;
     }
 
+    let member_names = match member_name_overrides_for_session(pool, session_id).await {
+        Ok(names) => names,
+        Err(err) => {
+            tracing::warn!(
+                session_id = %session_id,
+                error = %err,
+                "Failed to load project member names for summarization; using agent template names"
+            );
+            HashMap::new()
+        }
+    };
+
     for session_agent in prioritize_summary_agents(&candidate_agents) {
         // Get the agent details
-        let agent = match ChatAgent::find_by_id(pool, session_agent.agent_id).await {
+        let mut agent = match ChatAgent::find_by_id(pool, session_agent.agent_id).await {
             Ok(Some(agent)) => agent,
             _ => continue,
         };
+        apply_effective_agent_name(&mut agent, &member_names);
 
         tracing::debug!(
             "Attempting to summarize with agent: {} ({})",

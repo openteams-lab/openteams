@@ -62,9 +62,10 @@ pub async fn create_message_with_id(
         .map(|value| value.to_string());
     let sender_name = if matches!(sender_type, ChatSenderType::Agent) {
         if let Some(agent_id) = sender_id {
+            let member_names = member_name_overrides_for_session(pool, session_id).await?;
             ChatAgent::find_by_id(pool, agent_id)
                 .await?
-                .map(|agent| agent.name)
+                .map(|agent| effective_agent_name(&agent, member_names.get(&agent_id).map(String::as_str)))
         } else {
             None
         }
@@ -138,10 +139,16 @@ pub async fn build_structured_messages(
         .into_iter()
         .filter(should_include_message_in_history)
         .collect::<Vec<_>>();
+    let member_names = member_name_overrides_for_session(pool, session_id).await?;
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
-        .map(|agent| (agent.id, agent.name))
+        .map(|agent| {
+            (
+                agent.id,
+                effective_agent_name(&agent, member_names.get(&agent.id).map(String::as_str)),
+            )
+        })
         .collect();
 
     let mut result = Vec::with_capacity(messages.len());

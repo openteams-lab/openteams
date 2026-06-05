@@ -156,6 +156,7 @@ mod session_creation_tests {
                 member_type TEXT CHECK (member_type IN ('human', 'agent')),
                 user_id TEXT,
                 agent_id BLOB,
+                member_name TEXT,
                 role TEXT,
                 display_order INTEGER DEFAULT 0,
                 default_workspace_path TEXT,

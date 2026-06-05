@@ -18,9 +18,9 @@ mod tests {
     use super::{
         CompressionType, SimplifiedMessage, all_agents_running, build_message_analytics_metrics,
         compress_messages_if_needed, create_message, create_session_with_project_members,
-        is_protocol_notice_history_message, is_workflow_chat_input_mode,
-        limit_summary_input_messages, parse_agent_send_mentions, parse_mentions,
-        prioritize_summary_agents, select_messages_to_compress_by_token,
+        effective_agent_name, is_protocol_notice_history_message, is_workflow_chat_input_mode,
+        limit_summary_input_messages, member_name_overrides_for_session, parse_agent_send_mentions,
+        parse_mentions, prioritize_summary_agents, select_messages_to_compress_by_token,
         should_include_message_in_history,
     };
 
@@ -292,6 +292,7 @@ mod tests {
                 member_type TEXT CHECK (member_type IN ('human', 'agent')),
                 user_id TEXT,
                 agent_id BLOB,
+                member_name TEXT,
                 role TEXT,
                 display_order INTEGER DEFAULT 0,
                 default_workspace_path TEXT,
@@ -361,6 +362,7 @@ mod tests {
             ProjectMemberType::Agent,
             None,
             Some(agent.id),
+            None,
             Some("developer".to_string()),
             0,
             Some("E:/workspace".to_string()),
@@ -443,6 +445,52 @@ mod tests {
 
         assert_eq!(session_agents.len(), 1);
         assert_eq!(session_agents[0].agent_id, agent.id);
+    }
+
+    #[tokio::test]
+    async fn project_member_name_overrides_runtime_agent_name() {
+        let pool = setup_project_session_pool().await;
+        let project_id = Uuid::new_v4();
+        let agent = create_agent_member(&pool, "coder-template").await;
+
+        ProjectMember::create(
+            &pool,
+            project_id,
+            ProjectMemberType::Agent,
+            None,
+            Some(agent.id),
+            Some("backend-lead".to_string()),
+            Some("developer".to_string()),
+            0,
+            None,
+            Vec::new(),
+            MemberExecutionConfig::default(),
+            true,
+        )
+        .await
+        .expect("create project member");
+
+        let session = create_session_with_project_members(
+            &pool,
+            &CreateChatSession {
+                title: Some("project session".to_string()),
+                workspace_path: None,
+                project_id: Some(project_id),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create project session");
+
+        let overrides = member_name_overrides_for_session(&pool, session.id)
+            .await
+            .expect("load member name overrides");
+
+        assert_eq!(overrides.get(&agent.id).map(String::as_str), Some("backend-lead"));
+        assert_eq!(
+            effective_agent_name(&agent, overrides.get(&agent.id).map(String::as_str)),
+            "backend-lead"
+        );
     }
 
     #[test]

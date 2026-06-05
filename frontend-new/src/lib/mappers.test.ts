@@ -22,6 +22,10 @@ import {
   monogramFromName,
   renderKeyMask,
 } from './mappers';
+import {
+  ProjectMemberType,
+  type ProjectMemberWithRuntime,
+} from '../../../shared/types';
 
 let failures = 0;
 const check = (label: string, cond: boolean, detail?: unknown) => {
@@ -235,6 +239,33 @@ const membersJoined = mapSessionAgentsToMembers(
   [agentB],
 );
 eq('joins by agent_id and drops orphans', membersJoined.length, 1);
+const projectMemberB: ProjectMemberWithRuntime = {
+  reasoning_capability: null,
+  id: 'pm-1',
+  project_id: 'project-1',
+  member_type: ProjectMemberType.agent,
+  user_id: null,
+  agent_id: 'agent-1',
+  member_name: 'project frontend',
+  role: 'member',
+  display_order: BigInt(1),
+  default_workspace_path: null,
+  allowed_skill_ids: [],
+  execution_config: {},
+  is_default: true,
+  created_at: new Date(),
+  updated_at: new Date(),
+};
+const membersJoinedWithProjectName = mapSessionAgentsToMembers(
+  [{ ...sessAgentB, project_member_id: 'pm-1' }],
+  [agentB],
+  [projectMemberB],
+);
+eq(
+  'session member name prefers project member name',
+  membersJoinedWithProjectName[0]?.name,
+  '@project frontend',
+);
 
 // ---- mapProvider ------------------------------------------------------------
 console.log('mapProvider');

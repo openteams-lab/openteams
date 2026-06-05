@@ -46,10 +46,16 @@ pub async fn build_full_context(
         .into_iter()
         .filter(should_include_message_in_history)
         .collect::<Vec<_>>();
+    let member_names = member_name_overrides_for_session(pool, session_id).await?;
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
-        .map(|agent| (agent.id, agent.name))
+        .map(|agent| {
+            (
+                agent.id,
+                effective_agent_name(&agent, member_names.get(&agent.id).map(String::as_str)),
+            )
+        })
         .collect();
 
     let simplified_messages: Vec<SimplifiedMessage> = all_messages
@@ -153,10 +159,16 @@ pub async fn build_compacted_context(
         .into_iter()
         .filter(should_include_message_in_history)
         .collect::<Vec<_>>();
+    let member_names = member_name_overrides_for_session(pool, session_id).await?;
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
-        .map(|agent| (agent.id, agent.name))
+        .map(|agent| {
+            (
+                agent.id,
+                effective_agent_name(&agent, member_names.get(&agent.id).map(String::as_str)),
+            )
+        })
         .collect();
 
     let simplified_messages: Vec<SimplifiedMessage> = all_messages
@@ -227,10 +239,16 @@ pub async fn build_simplified_messages(
         .into_iter()
         .filter(should_include_message_in_history)
         .collect::<Vec<_>>();
+    let member_names = member_name_overrides_for_session(pool, session_id).await?;
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
-        .map(|agent| (agent.id, agent.name))
+        .map(|agent| {
+            (
+                agent.id,
+                effective_agent_name(&agent, member_names.get(&agent.id).map(String::as_str)),
+            )
+        })
         .collect();
 
     Ok(messages

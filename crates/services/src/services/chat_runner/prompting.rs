@@ -704,6 +704,8 @@ impl ChatRunner {
         }
 
         let agents = ChatAgent::find_all(&self.db.pool).await?;
+        let member_names =
+            chat::member_name_overrides_for_session(&self.db.pool, session_id).await?;
         let agent_map: HashMap<Uuid, ChatAgent> =
             agents.into_iter().map(|agent| (agent.id, agent)).collect();
 
@@ -740,7 +742,10 @@ impl ChatRunner {
             summaries.push(SessionAgentSummary {
                 session_agent_id: session_agent.id,
                 agent_id: agent.id,
-                name: agent.name.clone(),
+                name: chat::effective_agent_name(
+                    agent,
+                    member_names.get(&agent.id).map(String::as_str),
+                ),
                 runner_type: agent.runner_type.clone(),
                 state: session_agent.state,
                 description,

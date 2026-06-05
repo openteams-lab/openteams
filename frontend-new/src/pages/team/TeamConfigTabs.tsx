@@ -4,7 +4,6 @@ import {
   Check,
   CheckCircle2,
   CircleAlert,
-  Crown,
   FolderGit2,
   PackagePlus,
   RefreshCw,
@@ -41,6 +40,8 @@ type TeamConfigTabsProps = {
   capability: AgentRuntimeReasoningCapability | null;
   configuredMcpServerKeys: string[];
   isLeader: boolean;
+  memberName: string;
+  memberNamePlaceholder: string;
   memberDirty: boolean;
   memberSuccess: boolean;
   mcpApplying: boolean;
@@ -73,6 +74,7 @@ type TeamConfigTabsProps = {
   onToggleMcpServer: (serverKey: string) => void;
   setAllowedSkillIds: (ids: string[]) => void;
   setIsLeader: (value: boolean | ((current: boolean) => boolean)) => void;
+  setMemberName: (value: string) => void;
   setModelName: (value: string) => void;
   setModelVariant: (value: string) => void;
   setRoleDefinition: (value: string) => void;
@@ -459,12 +461,15 @@ function ConfigTab({
   onSaveMember,
   setAllowedSkillIds,
   setIsLeader,
+  setMemberName,
   setModelName,
   setModelVariant,
   setRoleDefinition,
   setRunnerType,
   setThinkingEffort,
   setWorkspacePath,
+  memberName,
+  memberNamePlaceholder,
 }: Omit<
   TeamConfigTabsProps,
   | "configuredMcpServerKeys"
@@ -493,9 +498,21 @@ function ConfigTab({
       >
         <ConfigSection
           title="PROJECT MEMBER CONFIG"
-          description="Choose runtime, model, workspace, and lead status."
+          description="Choose name, runtime, model, workspace, and lead status."
           className="pb-0"
         >
+          <SettingRow
+            title="Member name"
+            description="Project-specific display name for this AI member."
+          >
+            <input
+              value={memberName}
+              onChange={(event) => setMemberName(event.target.value)}
+              placeholder={memberNamePlaceholder}
+              className={inputClassName}
+            />
+          </SettingRow>
+
           <SettingRow
             title="Agent Runtime"
             description="Installed executor used when this project member runs."
@@ -564,48 +581,25 @@ function ConfigTab({
             />
           </SettingRow>
 
-          <SettingRow
-            title="是否为主Agent"
-            description="计划模式下负责完成计划制定和任务分配"
-          >
+          <SettingRow title="是否为主Agent">
             <button
               type="button"
               onClick={() => setIsLeader((value) => !value)}
-              className="flex w-full items-center justify-between rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-3)] px-4 py-3 text-left transition-colors hover:border-[var(--hairline-strong)]"
+              aria-label="Toggle main agent"
+              aria-pressed={isLeader}
+              className={cx(
+                "relative h-6 w-11 rounded-full border transition-colors",
+                isLeader
+                  ? "border-[var(--primary)] bg-[var(--primary)]"
+                  : "border-[var(--hairline-strong)] bg-[var(--surface-3)]",
+              )}
             >
-              <div className="flex items-center gap-3">
-                <Crown
-                  className={cx(
-                    "h-4 w-4",
-                    isLeader
-                      ? "text-[var(--primary)]"
-                      : "text-[var(--ink-tertiary)]",
-                  )}
-                />
-                <div>
-                  <p className="text-[14px] font-medium leading-[1.3] text-[var(--ink)]">
-                    Workflow Lead
-                  </p>
-                  <p className="text-[13px] leading-[1.45] text-[var(--ink-subtle)]">
-                    {isLeader ? "Enabled for this project member" : "Disabled"}
-                  </p>
-                </div>
-              </div>
               <span
                 className={cx(
-                  "relative h-6 w-11 rounded-full border transition-colors",
-                  isLeader
-                    ? "border-[var(--primary)] bg-[var(--primary)]"
-                    : "border-[var(--hairline-strong)] bg-[var(--surface-3)]",
+                  "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform",
+                  isLeader ? "translate-x-5" : "translate-x-0",
                 )}
-              >
-                <span
-                  className={cx(
-                    "absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform",
-                    isLeader ? "translate-x-5" : "translate-x-0.5",
-                  )}
-                />
-              </span>
+              />
             </button>
           </SettingRow>
         </ConfigSection>

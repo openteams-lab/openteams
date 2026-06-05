@@ -36,6 +36,7 @@ import {
   trimOrNull,
   type ProjectMemberWithExecution,
 } from "./team/teamUtils";
+import { ProjectMemberType } from "../../../shared/types";
 
 const createRunnerOptions = (
   runners: AgentRuntimeStatus[],
@@ -90,6 +91,7 @@ const runtimeConfiguredModel = (
 type MemberFormState = {
   allowedSkillIds: string[];
   isLeader: boolean;
+  memberName: string;
   modelName: string;
   modelVariant: string;
   roleDefinition: string;
@@ -115,6 +117,7 @@ const resolveMemberFormState = (
   return {
     allowedSkillIds: member.allowed_skill_ids ?? [],
     isLeader: member.role === "lead",
+    memberName: member.member_name?.trim() || agent?.name?.trim() || "",
     modelName: config.model_name ?? agent?.model_name ?? "",
     modelVariant: config.model_variant ?? "",
     roleDefinition: agent?.system_prompt ?? "",
@@ -132,8 +135,13 @@ const sameStringSet = (left: string[], right: string[]) => {
 };
 
 export function TeamPage() {
-  const { projects, selectedProjectId, activeSessionId, refreshMembers } =
-    useWorkspace();
+  const {
+    projects,
+    selectedProjectId,
+    activeSessionId,
+    refreshMembers,
+    refreshMessages,
+  } = useWorkspace();
   const [members, setMembers] = useState<ProjectMemberWithExecution[]>([]);
   const [agents, setAgents] = useState<BackendChatAgent[]>([]);
   const [runners, setRunners] = useState<AgentRuntimeStatus[]>([]);
@@ -148,6 +156,7 @@ export function TeamPage() {
   );
   const [selectedMemberId, setSelectedMemberId] = useState<string>("");
   const [workspacePath, setWorkspacePath] = useState("");
+  const [memberNameValue, setMemberNameValue] = useState("");
   const [isLeader, setIsLeader] = useState(false);
   const [allowedSkillIds, setAllowedSkillIds] = useState<string[]>([]);
   const [runnerType, setRunnerType] = useState<BaseCodingAgent>("CODEX");
@@ -238,6 +247,7 @@ export function TeamPage() {
   const memberDirty =
     memberFormState !== null &&
     (workspacePath !== memberFormState.workspacePath ||
+      memberNameValue !== memberFormState.memberName ||
       isLeader !== memberFormState.isLeader ||
       runnerType !== memberFormState.runnerType ||
       modelName !== memberFormState.modelName ||
@@ -337,6 +347,7 @@ export function TeamPage() {
   useEffect(() => {
     if (!memberFormState) return;
     setWorkspacePath(memberFormState.workspacePath);
+    setMemberNameValue(memberFormState.memberName);
     setIsLeader(memberFormState.isLeader);
     setAllowedSkillIds(memberFormState.allowedSkillIds);
     setRunnerType(memberFormState.runnerType);
@@ -474,11 +485,21 @@ export function TeamPage() {
     setNotice(null);
     setMemberSuccess(false);
     try {
+      const explicitMemberName = selectedMember.member_name?.trim() ?? "";
+      const fallbackAgentName = selectedAgent?.name?.trim() ?? "";
+      const nextMemberName = memberNameValue.trim();
+      const memberNamePayload =
+        !explicitMemberName &&
+        fallbackAgentName &&
+        nextMemberName === fallbackAgentName
+          ? null
+          : trimOrNull(memberNameValue);
       const memberUpdate = projectApi.updateMember(
         selectedProjectId,
         selectedMember.id,
         {
           role: isLeader ? "lead" : nonLeadRole,
+          member_name: memberNamePayload,
           display_order: null,
           default_workspace_path: trimOrNull(workspacePath),
           is_default: null,
@@ -543,6 +564,7 @@ export function TeamPage() {
               .catch(() => undefined)
           : Promise.resolve(),
         refreshMembers().catch(() => undefined),
+        refreshMessages().catch(() => undefined),
       ]);
       setMemberSuccess(true);
     } catch (err) {
@@ -655,6 +677,7 @@ export function TeamPage() {
     if (!memberFormState) return;
     setMemberSuccess(false);
     setWorkspacePath(memberFormState.workspacePath);
+    setMemberNameValue(memberFormState.memberName);
     setIsLeader(memberFormState.isLeader);
     setAllowedSkillIds(memberFormState.allowedSkillIds);
     setRunnerType(memberFormState.runnerType);
@@ -671,15 +694,34 @@ export function TeamPage() {
     setError(null);
     setNotice(null);
     try {
+      const agent = agents.find((item) => item.id === agentId);
       const newMember = await projectApi.addMember(selectedProjectId, {
+        member_type: ProjectMemberType.agent,
+        user_id: null,
         agent_id: agentId,
+        member_name: trimOrNull(agent?.name ?? ""),
         role: nonLeadRole,
-        display_order: members.length,
-      } as any);
+        display_order: members.length as unknown as bigint,
+        default_workspace_path: null,
+        allowed_skill_ids: [],
+        execution_config: {},
+        is_default: true,
+      });
       const memberWithExec = newMember as ProjectMemberWithExecution;
       setMembers((current) => [...current, memberWithExec]);
       setSelectedMemberId(memberWithExec.id);
-      const agent = agents.find((a) => a.id === agentId);
+      await Promise.all([
+        activeSessionId
+          ? sessionAgentsApi
+              .list(activeSessionId)
+              .then((activeSessionAgents) =>
+                setSessionAgents(activeSessionAgents),
+              )
+              .catch(() => undefined)
+          : Promise.resolve(),
+        refreshMembers().catch(() => undefined),
+        refreshMessages().catch(() => undefined),
+      ]);
       setNotice(`Added ${agent?.name ?? "agent"} as a project member.`);
     } catch (err) {
       setError(
@@ -757,6 +799,8 @@ export function TeamPage() {
                 capability={capability}
                 configuredMcpServerKeys={configuredMcpServerKeys}
                 isLeader={isLeader}
+                memberName={memberNameValue}
+                memberNamePlaceholder={selectedAgent?.name ?? "Member name"}
                 memberDirty={memberDirty}
                 memberSuccess={memberSuccess}
                 mcpApplying={mcpApplying}
@@ -789,6 +833,7 @@ export function TeamPage() {
                 onToggleMcpServer={toggleMcpServer}
                 setAllowedSkillIds={setAllowedSkillIds}
                 setIsLeader={setIsLeader}
+                setMemberName={setMemberNameValue}
                 setModelName={setModelName}
                 setModelVariant={setModelVariant}
                 setRoleDefinition={setRoleDefinition}

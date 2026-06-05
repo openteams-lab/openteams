@@ -14,6 +14,7 @@ use db::models::{
     chat_message::{ChatMessage, ChatSenderType, CreateChatMessage},
     chat_session::{ChatSession, ChatSessionStatus},
     chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
+    project_member::{ProjectMember, ProjectMemberType},
 };
 use executors::{
     approvals::NoopExecutorApprovalService,
@@ -47,6 +48,7 @@ include!("types.rs");
 include!("session_creation.rs");
 include!("attachments.rs");
 include!("mentions.rs");
+include!("member_names.rs");
 include!("analytics.rs");
 include!("messages.rs");
 include!("context.rs");

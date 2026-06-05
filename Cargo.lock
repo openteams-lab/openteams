@@ -6180,6 +6180,7 @@ dependencies = [
  "sentry",
  "serde",
  "serde_json",
+ "serde_with",
  "services",
  "sha2",
  "shlex",

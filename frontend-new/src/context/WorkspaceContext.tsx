@@ -42,7 +42,11 @@ import {
   systemApi,
   workflowApi,
 } from '@/lib/api';
-import type { CreateProjectRequest, Project } from '../../../shared/types';
+import type {
+  CreateProjectRequest,
+  Project,
+  ProjectMemberWithRuntime,
+} from '../../../shared/types';
 import {
   effectiveSessionAgentModelName,
   mapMessage,
@@ -285,8 +289,15 @@ const hydrateRunningAgentPlaceholders = async (
   sessionAgents: BackendChatSessionAgent[],
   agents: BackendChatAgent[],
   runs: ChatRunRetentionInfo[],
+  projectMembers: ProjectMemberWithRuntime[] = [],
 ): Promise<Message[]> => {
   const agentById = new Map(agents.map((agent) => [agent.id, agent]));
+  const projectMemberById = new Map(projectMembers.map((m) => [m.id, m]));
+  const projectMemberByAgentId = new Map(
+    projectMembers
+      .filter((m) => m.agent_id)
+      .map((m) => [m.agent_id as string, m]),
+  );
   const latestRunBySessionAgentId = latestRunsBySessionAgent(runs);
   const runningSessionAgents = sessionAgents.filter((sessionAgent) =>
     ['running', 'stopping'].includes(sessionAgent.state),
@@ -298,7 +309,12 @@ const hydrateRunningAgentPlaceholders = async (
       if (!run) return null;
 
       const agent = agentById.get(sessionAgent.agent_id);
-      const agentName = agent?.name ?? sessionAgent.agent_id;
+      const projectMember =
+        (sessionAgent.project_member_id
+          ? projectMemberById.get(sessionAgent.project_member_id)
+          : undefined) ?? projectMemberByAgentId.get(sessionAgent.agent_id);
+      const agentName =
+        projectMember?.member_name?.trim() || agent?.name || sessionAgent.agent_id;
       const activityLines = await chatRunsApi
         .getActivity(run.run_id, { offset: 0, limit: 1000 })
         .then((response) => sortActivityLines(response.lines))
@@ -732,7 +748,14 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setMessagesAsync(beginLoad);
     try {
-      const [backendMsgs, backendAgents, sessionAgents, retention] =
+      const projectId = selectedProjectIdRef.current;
+      const [
+        backendMsgs,
+        backendAgents,
+        sessionAgents,
+        retention,
+        projectMembers,
+      ] =
         await Promise.all([
           chatMessagesApi.list(sid),
           chatAgentsApi.list().catch(() => []),
@@ -740,7 +763,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           chatRunsApi.listSessionRetention(sid, { limit: 100 }).catch(() => ({
             runs: [],
           })),
+          projectId ? projectApi.listMembers(projectId).catch(() => []) : [],
         ]);
+      const projectMemberNameByAgentId = new Map(
+        projectMembers
+          .filter((member) => member.agent_id && member.member_name?.trim())
+          .map((member) => [
+            member.agent_id as string,
+            member.member_name as string,
+          ]),
+      );
       const agentNamesById: Record<string, string> = {};
       const agentModelsById: Record<string, string | null> = {};
       const sessionAgentByAgentId = new Map(
@@ -750,7 +782,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         ]),
       );
       for (const a of backendAgents) {
-        agentNamesById[a.id] = a.name;
+        agentNamesById[a.id] = projectMemberNameByAgentId.get(a.id) ?? a.name;
         agentModelsById[a.id] = effectiveSessionAgentModelName(
           a,
           sessionAgentByAgentId.get(a.id),
@@ -766,6 +798,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         sessionAgents,
         backendAgents,
         retention.runs,
+        projectMembers,
       );
       setAllMessages((prev) => {
         const next = resolveQuotedMessageReferences(
@@ -792,12 +825,25 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setMembersAsync(beginLoad);
     try {
-      const [agents, sessionAgents] = await Promise.all([
+      const projectId = selectedProjectIdRef.current;
+      const [agents, sessionAgents, projectMembers] = await Promise.all([
         chatAgentsApi.list(),
         sessionAgentsApi.list(sid).catch(() => []),
+        projectId ? projectApi.listMembers(projectId).catch(() => []) : [],
       ]);
+      const projectMemberNameByAgentId = new Map(
+        projectMembers
+          .filter((member) => member.agent_id && member.member_name?.trim())
+          .map((member) => [
+            member.agent_id as string,
+            member.member_name as string,
+          ]),
+      );
       agentNamesByIdRef.current = Object.fromEntries(
-        agents.map((agent) => [agent.id, agent.name]),
+        agents.map((agent) => [
+          agent.id,
+          projectMemberNameByAgentId.get(agent.id) ?? agent.name,
+        ]),
       );
       const sessionAgentByAgentId = new Map(
         sessionAgents.map((sessionAgent) => [
@@ -814,7 +860,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           ),
         ]),
       );
-      const mapped = mapSessionAgentsToMembers(sessionAgents, agents);
+      const mapped = mapSessionAgentsToMembers(
+        sessionAgents,
+        agents,
+        projectMembers,
+      );
       setMembersAsync(succeed(mapped));
     } catch (err) {
       setMembersAsync((prev) =>

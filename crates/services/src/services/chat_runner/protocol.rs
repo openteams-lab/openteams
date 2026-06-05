@@ -1073,9 +1073,11 @@ impl ChatRunner {
             return Ok(());
         }
 
+        let member_names = chat::member_name_overrides_for_session(pool, session_id).await?;
         let mut agents = Vec::with_capacity(session_agents.len());
         for session_agent in &session_agents {
-            if let Some(agent) = ChatAgent::find_by_id(pool, session_agent.agent_id).await? {
+            if let Some(mut agent) = ChatAgent::find_by_id(pool, session_agent.agent_id).await? {
+                chat::apply_effective_agent_name(&mut agent, &member_names);
                 agents.push(agent);
             }
         }

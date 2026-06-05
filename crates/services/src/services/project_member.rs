@@ -1,7 +1,8 @@
 use anyhow::{Result, bail};
 use db::models::{
     chat_agent::ChatAgent,
-    chat_session_agent::ChatSessionAgent,
+    chat_session::ChatSession,
+    chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
     member_execution_config::MemberExecutionConfig,
     project_member::{ProjectMember, ProjectMemberType, UpdateProjectMember},
     workflow_agent_session::WorkflowAgentSession,
@@ -13,6 +14,7 @@ use uuid::Uuid;
 pub struct ProjectMemberService;
 
 pub struct ProjectMemberUpdateInput {
+    pub member_name: Option<Option<String>>,
     pub role: Option<String>,
     pub display_order: Option<i64>,
     pub default_workspace_path: Option<String>,
@@ -58,6 +60,7 @@ impl ProjectMemberService {
         member_type: ProjectMemberType,
         user_id: Option<String>,
         agent_id: Option<Uuid>,
+        member_name: Option<String>,
         role: Option<String>,
         display_order: i64,
         default_workspace_path: Option<String>,
@@ -74,12 +77,13 @@ impl ProjectMemberService {
             }
         }
 
-        Ok(ProjectMember::create(
+        let member = ProjectMember::create(
             pool,
             project_id,
             member_type,
             user_id,
             agent_id,
+            member_name,
             role,
             display_order,
             default_workspace_path,
@@ -87,7 +91,60 @@ impl ProjectMemberService {
             execution_config,
             is_default,
         )
-        .await?)
+        .await?;
+
+        let created_session_agents = self
+            .add_default_member_to_existing_project_sessions(pool, &member)
+            .await?;
+        if created_session_agents > 0 {
+            tracing::info!(
+                project_member_id = %member.id,
+                created_session_agents,
+                "Added project member to existing project sessions"
+            );
+        }
+
+        Ok(member)
+    }
+
+    async fn add_default_member_to_existing_project_sessions(
+        &self,
+        pool: &SqlitePool,
+        member: &ProjectMember,
+    ) -> Result<u64> {
+        if member.member_type != ProjectMemberType::Agent || !member.is_default {
+            return Ok(0);
+        }
+        let Some(agent_id) = member.agent_id else {
+            return Ok(0);
+        };
+
+        let mut created = 0;
+        for session in ChatSession::find_by_project(pool, member.project_id).await? {
+            if ChatSessionAgent::find_by_session_and_agent(pool, session.id, agent_id)
+                .await?
+                .is_some()
+            {
+                continue;
+            }
+
+            ChatSessionAgent::create(
+                pool,
+                &CreateChatSessionAgent {
+                    session_id: session.id,
+                    agent_id,
+                    workspace_path: member.default_workspace_path.clone(),
+                    allowed_skill_ids: member.allowed_skill_ids.0.clone(),
+                    project_member_id: Some(member.id),
+                    execution_config: member.execution_config.0.clone(),
+                },
+                Uuid::new_v4(),
+            )
+            .await?;
+            created += 1;
+        }
+
+        Ok(created)
     }
 
     pub async fn update_member(
@@ -106,6 +163,7 @@ impl ProjectMemberService {
                 member_type: None,
                 user_id: None,
                 agent_id: None,
+                member_name: input.member_name,
                 role: input.role,
                 display_order: input.display_order,
                 default_workspace_path: input.default_workspace_path,
@@ -203,6 +261,7 @@ impl ProjectMemberService {
                     ProjectMemberType::Human,
                     Some(user_id.to_string()),
                     None,
+                    None,
                     Some("owner".to_string()),
                     0,
                     None,
@@ -241,6 +300,7 @@ impl ProjectMemberService {
                     ProjectMemberType::Agent,
                     None,
                     Some(agent_id),
+                    None,
                     Some("agent".to_string()),
                     (index + 1) as i64,
                     None,
@@ -295,6 +355,7 @@ async fn chat_agents_has_is_default(pool: &SqlitePool) -> Result<bool> {
 mod tests {
     use db::models::{
         chat_agent::{ChatAgent, CreateChatAgent},
+        chat_session_agent::ChatSessionAgent,
         member_execution_config::MemberExecutionConfig,
         project_member::ProjectMemberType,
     };
@@ -343,6 +404,7 @@ mod tests {
                 member_type TEXT CHECK (member_type IN ('human', 'agent')),
                 user_id TEXT,
                 agent_id BLOB,
+                member_name TEXT,
                 role TEXT,
                 display_order INTEGER DEFAULT 0,
                 default_workspace_path TEXT,
@@ -358,9 +420,18 @@ mod tests {
                 id BLOB PRIMARY KEY,
                 title TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
+                lead_agent_id BLOB,
+                summary_text TEXT,
+                archive_ref TEXT,
+                last_seen_diff_key TEXT,
+                team_protocol TEXT,
+                team_protocol_enabled BOOLEAN NOT NULL DEFAULT 0,
+                default_workspace_path TEXT,
+                chat_input_mode TEXT,
                 project_id BLOB,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                archived_at TEXT
             )
             "#,
             r#"
@@ -436,6 +507,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
                 0,
                 None,
                 Vec::new(),
@@ -460,6 +532,7 @@ mod tests {
                 None,
                 Some(Uuid::new_v4()),
                 None,
+                None,
                 0,
                 None,
                 Vec::new(),
@@ -469,6 +542,58 @@ mod tests {
             .await;
 
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn add_member_adds_default_agent_to_existing_project_sessions() {
+        let pool = setup_pool().await;
+        let service = ProjectMemberService::new();
+        let project_id = Uuid::new_v4();
+        let session_id = Uuid::new_v4();
+        let agent = create_agent(&pool).await;
+
+        sqlx::query(
+            r#"
+            INSERT INTO chat_sessions (id, title, status, project_id)
+            VALUES (?1, 'Existing session', 'active', ?2)
+            "#,
+        )
+        .bind(session_id)
+        .bind(project_id)
+        .execute(&pool)
+        .await
+        .expect("insert project session");
+
+        let member = service
+            .add_member(
+                &pool,
+                project_id,
+                ProjectMemberType::Agent,
+                None,
+                Some(agent.id),
+                Some("Project Agent".to_string()),
+                Some("member".to_string()),
+                1,
+                Some("/workspace/agent".to_string()),
+                vec!["skill-a".to_string()],
+                true,
+                MemberExecutionConfig::default(),
+            )
+            .await
+            .expect("add project member");
+
+        let session_agent =
+            ChatSessionAgent::find_by_session_and_agent(&pool, session_id, agent.id)
+                .await
+                .expect("find session agent")
+                .expect("session agent exists");
+
+        assert_eq!(session_agent.project_member_id, Some(member.id));
+        assert_eq!(
+            session_agent.workspace_path.as_deref(),
+            Some("/workspace/agent")
+        );
+        assert_eq!(session_agent.allowed_skill_ids.0, vec!["skill-a"]);
     }
 
     #[tokio::test]
@@ -485,6 +610,7 @@ mod tests {
                 ProjectMemberType::Agent,
                 None,
                 Some(first_agent.id),
+                None,
                 Some("lead".to_string()),
                 1,
                 None,
@@ -501,6 +627,7 @@ mod tests {
                 ProjectMemberType::Agent,
                 None,
                 Some(second_agent.id),
+                None,
                 Some("member".to_string()),
                 2,
                 None,
@@ -516,6 +643,7 @@ mod tests {
                 &pool,
                 second_member.id,
                 super::ProjectMemberUpdateInput {
+                    member_name: None,
                     role: Some("lead".to_string()),
                     display_order: None,
                     default_workspace_path: None,
@@ -560,6 +688,7 @@ mod tests {
                 ProjectMemberType::Agent,
                 None,
                 Some(agent.id),
+                None,
                 Some("agent".to_string()),
                 1,
                 None,
@@ -714,6 +843,7 @@ mod tests {
                 &pool,
                 member.id,
                 super::ProjectMemberUpdateInput {
+                    member_name: None,
                     role: None,
                     display_order: None,
                     default_workspace_path: None,

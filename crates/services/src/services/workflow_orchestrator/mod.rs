@@ -54,6 +54,7 @@ use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use super::{
+    chat,
     chat_runner::{ChatRunner, ChatRunnerError},
     workflow_analytics,
     workflow_compiler::WorkflowCompiler,
@@ -1779,13 +1780,18 @@ pub(crate) async fn load_agents_for_session(
     pool: &SqlitePool,
     session_agents: &[ChatSessionAgent],
 ) -> Result<Vec<ChatAgent>, OrchestratorError> {
+    let Some(session_id) = session_agents.first().map(|agent| agent.session_id) else {
+        return Ok(Vec::new());
+    };
+    let member_names = chat::member_name_overrides_for_session(pool, session_id).await?;
     let mut agents = Vec::new();
     for session_agent in session_agents {
-        let agent = ChatAgent::find_by_id(pool, session_agent.agent_id)
+        let mut agent = ChatAgent::find_by_id(pool, session_agent.agent_id)
             .await?
             .ok_or_else(|| {
                 OrchestratorError::NotFound(format!("agent {} 未找到", session_agent.agent_id))
             })?;
+        chat::apply_effective_agent_name(&mut agent, &member_names);
         agents.push(agent);
     }
     Ok(agents)

@@ -19,6 +19,7 @@ use db::models::{
 use deployment::Deployment;
 use executors::executors::BaseCodingAgent;
 use serde::{Deserialize, Serialize};
+use serde_with::rust::double_option;
 use services::services::{
     agent_runtime::{AgentRuntimeReasoningCapability, reasoning_capability_for_runner_type},
     chat::create_session_with_project_members,
@@ -50,6 +51,7 @@ pub struct AddProjectMemberRequest {
     pub member_type: ProjectMemberType,
     pub user_id: Option<String>,
     pub agent_id: Option<Uuid>,
+    pub member_name: Option<String>,
     pub role: Option<String>,
     #[serde(default)]
     pub display_order: i64,
@@ -64,6 +66,13 @@ pub struct AddProjectMemberRequest {
 
 #[derive(Debug, Deserialize, TS)]
 pub struct UpdateProjectMemberRequest {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "double_option"
+    )]
+    #[ts(optional, type = "string | null")]
+    pub member_name: Option<Option<String>>,
     pub role: Option<String>,
     pub display_order: Option<i64>,
     pub default_workspace_path: Option<String>,
@@ -376,6 +385,7 @@ pub async fn add_project_member(
             payload.member_type,
             payload.user_id,
             payload.agent_id,
+            payload.member_name,
             payload.role,
             payload.display_order,
             payload.default_workspace_path,
@@ -404,6 +414,7 @@ pub async fn update_project_member(
             &deployment.db().pool,
             member_id,
             ProjectMemberUpdateInput {
+                member_name: payload.member_name,
                 role: payload.role,
                 display_order: payload.display_order,
                 default_workspace_path: payload.default_workspace_path,

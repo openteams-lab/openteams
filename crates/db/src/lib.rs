@@ -1718,6 +1718,7 @@ mod tests {
             ProjectMemberType::Human,
             Some("user-1".to_string()),
             None,
+            None,
             Some("owner".to_string()),
             0,
             None,
@@ -1733,6 +1734,7 @@ mod tests {
             ProjectMemberType::Agent,
             None,
             Some(agent.id),
+            Some("Project Developer".to_string()),
             Some("developer".to_string()),
             1,
             Some("E:/workspace/agent".to_string()),
@@ -1761,6 +1763,7 @@ mod tests {
                 member_type: None,
                 user_id: None,
                 agent_id: None,
+                member_name: Some(Some("Project Reviewer".to_string())),
                 role: Some("reviewer".to_string()),
                 display_order: Some(2),
                 default_workspace_path: None,
@@ -1772,6 +1775,10 @@ mod tests {
         .await
         .expect("update project member");
         assert_eq!(updated_member.role.as_deref(), Some("reviewer"));
+        assert_eq!(
+            updated_member.member_name.as_deref(),
+            Some("Project Reviewer")
+        );
         assert!(!updated_member.is_default);
 
         let path = ProjectPath::create(

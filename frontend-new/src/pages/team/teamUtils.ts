@@ -68,7 +68,7 @@ export const compactRunnerLabel = (runner?: BaseCodingAgent | null) =>
 export const memberName = (
   member: ProjectMemberWithExecution,
   agent?: BackendChatAgent | null,
-) => agent?.name ?? member.role ?? "Member";
+) => member.member_name?.trim() || agent?.name || member.role || "Member";
 
 export const normalizeMemberRunState = (
   state?: ChatSessionAgentState | null,

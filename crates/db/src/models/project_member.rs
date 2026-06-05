@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::rust::double_option;
 use sqlx::{FromRow, SqlitePool, Type, types::Json};
 use ts_rs::TS;
 use uuid::Uuid;
@@ -12,6 +13,7 @@ const PROJECT_MEMBER_SELECT: &str = r#"
            member_type,
            user_id,
            agent_id,
+           member_name,
            role,
            display_order,
            default_workspace_path,
@@ -39,6 +41,7 @@ pub struct ProjectMember {
     pub member_type: ProjectMemberType,
     pub user_id: Option<String>,
     pub agent_id: Option<Uuid>,
+    pub member_name: Option<String>,
     pub role: Option<String>,
     pub display_order: i64,
     pub default_workspace_path: Option<String>,
@@ -58,6 +61,7 @@ pub struct CreateProjectMember {
     pub member_type: ProjectMemberType,
     pub user_id: Option<String>,
     pub agent_id: Option<Uuid>,
+    pub member_name: Option<String>,
     pub role: Option<String>,
     pub display_order: i64,
     pub default_workspace_path: Option<String>,
@@ -71,6 +75,13 @@ pub struct UpdateProjectMember {
     pub member_type: Option<ProjectMemberType>,
     pub user_id: Option<String>,
     pub agent_id: Option<Uuid>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "double_option"
+    )]
+    #[ts(optional, type = "string | null")]
+    pub member_name: Option<Option<String>>,
     pub role: Option<String>,
     pub display_order: Option<i64>,
     pub default_workspace_path: Option<String>,
@@ -130,6 +141,7 @@ impl ProjectMember {
         member_type: ProjectMemberType,
         user_id: Option<String>,
         agent_id: Option<Uuid>,
+        member_name: Option<String>,
         role: Option<String>,
         display_order: i64,
         default_workspace_path: Option<String>,
@@ -148,18 +160,20 @@ impl ProjectMember {
                     member_type,
                     user_id,
                     agent_id,
+                    member_name,
                     role,
                     display_order,
                     default_workspace_path,
                     allowed_skill_ids,
                     execution_config,
                     is_default
-               ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+               ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
                RETURNING id,
                          project_id,
                          member_type,
                          user_id,
                          agent_id,
+                         member_name,
                          role,
                          display_order,
                          default_workspace_path,
@@ -174,6 +188,7 @@ impl ProjectMember {
         .bind(member_type)
         .bind(user_id)
         .bind(agent_id)
+        .bind(member_name)
         .bind(role)
         .bind(display_order)
         .bind(default_workspace_path)
@@ -199,6 +214,7 @@ impl ProjectMember {
         let member_type = data.member_type.clone().unwrap_or(existing.member_type);
         let user_id = data.user_id.clone().or(existing.user_id);
         let agent_id = data.agent_id.or(existing.agent_id);
+        let member_name = data.member_name.clone().unwrap_or(existing.member_name);
         let role = data.role.clone().or(existing.role);
         let display_order = data.display_order.unwrap_or(existing.display_order);
         let default_workspace_path = data
@@ -223,12 +239,13 @@ impl ProjectMember {
                SET member_type = ?2,
                    user_id = ?3,
                    agent_id = ?4,
-                   role = ?5,
-                   display_order = ?6,
-                   default_workspace_path = ?7,
-                   allowed_skill_ids = ?8,
-                   execution_config = ?9,
-                   is_default = ?10,
+                   member_name = ?5,
+                   role = ?6,
+                   display_order = ?7,
+                   default_workspace_path = ?8,
+                   allowed_skill_ids = ?9,
+                   execution_config = ?10,
+                   is_default = ?11,
                    updated_at = datetime('now', 'subsec')
                WHERE id = ?1
                RETURNING id,
@@ -236,6 +253,7 @@ impl ProjectMember {
                          member_type,
                          user_id,
                          agent_id,
+                         member_name,
                          role,
                          display_order,
                          default_workspace_path,
@@ -249,6 +267,7 @@ impl ProjectMember {
         .bind(member_type)
         .bind(user_id)
         .bind(agent_id)
+        .bind(member_name)
         .bind(role)
         .bind(display_order)
         .bind(default_workspace_path)
@@ -321,6 +340,7 @@ mod tests {
                 member_type TEXT CHECK (member_type IN ('human', 'agent')),
                 user_id TEXT,
                 agent_id BLOB,
+                member_name TEXT,
                 role TEXT,
                 display_order INTEGER DEFAULT 0,
                 default_workspace_path TEXT,
@@ -361,6 +381,7 @@ mod tests {
             ProjectMemberType::Human,
             Some("user-1".to_string()),
             None,
+            None,
             Some("owner".to_string()),
             0,
             None,
@@ -376,6 +397,7 @@ mod tests {
             ProjectMemberType::Agent,
             None,
             Some(agent_id),
+            Some("Project Codex".to_string()),
             Some("agent".to_string()),
             1,
             Some("/workspace".to_string()),
@@ -394,6 +416,7 @@ mod tests {
             ProjectMemberType::Agent,
             None,
             Some(Uuid::new_v4()),
+            None,
             Some("agent".to_string()),
             2,
             None,
@@ -430,6 +453,7 @@ mod tests {
                 member_type: None,
                 user_id: None,
                 agent_id: None,
+                member_name: Some(Some("Project Reviewer".to_string())),
                 role: Some("reviewer".to_string()),
                 display_order: Some(9),
                 default_workspace_path: Some("/updated".to_string()),
@@ -444,6 +468,7 @@ mod tests {
         .await
         .expect("update project member");
         assert_eq!(updated.role.as_deref(), Some("reviewer"));
+        assert_eq!(updated.member_name.as_deref(), Some("Project Reviewer"));
         assert_eq!(updated.display_order, 9);
         assert_eq!(updated.allowed_skill_ids.0, vec!["read"]);
         assert_eq!(
@@ -477,6 +502,7 @@ mod tests {
             ProjectMemberType::Human,
             Some("user-1".to_string()),
             None,
+            None,
             Some("owner".to_string()),
             0,
             None,
@@ -492,6 +518,7 @@ mod tests {
             project_id,
             ProjectMemberType::Human,
             Some("user-2".to_string()),
+            None,
             None,
             Some("owner".to_string()),
             1,
@@ -509,6 +536,7 @@ mod tests {
             ProjectMemberType::Agent,
             None,
             Some(Uuid::new_v4()),
+            None,
             Some("agent".to_string()),
             2,
             None,

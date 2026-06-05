@@ -18,13 +18,13 @@ score: bigint, };
 
 export type SearchMatchType = "FileName" | "DirectoryName" | "FullPath";
 
-export type ProjectMember = { id: string, project_id: string, member_type: ProjectMemberType, user_id: string | null, agent_id: string | null, role: string | null, display_order: bigint, default_workspace_path: string | null, allowed_skill_ids: string[], execution_config: MemberExecutionConfig, is_default: boolean, created_at: Date, updated_at: Date, };
+export type ProjectMember = { id: string, project_id: string, member_type: ProjectMemberType, user_id: string | null, agent_id: string | null, member_name: string | null, role: string | null, display_order: bigint, default_workspace_path: string | null, allowed_skill_ids: string[], execution_config: MemberExecutionConfig, is_default: boolean, created_at: Date, updated_at: Date, };
 
 export enum ProjectMemberType { human = "human", agent = "agent" }
 
-export type CreateProjectMember = { member_type: ProjectMemberType, user_id: string | null, agent_id: string | null, role: string | null, display_order: bigint, default_workspace_path: string | null, allowed_skill_ids: Array<string>, execution_config: MemberExecutionConfig | null, is_default: boolean, };
+export type CreateProjectMember = { member_type: ProjectMemberType, user_id: string | null, agent_id: string | null, member_name: string | null, role: string | null, display_order: bigint, default_workspace_path: string | null, allowed_skill_ids: Array<string>, execution_config: MemberExecutionConfig | null, is_default: boolean, };
 
-export type UpdateProjectMember = { member_type: ProjectMemberType | null, user_id: string | null, agent_id: string | null, role: string | null, display_order: bigint | null, default_workspace_path: string | null, allowed_skill_ids: Array<string> | null, execution_config: MemberExecutionConfig | null, is_default: boolean | null, };
+export type UpdateProjectMember = { member_type: ProjectMemberType | null, user_id: string | null, agent_id: string | null, member_name?: string | null, role: string | null, display_order: bigint | null, default_workspace_path: string | null, allowed_skill_ids: Array<string> | null, execution_config: MemberExecutionConfig | null, is_default: boolean | null, };
 
 export type MemberExecutionConfig = { runner_type?: BaseCodingAgent | null, model_name?: string | null, thinking_effort?: string | null, model_variant?: string | null, };
 
@@ -462,9 +462,9 @@ export type UserIterationFeedbackResponse = { execution_id: string, status: stri
 
 export type CreateProjectRequest = { name: string, repositories: Array<CreateProjectRepo>, description: string | null, status: string | null, default_workspace_path: string | null, active_repo_id: string | null, };
 
-export type AddProjectMemberRequest = { member_type: ProjectMemberType, user_id: string | null, agent_id: string | null, role: string | null, display_order: bigint, default_workspace_path: string | null, allowed_skill_ids: Array<string>, execution_config: MemberExecutionConfig, is_default: boolean, };
+export type AddProjectMemberRequest = { member_type: ProjectMemberType, user_id: string | null, agent_id: string | null, member_name: string | null, role: string | null, display_order: bigint, default_workspace_path: string | null, allowed_skill_ids: Array<string>, execution_config: MemberExecutionConfig, is_default: boolean, };
 
-export type UpdateProjectMemberRequest = { role: string | null, display_order: bigint | null, default_workspace_path: string | null, is_default: boolean | null, allowed_skill_ids: Array<string> | null, execution_config: MemberExecutionConfig | null, };
+export type UpdateProjectMemberRequest = { member_name?: string | null, role: string | null, display_order: bigint | null, default_workspace_path: string | null, is_default: boolean | null, allowed_skill_ids: Array<string> | null, execution_config: MemberExecutionConfig | null, };
 
 export type CreateProjectSessionRequest = { title: string | null, workspace_path: string | null, };
 
@@ -476,7 +476,7 @@ export type ProjectResponse = { project: Project, };
 
 export type ProjectDetailResponse = { project: Project, paths: Array<ProjectPath>, members: Array<ProjectMember>, sessions: Array<ChatSession>, repos: Array<Repo>, stats: Array<ProjectStats>, };
 
-export type ProjectMemberWithRuntime = { reasoning_capability: AgentRuntimeReasoningCapability | null, id: string, project_id: string, member_type: ProjectMemberType, user_id: string | null, agent_id: string | null, role: string | null, display_order: bigint, default_workspace_path: string | null, allowed_skill_ids: string[], execution_config: MemberExecutionConfig, is_default: boolean, created_at: Date, updated_at: Date, };
+export type ProjectMemberWithRuntime = { reasoning_capability: AgentRuntimeReasoningCapability | null, id: string, project_id: string, member_type: ProjectMemberType, user_id: string | null, agent_id: string | null, member_name: string | null, role: string | null, display_order: bigint, default_workspace_path: string | null, allowed_skill_ids: string[], execution_config: MemberExecutionConfig, is_default: boolean, created_at: Date, updated_at: Date, };
 
 export type ProjectMembersResponse = { members: Array<ProjectMemberWithRuntime>, };
 

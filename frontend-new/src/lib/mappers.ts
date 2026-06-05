@@ -25,6 +25,7 @@ import type {
   Session,
   CliConfig,
 } from '@/types';
+import type { ProjectMemberWithRuntime } from '../../../shared/types';
 
 // -----------------------------------------------------------------------------
 // Avatar / monogram derivation
@@ -238,6 +239,7 @@ const sessionAgentStateToMemberStatus = (
 interface MapMemberOptions {
   /** Backend session-agent record (provides live state). Optional. */
   sessionAgent?: BackendChatSessionAgent;
+  projectMemberName?: string | null;
 }
 
 const normalizeOptionalString = (value: string | null | undefined) => {
@@ -274,14 +276,16 @@ export const mapAgentToMember = (
   agent: BackendChatAgent,
   opts: MapMemberOptions = {},
 ): Member => {
-  const handle = agent.name.startsWith('@') ? agent.name : `@${agent.name}`;
+  const displayName =
+    normalizeOptionalString(opts.projectMemberName) ?? agent.name;
+  const handle = displayName.startsWith('@') ? displayName : `@${displayName}`;
   const status = sessionAgentStateToMemberStatus(opts.sessionAgent?.state);
   const modelName =
     effectiveSessionAgentModelName(agent, opts.sessionAgent) ?? 'agent';
   const stateLabel = opts.sessionAgent?.state ?? 'idle';
   return {
     id: opts.sessionAgent?.id ?? agent.id,
-    avatar: monogramFromName(agent.name),
+    avatar: monogramFromName(displayName),
     status,
     name: handle,
     roleDetail: `${modelName} · ${stateLabel}`,
@@ -296,13 +300,29 @@ export const mapAgentToMember = (
 export const mapSessionAgentsToMembers = (
   sessionAgents: BackendChatSessionAgent[],
   agents: BackendChatAgent[],
+  projectMembers: ProjectMemberWithRuntime[] = [],
 ): Member[] => {
   const agentById = new Map(agents.map((a) => [a.id, a]));
+  const projectMemberById = new Map(projectMembers.map((m) => [m.id, m]));
+  const projectMemberByAgentId = new Map(
+    projectMembers
+      .filter((m) => m.agent_id)
+      .map((m) => [m.agent_id as string, m]),
+  );
   const members: Member[] = [];
   for (const sa of sessionAgents) {
     const agent = agentById.get(sa.agent_id);
     if (!agent) continue;
-    members.push(mapAgentToMember(agent, { sessionAgent: sa }));
+    const projectMember =
+      (sa.project_member_id
+        ? projectMemberById.get(sa.project_member_id)
+        : undefined) ?? projectMemberByAgentId.get(sa.agent_id);
+    members.push(
+      mapAgentToMember(agent, {
+        sessionAgent: sa,
+        projectMemberName: projectMember?.member_name,
+      }),
+    );
   }
   return members;
 };

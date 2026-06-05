@@ -28,7 +28,7 @@ use db::models::{
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use services::services::{
-    config, workflow_analytics,
+    chat, config, workflow_analytics,
     workflow_compiler::WorkflowCompiler,
     workflow_orchestrator::WorkflowOrchestrator,
     workflow_runtime::{
@@ -102,15 +102,7 @@ pub async fn generate_plan_and_run(
         ));
     }
 
-    let mut agents = Vec::with_capacity(session_agents.len());
-    for session_agent in &session_agents {
-        let agent = ChatAgent::find_by_id(pool, session_agent.agent_id)
-            .await?
-            .ok_or_else(|| {
-                ApiError::BadRequest("Session agent is missing its agent record.".to_string())
-            })?;
-        agents.push(agent);
-    }
+    let agents = load_effective_agents_for_route(pool, session.id, &session_agents).await?;
 
     let (lead_agent, lead_session_agent) = resolve_lead_agent(&session, &session_agents, &agents)
         .map_err(|err| ApiError::BadRequest(err.to_string()))?;
@@ -1256,7 +1248,7 @@ async fn list_transcript_response(
         )
         .await?;
     let session_agents = ChatSessionAgent::find_all_for_session(pool, session.id).await?;
-    let agents = load_agents_for_route(pool, &session_agents).await?;
+    let agents = load_effective_agents_for_route(pool, session.id, &session_agents).await?;
     let step_key_by_id: HashMap<Uuid, String> = steps
         .iter()
         .map(|step| (step.id, step.step_key.clone()))
@@ -1487,15 +1479,21 @@ pub async fn resolve_approval(
         .into_response())
 }
 
-async fn load_agents_for_route(
+async fn load_effective_agents_for_route(
     pool: &sqlx::SqlitePool,
+    session_id: Uuid,
     session_agents: &[ChatSessionAgent],
 ) -> Result<Vec<ChatAgent>, ApiError> {
+    let member_names = chat::member_name_overrides_for_session(pool, session_id).await?;
     let mut agents = Vec::with_capacity(session_agents.len());
     for sa in session_agents {
-        if let Some(agent) = ChatAgent::find_by_id(pool, sa.agent_id).await? {
-            agents.push(agent);
-        }
+        let mut agent = ChatAgent::find_by_id(pool, sa.agent_id)
+            .await?
+            .ok_or_else(|| {
+                ApiError::BadRequest("Session agent is missing its agent record.".to_string())
+            })?;
+        chat::apply_effective_agent_name(&mut agent, &member_names);
+        agents.push(agent);
     }
     Ok(agents)
 }

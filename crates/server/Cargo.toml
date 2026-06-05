@@ -21,6 +21,7 @@ tokio-util = { version = "0.7", features = ["io"] }
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_with = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

@@ -532,6 +532,7 @@ impl ChatRunner {
         }
 
         let agents = ChatAgent::find_all(&self.db.pool).await?;
+        let member_names = chat::member_name_overrides_for_session(&self.db.pool, session.id).await?;
 
         // In workflow mode, route to the designated lead agent (falls back to first if none set).
         // In free mode, route to the first session agent (original behaviour).
@@ -549,7 +550,12 @@ impl ChatRunner {
                 "attempting to resolve lead agent for workflow mode message"
             );
             match resolve_lead_agent(session, &session_agents, &agents) {
-                Ok((lead_agent, _)) => return Ok(Some(lead_agent.name.clone())),
+                Ok((lead_agent, _)) => {
+                    return Ok(Some(chat::effective_agent_name(
+                        lead_agent,
+                        member_names.get(&lead_agent.id).map(String::as_str),
+                    )));
+                }
                 Err(_) => return Ok(None),
             }
         }
@@ -559,7 +565,10 @@ impl ChatRunner {
             agents.iter().map(|a| (a.id, a)).collect();
         for session_agent in &session_agents {
             if let Some(agent) = agent_map.get(&session_agent.agent_id) {
-                return Ok(Some(agent.name.clone()));
+                return Ok(Some(chat::effective_agent_name(
+                    agent,
+                    member_names.get(&agent.id).map(String::as_str),
+                )));
             }
             tracing::warn!(
                 session_id = %session.id,
@@ -698,11 +707,14 @@ impl ChatRunner {
         }
 
         let agents = ChatAgent::find_all(&self.db.pool).await?;
+        let member_names = chat::member_name_overrides_for_session(&self.db.pool, session_id).await?;
         let agent_map: HashMap<Uuid, ChatAgent> =
             agents.into_iter().map(|agent| (agent.id, agent)).collect();
 
-        let mut exact_match: Option<(ChatSessionAgent, ChatAgent)> = None;
-        let mut ci_match: Option<(ChatSessionAgent, ChatAgent)> = None;
+        let mut exact_member_match: Option<(ChatSessionAgent, ChatAgent)> = None;
+        let mut exact_template_match: Option<(ChatSessionAgent, ChatAgent)> = None;
+        let mut ci_member_match: Option<(ChatSessionAgent, ChatAgent)> = None;
+        let mut ci_template_match: Option<(ChatSessionAgent, ChatAgent)> = None;
 
         for session_agent in session_agents {
             let Some(agent) = agent_map.get(&session_agent.agent_id) else {
@@ -714,13 +726,24 @@ impl ChatRunner {
                 continue;
             };
 
-            if agent.name == mention {
-                exact_match = Some((session_agent, agent.clone()));
+            let effective_name =
+                chat::effective_agent_name(agent, member_names.get(&agent.id).map(String::as_str));
+            let build_match = |session_agent: &ChatSessionAgent, effective_name: &str| {
+                let mut effective_agent = agent.clone();
+                effective_agent.name = effective_name.to_string();
+                (session_agent.clone(), effective_agent)
+            };
+
+            if effective_name == mention {
+                exact_member_match = Some(build_match(&session_agent, &effective_name));
                 break;
             }
+            if agent.name == mention && exact_template_match.is_none() {
+                exact_template_match = Some(build_match(&session_agent, &effective_name));
+            }
 
-            if agent.name.eq_ignore_ascii_case(mention) {
-                if ci_match.is_some() {
+            if effective_name.eq_ignore_ascii_case(mention) {
+                if ci_member_match.is_some() {
                     tracing::warn!(
                         session_id = %session_id,
                         mention = mention,
@@ -728,11 +751,27 @@ impl ChatRunner {
                     );
                     return Ok(None);
                 }
-                ci_match = Some((session_agent, agent.clone()));
+                ci_member_match = Some(build_match(&session_agent, &effective_name));
+            }
+
+            if agent.name.eq_ignore_ascii_case(mention) {
+                if ci_template_match.is_some() {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        mention = mention,
+                        "multiple session agents matched template name mention; skipping"
+                    );
+                    return Ok(None);
+                }
+                ci_template_match = Some(build_match(&session_agent, &effective_name));
             }
         }
 
-        let Some((session_agent, agent)) = exact_match.or(ci_match) else {
+        let Some((session_agent, agent)) = exact_member_match
+            .or(exact_template_match)
+            .or(ci_member_match)
+            .or(ci_template_match)
+        else {
             return Ok(None);
         };
 
