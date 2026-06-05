@@ -1,5 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { WorkspaceProvider, useWorkspace } from "@/context/WorkspaceContext";
+import { AppScaleContext } from "@/context/AppScaleContext";
 import { WorkflowWorkspace } from "@/components/WorkflowWorkspace";
 import { CreateAgentSessionModal } from "@/components/CreateAgentSessionModal";
 import { DialogManager } from "@/components/DialogManager";
@@ -92,9 +99,123 @@ const createPageTab = (
 const defaultSidebarWidth = 224;
 const minSidebarWidth = 180;
 const maxSidebarWidth = 360;
+const appDesignWidth = 1440;
+const appDesignHeight = 900;
+const minScaledViewportWidth = 1024;
+const minAppScale = 0.8;
+const maxAppScale = 1.2;
+const compactViewportLayoutRelief = 0.06;
+const compactViewportFontScale = 1.06;
 
 const clampSidebarWidth = (width: number) =>
   Math.min(maxSidebarWidth, Math.max(minSidebarWidth, width));
+
+const clampAppScale = (scale: number) =>
+  Math.min(maxAppScale, Math.max(minAppScale, scale));
+
+type AppScaleState = {
+  enabled: boolean;
+  scale: number;
+  fontScale: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  frameWidth: number;
+  frameHeight: number;
+};
+
+const getAppScaleState = (): AppScaleState => {
+  if (typeof window === "undefined") {
+    return {
+      enabled: false,
+      scale: 1,
+      fontScale: 1,
+      viewportWidth: appDesignWidth,
+      viewportHeight: appDesignHeight,
+      frameWidth: appDesignWidth,
+      frameHeight: appDesignHeight,
+    };
+  }
+
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const enabled = viewportWidth >= minScaledViewportWidth;
+  const rawScale = Math.min(
+    viewportWidth / appDesignWidth,
+    viewportHeight / appDesignHeight,
+  );
+  const layoutScale =
+    viewportHeight < appDesignHeight
+      ? rawScale - compactViewportLayoutRelief
+      : rawScale;
+  const scale = enabled ? clampAppScale(layoutScale) : 1;
+  const fontScale =
+    enabled && viewportHeight < appDesignHeight
+      ? compactViewportFontScale
+      : 1;
+
+  return {
+    enabled,
+    scale,
+    fontScale,
+    viewportWidth,
+    viewportHeight,
+    frameWidth: viewportWidth / scale,
+    frameHeight: viewportHeight / scale,
+  };
+};
+
+function AppScaleFrame({ children }: { children: React.ReactNode }) {
+  const [scaleState, setScaleState] = useState(getAppScaleState);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    let frameId = 0;
+
+    const updateScale = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(() => {
+        setScaleState(getAppScaleState());
+      });
+    };
+
+    updateScale();
+    window.addEventListener("resize", updateScale);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", updateScale);
+    };
+  }, []);
+
+  const scaleContext = useMemo(
+    () => ({
+      ...scaleState,
+      portalRoot,
+    }),
+    [portalRoot, scaleState],
+  );
+
+  return (
+    <AppScaleContext.Provider value={scaleContext}>
+      <div
+        className="ot-app-scale-viewport"
+        style={
+          {
+            "--ot-app-scale": String(scaleState.scale),
+            "--ot-compact-font-scale": String(scaleState.fontScale),
+            "--ot-app-frame-width": `${scaleState.frameWidth}px`,
+            "--ot-app-frame-height": `${scaleState.frameHeight}px`,
+          } as React.CSSProperties
+        }
+      >
+        <div className="ot-app-scale-frame">
+          <div ref={setPortalRoot} className="ot-app-portal-root" />
+          {children}
+        </div>
+      </div>
+    </AppScaleContext.Provider>
+  );
+}
 
 function WorkspaceLayout() {
   const {
@@ -116,6 +237,7 @@ function WorkspaceLayout() {
     weeklyCost,
     showToast,
   } = useWorkspace();
+  const appScale = React.useContext(AppScaleContext);
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [desktopSidebarWidth, setDesktopSidebarWidth] =
@@ -135,6 +257,7 @@ function WorkspaceLayout() {
   const sidebarResizeRef = useRef({
     startX: 0,
     startWidth: defaultSidebarWidth,
+    scale: 1,
   });
 
   const translate = (
@@ -162,7 +285,9 @@ function WorkspaceLayout() {
     document.body.style.userSelect = "none";
 
     const handlePointerMove = (event: PointerEvent) => {
-      const deltaX = event.clientX - sidebarResizeRef.current.startX;
+      const deltaX =
+        (event.clientX - sidebarResizeRef.current.startX) /
+        sidebarResizeRef.current.scale;
       setDesktopSidebarWidth(
         clampSidebarWidth(sidebarResizeRef.current.startWidth + deltaX),
       );
@@ -415,6 +540,7 @@ function WorkspaceLayout() {
     sidebarResizeRef.current = {
       startX: event.clientX,
       startWidth: desktopSidebarWidth,
+      scale: appScale.enabled ? appScale.scale : 1,
     };
     setIsSidebarResizing(true);
   };
@@ -535,7 +661,7 @@ function WorkspaceLayout() {
     teamPresets,
   };
   return (
-    <div className="h-screen w-screen flex bg-[var(--canvas)] text-[var(--ink)] font-sans antialiased overflow-hidden selection:bg-[var(--primary)] selection:text-white transition-colors duration-200">
+    <div className="h-full w-full flex bg-[var(--canvas)] text-[var(--ink)] font-sans antialiased overflow-hidden selection:bg-[var(--primary)] selection:text-white transition-colors duration-200">
       {toast && (
         <div className="fixed bottom-5 right-5 z-50 rounded-lg border border-[var(--primary)] bg-[var(--surface-1)] px-4 py-3 text-xs font-semibold text-[var(--ink)] shadow-md animate-fade-in-up flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[var(--primary)] animate-pulse" />
@@ -682,8 +808,10 @@ function WorkspaceLayout() {
 
 export default function App() {
   return (
-    <WorkspaceProvider>
-      <WorkspaceLayout />
-    </WorkspaceProvider>
+    <AppScaleFrame>
+      <WorkspaceProvider>
+        <WorkspaceLayout />
+      </WorkspaceProvider>
+    </AppScaleFrame>
   );
 }

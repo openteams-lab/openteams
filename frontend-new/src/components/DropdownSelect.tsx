@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Search } from 'lucide-react';
+import { useAppScale } from '@/context/AppScaleContext';
 
 export interface DropdownSelectOption {
   id: string;
@@ -79,6 +80,7 @@ export function DropdownSelect(props: DropdownSelectProps) {
   } = props;
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const appScale = useAppScale();
   const [open, setOpen] = useState(defaultOpen);
   const [searchText, setSearchText] = useState('');
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({
@@ -87,15 +89,23 @@ export function DropdownSelect(props: DropdownSelectProps) {
     width: 280,
   });
   const isMultiple = props.selectionMode === 'multiple';
+  const portalTarget =
+    appScale.portalRoot ??
+    (typeof document === 'undefined' ? null : document.body);
+  const overlayScale =
+    appScale.enabled && portalTarget === appScale.portalRoot
+      ? appScale.scale
+      : 1;
+  const toOverlayValue = (value: number) => value / overlayScale;
 
   const updatePanelPosition = () => {
     const rect = rootRef.current?.getBoundingClientRect();
     if (!rect) return;
 
     setPanelStyle({
-      left: rect.left,
-      top: rect.bottom + 4,
-      width: rect.width,
+      left: toOverlayValue(rect.left),
+      top: toOverlayValue(rect.bottom) + 4,
+      width: toOverlayValue(rect.width),
     });
   };
 
@@ -123,7 +133,7 @@ export function DropdownSelect(props: DropdownSelectProps) {
       window.removeEventListener('resize', updatePanelPosition);
       window.removeEventListener('scroll', updatePanelPosition, true);
     };
-  }, [open]);
+  }, [appScale.enabled, appScale.portalRoot, appScale.scale, open]);
 
   const selectedIds = isMultiple
     ? new Set(props.values)
@@ -287,9 +297,7 @@ export function DropdownSelect(props: DropdownSelectProps) {
       </button>
 
       {open &&
-        (typeof document === 'undefined'
-          ? panel
-          : createPortal(panel, document.body))}
+        (portalTarget ? createPortal(panel, portalTarget) : panel)}
     </div>
   );
 }

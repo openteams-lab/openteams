@@ -31,6 +31,41 @@ check(
   source.includes("import { CreateAgentSessionModal }"),
 );
 check(
+  "imports app scale context",
+  source.includes("import { AppScaleContext }"),
+);
+check(
+  "defines the approved desktop scale baseline",
+  source.includes("const appDesignWidth = 1440") &&
+    source.includes("const appDesignHeight = 900") &&
+    source.includes("const minAppScale = 0.8") &&
+    source.includes("const maxAppScale = 1.2") &&
+    source.includes("const compactViewportLayoutRelief = 0.06") &&
+    source.includes("const compactViewportFontScale = 1.06"),
+  source,
+);
+check(
+  "relaxes layout density for compact-height desktop screens",
+  source.includes("viewportHeight < appDesignHeight") &&
+    source.includes("rawScale - compactViewportLayoutRelief"),
+  source,
+);
+check(
+  "keeps compact font scale separate from layout scale",
+  source.includes("fontScale: number") &&
+    source.includes("fontScale,") &&
+    source.includes('"--ot-compact-font-scale": String(scaleState.fontScale)'),
+  source,
+);
+check(
+  "wraps the workspace in the app scale frame",
+  source.includes("<AppScaleFrame>") &&
+    source.includes("</AppScaleFrame>") &&
+    source.includes("ot-app-scale-viewport") &&
+    source.includes("ot-app-scale-frame"),
+  source,
+);
+check(
   "does not keep legacy renderSidebarContent helper",
   !source.includes("renderSidebarContent"),
 );

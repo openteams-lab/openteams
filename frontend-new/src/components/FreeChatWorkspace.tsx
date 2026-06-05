@@ -6,6 +6,7 @@ import React, {
   useLayoutEffect,
 } from "react";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { useAppScale } from "@/context/AppScaleContext";
 import {
   Plus,
   ArrowUp,
@@ -285,6 +286,7 @@ const getVisibleSidebarMemberCount = (
 export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   embedded = false,
 }) => {
+  const appScale = useAppScale();
   const {
     t,
     activeSessionId,
@@ -707,6 +709,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
 
     const startX = event.clientX;
     const startWidth = effectiveRelatedFilesWidth;
+    const pointerScale = appScale.enabled ? appScale.scale : 1;
     const originalCursor = document.body.style.cursor;
     const originalUserSelect = document.body.style.userSelect;
 
@@ -714,7 +717,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     document.body.style.userSelect = "none";
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const delta = startX - moveEvent.clientX;
+      const delta = (startX - moveEvent.clientX) / pointerScale;
       const nextWidth = Math.min(
         relatedFilesMaxAvailableWidth,
         Math.max(RELATED_FILES_MIN_WIDTH, startWidth + delta),

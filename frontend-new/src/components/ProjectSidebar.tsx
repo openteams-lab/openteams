@@ -45,6 +45,7 @@ import type {
   SidebarProjectDisplay,
 } from "@/types";
 import { DropdownSelect, type DropdownSelectOption } from "./DropdownSelect";
+import { useAppScale } from "@/context/AppScaleContext";
 import { filesystemApi } from "@/lib/api";
 import { buildStatsApi } from "@/lib/buildStatsApi";
 import { onBuildStatsUpdated } from "@/lib/buildStatsEvents";
@@ -257,6 +258,7 @@ export function ProjectSidebar({
   onDeleteProject,
   teamPresets = [],
 }: ProjectSidebarProps) {
+  const appScale = useAppScale();
   const projectSwitcherTriggerRef = useRef<HTMLButtonElement | null>(null);
   const projectSwitcherMenuRef = useRef<HTMLDivElement | null>(null);
   const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
@@ -297,6 +299,17 @@ export function ProjectSidebar({
   const [realBuildStats, setRealBuildStats] =
     useState<SidebarBuildStats | null>(null);
   const [buildStatsRefreshVersion, setBuildStatsRefreshVersion] = useState(0);
+  const portalTarget =
+    appScale.portalRoot ??
+    (typeof document === "undefined" ? null : document.body);
+  const overlayScale =
+    appScale.enabled && portalTarget === appScale.portalRoot
+      ? appScale.scale
+      : 1;
+  const toOverlayValue = useCallback(
+    (value: number) => value / overlayScale,
+    [overlayScale],
+  );
   const displayedProjects = useMemo(
     () =>
       projects.length > 0
@@ -530,19 +543,20 @@ export function ProjectSidebar({
     if (!trigger) return;
 
     const rect = trigger.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
+    const viewportWidth = toOverlayValue(window.innerWidth);
     const menuWidth = Math.min(240, Math.max(200, viewportWidth - 24));
+    const rectLeft = toOverlayValue(rect.left);
     const left = Math.min(
-      Math.max(12, rect.left),
+      Math.max(12, rectLeft),
       Math.max(12, viewportWidth - menuWidth - 12),
     );
 
     setProjectSwitcherPosition({
       left,
-      top: rect.bottom + 4,
+      top: toOverlayValue(rect.bottom) + 4,
       width: menuWidth,
     });
-  }, []);
+  }, [toOverlayValue]);
 
   const toggleProjectSwitcher = () => {
     setProjectSwitcherOpen((open) => {
@@ -575,8 +589,8 @@ export function ProjectSidebar({
     const rect = trigger.getBoundingClientRect();
     setProjectActionMenu({
       projectId: project.id,
-      left: rect.right + 6,
-      top: rect.top,
+      left: toOverlayValue(rect.right) + 6,
+      top: toOverlayValue(rect.top),
     });
   };
 
@@ -797,6 +811,7 @@ export function ProjectSidebar({
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
         </button>
         {projectSwitcherOpen &&
+          portalTarget &&
           createPortal(
             <div
               ref={projectSwitcherMenuRef}
@@ -878,11 +893,12 @@ export function ProjectSidebar({
                 </div>
               )}
             </div>,
-            document.body,
+            portalTarget,
           )}
         {projectSwitcherOpen &&
           projectActionMenu &&
           actionMenuProject &&
+          portalTarget &&
           createPortal(
             <div
               ref={projectActionMenuRef}
@@ -946,12 +962,13 @@ export function ProjectSidebar({
                 </button>
               </div>
             </div>,
-            document.body,
+            portalTarget,
           )}
       </div>
 
       {createFormOpen &&
         onCreateProject &&
+        portalTarget &&
         createPortal(
           <div
             className="fixed inset-0 z-[1001] flex items-center justify-center p-4"
@@ -1216,10 +1233,11 @@ export function ProjectSidebar({
               </form>
             </section>
           </div>,
-          document.body,
+          portalTarget,
         )}
 
       {deletingProjectDraft &&
+        portalTarget &&
         createPortal(
           <div
             className="fixed inset-0 z-[1002] flex items-center justify-center p-4"
@@ -1294,7 +1312,7 @@ export function ProjectSidebar({
               </div>
             </div>
           </div>,
-          document.body,
+          portalTarget,
         )}
 
       <div className="flex-1 space-y-5 overflow-y-auto px-2.5 py-2 ot-scroll-area-styled">
