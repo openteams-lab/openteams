@@ -2368,7 +2368,7 @@ function IssueRow({
         }
       }}
       className={cn(
-        'grid h-[48px] grid-cols-[32px_70px_25px_minmax(0,1fr)_auto_34px_62px] items-center px-9 text-[#f2f2f3] transition hover:bg-[#131415]',
+        'grid h-[48px] grid-cols-[32px_70px_25px_minmax(0,1fr)_auto_48px_62px] items-center px-9 text-[#f2f2f3] transition hover:bg-[#131415]',
         selected && 'bg-[#131415]',
       )}
     >
