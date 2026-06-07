@@ -43,7 +43,10 @@ const settingsSource = readFileSync(
   new URL("./SettingsWorkspace.tsx", import.meta.url),
   "utf8",
 );
-const apiSource = readFileSync(new URL("../lib/api.ts", import.meta.url), "utf8");
+const apiSource = readFileSync(
+  new URL("../lib/api.ts", import.meta.url),
+  "utf8",
+);
 const activityPanelIndex = messageContentSource.indexOf("<AgentActivityPanel");
 const markdownIndex = messageContentSource.indexOf("<AgentMarkdown");
 const composerQuoteIndex = source.indexOf("{quotedMessage && (");
@@ -203,6 +206,15 @@ check(
   source,
 );
 check(
+  "running agent stop action remains visible without hovering",
+  source.includes("absolute bottom-1 right-1 z-10") &&
+    source.includes("group-hover/message:pointer-events-auto") &&
+    source.includes('? "right-8"') &&
+    source.indexOf('title={t("agent.stop")}') <
+      source.indexOf("group-hover/message:pointer-events-auto"),
+  source,
+);
+check(
   "quoted agent message summary is shown above the composer",
   source.includes("quotedMessage") &&
     source.includes("message.quotePrefix") &&
@@ -238,7 +250,9 @@ check(
 );
 check(
   "attachment send uses backend multipart upload with quote reference id",
-  source.includes("chatMessagesApi.uploadAttachment(activeSessionId, attachedFiles") &&
+  source.includes(
+    "chatMessagesApi.uploadAttachment(activeSessionId, attachedFiles",
+  ) &&
     source.includes("content: trimmedInput || undefined") &&
     source.includes("referenceMessageId: quotedMessage?.id") &&
     source.includes("await refreshMessages()") &&
@@ -264,7 +278,7 @@ check(
   activityPanelSource.includes("labels.cleaned") &&
     activityPanelSource.includes("formatAgentActivityLines") &&
     activityPanelSource.includes("renderSimpleBoldMarkdown") &&
-    activityPanelSource.includes('<strong key={`bold-${partIndex}`}') &&
+    activityPanelSource.includes("<strong key={`bold-${partIndex}`}") &&
     messageContentSource.includes("translate={t}") &&
     activityPanelSource.includes("data-line-type={line.line_type}") &&
     activityPanelSource.includes('line_type === "tool"') &&
@@ -276,6 +290,16 @@ check(
     activityPanelSource.includes("text-[var(--ink-tertiary)]") &&
     activityPanelSource.includes("agent-activity-scrollbar") &&
     !activityPanelSource.includes("border border"),
+  activityPanelSource,
+);
+check(
+  "activity panel auto-follows the latest thinking line with idle recovery",
+  activityPanelSource.includes("AGENT_ACTIVITY_AUTO_SCROLL_IDLE_MS = 30000") &&
+    activityPanelSource.includes("useAutoFollowScroll") &&
+    activityPanelSource.includes("el.scrollTop = el.scrollHeight") &&
+    activityPanelSource.includes("autoFollowRef.current = false") &&
+    activityPanelSource.includes("onWheel: noteUserInteraction") &&
+    activityPanelSource.includes("onScroll: handleScroll"),
   activityPanelSource,
 );
 

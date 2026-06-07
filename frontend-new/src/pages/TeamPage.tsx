@@ -2,10 +2,12 @@ import {
   type ReactNode,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import { ChevronRight, Flame, ShieldCheck, Star } from "lucide-react";
+import { ChevronRight, ShieldCheck, Star } from "lucide-react";
 import type { DropdownSelectOption } from "@/components/DropdownSelect";
+import { ProjectBreadcrumbAvatar } from "@/components/ProjectBreadcrumbAvatar";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import {
   agentRuntimeApi,
@@ -99,9 +101,11 @@ const createReasoningOptions = (
 
 function TeamHeader({
   actions,
+  projectName,
   t,
 }: {
   actions?: ReactNode;
+  projectName: string;
   t: TranslateFn;
 }) {
   return (
@@ -110,11 +114,9 @@ function TeamHeader({
         aria-label="Breadcrumb"
         className="flex min-w-0 items-center gap-[7px]"
       >
-        <span className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full bg-[#f15b1a] text-[#0b0b0c]">
-          <Flame aria-hidden="true" className="h-[11px] w-[11px]" />
-        </span>
+        <ProjectBreadcrumbAvatar name={projectName} />
         <span className="truncate text-[16px] font-semibold leading-none text-[var(--ink)]">
-          Openteams
+          {projectName}
         </span>
         <ChevronRight
           aria-hidden="true"
@@ -201,6 +203,7 @@ const sameStringSet = (left: string[], right: string[]) => {
 export function TeamPage() {
   const {
     projects,
+    projectsAsync,
     selectedProjectId,
     activeSessionId,
     refreshMembers,
@@ -208,6 +211,7 @@ export function TeamPage() {
     t,
   } = useWorkspace();
   const [members, setMembers] = useState<ProjectMemberWithExecution[]>([]);
+  const [membersProjectId, setMembersProjectId] = useState<string | null>(null);
   const [agents, setAgents] = useState<BackendChatAgent[]>([]);
   const [runners, setRunners] = useState<AgentRuntimeStatus[]>([]);
   const [skills, setSkills] = useState<BackendChatSkill[]>([]);
@@ -229,7 +233,6 @@ export function TeamPage() {
   const [thinkingEffort, setThinkingEffort] = useState("");
   const [modelVariant, setModelVariant] = useState("");
   const [roleDefinition, setRoleDefinition] = useState("");
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [memberSuccess, setMemberSuccess] = useState(false);
   const [switchingLeadMemberId, setSwitchingLeadMemberId] = useState<
@@ -245,11 +248,13 @@ export function TeamPage() {
   const [mcpApplying, setMcpApplying] = useState(false);
   const [mcpError, setMcpError] = useState<string | null>(null);
   const [mcpSuccess, setMcpSuccess] = useState(false);
+  const loadRequestIdRef = useRef(0);
 
   const currentProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
   );
+  const currentProjectName = currentProject?.name ?? "Project";
   const currentProjectMembers = useMemo(
     () =>
       members.filter(
@@ -320,6 +325,10 @@ export function TeamPage() {
       modelVariant !== memberFormState.modelVariant ||
       roleDefinition !== memberFormState.roleDefinition ||
       !sameStringSet(allowedSkillIds, memberFormState.allowedSkillIds));
+  const projectSelectionPending = projectsAsync.loading && !selectedProjectId;
+  const teamDataReady = selectedProjectId
+    ? membersProjectId === selectedProjectId
+    : !projectSelectionPending;
   const configuredMcpServerKeys = useMemo(() => {
     if (!mcpConfig || mcpLoading) return [];
     try {
@@ -336,8 +345,13 @@ export function TeamPage() {
   }, [mcpConfig, mcpLoading, mcpServersJson]);
 
   const load = async () => {
-    if (!selectedProjectId) return;
-    setLoading(true);
+    const requestId = ++loadRequestIdRef.current;
+    if (!selectedProjectId) {
+      setMembers([]);
+      setMembersProjectId(null);
+      return;
+    }
+    const projectId = selectedProjectId;
     setError(null);
     setNotice(null);
     try {
@@ -351,14 +365,16 @@ export function TeamPage() {
         skillList,
         activeSessionAgents,
       ] = await Promise.all([
-        projectApi.listMembers(selectedProjectId),
+        projectApi.listMembers(projectId),
         chatAgentsApi.list(),
         agentRuntimeApi.list(),
         skillsApi.list(),
         sessionAgentPromise,
       ]);
+      if (loadRequestIdRef.current !== requestId) return;
       const nextMembers = projectMembers as ProjectMemberWithExecution[];
       setMembers(nextMembers);
+      setMembersProjectId(projectId);
       setAgents(chatAgents);
       setRunners(runtimeData.runners);
       setSkills(skillList);
@@ -366,7 +382,7 @@ export function TeamPage() {
 
       const nextProjectMembers = nextMembers.filter(
         (member) =>
-          member.project_id === selectedProjectId &&
+          member.project_id === projectId &&
           member.member_type === "agent",
       );
       setSelectedMemberId((current) =>
@@ -375,9 +391,10 @@ export function TeamPage() {
           : (nextProjectMembers[0]?.id ?? ""),
       );
     } catch (err) {
+      if (loadRequestIdRef.current !== requestId) return;
+      setMembers([]);
+      setMembersProjectId(projectId);
       setError(err instanceof Error ? err.message : t("teamPage.error.load"));
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -808,10 +825,12 @@ export function TeamPage() {
   if (!selectedProjectId) {
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--canvas)] text-[var(--ink)]">
-        <TeamHeader t={t} />
-        <div className="p-[19px] text-[14px] text-[var(--ink-subtle)]">
-          {t("teamPage.empty.noProject")}
-        </div>
+        <TeamHeader projectName={currentProjectName} t={t} />
+        {!projectSelectionPending && (
+          <div className="p-[19px] text-[14px] text-[var(--ink-subtle)]">
+            {t("teamPage.empty.noProject")}
+          </div>
+        )}
       </div>
     );
   }
@@ -819,20 +838,23 @@ export function TeamPage() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--canvas)] text-[var(--ink)]">
       <TeamHeader
+        projectName={currentProjectName}
         t={t}
         actions={
-          <TeamAddMemberButton
-            agents={agents}
-            members={currentProjectMembers}
-            saving={saving}
-            onAddMember={addMember}
-            t={t}
-          />
+          teamDataReady ? (
+            <TeamAddMemberButton
+              agents={agents}
+              members={currentProjectMembers}
+              saving={saving}
+              onAddMember={addMember}
+              t={t}
+            />
+          ) : null
         }
       />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--surface-1)]">
-        {(error || notice) && (
+        {teamDataReady && (error || notice) && (
           <div className="shrink-0 space-y-2 border-b border-[var(--hairline)] p-3">
             {error && (
               <div className="flex items-start gap-2 rounded-[8px] border border-red-500/20 bg-red-500/10 p-3 text-[14px] text-red-400">
@@ -848,11 +870,12 @@ export function TeamPage() {
           </div>
         )}
 
+        {teamDataReady && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[minmax(260px,280px)_minmax(0,1fr)]">
           <aside className="min-h-0 overflow-y-auto border-b border-[var(--hairline)] bg-[var(--surface-1)] ot-scroll-area-styled lg:border-b-0 lg:border-r">
             <TeamMemberSidebar
               agents={agents}
-              loading={loading}
+              loading={false}
               members={currentProjectMembers}
               saving={saving}
               selectedMemberId={selectedMemberId}
@@ -917,6 +940,7 @@ export function TeamPage() {
             />
           </main>
         </div>
+        )}
       </div>
     </div>
   );

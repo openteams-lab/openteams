@@ -1,10 +1,21 @@
 import React from 'react';
 import { FreeChatWorkspace } from '@/components/FreeChatWorkspace';
 
-export const WorkflowWorkspace: React.FC = () => {
+interface WorkflowWorkspaceProps {
+  onOpenDiffTab?: (
+    sessionId: string,
+    filePath: string,
+    status: string,
+    unifiedDiff: string,
+  ) => void;
+}
+
+export const WorkflowWorkspace: React.FC<WorkflowWorkspaceProps> = ({
+  onOpenDiffTab,
+}) => {
   return (
     <div className="h-full w-full bg-transparent overflow-hidden font-sans text-xs select-none">
-      <FreeChatWorkspace embedded />
+      <FreeChatWorkspace embedded onOpenDiffTab={onOpenDiffTab} />
     </div>
   );
 };

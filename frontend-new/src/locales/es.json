@@ -402,6 +402,7 @@
   "agents.filter.available": "Disponible",
   "agents.filter.error": "Error",
   "agents.filter.notInstalled": "No instalado",
+  "agents.breadcrumb.system": "Sistema",
   "agents.status.available": "Disponible",
   "agents.status.error": "Error",
   "agents.status.notInstalled": "No instalado",
@@ -714,5 +715,18 @@
   "issue.linkDialog.toast.repoLinked.message": "{repoName} ahora esta conectado a este proyecto.",
   "issue.linkDialog.toast.repoLinked.title": "Repositorio conectado",
   "issue.linkDialog.toast.repoUnlinked.message": "{repoName} se desconecto de este proyecto.",
-  "issue.linkDialog.toast.repoUnlinked.title": "Repositorio desconectado"
+  "issue.linkDialog.toast.repoUnlinked.title": "Repositorio desconectado",
+  "issue.importDialog.action.import": "Importar como elemento de trabajo",
+  "issue.importDialog.action.refresh": "Actualizar",
+  "issue.importDialog.empty": "No se encontraron issues de GitHub.",
+  "issue.importDialog.error.noLinkedRepo": "Vincula un repositorio de GitHub antes de importar issues.",
+  "issue.importDialog.loading": "Cargando issues de GitHub...",
+  "issue.importDialog.notice.linkRepoFirst": "Vincula un repositorio de GitHub antes de importar issues.",
+  "issue.importDialog.notice.opened": "Importacion de issues de GitHub abierta",
+  "issue.importDialog.searchPlaceholder": "Buscar issues de GitHub...",
+  "issue.importDialog.status.imported": "Importado",
+  "issue.importDialog.status.importing": "Importando...",
+  "issue.importDialog.title": "Importar issues de GitHub",
+  "issue.importDialog.toast.imported.message": "Se importo #{number} como elemento de trabajo del proyecto.",
+  "issue.importDialog.toast.imported.title": "Issue importada"
 }

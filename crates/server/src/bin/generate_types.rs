@@ -273,6 +273,7 @@ fn generate_types_content() -> String {
         server::routes::project_github::IssueIntegrationProvider::decl(),
         server::routes::project_github::ProjectIssueIntegrationsResponse::decl(),
         server::routes::project_github::GitHubIssueQuery::decl(),
+        server::routes::project_github::ImportGitHubIssueRequest::decl(),
         server::routes::project_github::DeliveryRecordsQuery::decl(),
         server::routes::project_github::DeliveryStatsQuery::decl(),
         server::routes::project_github::IssueCommentRequest::decl(),

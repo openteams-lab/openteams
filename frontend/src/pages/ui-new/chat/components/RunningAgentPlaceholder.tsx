@@ -1,4 +1,10 @@
-import { useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { CaretDownIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
@@ -29,6 +35,100 @@ export interface RunningAgentPlaceholderProps {
   queuedMessages?: ChatMessage[];
   chatBubbleTextClassName?: string;
 }
+
+const THINKING_AUTO_SCROLL_IDLE_MS = 30000;
+const THINKING_BOTTOM_THRESHOLD_PX = 8;
+
+const isScrolledToBottom = (el: HTMLElement): boolean =>
+  el.scrollHeight - el.scrollTop - el.clientHeight <=
+  THINKING_BOTTOM_THRESHOLD_PX;
+
+const useAutoFollowThinkingScroll = (active: boolean, scrollSignal: string) => {
+  const scrollRef = useRef<HTMLPreElement>(null);
+  const autoFollowRef = useRef(true);
+  const userInteractingRef = useRef(false);
+  const ignoreScrollRef = useRef(false);
+  const resumeTimerRef = useRef<number | undefined>(undefined);
+  const wasActiveRef = useRef(active);
+
+  const clearResumeTimer = useCallback(() => {
+    if (resumeTimerRef.current === undefined) return;
+    window.clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = undefined;
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    ignoreScrollRef.current = true;
+    el.scrollTop = el.scrollHeight;
+    window.requestAnimationFrame(() => {
+      ignoreScrollRef.current = false;
+    });
+  }, []);
+
+  const resumeAutoFollow = useCallback(() => {
+    autoFollowRef.current = true;
+    userInteractingRef.current = false;
+    scrollToBottom();
+  }, [scrollToBottom]);
+
+  const scheduleResume = useCallback(() => {
+    clearResumeTimer();
+    resumeTimerRef.current = window.setTimeout(
+      resumeAutoFollow,
+      THINKING_AUTO_SCROLL_IDLE_MS
+    );
+  }, [clearResumeTimer, resumeAutoFollow]);
+
+  const noteUserInteraction = useCallback(() => {
+    userInteractingRef.current = true;
+    scheduleResume();
+  }, [scheduleResume]);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || ignoreScrollRef.current) return;
+
+    if (isScrolledToBottom(el)) {
+      autoFollowRef.current = true;
+      userInteractingRef.current = false;
+      clearResumeTimer();
+      return;
+    }
+
+    if (userInteractingRef.current) {
+      autoFollowRef.current = false;
+      scheduleResume();
+    }
+  }, [clearResumeTimer, scheduleResume]);
+
+  useLayoutEffect(() => {
+    if (active && autoFollowRef.current) {
+      scrollToBottom();
+    }
+  }, [active, scrollSignal, scrollToBottom]);
+
+  useEffect(() => {
+    if (active && !wasActiveRef.current) {
+      resumeAutoFollow();
+    }
+    wasActiveRef.current = active;
+  }, [active, resumeAutoFollow]);
+
+  useEffect(() => clearResumeTimer, [clearResumeTimer]);
+
+  return {
+    scrollRef,
+    scrollHandlers: {
+      onKeyDown: noteUserInteraction,
+      onPointerDown: noteUserInteraction,
+      onScroll: handleScroll,
+      onTouchStart: noteUserInteraction,
+      onWheel: noteUserInteraction,
+    },
+  };
+};
 
 export function RunningAgentPlaceholder({
   member,
@@ -68,6 +168,10 @@ export function RunningAgentPlaceholder({
   const hasThinking = displayUnifiedContent.length > 0;
   const hasError = (run?.errorContent ?? '').trim().length > 0;
   const hasQueued = (queuedMessages?.length ?? 0) > 0;
+  const {
+    scrollRef: thinkingScrollRef,
+    scrollHandlers: thinkingScrollHandlers,
+  } = useAutoFollowThinkingScroll(thinkingExpanded, displayUnifiedContent);
 
   return (
     <div className="chat-session-message-row is-agent flex justify-start">
@@ -148,7 +252,11 @@ export function RunningAgentPlaceholder({
                 </div>
                 {thinkingExpanded && (
                   <div className="rounded-[4px_8px_8px_4px] border-l-[3px] border-l-[#5094FB] bg-white px-4 py-3 shadow-sm dark:bg-[#111926] dark:shadow-none">
-                    <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-ibm-plex-mono text-xs leading-relaxed text-low dark:text-[#BAC4D6]">
+                    <pre
+                      ref={thinkingScrollRef}
+                      className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-ibm-plex-mono text-xs leading-relaxed text-low dark:text-[#BAC4D6]"
+                      {...thinkingScrollHandlers}
+                    >
                       {displayUnifiedContent}
                     </pre>
                   </div>

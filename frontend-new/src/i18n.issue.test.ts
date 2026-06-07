@@ -1,4 +1,4 @@
-// Locale synchronization checks for the Issue link dialog.
+// Locale synchronization checks for Issue dialogs.
 //
 // Run with:
 //     pnpm exec tsx src/i18n.issue.test.ts
@@ -6,7 +6,10 @@
 import { readFileSync } from "node:fs";
 
 const locales = ["en", "zh", "ja", "ko", "fr", "es"] as const;
-const sourceFiles = ["./pages/IssuePage.tsx"] as const;
+const sourceFiles = [
+  "./pages/IssuePage.tsx",
+  "./pages/IssueDetailPage.tsx",
+] as const;
 const dynamicKeys = [
   "issue.linkDialog.provider.github.description",
   "issue.linkDialog.provider.github.name",
@@ -15,6 +18,7 @@ const dynamicKeys = [
   "issue.linkDialog.provider.linear.description",
   "issue.linkDialog.provider.linear.name",
 ] as const;
+const dialogPrefixes = ["issue.linkDialog.", "issue.importDialog."] as const;
 const requiredPlaceholders: Record<string, readonly string[]> = {
   "issue.linkDialog.auth.deviceCode": ["code"],
   "issue.linkDialog.auth.status": ["status"],
@@ -34,6 +38,7 @@ const requiredPlaceholders: Record<string, readonly string[]> = {
   "issue.linkDialog.repo.updated": ["date"],
   "issue.linkDialog.toast.repoLinked.message": ["repoName"],
   "issue.linkDialog.toast.repoUnlinked.message": ["repoName"],
+  "issue.importDialog.toast.imported.message": ["number"],
 };
 
 type Locale = (typeof locales)[number];
@@ -59,18 +64,18 @@ const readText = (path: string) =>
 const readLocale = (locale: Locale): LocaleDict =>
   JSON.parse(readText(`./locales/${locale}.json`)) as LocaleDict;
 
-const issueLinkDialogKeys = (dict: LocaleDict) =>
+const issueDialogKeys = (dict: LocaleDict) =>
   Object.keys(dict)
-    .filter((key) => key.startsWith("issue.linkDialog."))
+    .filter((key) => dialogPrefixes.some((prefix) => key.startsWith(prefix)))
     .sort();
 
-const usedIssueLinkDialogKeys = () => {
+const usedIssueDialogKeys = () => {
   const keys = new Set<string>(dynamicKeys);
 
   for (const file of sourceFiles) {
     const text = readText(file);
     for (const match of text.matchAll(
-      /tr\(\s*["'](issue\.linkDialog\.[^"']+)["']/g,
+      /tr\(\s*["'](issue\.(?:linkDialog|importDialog)\.[^"']+)["']/g,
     )) {
       keys.add(match[1]);
     }
@@ -88,22 +93,22 @@ const same = (left: unknown, right: unknown) =>
   JSON.stringify(left) === JSON.stringify(right);
 
 // eslint-disable-next-line no-console
-console.log("Issue link dialog locale sync");
+console.log("Issue dialog locale sync");
 
 const dictionaries = Object.fromEntries(
   locales.map((locale) => [locale, readLocale(locale)]),
 ) as Record<Locale, LocaleDict>;
-const baselineKeys = issueLinkDialogKeys(dictionaries.en);
-const usedKeys = usedIssueLinkDialogKeys();
+const baselineKeys = issueDialogKeys(dictionaries.en);
+const usedKeys = usedIssueDialogKeys();
 
 check(
-  "en defines every issue.linkDialog.* key used by the Issue page",
+  "en defines every Issue dialog key used by the Issue page",
   usedKeys.every((key) => baselineKeys.includes(key)),
   usedKeys.filter((key) => !baselineKeys.includes(key)),
 );
 
 check(
-  "en keeps required issue.linkDialog.* placeholders",
+  "en keeps required Issue dialog placeholders",
   Object.entries(requiredPlaceholders).every(([key, expected]) =>
     same(placeholders(dictionaries.en[key]), [...expected].sort()),
   ),
@@ -121,9 +126,9 @@ check(
 );
 
 for (const locale of locales) {
-  const keys = issueLinkDialogKeys(dictionaries[locale]);
+  const keys = issueDialogKeys(dictionaries[locale]);
   check(
-    `${locale} has the same issue.linkDialog.* keys as en`,
+    `${locale} has the same Issue dialog keys as en`,
     same(keys, baselineKeys),
     {
       missing: baselineKeys.filter((key) => !keys.includes(key)),
@@ -147,7 +152,7 @@ for (const locale of locales) {
     }));
 
   check(
-    `${locale} keeps issue.linkDialog.* placeholders aligned with en`,
+    `${locale} keeps Issue dialog placeholders aligned with en`,
     placeholderMismatches.length === 0,
     placeholderMismatches,
   );

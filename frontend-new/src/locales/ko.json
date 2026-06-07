@@ -402,6 +402,7 @@
   "agents.filter.available": "사용 가능",
   "agents.filter.error": "오류",
   "agents.filter.notInstalled": "설치 안 됨",
+  "agents.breadcrumb.system": "시스템",
   "agents.status.available": "사용 가능",
   "agents.status.error": "오류",
   "agents.status.notInstalled": "설치 안 됨",
@@ -714,5 +715,18 @@
   "issue.linkDialog.toast.repoLinked.message": "{repoName}이(가) 이 프로젝트에 연결되었습니다.",
   "issue.linkDialog.toast.repoLinked.title": "저장소 연결됨",
   "issue.linkDialog.toast.repoUnlinked.message": "{repoName}이(가) 이 프로젝트에서 연결 해제되었습니다.",
-  "issue.linkDialog.toast.repoUnlinked.title": "저장소 연결 해제됨"
+  "issue.linkDialog.toast.repoUnlinked.title": "저장소 연결 해제됨",
+  "issue.importDialog.action.import": "작업 항목으로 가져오기",
+  "issue.importDialog.action.refresh": "새로고침",
+  "issue.importDialog.empty": "GitHub issue를 찾을 수 없습니다.",
+  "issue.importDialog.error.noLinkedRepo": "issue를 가져오기 전에 GitHub 저장소를 연결하세요.",
+  "issue.importDialog.loading": "GitHub issue를 불러오는 중...",
+  "issue.importDialog.notice.linkRepoFirst": "issue를 가져오기 전에 GitHub 저장소를 연결하세요.",
+  "issue.importDialog.notice.opened": "GitHub issue 가져오기를 열었습니다",
+  "issue.importDialog.searchPlaceholder": "GitHub issue 검색...",
+  "issue.importDialog.status.imported": "가져옴",
+  "issue.importDialog.status.importing": "가져오는 중...",
+  "issue.importDialog.title": "GitHub issue 가져오기",
+  "issue.importDialog.toast.imported.message": "#{number}를 프로젝트 작업 항목으로 가져왔습니다.",
+  "issue.importDialog.toast.imported.title": "Issue를 가져왔습니다"
 }

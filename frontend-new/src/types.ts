@@ -540,6 +540,7 @@ export interface ProjectWorkItemDetailResponse {
   delivery_records: ProjectDeliveryRecord[];
   github_audits?: GitHubOperationAudit[];
   audits?: GitHubOperationAudit[];
+  github_issue_detail?: GitHubIssueDetail | null;
 }
 
 export interface ProjectDeliveryStatsSummary {
@@ -1195,7 +1196,7 @@ export interface WorkspaceChanges {
   modified: WorkspaceChangedFile[];
   added: WorkspaceChangedFile[];
   deleted: WorkspacePathEntry[];
-  untracked: WorkspacePathEntry[];
+  untracked: WorkspaceChangedFile[];
 }
 
 export interface WorkspaceChangesResponse {

@@ -72,6 +72,9 @@ pub struct ProjectWorkItem {
 #[derive(Debug, Clone, Deserialize, TS)]
 pub struct CreateProjectWorkItem {
     pub r#type: ProjectWorkItemType,
+    #[serde(default)]
+    #[ts(optional)]
+    pub status: Option<ProjectWorkItemStatus>,
     pub title: String,
     pub description: Option<String>,
     pub priority: ProjectWorkItemPriority,
@@ -99,7 +102,7 @@ impl ProjectWorkItem {
             r#"
             INSERT INTO project_work_items (
                 id, project_id, type, status, title, description, priority, source, created_by
-            ) VALUES (?1, ?2, ?3, 'open', ?4, ?5, ?6, ?7, ?8)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             RETURNING id, project_id, type, status, title, description, priority, source,
                       created_by, created_at, updated_at
             "#,
@@ -107,6 +110,7 @@ impl ProjectWorkItem {
         .bind(id)
         .bind(project_id)
         .bind(input.r#type)
+        .bind(input.status.unwrap_or(ProjectWorkItemStatus::Open))
         .bind(input.title)
         .bind(input.description)
         .bind(input.priority)
@@ -291,6 +295,7 @@ mod tests {
             project_id,
             CreateProjectWorkItem {
                 r#type: ProjectWorkItemType::Bug,
+                status: None,
                 title: "Fix issue".to_string(),
                 description: None,
                 priority: ProjectWorkItemPriority::High,
@@ -300,6 +305,45 @@ mod tests {
         )
         .await
         .expect("create project work item")
+    }
+
+    #[tokio::test]
+    async fn create_item_respects_optional_status() {
+        let pool = setup_pool().await;
+        let project_id = Uuid::new_v4();
+        let open = ProjectWorkItem::create(
+            &pool,
+            project_id,
+            CreateProjectWorkItem {
+                r#type: ProjectWorkItemType::Task,
+                status: None,
+                title: "Open by default".to_string(),
+                description: None,
+                priority: ProjectWorkItemPriority::Medium,
+                source: ProjectWorkItemSource::Manual,
+                created_by: None,
+            },
+        )
+        .await
+        .expect("create open item");
+        assert_eq!(open.status, super::ProjectWorkItemStatus::Open);
+
+        let done = ProjectWorkItem::create(
+            &pool,
+            project_id,
+            CreateProjectWorkItem {
+                r#type: ProjectWorkItemType::Task,
+                status: Some(super::ProjectWorkItemStatus::Done),
+                title: "Done import".to_string(),
+                description: None,
+                priority: ProjectWorkItemPriority::Medium,
+                source: ProjectWorkItemSource::GithubIssue,
+                created_by: None,
+            },
+        )
+        .await
+        .expect("create done item");
+        assert_eq!(done.status, super::ProjectWorkItemStatus::Done);
     }
 
     #[tokio::test]

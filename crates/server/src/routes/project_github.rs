@@ -17,12 +17,15 @@ use db::models::{
     github_pending_pr_creation::{GitHubPendingPrCreation, UpdateGitHubPendingPrCreation},
     project::{Project, ProjectError},
     project_delivery_record::{ProjectDeliveryRecord, ProjectDeliveryStatsSummary},
-    project_work_item::{CreateProjectWorkItem, ProjectWorkItem, UpdateProjectWorkItem},
+    project_work_item::{
+        CreateProjectWorkItem, ProjectWorkItem, ProjectWorkItemPriority, ProjectWorkItemSource,
+        ProjectWorkItemStatus, ProjectWorkItemType, UpdateProjectWorkItem,
+    },
     project_work_item_execution_link::{
         CreateProjectWorkItemExecutionLink, ProjectWorkItemExecutionLink,
     },
     project_work_item_external_link::{
-        CreateProjectWorkItemExternalLink, ProjectWorkItemExternalLink,
+        CreateProjectWorkItemExternalLink, ProjectExternalType, ProjectWorkItemExternalLink,
     },
     repo_integration::{
         RepoIntegration, RepoIntegrationRole, RepoIntegrationSyncStatus, UpdateRepoIntegration,
@@ -81,6 +84,12 @@ pub struct ProjectIssueIntegrationsResponse {
 pub struct GitHubIssueQuery {
     pub repo_integration_id: Uuid,
     pub q: Option<String>,
+}
+
+#[derive(Debug, Deserialize, TS)]
+pub struct ImportGitHubIssueRequest {
+    pub repo_integration_id: Uuid,
+    pub number: i64,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -194,6 +203,10 @@ pub fn router() -> Router<DeploymentImpl> {
             post(link_execution),
         )
         .route("/projects/{project_id}/github/issues", get(list_issues))
+        .route(
+            "/projects/{project_id}/github/issues/import",
+            post(import_github_issue),
+        )
         .route(
             "/projects/{project_id}/github/issues/{repo_integration_id}/{number}",
             get(issue_detail),
@@ -482,10 +495,11 @@ async fn work_item_detail(
     Path((project_id, work_item_id)): Path<(Uuid, Uuid)>,
 ) -> Result<ResponseJson<ApiResponse<ProjectWorkItemDetail>>, ApiError> {
     ensure_project(&deployment, project_id).await?;
-    let row = ProjectWorkItemService::new()
+    let mut row = ProjectWorkItemService::new()
         .detail(&deployment.db().pool, project_id, work_item_id)
         .await
         .map_err(|err| ApiError::BadRequest(err.to_string()))?;
+    enrich_work_item_github_issue_detail(&deployment, project_id, &mut row).await;
     Ok(ResponseJson(ApiResponse::success(row)))
 }
 
@@ -538,6 +552,207 @@ async fn link_execution(
         .await
         .map_err(|err| ApiError::BadRequest(err.to_string()))?;
     Ok(ResponseJson(ApiResponse::success(row)))
+}
+
+async fn import_github_issue(
+    State(deployment): State<DeploymentImpl>,
+    Path(project_id): Path<Uuid>,
+    Json(payload): Json<ImportGitHubIssueRequest>,
+) -> Result<ResponseJson<GitHubApiResponse<ProjectWorkItemDetail>>, ApiError> {
+    ensure_project(&deployment, project_id).await?;
+    let integration =
+        match ensure_github_project_connected(&deployment, project_id, payload.repo_integration_id)
+            .await?
+        {
+            Ok(integration) => integration,
+            Err(error_data) => {
+                return Ok(ResponseJson(ApiResponse::error_with_data(error_data)));
+            }
+        };
+
+    if let Some(existing) = ProjectWorkItemExternalLink::find_by_external(
+        &deployment.db().pool,
+        "github",
+        Some(integration.repo_id),
+        ProjectExternalType::GithubIssue,
+        &payload.number.to_string(),
+    )
+    .await
+    .map_err(|err| ApiError::BadRequest(err.to_string()))?
+    {
+        let mut detail = ProjectWorkItemService::new()
+            .detail(
+                &deployment.db().pool,
+                project_id,
+                existing.project_work_item_id,
+            )
+            .await
+            .map_err(|err| ApiError::BadRequest(err.to_string()))?;
+        enrich_work_item_github_issue_detail(&deployment, project_id, &mut detail).await;
+        return Ok(ResponseJson(ApiResponse::success(detail)));
+    }
+
+    let client = match github_client().await {
+        Ok(client) => client,
+        Err(err) => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                github_local_error_data("github_auth_required", err.to_string()),
+            )));
+        }
+    };
+    let issue_detail = match GitHubIssueService::new()
+        .detail(
+            &deployment.db().pool,
+            &client,
+            payload.repo_integration_id,
+            payload.number,
+        )
+        .await
+    {
+        Ok(detail) => detail,
+        Err(err) => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                github_local_error_data("github_stale_cache", err.to_string()),
+            )));
+        }
+    };
+
+    let work_item = ProjectWorkItemService::new()
+        .create(
+            &deployment.db().pool,
+            project_id,
+            CreateProjectWorkItem {
+                r#type: work_item_type_from_issue_labels(&issue_detail.summary.labels),
+                status: Some(work_item_status_from_github_state(
+                    &issue_detail.summary.state,
+                )),
+                title: issue_detail.summary.title.clone(),
+                description: issue_detail.body.clone(),
+                priority: work_item_priority_from_issue_labels(&issue_detail.summary.labels),
+                source: ProjectWorkItemSource::GithubIssue,
+                created_by: Some(deployment.user_id().to_string()),
+            },
+        )
+        .await
+        .map_err(|err| ApiError::BadRequest(err.to_string()))?;
+
+    ProjectWorkItemService::new()
+        .link_external(
+            &deployment.db().pool,
+            project_id,
+            work_item.id,
+            CreateProjectWorkItemExternalLink {
+                provider: "github".to_string(),
+                repo_id: Some(integration.repo_id),
+                external_type: ProjectExternalType::GithubIssue,
+                external_id: payload.number.to_string(),
+                number: Some(payload.number),
+                url: Some(issue_detail.summary.url.clone()),
+                state: Some(issue_detail.summary.state.clone()),
+                metadata_json: Some(issue_detail.summary.title.clone()),
+                last_synced_at: issue_detail.summary.last_synced_at,
+                stale: issue_detail.summary.stale,
+            },
+        )
+        .await
+        .map_err(|err| ApiError::BadRequest(err.to_string()))?;
+
+    let mut detail = ProjectWorkItemService::new()
+        .detail(&deployment.db().pool, project_id, work_item.id)
+        .await
+        .map_err(|err| ApiError::BadRequest(err.to_string()))?;
+    detail.github_issue_detail = Some(issue_detail);
+    Ok(ResponseJson(ApiResponse::success(detail)))
+}
+
+async fn enrich_work_item_github_issue_detail(
+    deployment: &DeploymentImpl,
+    project_id: Uuid,
+    detail: &mut ProjectWorkItemDetail,
+) {
+    if detail.github_issue_detail.is_some() {
+        return;
+    }
+    let Some(link) = detail.external_links.iter().find(|link| {
+        link.provider == "github" && link.external_type == ProjectExternalType::GithubIssue
+    }) else {
+        return;
+    };
+    let Some(repo_id) = link.repo_id else {
+        return;
+    };
+    let Some(number) = link.number else {
+        return;
+    };
+    let integration =
+        match RepoIntegration::find_by_project(&deployment.db().pool, project_id).await {
+            Ok(rows) => rows
+                .into_iter()
+                .find(|row| row.repo_id == repo_id && row.provider == "github"),
+            Err(_) => None,
+        };
+    let Some(integration) = integration else {
+        return;
+    };
+    let client = match github_client().await {
+        Ok(client) => client,
+        Err(_) => return,
+    };
+    if let Ok(issue_detail) = GitHubIssueService::new()
+        .detail(&deployment.db().pool, &client, integration.id, number)
+        .await
+    {
+        detail.github_issue_detail = Some(issue_detail);
+    }
+}
+
+fn work_item_status_from_github_state(state: &str) -> ProjectWorkItemStatus {
+    if state.eq_ignore_ascii_case("closed") {
+        ProjectWorkItemStatus::Done
+    } else {
+        ProjectWorkItemStatus::Open
+    }
+}
+
+fn work_item_type_from_issue_labels(labels: &[String]) -> ProjectWorkItemType {
+    if issue_labels_contain(labels, &["bug"]) {
+        ProjectWorkItemType::Bug
+    } else if issue_labels_contain(labels, &["doc", "docs", "documentation"]) {
+        ProjectWorkItemType::Doc
+    } else if issue_labels_contain(labels, &["test", "testing"]) {
+        ProjectWorkItemType::Test
+    } else if issue_labels_contain(labels, &["refactor"]) {
+        ProjectWorkItemType::Refactor
+    } else if issue_labels_contain(labels, &["deploy", "deployment"]) {
+        ProjectWorkItemType::Deploy
+    } else if issue_labels_contain(labels, &["feature", "enhancement"]) {
+        ProjectWorkItemType::Feature
+    } else {
+        ProjectWorkItemType::Task
+    }
+}
+
+fn work_item_priority_from_issue_labels(labels: &[String]) -> ProjectWorkItemPriority {
+    if issue_labels_contain(labels, &["urgent", "critical", "p0"]) {
+        ProjectWorkItemPriority::Urgent
+    } else if issue_labels_contain(labels, &["high", "p1"]) {
+        ProjectWorkItemPriority::High
+    } else if issue_labels_contain(labels, &["low", "p3"]) {
+        ProjectWorkItemPriority::Low
+    } else {
+        ProjectWorkItemPriority::Medium
+    }
+}
+
+fn issue_labels_contain(labels: &[String], candidates: &[&str]) -> bool {
+    labels.iter().any(|label| {
+        let normalized = label.to_ascii_lowercase().replace(['_', '-', '/'], " ");
+        candidates.iter().any(|candidate| {
+            normalized == *candidate
+                || normalized.ends_with(&format!(" {candidate}"))
+                || normalized.ends_with(&format!(":{candidate}"))
+        })
+    })
 }
 
 async fn list_issues(
@@ -1583,6 +1798,7 @@ mod tests {
     use chrono::Utc;
     use db::models::{
         github_operation_audit::GitHubOperationSource,
+        project_work_item::{ProjectWorkItemPriority, ProjectWorkItemStatus, ProjectWorkItemType},
         repo_integration::{RepoIntegration, RepoIntegrationRole, RepoIntegrationSyncStatus},
     };
     use serde_json::json;
@@ -1591,6 +1807,8 @@ mod tests {
     use super::{
         IssueCommentRequest, PushBranchRequest, github_local_error_data, github_pr_error_data,
         issue_integration_providers, primary_github_repository,
+        work_item_priority_from_issue_labels, work_item_status_from_github_state,
+        work_item_type_from_issue_labels,
     };
 
     #[test]
@@ -1629,6 +1847,28 @@ mod tests {
         .expect("deserialize");
 
         assert_eq!(payload.operation_source, GitHubOperationSource::Agent);
+    }
+
+    #[test]
+    fn imported_github_issue_maps_labels_to_work_item_fields() {
+        let labels = vec!["type: bug".to_string(), "P0".to_string()];
+
+        assert_eq!(
+            work_item_type_from_issue_labels(&labels),
+            ProjectWorkItemType::Bug
+        );
+        assert_eq!(
+            work_item_priority_from_issue_labels(&labels),
+            ProjectWorkItemPriority::Urgent
+        );
+        assert_eq!(
+            work_item_status_from_github_state("closed"),
+            ProjectWorkItemStatus::Done
+        );
+        assert_eq!(
+            work_item_status_from_github_state("open"),
+            ProjectWorkItemStatus::Open
+        );
     }
 
     #[test]

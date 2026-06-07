@@ -29,11 +29,16 @@ import { ScrollArea } from "@/components/ScrollArea";
 import { AgentMessageContent } from "@/components/AgentMessageContent";
 import { chatMessagesApi, sessionAgentsApi } from "@/lib/api";
 import { mockFrontendApi } from "@/lib/mockFrontendApi";
-import { mockSessionWorkspaceChanges } from "@/mockSessionWorkspaceChanges";
 import type { ChatAttachment, Member, QuotedMessageReference } from "@/types";
 
 interface FreeChatWorkspaceProps {
   embedded?: boolean;
+  onOpenDiffTab?: (
+    sessionId: string,
+    filePath: string,
+    status: string,
+    unifiedDiff: string,
+  ) => void;
 }
 
 type RelatedFileStatus = "M" | "A" | "D";
@@ -43,45 +48,14 @@ interface RelatedFileChange {
   status: RelatedFileStatus;
   additions?: number;
   deletions?: number;
+  unified_diff?: string | null;
+  has_diff?: boolean;
 }
 
 const statusTextTone: Record<RelatedFileStatus, string> = {
   M: "text-amber-600",
   A: "text-emerald-600",
   D: "text-rose-500",
-};
-
-const getSessionFileChanges = (sessionId: string): RelatedFileChange[] => {
-  const fallbackSessionId = "sess-1";
-  const response =
-    mockSessionWorkspaceChanges[sessionId] ??
-    mockSessionWorkspaceChanges[fallbackSessionId];
-  const changes = response?.changes;
-
-  if (!changes) return [];
-
-  return [
-    ...changes.modified.map((file) => ({
-      path: file.path,
-      status: "M" as const,
-      additions: file.additions,
-      deletions: file.deletions,
-    })),
-    ...changes.added.map((file) => ({
-      path: file.path,
-      status: "A" as const,
-      additions: file.additions,
-      deletions: file.deletions,
-    })),
-    ...changes.untracked.map((file) => ({
-      path: file.path,
-      status: "A" as const,
-    })),
-    ...changes.deleted.map((file) => ({
-      path: file.path,
-      status: "D" as const,
-    })),
-  ];
 };
 
 const hasLineStat = (value?: number) => typeof value === "number" && value > 0;
@@ -303,6 +277,7 @@ function SessionMemberAvatar({ member }: { member: Member }) {
 
 export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   embedded = false,
+  onOpenDiffTab,
 }) => {
   const appScale = useAppScale();
   const {
@@ -321,6 +296,10 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     refreshMembers,
     workflowCardAsync,
     chatMessageFontSize,
+    workspaceChangesAsync,
+    refreshWorkspaceChanges,
+    projects,
+    selectedProjectId,
   } = useWorkspace();
 
   const [inputText, setInputText] = useState("");
@@ -348,10 +327,48 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const memberRailRef = useRef<HTMLDivElement>(null);
   const copiedResetTimerRef = useRef<number | null>(null);
-  const relatedFileChanges = useMemo(
-    () => getSessionFileChanges(activeSessionId),
-    [activeSessionId],
-  );
+  const relatedFileChanges = useMemo((): RelatedFileChange[] => {
+    const changes = workspaceChangesAsync.data?.changes;
+    if (!changes) return [];
+    return [
+      ...changes.modified.map(
+        (file): RelatedFileChange => ({
+          path: file.path,
+          status: "M",
+          additions: file.additions,
+          deletions: file.deletions,
+          unified_diff: file.unified_diff,
+          has_diff: file.has_diff,
+        }),
+      ),
+      ...changes.added.map(
+        (file): RelatedFileChange => ({
+          path: file.path,
+          status: "A",
+          additions: file.additions,
+          deletions: file.deletions,
+          unified_diff: file.unified_diff,
+          has_diff: file.has_diff,
+        }),
+      ),
+      ...changes.untracked.map(
+        (file): RelatedFileChange => ({
+          path: file.path,
+          status: "A",
+          additions: file.additions,
+          deletions: file.deletions,
+          unified_diff: file.unified_diff,
+          has_diff: file.has_diff,
+        }),
+      ),
+      ...changes.deleted.map(
+        (file): RelatedFileChange => ({
+          path: file.path,
+          status: "D",
+        }),
+      ),
+    ];
+  }, [workspaceChangesAsync.data]);
   const sidebarMembers = members;
   const visibleSidebarMemberCount = getVisibleSidebarMemberCount(
     sidebarMembers.length,
@@ -521,6 +538,14 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     setStoppingSessionAgentIds(new Set());
   }, [activeSessionId]);
 
+  useEffect(() => {
+    if (!activeSessionId) return;
+    const project = projects.find((p) => p.id === selectedProjectId);
+    const workspacePath = project?.default_workspace_path;
+    if (!workspacePath) return;
+    void refreshWorkspaceChanges(activeSessionId, workspacePath, true);
+  }, [activeSessionId, projects, selectedProjectId, refreshWorkspaceChanges]);
+
   const summarizeMessage = (text: string) => {
     const normalized = text.trim().replace(/\s+/g, " ");
     if (!normalized) return t("message.quoteEmpty");
@@ -682,10 +707,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
       return;
     }
 
-    sendMessage(
-      trimmedInput,
-      quotedMessage ? { quotedMessage } : undefined,
-    );
+    sendMessage(trimmedInput, quotedMessage ? { quotedMessage } : undefined);
     setInputText("");
     setQuotedMessage(null);
   };
@@ -715,8 +737,17 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     inputRef.current?.focus();
   };
 
-  const handleRelatedFileClick = (path: string) => {
-    showToast(t("diffPreviewToast", { path }));
+  const handleRelatedFileClick = (file: RelatedFileChange) => {
+    if (!onOpenDiffTab) {
+      showToast(t("diffPreviewToast", { path: file.path }));
+      return;
+    }
+    onOpenDiffTab(
+      activeSessionId,
+      file.path,
+      file.status,
+      file.unified_diff ?? "",
+    );
   };
 
   const handleRelatedFilesResizeStart = (
@@ -1009,27 +1040,35 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                   )}
                 </div>
 
+                {!msg.isUser &&
+                  msg.isAgentRunning &&
+                  msg.sessionAgentId &&
+                  sessionsAsync.source === "api" && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleStopAgentMessage(msg.sessionAgentId!);
+                      }}
+                      disabled={stoppingSessionAgentIds.has(msg.sessionAgentId)}
+                      className="absolute bottom-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-sm text-rose-500 transition hover:bg-rose-500/10 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      title={t("agent.stop")}
+                      aria-label={t("agent.stop")}
+                    >
+                      <Square className="h-3 w-3 fill-current" />
+                    </button>
+                  )}
+
                 {!msg.isUser && (
-                  <div className="pointer-events-none absolute bottom-1 right-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/message:pointer-events-auto group-hover/message:opacity-100 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100">
-                    {msg.isAgentRunning &&
+                  <div
+                    className={`pointer-events-none absolute bottom-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/message:pointer-events-auto group-hover/message:opacity-100 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 ${
+                      msg.isAgentRunning &&
                       msg.sessionAgentId &&
-                      sessionsAsync.source === "api" && (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleStopAgentMessage(msg.sessionAgentId!);
-                          }}
-                          disabled={stoppingSessionAgentIds.has(
-                            msg.sessionAgentId,
-                          )}
-                          className="flex h-6 w-6 items-center justify-center rounded-sm text-rose-500 transition hover:bg-rose-500/10 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
-                          title={t("agent.stop")}
-                          aria-label={t("agent.stop")}
-                        >
-                          <Square className="h-3 w-3 fill-current" />
-                        </button>
-                      )}
+                      sessionsAsync.source === "api"
+                        ? "right-8"
+                        : "right-1"
+                    }`}
+                  >
                     <button
                       type="button"
                       onClick={(event) => {
@@ -1400,42 +1439,57 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
             </div>
 
             <ScrollArea className="flex-1 px-2 pb-2">
-              {relatedFileChanges.length === 0 ? (
+              {workspaceChangesAsync.loading && (
                 <div className="rounded-md bg-[var(--surface-1)] px-3 py-3 text-[13px] text-[var(--ink-tertiary)]">
-                  {t("relatedFiles.noChangedFiles")}
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {relatedFileChanges.map((file) => (
-                    <button
-                      type="button"
-                      key={`${file.status}-${file.path}`}
-                      onClick={() => handleRelatedFileClick(file.path)}
-                      className="flex h-8 w-full min-w-0 items-center gap-2 rounded-md bg-[var(--surface-1)] px-2 text-left text-[13px] transition-colors hover:bg-[var(--surface-3)]"
-                      aria-label={t("relatedFiles.openDiff", {
-                        path: file.path,
-                      })}
-                    >
-                      <TruncatedFileName path={file.path} />
-                      {hasLineStat(file.additions) && (
-                        <span className="shrink-0 font-mono text-[13px] text-emerald-500">
-                          +{file.additions}
-                        </span>
-                      )}
-                      {hasLineStat(file.deletions) && (
-                        <span className="shrink-0 font-mono text-[13px] text-rose-500">
-                          -{file.deletions}
-                        </span>
-                      )}
-                      <span
-                        className={`w-4 shrink-0 text-right font-mono text-[13px] font-semibold ${statusTextTone[file.status]}`}
-                      >
-                        {file.status}
-                      </span>
-                    </button>
-                  ))}
+                  Loading changes...
                 </div>
               )}
+              {workspaceChangesAsync.error && (
+                <div className="rounded-md bg-[var(--surface-1)] px-3 py-3 text-[13px] text-rose-500">
+                  {workspaceChangesAsync.error}
+                </div>
+              )}
+              {!workspaceChangesAsync.loading &&
+                !workspaceChangesAsync.error &&
+                relatedFileChanges.length === 0 && (
+                  <div className="rounded-md bg-[var(--surface-1)] px-3 py-3 text-[13px] text-[var(--ink-tertiary)]">
+                    {t("relatedFiles.noChangedFiles")}
+                  </div>
+                )}
+              {!workspaceChangesAsync.loading &&
+                !workspaceChangesAsync.error &&
+                relatedFileChanges.length > 0 && (
+                  <div className="space-y-1">
+                    {relatedFileChanges.map((file) => (
+                      <button
+                        type="button"
+                        key={`${file.status}-${file.path}`}
+                        onClick={() => handleRelatedFileClick(file)}
+                        className="flex h-8 w-full min-w-0 items-center gap-2 rounded-md bg-[var(--surface-1)] px-2 text-left text-[13px] transition-colors hover:bg-[var(--surface-3)]"
+                        aria-label={t("relatedFiles.openDiff", {
+                          path: file.path,
+                        })}
+                      >
+                        <TruncatedFileName path={file.path} />
+                        {hasLineStat(file.additions) && (
+                          <span className="shrink-0 font-mono text-[13px] text-emerald-500">
+                            +{file.additions}
+                          </span>
+                        )}
+                        {hasLineStat(file.deletions) && (
+                          <span className="shrink-0 font-mono text-[13px] text-rose-500">
+                            -{file.deletions}
+                          </span>
+                        )}
+                        <span
+                          className={`w-4 shrink-0 text-right font-mono text-[13px] font-semibold ${statusTextTone[file.status]}`}
+                        >
+                          {file.status}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
             </ScrollArea>
           </aside>
         )}

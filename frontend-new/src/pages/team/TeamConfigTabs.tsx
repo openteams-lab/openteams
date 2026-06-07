@@ -1,7 +1,5 @@
 import {
-  useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -548,16 +546,6 @@ function ConfigTab({
   | "skillsError"
   | "skillsLoading"
 >) {
-  const roleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-
-  useLayoutEffect(() => {
-    const textarea = roleTextareaRef.current;
-    if (!textarea) return;
-
-    textarea.style.height = "auto";
-    textarea.style.height = `${textarea.scrollHeight}px`;
-  }, [roleDefinition]);
-
   return (
     <div className="space-y-0">
       <div
@@ -686,12 +674,11 @@ function ConfigTab({
           bodyClassName="!p-0"
         >
           <textarea
-            ref={roleTextareaRef}
             value={roleDefinition}
             onChange={(event) => setRoleDefinition(event.target.value)}
             spellCheck={false}
             placeholder={t("teamPage.systemPrompt.placeholder")}
-            className="block min-h-full w-full resize-none overflow-hidden rounded-[12px] border-0 bg-[var(--surface-2)] px-5 py-5 font-mono text-[14px] leading-relaxed text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-muted)] placeholder:opacity-100 focus:ring-2 focus:ring-[var(--primary-focus)]/50"
+            className="block h-full min-h-[360px] w-full resize-none overflow-y-auto rounded-[12px] border-0 bg-[var(--surface-2)] px-5 py-5 font-mono text-[14px] leading-relaxed text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-muted)] placeholder:opacity-100 focus:ring-2 focus:ring-[var(--primary-focus)]/50"
           />
         </ConfigSection>
       </div>

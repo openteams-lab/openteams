@@ -1,4 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Activity,
   ChevronRight,
@@ -34,6 +41,9 @@ interface AgentActivityPanelProps {
   labels: AgentActivityPanelLabels;
   translate?: AgentActivityTranslator;
 }
+
+const AGENT_ACTIVITY_AUTO_SCROLL_IDLE_MS = 30000;
+const AGENT_ACTIVITY_BOTTOM_THRESHOLD_PX = 8;
 
 const toolIconByKind: Record<
   AgentActivityToolKind,
@@ -101,6 +111,89 @@ const renderSimpleBoldMarkdown = (content: string): React.ReactNode => {
   }
 
   return parts.length > 0 ? parts : content;
+};
+
+const isScrolledToBottom = (el: HTMLElement): boolean =>
+  el.scrollHeight - el.scrollTop - el.clientHeight <=
+  AGENT_ACTIVITY_BOTTOM_THRESHOLD_PX;
+
+const useAutoFollowScroll = (scrollSignal: string) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const autoFollowRef = useRef(true);
+  const userInteractingRef = useRef(false);
+  const ignoreScrollRef = useRef(false);
+  const resumeTimerRef = useRef<number | undefined>(undefined);
+
+  const clearResumeTimer = useCallback(() => {
+    if (resumeTimerRef.current === undefined) return;
+    window.clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = undefined;
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    ignoreScrollRef.current = true;
+    el.scrollTop = el.scrollHeight;
+    window.requestAnimationFrame(() => {
+      ignoreScrollRef.current = false;
+    });
+  }, []);
+
+  const resumeAutoFollow = useCallback(() => {
+    autoFollowRef.current = true;
+    userInteractingRef.current = false;
+    scrollToBottom();
+  }, [scrollToBottom]);
+
+  const scheduleResume = useCallback(() => {
+    clearResumeTimer();
+    resumeTimerRef.current = window.setTimeout(
+      resumeAutoFollow,
+      AGENT_ACTIVITY_AUTO_SCROLL_IDLE_MS,
+    );
+  }, [clearResumeTimer, resumeAutoFollow]);
+
+  const noteUserInteraction = useCallback(() => {
+    userInteractingRef.current = true;
+    scheduleResume();
+  }, [scheduleResume]);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || ignoreScrollRef.current) return;
+
+    if (isScrolledToBottom(el)) {
+      autoFollowRef.current = true;
+      userInteractingRef.current = false;
+      clearResumeTimer();
+      return;
+    }
+
+    if (userInteractingRef.current) {
+      autoFollowRef.current = false;
+      scheduleResume();
+    }
+  }, [clearResumeTimer, scheduleResume]);
+
+  useLayoutEffect(() => {
+    if (autoFollowRef.current) {
+      scrollToBottom();
+    }
+  }, [scrollSignal, scrollToBottom]);
+
+  useEffect(() => clearResumeTimer, [clearResumeTimer]);
+
+  return {
+    scrollRef,
+    scrollHandlers: {
+      onKeyDown: noteUserInteraction,
+      onPointerDown: noteUserInteraction,
+      onScroll: handleScroll,
+      onTouchStart: noteUserInteraction,
+      onWheel: noteUserInteraction,
+    },
+  };
 };
 
 const LineItem: React.FC<{ line: AgentActivityDisplayRow }> = ({ line }) => {
@@ -202,6 +295,11 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
     () => formatAgentActivityLines(lines, translate),
     [lines, translate],
   );
+  const lastDisplayRow = displayRows[displayRows.length - 1];
+  const scrollSignal = `${displayRows.length}:${lastDisplayRow?.row_id ?? ""}:${
+    lastDisplayRow?.content.length ?? 0
+  }`;
+  const { scrollRef, scrollHandlers } = useAutoFollowScroll(scrollSignal);
   const showLoading = state === "loading";
   const showPruned = state === "pruned";
   const showError = state === "error";
@@ -227,8 +325,10 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
         </div>
       ) : (
         <ScrollArea
+          ref={scrollRef}
           className="agent-activity-scrollbar max-h-[480px] pr-1"
           scrollbar="styled"
+          {...scrollHandlers}
         >
           <div className="space-y-0.5 py-0.5">
             {displayRows.map((line) => (

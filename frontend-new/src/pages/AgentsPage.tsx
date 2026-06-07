@@ -10,7 +10,6 @@ import {
   AlertTriangle,
   Bot,
   ChevronRight,
-  Flame,
   ListFilter,
   Plus,
   RefreshCw,
@@ -1296,6 +1295,7 @@ export function AgentsPage() {
   const runnersRef = useRef<AgentRuntimeStatus[]>([]);
   const [filter, setFilter] = useState<AgentRuntimeFilter>("all");
   const [loading, setLoading] = useState(true);
+  const [runtimeLoaded, setRuntimeLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1384,6 +1384,8 @@ export function AgentsPage() {
       sortRunnersByAvailability(filterRuntimeRunners(runners, "", filter)),
     [filter, runners],
   );
+  const suppressRuntimePlaceholder =
+    !runtimeLoaded || (loading && runners.length === 0);
 
   const loadRuntime = useCallback(
     async (options?: { showLoading?: boolean }) => {
@@ -1393,9 +1395,11 @@ export function AgentsPage() {
       try {
         const response = await agentRuntimeApi.list();
         updateRuntimeRunners(response.runners);
+        setRuntimeLoaded(true);
         setLoadError(null);
       } catch (error) {
         if (showLoading) {
+          setRuntimeLoaded(true);
           setLoadError(
             error instanceof Error ? error.message : t("agents.load.failed"),
           );
@@ -1516,6 +1520,7 @@ export function AgentsPage() {
     },
     [],
   );
+  const systemBreadcrumbLabel = t("agents.breadcrumb.system");
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--canvas)] text-[var(--ink)]">
@@ -1524,11 +1529,13 @@ export function AgentsPage() {
           aria-label="Breadcrumb"
           className="flex min-w-0 items-center gap-[7px]"
         >
-          <span className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full bg-[#f15b1a] text-[#0b0b0c]">
-            <Flame aria-hidden="true" className="h-[11px] w-[11px]" />
-          </span>
-          <span className="truncate text-[16px] font-semibold leading-none text-[var(--ink)]">
-            Openteams
+          <span
+            role="img"
+            aria-label={systemBreadcrumbLabel}
+            title={systemBreadcrumbLabel}
+            className="flex h-[19px] w-[19px] shrink-0 items-center justify-center text-[var(--primary)]"
+          >
+            <Settings aria-hidden="true" className="h-[17px] w-[17px]" />
           </span>
           <ChevronRight
             aria-hidden="true"
@@ -1598,15 +1605,8 @@ export function AgentsPage() {
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(640px,750px)]">
           <div className="min-h-0 flex-1 overflow-y-auto ot-scroll-area-styled">
-            {loading ? (
-              <div className="space-y-0">
-                {[0, 1, 2, 3, 4].map((item) => (
-                  <div
-                    key={item}
-                    className="h-[58px] animate-pulse border-b border-[var(--hairline)] bg-[var(--surface-2)] last:border-b-0"
-                  />
-                ))}
-              </div>
+            {suppressRuntimePlaceholder ? (
+              null
             ) : filteredRunners.length === 0 ? (
               <div className="flex min-h-[240px] flex-col items-center justify-center text-center">
                 <Bot className="h-8 w-8 text-[var(--ink-tertiary)]" />
@@ -1641,7 +1641,9 @@ export function AgentsPage() {
           </div>
 
             <div className="min-h-[360px] overflow-hidden border-t border-[var(--hairline)] lg:min-h-0 lg:border-l lg:border-t-0">
-              {selectedRunner ? (
+              {!runtimeLoaded ? (
+                null
+              ) : selectedRunner ? (
                 <AgentConfigSidebar
                   runner={selectedRunner}
                   refreshKey={diagnosticsRefreshKey}

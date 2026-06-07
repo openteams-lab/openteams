@@ -46,7 +46,7 @@ export enum ProjectDeliveryEventType { feature = "feature", bugfix = "bugfix", t
 
 export type ProjectWorkItem = { id: string, project_id: string, type: ProjectWorkItemType, status: ProjectWorkItemStatus, title: string, description: string | null, priority: ProjectWorkItemPriority, source: ProjectWorkItemSource, created_by: string | null, created_at: Date, updated_at: Date, };
 
-export type CreateProjectWorkItem = { type: ProjectWorkItemType, title: string, description: string | null, priority: ProjectWorkItemPriority, source: ProjectWorkItemSource, created_by: string | null, };
+export type CreateProjectWorkItem = { type: ProjectWorkItemType, status?: ProjectWorkItemStatus, title: string, description: string | null, priority: ProjectWorkItemPriority, source: ProjectWorkItemSource, created_by: string | null, };
 
 export type UpdateProjectWorkItem = { type: ProjectWorkItemType | null, status: ProjectWorkItemStatus | null, title: string | null, description: string | null, priority: ProjectWorkItemPriority | null, };
 
@@ -118,7 +118,7 @@ export enum GitHubPendingOperationStatus { pending_approval = "pending_approval"
 
 export type ProjectDetail = { project: Project, paths: Array<ProjectPath>, members: Array<ProjectMember>, sessions: Array<ChatSession>, repos: Array<Repo>, stats: Array<ProjectStats>, };
 
-export type ProjectWorkItemDetail = { work_item: ProjectWorkItem, external_links: Array<ProjectWorkItemExternalLink>, execution_links: Array<ProjectWorkItemExecutionLink>, delivery_records: Array<ProjectDeliveryRecord>, github_audits: Array<GitHubOperationAudit>, };
+export type ProjectWorkItemDetail = { work_item: ProjectWorkItem, external_links: Array<ProjectWorkItemExternalLink>, execution_links: Array<ProjectWorkItemExecutionLink>, delivery_records: Array<ProjectDeliveryRecord>, github_audits: Array<GitHubOperationAudit>, github_issue_detail: GitHubIssueDetail | null, };
 
 export type GitHubAccount = { login: string, id: bigint, avatar_url: string | null, html_url: string | null, scopes: Array<string>, connected_at: Date, };
 
@@ -536,7 +536,7 @@ has_diff: boolean, };
 
 export type WorkspacePathEntry = { path: string, };
 
-export type WorkspaceChanges = { modified: Array<WorkspaceChangedFile>, added: Array<WorkspaceChangedFile>, deleted: Array<WorkspacePathEntry>, untracked: Array<WorkspacePathEntry>, };
+export type WorkspaceChanges = { modified: Array<WorkspaceChangedFile>, added: Array<WorkspaceChangedFile>, deleted: Array<WorkspacePathEntry>, untracked: Array<WorkspaceChangedFile>, };
 
 export type WorkspaceChangesResponse = { workspace_path: string, is_git_repo: boolean, changes: WorkspaceChanges | null, error: string | null, };
 
@@ -609,6 +609,8 @@ export type IssueIntegrationProvider = { id: string, name: string, supported: bo
 export type ProjectIssueIntegrationsResponse = { providers: Array<IssueIntegrationProvider>, github_account: GitHubAccount | null, github_repositories: Array<GitHubRepositorySummary>, linked_repositories: Array<RepoIntegration>, primary_repository: RepoIntegration | null, };
 
 export type GitHubIssueQuery = { repo_integration_id: string, q: string | null, };
+
+export type ImportGitHubIssueRequest = { repo_integration_id: string, number: bigint, };
 
 export type DeliveryRecordsQuery = { work_item_id: string | null, repo_id: string | null, };
 

@@ -1,7 +1,5 @@
 import {
-  ArrowDown,
   ArrowLeftRight,
-  ArrowUp,
   BarChart3,
   Box,
   Check,
@@ -10,23 +8,15 @@ import {
   ChevronRight,
   Circle,
   CircleDashed,
-  Clock3,
-  Flame,
-  GitBranch,
+  CloudDownload,
   Github,
   Layers2,
   Link2,
   ListFilter,
-  MousePointer2,
   MoreHorizontal,
-  PanelRight,
-  Paperclip,
   Plus,
-  Send,
+  RefreshCw,
   SlidersHorizontal,
-  SmilePlus,
-  Tag,
-  Users,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -34,28 +24,37 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
   type SVGProps,
 } from 'react';
 import {
   DropdownSelect,
   type DropdownSelectOption,
 } from '@/components/DropdownSelect';
+import { IssueImportDialog } from '@/components/IssueImportDialog';
 import {
   NotificationToast,
   type NotificationToastTone,
 } from '@/components/NotificationToast';
+import { ProjectBreadcrumbAvatar } from '@/components/ProjectBreadcrumbAvatar';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { githubAuthApi, projectGithubApi } from '@/lib/api';
+import { githubAuthApi, projectGithubApi, projectWorkItemsApi } from '@/lib/api';
+import { IssueDetailPage } from '@/pages/IssueDetailPage';
 import type {
   GitHubAccount,
   GitHubDeviceFlowStartResponse,
+  GitHubIssueSummary,
   GitHubOAuthStartResponse,
   GitHubRepositorySummary,
   IssueIntegrationProvider,
   ProjectIssueIntegrationsResponse,
   ProjectRepoIntegration,
+  ProjectWorkItem,
+  ProjectWorkItemStatus,
 } from '@/types';
 
 type IssueLabel = {
@@ -65,10 +64,12 @@ type IssueLabel = {
 
 type IssueItem = {
   id: string;
+  workItemId: string;
   title: string;
   status: 'todo' | 'backlog' | 'done';
   labels?: IssueLabel[];
   date: string;
+  workItem: ProjectWorkItem;
 };
 
 type IssueGroup = {
@@ -106,122 +107,158 @@ type IssueTranslator = (
   replacements?: Record<string, string | number>,
 ) => string;
 
-const issueGroups: IssueGroup[] = [
-  {
-    id: 'todo',
-    title: 'Todo',
-    count: 1,
-    items: [
-      {
-        id: 'OPE-12',
-        title: '你好',
-        status: 'todo',
-        date: 'Jun 6',
-      },
-    ],
-  },
-  {
-    id: 'backlog',
-    title: 'Backlog',
-    count: 6,
-    items: [
-      {
-        id: 'OPE-5',
-        title: 'openteams/plugin@1.2.27 failed to resolve',
-        status: 'backlog',
-        labels: [
-          { name: 'Bug', color: 'red' },
-          { name: 'Migrated', color: 'blue' },
-        ],
-        date: 'Apr 16',
-      },
-      {
-        id: 'OPE-10',
-        title: '对话响应较慢且点击停止需等待1分钟左右',
-        status: 'backlog',
-        labels: [{ name: 'Migrated', color: 'blue' }],
-        date: 'May 26',
-      },
-      {
-        id: 'OPE-8',
-        title:
-          '建议： 直接增加对本地模型的支持： Custom provider endpoint must use ...',
-        status: 'backlog',
-        labels: [
-          { name: 'enhancem...', color: 'cyan' },
-          { name: 'Migrated', color: 'blue' },
-        ],
-        date: 'May 13',
-      },
-      {
-        id: 'OPE-6',
-        title: 'Sneak Peek: Version 0.4.0 Features',
-        status: 'backlog',
-        labels: [
-          { name: 'enhancem...', color: 'cyan' },
-          { name: 'Migrated', color: 'blue' },
-        ],
-        date: 'Apr 22',
-      },
-      {
-        id: 'OPE-9',
-        title: 'workflow状态错误',
-        status: 'backlog',
-        labels: [
-          { name: 'Bug', color: 'red' },
-          { name: 'Migrated', color: 'blue' },
-        ],
-        date: 'May 19',
-      },
-      {
-        id: 'OPE-7',
-        title: '增加对DeepSeek-TUI支持',
-        status: 'backlog',
-        labels: [
-          { name: 'enhancem...', color: 'cyan' },
-          { name: 'Migrated', color: 'blue' },
-        ],
-        date: 'May 13',
-      },
-    ],
-  },
-  {
-    id: 'done',
-    title: 'Done',
-    count: 4,
-    items: [
-      {
-        id: 'OPE-1',
-        title: 'Get familiar with Linear',
-        status: 'done',
-        date: 'Apr 24',
-      },
-      {
-        id: 'OPE-2',
-        title: 'Set up your teams',
-        status: 'done',
-        date: 'Apr 24',
-      },
-      {
-        id: 'OPE-3',
-        title: 'Connect your tools',
-        status: 'done',
-        date: 'Apr 24',
-      },
-      {
-        id: 'OPE-4',
-        title: 'Import your data',
-        status: 'done',
-        date: 'Apr 24',
-      },
-    ],
-  },
-];
+const issueGroupTitles: Record<IssueGroup['id'], string> = {
+  todo: 'Todo',
+  backlog: 'Backlog',
+  done: 'Done',
+};
 
 const labelColorClass: Record<IssueLabel['color'], string> = {
   red: 'bg-[#ff5f59]',
   blue: 'bg-[#4aa3ff]',
   cyan: 'bg-[#92ecec]',
+};
+
+const issueGroupOrder: Array<IssueGroup['id']> = [
+  'todo',
+  'backlog',
+  'done',
+];
+
+export const projectWorkItemToIssueItem = (
+  item: ProjectWorkItem,
+  projectName: string | null | undefined,
+  sequence: number,
+): IssueItem => ({
+  id: projectWorkItemDisplayId(projectName, sequence),
+  workItemId: item.id,
+  title: item.title,
+  status: projectWorkItemIssueStatus(item.status),
+  labels: projectWorkItemLabels(item),
+  date: formatSimpleDate(item.updated_at),
+  workItem: item,
+});
+
+export const projectWorkItemsToIssueGroups = (
+  items: ProjectWorkItem[],
+  filter: IssueFilter,
+  projectName?: string | null,
+): IssueGroup[] => {
+  const allowedGroups = new Set<IssueGroup['id']>(
+    filter === 'backlog'
+      ? ['backlog']
+      : filter === 'active'
+        ? ['todo', 'backlog']
+        : issueGroupOrder,
+  );
+  let sequence = 0;
+
+  return issueGroupOrder
+    .map((groupId) => {
+      const groupItems = items
+        .filter((item) => projectWorkItemIssueStatus(item.status) === groupId)
+        .map((item) =>
+          projectWorkItemToIssueItem(item, projectName, ++sequence),
+        );
+      return {
+        id: groupId,
+        title: issueGroupTitles[groupId],
+        count: groupItems.length,
+        items: groupItems,
+      };
+    })
+    .filter((group) => allowedGroups.has(group.id) && group.items.length > 0);
+};
+
+export const projectWorkItemIssueStatus = (
+  status: ProjectWorkItemStatus,
+): IssueItem['status'] => {
+  if (status === 'done' || status === 'cancelled') return 'done';
+  if (status === 'blocked') return 'backlog';
+  return 'todo';
+};
+
+export const projectIssueIdPrefix = (projectName?: string | null) => {
+  const normalized = Array.from((projectName ?? '').trim().replace(/\s+/g, ''))
+    .slice(0, 3)
+    .join('')
+    .toUpperCase();
+  return normalized || 'PRO';
+};
+
+export const projectWorkItemDisplayId = (
+  projectName: string | null | undefined,
+  sequence: number,
+) => `${projectIssueIdPrefix(projectName)}-${Math.max(1, sequence)}`;
+
+const ISSUE_ID_BASE_FONT_SIZE_PX = 16;
+const ISSUE_ID_MIN_FONT_SIZE_PX = 1;
+const ISSUE_ID_AVERAGE_CHAR_WIDTH_EM = 0.6;
+
+export const issueDisplayIdFontSizePx = (
+  displayId: string,
+  maxWidthPx = 70,
+) => {
+  const length = Math.max(displayId.length, 1);
+  const fitSize = Math.floor(
+    maxWidthPx / (length * ISSUE_ID_AVERAGE_CHAR_WIDTH_EM),
+  );
+  return Math.min(
+    ISSUE_ID_BASE_FONT_SIZE_PX,
+    Math.max(ISSUE_ID_MIN_FONT_SIZE_PX, fitSize),
+  );
+};
+
+type IssueSourceProviderId = RemoteProviderId | 'local';
+
+export const issueSourceProviderId = (
+  source: ProjectWorkItem['source'] | string,
+): IssueSourceProviderId => {
+  switch (source) {
+    case 'github':
+    case 'github_issue':
+      return 'github';
+    case 'linear':
+    case 'linear_issue':
+      return 'linear';
+    case 'jira':
+    case 'jira_issue':
+      return 'jira';
+    default:
+      return 'local';
+  }
+};
+
+const projectWorkItemLabels = (item: ProjectWorkItem): IssueLabel[] => {
+  return [
+    { name: titleCaseToken(item.type), color: 'cyan' },
+    {
+      name: titleCaseToken(item.priority),
+      color:
+        item.priority === 'high' || item.priority === 'urgent'
+          ? 'red'
+          : 'blue',
+    },
+  ];
+};
+
+const titleCaseToken = (value: string) =>
+  value
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const mergeWorkItem = (
+  item: ProjectWorkItem,
+  setItems: Dispatch<SetStateAction<ProjectWorkItem[]>>,
+) => {
+  setItems((current) => {
+    const existingIndex = current.findIndex((candidate) => candidate.id === item.id);
+    if (existingIndex === -1) return [item, ...current];
+    return current.map((candidate) =>
+      candidate.id === item.id ? item : candidate,
+    );
+  });
 };
 
 function GitHubProviderIcon(props: SVGProps<SVGSVGElement>) {
@@ -288,8 +325,34 @@ const remoteProviders: RemoteProvider[] = [
 const cn = (...classes: Array<string | false | undefined>) =>
   classes.filter(Boolean).join(' ');
 
+function IssueDisplayId({
+  id,
+  maxWidthPx = 70,
+  className,
+}: {
+  id: string;
+  maxWidthPx?: number;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        'block min-w-0 overflow-hidden whitespace-nowrap font-mono font-medium leading-none text-[#8f9298]',
+        className,
+      )}
+      style={{
+        maxWidth: maxWidthPx,
+        fontSize: issueDisplayIdFontSizePx(id, maxWidthPx),
+      }}
+      title={id}
+    >
+      {id}
+    </span>
+  );
+}
+
 export function IssuePage() {
-  const { selectedProjectId, t } = useWorkspace();
+  const { selectedProjectId, projects, projectsAsync, t } = useWorkspace();
   const tr = useCallback<IssueTranslator>(
     (key, fallback, replacements) => {
       const translated = t(key, replacements);
@@ -303,12 +366,22 @@ export function IssuePage() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<IssueGroup['id']>>(
     () => new Set(),
   );
-  const [selectedIssueId, setSelectedIssueId] = useState(
-    issueGroups[0]?.items[0]?.id ?? '',
+  const [workItems, setWorkItems] = useState<ProjectWorkItem[]>([]);
+  const [workItemsProjectId, setWorkItemsProjectId] = useState<string | null>(
+    null,
   );
+  const [workItemsLoading, setWorkItemsLoading] = useState(false);
+  const [workItemsError, setWorkItemsError] = useState('');
+  const [selectedIssueId, setSelectedIssueId] = useState('');
   const [activeIssue, setActiveIssue] = useState<IssueItem | null>(null);
   const [interactionMessage, setInteractionMessage] = useState('');
   const [repoNotice, setRepoNotice] = useState<IssueNotification | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importIssues, setImportIssues] = useState<GitHubIssueSummary[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importAction, setImportAction] = useState<string | null>(null);
+  const [importQuery, setImportQuery] = useState('');
   const [integrationDialogOpen, setIntegrationDialogOpen] = useState(false);
   const [integrationState, setIntegrationState] =
     useState<ProjectIssueIntegrationsResponse | null>(null);
@@ -323,20 +396,28 @@ export function IssuePage() {
   const [authFlow, setAuthFlow] =
     useState<GitHubDeviceFlowStartResponse | null>(null);
   const [authStatus, setAuthStatus] = useState<string | null>(null);
-  const visibleGroups = useMemo(() => {
-    if (activeFilter === 'backlog') {
-      return issueGroups.filter((group) => group.id === 'backlog');
-    }
-    if (activeFilter === 'active') {
-      return issueGroups.filter((group) => group.id !== 'done');
-    }
-    return issueGroups;
-  }, [activeFilter]);
+  const workItemsRequestIdRef = useRef(0);
+  const selectedProjectName = useMemo(
+    () =>
+      projects.find((project) => project.id === selectedProjectId)?.name ??
+      'Project',
+    [projects, selectedProjectId],
+  );
+  const visibleGroups = useMemo(
+    () =>
+      projectWorkItemsToIssueGroups(
+        workItems,
+        activeFilter,
+        selectedProjectName,
+      ),
+    [activeFilter, selectedProjectName, workItems],
+  );
   const visibleIssueCount = visibleGroups.reduce(
     (total, group) => total + group.items.length,
     0,
   );
   const linkedRepo = integrationState?.primary_repository ?? null;
+  const linkedRepoId = linkedRepo?.id ?? '';
   const linkedProviderId: RemoteProviderId | null =
     linkedRepo?.provider === 'github' ? 'github' : null;
   const linkedRepoName = linkedRepo ? repoIntegrationLabel(linkedRepo) : undefined;
@@ -346,6 +427,69 @@ export function IssuePage() {
         linkedRepo,
       )
     : '';
+  const projectSelectionPending = projectsAsync.loading && !selectedProjectId;
+  const workItemsReady = selectedProjectId
+    ? workItemsProjectId === selectedProjectId
+    : !projectSelectionPending;
+  const suppressIssuePlaceholder =
+    !workItemsReady || (workItemsLoading && workItems.length === 0);
+
+  const loadWorkItems = useCallback(async () => {
+    const requestId = ++workItemsRequestIdRef.current;
+    if (!selectedProjectId) {
+      setWorkItems([]);
+      setWorkItemsError('');
+      setWorkItemsProjectId(null);
+      setWorkItemsLoading(false);
+      return;
+    }
+    const projectId = selectedProjectId;
+    setWorkItemsLoading(true);
+    setWorkItemsError('');
+    try {
+      const result = await projectWorkItemsApi.list(projectId);
+      if (workItemsRequestIdRef.current !== requestId) return;
+      setWorkItems(result);
+      setWorkItemsProjectId(projectId);
+    } catch (error) {
+      if (workItemsRequestIdRef.current !== requestId) return;
+      setWorkItems([]);
+      setWorkItemsError(errorMessage(error));
+      setWorkItemsProjectId(projectId);
+    } finally {
+      if (workItemsRequestIdRef.current === requestId) {
+        setWorkItemsLoading(false);
+      }
+    }
+  }, [selectedProjectId]);
+
+  useEffect(() => {
+    void loadWorkItems();
+  }, [loadWorkItems]);
+
+  useEffect(() => {
+    if (selectedProjectId && workItemsProjectId !== selectedProjectId) {
+      setSelectedIssueId('');
+      setActiveIssue(null);
+      return;
+    }
+    const allIssues = projectWorkItemsToIssueGroups(
+      workItems,
+      'all',
+      selectedProjectName,
+    ).flatMap((group) => group.items);
+    setSelectedIssueId((current) =>
+      current && allIssues.some((issue) => issue.id === current)
+        ? current
+        : allIssues[0]?.id ?? '',
+    );
+    setActiveIssue((current) =>
+      current
+        ? allIssues.find((issue) => issue.workItemId === current.workItemId) ??
+          null
+        : current,
+    );
+  }, [selectedProjectId, selectedProjectName, workItems, workItemsProjectId]);
 
   useEffect(() => {
     if (!repoNotice) return;
@@ -577,6 +721,92 @@ export function IssuePage() {
 
   const handleAction = (message: string) => {
     setInteractionMessage(message);
+  };
+
+  const loadImportIssues = useCallback(async () => {
+    if (!selectedProjectId || !linkedRepoId) {
+      setImportIssues([]);
+      setImportError(
+        tr(
+          'issue.importDialog.error.noLinkedRepo',
+          'Link a GitHub repository before importing issues.',
+        ),
+      );
+      return;
+    }
+    setImportLoading(true);
+    setImportError('');
+    try {
+      const result = await projectGithubApi.listIssues(selectedProjectId, {
+        repoIntegrationId: linkedRepoId,
+        query: importQuery.trim() || undefined,
+      });
+      setImportIssues(result);
+    } catch (error) {
+      setImportError(errorMessage(error));
+    } finally {
+      setImportLoading(false);
+    }
+  }, [importQuery, linkedRepoId, selectedProjectId, tr]);
+
+  const handleOpenImportDialog = () => {
+    if (!linkedRepoId) {
+      setImportDialogOpen(false);
+      setInteractionMessage(
+        tr(
+          'issue.importDialog.notice.linkRepoFirst',
+          'Link a GitHub repository before importing issues.',
+        ),
+      );
+      handleOpenIntegrations();
+      return;
+    }
+    setImportDialogOpen(true);
+    setInteractionMessage(
+      tr('issue.importDialog.notice.opened', 'GitHub issue import opened'),
+    );
+    void loadImportIssues();
+  };
+
+  const handleImportIssue = async (issue: GitHubIssueSummary) => {
+    if (!selectedProjectId || !linkedRepoId) return;
+    setImportAction(String(issue.number));
+    setImportError('');
+    try {
+      const detail = await projectGithubApi.importIssue(selectedProjectId, {
+        repo_integration_id: linkedRepoId,
+        number: issue.number,
+      });
+      mergeWorkItem(detail.work_item, setWorkItems);
+      setImportIssues((current) =>
+        current.map((item) =>
+          item.number === issue.number
+            ? { ...item, work_item_id: detail.work_item.id }
+            : item,
+        ),
+      );
+      const importedIssue = projectWorkItemToIssueItem(
+        detail.work_item,
+        selectedProjectName,
+        1,
+      );
+      setSelectedIssueId(importedIssue.id);
+      setActiveIssue(importedIssue);
+      setRepoNotice({
+        id: Date.now(),
+        title: tr('issue.importDialog.toast.imported.title', 'Issue imported'),
+        message: tr(
+          'issue.importDialog.toast.imported.message',
+          'Imported #{number} as a project work item.',
+          { number: issue.number },
+        ),
+        tone: 'success',
+      });
+    } catch (error) {
+      setImportError(errorMessage(error));
+    } finally {
+      setImportAction(null);
+    }
   };
 
   const handleOpenIntegrations = () => {
@@ -837,8 +1067,10 @@ export function IssuePage() {
           onClose={() => setRepoNotice(null)}
         />
       )}
-      {activeIssue ? (
+      {activeIssue && workItemsReady ? (
         <IssueDetailPage
+          projectId={selectedProjectId}
+          projectName={selectedProjectName}
           issue={activeIssue}
           onBack={handleIssueBack}
           onAction={handleAction}
@@ -850,6 +1082,7 @@ export function IssuePage() {
       ) : (
         <>
           <IssueHeader
+            projectName={selectedProjectName}
             linkedProviderId={linkedProviderId}
             linkedRepoName={linkedRepoName}
             onOpenIntegrations={handleOpenIntegrations}
@@ -857,12 +1090,35 @@ export function IssuePage() {
           />
           <IssueToolbar
             activeFilter={activeFilter}
+            importEnabled={Boolean(linkedRepoId)}
             onFilterChange={handleFilterChange}
+            onImport={handleOpenImportDialog}
             onAction={handleAction}
           />
 
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#0c0c0d] pb-10">
-            {visibleIssueCount === 0 ? (
+            {suppressIssuePlaceholder ? (
+              null
+            ) : workItemsError ? (
+              <div className="flex min-h-[244px] items-center justify-center px-5">
+                <div className="max-w-[440px] rounded-[12px] border border-[#342a2d] bg-[#1b1214] p-4 text-center">
+                  <p className="text-[17px] font-bold text-[#ffb3bd]">
+                    Issues failed to load
+                  </p>
+                  <p className="mt-2 text-[14px] leading-snug text-[#d5a4ab]">
+                    {workItemsError}
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-4 inline-flex h-8 items-center gap-2 rounded-[8px] border border-[#55343a] px-3 text-[13px] font-semibold text-[#ffbec7] transition hover:bg-[#28181b]"
+                    onClick={() => void loadWorkItems()}
+                  >
+                    <RefreshCw aria-hidden="true" className="h-4 w-4" />
+                    Retry
+                  </button>
+                </div>
+              </div>
+            ) : visibleIssueCount === 0 ? (
               <IssueEmptyState
                 filter={activeFilter}
                 onAction={handleAction}
@@ -870,7 +1126,7 @@ export function IssuePage() {
                 tr={tr}
               />
             ) : (
-              <div className="min-w-[820px] px-[19px] pt-0">
+              <div className="min-w-[780px] px-[17px] pt-0">
                 {visibleGroups.map((group) => (
                   <IssueSection
                     key={group.id}
@@ -907,6 +1163,18 @@ export function IssuePage() {
         onRepoChange={handleRepositoryLink}
         onRepoUnlink={handleRepositoryUnlink}
         onClose={() => setIntegrationDialogOpen(false)}
+      />
+      <IssueImportDialog
+        open={importDialogOpen}
+        issues={importIssues}
+        loading={importLoading}
+        error={importError}
+        action={importAction}
+        query={importQuery}
+        tr={tr}
+        onQueryChange={setImportQuery}
+        onImport={handleImportIssue}
+        onClose={() => setImportDialogOpen(false)}
       />
     </div>
   );
@@ -947,32 +1215,32 @@ function IssueEmptyState({
   const copy = emptyIssueCopy[filter];
 
   return (
-    <div className="flex min-h-full min-w-[820px] items-center justify-center px-[19px] pb-[120px] pt-[120px]">
-      <section className="w-[510px] max-w-full">
+    <div className="flex min-h-full min-w-[780px] items-center justify-center px-[17px] pb-[108px] pt-[108px]">
+      <section className="w-[486px] max-w-full">
         <IssueEmptyIllustration />
 
-        <h2 className="mt-[31px] text-[20px] font-bold leading-none text-[#f7f7f8]">
+        <h2 className="mt-[28px] text-[19px] font-bold leading-none text-[#f7f7f8]">
           {copy.title}
         </h2>
-        <p className="mt-[25px] text-[16px] font-medium leading-[1.45] text-[#a6a8ad]">
+        <p className="mt-[22px] text-[15px] font-medium leading-[1.45] text-[#a6a8ad]">
           {copy.description}
         </p>
 
-        <div className="mt-[31px] flex items-center gap-[15px]">
+        <div className="mt-[28px] flex items-center gap-[13px]">
           <button
             type="button"
-            className="inline-flex h-[39px] items-center gap-2 rounded-full bg-[#5e6ad2] px-[18px] text-[16px] font-bold leading-none text-white transition hover:bg-[#6f78e2] active:scale-[0.99]"
+            className="inline-flex h-[37px] items-center gap-2 rounded-full bg-[#5e6ad2] px-4 text-[15px] font-bold leading-none text-white transition hover:bg-[#6f78e2] active:scale-[0.99]"
             onClick={() => onAction('Create issue opened')}
           >
             <span>Create new issue</span>
-            <span className="flex h-[24px] min-w-[24px] items-center justify-center rounded-[7px] border border-white/25 bg-white/10 font-mono text-[15px] font-bold leading-none text-white">
+            <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[7px] border border-white/25 bg-white/10 font-mono text-[14px] font-bold leading-none text-white">
               C
             </span>
           </button>
 
           <button
             type="button"
-            className="inline-flex h-[39px] items-center gap-2 rounded-full border border-[#2a2b2d] bg-[#1b1c1f] px-[18px] text-[16px] font-bold leading-none text-[#f2f2f3] transition hover:border-[#383a40] hover:bg-[#242529]"
+            className="inline-flex h-[37px] items-center gap-2 rounded-full border border-[#2a2b2d] bg-[#1b1c1f] px-4 text-[15px] font-bold leading-none text-[#f2f2f3] transition hover:border-[#383a40] hover:bg-[#242529]"
             onClick={onOpenIntegrations}
           >
             <Link2 aria-hidden="true" className="h-[15px] w-[15px]" />
@@ -988,7 +1256,7 @@ function IssueEmptyIllustration() {
   return (
     <svg
       aria-hidden="true"
-      className="h-[118px] w-[178px] text-[#aeb0b6]"
+      className="h-[112px] w-[169px] text-[#aeb0b6]"
       fill="none"
       viewBox="0 0 178 118"
     >
@@ -1126,441 +1394,14 @@ function IssueEmptyIllustration() {
   );
 }
 
-function IssueDetailPage({
-  issue,
-  onBack,
-  onAction,
-  linkedProviderId,
-  linkedRepoName,
-  onOpenIntegrations,
-  tr,
-}: {
-  issue: IssueItem;
-  onBack: () => void;
-  onAction: (message: string) => void;
-  linkedProviderId: RemoteProviderId | null;
-  linkedRepoName?: string;
-  onOpenIntegrations: () => void;
-  tr: IssueTranslator;
-}) {
-  return (
-    <>
-      <IssueDetailHeader
-        issue={issue}
-        onBack={onBack}
-        onAction={onAction}
-        linkedProviderId={linkedProviderId}
-        linkedRepoName={linkedRepoName}
-        onOpenIntegrations={onOpenIntegrations}
-        tr={tr}
-      />
-
-      <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#0c0c0d]">
-        <div className="grid min-w-[860px] grid-cols-[minmax(0,1fr)_255px] gap-[38px] px-[17px] pb-16 pt-[7px]">
-          <section className="min-w-0 pl-2 pr-1 pt-[27px]">
-            <h2 className="truncate text-[25px] font-bold leading-tight text-[#fbfbfc]">
-              {issue.title}
-            </h2>
-
-            <button
-              type="button"
-              className="mt-[35px] block text-left text-[17px] font-medium leading-none text-[#60636a] transition hover:text-[#a7aab1]"
-              onClick={() => onAction(`Description focused for ${issue.id}`)}
-            >
-              Add description...
-            </button>
-
-            <div className="mt-[22px] flex items-center gap-5 text-[#9ca0a7]">
-              <DetailPlainButton
-                icon={SmilePlus}
-                label="Add reaction"
-                onClick={() => onAction(`Reaction opened for ${issue.id}`)}
-              />
-              <DetailPlainButton
-                icon={Paperclip}
-                label="Attach file"
-                onClick={() => onAction(`Attachment opened for ${issue.id}`)}
-              />
-            </div>
-
-            <button
-              type="button"
-              className="mt-6 flex items-center gap-2 text-[14px] font-medium leading-none text-[#b0b3ba] transition hover:text-[#f2f2f3]"
-              onClick={() => onAction(`Sub-issues opened for ${issue.id}`)}
-            >
-              <Plus aria-hidden="true" className="h-[14px] w-[14px]" />
-              <span>Add sub-issues</span>
-            </button>
-
-            <div className="mt-3 border-t border-[#242528] pt-[22px]">
-              <div className="mb-[26px] flex items-center justify-between">
-                <h3 className="text-[18px] font-bold leading-none text-[#fbfbfc]">
-                  Activity
-                </h3>
-                <div className="flex items-center gap-6">
-                  <button
-                    type="button"
-                    className="text-[14px] font-semibold leading-none text-[#a3a7af] transition hover:text-[#f2f2f3]"
-                    onClick={() => onAction(`Unsubscribed from ${issue.id}`)}
-                  >
-                    Unsubscribe
-                  </button>
-                  <IssueAvatar size="large" />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 pl-[11px] text-[14px] font-medium leading-none text-[#aeb1b8]">
-                <IssueAvatar />
-                <span>
-                  Mingy Davis created the issue{' '}
-                  <span className="text-[#82858d]">· 4h ago</span>
-                </span>
-              </div>
-
-              <div className="mt-[26px] flex h-[81px] items-end rounded-[9px] border border-[#232427] bg-[#161617] px-4 pb-[14px] pt-4">
-                <button
-                  type="button"
-                  className="self-start text-left text-[17px] font-medium leading-none text-[#666a72] transition hover:text-[#a6aab2]"
-                  onClick={() => onAction(`Comment focused for ${issue.id}`)}
-                >
-                  Leave a comment...
-                </button>
-                <div className="ml-auto flex items-center gap-4">
-                  <button
-                    type="button"
-                    className="text-[#83868e] transition hover:text-[#f2f2f3]"
-                    aria-label="Attach to comment"
-                    onClick={() =>
-                      onAction(`Comment attachment opened for ${issue.id}`)
-                    }
-                  >
-                    <Paperclip
-                      aria-hidden="true"
-                      className="h-[15px] w-[15px]"
-                      strokeWidth={2.2}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    className="flex h-7 w-7 items-center justify-center rounded-full bg-[#25262a] text-[#a1a4ab] transition hover:bg-[#303136] hover:text-[#f4f4f5] active:scale-95"
-                    aria-label="Send comment"
-                    onClick={() => onAction(`Comment submitted for ${issue.id}`)}
-                  >
-                    <Send
-                      aria-hidden="true"
-                      className="h-[14px] w-[14px]"
-                      strokeWidth={2.4}
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <aside className="min-w-0">
-            <div className="mb-[7px] flex justify-end gap-2">
-              <DetailRoundButton
-                icon={Link2}
-                label="Copy issue link"
-                onClick={() => onAction(`Copied link for ${issue.id}`)}
-              />
-              <DetailRoundButton
-                label="Copy issue ID"
-                onClick={() => onAction(`Copied ID for ${issue.id}`)}
-              >
-                <span className="text-[9px] font-black leading-none">ID</span>
-              </DetailRoundButton>
-              <DetailRoundButton
-                icon={GitBranch}
-                label="Create branch"
-                onClick={() => onAction(`Branch opened for ${issue.id}`)}
-              />
-              <div className="flex h-[30px] items-center rounded-full border border-[#2a2b2e] bg-[#202124] text-[#9fa2a9]">
-                <button
-                  type="button"
-                  className="flex h-full w-[39px] items-center justify-center rounded-l-full transition hover:bg-[#292a2e] hover:text-[#f4f4f5]"
-                  aria-label="Issue actions"
-                  onClick={() => onAction(`Issue actions opened for ${issue.id}`)}
-                >
-                  <MousePointer2
-                    aria-hidden="true"
-                    className="h-[15px] w-[15px]"
-                    strokeWidth={2.2}
-                  />
-                </button>
-                <span className="h-[18px] w-px bg-[#303136]" />
-                <button
-                  type="button"
-                  className="flex h-full w-[31px] items-center justify-center rounded-r-full transition hover:bg-[#292a2e] hover:text-[#f4f4f5]"
-                  aria-label="More issue actions"
-                  onClick={() =>
-                    onAction(`More issue actions opened for ${issue.id}`)
-                  }
-                >
-                  <ChevronDown
-                    aria-hidden="true"
-                    className="h-[14px] w-[14px]"
-                    strokeWidth={2.4}
-                  />
-                </button>
-              </div>
-            </div>
-
-            <DetailPanel title="Properties">
-              <DetailPropertyRow iconNode={<StatusIcon status={issue.status} size="row" />}>
-                <span className="font-bold text-[#e3e4e8]">
-                  {statusLabel(issue.status)}
-                </span>
-              </DetailPropertyRow>
-              <DetailPropertyRow prefix="---">Set priority</DetailPropertyRow>
-              <DetailPropertyRow icon={Users}>Assign</DetailPropertyRow>
-              <DetailPropertyRow icon={Clock3}>Add to cycle</DetailPropertyRow>
-            </DetailPanel>
-
-            <DetailPanel title="Labels">
-              <DetailPropertyRow icon={Tag}>Add label</DetailPropertyRow>
-            </DetailPanel>
-
-            <DetailPanel title="Project">
-              <DetailPropertyRow icon={Box}>Add to project</DetailPropertyRow>
-            </DetailPanel>
-          </aside>
-        </div>
-      </main>
-    </>
-  );
-}
-
-function IssueDetailHeader({
-  issue,
-  onBack,
-  onAction,
-  linkedProviderId,
-  linkedRepoName,
-  onOpenIntegrations,
-  tr,
-}: {
-  issue: IssueItem;
-  onBack: () => void;
-  onAction: (message: string) => void;
-  linkedProviderId: RemoteProviderId | null;
-  linkedRepoName?: string;
-  onOpenIntegrations: () => void;
-  tr: IssueTranslator;
-}) {
-  return (
-    <header className="flex h-[49px] shrink-0 items-center justify-between border-b border-[#1e1f20] bg-[#101112] px-[29px]">
-      <div className="flex min-w-0 items-center gap-[7px]">
-        <span className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full bg-[#f15b1a] text-[#0b0b0c]">
-          <Flame aria-hidden="true" className="h-[11px] w-[11px]" />
-        </span>
-        <button
-          type="button"
-          className="truncate text-[16px] font-semibold leading-none text-[#f2f2f3] transition hover:text-white"
-          onClick={() => onAction('Project breadcrumb selected')}
-        >
-          Openteams
-        </button>
-        <ChevronRight
-          aria-hidden="true"
-          className="h-[15px] w-[15px] shrink-0 text-[#8f9298]"
-          strokeWidth={2.4}
-        />
-        <button
-          type="button"
-          className="truncate text-[16px] font-semibold leading-none text-[#f2f2f3] transition hover:text-white"
-          onClick={onBack}
-        >
-          Issues
-        </button>
-        <ChevronRight
-          aria-hidden="true"
-          className="h-[15px] w-[15px] shrink-0 text-[#8f9298]"
-          strokeWidth={2.4}
-        />
-        <h1 className="truncate text-[16px] font-semibold leading-none text-[#f2f2f3]">
-          {issue.id} {issue.title}
-        </h1>
-        <button
-          type="button"
-          className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#8a8d93] transition hover:bg-[#191a1b] hover:text-[#f2f2f3]"
-          aria-label="More issue options"
-          onClick={() => onAction(`More options opened for ${issue.id}`)}
-        >
-          <MoreHorizontal aria-hidden="true" className="h-[17px] w-[17px]" />
-        </button>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-4 text-[#8f9298]">
-        <HeaderIntegrationControls
-          linkedProviderId={linkedProviderId}
-          linkedRepoName={linkedRepoName}
-          onOpen={onOpenIntegrations}
-          tr={tr}
-        />
-        <span className="font-mono text-[16px] font-medium leading-none">
-          <span className="text-[#a7aab1]">1</span> / 11
-        </span>
-        <button
-          type="button"
-          className="flex h-6 w-6 items-center justify-center rounded-full transition hover:bg-[#191a1b] hover:text-[#f2f2f3]"
-          aria-label="Next issue"
-          onClick={() => onAction('Next issue selected')}
-        >
-          <ArrowDown aria-hidden="true" className="h-[15px] w-[15px]" />
-        </button>
-        <span className="h-[39px] w-px bg-[#242528]" />
-        <button
-          type="button"
-          className="flex h-6 w-6 items-center justify-center rounded-full transition hover:bg-[#191a1b] hover:text-[#f2f2f3]"
-          aria-label="Previous issue"
-          onClick={() => onAction('Previous issue selected')}
-        >
-          <ArrowUp aria-hidden="true" className="h-[15px] w-[15px]" />
-        </button>
-      </div>
-    </header>
-  );
-}
-
-function DetailPlainButton({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="transition hover:text-[#f4f4f5]"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-    >
-      <Icon aria-hidden="true" className="h-[15px] w-[15px]" strokeWidth={2.2} />
-    </button>
-  );
-}
-
-function DetailRoundButton({
-  icon: Icon,
-  label,
-  onClick,
-  children,
-}: {
-  icon?: LucideIcon;
-  label: string;
-  onClick: () => void;
-  children?: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#2a2b2e] bg-[#202124] text-[#9fa2a9] transition hover:bg-[#292a2e] hover:text-[#f4f4f5] active:scale-95"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-    >
-      {Icon ? (
-        <Icon aria-hidden="true" className="h-[15px] w-[15px]" strokeWidth={2.2} />
-      ) : (
-        children
-      )}
-    </button>
-  );
-}
-
-function DetailPanel({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="mb-[10px] rounded-[10px] border border-[#242528] bg-[#161617] px-[18px] py-[17px]">
-      <button
-        type="button"
-        className="mb-5 flex items-center gap-2 text-[16px] font-medium leading-none text-[#aeb2ba] transition hover:text-[#f2f2f3]"
-      >
-        <span>{title}</span>
-        <ChevronDown
-          aria-hidden="true"
-          className="h-[12px] w-[12px]"
-          fill="#9da1a9"
-          strokeWidth={0}
-        />
-      </button>
-      <div className="space-y-[18px]">{children}</div>
-    </section>
-  );
-}
-
-function DetailPropertyRow({
-  icon: Icon,
-  iconNode,
-  prefix,
-  children,
-}: {
-  icon?: LucideIcon;
-  iconNode?: ReactNode;
-  prefix?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      className="flex w-full items-center gap-3 text-left text-[15px] font-semibold leading-none text-[#979aa1] transition hover:text-[#f2f2f3]"
-    >
-      <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center text-[#979aa1]">
-        {iconNode}
-        {Icon && (
-          <Icon
-            aria-hidden="true"
-            className="h-[17px] w-[17px]"
-            strokeWidth={2.2}
-          />
-        )}
-        {prefix && (
-          <span className="font-mono text-[16px] font-bold leading-none">
-            {prefix}
-          </span>
-        )}
-      </span>
-      <span>{children}</span>
-    </button>
-  );
-}
-
-function IssueAvatar({ size = 'normal' }: { size?: 'normal' | 'large' }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-full border border-[#2e8cff] bg-[radial-gradient(circle_at_36%_30%,#ffd6a4_0_18%,#f06b35_19%_46%,#1779ff_47%_100%)] text-[8px] font-black text-white shadow-[0_0_0_1px_rgba(255,255,255,0.12)_inset]',
-        size === 'large' ? 'h-5 w-5' : 'h-4 w-4',
-      )}
-    >
-      M
-    </span>
-  );
-}
-
-function statusLabel(status: IssueItem['status']) {
-  if (status === 'backlog') return 'Backlog';
-  if (status === 'done') return 'Done';
-  return 'Todo';
-}
-
 function IssueHeader({
+  projectName,
   linkedProviderId,
   linkedRepoName,
   onOpenIntegrations,
   tr,
 }: {
+  projectName: string;
   linkedProviderId: RemoteProviderId | null;
   linkedRepoName?: string;
   onOpenIntegrations: () => void;
@@ -1569,11 +1410,9 @@ function IssueHeader({
   return (
     <header className="flex h-[49px] shrink-0 items-center justify-between border-b border-[#1e1f20] bg-[#101112] px-[29px]">
       <div className="flex min-w-0 items-center gap-[7px]">
-        <span className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full bg-[#f15b1a] text-[#0b0b0c]">
-          <Flame aria-hidden="true" className="h-[11px] w-[11px]" />
-        </span>
+        <ProjectBreadcrumbAvatar name={projectName} />
         <span className="truncate text-[16px] font-semibold leading-none text-[#f2f2f3]">
-          Openteams
+          {projectName}
         </span>
         <ChevronRight
           aria-hidden="true"
@@ -2299,15 +2138,19 @@ function ProviderIcon({
 
 function IssueToolbar({
   activeFilter,
+  importEnabled,
   onFilterChange,
+  onImport,
   onAction,
 }: {
   activeFilter: IssueFilter;
+  importEnabled: boolean;
   onFilterChange: (filter: IssueFilter) => void;
+  onImport: () => void;
   onAction: (message: string) => void;
 }) {
   return (
-    <section className="flex h-[49px] shrink-0 items-center justify-between bg-[#101112] px-[19px]">
+    <section className="flex h-[46px] shrink-0 items-center justify-between bg-[#101112] px-[17px]">
       <div className="flex items-center gap-1.5">
         <FilterTab
           active={activeFilter === 'all'}
@@ -2326,7 +2169,7 @@ function IssueToolbar({
         />
         <button
           type="button"
-          className="ml-[23px] flex h-7 w-7 items-center justify-center rounded-full text-[#8a8d93] transition hover:bg-[#1d1e20] hover:text-[#f4f4f5]"
+          className="ml-5 flex h-[26px] w-[26px] items-center justify-center rounded-full text-[#8a8d93] transition hover:bg-[#1d1e20] hover:text-[#f4f4f5]"
           aria-label="Group by status"
           onClick={() => onAction('Group menu opened')}
         >
@@ -2351,9 +2194,11 @@ function IssueToolbar({
           onClick={() => onAction('Analytics opened')}
         />
         <ToolbarButton
-          icon={PanelRight}
-          label="Open side panel"
-          onClick={() => onAction('Side panel opened')}
+          disabled={!importEnabled}
+          disabledTitle="Connect a GitHub repository to import issues"
+          icon={CloudDownload}
+          label="Import issues"
+          onClick={onImport}
         />
       </div>
     </section>
@@ -2375,7 +2220,7 @@ function FilterTab({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'h-[35px] rounded-[18px] border px-[13px] text-[16px] font-semibold leading-none transition',
+        'h-[33px] rounded-[17px] border px-3 text-[15px] font-semibold leading-none transition',
         active
           ? 'border-[#2c2d30] bg-[#202123] text-[#fbfbfc]'
           : 'border-[#292a2d] bg-[#121314] text-[#979a9f] hover:bg-[#191a1b] hover:text-[#d8d9dc]',
@@ -2387,23 +2232,35 @@ function FilterTab({
 }
 
 function ToolbarButton({
+  disabled = false,
+  disabledTitle,
   icon: Icon,
   label,
   onClick,
 }: {
+  disabled?: boolean;
+  disabledTitle?: string;
   icon: LucideIcon;
   label: string;
   onClick: () => void;
 }) {
+  const buttonLabel = disabled ? (disabledTitle ?? label) : label;
+
   return (
     <button
       type="button"
-      className="flex h-[35px] w-[35px] items-center justify-center rounded-full border border-[#2a2b2d] bg-[#202123] text-[#a1a3a8] transition hover:bg-[#292a2d] hover:text-[#f4f4f5]"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
+      className={cn(
+        'flex h-[33px] w-[33px] items-center justify-center rounded-full border border-[#2a2b2d] bg-[#202123] text-[#a1a3a8] transition',
+        disabled
+          ? 'cursor-not-allowed opacity-45'
+          : 'hover:bg-[#292a2d] hover:text-[#f4f4f5]',
+      )}
+      aria-label={buttonLabel}
+      disabled={disabled}
+      title={buttonLabel}
+      onClick={disabled ? undefined : onClick}
     >
-      <Icon aria-hidden="true" className="h-[15px] w-[15px]" strokeWidth={2.2} />
+      <Icon aria-hidden="true" className="h-[14px] w-[14px]" strokeWidth={2.2} />
     </button>
   );
 }
@@ -2437,7 +2294,7 @@ function IssueSection({
           }
         }}
         className={cn(
-          'flex h-[42px] items-center justify-between rounded-[9px] px-5',
+          'flex h-[39px] items-center justify-between rounded-[9px] px-4',
           group.id === 'done' ? 'bg-[#191a21]' : 'bg-[#191a1b]',
         )}
       >
@@ -2450,10 +2307,10 @@ function IssueSection({
           />
           <StatusIcon status={group.id} size="header" />
           <div className="flex items-baseline gap-3">
-            <h2 className="text-[17px] font-semibold leading-none text-[#e5e5e7]">
+            <h2 className="text-[16px] font-semibold leading-none text-[#e5e5e7]">
               {group.title}
             </h2>
-            <span className="text-[17px] font-medium leading-none text-[#8f939b]">
+            <span className="text-[16px] font-medium leading-none text-[#8f939b]">
               {group.count}
             </span>
           </div>
@@ -2511,7 +2368,7 @@ function IssueRow({
         }
       }}
       className={cn(
-        'grid h-[51px] grid-cols-[35px_74px_27px_minmax(0,1fr)_auto_37px_67px] items-center px-11 text-[#f2f2f3] transition hover:bg-[#131415]',
+        'grid h-[48px] grid-cols-[32px_70px_25px_minmax(0,1fr)_auto_34px_62px] items-center px-9 text-[#f2f2f3] transition hover:bg-[#131415]',
         selected && 'bg-[#131415]',
       )}
     >
@@ -2531,40 +2388,64 @@ function IssueRow({
         />
       </button>
 
-      <span className="font-mono text-[16px] font-medium leading-none text-[#8f9298]">
-        {issue.id}
-      </span>
+      <IssueDisplayId id={issue.id} />
 
       <StatusIcon status={issue.status} size="row" />
 
-      <h3 className="min-w-0 truncate pr-2.5 text-[14px] font-semibold leading-none text-[#f4f4f5]">
+      <h3 className="min-w-0 truncate pr-2 text-[13px] font-semibold leading-none text-[#f4f4f5]">
         {issue.title}
       </h3>
 
-      <div className="hidden min-w-[210px] items-center justify-end gap-1.5 xl:flex">
+      <div className="hidden min-w-[198px] items-center justify-end gap-1.5 xl:flex">
         {issue.labels?.map((label) => (
           <IssueLabel key={`${issue.id}-${label.name}`} label={label} />
         ))}
       </div>
 
       <div className="flex justify-center">
-        <Users
-          aria-hidden="true"
-          className="h-[19px] w-[19px] text-[#6d7076]"
-          strokeWidth={2.2}
-        />
+        <IssueSourceIcon source={issue.workItem.source} />
       </div>
 
-      <time className="whitespace-nowrap text-right text-[14px] font-medium leading-none text-[#999ba0]">
+      <time className="whitespace-nowrap text-right text-[13px] font-medium leading-none text-[#999ba0]">
         {issue.date}
       </time>
     </article>
   );
 }
 
+function IssueSourceIcon({
+  source,
+}: {
+  source: ProjectWorkItem['source'] | string;
+}) {
+  const providerId = issueSourceProviderId(source);
+  const title =
+    providerId === 'local'
+      ? 'Local issue'
+      : `${titleCaseToken(providerId)} issue`;
+
+  if (providerId === 'local') {
+    return (
+      <span title={title}>
+        <Box
+          aria-hidden="true"
+          className="h-[18px] w-[18px] text-[#6d7076]"
+          strokeWidth={2.2}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span title={title}>
+      <ProviderIcon providerId={providerId} className="h-[18px] w-[18px]" />
+    </span>
+  );
+}
+
 function IssueLabel({ label }: { label: IssueLabel }) {
   return (
-    <span className="inline-flex h-[29px] max-w-[124px] items-center gap-2 rounded-full border border-[#28292c] bg-[#101112] px-[11px] text-[14px] font-medium leading-none text-[#9b9da3]">
+    <span className="inline-flex h-[27px] max-w-[116px] items-center gap-2 rounded-full border border-[#28292c] bg-[#101112] px-[10px] text-[13px] font-medium leading-none text-[#9b9da3]">
       <span
         className={cn(
           'h-[11px] w-[11px] shrink-0 rounded-full',

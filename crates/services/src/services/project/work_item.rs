@@ -16,6 +16,8 @@ use sqlx::SqlitePool;
 use ts_rs::TS;
 use uuid::Uuid;
 
+use crate::services::github::rest_client::GitHubIssueDetail;
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct ProjectWorkItemDetail {
     pub work_item: ProjectWorkItem,
@@ -23,6 +25,7 @@ pub struct ProjectWorkItemDetail {
     pub execution_links: Vec<ProjectWorkItemExecutionLink>,
     pub delivery_records: Vec<ProjectDeliveryRecord>,
     pub github_audits: Vec<GitHubOperationAudit>,
+    pub github_issue_detail: Option<GitHubIssueDetail>,
 }
 
 #[derive(Clone, Default)]
@@ -90,6 +93,7 @@ impl ProjectWorkItemService {
             execution_links,
             delivery_records,
             github_audits,
+            github_issue_detail: None,
         })
     }
 

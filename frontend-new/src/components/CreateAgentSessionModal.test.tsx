@@ -70,6 +70,17 @@ const closedHtml = renderToStaticMarkup(
     onCreate={() => undefined}
   />,
 );
+const noLeadHtml = renderToStaticMarkup(
+  <CreateAgentSessionModal
+    open
+    projectName="my-saas"
+    members={members}
+    leadMember={null}
+    t={t}
+    onClose={() => undefined}
+    onCreate={() => undefined}
+  />,
+);
 const source = readFileSync(
   new URL('./CreateAgentSessionModal.tsx', import.meta.url),
   'utf8',
@@ -86,6 +97,7 @@ check('renders read-only main agent in workflow mode', html.includes('MEMBER_LAB
 check('read-only workflow main agent has no outer border', source.includes('inline-flex min-w-0 max-w-[280px] items-center gap-2 rounded-md bg-[var(--surface-2)]'), source);
 check('does not render member dropdown in workflow mode', !html.includes('aria-haspopup="listbox"'), html);
 check('workflow mode only shows the main agent by default', html.includes('@lead') && !html.includes('@backend'), html);
+check('does not fall back when App explicitly has no workflow agent', noLeadHtml.includes('No members available') && !noLeadHtml.includes('@lead'), noLeadHtml);
 check('renders prompt composer placeholder', html.includes('PROMPT_PLACEHOLDER'), html);
 check('renders only the current mode label', html.includes('WORKFLOW') && !html.includes('FREE_CHAT'), html);
 check('mode labels omit the word mode', !html.includes('Workflow mode') && !html.includes('Free chat mode'), html);

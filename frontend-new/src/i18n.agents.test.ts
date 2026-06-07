@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 
 const locales = ["en", "zh", "ja", "ko", "fr", "es"] as const;
+const sourceFiles = ["./pages/AgentsPage.tsx"] as const;
 
 type Locale = (typeof locales)[number];
 type LocaleDict = Record<string, string>;
@@ -24,15 +25,29 @@ const check = (label: string, condition: boolean, detail?: unknown) => {
   console.error(`  FAIL ${label}`, detail ?? "");
 };
 
+const readText = (path: string) =>
+  readFileSync(new URL(path, import.meta.url), "utf8");
+
 const readLocale = (locale: Locale): LocaleDict =>
-  JSON.parse(
-    readFileSync(new URL(`./locales/${locale}.json`, import.meta.url), "utf8"),
-  ) as LocaleDict;
+  JSON.parse(readText(`./locales/${locale}.json`)) as LocaleDict;
 
 const agentKeys = (dict: LocaleDict) =>
   Object.keys(dict)
     .filter((key) => key.startsWith("agents."))
     .sort();
+
+const usedAgentKeys = () => {
+  const keys = new Set<string>();
+
+  for (const file of sourceFiles) {
+    const text = readText(file);
+    for (const match of text.matchAll(/t\(["'](agents\.[^"']+)["']/g)) {
+      keys.add(match[1]);
+    }
+  }
+
+  return Array.from(keys).sort();
+};
 
 const placeholders = (value: string) =>
   Array.from(value.matchAll(/\{([a-zA-Z0-9_]+)\}/g))
@@ -49,6 +64,13 @@ const dictionaries = Object.fromEntries(
   locales.map((locale) => [locale, readLocale(locale)]),
 ) as Record<Locale, LocaleDict>;
 const baselineKeys = agentKeys(dictionaries.en);
+const usedKeys = usedAgentKeys();
+
+check(
+  "en defines every static agents.* key used by the Agent runtime page",
+  usedKeys.every((key) => baselineKeys.includes(key)),
+  usedKeys.filter((key) => !baselineKeys.includes(key)),
+);
 
 for (const locale of locales) {
   const keys = agentKeys(dictionaries[locale]);

@@ -20,6 +20,7 @@ interface CreateAgentSessionModalProps {
   open: boolean;
   projectName?: string;
   members?: Member[];
+  leadMember?: Member | null;
   t: (key: string, replacements?: Record<string, string | number>) => string;
   onClose: () => void;
   onCreate: (
@@ -46,6 +47,7 @@ export function CreateAgentSessionModal({
   open,
   projectName,
   members = [],
+  leadMember,
   t,
   onClose,
   onCreate,
@@ -55,7 +57,7 @@ export function CreateAgentSessionModal({
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [expanded, setExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const mainAgent = members[0];
+  const mainAgent = leadMember === undefined ? members[0] : leadMember;
   const selectableMembers =
     taskMode === 'workflow' ? (mainAgent ? [mainAgent] : []) : members;
   const selectedMember =

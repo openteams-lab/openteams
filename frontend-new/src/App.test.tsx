@@ -21,6 +21,7 @@ const check = (label: string, cond: boolean, detail?: unknown) => {
 console.log("App ProjectSidebar wiring");
 
 const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+const legacyDefaultMemberFlag = ["is", "default"].join("_");
 const projectSidebarUsages = source.match(/<ProjectSidebar\b/g) ?? [];
 const sidebarPropsMatches =
   source.match(/\{\.\.\.projectSidebarProps\}/g) ?? [];
@@ -154,6 +155,31 @@ check(
 check(
   "passes workspace members into create-agent modal",
   source.includes("members={members}"),
+  source,
+);
+check(
+  "passes project lead agent into create-agent modal",
+  source.includes("leadMember={leadMember}"),
+  source,
+);
+check(
+  "workflow session creation uses lead role then first agent rather than default member",
+  source.includes('member.role === "lead"') &&
+    source.includes("ProjectMemberType.agent") &&
+    source.includes("findWorkflowProjectAgent") &&
+    source.includes("??") &&
+    !source.includes(`pm.${legacyDefaultMemberFlag}`) &&
+    !source.includes(`find((pm) => pm.${legacyDefaultMemberFlag})`),
+  source,
+);
+check(
+  "workflow member display uses project member or agent name instead of ids",
+  source.includes("workflowProjectAgent.member_name?.trim()") &&
+    source.includes("agent?.name?.trim()") &&
+    source.includes("avatar: monogramFromName(displayName)") &&
+    source.includes("id: workflowProjectAgent.id") &&
+    !source.includes("workflowProjectAgent.agent_id ?? 'lead'") &&
+    !source.includes("monogramFromName(rawName)"),
   source,
 );
 check(

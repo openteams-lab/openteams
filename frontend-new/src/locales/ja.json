@@ -402,6 +402,7 @@
   "agents.filter.available": "利用可能",
   "agents.filter.error": "エラー",
   "agents.filter.notInstalled": "未インストール",
+  "agents.breadcrumb.system": "システム",
   "agents.status.available": "利用可能",
   "agents.status.error": "エラー",
   "agents.status.notInstalled": "未インストール",
@@ -714,5 +715,18 @@
   "issue.linkDialog.toast.repoLinked.message": "{repoName} をこのプロジェクトにリンクしました。",
   "issue.linkDialog.toast.repoLinked.title": "リポジトリをリンクしました",
   "issue.linkDialog.toast.repoUnlinked.message": "{repoName} をこのプロジェクトから切断しました。",
-  "issue.linkDialog.toast.repoUnlinked.title": "リポジトリのリンクを解除しました"
+  "issue.linkDialog.toast.repoUnlinked.title": "リポジトリのリンクを解除しました",
+  "issue.importDialog.action.import": "作業項目としてインポート",
+  "issue.importDialog.action.refresh": "更新",
+  "issue.importDialog.empty": "GitHub issue が見つかりません。",
+  "issue.importDialog.error.noLinkedRepo": "issue をインポートする前に GitHub リポジトリをリンクしてください。",
+  "issue.importDialog.loading": "GitHub issue を読み込み中...",
+  "issue.importDialog.notice.linkRepoFirst": "issue をインポートする前に GitHub リポジトリをリンクしてください。",
+  "issue.importDialog.notice.opened": "GitHub issue インポートを開きました",
+  "issue.importDialog.searchPlaceholder": "GitHub issue を検索...",
+  "issue.importDialog.status.imported": "インポート済み",
+  "issue.importDialog.status.importing": "インポート中...",
+  "issue.importDialog.title": "GitHub issue をインポート",
+  "issue.importDialog.toast.imported.message": "#{number} をプロジェクト作業項目としてインポートしました。",
+  "issue.importDialog.toast.imported.title": "Issue をインポートしました"
 }

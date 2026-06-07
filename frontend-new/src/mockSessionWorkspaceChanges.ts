@@ -207,7 +207,15 @@ export const mockSessionWorkspaceChanges: Record<
       ],
       added: [],
       deleted: [],
-      untracked: [{ path: 'dist/index.html' }],
+      untracked: [
+        {
+          path: 'dist/index.html',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+      ],
     },
   },
 };

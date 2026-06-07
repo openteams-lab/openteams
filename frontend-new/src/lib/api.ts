@@ -1218,6 +1218,19 @@ export const projectGithubApi = {
     );
     return handleApiResponse<GitHubIssueDetail, GitHubErrorData>(r);
   },
+  importIssue: async (
+    projectId: string,
+    data: {
+      repo_integration_id: string;
+      number: number;
+    },
+  ): Promise<ProjectWorkItemDetailResponse> => {
+    const r = await makeRequest(
+      `/api/projects/${encodeURIComponent(projectId)}/github/issues/import`,
+      { method: "POST", body: jsonBody(data) },
+    );
+    return handleApiResponse<ProjectWorkItemDetailResponse, GitHubErrorData>(r);
+  },
   refreshIssue: async (
     projectId: string,
     repoIntegrationId: string,

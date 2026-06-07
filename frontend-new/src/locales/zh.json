@@ -462,6 +462,7 @@
   "agents.filter.available": "可用",
   "agents.filter.error": "错误",
   "agents.filter.notInstalled": "未安装",
+  "agents.breadcrumb.system": "系统",
   "agents.status.available": "可用",
   "agents.status.error": "错误",
   "agents.status.notInstalled": "未安装",
@@ -774,5 +775,18 @@
   "issue.linkDialog.toast.repoLinked.message": "{repoName} 已关联到此项目。",
   "issue.linkDialog.toast.repoLinked.title": "仓库已关联",
   "issue.linkDialog.toast.repoUnlinked.message": "{repoName} 已从此项目解除关联。",
-  "issue.linkDialog.toast.repoUnlinked.title": "仓库已解除关联"
+  "issue.linkDialog.toast.repoUnlinked.title": "仓库已解除关联",
+  "issue.importDialog.action.import": "导入为工作项",
+  "issue.importDialog.action.refresh": "刷新",
+  "issue.importDialog.empty": "未找到 GitHub issue。",
+  "issue.importDialog.error.noLinkedRepo": "导入 issue 前请先关联 GitHub 仓库。",
+  "issue.importDialog.loading": "正在加载 GitHub issue...",
+  "issue.importDialog.notice.linkRepoFirst": "导入 issue 前请先关联 GitHub 仓库。",
+  "issue.importDialog.notice.opened": "已打开 GitHub issue 导入",
+  "issue.importDialog.searchPlaceholder": "搜索 GitHub issue...",
+  "issue.importDialog.status.imported": "已导入",
+  "issue.importDialog.status.importing": "导入中...",
+  "issue.importDialog.title": "导入 GitHub issue",
+  "issue.importDialog.toast.imported.message": "已将 #{number} 导入为项目工作项。",
+  "issue.importDialog.toast.imported.title": "Issue 已导入"
 }

@@ -196,7 +196,7 @@ pub struct WorkspaceChanges {
     pub modified: Vec<WorkspaceChangedFile>,
     pub added: Vec<WorkspaceChangedFile>,
     pub deleted: Vec<WorkspacePathEntry>,
-    pub untracked: Vec<WorkspacePathEntry>,
+    pub untracked: Vec<WorkspaceChangedFile>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -331,7 +331,9 @@ fn build_workspace_changes(
         }
 
         if untracked_paths.contains(&path) {
-            changes.untracked.push(WorkspacePathEntry { path });
+            changes
+                .untracked
+                .push(diff_to_workspace_changed_file(diff, path, include_diff));
             continue;
         }
 
@@ -1968,7 +1970,7 @@ mod tests {
     }
 
     #[test]
-    fn build_workspace_changes_splits_untracked_from_added() {
+    fn build_workspace_changes_keeps_untracked_diff_payloads() {
         let changes = build_workspace_changes(
             vec![
                 Diff {
@@ -2032,11 +2034,17 @@ mod tests {
                 path: "src/old.ts".to_string()
             }]
         );
-        assert_eq!(
-            changes.untracked,
-            vec![WorkspacePathEntry {
-                path: "tmp/debug.log".to_string()
-            }]
+        assert_eq!(changes.untracked.len(), 1);
+        assert_eq!(changes.untracked[0].path, "tmp/debug.log");
+        assert_eq!(changes.untracked[0].additions, 1);
+        assert_eq!(changes.untracked[0].deletions, 0);
+        assert!(changes.untracked[0].has_diff);
+        assert!(
+            changes.untracked[0]
+                .unified_diff
+                .as_deref()
+                .unwrap_or_default()
+                .contains("+debug")
         );
     }
 
@@ -2111,11 +2119,16 @@ mod tests {
                 .iter()
                 .all(|entry| entry.path != "outside.txt")
         );
-        assert_eq!(
-            changes.untracked,
-            vec![WorkspacePathEntry {
-                path: "untracked.txt".to_string()
-            }]
+        assert_eq!(changes.untracked.len(), 1);
+        assert_eq!(changes.untracked[0].path, "untracked.txt");
+        assert_eq!(changes.untracked[0].additions, 1);
+        assert!(changes.untracked[0].has_diff);
+        assert!(
+            changes.untracked[0]
+                .unified_diff
+                .as_deref()
+                .unwrap_or_default()
+                .contains("+untracked")
         );
     }
 
