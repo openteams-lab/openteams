@@ -1,5 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { ShieldCheck, Users } from "lucide-react";
+import {
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { ChevronRight, Flame, ShieldCheck, Star } from "lucide-react";
 import type { DropdownSelectOption } from "@/components/DropdownSelect";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import {
@@ -26,7 +31,10 @@ import {
   getRuntimeDisplayState,
 } from "./agent-runtime/agentRuntimeViewModel";
 import { TeamConfigTabs } from "./team/TeamConfigTabs";
-import { TeamMemberSidebar } from "./team/TeamMemberSidebar";
+import {
+  TeamAddMemberButton,
+  TeamMemberSidebar,
+} from "./team/TeamMemberSidebar";
 import {
   buildSessionAgentLookup,
   defaultOptionId,
@@ -88,6 +96,47 @@ const createReasoningOptions = (
         : t("teamPage.options.reasoningEffort"),
   })),
 ];
+
+function TeamHeader({
+  actions,
+  t,
+}: {
+  actions?: ReactNode;
+  t: TranslateFn;
+}) {
+  return (
+    <header className="flex h-[49px] shrink-0 items-center justify-between border-b border-[var(--hairline)] bg-[var(--surface-1)] px-[29px]">
+      <nav
+        aria-label="Breadcrumb"
+        className="flex min-w-0 items-center gap-[7px]"
+      >
+        <span className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full bg-[#f15b1a] text-[#0b0b0c]">
+          <Flame aria-hidden="true" className="h-[11px] w-[11px]" />
+        </span>
+        <span className="truncate text-[16px] font-semibold leading-none text-[var(--ink)]">
+          Openteams
+        </span>
+        <ChevronRight
+          aria-hidden="true"
+          className="h-[15px] w-[15px] shrink-0 text-[#8f9298]"
+          strokeWidth={2.4}
+        />
+        <h1 className="truncate text-[16px] font-semibold leading-none text-[var(--ink)]">
+          {t("page.team")}
+        </h1>
+        <button
+          type="button"
+          className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+          aria-label="Favorite team page"
+        >
+          <Star aria-hidden="true" className="h-[15px] w-[15px]" />
+        </button>
+      </nav>
+
+      <div className="flex min-w-0 items-center">{actions}</div>
+    </header>
+  );
+}
 
 const isObjectRecord = (value: unknown): value is Record<string, JsonValue> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -758,121 +807,116 @@ export function TeamPage() {
 
   if (!selectedProjectId) {
     return (
-      <div className="mx-auto max-w-6xl rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)] p-4 text-[14px] text-[var(--ink-subtle)]">
-        {t("teamPage.empty.noProject")}
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--canvas)] text-[var(--ink)]">
+        <TeamHeader t={t} />
+        <div className="p-[19px] text-[14px] text-[var(--ink-subtle)]">
+          {t("teamPage.empty.noProject")}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-2)] text-[var(--ink)]">
-      <header className="shrink-0 border-b border-[var(--hairline)] bg-[var(--surface-2)] px-4 py-4 md:px-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--primary)]">
-              <Users aria-hidden="true" className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <h1 className="text-[22px] font-semibold leading-[1.15] tracking-[-0.4px] text-[var(--ink)]">
-                {t("teamPage.header.title")}
-              </h1>
-              <p className="mt-1 max-w-[560px] text-[14px] leading-[1.45] text-[var(--ink-subtle)]">
-                {t("teamPage.header.subtitle")}
-              </p>
-            </div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--canvas)] text-[var(--ink)]">
+      <TeamHeader
+        t={t}
+        actions={
+          <TeamAddMemberButton
+            agents={agents}
+            members={currentProjectMembers}
+            saving={saving}
+            onAddMember={addMember}
+            t={t}
+          />
+        }
+      />
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--surface-1)]">
+        {(error || notice) && (
+          <div className="shrink-0 space-y-2 border-b border-[var(--hairline)] p-3">
+            {error && (
+              <div className="flex items-start gap-2 rounded-[8px] border border-red-500/20 bg-red-500/10 p-3 text-[14px] text-red-400">
+                <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {error}
+              </div>
+            )}
+            {notice && (
+              <div className="rounded-[8px] border border-[var(--success)]/30 bg-[var(--success)]/10 p-3 text-[14px] text-[var(--success)]">
+                {notice}
+              </div>
+            )}
           </div>
+        )}
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[minmax(260px,280px)_minmax(0,1fr)]">
+          <aside className="min-h-0 overflow-y-auto border-b border-[var(--hairline)] bg-[var(--surface-1)] ot-scroll-area-styled lg:border-b-0 lg:border-r">
+            <TeamMemberSidebar
+              agents={agents}
+              loading={loading}
+              members={currentProjectMembers}
+              saving={saving}
+              selectedMemberId={selectedMemberId}
+              sessionAgentLookup={sessionAgentLookup}
+              switchingLeadMemberId={switchingLeadMemberId}
+              onSelectMember={setSelectedMemberId}
+              onSetLeadMember={(member) => void setLeadMember(member)}
+              t={t}
+            />
+          </aside>
+
+          <main className="min-h-0 overflow-y-auto bg-[var(--surface-1)] text-[var(--ink)] ot-scroll-area-styled">
+            <TeamConfigTabs
+              allowedSkillIds={allowedSkillIds}
+              capability={capability}
+              configuredMcpServerKeys={configuredMcpServerKeys}
+              isLeader={isLeader}
+              memberName={memberNameValue}
+              memberNamePlaceholder={
+                selectedAgent?.name ?? t("teamPage.form.memberName")
+              }
+              memberDirty={memberDirty}
+              memberSuccess={memberSuccess}
+              mcpApplying={mcpApplying}
+              mcpConfig={mcpConfig}
+              mcpConfigPath={mcpConfigPath}
+              mcpDirty={mcpDirty}
+              mcpError={mcpError}
+              mcpLoading={mcpLoading}
+              mcpServersJson={mcpServersJson}
+              mcpSuccess={mcpSuccess}
+              modelOptions={modelOptions}
+              reasoningOptions={reasoningOptions}
+              roleDefinition={roleDefinition}
+              runnerType={runnerType}
+              runtimeOptions={runtimeOptions}
+              saving={saving}
+              selectedMember={selectedMember}
+              selectedModelValue={selectedModelValue}
+              selectedReasoningValue={selectedReasoningValue}
+              skillLookup={skills}
+              skills={runtimeSkills}
+              skillsError={runtimeSkillsError}
+              skillsLoading={runtimeSkillsLoading}
+              workspacePath={workspacePath}
+              onDiscardMemberChanges={discardMemberChanges}
+              onApplyMcpServers={applyMcpServers}
+              onDiscardMcpChanges={discardMcpChanges}
+              onMcpServersChange={handleMcpServersChange}
+              onSaveMember={saveMember}
+              onToggleMcpServer={toggleMcpServer}
+              setAllowedSkillIds={setAllowedSkillIds}
+              setIsLeader={setIsLeader}
+              setMemberName={setMemberNameValue}
+              setModelName={setModelName}
+              setModelVariant={setModelVariant}
+              setRoleDefinition={setRoleDefinition}
+              setRunnerType={handleRunnerTypeChange}
+              setThinkingEffort={setThinkingEffort}
+              setWorkspacePath={setWorkspacePath}
+              t={t}
+            />
+          </main>
         </div>
-      </header>
-
-      <div className="min-h-0 flex-1 overflow-hidden p-4">
-        <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)]">
-          {(error || notice) && (
-            <div className="shrink-0 space-y-2 border-b border-[var(--hairline)] p-3">
-              {error && (
-                <div className="flex items-start gap-2 rounded-[8px] border border-red-500/20 bg-red-500/10 p-3 text-[14px] text-red-400">
-                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  {error}
-                </div>
-              )}
-              {notice && (
-                <div className="rounded-[8px] border border-[var(--success)]/30 bg-[var(--success)]/10 p-3 text-[14px] text-[var(--success)]">
-                  {notice}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[minmax(260px,280px)_minmax(0,1fr)]">
-            <aside className="min-h-0 overflow-y-auto border-b border-[var(--hairline)] bg-[var(--surface-1)] ot-scroll-area-styled lg:border-b-0 lg:border-r">
-              <TeamMemberSidebar
-                agents={agents}
-                loading={loading}
-                members={currentProjectMembers}
-                saving={saving}
-                selectedMemberId={selectedMemberId}
-                sessionAgentLookup={sessionAgentLookup}
-                switchingLeadMemberId={switchingLeadMemberId}
-                onSelectMember={setSelectedMemberId}
-                onSetLeadMember={(member) => void setLeadMember(member)}
-                onAddMember={addMember}
-                t={t}
-              />
-            </aside>
-
-            <main className="min-h-0 overflow-y-auto bg-[var(--surface-1)] text-[var(--ink)] ot-scroll-area-styled">
-              <TeamConfigTabs
-                allowedSkillIds={allowedSkillIds}
-                capability={capability}
-                configuredMcpServerKeys={configuredMcpServerKeys}
-                isLeader={isLeader}
-                memberName={memberNameValue}
-                memberNamePlaceholder={
-                  selectedAgent?.name ?? t("teamPage.form.memberName")
-                }
-                memberDirty={memberDirty}
-                memberSuccess={memberSuccess}
-                mcpApplying={mcpApplying}
-                mcpConfig={mcpConfig}
-                mcpConfigPath={mcpConfigPath}
-                mcpDirty={mcpDirty}
-                mcpError={mcpError}
-                mcpLoading={mcpLoading}
-                mcpServersJson={mcpServersJson}
-                mcpSuccess={mcpSuccess}
-                modelOptions={modelOptions}
-                reasoningOptions={reasoningOptions}
-                roleDefinition={roleDefinition}
-                runnerType={runnerType}
-                runtimeOptions={runtimeOptions}
-                saving={saving}
-                selectedMember={selectedMember}
-                selectedModelValue={selectedModelValue}
-                selectedReasoningValue={selectedReasoningValue}
-                skillLookup={skills}
-                skills={runtimeSkills}
-                skillsError={runtimeSkillsError}
-                skillsLoading={runtimeSkillsLoading}
-                workspacePath={workspacePath}
-                onDiscardMemberChanges={discardMemberChanges}
-                onApplyMcpServers={applyMcpServers}
-                onDiscardMcpChanges={discardMcpChanges}
-                onMcpServersChange={handleMcpServersChange}
-                onSaveMember={saveMember}
-                onToggleMcpServer={toggleMcpServer}
-                setAllowedSkillIds={setAllowedSkillIds}
-                setIsLeader={setIsLeader}
-                setMemberName={setMemberNameValue}
-                setModelName={setModelName}
-                setModelVariant={setModelVariant}
-                setRoleDefinition={setRoleDefinition}
-                setRunnerType={handleRunnerTypeChange}
-                setThinkingEffort={setThinkingEffort}
-                setWorkspacePath={setWorkspacePath}
-                t={t}
-              />
-            </main>
-          </div>
-        </section>
       </div>
     </div>
   );

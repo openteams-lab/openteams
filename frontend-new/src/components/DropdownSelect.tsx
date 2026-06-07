@@ -25,6 +25,7 @@ interface DropdownSelectBaseProps {
   showSearch?: boolean;
   className?: string;
   panelClassName?: string;
+  panelMinWidth?: number;
   maxPanelHeightClassName?: string;
 }
 
@@ -76,6 +77,7 @@ export function DropdownSelect(props: DropdownSelectProps) {
     showSearch = true,
     className,
     panelClassName,
+    panelMinWidth,
     maxPanelHeightClassName = 'max-h-[160px]',
   } = props;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -102,10 +104,18 @@ export function DropdownSelect(props: DropdownSelectProps) {
     const rect = rootRef.current?.getBoundingClientRect();
     if (!rect) return;
 
+    const panelWidth = panelMinWidth
+      ? Math.max(toOverlayValue(rect.width), panelMinWidth)
+      : toOverlayValue(rect.width);
+    const viewportWidth = toOverlayValue(window.innerWidth);
+    const left = Math.max(
+      8,
+      Math.min(toOverlayValue(rect.left), viewportWidth - panelWidth - 8),
+    );
     setPanelStyle({
-      left: toOverlayValue(rect.left),
+      left,
       top: toOverlayValue(rect.bottom) + 4,
-      width: toOverlayValue(rect.width),
+      width: panelWidth,
     });
   };
 
@@ -133,7 +143,13 @@ export function DropdownSelect(props: DropdownSelectProps) {
       window.removeEventListener('resize', updatePanelPosition);
       window.removeEventListener('scroll', updatePanelPosition, true);
     };
-  }, [appScale.enabled, appScale.portalRoot, appScale.scale, open]);
+  }, [
+    appScale.enabled,
+    appScale.portalRoot,
+    appScale.scale,
+    open,
+    panelMinWidth,
+  ]);
 
   const selectedIds = isMultiple
     ? new Set(props.values)

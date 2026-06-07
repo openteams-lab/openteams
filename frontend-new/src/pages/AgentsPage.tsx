@@ -9,13 +9,14 @@ import {
 import {
   AlertTriangle,
   Bot,
-  Gauge,
+  ChevronRight,
+  Flame,
+  ListFilter,
   Plus,
   RefreshCw,
   Save,
-  Search,
   Settings,
-  Terminal,
+  Star,
   X,
 } from "lucide-react";
 import {
@@ -1098,7 +1099,11 @@ function AgentConfigSidebar({
   };
 
   return (
-    <aside className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-1)]">
+    <aside
+      className={cx(
+        "relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-1)]",
+      )}
+    >
       <header className="shrink-0 border-b border-[var(--hairline)] px-5 py-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-4">
@@ -1263,7 +1268,11 @@ function AgentConfigSidebar({
 
 function AgentConfigEmptyState({ t }: { t: TranslateFn }) {
   return (
-    <aside className="flex h-full min-h-0 flex-col bg-[var(--surface-1)]">
+    <aside
+      className={cx(
+        "flex h-full min-h-0 flex-col bg-[var(--surface-1)]",
+      )}
+    >
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center">
         <span className="flex h-10 w-10 items-center justify-center rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-tertiary)]">
           <Settings className="h-5 w-5" />
@@ -1285,7 +1294,6 @@ export function AgentsPage() {
   const { t, showToast } = useWorkspace();
   const [runners, setRunners] = useState<AgentRuntimeStatus[]>([]);
   const runnersRef = useRef<AgentRuntimeStatus[]>([]);
-  const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<AgentRuntimeFilter>("all");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1373,8 +1381,8 @@ export function AgentsPage() {
 
   const filteredRunners = useMemo(
     () =>
-      sortRunnersByAvailability(filterRuntimeRunners(runners, query, filter)),
-    [filter, query, runners],
+      sortRunnersByAvailability(filterRuntimeRunners(runners, "", filter)),
+    [filter, runners],
   );
 
   const loadRuntime = useCallback(
@@ -1510,125 +1518,127 @@ export function AgentsPage() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-2)] text-[var(--ink)]">
-      <header className="shrink-0 border-b border-[var(--hairline)] bg-[var(--surface-2)] px-4 py-4 md:px-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--primary)]">
-              <Terminal className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <h1 className="text-[22px] font-semibold leading-[1.15] tracking-[-0.4px] text-[var(--ink)]">
-                {t("agents.page.title")}
-              </h1>
-              <p className="mt-1 max-w-[560px] text-[14px] leading-[1.45] text-[var(--ink-subtle)]">
-                {t("agents.page.subtitle")}
-              </p>
-            </div>
-          </div>
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center lg:w-auto">
-            <div className="relative min-w-[220px] sm:w-[280px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--ink-tertiary)]" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t("agents.search.placeholder")}
-                className="h-9 w-full rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)] pl-8 pr-3 text-[14px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)]"
-              />
-            </div>
-            <DropdownSelect
-              value={filter}
-              options={statusFilterOptions}
-              showSearch={false}
-              triggerIcon={
-                <Gauge className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
-              }
-              className="min-w-[170px] [&>button]:h-9 [&>button]:bg-[var(--surface-1)] [&>button]:py-0"
-              panelClassName="max-w-none"
-              maxPanelHeightClassName="max-h-[220px]"
-              onChange={(value) => setFilter(value as AgentRuntimeFilter)}
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--canvas)] text-[var(--ink)]">
+      <header className="flex h-[49px] shrink-0 items-center justify-between border-b border-[var(--hairline)] bg-[var(--surface-1)] px-[29px]">
+        <nav
+          aria-label="Breadcrumb"
+          className="flex min-w-0 items-center gap-[7px]"
+        >
+          <span className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full bg-[#f15b1a] text-[#0b0b0c]">
+            <Flame aria-hidden="true" className="h-[11px] w-[11px]" />
+          </span>
+          <span className="truncate text-[16px] font-semibold leading-none text-[var(--ink)]">
+            Openteams
+          </span>
+          <ChevronRight
+            aria-hidden="true"
+            className="h-[15px] w-[15px] shrink-0 text-[#8f9298]"
+            strokeWidth={2.4}
+          />
+          <h1 className="truncate text-[16px] font-semibold leading-none text-[var(--ink)]">
+            {t("agents.page.title")}
+          </h1>
+          <button
+            type="button"
+            className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+            aria-label="Favorite agents page"
+          >
+            <Star aria-hidden="true" className="h-[15px] w-[15px]" />
+          </button>
+        </nav>
+
+        <div className="flex min-w-0 items-center gap-2">
+          <DropdownSelect
+            value={filter}
+            options={statusFilterOptions}
+            showSearch={false}
+            triggerIcon={
+              <ListFilter className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+            }
+            className="w-7 [&>button]:h-7 [&>button]:w-7 [&>button]:justify-center [&>button]:gap-0 [&>button]:rounded-full [&>button]:border-[var(--hairline)] [&>button]:bg-[var(--surface-2)] [&>button]:p-0 [&>button>span]:hidden [&>button>svg:last-child]:hidden"
+            panelClassName="max-w-none"
+            panelMinWidth={180}
+            maxPanelHeightClassName="max-h-[220px]"
+            onChange={(value) => setFilter(value as AgentRuntimeFilter)}
+          />
+          <button
+            type="button"
+            onClick={() => void handleRefresh()}
+            disabled={refreshing}
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label={refreshing ? t("agents.refreshing") : t("agents.refresh")}
+            title={refreshing ? t("agents.refreshing") : t("agents.refresh")}
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
             />
-            <button
-              type="button"
-              onClick={() => void handleRefresh()}
-              disabled={refreshing}
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-[8px] bg-[var(--primary)] px-[14px] text-[14px] font-medium text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
-              />
-              {refreshing ? t("agents.refreshing") : t("agents.refresh")}
-            </button>
-          </div>
+          </button>
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-hidden p-4">
-        <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)]">
-          {(loadError || notice) && (
-            <div className="shrink-0 space-y-2 border-b border-[var(--hairline)] p-3">
-              {loadError && (
-                <div className="rounded-[8px] border border-red-500/30 bg-red-500/10 p-3 text-[14px] text-red-300">
-                  <span className="inline-flex items-center gap-2 font-medium">
-                    <AlertTriangle className="h-4 w-4" />
-                    {t("agents.load.failedTitle")}
-                  </span>
-                  <p className="mt-1 text-red-300/80">{loadError}</p>
-                </div>
-              )}
-              {notice && (
-                <div className="rounded-[8px] border border-[var(--primary)]/30 bg-[var(--primary-tint)] p-3 text-[14px] text-[var(--primary)]">
-                  {notice}
-                </div>
-              )}
-            </div>
-          )}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--surface-1)]">
+        {(loadError || notice) && (
+          <div className="shrink-0 space-y-2 border-b border-[var(--hairline)] p-3">
+            {loadError && (
+              <div className="rounded-[8px] border border-red-500/30 bg-red-500/10 p-3 text-[14px] text-red-300">
+                <span className="inline-flex items-center gap-2 font-medium">
+                  <AlertTriangle className="h-4 w-4" />
+                  {t("agents.load.failedTitle")}
+                </span>
+                <p className="mt-1 text-red-300/80">{loadError}</p>
+              </div>
+            )}
+            {notice && (
+              <div className="rounded-[8px] border border-[var(--primary)]/30 bg-[var(--primary-tint)] p-3 text-[14px] text-[var(--primary)]">
+                {notice}
+              </div>
+            )}
+          </div>
+        )}
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(640px,750px)]">
-            <div className="min-h-0 flex-1 overflow-y-auto ot-scroll-area-styled">
-              {loading ? (
-                <div className="space-y-0">
-                  {[0, 1, 2, 3, 4].map((item) => (
-                    <div
-                      key={item}
-                      className="h-[58px] animate-pulse border-b border-[var(--hairline)] bg-[var(--surface-2)] last:border-b-0"
-                    />
-                  ))}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(640px,750px)]">
+          <div className="min-h-0 flex-1 overflow-y-auto ot-scroll-area-styled">
+            {loading ? (
+              <div className="space-y-0">
+                {[0, 1, 2, 3, 4].map((item) => (
+                  <div
+                    key={item}
+                    className="h-[58px] animate-pulse border-b border-[var(--hairline)] bg-[var(--surface-2)] last:border-b-0"
+                  />
+                ))}
+              </div>
+            ) : filteredRunners.length === 0 ? (
+              <div className="flex min-h-[240px] flex-col items-center justify-center text-center">
+                <Bot className="h-8 w-8 text-[var(--ink-tertiary)]" />
+                <h3 className="mt-3 text-[14px] font-medium text-[var(--ink)]">
+                  {t("agents.empty.title")}
+                </h3>
+                <p className="mt-1 max-w-sm text-[14px] leading-[1.5] text-[var(--ink-subtle)]">
+                  {t("agents.empty.desc")}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <div className="hidden grid-cols-[minmax(210px,1.15fr)_128px_minmax(220px,1.85fr)_72px] border-b border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2 text-[14px] font-medium text-[var(--ink-tertiary)] md:grid">
+                  <span>{t("agents.table.agent")}</span>
+                  <span>{t("agents.table.status")}</span>
+                  <span>{t("agents.table.models")}</span>
+                  <span className="text-right">
+                    {t("agents.table.actions")}
+                  </span>
                 </div>
-              ) : filteredRunners.length === 0 ? (
-                <div className="flex min-h-[240px] flex-col items-center justify-center text-center">
-                  <Bot className="h-8 w-8 text-[var(--ink-tertiary)]" />
-                  <h3 className="mt-3 text-[14px] font-medium text-[var(--ink)]">
-                    {t("agents.empty.title")}
-                  </h3>
-                  <p className="mt-1 max-w-sm text-[14px] leading-[1.5] text-[var(--ink-subtle)]">
-                    {t("agents.empty.desc")}
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <div className="sticky top-0 z-10 hidden grid-cols-[minmax(210px,1.15fr)_128px_minmax(220px,1.85fr)_72px] border-b border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2 text-[14px] font-medium text-[var(--ink-tertiary)] md:grid">
-                    <span>{t("agents.table.agent")}</span>
-                    <span>{t("agents.table.status")}</span>
-                    <span>{t("agents.table.models")}</span>
-                    <span className="text-right">
-                      {t("agents.table.actions")}
-                    </span>
-                  </div>
-                  {filteredRunners.map((runner) => (
-                    <AgentRow
-                      key={runner.runner_type}
-                      runner={runner}
-                      selected={
-                        selectedRunner?.runner_type === runner.runner_type
-                      }
-                      onOpenConfig={() => handleOpenConfig(runner)}
-                      t={t}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+                {filteredRunners.map((runner) => (
+                  <AgentRow
+                    key={runner.runner_type}
+                    runner={runner}
+                    selected={selectedRunner?.runner_type === runner.runner_type}
+                    onOpenConfig={() => handleOpenConfig(runner)}
+                    t={t}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
 
             <div className="min-h-[360px] overflow-hidden border-t border-[var(--hairline)] lg:min-h-0 lg:border-l lg:border-t-0">
               {selectedRunner ? (
@@ -1647,7 +1657,6 @@ export function AgentsPage() {
               )}
             </div>
           </div>
-        </section>
       </div>
     </div>
   );

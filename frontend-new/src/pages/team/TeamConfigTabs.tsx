@@ -39,7 +39,7 @@ import {
   type ProjectMemberWithExecution,
 } from "./teamUtils";
 
-type MemberConfigTab = "config" | "mcp";
+type MemberConfigTab = "config" | "skills" | "mcp";
 
 type TranslateFn = (
   key: string,
@@ -111,11 +111,11 @@ function ConfigSection({
   return (
     <section className={cx("flex flex-col pb-8", className)}>
       <div className="mb-3 px-1">
-        <h3 className="text-[16px] font-semibold leading-[1.25] tracking-[-0.1px] text-[var(--ink)]">
+        <h3 className="text-[17px] font-semibold leading-[1.2] text-[var(--ink)]">
           {title}
         </h3>
         {description && (
-          <p className="mt-1 max-w-[680px] text-[14px] leading-[1.5] text-[var(--ink-subtle)]">
+          <p className="mt-1 max-w-[680px] text-[13px] leading-[1.5] text-[var(--ink-subtle)]">
             {description}
           </p>
         )}
@@ -144,11 +144,11 @@ function SettingRow({
   return (
     <div className="grid gap-3 md:grid-cols-[minmax(180px,260px)_minmax(0,1fr)] md:items-start md:gap-8">
       <div className="min-w-0">
-        <p className="text-[14px] font-medium leading-[1.35] text-[var(--ink)]">
+        <p className="text-[13px] font-semibold leading-[1.35] text-[var(--ink)]">
           {title}
         </p>
         {description && (
-          <p className="mt-1 text-[13px] leading-[1.45] text-[var(--ink-subtle)]">
+          <p className="mt-1 text-[12px] leading-[1.5] text-[var(--ink-subtle)]">
             {description}
           </p>
         )}
@@ -170,11 +170,11 @@ function SkillSettingBlock({
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-[14px] font-medium leading-[1.35] text-[var(--ink)]">
+        <p className="text-[13px] font-semibold leading-[1.35] text-[var(--ink)]">
           {title}
         </p>
         {description && (
-          <p className="mt-1 text-[13px] leading-[1.45] text-[var(--ink-subtle)]">
+          <p className="mt-1 text-[12px] leading-[1.5] text-[var(--ink-subtle)]">
             {description}
           </p>
         )}
@@ -291,7 +291,7 @@ function SkillsSection({
             )}
           >
             <div className="min-w-0">
-              <div className="grid gap-2 md:grid-cols-2">
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {skills.map((skill) => {
                   const selected = selectedSkillIds.has(skill.id);
                   return (
@@ -307,19 +307,22 @@ function SkillsSection({
                         }
                       }}
                       className={cx(
-                        "flex min-h-[112px] min-w-0 cursor-pointer flex-col overflow-hidden rounded-[8px] border bg-[var(--surface-3)] p-3 text-left transition-colors",
+                        "flex min-h-[64px] min-w-0 cursor-pointer overflow-hidden rounded-[8px] border bg-[var(--surface-3)] p-2.5 text-left transition-colors",
                         selected
                           ? "border-[var(--primary)]/35 bg-[var(--primary-tint)]"
                           : "border-[var(--hairline)] hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-4)]",
                       )}
                     >
-                      <div className="flex min-w-0 items-start gap-3">
-                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-[var(--mono-border)] bg-[var(--mono-bg)] text-[var(--ink-muted)]">
+                      <div className="flex min-w-0 flex-1 items-start gap-2">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-[var(--mono-border)] bg-[var(--mono-bg)] text-[var(--ink-muted)]">
                           <FolderGit2 className="h-3.5 w-3.5" />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[14px] font-medium text-[var(--ink)]">
+                          <p className="truncate text-[13px] font-medium text-[var(--ink)]">
                             {skill.name}
+                          </p>
+                          <p className="mt-1 truncate text-[12px] leading-[1.35] text-[var(--ink-subtle)]">
+                            {skill.description || t("teamPage.fallback.noDesc")}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">
@@ -330,20 +333,22 @@ function SkillsSection({
                               toggleSkill(skill);
                             }}
                             className={cx(
-                              "inline-flex h-7 items-center gap-1 rounded-[8px] border px-2 text-[12px] font-medium transition-colors",
+                              "inline-flex h-7 w-7 items-center justify-center rounded-[8px] border transition-colors",
                               selected
                                 ? "border-[var(--primary)]/35 bg-[var(--primary-tint)] text-[var(--primary)]"
                                 : "border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-subtle)] hover:text-[var(--ink)]",
                             )}
+                            aria-label={
+                              selected
+                                ? t("teamPage.action.added")
+                                : t("teamPage.action.add")
+                            }
                           >
                             {selected ? (
                               <Check className="h-3.5 w-3.5" />
                             ) : (
                               <PackagePlus className="h-3.5 w-3.5" />
                             )}
-                            {selected
-                              ? t("teamPage.action.added")
-                              : t("teamPage.action.add")}
                           </button>
                           <button
                             type="button"
@@ -366,18 +371,6 @@ function SkillsSection({
                           </button>
                         </div>
                       </div>
-
-                      <div className="mt-2 min-w-0">
-                        <p className="line-clamp-2 overflow-hidden text-[13px] leading-[1.45] text-[var(--ink-subtle)]">
-                          {skill.description || t("teamPage.fallback.noDesc")}
-                        </p>
-                      </div>
-
-                      {skill.category && (
-                        <span className="mt-2 block truncate font-mono text-[11px] text-[var(--ink-tertiary)]">
-                          {skill.category}
-                        </span>
-                      )}
                     </div>
                   );
                 })}
@@ -414,10 +407,10 @@ function SkillMarkdownPanel({
     <div className="min-w-0 rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-3)] p-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-[15px] font-medium text-[var(--ink)]">
+          <p className="truncate text-[13px] font-medium text-[var(--ink)]">
             {skill.name}
           </p>
-          <p className="mt-1 text-[13px] leading-[1.45] text-[var(--ink-subtle)]">
+          <p className="mt-1 text-[12px] leading-[1.45] text-[var(--ink-subtle)]">
             {skill.description || t("teamPage.fallback.noDesc")}
           </p>
         </div>
@@ -442,18 +435,70 @@ function SkillMarkdownPanel({
           ))}
         </div>
       )}
-      <div className="mt-4 max-h-[680px] overflow-auto rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] p-4 text-[13px] leading-relaxed text-[var(--ink-muted)] ot-scroll-area-styled">
+      <div className="mt-4 max-h-[420px] overflow-auto rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] p-4 text-[12px] leading-relaxed text-[var(--ink-muted)] ot-scroll-area-styled">
         <AgentMarkdown
           content={skill.content || t("teamPage.fallback.noSkillContent")}
-          fontSize={13}
+          fontSize={12}
         />
       </div>
     </div>
   );
 }
 
+function MemberSaveActions({
+  dirty,
+  onDiscardChanges,
+  onSaveChanges,
+  saving,
+  success,
+  t,
+}: {
+  dirty: boolean;
+  onDiscardChanges: () => void;
+  onSaveChanges: () => void;
+  saving: boolean;
+  success: boolean;
+  t: TranslateFn;
+}) {
+  if (!dirty && !success && !saving) return null;
+
+  return (
+    <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-[var(--hairline)] bg-[var(--surface-1)] py-4">
+      {dirty && !success && (
+        <button
+          type="button"
+          onClick={onDiscardChanges}
+          disabled={saving}
+          className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] px-3.5 text-[14px] font-medium text-[var(--ink-subtle)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <RotateCcw className="h-4 w-4" />
+          {t("teamPage.action.discard")}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => void onSaveChanges()}
+        disabled={saving || success}
+        className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[var(--primary)] px-3.5 text-[14px] font-semibold text-[var(--on-primary)] transition-colors hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {success ? (
+          <Check className="h-4 w-4" />
+        ) : saving ? (
+          <RefreshCw className="h-4 w-4 animate-spin" />
+        ) : (
+          <Save className="h-4 w-4" />
+        )}
+        {success
+          ? t("teamPage.action.saved")
+          : saving
+            ? t("teamPage.action.saving")
+            : t("teamPage.action.saveChanges")}
+      </button>
+    </div>
+  );
+}
+
 function ConfigTab({
-  allowedSkillIds,
   capability,
   isLeader,
   memberDirty,
@@ -466,14 +511,9 @@ function ConfigTab({
   saving,
   selectedModelValue,
   selectedReasoningValue,
-  skillLookup,
-  skills,
-  skillsError,
-  skillsLoading,
   workspacePath,
   onDiscardMemberChanges,
   onSaveMember,
-  setAllowedSkillIds,
   setIsLeader,
   setMemberName,
   setModelName,
@@ -501,6 +541,12 @@ function ConfigTab({
   | "onMcpServersChange"
   | "onToggleMcpServer"
   | "selectedMember"
+  | "allowedSkillIds"
+  | "setAllowedSkillIds"
+  | "skillLookup"
+  | "skills"
+  | "skillsError"
+  | "skillsLoading"
 >) {
   const roleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -650,6 +696,48 @@ function ConfigTab({
         </ConfigSection>
       </div>
 
+      <MemberSaveActions
+        dirty={memberDirty}
+        saving={saving}
+        success={memberSuccess}
+        onDiscardChanges={onDiscardMemberChanges}
+        onSaveChanges={onSaveMember}
+        t={t}
+      />
+    </div>
+  );
+}
+
+function SkillsTab({
+  allowedSkillIds,
+  memberDirty,
+  memberSuccess,
+  onDiscardMemberChanges,
+  onSaveMember,
+  saving,
+  setAllowedSkillIds,
+  skillLookup,
+  skills,
+  skillsError,
+  skillsLoading,
+  t,
+}: Pick<
+  TeamConfigTabsProps,
+  | "allowedSkillIds"
+  | "memberDirty"
+  | "memberSuccess"
+  | "onDiscardMemberChanges"
+  | "onSaveMember"
+  | "saving"
+  | "setAllowedSkillIds"
+  | "skillLookup"
+  | "skills"
+  | "skillsError"
+  | "skillsLoading"
+  | "t"
+>) {
+  return (
+    <div className="space-y-0">
       <ConfigSection
         title={t("teamPage.skills.title")}
         description={t("teamPage.skills.desc")}
@@ -665,40 +753,14 @@ function ConfigTab({
         />
       </ConfigSection>
 
-      {(memberDirty || memberSuccess || saving) && (
-        <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-[var(--hairline)] bg-[var(--surface-1)] py-4">
-          {memberDirty && !memberSuccess && (
-            <button
-              type="button"
-              onClick={onDiscardMemberChanges}
-              disabled={saving}
-              className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] px-3.5 text-[14px] font-medium text-[var(--ink-subtle)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RotateCcw className="h-4 w-4" />
-              {t("teamPage.action.discard")}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => void onSaveMember()}
-            disabled={saving || memberSuccess}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[var(--primary)] px-3.5 text-[14px] font-semibold text-[var(--on-primary)] transition-colors hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {memberSuccess ? (
-              <Check className="h-4 w-4" />
-            ) : saving ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            {memberSuccess
-              ? t("teamPage.action.saved")
-              : saving
-                ? t("teamPage.action.saving")
-                : t("teamPage.action.saveChanges")}
-          </button>
-        </div>
-      )}
+      <MemberSaveActions
+        dirty={memberDirty}
+        saving={saving}
+        success={memberSuccess}
+        onDiscardChanges={onDiscardMemberChanges}
+        onSaveChanges={onSaveMember}
+        t={t}
+      />
     </div>
   );
 }
@@ -936,7 +998,16 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
   const statusKind = dirtyNotice ? "dirty" : savedNotice ? "saved" : null;
   const tabItems = useMemo(
     () => [
-      { id: "config" as const, label: t("teamPage.tabs.config"), icon: Settings },
+      {
+        id: "config" as const,
+        label: t("teamPage.tabs.config"),
+        icon: Settings,
+      },
+      {
+        id: "skills" as const,
+        label: t("teamPage.tabs.skills"),
+        icon: FolderGit2,
+      },
       { id: "mcp" as const, label: t("teamPage.tabs.mcp"), icon: Server },
     ],
     [t],
@@ -999,6 +1070,21 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
       <div className="min-h-0 flex-1 px-5 py-5">
         {activeTab === "config" ? (
           <ConfigTab {...props} />
+        ) : activeTab === "skills" ? (
+          <SkillsTab
+            allowedSkillIds={props.allowedSkillIds}
+            memberDirty={props.memberDirty}
+            memberSuccess={props.memberSuccess}
+            saving={props.saving}
+            skillLookup={props.skillLookup}
+            skills={props.skills}
+            skillsError={props.skillsError}
+            skillsLoading={props.skillsLoading}
+            onDiscardMemberChanges={props.onDiscardMemberChanges}
+            onSaveMember={props.onSaveMember}
+            setAllowedSkillIds={props.setAllowedSkillIds}
+            t={t}
+          />
         ) : (
           <McpConfigTab
             mcpApplying={props.mcpApplying}

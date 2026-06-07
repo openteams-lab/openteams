@@ -128,6 +128,12 @@ export type GitHubDeviceFlowPollResponse = { status: GitHubDeviceFlowPollStatus,
 
 export type GitHubDeviceFlowPollStatus = "pending" | "slow_down" | "authorized" | "denied" | "expired" | "error";
 
+export type GitHubOAuthStartResponse = { flow_id: string, authorization_url: string, expires_at: Date, };
+
+export type GitHubOAuthStatusResponse = { status: GitHubOAuthFlowStatus, account: GitHubAccount | null, error: string | null, };
+
+export type GitHubOAuthFlowStatus = "pending" | "authorized" | "denied" | "expired" | "error";
+
 export type GitHubApiErrorData = { code: string, message: string, retry_after: Date | null, last_synced_at: Date | null, stale: boolean, };
 
 export type GitHubIssueSummary = { number: bigint, node_id: string, title: string, state: string, url: string, author: string | null, labels: Array<string>, assignees: Array<string>, updated_at: Date, last_synced_at: Date | null, stale: boolean, work_item_id: string | null, };
@@ -595,6 +601,12 @@ export type ProjectReposResponse = { repos: Array<Repo>, };
 export type ProjectStatsResponse = { stats: Array<ProjectStats>, };
 
 export type GitHubDevicePollRequest = { device_code: string, };
+
+export type GitHubOAuthStatusQuery = { flow_id: string, };
+
+export type IssueIntegrationProvider = { id: string, name: string, supported: boolean, status: string, };
+
+export type ProjectIssueIntegrationsResponse = { providers: Array<IssueIntegrationProvider>, github_account: GitHubAccount | null, github_repositories: Array<GitHubRepositorySummary>, linked_repositories: Array<RepoIntegration>, primary_repository: RepoIntegration | null, };
 
 export type GitHubIssueQuery = { repo_integration_id: string, q: string | null, };
 

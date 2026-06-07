@@ -24,11 +24,13 @@ use db::models::{
     project_work_item_external_link::{
         CreateProjectWorkItemExternalLink, ProjectWorkItemExternalLink,
     },
-    repo_integration::{RepoIntegration, UpdateRepoIntegration},
+    repo_integration::{
+        RepoIntegration, RepoIntegrationRole, RepoIntegrationSyncStatus, UpdateRepoIntegration,
+    },
 };
 use deployment::Deployment;
 use secrecy::{ExposeSecret, SecretString};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use services::services::{
     github::{
         audit::GitHubAuditService,
@@ -40,8 +42,8 @@ use services::services::{
             GitHubPrService, GitHubRetryPrRequest,
         },
         rest_client::{
-            GitHubApiErrorData, GitHubIssueDetail, GitHubIssueSummary, GitHubRestClient,
-            GitHubRestError,
+            GitHubApiErrorData, GitHubIssueDetail, GitHubIssueSummary, GitHubRepositorySummary,
+            GitHubRestClient, GitHubRestError,
         },
     },
     project::{
@@ -57,6 +59,23 @@ use uuid::Uuid;
 use crate::{DeploymentImpl, error::ApiError};
 
 type GitHubApiResponse<T> = ApiResponse<T, GitHubApiErrorData>;
+
+#[derive(Debug, Clone, Serialize, TS)]
+pub struct IssueIntegrationProvider {
+    pub id: String,
+    pub name: String,
+    pub supported: bool,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+pub struct ProjectIssueIntegrationsResponse {
+    pub providers: Vec<IssueIntegrationProvider>,
+    pub github_account: Option<services::services::github::auth::GitHubAccount>,
+    pub github_repositories: Vec<GitHubRepositorySummary>,
+    pub linked_repositories: Vec<RepoIntegration>,
+    pub primary_repository: Option<RepoIntegration>,
+}
 
 #[derive(Debug, Deserialize, TS)]
 pub struct GitHubIssueQuery {
@@ -130,6 +149,10 @@ pub struct DenyGitHubOperationRequest {
 
 pub fn router() -> Router<DeploymentImpl> {
     Router::new()
+        .route(
+            "/projects/{project_id}/issue-integrations",
+            get(issue_integrations),
+        )
         .route(
             "/projects/{project_id}/github/repos",
             get(list_repos).post(create_repo),
@@ -230,9 +253,13 @@ async fn ensure_project(deployment: &DeploymentImpl, project_id: Uuid) -> Result
     Ok(())
 }
 
+fn github_auth_provider() -> Result<DeviceFlowGitHubAuthProvider, ApiError> {
+    DeviceFlowGitHubAuthProvider::from_env()
+        .map_err(|err| ApiError::BadRequest(format!("GitHub auth setup failed: {err}")))
+}
+
 async fn github_client() -> Result<GitHubRestClient, ApiError> {
-    let provider = DeviceFlowGitHubAuthProvider::from_env()
-        .map_err(|err| ApiError::BadRequest(format!("GitHub auth setup failed: {err}")))?;
+    let provider = github_auth_provider()?;
     let token = provider
         .access_token()
         .await
@@ -259,6 +286,59 @@ async fn ensure_github_project_connected(
     }
 }
 
+async fn issue_integrations(
+    State(deployment): State<DeploymentImpl>,
+    Path(project_id): Path<Uuid>,
+) -> Result<ResponseJson<GitHubApiResponse<ProjectIssueIntegrationsResponse>>, ApiError> {
+    ensure_project(&deployment, project_id).await?;
+    let linked_repositories = RepoIntegrationService::new()
+        .list_repo_integrations(&deployment.db().pool, project_id)
+        .await
+        .map_err(|err| ApiError::BadRequest(err.to_string()))?;
+    let primary_repository = primary_github_repository(&linked_repositories);
+    let auth_provider = github_auth_provider()?;
+    let github_account = auth_provider
+        .current_account()
+        .await
+        .map_err(|err| ApiError::BadRequest(format!("GitHub account lookup failed: {err}")))?;
+    let github_repositories = if github_account.is_some() {
+        let token = match auth_provider.access_token().await {
+            Ok(token) => token,
+            Err(err) => {
+                return Ok(ResponseJson(ApiResponse::error_with_data(
+                    github_local_error_data("github_auth_required", err.to_string()),
+                )));
+            }
+        };
+        let client =
+            GitHubRestClient::new(SecretString::from(token.token.expose_secret().to_string()));
+        match client.list_authenticated_repositories().await {
+            Ok(repos) => repos,
+            Err(GitHubRestError::Api(data)) => {
+                return Ok(ResponseJson(ApiResponse::error_with_data(data)));
+            }
+            Err(err) => {
+                return Ok(ResponseJson(ApiResponse::error_with_data(
+                    github_local_error_data("github_write_failed", err.to_string()),
+                )));
+            }
+        }
+    } else {
+        Vec::new()
+    };
+    let providers =
+        issue_integration_providers(github_account.is_some(), primary_repository.is_some());
+    Ok(ResponseJson(ApiResponse::success(
+        ProjectIssueIntegrationsResponse {
+            providers,
+            github_account,
+            github_repositories,
+            linked_repositories,
+            primary_repository,
+        },
+    )))
+}
+
 async fn list_repos(
     State(deployment): State<DeploymentImpl>,
     Path(project_id): Path<Uuid>,
@@ -274,9 +354,31 @@ async fn list_repos(
 async fn create_repo(
     State(deployment): State<DeploymentImpl>,
     Path(project_id): Path<Uuid>,
-    Json(payload): Json<CreateProjectGitHubRepoIntegration>,
-) -> Result<ResponseJson<ApiResponse<RepoIntegration>>, ApiError> {
+    Json(mut payload): Json<CreateProjectGitHubRepoIntegration>,
+) -> Result<ResponseJson<GitHubApiResponse<RepoIntegration>>, ApiError> {
     ensure_project(&deployment, project_id).await?;
+    let auth_provider = github_auth_provider()?;
+    let account = match auth_provider.current_account().await {
+        Ok(Some(account)) => account,
+        Ok(None) => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                github_local_error_data("github_auth_required", "GitHub account is not authorized"),
+            )));
+        }
+        Err(err) => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                github_local_error_data("github_auth_required", err.to_string()),
+            )));
+        }
+    };
+    if payload.github_account_id.is_none() {
+        payload.github_account_id = Some(account.id.to_string());
+    }
+    if payload.repo_grant_json.is_none() {
+        payload.repo_grant_json = Some(serde_json::json!({
+            "permissions": ["metadata", "contents", "issues", "pull_requests"]
+        }));
+    }
     let row = RepoIntegrationService::new()
         .create_project_github_repo_integration(&deployment.db().pool, project_id, payload)
         .await
@@ -1067,6 +1169,53 @@ fn github_pr_error_data(err: &anyhow::Error, fallback_code: &str) -> GitHubApiEr
     github_local_error_data(code, message)
 }
 
+fn primary_github_repository(integrations: &[RepoIntegration]) -> Option<RepoIntegration> {
+    let is_active_github = |integration: &&RepoIntegration| {
+        integration.provider == "github"
+            && integration.sync_status == RepoIntegrationSyncStatus::Connected
+    };
+    integrations
+        .iter()
+        .find(|integration| {
+            is_active_github(integration) && integration.role == RepoIntegrationRole::Primary
+        })
+        .cloned()
+        .or_else(|| integrations.iter().find(is_active_github).cloned())
+}
+
+fn issue_integration_providers(
+    github_authorized: bool,
+    github_linked: bool,
+) -> Vec<IssueIntegrationProvider> {
+    let github_status = if github_linked {
+        "linked"
+    } else if github_authorized {
+        "authorized"
+    } else {
+        "auth_required"
+    };
+    vec![
+        IssueIntegrationProvider {
+            id: "github".to_string(),
+            name: "GitHub".to_string(),
+            supported: true,
+            status: github_status.to_string(),
+        },
+        IssueIntegrationProvider {
+            id: "linear".to_string(),
+            name: "Linear".to_string(),
+            supported: false,
+            status: "unsupported".to_string(),
+        },
+        IssueIntegrationProvider {
+            id: "jira".to_string(),
+            name: "Jira".to_string(),
+            supported: false,
+            status: "unsupported".to_string(),
+        },
+    ]
+}
+
 async fn delivery_records(
     State(deployment): State<DeploymentImpl>,
     Path(project_id): Path<Uuid>,
@@ -1431,11 +1580,17 @@ async fn deny_github_audit(
 
 #[cfg(test)]
 mod tests {
-    use db::models::github_operation_audit::GitHubOperationSource;
+    use chrono::Utc;
+    use db::models::{
+        github_operation_audit::GitHubOperationSource,
+        repo_integration::{RepoIntegration, RepoIntegrationRole, RepoIntegrationSyncStatus},
+    };
     use serde_json::json;
+    use uuid::Uuid;
 
     use super::{
         IssueCommentRequest, PushBranchRequest, github_local_error_data, github_pr_error_data,
+        issue_integration_providers, primary_github_repository,
     };
 
     #[test]
@@ -1491,5 +1646,53 @@ mod tests {
         let data = github_pr_error_data(&err, "github_write_failed");
 
         assert_eq!(data.code, "github_repo_disconnected");
+    }
+
+    #[test]
+    fn issue_integration_provider_statuses_reflect_github_state() {
+        let unauthenticated = issue_integration_providers(false, false);
+        assert_eq!(unauthenticated[0].id, "github");
+        assert_eq!(unauthenticated[0].status, "auth_required");
+        assert_eq!(unauthenticated[1].status, "unsupported");
+
+        let authorized = issue_integration_providers(true, false);
+        assert_eq!(authorized[0].status, "authorized");
+
+        let linked = issue_integration_providers(true, true);
+        assert_eq!(linked[0].status, "linked");
+    }
+
+    #[test]
+    fn primary_github_repository_ignores_disconnected_integrations() {
+        let disconnected = test_repo_integration(RepoIntegrationSyncStatus::Disconnected);
+        let connected = test_repo_integration(RepoIntegrationSyncStatus::Connected);
+
+        let selected = primary_github_repository(&[disconnected, connected.clone()])
+            .expect("connected repo selected");
+
+        assert_eq!(selected.id, connected.id);
+        assert_eq!(selected.sync_status, RepoIntegrationSyncStatus::Connected);
+    }
+
+    fn test_repo_integration(sync_status: RepoIntegrationSyncStatus) -> RepoIntegration {
+        RepoIntegration {
+            id: Uuid::new_v4(),
+            repo_id: Uuid::new_v4(),
+            provider: "github".to_string(),
+            owner: Some("openteams".to_string()),
+            name: Some("repo".to_string()),
+            remote_url: None,
+            default_branch: Some("main".to_string()),
+            external_id: None,
+            installation_id: None,
+            github_account_id: None,
+            repo_grant_json: None,
+            role: RepoIntegrationRole::Primary,
+            sync_status,
+            last_synced_at: None,
+            last_error: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
     }
 }

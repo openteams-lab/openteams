@@ -123,23 +123,83 @@ impl RepoIntegrationService {
     ) -> Result<RepoIntegration> {
         let owner = normalize_optional_string(input.owner);
         let name = normalize_optional_string(input.name);
+        let remote_url = normalize_optional_string(input.html_url)
+            .or_else(|| normalize_optional_string(input.clone_url))
+            .or_else(|| normalize_optional_string(input.ssh_url));
+        let default_branch = normalize_optional_string(input.default_branch);
+        let external_id = normalize_optional_string(input.external_id);
+        let installation_id = normalize_optional_string(input.installation_id);
+        let github_account_id = normalize_optional_string(input.github_account_id);
+        let repo_grant_json = input.repo_grant_json.map(|value| value.to_string());
+        let requested_role = input.role;
         let existing = RepoIntegration::find_by_project(pool, project_id).await?;
-        if existing.len() >= MAX_PROJECT_REPO_INTEGRATIONS {
-            return Err(anyhow!(
-                "A project can connect at most 3 GitHub repositories"
-            ));
-        }
-        if let (Some(owner), Some(name)) = (&owner, &name) {
-            let duplicate = existing.iter().any(|integration| {
-                integration.provider == "github"
-                    && integration.owner.as_deref() == Some(owner.as_str())
-                    && integration.name.as_deref() == Some(name.as_str())
-            });
-            if duplicate {
+        let has_github_identity = external_id.is_some() || (owner.is_some() && name.is_some());
+
+        let matching_existing = existing.iter().find(|integration| {
+            integration.provider == "github"
+                && (external_id
+                    .as_deref()
+                    .is_some_and(|value| integration.external_id.as_deref() == Some(value))
+                    || (owner
+                        .as_deref()
+                        .is_some_and(|value| integration.owner.as_deref() == Some(value))
+                        && name
+                            .as_deref()
+                            .is_some_and(|value| integration.name.as_deref() == Some(value)))
+                    || (!has_github_identity && input.repo_id == Some(integration.repo_id)))
+        });
+
+        if let Some(existing_integration) = matching_existing {
+            if existing_integration.sync_status == RepoIntegrationSyncStatus::Connected {
                 return Err(anyhow!(
                     "GitHub repository is already connected to this project"
                 ));
             }
+            let reconnected = RepoIntegration::mark_connected_with_metadata(
+                pool,
+                existing_integration.id,
+                owner.clone(),
+                name.clone(),
+                remote_url.clone(),
+                default_branch.clone(),
+                external_id.clone(),
+            )
+            .await?;
+            let updated = RepoIntegration::update(
+                pool,
+                reconnected.id,
+                &UpdateRepoIntegration {
+                    provider: None,
+                    owner: None,
+                    name: None,
+                    remote_url: None,
+                    default_branch: None,
+                    external_id: None,
+                    installation_id,
+                    github_account_id,
+                    repo_grant_json,
+                    role: requested_role,
+                    sync_status: Some(RepoIntegrationSyncStatus::Connected),
+                    last_synced_at: None,
+                    last_error: None,
+                },
+            )
+            .await?;
+            if updated.role == RepoIntegrationRole::Primary {
+                self.demote_other_project_integrations(pool, project_id, updated.id)
+                    .await?;
+            }
+            return Ok(updated);
+        }
+
+        let connected_count = existing
+            .iter()
+            .filter(|integration| integration.sync_status == RepoIntegrationSyncStatus::Connected)
+            .count();
+        if connected_count >= MAX_PROJECT_REPO_INTEGRATIONS {
+            return Err(anyhow!(
+                "A project can connect at most 3 GitHub repositories"
+            ));
         }
 
         let repo_id = match input.repo_id {
@@ -165,16 +225,13 @@ impl RepoIntegrationService {
             }
         };
 
-        let role = input.role.or_else(|| {
-            Some(if existing.is_empty() {
+        let role = requested_role.or_else(|| {
+            Some(if connected_count == 0 {
                 RepoIntegrationRole::Primary
             } else {
                 RepoIntegrationRole::Auxiliary
             })
         });
-        let remote_url = normalize_optional_string(input.html_url)
-            .or_else(|| normalize_optional_string(input.clone_url))
-            .or_else(|| normalize_optional_string(input.ssh_url));
         let integration = RepoIntegration::create_with_input(
             pool,
             CreateRepoIntegration {
@@ -183,11 +240,11 @@ impl RepoIntegrationService {
                 owner,
                 name,
                 remote_url,
-                default_branch: normalize_optional_string(input.default_branch),
-                external_id: normalize_optional_string(input.external_id),
-                installation_id: normalize_optional_string(input.installation_id),
-                github_account_id: normalize_optional_string(input.github_account_id),
-                repo_grant_json: input.repo_grant_json.map(|value| value.to_string()),
+                default_branch,
+                external_id,
+                installation_id,
+                github_account_id,
+                repo_grant_json,
                 role,
                 sync_status: RepoIntegrationSyncStatus::Connected,
             },
@@ -685,6 +742,92 @@ mod tests {
             .expect("repo exists");
         assert_eq!(repo.display_name, "octo-org/hello-world");
         assert_eq!(repo.path.to_string_lossy(), workspace_path);
+    }
+
+    #[tokio::test]
+    async fn create_github_integration_allows_new_repo_after_disconnect() {
+        let pool = setup_pool().await;
+        let service = RepoIntegrationService::new();
+        let project_id = Uuid::new_v4();
+        let workspace_path = "E:/workspace/projectSS/openteams-refactor-restored";
+        sqlx::query("INSERT INTO projects (id, name, default_workspace_path) VALUES (?1, ?2, ?3)")
+            .bind(project_id)
+            .bind("OpenTeams")
+            .bind(workspace_path)
+            .execute(&pool)
+            .await
+            .expect("insert project with workspace path");
+
+        let first = service
+            .create_project_github_repo_integration(
+                &pool,
+                project_id,
+                super::CreateProjectGitHubRepoIntegration {
+                    repo_id: None,
+                    owner: Some("octo-org".to_string()),
+                    name: Some("first".to_string()),
+                    full_name: Some("octo-org/first".to_string()),
+                    html_url: Some("https://github.com/octo-org/first".to_string()),
+                    clone_url: None,
+                    ssh_url: None,
+                    default_branch: Some("main".to_string()),
+                    external_id: Some("R_first".to_string()),
+                    installation_id: None,
+                    github_account_id: Some("12345".to_string()),
+                    repo_grant_json: Some(json!({"permissions":["metadata","issues"]})),
+                    role: None,
+                },
+            )
+            .await
+            .expect("create first integration");
+        service
+            .disconnect_project_repo_integration(
+                &pool,
+                project_id,
+                first.id,
+                Some("test disconnect".to_string()),
+            )
+            .await
+            .expect("disconnect first integration");
+
+        let second = service
+            .create_project_github_repo_integration(
+                &pool,
+                project_id,
+                super::CreateProjectGitHubRepoIntegration {
+                    repo_id: None,
+                    owner: Some("octo-org".to_string()),
+                    name: Some("second".to_string()),
+                    full_name: Some("octo-org/second".to_string()),
+                    html_url: Some("https://github.com/octo-org/second".to_string()),
+                    clone_url: None,
+                    ssh_url: None,
+                    default_branch: Some("main".to_string()),
+                    external_id: Some("R_second".to_string()),
+                    installation_id: None,
+                    github_account_id: Some("12345".to_string()),
+                    repo_grant_json: Some(json!({"permissions":["metadata","issues"]})),
+                    role: None,
+                },
+            )
+            .await
+            .expect("create second integration after disconnect");
+
+        assert_ne!(second.id, first.id);
+        assert_eq!(second.name.as_deref(), Some("second"));
+        assert_eq!(second.sync_status, RepoIntegrationSyncStatus::Connected);
+
+        let integrations = service
+            .list_repo_integrations(&pool, project_id)
+            .await
+            .expect("list integrations");
+        assert_eq!(
+            integrations
+                .iter()
+                .filter(|row| row.sync_status == RepoIntegrationSyncStatus::Connected)
+                .count(),
+            1
+        );
     }
 
     #[tokio::test]

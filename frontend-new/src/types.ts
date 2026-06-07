@@ -205,6 +205,15 @@ export type RepoIntegrationSyncStatus =
   | 'disconnected'
   | 'error';
 
+export type RepoIntegrationRole = 'primary' | 'auxiliary';
+
+export interface IssueIntegrationProvider {
+  id: 'github' | 'linear' | 'jira' | string;
+  name: string;
+  supported: boolean;
+  status: 'auth_required' | 'authorized' | 'linked' | 'unsupported' | string;
+}
+
 export type ProjectWorkItemType =
   | 'feature'
   | 'bug'
@@ -299,6 +308,18 @@ export interface GitHubDeviceFlowPollResponse {
   error: GitHubErrorData | string | null;
 }
 
+export interface GitHubOAuthStartResponse {
+  flow_id: string;
+  authorization_url: string;
+  expires_at: string;
+}
+
+export interface GitHubOAuthStatusResponse {
+  status: 'pending' | 'authorized' | 'expired' | 'denied' | 'error';
+  account: GitHubAccount | null;
+  error: string | null;
+}
+
 export interface GitHubRepositorySummary {
   id: number | string;
   node_id: string;
@@ -325,11 +346,20 @@ export interface ProjectRepoIntegration {
   installation_id: string | null;
   github_account_id: string | null;
   repo_grant_json: JsonValue | null;
+  role?: RepoIntegrationRole | null;
   sync_status: RepoIntegrationSyncStatus | null;
   last_synced_at: string | null;
   last_error: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProjectIssueIntegrationsResponse {
+  providers: IssueIntegrationProvider[];
+  github_account: GitHubAccount | null;
+  github_repositories: GitHubRepositorySummary[];
+  linked_repositories: ProjectRepoIntegration[];
+  primary_repository: ProjectRepoIntegration | null;
 }
 
 export interface ProjectWorkItem {

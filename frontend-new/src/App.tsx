@@ -798,6 +798,7 @@ function WorkspaceLayout() {
               activeAppPage === "providers" ||
               activeAppPage === "build-stats" ||
               activeAppPage === "github" ||
+              activeAppPage === "issue" ||
               activeAppPage === "agents" ||
               activeAppPage === "team"
                 ? "overflow-hidden p-0"

@@ -4,8 +4,6 @@ import {
   Plus,
   Search,
   UserPlus,
-  X,
-  Check,
 } from "lucide-react";
 import { useState, useMemo, useRef, useEffect } from "react";
 import type { BackendChatAgent } from "@/types";
@@ -94,22 +92,23 @@ type TeamMemberSidebarProps = {
   t: TranslateFn;
   onSelectMember: (memberId: string) => void;
   onSetLeadMember: (member: ProjectMemberWithExecution) => void;
-  onAddMember?: (agentId: string) => void;
 };
 
-export function TeamMemberSidebar({
+type TeamAddMemberButtonProps = {
+  agents: BackendChatAgent[];
+  members: ProjectMemberWithExecution[];
+  saving: boolean;
+  t: TranslateFn;
+  onAddMember: (agentId: string) => void;
+};
+
+export function TeamAddMemberButton({
   agents,
-  loading,
   members,
   saving,
-  selectedMemberId,
-  sessionAgentLookup,
-  switchingLeadMemberId,
   t,
-  onSelectMember,
-  onSetLeadMember,
   onAddMember,
-}: TeamMemberSidebarProps) {
+}: TeamAddMemberButtonProps) {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -125,16 +124,107 @@ export function TeamMemberSidebar({
   }, []);
 
   const availableAgents = useMemo(() => {
-    const memberAgentIds = new Set(members.map((m) => m.agent_id).filter(Boolean));
-    return agents.filter((a) => !memberAgentIds.has(a.id));
+    const memberAgentIds = new Set(
+      members.map((member) => member.agent_id).filter(Boolean),
+    );
+    return agents.filter((agent) => !memberAgentIds.has(agent.id));
   }, [agents, members]);
 
   const filteredAgents = useMemo(() => {
-    return availableAgents.filter((a) =>
-      a.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return availableAgents;
+    return availableAgents.filter((agent) =>
+      agent.name.toLowerCase().includes(query),
     );
   }, [availableAgents, searchQuery]);
 
+  const disabled = saving || availableAgents.length === 0;
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        type="button"
+        onClick={() => setShowAddMenu((current) => !current)}
+        disabled={disabled}
+        className={cx(
+          "flex h-7 w-7 items-center justify-center rounded-full border border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50",
+          showAddMenu && "border-[var(--primary)] text-[var(--primary)]",
+        )}
+        aria-label={t("teamPage.sidebar.addMember")}
+        title={t("teamPage.sidebar.addMember")}
+      >
+        <Plus aria-hidden="true" className="h-[15px] w-[15px]" />
+      </button>
+
+      {showAddMenu && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-[240px] origin-top-right overflow-hidden rounded-xl border border-[var(--hairline-strong)] bg-[var(--surface-1)] shadow-2xl animate-fade-in-down">
+          <div className="flex items-center gap-2 border-b border-[var(--hairline)] px-3 py-2">
+            <Search className="h-3.5 w-3.5 text-[var(--ink-tertiary)]" />
+            <input
+              autoFocus
+              type="text"
+              placeholder={t("teamPage.sidebar.findAgent")}
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="w-full bg-transparent text-[13px] text-[var(--ink)] placeholder:text-[var(--ink-tertiary)] focus:outline-none"
+            />
+          </div>
+          <div className="max-h-[300px] overflow-y-auto p-1.5 ot-scroll-area-styled">
+            {filteredAgents.length === 0 ? (
+              <div className="px-3 py-4 text-center">
+                <p className="text-[12px] text-[var(--ink-tertiary)]">
+                  {t("teamPage.sidebar.noAvailableAgents")}
+                </p>
+              </div>
+            ) : (
+              filteredAgents.map((agent) => (
+                <button
+                  key={agent.id}
+                  type="button"
+                  onClick={() => {
+                    onAddMember(agent.id);
+                    setShowAddMenu(false);
+                    setSearchQuery("");
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-2)]"
+                >
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--surface-3)] text-[var(--ink-subtle)]">
+                    <Bot className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium text-[var(--ink)]">
+                      {agent.name}
+                    </p>
+                    <p className="truncate text-[11px] text-[var(--ink-tertiary)]">
+                      {compactRunnerLabel(
+                        normalizeRunnerType(agent.runner_type),
+                        t("teamPage.fallback.runtime"),
+                      )}
+                    </p>
+                  </div>
+                  <Plus className="h-3.5 w-3.5 text-[var(--ink-tertiary)]" />
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function TeamMemberSidebar({
+  agents,
+  loading,
+  members,
+  saving,
+  selectedMemberId,
+  sessionAgentLookup,
+  switchingLeadMemberId,
+  t,
+  onSelectMember,
+  onSetLeadMember,
+}: TeamMemberSidebarProps) {
   if (loading) {
     return (
       <div className="space-y-2 p-3">
@@ -150,76 +240,6 @@ export function TeamMemberSidebar({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-[var(--hairline)] px-4 py-3">
-        <h3 className="text-[12px] font-bold uppercase tracking-[0.05em] text-[var(--ink-tertiary)]">
-          {t("teamPage.sidebar.title", { count: members.length })}
-        </h3>
-        <div className="relative" ref={menuRef}>
-          <button
-            onClick={() => setShowAddMenu(!showAddMenu)}
-            disabled={saving || availableAgents.length === 0}
-            className={cx(
-              "group flex h-7 w-7 items-center justify-center rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] transition-all hover:border-[var(--primary)]/40 hover:bg-[var(--surface-3)]",
-              showAddMenu && "border-[var(--primary)] ring-2 ring-[var(--primary-tint)]"
-            )}
-            title={t("teamPage.sidebar.addMember")}
-          >
-            <Plus className={cx("h-4 w-4 text-[var(--ink-subtle)] transition-colors group-hover:text-[var(--primary)]", showAddMenu && "text-[var(--primary)]")} />
-          </button>
-
-          {showAddMenu && (
-            <div className="absolute right-0 top-full z-50 mt-1.5 w-[240px] origin-top-right overflow-hidden rounded-xl border border-[var(--hairline-strong)] bg-[var(--surface-1)] shadow-2xl animate-fade-in-down">
-              <div className="flex items-center gap-2 border-b border-[var(--hairline)] px-3 py-2">
-                <Search className="h-3.5 w-3.5 text-[var(--ink-tertiary)]" />
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder={t("teamPage.sidebar.findAgent")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent text-[13px] text-[var(--ink)] placeholder:text-[var(--ink-tertiary)] focus:outline-none"
-                />
-              </div>
-              <div className="max-h-[300px] overflow-y-auto p-1.5 ot-scroll-area-styled">
-                {filteredAgents.length === 0 ? (
-                  <div className="px-3 py-4 text-center">
-                    <p className="text-[12px] text-[var(--ink-tertiary)]">
-                      {t("teamPage.sidebar.noAvailableAgents")}
-                    </p>
-                  </div>
-                ) : (
-                  filteredAgents.map((agent) => (
-                    <button
-                      key={agent.id}
-                      onClick={() => {
-                        onAddMember?.(agent.id);
-                        setShowAddMenu(false);
-                        setSearchQuery("");
-                      }}
-                      className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-2)]"
-                    >
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--surface-3)] text-[var(--ink-subtle)]">
-                        <Bot className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-medium text-[var(--ink)]">{agent.name}</p>
-                        <p className="truncate text-[11px] text-[var(--ink-tertiary)]">
-                          {compactRunnerLabel(
-                            normalizeRunnerType(agent.runner_type),
-                            t("teamPage.fallback.runtime"),
-                          )}
-                        </p>
-                      </div>
-                      <Plus className="h-3.5 w-3.5 text-[var(--ink-tertiary)]" />
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="flex-1 space-y-1 p-2 overflow-y-auto ot-scroll-area-styled">
         {members.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">

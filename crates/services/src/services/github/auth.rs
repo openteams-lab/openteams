@@ -5,13 +5,17 @@ use std::{
 };
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use once_cell::sync::Lazy;
 use reqwest::StatusCode;
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 use ts_rs::TS;
+use url::Url;
+use uuid::Uuid;
 
 use super::token_store::{
     GitHubStoredAccount, GitHubStoredToken, GitHubTokenStoreError, LocalEncryptedGitHubTokenStore,
@@ -20,14 +24,28 @@ use super::token_store::{
 const DEFAULT_DEVICE_FLOW_INTERVAL_SECS: u64 = 5;
 const SLOW_DOWN_INCREMENT_SECS: u64 = 5;
 const RATE_LIMIT_BACKOFF_SECS: u64 = 30;
+const OAUTH_FLOW_TTL_SECS: i64 = 600;
 
 static DEVICE_FLOW_POLL_STATE: Lazy<Mutex<HashMap<String, DeviceFlowPollState>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+static OAUTH_FLOW_STATE: Lazy<Mutex<HashMap<String, OAuthFlowState>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug, Clone)]
 struct DeviceFlowPollState {
     interval: Duration,
     next_allowed_at: Instant,
+}
+
+#[derive(Debug, Clone)]
+struct OAuthFlowState {
+    state: String,
+    code_verifier: String,
+    redirect_uri: String,
+    status: GitHubOAuthFlowStatus,
+    account: Option<GitHubAccount>,
+    error: Option<String>,
+    expires_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone)]
@@ -75,12 +93,39 @@ pub struct GitHubDeviceFlowPollResponse {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct GitHubOAuthStartResponse {
+    pub flow_id: String,
+    pub authorization_url: String,
+    #[ts(type = "Date")]
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GitHubOAuthFlowStatus {
+    Pending,
+    Authorized,
+    Denied,
+    Expired,
+    Error,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct GitHubOAuthStatusResponse {
+    pub status: GitHubOAuthFlowStatus,
+    pub account: Option<GitHubAccount>,
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Error)]
 pub enum GitHubAuthError {
     #[error("GitHub auth required")]
     AuthRequired,
     #[error("GitHub OAuth client id is not configured")]
     MissingClientId,
+    #[error("invalid GitHub OAuth callback URL")]
+    InvalidCallbackUrl,
     #[error(transparent)]
     Store(#[from] GitHubTokenStoreError),
     #[error(transparent)]
@@ -98,6 +143,7 @@ pub struct DeviceFlowGitHubAuthProvider {
     client: reqwest::Client,
     store: LocalEncryptedGitHubTokenStore,
     client_id: String,
+    client_secret: Option<SecretString>,
     scopes: Vec<String>,
 }
 
@@ -111,8 +157,14 @@ impl DeviceFlowGitHubAuthProvider {
             client: reqwest::Client::new(),
             store,
             client_id: client_id.into(),
+            client_secret: None,
             scopes,
         }
+    }
+
+    pub fn with_client_secret(mut self, client_secret: Option<SecretString>) -> Self {
+        self.client_secret = client_secret;
+        self
     }
 
     pub fn from_env() -> Result<Self, GitHubAuthError> {
@@ -121,6 +173,12 @@ impl DeviceFlowGitHubAuthProvider {
             LocalEncryptedGitHubTokenStore::new_default()?,
             client_id,
             vec!["repo".to_string(), "read:user".to_string()],
+        )
+        .with_client_secret(
+            std::env::var("GITHUB_CLIENT_SECRET")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .map(SecretString::from),
         ))
     }
 
@@ -146,6 +204,164 @@ impl DeviceFlowGitHubAuthProvider {
             .await?;
         remember_device_flow_poll_state(&response.device_code, response.interval);
         Ok(response)
+    }
+
+    pub async fn start_oauth_flow(
+        &self,
+        callback_base_url: &str,
+    ) -> Result<GitHubOAuthStartResponse, GitHubAuthError> {
+        if self.client_id.is_empty() {
+            return Err(GitHubAuthError::MissingClientId);
+        }
+
+        let flow_id = Uuid::new_v4().to_string();
+        let state = random_oauth_token();
+        let code_verifier = random_oauth_token();
+        let code_challenge = pkce_code_challenge(&code_verifier);
+        let expires_at = Utc::now() + ChronoDuration::seconds(OAUTH_FLOW_TTL_SECS);
+        let redirect_uri = oauth_redirect_uri(callback_base_url, &flow_id)?;
+        let scope = self.scopes.join(" ");
+        let mut authorization_url =
+            Url::parse("https://github.com/login/oauth/authorize").expect("valid GitHub URL");
+        authorization_url
+            .query_pairs_mut()
+            .append_pair("client_id", &self.client_id)
+            .append_pair("redirect_uri", redirect_uri.as_str())
+            .append_pair("scope", scope.as_str())
+            .append_pair("state", state.as_str())
+            .append_pair("response_type", "code")
+            .append_pair("code_challenge", code_challenge.as_str())
+            .append_pair("code_challenge_method", "S256");
+
+        remember_oauth_flow(
+            flow_id.clone(),
+            OAuthFlowState {
+                state,
+                code_verifier,
+                redirect_uri,
+                status: GitHubOAuthFlowStatus::Pending,
+                account: None,
+                error: None,
+                expires_at,
+            },
+        );
+
+        Ok(GitHubOAuthStartResponse {
+            flow_id,
+            authorization_url: authorization_url.to_string(),
+            expires_at,
+        })
+    }
+
+    pub async fn complete_oauth_callback(
+        &self,
+        flow_id: &str,
+        state: &str,
+        code: &str,
+    ) -> Result<GitHubOAuthStatusResponse, GitHubAuthError> {
+        if self.client_id.is_empty() {
+            return Err(GitHubAuthError::MissingClientId);
+        }
+
+        let Some(flow) = oauth_flow_for_callback(flow_id, state) else {
+            return Ok(GitHubOAuthStatusResponse {
+                status: GitHubOAuthFlowStatus::Error,
+                account: None,
+                error: Some("invalid_oauth_flow".to_string()),
+            });
+        };
+
+        let response = match self
+            .exchange_oauth_code(code, &flow.code_verifier, &flow.redirect_uri)
+            .await
+        {
+            Ok(response) => response,
+            Err(err) => {
+                let message = err.to_string();
+                update_oauth_flow_status(
+                    flow_id,
+                    GitHubOAuthFlowStatus::Error,
+                    None,
+                    Some(message.clone()),
+                );
+                return Ok(GitHubOAuthStatusResponse {
+                    status: GitHubOAuthFlowStatus::Error,
+                    account: None,
+                    error: Some(message),
+                });
+            }
+        };
+
+        if let Some(error) = response.error {
+            let message = response.error_description.unwrap_or(error);
+            update_oauth_flow_status(
+                flow_id,
+                GitHubOAuthFlowStatus::Error,
+                None,
+                Some(message.clone()),
+            );
+            return Ok(GitHubOAuthStatusResponse {
+                status: GitHubOAuthFlowStatus::Error,
+                account: None,
+                error: Some(message),
+            });
+        }
+
+        let Some(access_token) = response.access_token else {
+            update_oauth_flow_status(
+                flow_id,
+                GitHubOAuthFlowStatus::Error,
+                None,
+                Some("missing_access_token".to_string()),
+            );
+            return Ok(GitHubOAuthStatusResponse {
+                status: GitHubOAuthFlowStatus::Error,
+                account: None,
+                error: Some("missing_access_token".to_string()),
+            });
+        };
+        let scopes = response
+            .scope
+            .unwrap_or_default()
+            .split(',')
+            .filter(|scope| !scope.is_empty())
+            .map(ToOwned::to_owned)
+            .collect::<Vec<_>>();
+        let account = self.fetch_account(&access_token, scopes.clone()).await?;
+        self.store.store(GitHubStoredToken {
+            access_token: access_token.into(),
+            scopes,
+            account: Some((&account).into()),
+        })?;
+        update_oauth_flow_status(
+            flow_id,
+            GitHubOAuthFlowStatus::Authorized,
+            Some(account.clone()),
+            None,
+        );
+        Ok(GitHubOAuthStatusResponse {
+            status: GitHubOAuthFlowStatus::Authorized,
+            account: Some(account),
+            error: None,
+        })
+    }
+
+    pub fn fail_oauth_flow(
+        &self,
+        flow_id: &str,
+        status: GitHubOAuthFlowStatus,
+        error: String,
+    ) -> GitHubOAuthStatusResponse {
+        update_oauth_flow_status(flow_id, status.clone(), None, Some(error.clone()));
+        GitHubOAuthStatusResponse {
+            status,
+            account: None,
+            error: Some(error),
+        }
+    }
+
+    pub fn oauth_flow_status(&self, flow_id: &str) -> GitHubOAuthStatusResponse {
+        oauth_flow_status(flow_id)
     }
 
     pub async fn poll_device_flow(
@@ -243,6 +459,49 @@ impl DeviceFlowGitHubAuthProvider {
             account: Some(account),
             error: None,
         })
+    }
+
+    async fn exchange_oauth_code(
+        &self,
+        code: &str,
+        code_verifier: &str,
+        redirect_uri: &str,
+    ) -> Result<OAuthCodeRawResponse, GitHubAuthError> {
+        let mut form = vec![
+            ("client_id", self.client_id.as_str()),
+            ("code", code),
+            ("redirect_uri", redirect_uri),
+            ("code_verifier", code_verifier),
+        ];
+        if let Some(client_secret) = &self.client_secret {
+            form.push(("client_secret", client_secret.expose_secret()));
+        }
+        let response = self
+            .client
+            .post("https://github.com/login/oauth/access_token")
+            .header("Accept", "application/json")
+            .form(&form)
+            .send()
+            .await?;
+        let status = response.status();
+        if status.is_success() {
+            return Ok(response.json::<OAuthCodeRawResponse>().await?);
+        }
+
+        let body = response.text().await.unwrap_or_default();
+        let parsed = serde_json::from_str::<OAuthCodeRawResponse>(&body).unwrap_or_else(|_| {
+            OAuthCodeRawResponse {
+                access_token: None,
+                scope: None,
+                error: Some(format!("github_oauth_exchange_failed:{status}")),
+                error_description: if body.trim().is_empty() {
+                    None
+                } else {
+                    Some(body)
+                },
+            }
+        });
+        Ok(parsed)
     }
 
     pub fn disconnect(&self) -> Result<(), GitHubAuthError> {
@@ -371,6 +630,93 @@ fn retry_after_duration(response: &reqwest::Response) -> Option<Duration> {
         .map(Duration::from_secs)
 }
 
+fn remember_oauth_flow(flow_id: String, flow: OAuthFlowState) {
+    prune_oauth_flows();
+    OAUTH_FLOW_STATE
+        .lock()
+        .expect("oauth flow state lock")
+        .insert(flow_id, flow);
+}
+
+fn oauth_flow_for_callback(flow_id: &str, state: &str) -> Option<OAuthFlowState> {
+    let mut flows = OAUTH_FLOW_STATE.lock().expect("oauth flow state lock");
+    let flow = flows.get_mut(flow_id)?;
+    if flow.expires_at <= Utc::now() {
+        flow.status = GitHubOAuthFlowStatus::Expired;
+        flow.error = Some("oauth_flow_expired".to_string());
+        return None;
+    }
+    if flow.state != state {
+        flow.status = GitHubOAuthFlowStatus::Error;
+        flow.error = Some("oauth_state_mismatch".to_string());
+        return None;
+    }
+    Some(flow.clone())
+}
+
+fn oauth_flow_status(flow_id: &str) -> GitHubOAuthStatusResponse {
+    let mut flows = OAUTH_FLOW_STATE.lock().expect("oauth flow state lock");
+    match flows.get_mut(flow_id) {
+        Some(flow) => {
+            if flow.status == GitHubOAuthFlowStatus::Pending && flow.expires_at <= Utc::now() {
+                flow.status = GitHubOAuthFlowStatus::Expired;
+                flow.error = Some("oauth_flow_expired".to_string());
+            }
+            GitHubOAuthStatusResponse {
+                status: flow.status.clone(),
+                account: flow.account.clone(),
+                error: flow.error.clone(),
+            }
+        }
+        None => GitHubOAuthStatusResponse {
+            status: GitHubOAuthFlowStatus::Error,
+            account: None,
+            error: Some("oauth_flow_not_found".to_string()),
+        },
+    }
+}
+
+fn update_oauth_flow_status(
+    flow_id: &str,
+    status: GitHubOAuthFlowStatus,
+    account: Option<GitHubAccount>,
+    error: Option<String>,
+) {
+    let mut flows = OAUTH_FLOW_STATE.lock().expect("oauth flow state lock");
+    if let Some(flow) = flows.get_mut(flow_id) {
+        flow.status = status;
+        flow.account = account;
+        flow.error = error;
+    }
+}
+
+fn prune_oauth_flows() {
+    let now = Utc::now();
+    OAUTH_FLOW_STATE
+        .lock()
+        .expect("oauth flow state lock")
+        .retain(|_, flow| flow.expires_at > now);
+}
+
+fn oauth_redirect_uri(callback_base_url: &str, flow_id: &str) -> Result<String, GitHubAuthError> {
+    let mut url = Url::parse(callback_base_url).map_err(|_| GitHubAuthError::InvalidCallbackUrl)?;
+    url.query_pairs_mut().append_pair("flow_id", flow_id);
+    Ok(url.to_string())
+}
+
+fn random_oauth_token() -> String {
+    format!("{}{}", compact_uuid(), compact_uuid())
+}
+
+fn compact_uuid() -> String {
+    Uuid::new_v4().simple().to_string()
+}
+
+fn pkce_code_challenge(code_verifier: &str) -> String {
+    let digest = Sha256::digest(code_verifier.as_bytes());
+    URL_SAFE_NO_PAD.encode(digest)
+}
+
 #[async_trait]
 impl GitHubAuthProvider for DeviceFlowGitHubAuthProvider {
     async fn access_token(&self) -> Result<GitHubAccessToken, GitHubAuthError> {
@@ -394,6 +740,14 @@ struct OAuthPollRawResponse {
     access_token: Option<String>,
     scope: Option<String>,
     error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OAuthCodeRawResponse {
+    access_token: Option<String>,
+    scope: Option<String>,
+    error: Option<String>,
+    error_description: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -438,7 +792,8 @@ mod tests {
 
     use super::{
         DeviceFlowGitHubAuthProvider, DeviceFlowPollState, GitHubAuthProvider,
-        next_poll_interval_after_error, poll_wait_remaining,
+        next_poll_interval_after_error, oauth_redirect_uri, pkce_code_challenge,
+        poll_wait_remaining,
     };
     use crate::services::github::token_store::{GitHubStoredToken, LocalEncryptedGitHubTokenStore};
 
@@ -485,5 +840,29 @@ mod tests {
             Some(4)
         );
         assert!(poll_wait_remaining(&state, now + Duration::from_secs(5)).is_none());
+    }
+
+    #[test]
+    fn pkce_code_challenge_uses_s256_url_safe_no_padding() {
+        let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+
+        assert_eq!(
+            pkce_code_challenge(verifier),
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+        );
+    }
+
+    #[test]
+    fn oauth_redirect_uri_adds_flow_id_query() {
+        let uri = oauth_redirect_uri(
+            "http://127.0.0.1:3001/api/github/auth/oauth/callback",
+            "flow-123",
+        )
+        .expect("valid redirect uri");
+
+        assert_eq!(
+            uri,
+            "http://127.0.0.1:3001/api/github/auth/oauth/callback?flow_id=flow-123"
+        );
     }
 }

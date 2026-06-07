@@ -284,6 +284,229 @@ body {
   display: none;
 }
 
+body[data-mode="light"] .issue-page {
+  color: var(--ink);
+}
+
+/* Keep the legacy issue screen readable while it is still mostly hex-tokened. */
+body[data-mode="light"] .issue-page [class~="bg-[#0c0c0d]"] {
+  background-color: var(--canvas);
+}
+
+body[data-mode="light"] .issue-link-dialog {
+  background-color: var(--surface-1);
+  border-color: var(--hairline);
+  color: var(--ink);
+}
+
+body[data-mode="light"] .issue-link-warning {
+  background-color: rgba(245, 158, 11, 0.14);
+  border-color: rgba(180, 83, 9, 0.28);
+  color: #7c2d12;
+}
+
+body[data-mode="light"] .issue-link-repo-select > button {
+  background-color: var(--surface-2);
+  border-color: var(--hairline);
+  color: var(--ink);
+}
+
+body[data-mode="light"] .issue-link-repo-select > button:hover {
+  border-color: var(--hairline-strong);
+}
+
+body[data-mode="light"] .issue-link-repo-select-panel {
+  background-color: var(--surface-1) !important;
+  border-color: var(--hairline) !important;
+  color: var(--ink) !important;
+}
+
+body[data-mode="light"] .issue-page [class~="bg-[#101112]"],
+body[data-mode="light"] .issue-page [class~="bg-[#121314]"],
+body[data-mode="light"] .issue-page [class~="bg-[#131415]"],
+body[data-mode="light"] .issue-page [class~="bg-[#141416]"],
+body[data-mode="light"] .issue-page [class~="bg-[#151618]"],
+body[data-mode="light"] .issue-page [class~="bg-[#161617]"],
+body[data-mode="light"] .issue-page [class~="bg-[#18181a]"],
+body[data-mode="light"] .issue-page [class~="bg-[#191a1b]"],
+body[data-mode="light"] .issue-page [class~="bg-[#191a21]"],
+body[data-mode="light"] .issue-page [class~="bg-[#1b1c1f]"],
+body[data-mode="light"] .issue-page [class~="bg-[#222326]"],
+body[data-mode="light"] .issue-page [class~="bg-[#232427]"],
+body[data-mode="light"] .issue-page [class~="bg-[#242529]"],
+body[data-mode="light"] .issue-page [class~="bg-[#25262a]"],
+body[data-mode="light"] .issue-page [class~="bg-[#28292d]"] {
+  background-color: var(--surface-2);
+}
+
+body[data-mode="light"] .issue-page [class~="bg-[#202123]"],
+body[data-mode="light"] .issue-page [class~="bg-[#202124]"] {
+  background-color: var(--surface-3);
+}
+
+body[data-mode="light"] .issue-page [class~="bg-[#131415]"],
+body[data-mode="light"] .issue-page [class~="bg-[#1c1d2c]"] {
+  background-color: var(--primary-tint);
+}
+
+body[data-mode="light"] .issue-page [class~="bg-[#15351c]"] {
+  background-color: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+body[data-mode="light"] .issue-page [class~="bg-[#28181b]"] {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+body[data-mode="light"] .issue-page [class~="hover:bg-[#131415]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:bg-[#191a1b]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:bg-[#1d1e20]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:bg-[#242529]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:bg-[#27282a]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:bg-[#292a2d]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:bg-[#292a2e]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:bg-[#303136]"]:hover {
+  background-color: var(--surface-3);
+}
+
+body[data-mode="light"] .issue-page [class~="hover:bg-[#351f24]"]:hover {
+  background-color: rgba(239, 68, 68, 0.15);
+}
+
+body[data-mode="light"] .issue-page [class~="border-[#1e1f20]"],
+body[data-mode="light"] .issue-page [class~="border-[#232427]"],
+body[data-mode="light"] .issue-page [class~="border-[#242528]"],
+body[data-mode="light"] .issue-page [class~="border-[#24252a]"],
+body[data-mode="light"] .issue-page [class~="border-[#28292c]"],
+body[data-mode="light"] .issue-page [class~="border-[#292a2d]"],
+body[data-mode="light"] .issue-page [class~="border-[#2a2b2d]"],
+body[data-mode="light"] .issue-page [class~="border-[#2a2b2e]"],
+body[data-mode="light"] .issue-page [class~="border-[#2a2b2f]"],
+body[data-mode="light"] .issue-page [class~="border-[#2b2c31]"],
+body[data-mode="light"] .issue-page [class~="border-[#2c2d30]"],
+body[data-mode="light"] .issue-page [class~="border-[#2d2e34]"],
+body[data-mode="light"] .issue-page [class~="border-[#2e2f35]"],
+body[data-mode="light"] .issue-page [class~="border-[#303137]"],
+body[data-mode="light"] .issue-page [class~="border-[#32343a]"],
+body[data-mode="light"] .issue-page [class~="border-[#33343a]"],
+body[data-mode="light"] .issue-page [class~="border-[#33353a]"],
+body[data-mode="light"] .issue-page [class~="border-[#34363c]"],
+body[data-mode="light"] .issue-page [class~="border-[#3a3c42]"] {
+  border-color: var(--hairline);
+}
+
+body[data-mode="light"] .issue-page [class~="border-[#4550a0]"] {
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
+body[data-mode="light"] .issue-page [class~="border-[#2f5d38]"] {
+  border-color: color-mix(in srgb, var(--success) 25%, transparent);
+}
+
+body[data-mode="light"] .issue-page [class~="border-[#55343a]"] {
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+body[data-mode="light"] .issue-page [class~="hover:border-[#383a40]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:border-[#444651]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:border-[#45474f]"]:hover {
+  border-color: var(--hairline-strong);
+}
+
+body[data-mode="light"] .issue-page [class~="hover:border-[#74434c]"]:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+body[data-mode="light"] .issue-page [class~="text-[#d7d9de]"],
+body[data-mode="light"] .issue-page [class~="text-[#e3e4e8]"],
+body[data-mode="light"] .issue-page [class~="text-[#e5e5e7]"],
+body[data-mode="light"] .issue-page [class~="text-[#f0f1f3]"],
+body[data-mode="light"] .issue-page [class~="text-[#f2f2f3]"],
+body[data-mode="light"] .issue-page [class~="text-[#f4f4f5]"],
+body[data-mode="light"] .issue-page [class~="text-[#f6f7f8]"],
+body[data-mode="light"] .issue-page [class~="text-[#f7f7f8]"],
+body[data-mode="light"] .issue-page [class~="text-[#f7f7f8]"],
+body[data-mode="light"] .issue-page [class~="text-[#f8f8f9]"],
+body[data-mode="light"] .issue-page [class~="text-[#fbfbfc]"] {
+  color: var(--ink);
+}
+
+body[data-mode="light"] .issue-page [class~="text-[#a1a3a8]"],
+body[data-mode="light"] .issue-page [class~="text-[#a1a4ab]"],
+body[data-mode="light"] .issue-page [class~="text-[#a3a7af]"],
+body[data-mode="light"] .issue-page [class~="text-[#a4a6ad]"],
+body[data-mode="light"] .issue-page [class~="text-[#a5a7af]"],
+body[data-mode="light"] .issue-page [class~="text-[#a6a8ad]"],
+body[data-mode="light"] .issue-page [class~="text-[#a6a8af]"],
+body[data-mode="light"] .issue-page [class~="text-[#a6a9b0]"],
+body[data-mode="light"] .issue-page [class~="text-[#a7aab1]"],
+body[data-mode="light"] .issue-page [class~="text-[#aeb0b6]"],
+body[data-mode="light"] .issue-page [class~="text-[#aeb1b8]"],
+body[data-mode="light"] .issue-page [class~="text-[#aeb2ba]"],
+body[data-mode="light"] .issue-page [class~="text-[#b0b3ba]"],
+body[data-mode="light"] .issue-page [class~="text-[#b9bbc1]"],
+body[data-mode="light"] .issue-page [class~="text-[#d4d5da]"] {
+  color: var(--ink-subtle);
+}
+
+body[data-mode="light"] .issue-page [class~="text-[#60636a]"],
+body[data-mode="light"] .issue-page [class~="text-[#666a72]"],
+body[data-mode="light"] .issue-page [class~="text-[#6d7076]"],
+body[data-mode="light"] .issue-page [class~="text-[#777a82]"],
+body[data-mode="light"] .issue-page [class~="text-[#82858d]"],
+body[data-mode="light"] .issue-page [class~="text-[#83868e]"],
+body[data-mode="light"] .issue-page [class~="text-[#8a8d93]"],
+body[data-mode="light"] .issue-page [class~="text-[#8f9298]"],
+body[data-mode="light"] .issue-page [class~="text-[#8f939b]"],
+body[data-mode="light"] .issue-page [class~="text-[#91949a]"],
+body[data-mode="light"] .issue-page [class~="text-[#979a9f]"],
+body[data-mode="light"] .issue-page [class~="text-[#979aa1]"],
+body[data-mode="light"] .issue-page [class~="text-[#9a9da5]"],
+body[data-mode="light"] .issue-page [class~="text-[#9b9da3]"],
+body[data-mode="light"] .issue-page [class~="text-[#9ca0a7]"],
+body[data-mode="light"] .issue-page [class~="text-[#9fa2a9]"],
+body[data-mode="light"] .issue-page [class~="text-[#9fa2aa]"] {
+  color: var(--ink-tertiary);
+}
+
+body[data-mode="light"] .issue-page [class~="text-[#6ee188]"] {
+  color: var(--success);
+}
+
+body[data-mode="light"] .issue-page [class~="text-[#ff9aa8]"] {
+  color: rgb(239, 68, 68);
+}
+
+body[data-mode="light"] .issue-page [class~="hover:text-[#ff9aa8]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:text-red-600"]:hover {
+  color: rgb(220, 38, 38);
+}
+
+body[data-mode="light"] .issue-page [class~="hover:text-[#a6aab2]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:text-[#a7aab1]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:text-[#d8d9dc]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:text-[#f2f2f3]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:text-[#f4f4f5]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:text-white"]:hover {
+  color: var(--ink);
+}
+
+body[data-mode="light"] .issue-page [class~="bg-[#5e6ad2]"] {
+  background-color: var(--primary);
+}
+
+body[data-mode="light"] .issue-page [class~="bg-[#606bdb]"] {
+  background-color: var(--primary);
+}
+
+body[data-mode="light"] .issue-page [class~="hover:bg-[#6c76e7]"]:hover,
+body[data-mode="light"] .issue-page [class~="hover:bg-[#6f78e2]"]:hover {
+  background-color: var(--primary-hover);
+}
+
+body[data-mode="light"] .issue-page [class~="text-[#5e6ad2]"] {
+  color: var(--primary);
+}
+
 .settings-workspace,
 .settings-workspace :where(*) {
   font-size: var(--settings-font-size, 14px) !important;

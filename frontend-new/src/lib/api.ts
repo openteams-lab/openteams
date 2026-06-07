@@ -45,6 +45,8 @@ import type {
   GitHubErrorData,
   GitHubIssueDetail,
   GitHubIssueSummary,
+  GitHubOAuthStartResponse,
+  GitHubOAuthStatusResponse,
   GitHubOperationAudit,
   GitHubPrPreview,
   GitHubRepositorySummary,
@@ -56,6 +58,7 @@ import type {
   PauseAllResponse,
   ProjectDeliveryRecord,
   ProjectDeliveryStatsSummary,
+  ProjectIssueIntegrationsResponse,
   ProjectRepoIntegration,
   ProjectWorkItem,
   ProjectWorkItemDetailResponse,
@@ -1054,6 +1057,21 @@ export const projectApi = {
 // -----------------------------------------------------------------------------
 
 export const githubAuthApi = {
+  startOAuthFlow: async (): Promise<GitHubOAuthStartResponse> => {
+    const r = await makeRequest("/api/github/auth/oauth/start", {
+      method: "POST",
+    });
+    return handleApiResponse<GitHubOAuthStartResponse, GitHubErrorData>(r);
+  },
+  getOAuthStatus: async (
+    flowId: string,
+  ): Promise<GitHubOAuthStatusResponse> => {
+    const r = await makeRequest(
+      `/api/github/auth/oauth/status${qs({ flow_id: flowId })}`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<GitHubOAuthStatusResponse, GitHubErrorData>(r);
+  },
   startDeviceFlow: async (): Promise<GitHubDeviceFlowStartResponse> => {
     const r = await makeRequest("/api/github/auth/device/start", {
       method: "POST",
@@ -1088,6 +1106,17 @@ export const githubAuthApi = {
 };
 
 export const projectGithubApi = {
+  getIssueIntegrations: async (
+    projectId: string,
+  ): Promise<ProjectIssueIntegrationsResponse> => {
+    const r = await makeRequest(
+      `/api/projects/${encodeURIComponent(projectId)}/issue-integrations`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<ProjectIssueIntegrationsResponse, GitHubErrorData>(
+      r,
+    );
+  },
   listRepos: async (projectId: string): Promise<ProjectRepoIntegration[]> => {
     const r = await makeRequest(
       `/api/projects/${encodeURIComponent(projectId)}/github/repos`,
@@ -1109,8 +1138,10 @@ export const projectGithubApi = {
       remote_url?: string | null;
       default_branch?: string | null;
       external_id?: string | null;
+      github_account_id?: string | null;
       sync_status?: "connected" | "disconnected" | "error";
       repo_grant_json?: JsonValue | null;
+      role?: "primary" | "auxiliary" | null;
     },
   ): Promise<ProjectRepoIntegration> => {
     const r = await makeRequest(
