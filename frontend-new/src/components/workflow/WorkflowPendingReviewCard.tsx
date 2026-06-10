@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { WorkflowPendingReviewData } from '@/lib/api';
 import { localizeWorkflowGeneratedText } from './workflowGeneratedText';
@@ -102,39 +101,57 @@ export function WorkflowPendingReviewCard({
   };
 
   return (
-    <div className="workflow-pending-review-card rounded-[0_12px_12px_0] border border-[var(--hairline)] border-l-2 border-l-[var(--primary)] bg-[var(--surface-1)] p-4">
-      <div className="mb-2 flex items-center gap-2 text-xs font-bold text-[var(--primary)]">
-        <AlertCircle className="w-4 h-4" />
-        {t('workflow.pendingReview.title', { defaultValue: 'Pending Review' })}
+    <div className="workflow-pending-review-card relative overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] p-4 shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
+      {/* Left accent line with subtle glow */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-[2.5px] bg-[#6e8de8]"
+        style={{
+          boxShadow: '0 0 6px 0 rgba(110, 141, 232, 0.4)',
+        }}
+      />
+
+      {/* Header */}
+      <div className="mb-3 flex items-center gap-1.5">
+        <span className="inline-block w-[5px] h-[5px] rounded-full bg-[var(--workflow-review-accent)] opacity-90" />
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--workflow-review-accent)]">
+          {t('workflow.pendingReview.title', { defaultValue: 'Pending Review' })}
+        </span>
       </div>
 
+      {/* Meta tags */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="rounded-full border border-[var(--hairline)] bg-[var(--primary-tint)] px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.04em] text-[var(--primary)]">
+        <span className="font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--workflow-review-meta)]">
           {getReviewTypeLabel(pendingReview.review_type, t)}
         </span>
-        <span className="rounded-full border border-[var(--hairline)] bg-[var(--surface-2)] px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.04em] text-[var(--ink-subtle)]">
+        <span className="text-[var(--workflow-review-separator)] opacity-80">·</span>
+        <span className="font-mono text-[10px] font-medium text-[var(--workflow-review-target)] truncate max-w-[200px]">
           {pendingReview.target_title}
         </span>
       </div>
 
-      <p className="mb-3 text-[11px] font-medium leading-relaxed text-[var(--ink-muted)]">
+      {/* Review message */}
+      <p className="mb-3 text-[11px] font-medium leading-[1.6] text-[var(--workflow-review-body)]">
         {reviewMessage}
       </p>
 
+      {/* Context section */}
       {pendingReview.context_summary && (
-        <div className="mb-3 rounded-lg border border-[var(--hairline)] bg-[var(--surface-2)] p-3">
-          <div className="mb-1 font-mono text-[10px] font-medium uppercase tracking-[0.04em] text-[var(--ink-tertiary)]">
+        <div className="mb-3 relative pl-3">
+          {/* Left guide line */}
+          <div className="absolute left-0 top-0.5 bottom-0.5 w-[1.5px] rounded-full bg-[var(--hairline-strong)] opacity-60" />
+          <div className="mb-1 font-mono text-[9px] font-medium uppercase tracking-[0.1em] text-[var(--workflow-review-label)]">
             {t('workflow.pendingReview.context', { defaultValue: 'Context' })}
           </div>
-          <div className="whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--ink-muted)]">
+          <div className="whitespace-pre-wrap text-[11px] leading-[1.6] text-[var(--workflow-review-body)]">
             {localizeWorkflowGeneratedText(pendingReview.context_summary, t)}
           </div>
         </div>
       )}
 
+      {/* Reject feedback area */}
       {expandedReject && (
         <div className="mb-3">
-          <div className="mb-1 font-mono text-[10px] font-medium uppercase tracking-[0.04em] text-[var(--workflow-danger,#ef4444)]">
+          <div className="mb-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.1em] text-[var(--workflow-danger,#ef4444)] opacity-80">
             {feedbackLabel}
           </div>
           <textarea
@@ -143,22 +160,23 @@ export function WorkflowPendingReviewCard({
             rows={3}
             disabled={disabled}
             placeholder={feedbackPlaceholder}
-            className="w-full rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)] focus:outline-2 focus:outline-[color-mix(in_srgb,var(--primary-focus)_48%,transparent)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded border border-[var(--hairline-strong)] bg-[var(--surface-2)] px-3 py-2 text-[11px] leading-[1.6] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-tertiary)] placeholder:opacity-60 focus:border-[var(--primary)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
           {validationError && (
-            <div className="mt-1 text-[10px] text-[var(--workflow-danger,#ef4444)]">
+            <div className="mt-1 text-[10px] text-[var(--workflow-danger,#ef4444)] opacity-90">
               {validationError}
             </div>
           )}
         </div>
       )}
 
+      {/* Action buttons */}
       <div className="flex gap-2">
         <button
           type="button"
           onClick={handleApprove}
           disabled={disabled || !onSubmit}
-          className="flex-1 rounded-lg bg-[var(--success)] py-1.5 font-mono text-[10px] font-medium text-[var(--on-primary)] transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex-1 rounded py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.04em] transition-all disabled:cursor-not-allowed disabled:opacity-40 border border-[#6e8de8]/30 text-[var(--workflow-review-accent)] bg-[#6e8de8]/8 hover:bg-[#6e8de8]/14 hover:border-[#6e8de8]/50"
         >
           {t('workflow.pendingReview.approve', { defaultValue: 'APPROVE' })}
         </button>
@@ -166,10 +184,10 @@ export function WorkflowPendingReviewCard({
           type="button"
           onClick={handleReject}
           disabled={disabled || !onSubmit}
-          className={`flex-1 rounded-lg py-1.5 font-mono text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+          className={`flex-1 rounded py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.04em] transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
             expandedReject
-              ? 'border border-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_30%,var(--hairline))] bg-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_10%,var(--surface-1))] text-[var(--workflow-danger,#ef4444)]'
-              : 'border border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-muted)] hover:bg-[var(--surface-3)]'
+              ? 'border border-[rgba(229,72,77,0.3)] bg-transparent text-[#E5484D] hover:bg-[rgba(229,72,77,0.08)]'
+              : 'border border-transparent bg-transparent text-[#E5484D] hover:bg-[rgba(229,72,77,0.06)]'
           }`}
         >
           {expandedReject

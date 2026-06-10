@@ -655,6 +655,54 @@ body[data-mode="light"] .issue-page [class~="text-[#5e6ad2]"] {
   --settings-font-size: 13px;
 }
 
+.chat-markdown-copy-button {
+  background: var(--surface-3);
+  border-color: var(--hairline-strong);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.chat-markdown-copy-button:hover {
+  background: var(--surface-4);
+  color: var(--on-primary);
+}
+
+.chat-markdown-copy-button .chat-markdown-copy-check {
+  display: none;
+}
+
+.chat-markdown-copy-button[data-copied="true"] {
+  background: color-mix(in srgb, var(--success) 18%, var(--surface-3));
+  border-color: color-mix(in srgb, var(--success) 38%, var(--hairline-strong));
+  color: var(--ink);
+}
+
+.chat-markdown-copy-button[data-copied="true"]
+  .chat-markdown-copy-clipboard {
+  display: none;
+}
+
+.chat-markdown-copy-button[data-copied="true"] .chat-markdown-copy-check {
+  display: block;
+}
+
+body[data-mode="light"] .chat-markdown-copy-button {
+  background: var(--surface-1);
+  border-color: var(--hairline-strong);
+  color: var(--ink-muted);
+}
+
+body[data-mode="light"] .chat-markdown-copy-button:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+body[data-mode="light"] .chat-markdown-copy-button[data-copied="true"] {
+  background: color-mix(in srgb, var(--success) 10%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--success) 34%, var(--hairline-strong));
+  color: var(--success);
+}
+
 /* Workflow theme adapter
    The workflow UI components now use CSS variables natively (var(--canvas),
    var(--surface-1), var(--primary), etc.). This minimal adapter handles
@@ -695,12 +743,95 @@ body[data-mode="light"] .issue-page [class~="text-[#5e6ad2]"] {
   letter-spacing: -0.01em;
 }
 
+.workflow-pending-review-card {
+  --workflow-review-accent: #8baaf7;
+  --workflow-review-meta: #c8d0dc;
+  --workflow-review-target: #aeb8c8;
+  --workflow-review-body: #dce3ed;
+  --workflow-review-label: #aeb8c8;
+  --workflow-review-separator: #8a93a3;
+}
+
+body[data-mode="light"] .workflow-pending-review-card {
+  --workflow-review-accent: #4f5fc8;
+  --workflow-review-meta: #3f4654;
+  --workflow-review-target: #4b5563;
+  --workflow-review-body: #242832;
+  --workflow-review-label: #4b5563;
+  --workflow-review-separator: #6b7280;
+}
+
+.workflow-review-notification {
+  --workflow-notification-bg: #161618;
+  --workflow-notification-border: #2a2a2e;
+  --workflow-notification-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --workflow-notification-accent: #6e8de8;
+  --workflow-notification-label: #8b8b9a;
+  --workflow-notification-badge-text: #5a5a6a;
+  --workflow-notification-badge-border: #3a3a44;
+  --workflow-notification-title: #e0e0e6;
+  --workflow-notification-message: rgba(224, 224, 230, 0.62);
+  --workflow-notification-action-border: rgba(110, 141, 232, 0.4);
+  --workflow-notification-action-text: #8baaf7;
+  --workflow-notification-action-hover-bg: rgba(110, 141, 232, 0.1);
+  --workflow-notification-action-hover-border: rgba(110, 141, 232, 0.6);
+  --workflow-notification-secondary-bg: #1e1e22;
+  --workflow-notification-secondary-text: #6a6a7a;
+  --workflow-notification-secondary-hover-bg: #252528;
+  --workflow-notification-secondary-hover-text: #8b8b9a;
+}
+
+body[data-mode="light"] .workflow-review-notification {
+  --workflow-notification-bg: #ffffff;
+  --workflow-notification-border: #dfe3ea;
+  --workflow-notification-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  --workflow-notification-accent: #4f5fc8;
+  --workflow-notification-label: #4b5563;
+  --workflow-notification-badge-text: #5b6472;
+  --workflow-notification-badge-border: #cbd5e1;
+  --workflow-notification-title: #111827;
+  --workflow-notification-message: #4b5563;
+  --workflow-notification-action-border: rgba(79, 95, 200, 0.36);
+  --workflow-notification-action-text: #4f5fc8;
+  --workflow-notification-action-hover-bg: rgba(79, 95, 200, 0.08);
+  --workflow-notification-action-hover-border: rgba(79, 95, 200, 0.55);
+  --workflow-notification-secondary-bg: #f1f3f7;
+  --workflow-notification-secondary-text: #4b5563;
+  --workflow-notification-secondary-hover-bg: #e6e9f0;
+  --workflow-notification-secondary-hover-text: #111827;
+}
+
+.workflow-card-surface {
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--surface-1) 86%, var(--canvas));
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.workflow-card-surface:hover {
+  border-color: color-mix(in srgb, var(--hairline-strong) 62%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 92%, var(--canvas));
+}
+
+.workflow-card-graph-window {
+  border: 1px solid color-mix(in srgb, var(--hairline) 78%, transparent);
+  background: #111214;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -18px 36px rgba(0, 0, 0, 0.12);
+}
+
 /* WorkflowWindow inspector: legacy slate overrides
    The inspector panel in WorkflowWindow still uses some hardcoded slate classes.
    These minimal rules ensure it maps correctly to our token system. */
 .workflow-window-root {
   background: var(--surface-2) !important;
   color: var(--ink) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
 }
 
 /* Unified icon stroke weight — 1.5px monoline for all lucide icons */
@@ -805,6 +936,48 @@ body[data-mode="light"] .issue-page [class~="text-[#5e6ad2]"] {
   background-color: var(--surface-2) !important;
   border-color: var(--hairline-strong) !important;
   color: var(--ink) !important;
+}
+
+/* Light mode: WorkflowWindow inspector/details */
+body[data-mode="light"] .workflow-window-root {
+  background: var(--surface-2) !important;
+  color: var(--ink) !important;
+}
+
+body[data-mode="light"] .workflow-window-root [class*="text-[#F2F2F3]"],
+body[data-mode="light"] .workflow-window-root [class*="text-[#F3F6FB]"],
+body[data-mode="light"] .workflow-window-root [class*="text-[#F7F8F8]"] {
+  color: var(--ink) !important;
+}
+
+body[data-mode="light"] .workflow-window-root [class*="text-[#A0A5B1]"] {
+  color: var(--ink-muted) !important;
+}
+
+body[data-mode="light"] .workflow-window-root [class*="text-[#8A8F98]"],
+body[data-mode="light"] .workflow-window-root [class*="text-[#6E7681]"],
+body[data-mode="light"] .workflow-window-root [class*="text-[rgba(255,255,255,0.3)]"],
+body[data-mode="light"] .workflow-window-root [class*="text-[rgba(255,255,255,0.4)]"] {
+  color: var(--ink-subtle) !important;
+}
+
+body[data-mode="light"] .workflow-window-root [class*="text-[rgba(255,255,255,0.15)]"] {
+  color: var(--ink-tertiary) !important;
+}
+
+body[data-mode="light"] .workflow-window-root [class*="border-[rgba(255,255,255,0.06)]"],
+body[data-mode="light"] .workflow-window-root [class*="border-[rgba(255,255,255,0.08)]"],
+body[data-mode="light"] .workflow-window-root [class*="border-[rgba(255,255,255,0.1)]"],
+body[data-mode="light"] .workflow-window-root [class*="border-[rgba(255,255,255,0.12)]"] {
+  border-color: var(--hairline) !important;
+}
+
+body[data-mode="light"] .workflow-window-root [class*="bg-[rgba(255,255,255,0.04)]"] {
+  background-color: var(--surface-3) !important;
+}
+
+body[data-mode="light"] .workflow-window-root [class~="bg-[#18181B]"] {
+  background-color: var(--mono-bg) !important;
 }
 
 /* Graph board grid background */
@@ -1027,6 +1200,10 @@ body[data-mode="light"] .workflow-graph-board [data-workflow-node] [class*="text
   color: #111827 !important;
 }
 
+body[data-mode="light"] .workflow-graph-board [data-workflow-node] [class*="text-[#F3F6FB]"] {
+  color: #111827 !important;
+}
+
 body[data-mode="light"] .workflow-graph-board [data-workflow-node] [class*="text-[rgba(255,255,255,0.15)]"] {
   color: rgba(0, 0, 0, 0.2) !important;
 }
@@ -1058,4 +1235,41 @@ body[data-mode="light"] .workflow-graph-board > .absolute.top-4.right-4 button {
 body[data-mode="light"] .workflow-graph-board > .absolute.top-4.right-4 button:hover {
   background: var(--surface-3) !important;
   color: #111827 !important;
+}
+
+body[data-mode="light"] .workflow-graph-board > .absolute.bottom-4.right-4 button {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #6b7280 !important;
+}
+
+body[data-mode="light"] .workflow-graph-board > .absolute.bottom-4.right-4 button:hover {
+  background: var(--surface-3) !important;
+  color: #111827 !important;
+}
+
+.workflow-graph-board.workflow-card-graph-board {
+  background-color: #111214 !important;
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.09) 1px,
+    transparent 1px
+  ) !important;
+  background-size: 18px 18px !important;
+  background-position: 0 0 !important;
+}
+
+body[data-mode="light"] .workflow-card-graph-window {
+  background: #f5f6f8;
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -18px 36px rgba(15, 23, 42, 0.04);
+}
+
+body[data-mode="light"] .workflow-graph-board.workflow-card-graph-board {
+  background-color: #f6f7f9 !important;
+  background-image: radial-gradient(
+    rgba(15, 23, 42, 0.08) 1px,
+    transparent 1px
+  ) !important;
 }

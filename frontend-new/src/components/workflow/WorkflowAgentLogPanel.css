@@ -1,0 +1,307 @@
+/* ---------------------------------------------------------------------------
+ * Workflow Agent Log Panel — Linear-inspired minimal progress tracker
+ * --------------------------------------------------------------------------- */
+
+/* Panel container */
+.wf-log-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  padding: 16px 20px;
+  font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.8;
+  background: var(--surface-2, #141516);
+}
+
+.wf-log-panel--empty {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--ink-tertiary, #62666d);
+}
+
+.wf-log-panel-message {
+  font-size: 12px;
+  color: var(--ink-tertiary, #62666d);
+}
+
+/* Scrollbar */
+.wf-log-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.wf-log-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.wf-log-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+.wf-log-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+body[data-mode="light"] .workflow-window-root .wf-log-panel::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+body[data-mode="light"] .workflow-window-root .wf-log-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* Group */
+.wf-log-group {
+  padding-bottom: 12px;
+}
+
+.wf-log-group + .wf-log-group {
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+  margin-top: 12px;
+}
+
+.wf-log-group-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.wf-log-group-agent {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink, #f7f8f8);
+  letter-spacing: 0.02em;
+}
+
+body[data-mode="light"] .workflow-window-root .wf-log-group + .wf-log-group {
+  border-top-color: rgba(0, 0, 0, 0.16);
+}
+
+.wf-log-group-tasks {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Task Row */
+.wf-log-task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 1px 0;
+  min-height: 20px;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Content rows (body text) keep normal size */
+.wf-log-task-row--content {
+  font-size: 12px;
+  min-height: 24px;
+  padding: 2px 0;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+/* Status column (fixed width for vertical alignment) */
+.wf-log-task-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.wf-log-task-row--content .wf-log-task-status {
+  width: 14px;
+}
+
+/* Error cross — Lucide icon */
+.wf-log-error-x-icon {
+  width: 10px;
+  height: 10px;
+  color: #e5484d;
+  stroke-width: 2.5;
+}
+
+/* Spinner — rotating ring */
+.wf-log-spinner {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--ink-subtle, #8a8f98);
+  border-radius: 50%;
+  animation: wf-log-spin 0.7s linear infinite;
+}
+
+.wf-log-task-row--content .wf-log-spinner {
+  width: 11px;
+  height: 11px;
+}
+
+@keyframes wf-log-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Tool icon column */
+.wf-log-task-tool-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.wf-log-task-row--content .wf-log-task-tool-icon {
+  width: 14px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.wf-log-task-tool-icon--dimmed {
+  opacity: 0.4;
+}
+
+/* Action keyword — subdued, almost hidden */
+.wf-log-task-label {
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+/* Content rows restore label size */
+.wf-log-task-row--content .wf-log-task-label {
+  font-size: 12px;
+}
+
+/* Target (file path, tool name) — tool calls use muted gray, content stays bright */
+.wf-log-task-target {
+  flex: 1;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 10px;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body[data-mode="light"] .workflow-window-root .wf-log-task-tool-icon {
+  color: rgba(0, 0, 0, 0.25);
+}
+
+body[data-mode="light"] .workflow-window-root .wf-log-task-label {
+  color: rgba(0, 0, 0, 0.25);
+}
+
+body[data-mode="light"] .workflow-window-root .wf-log-task-target {
+  color: rgba(0, 0, 0, 0.38);
+}
+
+/* Content-type tasks (skill output, think) keep high-contrast text */
+.wf-log-task-row--content .wf-log-task-target {
+  color: var(--ink, #f7f8f8);
+  font-size: 12px;
+}
+
+/* Content entry — markdown body text */
+.wf-log-task-content {
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+}
+
+.wf-log-markdown {
+  font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink, #f7f8f8);
+}
+
+.wf-log-markdown p {
+  margin: 0;
+}
+
+.wf-log-markdown code {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 11px;
+}
+
+.wf-log-markdown pre {
+  margin: 6px 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow-x: auto;
+}
+
+.wf-log-markdown pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+  font-size: 11px;
+}
+
+body[data-mode="light"] .workflow-window-root .wf-log-markdown pre {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.wf-log-markdown strong {
+  color: var(--ink, #f7f8f8);
+  font-weight: 500;
+}
+
+.wf-log-markdown em {
+  color: var(--ink-subtle, #8a8f98);
+}
+
+.wf-log-markdown a {
+  color: var(--primary, #5e6ad2);
+  text-decoration: none;
+}
+
+.wf-log-markdown a:hover {
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
+ * Inline variant — used by AgentActivityPanel in the main chat
+ * --------------------------------------------------------------------------- */
+
+.wf-log-panel-inline {
+  font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.8;
+  margin-top: 4px;
+  max-height: 480px;
+  overflow: hidden;
+}
+
+/* Content text (non-tool body lines) */
+.wf-log-task-content-text {
+  flex: 1;
+  min-width: 0;
+  font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ink, #f7f8f8);
+}
+
+.wf-log-task-content-text--error {
+  color: #e5484d;
+}

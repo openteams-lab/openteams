@@ -299,10 +299,12 @@ const mergePersistedWithRunningPlaceholders = (
       .filter((runId): runId is string => Boolean(runId)),
   );
   const placeholdersByKey = new Map<string, Message>();
+  let hasRunIdPlaceholder = false;
   for (const message of current) {
     if (!message.isAgentRunning || persistedIds.has(message.id)) continue;
     if (message.runId && persistedRunIds.has(message.runId)) continue;
     const key = message.runId ?? message.id;
+    if (message.runId) hasRunIdPlaceholder = true;
     const existing = placeholdersByKey.get(key);
     const existingLineCount = existing?.activityLines?.length ?? 0;
     const nextLineCount = message.activityLines?.length ?? 0;
@@ -310,6 +312,17 @@ const mergePersistedWithRunningPlaceholders = (
       placeholdersByKey.set(key, message);
     }
   }
+
+  // If a real run placeholder exists, discard any pending placeholders (no runId)
+  // to avoid showing duplicates.
+  if (hasRunIdPlaceholder) {
+    for (const [key, message] of placeholdersByKey) {
+      if (!message.runId && isPendingAgentPlaceholder(message)) {
+        placeholdersByKey.delete(key);
+      }
+    }
+  }
+
   const placeholders = [...placeholdersByKey.values()];
 
   return placeholders.length > 0 ? [...persisted, ...placeholders] : persisted;

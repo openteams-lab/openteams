@@ -465,10 +465,10 @@ export function ChatMarkdown({
               title="Copy as Markdown"
               onClick={handleCopy}
               data-copied="false"
-              className="group/copy pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white/95 text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 data-[copied=true]:border-emerald-200 data-[copied=true]:text-emerald-600"
+              className="chat-markdown-copy-button pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
             >
-              <Clipboard className="h-4 w-4 group-data-[copied=true]/copy:hidden" />
-              <Check className="hidden h-4 w-4 group-data-[copied=true]/copy:block" />
+              <Clipboard className="chat-markdown-copy-clipboard h-4 w-4" />
+              <Check className="chat-markdown-copy-check h-4 w-4" />
             </button>
           </div>
         </div>

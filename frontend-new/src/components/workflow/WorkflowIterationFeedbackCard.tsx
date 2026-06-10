@@ -50,7 +50,7 @@ export function WorkflowIterationFeedbackCard({
   onSubmit,
 }: WorkflowIterationFeedbackCardProps) {
   const { t } = useTranslation('chat');
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [expandedReject, setExpandedReject] = useState(false);
   const [whatWrong, setWhatWrong] = useState('');
   const [expected, setExpected] = useState('');

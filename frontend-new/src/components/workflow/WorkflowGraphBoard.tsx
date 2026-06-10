@@ -898,8 +898,8 @@ export function WorkflowGraphBoard({
       style={{
         touchAction: 'none',
         backgroundColor: 'var(--workflow-board-bg, #F1F5F9)',
-        height: compact ? 320 : '100%',
-        minHeight: compact ? 320 : 0,
+        height: compact ? 240 : '100%',
+        minHeight: compact ? 240 : 0,
       }}
     >
       <div className="absolute top-4 left-4 pointer-events-none z-10 text-xs text-slate-600 font-medium flex flex-col gap-1">

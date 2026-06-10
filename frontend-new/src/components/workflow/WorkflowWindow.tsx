@@ -9,7 +9,6 @@ import {
   Play,
   Pause,
   Square,
-  Bell,
   X,
   Send,
   AlertCircle,
@@ -32,6 +31,7 @@ import { WorkflowIterationFeedbackCard } from './WorkflowIterationFeedbackCard';
 import { WorkflowGraphBoard } from './WorkflowGraphBoard';
 import { WorkflowPendingInputCard } from './WorkflowPendingInputCard';
 import { WorkflowPendingReviewCard } from './WorkflowPendingReviewCard';
+import { WorkflowAgentLogPanel } from './WorkflowAgentLogPanel';
 import {
   workflowExecutionStatusLabel,
   workflowStatusBadgeClass,
@@ -109,15 +109,15 @@ const REVIEW_SETTINGS_ACTIVE_EXECUTION_ERROR =
   'Review settings can only be changed while execution is not running or waiting for review.';
 const workflowDetailMarkdownTextClassName = [
   'text-[14px] text-[#A0A5B1] leading-[1.6]',
-  '[&_h1]:text-[#F7F8F8] [&_h1]:font-semibold [&_h1]:text-[16px] [&_h1]:mb-3 [&_h1]:mt-6',
-  '[&_h2]:text-[#F7F8F8] [&_h2]:font-semibold [&_h2]:text-[15px] [&_h2]:mb-3 [&_h2]:mt-5',
-  '[&_h3]:text-[#F7F8F8] [&_h3]:font-medium [&_h3]:text-[14px] [&_h3]:mb-2 [&_h3]:mt-4',
+  '[&_h1]:text-[#F2F2F3] [&_h1]:font-semibold [&_h1]:text-[16px] [&_h1]:mb-3 [&_h1]:mt-6',
+  '[&_h2]:text-[#F2F2F3] [&_h2]:font-semibold [&_h2]:text-[15px] [&_h2]:mb-3 [&_h2]:mt-5',
+  '[&_h3]:text-[#F2F2F3] [&_h3]:font-medium [&_h3]:text-[14px] [&_h3]:mb-2 [&_h3]:mt-4',
   '[&_p]:mb-3',
   '[&_ul]:mb-3 [&_ul]:pl-4',
   '[&_ol]:mb-3 [&_ol]:pl-4',
   '[&_li]:mb-2 [&_li]:text-[#A0A5B1]',
   '[&_li::marker]:text-[rgba(255,255,255,0.3)]',
-  '[&_strong]:text-[#F7F8F8] [&_strong]:font-medium',
+  '[&_strong]:text-[#F2F2F3] [&_strong]:font-medium',
   '[&_em]:text-[#8A8F98]',
   '[&_blockquote]:border-l-2 [&_blockquote]:border-[rgba(255,255,255,0.1)] [&_blockquote]:pl-4 [&_blockquote]:text-[#8A8F98] [&_blockquote]:italic',
   '[&_:not(pre)>code]:bg-[rgba(94,106,210,0.08)]',
@@ -733,13 +733,6 @@ function InspectorCard({
   onActiveTabChange: (tab: ExecutionRecordTab) => void;
 }) {
   const { t } = useTranslation('chat');
-  const [expandedLogLines, setExpandedLogLines] = useState<Set<string>>(
-    () => new Set()
-  );
-  const [collapsedLogGroups, setCollapsedLogGroups] = useState<Set<string>>(
-    () => new Set()
-  );
-
   const instruction =
     planNode?.data.instructions?.trim() ||
     t('workflow.inspector.noInstructions', {
@@ -824,32 +817,6 @@ function InspectorCard({
       ),
     [transcriptEntries]
   );
-  const toggleLogLine = (lineKey: string) => {
-    setExpandedLogLines((current) => {
-      const next = new Set(current);
-      if (next.has(lineKey)) next.delete(lineKey);
-      else next.add(lineKey);
-      return next;
-    });
-  };
-  const toggleLogGroupVisibility = (groupKey: string, lineKeys: string[]) => {
-    const wasCollapsed = collapsedLogGroups.has(groupKey);
-    setCollapsedLogGroups((current) => {
-      const next = new Set(current);
-      if (wasCollapsed) next.delete(groupKey);
-      else next.add(groupKey);
-      return next;
-    });
-    setExpandedLogLines((lines) => {
-      const expanded = new Set(lines);
-      for (const key of lineKeys) {
-        if (wasCollapsed) expanded.add(key);
-        else expanded.delete(key);
-      }
-      return expanded;
-    });
-  };
-
   return (
     <motion.div
       initial={{ x: 60, opacity: 0 }}
@@ -928,12 +895,12 @@ function InspectorCard({
       <div className="flex-1 overflow-hidden relative">
         {activeTab === 'DETAILS' ? (
           <div className="absolute inset-0 p-8 overflow-y-auto bg-[var(--surface-2)]">
-            <h2 className="text-[17px] font-semibold mb-3 text-[#F7F8F8] tracking-[-0.01em]">
+            <h2 className="text-[17px] font-semibold mb-3 text-[#F3F6FB] tracking-[-0.01em]">
               {step.title}
             </h2>
 
             <div className="mb-8 flex flex-wrap items-baseline gap-2 text-[10px] text-[#8A8F98] font-normal">
-              <span className="inline-flex items-center gap-1">
+              <span className="relative top-[0.5px] inline-flex items-center gap-1">
                 <Bot className="w-3 h-3 relative top-[0.5px]" /> {agentName}
               </span>
               <span className="w-[3px] h-[3px] rounded-full bg-[#3A3B3E]"></span>
@@ -1117,98 +1084,18 @@ function InspectorCard({
             )}
           </div>
         ) : (
-          <div className="absolute inset-0 bg-slate-900 text-slate-300 flex flex-col">
-            {isLoadingTranscript ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-xs text-slate-500">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {t('workflow.inspector.loadingLogs', {
-                  defaultValue: 'Loading logs...',
-                })}
-              </div>
-            ) : agentLogGroups.length > 0 ? (
-              agentLogGroups.map((group, groupIndex) => {
-                const groupLineKeys = group.lines.map((line) => line.key);
-                const allExpanded = groupLineKeys.every((key) =>
-                  expandedLogLines.has(key)
-                );
-                const isGroupCollapsed = collapsedLogGroups.has(group.key);
-                return (
-                  <div
-                    key={group.key}
-                    className={cn(
-                      'overflow-hidden flex flex-col',
-                      isGroupCollapsed ? 'shrink-0' : 'flex-1 min-h-[50%]',
-                      groupIndex < agentLogGroups.length - 1 &&
-                        'border-b border-slate-700'
-                    )}
-                  >
-                    <div className="bg-slate-900 border-b border-slate-800 p-2 px-5 text-xs text-slate-500 font-mono flex justify-between items-center z-10 shrink-0">
-                      <span className="inline-flex min-w-0 items-center gap-2">
-                        <Bot className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                        <span className="truncate">
-                          {t('workflow.inspector.thinkingProcess', {
-                            agentName: group.agentName,
-                            defaultValue: `${group.agentName} - Thinking Process`,
-                          })}
-                        </span>
-                      </span>
-                      <button
-                        type="button"
-                        className="px-2 py-0.5 text-[10px] rounded-sm bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-                        onClick={() =>
-                          toggleLogGroupVisibility(group.key, groupLineKeys)
-                        }
-                      >
-                        {isGroupCollapsed || !allExpanded
-                          ? t('workflow.inspector.expand', {
-                              defaultValue: 'Expand',
-                            })
-                          : t('workflow.inspector.collapse', {
-                              defaultValue: 'Collapse',
-                            })}
-                      </button>
-                    </div>
-                    {!isGroupCollapsed && (
-                      <div className="flex-1 overflow-y-auto flex flex-col font-mono p-4 pb-8 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-600">
-                        {group.lines.map((line) => {
-                          const expanded = expandedLogLines.has(line.key);
-                          return (
-                            <div
-                              key={line.key}
-                              className="flex items-start px-2 py-0.5 text-[11px] text-slate-300 hover:bg-slate-800"
-                            >
-                              <span className="mr-4 shrink-0 select-none text-slate-500">
-                                [{line.timestamp}]
-                              </span>
-                              <button
-                                type="button"
-                                title={line.content}
-                                onClick={() => toggleLogLine(line.key)}
-                                className={cn(
-                                  'flex-1 text-left overflow-hidden text-ellipsis',
-                                  expanded
-                                    ? 'whitespace-pre-wrap break-all'
-                                    : 'whitespace-nowrap',
-                                  line.isError && 'text-red-400'
-                                )}
-                              >
-                                {line.content}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            ) : (
-              <div className="flex items-center justify-center py-8 text-xs text-slate-500">
-                {t('workflow.inspector.noLogs', {
-                  defaultValue: 'No logs for this step yet.',
-                })}
-              </div>
-            )}
+          <div className="absolute inset-0">
+            <WorkflowAgentLogPanel
+              agentLogGroups={agentLogGroups}
+              isLoading={isLoadingTranscript}
+              stepStatus={step.status}
+              emptyMessage={t('workflow.inspector.noLogs', {
+                defaultValue: 'No logs for this step yet.',
+              })}
+              loadingMessage={t('workflow.inspector.loadingLogs', {
+                defaultValue: 'Loading logs...',
+              })}
+            />
           </div>
         )}
       </div>
@@ -1548,7 +1435,7 @@ function ChatPanel({
                   <ChatMarkdown
                     content={markdownContent}
                     maxWidth="100%"
-                    textClassName="text-[13px] [&_:not(pre)>code]:bg-slate-100 [&_:not(pre)>code]:text-slate-800 [&_:not(pre)>code]:px-1.5 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:rounded-md"
+                    textClassName={workflowDetailMarkdownTextClassName}
                     className="w-full select-text"
                   />
                 ) : (
@@ -2432,84 +2319,88 @@ export function WorkflowWindow({
         />
 
         {/* Notifications Overlay */}
-        <div className="absolute top-6 right-6 flex flex-col gap-4 z-50 pointer-events-none">
+        <div className="absolute top-6 right-6 flex flex-col gap-3 z-50 pointer-events-none">
           <AnimatePresence>
             {notifications.map((notif) => (
               <motion.div
                 key={notif.id}
-                initial={{ opacity: 0, x: 100, scale: 0.95 }}
+                initial={{ opacity: 0, x: 80, scale: 0.97 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 100, scale: 0.95 }}
-                className="w-72 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden ring-4 ring-[#5094fb]/10 pointer-events-auto"
+                exit={{ opacity: 0, x: 80, scale: 0.97 }}
+                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                className="workflow-review-notification w-72 rounded-lg border border-[var(--workflow-notification-border)] bg-[var(--workflow-notification-bg)] [box-shadow:var(--workflow-notification-shadow)] pointer-events-auto relative overflow-hidden"
               >
-                <div className="bg-[#5094fb] p-2.5 flex items-center justify-between text-white">
-                  <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5">
-                    <Bell className="w-3.5 h-3.5" />{' '}
-                    {notif.type === 'input_request'
-                      ? t('workflow.notifications.pendingInput', {
-                          defaultValue: 'Input Required',
-                        })
-                      : t('workflow.notifications.pendingReview', {
-                          defaultValue: 'Pending Review',
-                        })}
-                  </span>
-                  <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">
-                    {notif.type === 'final_review'
-                      ? t('workflow.notifications.typeFinal', {
-                          defaultValue: 'Final',
-                        })
-                      : notif.type === 'input_request'
-                        ? t('workflow.notifications.typeInput', {
-                            defaultValue: 'Input',
+                {/* Left status accent line */}
+                <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[var(--workflow-notification-accent)]" />
+
+                <div className="p-3.5 pl-4">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--workflow-notification-accent)]" />
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--workflow-notification-label)]">
+                        {notif.type === 'input_request'
+                          ? t('workflow.notifications.pendingInput', {
+                              defaultValue: 'Input Required',
+                            })
+                          : t('workflow.notifications.pendingReview', {
+                              defaultValue: 'Pending Review',
+                            })}
+                      </span>
+                    </span>
+                    <span className="text-[10px] text-[var(--workflow-notification-badge-text)] border border-dashed border-[var(--workflow-notification-badge-border)] px-1.5 py-0.5 rounded">
+                      {notif.type === 'final_review'
+                        ? t('workflow.notifications.typeFinal', {
+                            defaultValue: 'Final',
                           })
-                        : t('workflow.notifications.typeStep', {
-                            defaultValue: 'Step',
-                          })}
-                  </span>
-                </div>
-                <div className="p-4 space-y-3">
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#5094fb]/10 flex items-center justify-center shrink-0">
-                      <AlertCircle className="w-5 h-5 text-[#5094fb]" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-slate-900 truncate">
-                        {notif.title}
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">
-                        {notif.message}
-                      </p>
-                    </div>
+                        : notif.type === 'input_request'
+                          ? t('workflow.notifications.typeInput', {
+                              defaultValue: 'Input',
+                            })
+                          : t('workflow.notifications.typeStep', {
+                              defaultValue: 'Step',
+                            })}
+                    </span>
                   </div>
-                  <div className="flex gap-2 mt-2">
+
+                  {/* Content */}
+                  <div className="mb-3">
+                    <p className="text-[13px] font-medium text-[var(--workflow-notification-title)] truncate leading-tight">
+                      {notif.title}
+                    </p>
+                    <p className="text-[11px] text-[var(--workflow-notification-message)] mt-1 leading-snug line-clamp-2">
+                      {notif.message}
+                    </p>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2">
                     {notif.type === 'final_review' &&
                     workflowFinalReviewAction ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenedReviewNotificationId(
-                              workflowFinalReviewAction.transcriptId
-                            )
-                          }
-                          disabled={
-                            pendingActionId ===
-                            workflowFinalReviewAction.executionId
-                          }
-                          className="flex-1 py-1.5 bg-[#5094fb] text-white rounded-md text-[10px] font-bold shadow-sm hover:bg-[#4080e0] transition-colors disabled:opacity-50"
-                        >
-                          {t('workflow.notifications.review', {
-                            defaultValue: 'REVIEW',
-                          })}
-                        </button>
-                      </>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenedReviewNotificationId(
+                            workflowFinalReviewAction.transcriptId
+                          )
+                        }
+                        disabled={
+                          pendingActionId ===
+                          workflowFinalReviewAction.executionId
+                        }
+                        className="flex-1 py-1.5 border border-[var(--workflow-notification-action-border)] text-[var(--workflow-notification-action-text)] rounded bg-transparent text-[10px] font-semibold uppercase tracking-[0.04em] hover:bg-[var(--workflow-notification-action-hover-bg)] hover:border-[var(--workflow-notification-action-hover-border)] transition-colors disabled:opacity-40"
+                      >
+                        {t('workflow.notifications.review', {
+                          defaultValue: 'REVIEW',
+                        })}
+                      </button>
                     ) : notif.type === 'input_request' ? (
                       <button
                         type="button"
                         onClick={() =>
                           openPendingReviewInChat(notif.id, notif.nodeId)
                         }
-                        className="flex-1 py-1.5 bg-[#5094fb] text-white rounded-md text-[10px] font-bold shadow-sm hover:bg-[#4080e0] transition-colors"
+                        className="flex-1 py-1.5 border border-[var(--workflow-notification-action-border)] text-[var(--workflow-notification-action-text)] rounded bg-transparent text-[10px] font-semibold uppercase tracking-[0.04em] hover:bg-[var(--workflow-notification-action-hover-bg)] hover:border-[var(--workflow-notification-action-hover-border)] transition-colors"
                       >
                         {t('workflow.notifications.respond', {
                           defaultValue: 'RESPOND',
@@ -2523,7 +2414,7 @@ export function WorkflowWindow({
                             openPendingReviewInChat(notif.id, notif.nodeId)
                           }
                           disabled={pendingActionId === notif.id}
-                          className="flex-1 py-1.5 bg-[#5094fb] text-white rounded-md text-[10px] font-bold shadow-sm hover:bg-[#4080e0] transition-colors disabled:opacity-50"
+                          className="flex-1 py-1.5 border border-[var(--workflow-notification-action-border)] text-[var(--workflow-notification-action-text)] rounded bg-transparent text-[10px] font-semibold uppercase tracking-[0.04em] hover:bg-[var(--workflow-notification-action-hover-bg)] hover:border-[var(--workflow-notification-action-hover-border)] transition-colors disabled:opacity-40"
                         >
                           {t('workflow.notifications.approve', {
                             defaultValue: 'APPROVE',
@@ -2534,7 +2425,7 @@ export function WorkflowWindow({
                           onClick={() =>
                             openPendingReviewInChat(notif.id, notif.nodeId)
                           }
-                          className="flex-1 py-1.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-bold hover:bg-slate-200 transition-colors"
+                          className="flex-1 py-1.5 text-[var(--workflow-notification-secondary-text)] rounded bg-[var(--workflow-notification-secondary-bg)] text-[10px] font-semibold uppercase tracking-[0.04em] hover:bg-[var(--workflow-notification-secondary-hover-bg)] hover:text-[var(--workflow-notification-secondary-hover-text)] transition-colors"
                         >
                           {t('workflow.notifications.viewDetails', {
                             defaultValue: 'VIEW DETAILS',
@@ -2589,7 +2480,7 @@ export function WorkflowWindow({
             </div>
           )}
 
-        {/* Side Panels ï¿?embedded in flex layout */}
+        {/* Side Panels ï¿½?embedded in flex layout */}
         {activeNodeId && activeStep && (
           <div className="flex h-full shrink-0 border-l border-[var(--hairline)]">
             {/* Chat Panel */}
@@ -2679,4 +2570,3 @@ export function WorkflowWindow({
         document.getElementById('app-main-content') ?? document.body
       );
 }
-

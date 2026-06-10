@@ -1,11 +1,9 @@
 import {
   ArrowClockwiseIcon,
-  CheckCircleIcon,
-  ClockIcon,
   PlayIcon,
-  WarningCircleIcon,
   PauseIcon,
 } from '@phosphor-icons/react';
+import { FolderOpen } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
@@ -445,26 +443,6 @@ export function ChatWorkflowCard({
     generationMeta?.retryable !== false &&
     !!onRetryPlanGeneration;
 
-  const stateIcon = isPlanGenerationFailed ? (
-    <WarningCircleIcon className="size-icon-sm text-[var(--workflow-danger,#ef4444)]" weight="fill" />
-  ) : isPlanGenerationPending ? (
-    <ClockIcon className="size-icon-sm text-[var(--primary)]" weight="fill" />
-  ) : isExecutionRecompiling ? (
-    <ClockIcon className="size-icon-sm text-[var(--primary)]" weight="fill" />
-  ) : !isPreview && executionStatus === 'completed' ? (
-    <CheckCircleIcon className="size-icon-sm text-[var(--success)]" weight="fill" />
-  ) : (!isPreview && executionStatus === 'failed') || isInvalid ? (
-    <WarningCircleIcon className="size-icon-sm text-[var(--workflow-danger,#ef4444)]" weight="fill" />
-  ) : projection.state === 'preview_ready' ? (
-    <PlayIcon className="size-icon-sm text-[var(--primary)]" weight="fill" />
-  ) : !isPreview && executionStatus === 'paused' ? (
-    <PauseIcon className="size-icon-sm text-[var(--ink-subtle)]" weight="fill" />
-  ) : !isPreview && executionStatus === 'waiting' ? (
-    <WarningCircleIcon className="size-icon-sm text-[var(--primary)]" weight="fill" />
-  ) : (
-    <ClockIcon className="size-icon-sm text-[var(--primary)]" weight="fill" />
-  );
-
   const stateLabel = isPlanGenerationFailed
     ? t('workflow.card.stateLabels.planGenerationFailed', {
         defaultValue: 'Plan Generation Failed',
@@ -487,63 +465,104 @@ export function ChatWorkflowCard({
               })
             : executionStatusLabel;
 
+  const progressTotal =
+    selectedRoundStepProgress.totalSteps || projection.total_step_count;
+  const progressCompleted =
+    selectedRoundStepProgress.totalSteps > 0
+      ? selectedRoundStepProgress.completedSteps
+      : projection.completed_step_count;
+  const progressPercent =
+    progressTotal > 0
+      ? Math.min(100, Math.round((progressCompleted / progressTotal) * 100))
+      : 0;
+  const progressSummary =
+    progressTotal > 0
+      ? `Round ${visibleRoundIndex} • ${progressPercent}% Complete`
+      : null;
+  const isFailedState =
+    isPlanGenerationFailed ||
+    isInvalid ||
+    (!isPreview && executionStatus === 'failed') ||
+    projection.state === 'failed';
+  const isCompletedState =
+    !isPreview &&
+    (executionStatus === 'completed' || projection.state === 'completed');
+  const isPausedState = !isPreview && executionStatus === 'paused';
+  const statusDotClassName = isFailedState
+    ? 'bg-[var(--workflow-danger,#ef4444)]'
+    : isCompletedState
+      ? 'bg-[var(--success)]'
+      : isPausedState
+        ? 'bg-[#D97706]'
+        : 'bg-[var(--primary)]';
+  const progressAccentClassName = isFailedState
+    ? 'bg-[var(--workflow-danger,#ef4444)]'
+    : isCompletedState
+      ? 'bg-[var(--success)]'
+      : isPausedState
+        ? 'bg-[#D97706]'
+        : 'bg-[var(--primary)]';
+  const quietButtonClassName =
+    'inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--hairline)] bg-transparent px-3 text-[12px] font-medium text-[var(--ink-muted)] transition-colors hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]';
+  const primaryButtonClassName =
+    'inline-flex h-8 items-center gap-1.5 rounded-md border border-[color-mix(in_srgb,var(--primary)_24%,var(--hairline))] bg-[color-mix(in_srgb,var(--primary)_16%,var(--surface-1))] px-3 text-[12px] font-semibold text-[var(--primary)] transition-colors hover:bg-[color-mix(in_srgb,var(--primary)_22%,var(--surface-1))] hover:text-[var(--primary-hover)]';
+  const shouldShowProgressInfo =
+    !projection.pending_review &&
+    !projection.pending_input &&
+    projection.execution_id &&
+    (projection.iteration_history.length > 0 || canReviewCurrentRound);
+
   return (
-    <div className="workflow-card-surface w-full max-w-[640px] rounded-xl border border-[var(--hairline)] bg-[var(--surface-1)] p-4 flex flex-col">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1 select-text">
-          <div className="flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--ink-subtle)]">
-            {stateIcon}
-            <span>{stateLabel}</span>
-          </div>
-          <div className="mt-2 text-[20px] font-semibold leading-tight text-[var(--ink)]">
-            {projection.title}
-          </div>
-          {isPlanGenerationCard ? (
-            <ChatMarkdown
-              content={displayGoal}
-              maxWidth="100%"
-              hideCopyButton
-              className="mt-2"
-              textClassName="text-sm leading-6 text-[var(--ink-muted)]"
-            />
-          ) : (
-            <div className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-              {displayGoal}
-            </div>
+    <div className="workflow-card-surface w-full max-w-[640px] rounded-lg px-5 py-5 flex flex-col">
+      <div className="min-w-0 select-text">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--ink-subtle)]">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${statusDotClassName}`}
+            aria-hidden="true"
+          />
+          <span>{stateLabel}</span>
+          {progressSummary && (
+            <>
+              <span className="text-[var(--ink-tertiary)]">•</span>
+              <span>{progressSummary}</span>
+            </>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-2 self-start">
-          {isPlanGenerationCard ? (
+        <div className="mt-2.5 text-[19px] font-semibold leading-snug text-[var(--ink)]">
+          {projection.title}
+        </div>
+        {isPlanGenerationCard ? (
+          <ChatMarkdown
+            content={displayGoal}
+            maxWidth="100%"
+            hideCopyButton
+            className="mt-2"
+            textClassName="text-[13px] leading-6 text-[var(--ink-muted)]"
+          />
+        ) : (
+          <div className="mt-2 text-[13px] leading-6 text-[var(--ink-muted)]">
+            {displayGoal}
+          </div>
+        )}
+        {progressSummary && (
+          <div className="mt-4 h-[2px] overflow-hidden rounded-full bg-[var(--surface-3)]">
             <div
-              className={
-                isPlanGenerationFailed
-                  ? 'whitespace-nowrap rounded-full border border-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_28%,var(--hairline))] bg-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_12%,var(--surface-1))] px-3 py-1 text-xs font-semibold text-[var(--workflow-danger,#ef4444)]'
-                  : 'whitespace-nowrap rounded-full border border-[color-mix(in_srgb,var(--primary)_28%,var(--hairline))] bg-[var(--primary-tint)] px-3 py-1 text-xs font-semibold text-[var(--primary)]'
-              }
-            >
-              {isPlanGenerationFailed
-                ? t('workflow.card.badges.failed', { defaultValue: 'Failed' })
-                : t('workflow.card.badges.generating', {
-                    defaultValue: 'Generating',
-                  })}
-            </div>
-          ) : (
-            <div className="whitespace-nowrap rounded-full border border-[color-mix(in_srgb,var(--primary)_28%,var(--hairline))] bg-[var(--primary-tint)] px-3 py-1 text-xs font-semibold text-[var(--primary)]">
-              {projection.completed_step_count}/{projection.total_step_count}
-            </div>
-          )}
-        </div>
+              className={`h-full rounded-full ${progressAccentClassName}`}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Agent list (preview/generation mode) */}
       {(isPreview || isPlanGenerationCard) &&
         projection.agents &&
         projection.agents.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-1.5">
             {projection.agents.map((agent) => (
               <span
                 key={agent.session_agent_id}
-                className="rounded-full border border-[var(--hairline)] bg-[var(--surface-2)] px-3 py-1 text-xs font-medium text-[var(--ink-muted)]"
+                className="rounded-md bg-[var(--surface-2)] px-2 py-1 text-[11px] font-medium text-[var(--ink-muted)]"
               >
                 {agent.name}
               </span>
@@ -552,7 +571,7 @@ export function ChatWorkflowCard({
         )}
 
       {hasWorkflowGraph ? (
-        <div className="mt-4">
+        <div className="workflow-card-graph-window mt-5 overflow-hidden rounded-lg">
           <WorkflowGraphBoard
             nodes={graphPlan.nodes}
             edges={graphPlan.edges}
@@ -562,11 +581,12 @@ export function ChatWorkflowCard({
             agents={projection.agents}
             onRetryStep={isViewingCurrentRound ? onRetryStep : undefined}
             pendingActionId={pendingActionId}
+            className="workflow-card-graph-board"
             compact
           />
         </div>
       ) : isPlanGenerationPending ? (
-        <div className="mt-4 rounded-xl border border-[color-mix(in_srgb,var(--primary)_28%,var(--hairline))] bg-[var(--primary-tint)] px-6 py-8 text-center">
+        <div className="mt-5 rounded-lg border border-[color-mix(in_srgb,var(--primary)_18%,var(--hairline))] bg-[color-mix(in_srgb,var(--primary)_8%,var(--surface-1))] px-6 py-8 text-center">
           <GeneratingPlanAnimation
             label={t('workflow.card.generatingPlan', {
               defaultValue: 'Generating workflow plan',
@@ -575,7 +595,7 @@ export function ChatWorkflowCard({
         </div>
       ) : (
         <div
-          className={`mt-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--hairline-strong)] bg-[var(--surface-2)] p-6 text-center ${
+          className={`mt-5 flex flex-col items-center justify-center rounded-lg border border-dashed border-[var(--hairline)] bg-[var(--surface-2)] p-6 text-center ${
             isPlanGenerationCard ? 'py-10' : 'h-[320px]'
           }`}
         >
@@ -604,11 +624,9 @@ export function ChatWorkflowCard({
         </div>
       )}
 
-      {!projection.pending_review &&
-        !projection.pending_input &&
-        projection.execution_id &&
-        (projection.iteration_history.length > 0 || canReviewCurrentRound) && (
-          <div className="mt-4">
+      {shouldShowProgressInfo ? (
+        <div className="mt-4 flex flex-wrap items-stretch gap-3">
+          <div className="min-w-0 flex-1">
             <WorkflowIterationFeedbackCard
               currentRound={visibleRoundIndex}
               completedSteps={selectedRoundStepProgress.completedSteps}
@@ -643,7 +661,30 @@ export function ChatWorkflowCard({
               }}
             />
           </div>
-        )}
+          <div className="flex shrink-0 items-center gap-2">
+            {onOpenWindow && !isPlanGenerationCard && (
+              <button
+                type="button"
+                onClick={onOpenWindow}
+                className={quietButtonClassName}
+              >
+                <FolderOpen className="size-3.5" />
+                {t('workflow.card.buttons.open', { defaultValue: 'Open' })}
+              </button>
+            )}
+            {canPauseExecution && projection.execution_id && onPauseAll && (
+              <button
+                type="button"
+                onClick={() => onPauseAll(projection.execution_id!)}
+                className={quietButtonClassName}
+              >
+                <PauseIcon className="size-3.5" weight="bold" />
+                {t('workflow.card.buttons.pauseAll', { defaultValue: 'Pause All' })}
+              </button>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {/* Validation errors (preview_invalid) */}
       {isInvalid && projection.validation_errors && (
@@ -658,12 +699,13 @@ export function ChatWorkflowCard({
       )}
 
       <div className="mt-4 flex items-center justify-end gap-2">
-        {onOpenWindow && !isPlanGenerationCard && (
+        {!shouldShowProgressInfo && onOpenWindow && !isPlanGenerationCard && (
           <button
             type="button"
             onClick={onOpenWindow}
-            className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-2)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-3)]"
+            className={quietButtonClassName}
           >
+            <FolderOpen className="size-3.5" />
             {t('workflow.card.buttons.open', { defaultValue: 'Open' })}
           </button>
         )}
@@ -673,31 +715,34 @@ export function ChatWorkflowCard({
             <button
               type="button"
               onClick={() => onExecute(projection)}
-              className="flex items-center gap-2 rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-[var(--on-primary)] transition-colors hover:bg-[var(--primary-hover)]"
+              className={primaryButtonClassName}
             >
-              <PlayIcon className="size-4" weight="bold" />
+              <PlayIcon className="size-3.5" weight="bold" />
               {t('workflow.card.buttons.executePlan', {
                 defaultValue: 'Execute Plan',
               })}
             </button>
-          )}
-        {canPauseExecution && projection.execution_id && onPauseAll && (
+        )}
+        {!shouldShowProgressInfo &&
+          canPauseExecution &&
+          projection.execution_id &&
+          onPauseAll && (
           <button
             type="button"
             onClick={() => onPauseAll(projection.execution_id!)}
-            className="flex items-center gap-2 rounded-lg border border-[var(--hairline)] bg-[var(--surface-2)] px-5 py-2 text-sm font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-3)]"
+            className={quietButtonClassName}
           >
-            <PauseIcon className="size-4" weight="bold" />
+            <PauseIcon className="size-3.5" weight="bold" />
             {t('workflow.card.buttons.pauseAll', { defaultValue: 'Pause All' })}
           </button>
-        )}
+          )}
         {canResumeExecution && projection.execution_id && onResume && (
           <button
             type="button"
             onClick={() => onResume(projection.execution_id!, projection)}
-            className="flex items-center gap-2 rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-[var(--on-primary)] transition-colors hover:bg-[var(--primary-hover)]"
+            className={primaryButtonClassName}
           >
-            <PlayIcon className="size-4" weight="bold" />
+            <PlayIcon className="size-3.5" weight="bold" />
             {t('workflow.card.buttons.resume', { defaultValue: 'Resume' })}
           </button>
         )}
@@ -706,11 +751,13 @@ export function ChatWorkflowCard({
             type="button"
             onClick={() => onRetryPlanGeneration?.(message.id)}
             disabled={retryPlanGenerationPending}
-            className="flex items-center gap-2 rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-[var(--on-primary)] transition-colors hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+            className={`${primaryButtonClassName} disabled:cursor-not-allowed disabled:opacity-50`}
           >
             <ArrowClockwiseIcon
               className={
-                retryPlanGenerationPending ? 'size-4 animate-spin' : 'size-4'
+                retryPlanGenerationPending
+                  ? 'size-3.5 animate-spin'
+                  : 'size-3.5'
               }
               weight="bold"
             />

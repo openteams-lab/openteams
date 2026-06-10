@@ -4,11 +4,9 @@ import React, {
   useLayoutEffect,
   useMemo,
   useRef,
-  useState,
 } from "react";
 import {
   Activity,
-  ChevronRight,
   ClipboardList,
   FilePenLine,
   FileText,
@@ -18,6 +16,7 @@ import {
   Search,
   Terminal,
   Wrench,
+  X as XIcon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ScrollArea";
 import {
@@ -27,6 +26,7 @@ import {
   type AgentActivityTranslator,
 } from "@/lib/agentActivityFormatter";
 import type { ActivityLoadState, ChatRunActivityLine } from "@/types";
+import "@/components/workflow/WorkflowAgentLogPanel.css";
 
 interface AgentActivityPanelLabels {
   loading: string;
@@ -61,18 +61,28 @@ const toolIconByKind: Record<
   activity: Activity,
 };
 
-const toolToneClass = (line: AgentActivityDisplayRow): string => {
-  switch (line.toolStatus) {
-    case "failed":
-    case "denied":
-    case "timed_out":
-      return "text-rose-500/80";
-    case "completed":
-      return "text-[var(--ink)]";
-    default:
-      return "text-[var(--ink-subtle)]";
-  }
-};
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Tool-call types that should be hidden while running */
+const TOOL_CALL_KINDS = new Set<AgentActivityToolKind>([
+  "command",
+  "file_read",
+  "file_edit",
+  "search",
+  "web_fetch",
+  "tool",
+  "mcp_tool",
+]);
+
+function isToolCallLine(line: AgentActivityDisplayRow): boolean {
+  return line.line_type === "tool" && !!line.toolKind && TOOL_CALL_KINDS.has(line.toolKind);
+}
+
+function isToolRunning(line: AgentActivityDisplayRow): boolean {
+  return line.toolStatus === "running" || line.toolStatus === "waiting_approval";
+}
 
 const renderSimpleBoldMarkdown = (content: string): React.ReactNode => {
   const parts: React.ReactNode[] = [];
@@ -112,6 +122,10 @@ const renderSimpleBoldMarkdown = (content: string): React.ReactNode => {
 
   return parts.length > 0 ? parts : content;
 };
+
+// ---------------------------------------------------------------------------
+// Auto-scroll hook
+// ---------------------------------------------------------------------------
 
 const isScrolledToBottom = (el: HTMLElement): boolean =>
   el.scrollHeight - el.scrollTop - el.clientHeight <=
@@ -196,94 +210,53 @@ const useAutoFollowScroll = (scrollSignal: string) => {
   };
 };
 
-const LineItem: React.FC<{ line: AgentActivityDisplayRow }> = ({ line }) => {
-  const [expanded, setExpanded] = useState(false);
-  const [overflows, setOverflows] = useState(false);
-  const textRef = useRef<HTMLSpanElement>(null);
+// ---------------------------------------------------------------------------
+// LineItem — Linear-style minimal row
+// ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    const el = textRef.current;
-    if (!el) return;
-    const updateOverflow = () => {
-      setOverflows(
-        el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight,
-      );
-    };
-    updateOverflow();
-    const frame = window.requestAnimationFrame(updateOverflow);
-    return () => window.cancelAnimationFrame(frame);
-  }, [line.content]);
-
-  const isTool = line.line_type === "tool";
-  const isError = line.line_type === "error";
-
-  const textColor = isError ? "text-rose-500/80" : "text-[var(--ink)]";
+const ToolLineItem: React.FC<{ line: AgentActivityDisplayRow }> = ({ line }) => {
   const ToolIcon = line.toolKind ? toolIconByKind[line.toolKind] : Wrench;
-  const rowClass =
-    "group flex w-full min-w-0 items-start gap-2 rounded-sm px-1 py-1 text-left text-[12px] leading-[1.5] transition hover:bg-[var(--surface-1)]/70";
-  const collapsedClass = "line-clamp-1 break-all";
-  const expandedClass = "whitespace-pre-wrap break-words";
-
-  if (isTool) {
-    return (
-      <button
-        type="button"
-        className={rowClass}
-        data-line-type={line.line_type}
-        onClick={() => overflows && setExpanded((v) => !v)}
-        aria-expanded={overflows ? expanded : undefined}
-      >
-        <ToolIcon className="mt-[3px] h-3 w-3 shrink-0 text-[var(--ink-tertiary)]" />
-        <span
-          ref={textRef}
-          className={`min-w-0 flex-1 text-[12px] ${toolToneClass(line)} ${
-            expanded ? expandedClass : collapsedClass
-          }`}
-        >
-          <span className="font-medium">{line.title}</span>
-          {line.detail && (
-            <span className="ml-1 font-mono text-[var(--ink-tertiary)]">
-              {line.detail}
-            </span>
-          )}
-        </span>
-        {overflows && (
-          <ChevronRight
-            className={`mt-[3px] h-3 w-3 shrink-0 text-[var(--ink-tertiary)] opacity-0 transition group-hover:opacity-100 ${
-              expanded ? "rotate-90 opacity-100" : ""
-            }`}
-          />
-        )}
-      </button>
-    );
-  }
+  const isError =
+    line.toolStatus === "failed" ||
+    line.toolStatus === "denied" ||
+    line.toolStatus === "timed_out";
 
   return (
-    <button
-      type="button"
-      className={rowClass}
-      data-line-type={line.line_type}
-      onClick={() => overflows && setExpanded((v) => !v)}
-      aria-expanded={overflows ? expanded : undefined}
-    >
-      <span
-        ref={textRef}
-        className={`min-w-0 flex-1 font-mono text-[12px] ${textColor} ${
-          expanded ? expandedClass : collapsedClass
-        }`}
-      >
-        {renderSimpleBoldMarkdown(line.content)}
+    <div className="wf-log-task-row">
+      <span className="wf-log-task-status">
+        {isError && <XIcon className="wf-log-error-x-icon" aria-label="error" />}
       </span>
-      {overflows && (
-        <ChevronRight
-          className={`mt-[3px] h-3 w-3 shrink-0 text-[var(--ink-tertiary)] opacity-0 transition group-hover:opacity-100 ${
-            expanded ? "rotate-90 opacity-100" : ""
-          }`}
-        />
+      <span className="wf-log-task-tool-icon">
+        <ToolIcon className="w-3 h-3" />
+      </span>
+      {line.title && <span className="wf-log-task-label">{line.title}</span>}
+      {line.detail && (
+        <span className="wf-log-task-target" title={line.detail}>
+          {line.detail}
+        </span>
       )}
-    </button>
+    </div>
   );
 };
+
+const ContentLineItem: React.FC<{ line: AgentActivityDisplayRow }> = ({ line }) => {
+  const isError = line.line_type === "error";
+
+  return (
+    <div className="wf-log-task-row wf-log-task-row--content">
+      <span className="wf-log-task-status">
+        {isError && <XIcon className="wf-log-error-x-icon" aria-label="error" />}
+      </span>
+      <span className={`wf-log-task-content-text ${isError ? "wf-log-task-content-text--error" : ""}`}>
+        {renderSimpleBoldMarkdown(line.content)}
+      </span>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Panel
+// ---------------------------------------------------------------------------
 
 export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
   lines = [],
@@ -295,8 +268,18 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
     () => formatAgentActivityLines(lines, translate),
     [lines, translate],
   );
-  const lastDisplayRow = displayRows[displayRows.length - 1];
-  const scrollSignal = `${displayRows.length}:${lastDisplayRow?.row_id ?? ""}:${
+
+  // Filter: hide tool calls that are still running
+  const visibleRows = useMemo(
+    () =>
+      displayRows.filter(
+        (line) => !(isToolCallLine(line) && isToolRunning(line)),
+      ),
+    [displayRows],
+  );
+
+  const lastDisplayRow = visibleRows[visibleRows.length - 1];
+  const scrollSignal = `${visibleRows.length}:${lastDisplayRow?.row_id ?? ""}:${
     lastDisplayRow?.content.length ?? 0
   }`;
   const { scrollRef, scrollHandlers } = useAutoFollowScroll(scrollSignal);
@@ -304,23 +287,23 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
   const showPruned = state === "pruned";
   const showError = state === "error";
   const showEmpty =
-    !showLoading && !showPruned && !showError && displayRows.length === 0;
+    !showLoading && !showPruned && !showError && visibleRows.length === 0;
 
   if (showEmpty) return null;
 
   return (
-    <div className="mt-1 max-h-[480px] overflow-hidden text-[12px] leading-[1.5]">
+    <div className="wf-log-panel-inline">
       {showLoading ? (
-        <div className="flex items-center gap-2 py-1 text-[12px] text-[var(--ink-tertiary)]">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span className="font-mono">{labels.loading}</span>
+        <div className="wf-log-panel wf-log-panel--empty" style={{ height: "auto", padding: "8px 0" }}>
+          <span className="wf-log-spinner" />
+          <span className="wf-log-panel-message">{labels.loading}</span>
         </div>
       ) : showPruned ? (
-        <div className="py-1 font-mono text-[12px] text-[var(--ink-tertiary)]">
+        <div className="wf-log-panel-message" style={{ padding: "4px 0" }}>
           {labels.cleaned}
         </div>
       ) : showError ? (
-        <div className="py-1 font-mono text-[12px] text-rose-500/80">
+        <div className="wf-log-panel-message" style={{ padding: "4px 0", color: "#e5484d" }}>
           {labels.error}
         </div>
       ) : (
@@ -330,10 +313,14 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
           scrollbar="styled"
           {...scrollHandlers}
         >
-          <div className="space-y-0.5 py-0.5">
-            {displayRows.map((line) => (
-              <LineItem key={line.row_id} line={line} />
-            ))}
+          <div className="wf-log-group-tasks">
+            {visibleRows.map((line) =>
+              isToolCallLine(line) ? (
+                <ToolLineItem key={line.row_id} line={line} />
+              ) : (
+                <ContentLineItem key={line.row_id} line={line} />
+              ),
+            )}
           </div>
         </ScrollArea>
       )}
