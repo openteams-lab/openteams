@@ -3,13 +3,26 @@ import {
   CHAT_MESSAGE_FONT_SIZE_OPTIONS,
   useWorkspace,
 } from '@/context/WorkspaceContext';
-import { 
-  User, CreditCard, Bell, Cpu, Route, Users, Github, Key, SlidersHorizontal, Keyboard, FlaskConical, Edit, Trash, Plus
+import {
+  Bell,
+  Cpu,
+  CreditCard,
+  FlaskConical,
+  Github,
+  Key,
+  Keyboard,
+  Route,
+  SlidersHorizontal,
+  User,
+  Users,
 } from 'lucide-react';
 import { DropdownSelect, type DropdownSelectOption } from '@/components/DropdownSelect';
 import { ResourceStateNotice } from '@/components/ResourceState';
+import { ProviderSettingsPanel } from '@/components/settings/ProviderSettingsPanel';
+import { githubAuthApi } from '@/lib/api';
 import { mockFrontendApi } from '@/lib/mockFrontendApi';
 import type { SettingsOptionsMock } from '@/mockApiData';
+import type { GitHubAccount } from '@/types';
 
 type NotificationToggleKey =
   | 'newMessage'
@@ -69,29 +82,18 @@ export const SettingsWorkspace: React.FC = () => {
     setTheme,
     locale,
     setLocale,
-    providers,
-    setProviders,
-    smartRouting,
-    setSmartRouting,
-    showCost,
-    setShowCost,
-    showExplanation,
-    setShowExplanation,
-    warnOverDollar,
-    setWarnOverDollar,
-    setIsAddProviderModalOpen,
-    showToast,
     activeSettingsTab,
     setActiveSettingsTab,
     chatMessageFontSize,
     setChatMessageFontSize,
-    providersAsync,
-    refreshProviders,
     configAsync,
     refreshConfig
   } = useWorkspace();
   const [settingsOptions, setSettingsOptions] =
     useState<SettingsOptionsMock | null>(null);
+  const [githubAccount, setGithubAccount] = useState<GitHubAccount | null>(
+    null,
+  );
   const [notificationToggles, setNotificationToggles] = useState<Record<NotificationToggleKey, boolean>>({
     newMessage: true,
     workflowStatus: true,
@@ -107,7 +109,21 @@ export const SettingsWorkspace: React.FC = () => {
     }));
 
   useEffect(() => {
-    void mockFrontendApi.getSettingsOptions().then(setSettingsOptions);
+    let cancelled = false;
+    void mockFrontendApi.getSettingsOptions().then((options) => {
+      if (!cancelled) setSettingsOptions(options);
+    });
+    void githubAuthApi
+      .getAccount()
+      .then((account) => {
+        if (!cancelled) setGithubAccount(account);
+      })
+      .catch(() => {
+        if (!cancelled) setGithubAccount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const translate = (
@@ -119,34 +135,15 @@ export const SettingsWorkspace: React.FC = () => {
     return translated && translated !== key ? translated : fallback;
   };
 
-  const handleToggleProvider = (id: string) => {
-    setProviders(providers.map(p => {
-      if (p.id === id) {
-        return { ...p, active: !p.active };
-      }
-      return p;
-    }));
-    const prov = providers.find(p => p.id === id);
-    if (prov) {
-      showToast(
-        t(prov.active ? 'toast.providerDisabled' : 'toast.providerEnabled', {
-          name: prov.name,
-        }),
-      );
-    }
-  };
-
-  const handleRemoveProvider = (id: string, name: string) => {
-    setProviders(providers.filter(p => p.id !== id));
-    showToast(t('toast.providerRemoved', { name }));
-  };
-
   const handleToggleNotification = (key: NotificationToggleKey) => {
     setNotificationToggles((current) => ({
       ...current,
       [key]: !current[key],
     }));
   };
+
+  const accountDisplayLabel =
+    githubAccount?.login ?? settingsOptions?.account.email ?? '-';
 
   const renderActiveSettingPanel = () => {
     switch (activeSettingsTab) {
@@ -363,18 +360,20 @@ export const SettingsWorkspace: React.FC = () => {
               onRetry={() => void refreshConfig()}
             />
 
-            <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] p-4 space-y-3 font-mono text-sm">
-              <div className="flex justify-between py-1 border-b border-[var(--hairline)]">
+            <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] p-4 font-mono text-sm">
+              <div className="flex justify-between gap-4 py-1">
                 <span className="text-[var(--ink-subtle)]">{t('settings.account.emailEndpoint')}</span>
-                <span className="text-[var(--ink)] font-semibold select-all">{settingsOptions?.account.email ?? '-'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-[var(--hairline)]">
-                <span className="text-[var(--ink-subtle)]">{t('settings.account.roleLevel')}</span>
-                <span className="text-[var(--ink)] font-semibold">{settingsOptions?.account.roleLevel ?? '-'}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-[var(--ink-subtle)]">{t('settings.account.localKeysSynced')}</span>
-                <span className="text-emerald-500 font-semibold">{settingsOptions?.account.keyStatus ?? '-'}</span>
+                <span className="inline-flex min-w-0 items-center gap-1.5 text-[var(--ink)] font-semibold select-all">
+                  {githubAccount ? (
+                    <Github
+                      className="h-3.5 w-3.5 shrink-0 text-[var(--ink-subtle)]"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  <span className="min-w-0 truncate">
+                    {accountDisplayLabel}
+                  </span>
+                </span>
               </div>
             </div>
           </div>
@@ -405,191 +404,27 @@ export const SettingsWorkspace: React.FC = () => {
           </div>
         );
 
-      default: // 'providers'
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--ink)] tracking-tight">{t('Providers')}</h3>
-                <p className="mt-0.5 text-sm text-[var(--ink-subtle)]">{t('connectAgentsExisting')}</p>
-              </div>
-              <span className="rounded-full border border-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-sm font-semibold text-emerald-500">
-                {t('activeCount', { count: providers.filter(p => p.active).length })}
-              </span>
-            </div>
-
-            <p className="text-sm leading-relaxed text-[var(--ink-subtle)] select-text">
-              {t('keyStorageTip')}
-            </p>
-
-            <ResourceStateNotice
-              resource={providersAsync}
-              className="!text-sm [&_button]:!text-sm [&_p]:!text-sm"
-              labels={{
-                loading: t('resource.providers.loading'),
-                empty: t('resource.providers.empty'),
-                error: t('resource.providers.error'),
-                fallback: t('resource.providers.fallback'),
-              }}
-              onRetry={() => void refreshProviders()}
-            />
-
-            {/* Providers Connected List */}
-            <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] overflow-hidden divide-y divide-[var(--hairline)]">
-              {providers.length === 0 && (
-                <div className="p-4 text-sm text-[var(--ink-tertiary)]">
-                  {t('settings.providers.noConnected')}
-                </div>
-              )}
-              {providers.map(p => (
-                <div key={p.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-                  <span className="h-7 w-7 rounded-full bg-[var(--mono-bg)] border border-[var(--mono-border)] flex items-center justify-center font-mono font-bold text-[var(--ink-muted)] shrink-0">
-                    {p.monogram}
-                  </span>
-                  
-                  <div className="flex-1 min-w-0 pr-2">
-                    <p className="font-semibold text-[var(--ink)]">{p.name}</p>
-                    <p className="text-sm font-mono text-[var(--ink-tertiary)] truncate">
-                      {p.keyMask} · {t('settings.providers.lastUsed', { value: p.lastUsed })}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 font-mono text-sm text-[var(--ink-subtle)]">
-                    <button 
-                      onClick={() => handleToggleProvider(p.id)}
-                      disabled={providersAsync.loading}
-                      className={`h-2.5 w-6 rounded-full border border-[var(--hairline-strong)] relative cursor-pointer transition-colors ${
-                        p.active ? 'bg-[var(--primary)]' : 'bg-[var(--surface-3)]'
-                      } disabled:cursor-wait disabled:opacity-60`}
-                    >
-                      <span className={`absolute top-0.5 h-1.5 w-1.5 rounded-full bg-white transition-all ${
-                        p.active ? 'right-0.5' : 'left-0.5'
-                      }`} />
-                    </button>
-                    <span>{p.active ? t('connected') : t('disconnected')}</span>
-                  </div>
-
-                  <div className="flex gap-1">
-                    <button 
-                      onClick={() => showToast(t('toast.providerEdit', { name: p.name }))}
-                      className="rounded border border-[var(--hairline-strong)] p-1.5 text-[var(--ink-tertiary)] hover:text-[var(--ink)] cursor-pointer"
-                    >
-                      <Edit className="h-3.5 w-3.5" />
-                    </button>
-                    <button 
-                      onClick={() => handleRemoveProvider(p.id, p.name)}
-                      className="rounded border border-[var(--hairline-strong)] p-1.5 text-[var(--ink-tertiary)] hover:text-red-500 hover:border-red-500/40 cursor-pointer"
-                    >
-                      <Trash className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button 
-              onClick={() => setIsAddProviderModalOpen(true)}
-              className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] cursor-pointer"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>{t('addAnotherProvider')}</span>
-            </button>
-
-            {/* Routing Options list of switches */}
-            <div className="border-t border-[var(--hairline)] pt-5 space-y-4">
-              <h4 className="text-sm font-semibold text-[var(--ink)] uppercase tracking-wider">{t('routingDefaults')}</h4>
-              
-              <div className="space-y-3.5">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm text-[var(--ink)] leading-none">{t('defaultSmartRoutingTitle')}</p>
-                    <p className="text-sm text-[var(--ink-tertiary)] mt-1 leading-relaxed">{t('defaultSmartRoutingSub')}</p>
-                  </div>
-                  <button 
-                    onClick={() => setSmartRouting(!smartRouting)}
-                    className={`h-5 w-9 rounded-full relative cursor-pointer flex-shrink-0 transition-colors ${
-                      smartRouting ? 'bg-[var(--primary)]' : 'bg-[var(--surface-3)] border border-[var(--hairline-strong)]'
-                    }`}
-                  >
-                    <span className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white transition-all ${
-                      smartRouting ? 'right-0.5' : 'left-0.5'
-                    }`} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm text-[var(--ink)] leading-none">{t('showCostNodeTitle')}</p>
-                    <p className="text-sm text-[var(--ink-tertiary)] mt-1 leading-relaxed">{t('showCostNodeSub')}</p>
-                  </div>
-                  <button 
-                    onClick={() => setShowCost(!showCost)}
-                    className={`h-5 w-9 rounded-full relative cursor-pointer flex-shrink-0 transition-colors ${
-                      showCost ? 'bg-[var(--primary)]' : 'bg-[var(--surface-3)] border border-[var(--hairline-strong)]'
-                    }`}
-                  >
-                    <span className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white transition-all ${
-                      showCost ? 'right-0.5' : 'left-0.5'
-                    }`} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm text-[var(--ink)] leading-none">{t('whyThisModelTitle')}</p>
-                    <p className="text-sm text-[var(--ink-tertiary)] mt-1 leading-relaxed">{t('whyThisModelSub')}</p>
-                  </div>
-                  <button 
-                    onClick={() => setShowExplanation(!showExplanation)}
-                    className={`h-5 w-9 rounded-full relative cursor-pointer flex-shrink-0 transition-colors ${
-                      showExplanation ? 'bg-[var(--primary)]' : 'bg-[var(--surface-3)] border border-[var(--hairline-strong)]'
-                    }`}
-                  >
-                    <span className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white transition-all ${
-                      showExplanation ? 'right-0.5' : 'left-0.5'
-                    }`} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm text-[var(--ink)] leading-none">{t('warnOverDollarTitle')}</p>
-                    <p className="text-sm text-[var(--ink-tertiary)] mt-1 leading-relaxed">{t('warnOverDollarSub')}</p>
-                  </div>
-                  <button 
-                    onClick={() => setWarnOverDollar(!warnOverDollar)}
-                    className={`h-5 w-9 rounded-full relative cursor-pointer flex-shrink-0 transition-colors ${
-                      warnOverDollar ? 'bg-[var(--primary)]' : 'bg-[var(--surface-3)] border border-[var(--hairline-strong)]'
-                    }`}
-                  >
-                    <span className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white transition-all ${
-                      warnOverDollar ? 'right-0.5' : 'left-0.5'
-                    }`} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
+      default:
+        return <ProviderSettingsPanel />;
     }
   };
 
   const renderMenuIcon = (icon: string) => {
-    const className = 'h-3.5 w-3.5';
+    const iconProps = { className: 'h-3.5 w-3.5', strokeWidth: 1.5 };
     const icons: Record<string, React.ReactNode> = {
-      user: <User className={className} />,
-      'credit-card': <CreditCard className={className} />,
-      bell: <Bell className={className} />,
-      cpu: <Cpu className={className} />,
-      route: <Route className={className} />,
-      users: <Users className={className} />,
-      github: <Github className={className} />,
-      key: <Key className={className} />,
-      sliders: <SlidersHorizontal className={className} />,
-      keyboard: <Keyboard className={className} />,
-      flask: <FlaskConical className={className} />,
+      user: <User {...iconProps} />,
+      'credit-card': <CreditCard {...iconProps} />,
+      bell: <Bell {...iconProps} />,
+      cpu: <Cpu {...iconProps} />,
+      route: <Route {...iconProps} />,
+      users: <Users {...iconProps} />,
+      github: <Github {...iconProps} />,
+      key: <Key {...iconProps} />,
+      sliders: <SlidersHorizontal {...iconProps} />,
+      keyboard: <Keyboard {...iconProps} />,
+      flask: <FlaskConical {...iconProps} />,
     };
-    return icons[icon] ?? <SlidersHorizontal className={className} />;
+    return icons[icon] ?? <SlidersHorizontal {...iconProps} />;
   };
 
   const menuItems = settingsOptions?.menu ?? [];
@@ -601,12 +436,12 @@ export const SettingsWorkspace: React.FC = () => {
   return (
     <div className="settings-workspace h-full w-full overflow-hidden font-sans text-sm select-none">
       
-      <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[180px_1fr]">
+      <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[196px_1fr]">
         {/* Left Nav menu list */}
-        <aside className="border-r border-[var(--hairline)] p-3 space-y-3 overflow-y-auto">
+        <aside className="settings-sidebar border-r border-[var(--hairline)] p-3 space-y-3 overflow-y-auto">
           {menuItems.map(group => (
             <div key={group.section} className="space-y-0.5">
-              <div className="text-sm font-semibold text-[var(--ink-tertiary)] uppercase tracking-wider px-1.5 mb-1.5">{getMenuSectionLabel(group.section)}</div>
+              <div className="settings-section-label font-semibold text-[var(--ink-tertiary)] uppercase px-1.5 mb-1.5">{getMenuSectionLabel(group.section)}</div>
               {group.items.map(item => {
                 const active = item.id === activeSettingsTab;
                 return (
@@ -614,9 +449,9 @@ export const SettingsWorkspace: React.FC = () => {
                     key={item.id}
                     onClick={() => !item.disabled && setActiveSettingsTab(item.id)}
                     disabled={item.disabled}
-                    className={`w-full flex items-center gap-2 rounded px-2 py-1.5 text-left border ${
+                    className={`w-full flex min-h-8 items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-left border transition-colors ${
                       active 
-                        ? 'text-[var(--ink)] bg-[var(--surface-1)] font-semibold border-[var(--hairline)]' 
+                        ? 'text-[var(--ink)] bg-[var(--surface-1)] font-medium border-[var(--hairline)]' 
                         : 'text-[var(--ink-subtle)] hover:bg-[var(--surface-1)] hover:text-[var(--ink)] border-transparent'
                     } ${item.disabled ? 'opacity-40 cursor-not-allowed hover:bg-transparent' : 'cursor-pointer'}`}
                   >

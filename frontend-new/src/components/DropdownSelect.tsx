@@ -166,6 +166,7 @@ export function DropdownSelect(props: DropdownSelectProps) {
     }
     return activeSingleOption?.label ?? placeholder;
   })();
+  const isPlaceholder = selectedOptions.length === 0;
 
   const filteredOptions = useMemo(() => {
     if (!showSearch) return options;
@@ -301,6 +302,7 @@ export function DropdownSelect(props: DropdownSelectProps) {
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
+        data-placeholder={isPlaceholder ? 'true' : undefined}
         onClick={() => {
           if (!open) updatePanelPosition();
           setOpen((current) => !current);
@@ -308,7 +310,13 @@ export function DropdownSelect(props: DropdownSelectProps) {
         className={`${triggerClass} ${open ? 'border-[var(--primary)] text-[var(--ink)]' : ''}`}
       >
         {triggerIcon}
-        <span className="min-w-0 flex-1 truncate text-left">{triggerLabel}</span>
+        <span
+          className={`min-w-0 flex-1 truncate text-left ${
+            isPlaceholder ? 'text-[var(--ink-tertiary)]' : ''
+          }`}
+        >
+          {triggerLabel}
+        </span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
       </button>
 

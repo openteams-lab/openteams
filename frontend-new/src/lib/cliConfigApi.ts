@@ -13,7 +13,7 @@ import type {
   SyncToCliResponse,
   ValidateProviderRequest,
   ValidateProviderResponse,
-} from '@/types';
+} from './cliConfigTypes';
 import { handleApiResponse, makeRequest } from './apiCore';
 
 export const cliConfigApi = {

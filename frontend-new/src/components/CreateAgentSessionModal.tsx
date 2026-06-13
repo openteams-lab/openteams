@@ -498,7 +498,7 @@ export function CreateAgentSessionModal({
             <button
               type="button"
               className={cn(
-                'plan-mode-toggle flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium transition cursor-pointer',
+                'plan-mode-toggle flex items-center gap-1 rounded-full border px-2 py-1 text-[12px] font-medium transition cursor-pointer',
                 isPlanMode
                   ? 'plan-mode-toggle-active border-[var(--primary)] bg-[var(--primary-tint)] text-[var(--primary)]'
                   : 'border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-muted)] hover:bg-[var(--surface-3)]',
@@ -526,7 +526,7 @@ export function CreateAgentSessionModal({
                 disabled={!projectId}
                 aria-haspopup="listbox"
                 aria-expanded={workItemMenuOpen}
-                className="inline-flex max-w-[220px] items-center gap-1 rounded-full border border-[var(--hairline)] bg-[var(--surface-2)] px-2 py-1 text-[10px] font-medium leading-none text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex max-w-[220px] items-center gap-1 rounded-full border border-[var(--hairline)] bg-[var(--surface-2)] px-2 py-1 text-[12px] font-medium leading-none text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={handleToggleWorkItemMenu}
               >
                 <Box
@@ -594,7 +594,7 @@ export function CreateAgentSessionModal({
                                 aria-selected={selected}
                                 data-active={active ? 'true' : undefined}
                                 className={cn(
-                                  'flex min-h-12 w-full items-center gap-3 rounded-[7px] px-3 py-2 text-left text-[14px] font-bold leading-normal text-[var(--ink-muted)] transition hover:bg-[var(--surface-4)]',
+                                  'flex min-h-12 w-full items-center gap-3 rounded-[7px] px-3 py-2 text-left text-[12px] font-bold leading-normal text-[var(--ink-muted)] transition hover:bg-[var(--surface-4)]',
                                   active && 'bg-[var(--surface-4)]',
                                 )}
                                 onClick={() =>
@@ -613,7 +613,7 @@ export function CreateAgentSessionModal({
                                   <span className="block truncate leading-snug">
                                     {option.label}
                                   </span>
-                                  <span className="mt-1 block truncate text-[12px] font-semibold leading-normal text-[var(--ink-tertiary)]">
+                                  <span className="mt-1 block truncate text-[10px] font-semibold leading-normal text-[var(--ink-tertiary)]">
                                     {option.detail}
                                   </span>
                                 </span>
