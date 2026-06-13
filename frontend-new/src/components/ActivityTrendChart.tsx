@@ -13,16 +13,37 @@ export function ActivityTrendChart({
   loading,
   t,
 }: ActivityTrendChartProps) {
-  const label = (key: string, fallback: string) => {
-    const value = t(key);
-    return value === key ? fallback : value;
+  const label = (
+    key: string,
+    fallback: string,
+    replacements?: Record<string, string | number>,
+  ) => {
+    const value = t(key, replacements);
+    const fallbackText = replacements
+      ? Object.entries(replacements).reduce(
+          (text, [name, replacement]) =>
+            text.replace(`{${name}}`, String(replacement)),
+          fallback,
+        )
+      : fallback;
+    return value === key ? fallbackText : value;
   };
 
   return (
     <SimpleLineChart
       data={data}
       loading={loading}
-      emptyLabel={label('buildStats.empty.noActivityData', 'No build activity data')}
+      loadingLabel={label('buildStats.chart.loading', 'Loading chart')}
+      emptyLabel={label(
+        'buildStats.empty.noActivityData',
+        'No build activity data',
+      )}
+      pointAriaLabel={(date, series) =>
+        label('buildStats.chart.point', '{date} {series} chart point', {
+          date,
+          series,
+        })
+      }
       series={[
         {
           id: 'bugs',

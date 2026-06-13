@@ -26,16 +26,34 @@ export function DailyTokenChart({
   t,
   onDateSelect,
 }: DailyTokenChartProps) {
-  const label = (key: string, fallback: string) => {
-    const value = t(key);
-    return value === key ? fallback : value;
+  const label = (
+    key: string,
+    fallback: string,
+    replacements?: Record<string, string | number>,
+  ) => {
+    const value = t(key, replacements);
+    const fallbackText = replacements
+      ? Object.entries(replacements).reduce(
+          (text, [name, replacement]) =>
+            text.replace(`{${name}}`, String(replacement)),
+          fallback,
+        )
+      : fallback;
+    return value === key ? fallbackText : value;
   };
 
   return (
     <SimpleLineChart
       data={data}
       loading={loading}
+      loadingLabel={label('buildStats.chart.loading', 'Loading chart')}
       emptyLabel={label('buildStats.empty.noTokenData', 'No token usage data')}
+      pointAriaLabel={(date, series) =>
+        label('buildStats.chart.point', '{date} {series} chart point', {
+          date,
+          series,
+        })
+      }
       formatValue={formatCompactNumber}
       onDatumClick={
         onDateSelect ? (datum) => onDateSelect(datum.date) : undefined

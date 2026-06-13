@@ -135,6 +135,11 @@ export function ModelPricingTable({
   }
 
   const maxTokens = Math.max(...models.map((m) => numVal(m.total_tokens)), 1);
+  const tokensLabel = label('buildStats.tokens', 'tokens');
+  const inputShortLabel = label('buildStats.inputShort', 'in');
+  const outputShortLabel = label('buildStats.outputShort', 'out');
+  const cacheShortLabel = label('buildStats.cacheShort', 'cache');
+  const perMillionLabel = label('buildStats.perMillion', 'per 1M');
 
   return (
     <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1 ot-scroll-area-styled">
@@ -184,7 +189,7 @@ export function ModelPricingTable({
               {/* Token label inside bar */}
               <div className="absolute inset-0 flex items-center px-2">
                 <span className="font-mono text-[12px] text-[var(--ink)]">
-                  {formatCompactNumber(total)} tokens
+                  {formatCompactNumber(total)} {tokensLabel}
                 </span>
               </div>
             </div>
@@ -192,11 +197,17 @@ export function ModelPricingTable({
             {/* Sub-detail row */}
             <div className="mt-0.5 flex items-center gap-3 text-[12px] font-mono text-[var(--ink-tertiary)]">
               <span>
-                in {formatCompactNumber(input)} / out {formatCompactNumber(output)}
-                {cache > 0 ? ` / cache ${formatCompactNumber(cache)}` : ''}
+                {inputShortLabel} {formatCompactNumber(input)} /{' '}
+                {outputShortLabel} {formatCompactNumber(output)}
+                {cache > 0
+                  ? ` / ${cacheShortLabel} ${formatCompactNumber(cache)}`
+                  : ''}
               </span>
               <span className="ml-auto">
-                {formatPrice(numVal(model.input_price_per_1m))} / {formatPrice(numVal(model.output_price_per_1m))} / {formatPrice(numVal(model.cache_read_price_per_1m))} per 1M
+                {formatPrice(numVal(model.input_price_per_1m))} /{' '}
+                {formatPrice(numVal(model.output_price_per_1m))} /{' '}
+                {formatPrice(numVal(model.cache_read_price_per_1m))}{' '}
+                {perMillionLabel}
               </span>
             </div>
             {projectId && (

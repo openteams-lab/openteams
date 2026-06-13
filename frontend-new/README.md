@@ -29,5 +29,5 @@
 - `src/components`: UI workspaces and dialogs
 - `src/context`: shared React context and state orchestration
 - `src/data.ts`: demo seed data
-- `src/i18n.ts`: locale dictionaries
+- `src/i18n.ts`: locale dictionary aggregation from `src/locales/<locale>/`
 - `src/types.ts`: shared TypeScript models

@@ -19,6 +19,10 @@ export function SessionCostList({
 }: SessionCostListProps) {
   const numberValue = (value: unknown): number =>
     typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  const label = (key: string, fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  };
 
   if (loading) {
     return (
@@ -48,6 +52,8 @@ export function SessionCostList({
     1,
     ...sorted.map((session) => numberValue(session.total_tokens)),
   );
+  const inputShortLabel = label('buildStats.inputShort', 'in');
+  const cacheShortLabel = label('buildStats.cacheShort', 'cache');
 
   if (mode === 'bar') {
     return (
@@ -103,9 +109,9 @@ export function SessionCostList({
             {truncateTitle(session.title || session.session_id, 60)}
           </span>
           <span className="font-mono text-[12px] text-[var(--ink-tertiary)]">
-            in {formatNumber(numberValue(session.input_tokens))}
+            {inputShortLabel} {formatNumber(numberValue(session.input_tokens))}
             {numberValue(session.cache_read_tokens) > 0
-              ? ` / cache ${formatNumber(
+              ? ` / ${cacheShortLabel} ${formatNumber(
                   numberValue(session.cache_read_tokens),
                 )}`
               : ''}

@@ -24,6 +24,8 @@ export interface SimpleLineChartProps<T extends { date: string }> {
   formatValue?: (value: number) => string;
   tooltipRows?: (datum: T) => SimpleLineChartTooltipRow[];
   onDatumClick?: (datum: T) => void;
+  loadingLabel?: string;
+  pointAriaLabel?: (date: string, seriesLabel: string) => string;
 }
 
 const chartPadding = {
@@ -42,6 +44,8 @@ export function SimpleLineChart<T extends { date: string }>({
   formatValue = formatNumber,
   tooltipRows,
   onDatumClick,
+  loadingLabel = 'Loading chart',
+  pointAriaLabel,
 }: SimpleLineChartProps<T>) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const chartData = Array.isArray(data) ? data : [];
@@ -65,7 +69,7 @@ export function SimpleLineChart<T extends { date: string }>({
       <div
         className="h-[220px] w-full animate-pulse rounded bg-[var(--surface-2)]"
         role="status"
-        aria-label="Loading chart"
+        aria-label={loadingLabel}
       />
     );
   }
@@ -217,7 +221,10 @@ export function SimpleLineChart<T extends { date: string }>({
               fill="transparent"
               tabIndex={0}
               role={onDatumClick ? 'button' : undefined}
-              aria-label={`${formatChartDate(datum.date)} ${item.label} chart point`}
+              aria-label={
+                pointAriaLabel?.(formatChartDate(datum.date), item.label) ??
+                `${formatChartDate(datum.date)} ${item.label} chart point`
+              }
               onFocus={() => setActiveIndex(index)}
               onBlur={() => setActiveIndex(null)}
               onPointerEnter={() => setActiveIndex(index)}

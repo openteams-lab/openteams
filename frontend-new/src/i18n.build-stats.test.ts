@@ -1,7 +1,7 @@
-// Locale synchronization checks for the Agent runtime page.
+// Locale synchronization checks for the Build Stats page.
 //
 // Run with:
-//     pnpm exec tsx src/i18n.agents.test.ts
+//     pnpm exec tsx src/i18n.build-stats.test.ts
 
 import {
   readSplitLocaleForTest,
@@ -10,7 +10,14 @@ import {
 } from "./i18n.test-utils";
 
 const locales = testLocales;
-const sourceFiles = ["./pages/AgentsPage.tsx"] as const;
+const sourceFiles = [
+  "./pages/BuildStatsPage.tsx",
+  "./components/ActivityTrendChart.tsx",
+  "./components/DailyTokenChart.tsx",
+  "./components/ModelPricingTable.tsx",
+  "./components/SessionCostList.tsx",
+  "./components/TimeRangeFilter.tsx",
+] as const;
 
 type Locale = (typeof locales)[number];
 type LocaleDict = Record<string, string>;
@@ -33,17 +40,17 @@ const readText = readTextForTest;
 
 const readLocale = readSplitLocaleForTest;
 
-const agentKeys = (dict: LocaleDict) =>
+const buildStatsKeys = (dict: LocaleDict) =>
   Object.keys(dict)
-    .filter((key) => key.startsWith("agents."))
+    .filter((key) => key.startsWith("buildStats."))
     .sort();
 
-const usedAgentKeys = () => {
+const usedBuildStatsKeys = () => {
   const keys = new Set<string>();
 
   for (const file of sourceFiles) {
     const text = readText(file);
-    for (const match of text.matchAll(/t\(["'](agents\.[^"']+)["']/g)) {
+    for (const match of text.matchAll(/(?:t|text|label)\(["'](buildStats\.[^"']+)["']/g)) {
       keys.add(match[1]);
     }
   }
@@ -60,26 +67,30 @@ const same = (left: unknown, right: unknown) =>
   JSON.stringify(left) === JSON.stringify(right);
 
 // eslint-disable-next-line no-console
-console.log("Agent runtime locale sync");
+console.log("Build Stats page locale sync");
 
 const dictionaries = Object.fromEntries(
   locales.map((locale) => [locale, readLocale(locale)]),
 ) as Record<Locale, LocaleDict>;
-const baselineKeys = agentKeys(dictionaries.en);
-const usedKeys = usedAgentKeys();
+const baselineKeys = buildStatsKeys(dictionaries.en);
+const usedKeys = usedBuildStatsKeys();
 
 check(
-  "en defines every static agents.* key used by the Agent runtime page",
+  "en defines every buildStats.* key used by the Build Stats page",
   usedKeys.every((key) => baselineKeys.includes(key)),
   usedKeys.filter((key) => !baselineKeys.includes(key)),
 );
 
 for (const locale of locales) {
-  const keys = agentKeys(dictionaries[locale]);
-  check(`${locale} has the same agents.* keys as en`, same(keys, baselineKeys), {
-    missing: baselineKeys.filter((key) => !keys.includes(key)),
-    extra: keys.filter((key) => !baselineKeys.includes(key)),
-  });
+  const keys = buildStatsKeys(dictionaries[locale]);
+  check(
+    `${locale} has the same buildStats.* keys as en`,
+    same(keys, baselineKeys),
+    {
+      missing: baselineKeys.filter((key) => !keys.includes(key)),
+      extra: keys.filter((key) => !baselineKeys.includes(key)),
+    },
+  );
 
   const placeholderMismatches = baselineKeys
     .filter(
@@ -97,7 +108,7 @@ for (const locale of locales) {
     }));
 
   check(
-    `${locale} keeps agents.* placeholders aligned with en`,
+    `${locale} keeps buildStats.* placeholders aligned with en`,
     placeholderMismatches.length === 0,
     placeholderMismatches,
   );

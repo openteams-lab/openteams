@@ -3,9 +3,13 @@
 // Run with:
 //     pnpm exec tsx src/i18n.issue.test.ts
 
-import { readFileSync } from "node:fs";
+import {
+  readSplitLocaleForTest,
+  readTextForTest,
+  testLocales,
+} from "./i18n.test-utils";
 
-const locales = ["en", "zh", "ja", "ko", "fr", "es"] as const;
+const locales = testLocales;
 const sourceFiles = [
   "./pages/IssuePage.tsx",
   "./pages/IssueDetailPage.tsx",
@@ -58,11 +62,9 @@ const check = (label: string, condition: boolean, detail?: unknown) => {
   console.error(`  FAIL ${label}`, detail ?? "");
 };
 
-const readText = (path: string) =>
-  readFileSync(new URL(path, import.meta.url), "utf8");
+const readText = readTextForTest;
 
-const readLocale = (locale: Locale): LocaleDict =>
-  JSON.parse(readText(`./locales/${locale}.json`)) as LocaleDict;
+const readLocale = readSplitLocaleForTest;
 
 const issueDialogKeys = (dict: LocaleDict) =>
   Object.keys(dict)

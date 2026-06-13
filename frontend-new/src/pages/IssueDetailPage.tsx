@@ -2160,7 +2160,7 @@ export function PriorityMenuIcon({
       <span
         aria-hidden="true"
         className={cn(
-          'flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-[8px] text-[12px] font-black leading-none text-white',
+          'flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-[2px] text-[12px] font-black leading-none text-white',
           urgentFillClass,
         )}
       >
