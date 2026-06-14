@@ -158,24 +158,48 @@ export const COMMON_GITHUB_LABELS = [
   'good first issue',
 ] as const;
 
-const statusMenuOptions: StatusMenuOption[] = [
-  { value: 'blocked', label: 'Backlog', shortcut: '1' },
-  { value: 'open', label: 'Todo', shortcut: '2' },
-  { value: 'in_progress', label: 'In Progress', shortcut: '3' },
-  { value: 'ready_to_merge', label: 'Ready to Merge', shortcut: '4' },
-  { value: 'merging', label: 'Merging', shortcut: '5' },
-  { value: 'done', label: 'Done', shortcut: '6' },
-  { value: 'cancelled', label: 'Canceled', shortcut: '7' },
-  { value: 'duplicate', label: 'Duplicate', shortcut: '8' },
+const statusMenuValues: Array<{ value: IssueDetailStatus; shortcut: string; key: string; fallback: string }> = [
+  { value: 'blocked', shortcut: '1', key: 'issue.status.backlog', fallback: 'Backlog' },
+  { value: 'open', shortcut: '2', key: 'issue.status.todo', fallback: 'Todo' },
+  { value: 'in_progress', shortcut: '3', key: 'issue.status.in_progress', fallback: 'In Progress' },
+  { value: 'ready_to_merge', shortcut: '4', key: 'issue.status.ready_to_merge', fallback: 'Ready to Merge' },
+  { value: 'merging', shortcut: '5', key: 'issue.status.merging', fallback: 'Merging' },
+  { value: 'done', shortcut: '6', key: 'issue.status.done', fallback: 'Done' },
+  { value: 'cancelled', shortcut: '7', key: 'issue.status.cancelled', fallback: 'Canceled' },
+  { value: 'duplicate', shortcut: '8', key: 'issue.status.duplicate', fallback: 'Duplicate' },
 ];
 
-const priorityMenuOptions: PriorityMenuOption[] = [
-  { value: 'none', label: 'No priority', shortcut: '0' },
-  { value: 'urgent', label: 'Urgent', shortcut: '4' },
-  { value: 'high', label: 'High', shortcut: '3' },
-  { value: 'medium', label: 'Medium', shortcut: '2' },
-  { value: 'low', label: 'Low', shortcut: '1' },
+const priorityMenuValues: Array<{ value: PriorityMenuValue; shortcut: string; key: string; fallback: string }> = [
+  { value: 'none', shortcut: '0', key: 'issue.priority.none', fallback: 'No priority' },
+  { value: 'urgent', shortcut: '4', key: 'issue.priority.urgent', fallback: 'Urgent' },
+  { value: 'high', shortcut: '3', key: 'issue.priority.high', fallback: 'High' },
+  { value: 'medium', shortcut: '2', key: 'issue.priority.medium', fallback: 'Medium' },
+  { value: 'low', shortcut: '1', key: 'issue.priority.low', fallback: 'Low' },
 ];
+
+const buildStatusMenuOptions = (
+  tr: IssueDetailTranslator,
+): StatusMenuOption[] =>
+  statusMenuValues.map((entry) => ({
+    value: entry.value,
+    label: tr(entry.key, entry.fallback),
+    shortcut: entry.shortcut,
+  }));
+
+const buildPriorityMenuOptions = (
+  tr: IssueDetailTranslator,
+): PriorityMenuOption[] =>
+  priorityMenuValues.map((entry) => ({
+    value: entry.value,
+    label: tr(entry.key, entry.fallback),
+    shortcut: entry.shortcut,
+  }));
+
+const statusValueKey = (status: IssueDetailStatus) =>
+  statusMenuValues.find((entry) => entry.value === status);
+
+const priorityValueKey = (priority: ProjectWorkItemPriority) =>
+  priorityMenuValues.find((entry) => entry.value === priority);
 
 const labelColorByName: Record<string, string> = {
   bug: '#f25f67',
@@ -217,9 +241,9 @@ const WORKFLOW_MODE_LABEL_KEYS = new Set([
 const cn = (...classes: Array<string | false | undefined>) =>
   classes.filter(Boolean).join(' ');
 
-function truncateIssueSessionTitle(title: string) {
+function truncateIssueSessionTitle(title: string, fallback: string) {
   const normalized = title.trim().replace(/\s+/g, ' ');
-  if (!normalized) return 'Issue session';
+  if (!normalized) return fallback;
 
   const chars = Array.from(normalized);
   if (chars.length <= ISSUE_SESSION_TITLE_MAX_LENGTH) return normalized;
@@ -444,6 +468,8 @@ export function IssueDetailPage({
     : descriptionDraft || issueBodyText;
   const issueLabelKey = issueLabels.join('\u0000');
   const issueStatus = current.status;
+  const statusMenuOptions = useMemo(() => buildStatusMenuOptions(tr), [tr]);
+  const priorityMenuOptions = useMemo(() => buildPriorityMenuOptions(tr), [tr]);
   const localCreatorIdentity = defaultIssueUserIdentity(githubAccount ?? null);
   const creatorName = githubIssue?.summary.author ?? localCreatorIdentity.name;
   const creatorAvatarUrl =
@@ -568,7 +594,7 @@ export function IssueDetailPage({
         workItem: updated,
         labels: githubIssue ? issueLabels : undefined,
       });
-      onAction('Issue name updated');
+      onAction(tr('issue.detail.action.nameUpdated', 'Issue name updated'));
       return true;
     } catch (error) {
       setActionError(errorMessage(error));
@@ -590,7 +616,7 @@ export function IssueDetailPage({
     setActionError('');
     try {
       await projectWorkItemsApi.delete(projectId, current.id);
-      onAction('Issue deleted');
+      onAction(tr('issue.detail.action.deleted', 'Issue deleted'));
       onIssueDeleted?.(current.id);
       return true;
     } catch (error) {
@@ -647,19 +673,19 @@ export function IssueDetailPage({
             : existing,
         );
         clearPendingIssueStatusSync(projectId, current.id);
-        onAction('GitHub issue status synced');
+        onAction(tr('issue.detail.action.statusSynced', 'GitHub issue status synced'));
         showSyncNotice(
-          'GitHub sync complete',
-          'Status synced to GitHub.',
+          tr('issue.detail.syncNotice.complete.title', 'GitHub sync complete'),
+          tr('issue.detail.syncNotice.statusSynced.message', 'Status synced to GitHub.'),
           'success',
         );
       })
       .catch((error) => {
         setActionError(errorMessage(error));
-        onAction('GitHub issue status sync failed');
+        onAction(tr('issue.detail.action.statusSyncFailed', 'GitHub issue status sync failed'));
         showSyncNotice(
-          'GitHub sync pending',
-          'Could not sync status to GitHub. It will retry when you reopen this issue.',
+          tr('issue.detail.syncNotice.pending.title', 'GitHub sync pending'),
+          tr('issue.detail.syncNotice.pending.message', 'Could not sync status to GitHub. It will retry when you reopen this issue.'),
           'warning',
         );
       })
@@ -677,6 +703,7 @@ export function IssueDetailPage({
     onAction,
     projectId,
     targetRepoIntegrationId,
+    tr,
   ]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -1050,7 +1077,10 @@ export function IssueDetailPage({
         ? 'workflow'
         : undefined;
       const createdSession = await projectApi.createSession(projectId, {
-        title: truncateIssueSessionTitle(issueTitle),
+        title: truncateIssueSessionTitle(
+          issueTitle,
+          tr('issue.detail.sessionFallbackTitle', 'Issue session'),
+        ),
         workspace_path: projectWorkspacePath,
       });
 
@@ -2905,9 +2935,13 @@ function labelKey(label: string) {
   return label.trim().toLowerCase();
 }
 
-function labelDisplayName(label: string) {
+function labelDisplayName(label: string, tr?: IssueDetailTranslator) {
   const normalized = labelKey(label);
-  if (normalized === 'enhancement') return 'Improvement';
+  if (normalized === 'enhancement') {
+    return tr
+      ? tr('issue.detail.labelImprovement', 'Improvement')
+      : 'Improvement';
+  }
   return label
     .trim()
     .split(/[\s_-]+/)
@@ -2982,22 +3016,19 @@ export function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function statusLabel(status: IssueDetailStatus) {
-  if (status === 'open') return 'Todo';
-  if (status === 'in_progress') return 'In Progress';
-  if (status === 'blocked') return 'Backlog';
-  if (status === 'ready_to_merge') return 'Ready to Merge';
-  if (status === 'merging') return 'Merging';
-  if (status === 'done') return 'Done';
-  if (status === 'cancelled') return 'Canceled';
-  return 'Duplicate';
+function statusLabel(status: IssueDetailStatus, tr?: IssueDetailTranslator) {
+  const entry = statusValueKey(status);
+  if (entry) return tr ? tr(entry.key, entry.fallback) : entry.fallback;
+  return status;
 }
 
-function priorityLabel(priority: ProjectWorkItemPriority) {
-  return (
-    priorityMenuOptions.find((option) => option.value === priority)?.label ??
-    titleCaseToken(priority)
-  );
+function priorityLabel(
+  priority: ProjectWorkItemPriority,
+  tr?: IssueDetailTranslator,
+) {
+  const entry = priorityValueKey(priority);
+  if (entry) return tr ? tr(entry.key, entry.fallback) : entry.fallback;
+  return titleCaseToken(priority);
 }
 
 export function defaultIssueUserIdentity(account: GitHubAccount | null): {
@@ -3024,9 +3055,13 @@ function commentAvatarUrl(
   return null;
 }
 
-function commentBodyText(body: unknown) {
+function commentBodyText(body: unknown, tr?: IssueDetailTranslator) {
   const text = typeof body === 'string' ? body : '';
-  return text.trim() ? text : 'No comment body.';
+  return text.trim()
+    ? text
+    : tr
+      ? tr('issue.detail.noCommentBody', 'No comment body.')
+      : 'No comment body.';
 }
 
 function filterMenuOptions<TOption extends { label: string }>(

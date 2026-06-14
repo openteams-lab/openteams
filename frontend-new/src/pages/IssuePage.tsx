@@ -143,11 +143,22 @@ type IssueTranslator = (
   replacements?: Record<string, string | number>,
 ) => string;
 
-const issueGroupTitles: Record<IssueGroup['id'], string> = {
+const issueGroupStatusKey: Record<IssueGroup['id'], string> = {
+  todo: 'issue.status.todo',
+  in_progress: 'issue.status.in_progress',
+  backlog: 'issue.status.backlog',
+  ready_to_merge: 'issue.status.ready_to_merge',
+  merging: 'issue.status.merging',
+  done: 'issue.status.done',
+  cancelled: 'issue.status.cancelled',
+  duplicate: 'issue.status.duplicate',
+};
+
+const issueGroupTitleFallback: Record<IssueGroup['id'], string> = {
   todo: 'Todo',
   in_progress: 'In Progress',
   backlog: 'Backlog',
-  ready_to_merge: 'Ready To Merge',
+  ready_to_merge: 'Ready to Merge',
   merging: 'Merging',
   done: 'Done',
   cancelled: 'Canceled',
@@ -234,7 +245,7 @@ export const projectWorkItemsToIssueGroups = (
         );
       return {
         id: groupId,
-        title: issueGroupTitles[groupId],
+        title: issueGroupTitleFallback[groupId],
         count: groupItems.length,
         items: groupItems,
       };
@@ -947,18 +958,21 @@ export function IssuePage() {
 
   const handleFilterChange = (filter: IssueFilter) => {
     setActiveFilter(filter);
-    setInteractionMessage(`Showing ${filter} issues`);
+    setInteractionMessage(
+      tr('issue.action.showingFilter', 'Showing {filter} issues', { filter }),
+    );
   };
 
   const handleGroupToggle = (groupId: IssueGroup['id']) => {
     setCollapsedGroups((current) => {
       const next = new Set(current);
+      const label = tr(issueGroupStatusKey[groupId], issueGroupTitleFallback[groupId]);
       if (next.has(groupId)) {
         next.delete(groupId);
-        setInteractionMessage(`Expanded ${groupId}`);
+        setInteractionMessage(tr('issue.action.expanded', 'Expanded {group}', { group: label }));
       } else {
         next.add(groupId);
-        setInteractionMessage(`Collapsed ${groupId}`);
+        setInteractionMessage(tr('issue.action.collapsed', 'Collapsed {group}', { group: label }));
       }
       return next;
     });
@@ -967,12 +981,12 @@ export function IssuePage() {
   const handleIssueSelect = (issue: IssueItem) => {
     setSelectedIssueId(issue.id);
     setActiveIssue(issue);
-    setInteractionMessage(`Opened ${issue.id}`);
+    setInteractionMessage(tr('issue.action.opened', 'Opened {id}', { id: issue.id }));
   };
 
   const handleIssueBack = () => {
     setActiveIssue(null);
-    setInteractionMessage('Returned to issues');
+    setInteractionMessage(tr('issue.action.returnedToIssues', 'Returned to issues'));
   };
 
   const handleAction = (message: string) => {
@@ -987,17 +1001,24 @@ export function IssuePage() {
     [],
   );
 
-  const handleIssueDeleted = useCallback((workItemId: string) => {
-    setWorkItems((current) => current.filter((item) => item.id !== workItemId));
-    setIssueRowOverrides((current) => {
-      const next = { ...current };
-      delete next[workItemId];
-      return next;
-    });
-    setSelectedIssueId('');
-    setActiveIssue(null);
-    setInteractionMessage('Issue deleted');
-  }, []);
+  const handleIssueDeleted = useCallback(
+    (workItemId: string) => {
+      setWorkItems((current) =>
+        current.filter((item) => item.id !== workItemId),
+      );
+      setIssueRowOverrides((current) => {
+        const next = { ...current };
+        delete next[workItemId];
+        return next;
+      });
+      setSelectedIssueId('');
+      setActiveIssue(null);
+      setInteractionMessage(
+        tr('issue.action.issueDeleted', 'Issue deleted'),
+      );
+    },
+    [tr],
+  );
 
   const openCreateIssueDialog = useCallback(
     (initialStatus: ProjectWorkItemStatus = 'open') => {
@@ -1017,7 +1038,10 @@ export function IssuePage() {
       sessionId,
     }: IssueCreateDialogSubmitValue) => {
       if (!selectedProjectId) {
-        const message = 'Select a project before creating an issue.';
+        const message = tr(
+          'issue.error.selectProject',
+          'Select a project before creating an issue.',
+        );
         setInteractionMessage(message);
         throw new Error(message);
       }
@@ -1058,8 +1082,14 @@ export function IssuePage() {
         setActiveIssue(createdIssue);
         setInteractionMessage(
           sessionLinkError
-            ? `Issue created, but session link failed: ${sessionLinkError}`
-            : `Issue created: ${title}`,
+            ? tr(
+                'issue.action.issueCreatedSessionLinkFailed',
+                'Issue created, but session link failed: {error}',
+                { error: sessionLinkError },
+              )
+            : tr('issue.action.issueCreated', 'Issue created: {title}', {
+                title,
+              }),
         );
       } catch (error) {
         setInteractionMessage(errorMessage(error));
@@ -1068,7 +1098,7 @@ export function IssuePage() {
         setCreateIssueSubmitting(false);
       }
     },
-    [selectedProjectId, selectedProjectName],
+    [selectedProjectId, selectedProjectName, tr],
   );
 
   const loadImportIssues = useCallback(async () => {
@@ -1460,6 +1490,7 @@ export function IssuePage() {
             onCreateIssue={openCreateIssueDialog}
             onImport={handleOpenImportDialog}
             onAction={handleAction}
+            tr={tr}
           />
 
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--surface-2)] pb-10">
@@ -1469,7 +1500,7 @@ export function IssuePage() {
               <div className="flex min-h-[244px] items-center justify-center px-5">
                 <div className="max-w-[440px] rounded-[12px] border border-[#342a2d] bg-[#1b1214] p-4 text-center">
                   <p className="text-[17px] font-bold text-[#ffb3bd]">
-                    Issues failed to load
+                    {tr('issue.error.loadFailed', 'Issues failed to load')}
                   </p>
                   <p className="mt-2 text-[14px] leading-snug text-[#d5a4ab]">
                     {workItemsError}
@@ -1480,7 +1511,7 @@ export function IssuePage() {
                     onClick={() => void loadWorkItems()}
                   >
                     <RefreshCw aria-hidden="true" className="h-4 w-4" />
-                    Retry
+                    {tr('issue.error.retry', 'Retry')}
                   </button>
                 </div>
               </div>
@@ -1509,6 +1540,7 @@ export function IssuePage() {
                       )
                     }
                     onAction={handleAction}
+                    tr={tr}
                   />
                 ))}
               </div>
@@ -1628,10 +1660,12 @@ function IssueEmptyState({
             className="inline-flex h-[37px] items-center gap-2 rounded-full bg-[#5e6ad2] px-4 text-[15px] font-bold leading-none text-white transition hover:bg-[#6f78e2] active:scale-[0.99]"
             onClick={() => {
               onCreateIssue();
-              onAction('Create issue opened');
+              onAction(tr('issue.empty.createAction', 'Create issue opened'));
             }}
           >
-            <span>Create new issue</span>
+            <span>
+              {tr('issue.empty.createNew', 'Create new issue')}
+            </span>
             <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[7px] border border-white/25 bg-white/10 font-mono text-[14px] font-bold leading-none text-white">
               C
             </span>
@@ -1820,7 +1854,7 @@ function IssueHeader({
           strokeWidth={2.4}
         />
         <h1 className="truncate text-[16px] font-semibold leading-none text-[var(--ink)]">
-          Issues
+          {tr('issue.header.title', 'Issues')}
         </h1>
       </div>
 
@@ -2543,6 +2577,7 @@ function IssueToolbar({
   onCreateIssue,
   onImport,
   onAction,
+  tr,
 }: {
   activeFilter: IssueFilter;
   importEnabled: boolean;
@@ -2550,29 +2585,30 @@ function IssueToolbar({
   onCreateIssue: () => void;
   onImport: () => void;
   onAction: (message: string) => void;
+  tr: IssueTranslator;
 }) {
   return (
     <section className="flex h-[46px] shrink-0 items-center justify-between bg-[var(--surface-2)] px-[17px]">
       <div className="flex items-center gap-1.5">
         <FilterTab
           active={activeFilter === 'all'}
-          label="All issues"
+          label={tr('issue.toolbar.filter.all', 'All issues')}
           onClick={() => onFilterChange('all')}
         />
         <FilterTab
           active={activeFilter === 'active'}
-          label="Active"
+          label={tr('issue.toolbar.filter.active', 'Active')}
           onClick={() => onFilterChange('active')}
         />
         <FilterTab
           active={activeFilter === 'backlog'}
-          label="Backlog"
+          label={tr('issue.toolbar.filter.backlog', 'Backlog')}
           onClick={() => onFilterChange('backlog')}
         />
         <button
           type="button"
           className="ml-5 flex h-[26px] w-[26px] items-center justify-center rounded-full text-[#8a8d93] transition hover:bg-[#1d1e20] hover:text-[#f4f4f5]"
-          aria-label="Create issue"
+          aria-label={tr('issue.toolbar.createIssue', 'Create issue')}
           onClick={() => onCreateIssue()}
         >
           <Plus aria-hidden="true" className="h-[15px] w-[15px]" />
@@ -2582,26 +2618,37 @@ function IssueToolbar({
       <div className="flex items-center gap-2">
         <ToolbarButton
           icon={ListFilter}
-          label="Filter issues"
-          onClick={() => onAction('Filter menu opened')}
+          label={tr('issue.toolbar.filterIssues', 'Filter issues')}
+          onClick={() =>
+            onAction(tr('issue.action.filterMenuOpened', 'Filter menu opened'))
+          }
         />
         <ToolbarButton
           disabled
           icon={SlidersHorizontal}
-          label="Display settings"
-          onClick={() => onAction('Display settings opened')}
+          label={tr('issue.toolbar.displaySettings', 'Display settings')}
+          onClick={() =>
+            onAction(
+              tr('issue.action.displaySettingsOpened', 'Display settings opened'),
+            )
+          }
         />
         <ToolbarButton
           disabled
           icon={BarChart3}
-          label="Analytics"
-          onClick={() => onAction('Analytics opened')}
+          label={tr('issue.toolbar.analytics', 'Analytics')}
+          onClick={() =>
+            onAction(tr('issue.action.analyticsOpened', 'Analytics opened'))
+          }
         />
         <ToolbarButton
           disabled={!importEnabled}
-          disabledTitle="Connect a GitHub repository to import issues"
+          disabledTitle={tr(
+            'issue.toolbar.importDisabled',
+            'Connect a GitHub repository to import issues',
+          )}
           icon={CloudDownload}
-          label="Import issues"
+          label={tr('issue.toolbar.importIssues', 'Import issues')}
           onClick={onImport}
         />
       </div>
@@ -2677,6 +2724,7 @@ function IssueSection({
   onIssueSelect,
   onCreateIssue,
   onAction,
+  tr,
 }: {
   group: IssueGroup;
   collapsed: boolean;
@@ -2685,7 +2733,12 @@ function IssueSection({
   onIssueSelect: (issue: IssueItem) => void;
   onCreateIssue: () => void;
   onAction: (message: string) => void;
+  tr: IssueTranslator;
 }) {
+  const groupTitle = tr(
+    issueGroupStatusKey[group.id],
+    issueGroupTitleFallback[group.id],
+  );
   return (
     <section className="group/section">
       <div
@@ -2714,7 +2767,7 @@ function IssueSection({
           <StatusIcon status={group.id} size="header" />
           <div className="flex items-baseline gap-3">
             <h2 className="text-[16px] font-semibold leading-none text-[var(--ink)]">
-              {group.title}
+              {groupTitle}
             </h2>
             <span className="text-[16px] font-medium leading-none text-[var(--ink-subtle)]">
               {group.count}
@@ -2724,7 +2777,9 @@ function IssueSection({
         <button
           type="button"
           className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
-          aria-label={`Add issue to ${group.title}`}
+          aria-label={tr('issue.section.addIssue', 'Add issue to {title}', {
+            title: groupTitle,
+          })}
           onClick={(event) => {
             event.stopPropagation();
             onCreateIssue();
@@ -2743,6 +2798,7 @@ function IssueSection({
               selected={selectedIssueId === issue.id}
               onSelect={() => onIssueSelect(issue)}
               onAction={onAction}
+              tr={tr}
             />
           ))}
       </div>
@@ -2755,11 +2811,13 @@ function IssueRow({
   selected,
   onSelect,
   onAction,
+  tr,
 }: {
   issue: IssueItem;
   selected: boolean;
   onSelect: () => void;
   onAction: (message: string) => void;
+  tr: IssueTranslator;
 }) {
   return (
     <article
@@ -2781,10 +2839,16 @@ function IssueRow({
       <button
         type="button"
         className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--ink-tertiary)] opacity-90 transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
-        aria-label={`Open actions for ${issue.id}`}
+        aria-label={tr('issue.row.openActions', 'Open actions for {id}', {
+          id: issue.id,
+        })}
         onClick={(event) => {
           event.stopPropagation();
-          onAction(`Actions opened for ${issue.id}`);
+          onAction(
+            tr('issue.row.actionsOpened', 'Actions opened for {id}', {
+              id: issue.id,
+            }),
+          );
         }}
       >
         <MoreHorizontal
@@ -2832,7 +2896,7 @@ function IssueRow({
       </div>
 
       <div className="flex justify-center">
-        <IssueSourceIcon source={issue.workItem.source} />
+        <IssueSourceIcon source={issue.workItem.source} tr={tr} />
       </div>
 
       <time
@@ -2851,14 +2915,18 @@ function IssueRow({
 
 function IssueSourceIcon({
   source,
+  tr,
 }: {
   source: ProjectWorkItem['source'] | string;
+  tr: IssueTranslator;
 }) {
   const providerId = issueSourceProviderId(source);
   const title =
     providerId === 'local'
-      ? 'Local issue'
-      : `${titleCaseToken(providerId)} issue`;
+      ? tr('issue.detail.sourceLocal', 'Local issue')
+      : tr('issue.detail.sourceProvider', '{provider} issue', {
+          provider: titleCaseToken(providerId),
+        });
 
   if (providerId === 'local') {
     return (
