@@ -439,6 +439,9 @@ export function IssueDetailPage({
   );
   const canEditLabels = !hasGitHubIssue || canWriteGitHub;
   const issueBodyText = issueBody ?? '';
+  const descriptionForPrompt = descriptionEditing
+    ? descriptionDraft
+    : descriptionDraft || issueBodyText;
   const issueLabelKey = issueLabels.join('\u0000');
   const issueStatus = current.status;
   const localCreatorIdentity = defaultIssueUserIdentity(githubAccount ?? null);
@@ -1037,7 +1040,7 @@ export function IssueDetailPage({
       const prompt = buildIssueSessionPrompt({
         label: issuePromptLabel(labelsForPrompt, current.type),
         title: issueTitle,
-        description: issueBodyText,
+        description: descriptionForPrompt,
       });
       const useWorkflowMode = shouldUseWorkflowModeForIssue(
         labelsForPrompt,
@@ -1542,7 +1545,8 @@ export function IssueDetailPage({
                   disabled={
                     sessionsLoading ||
                     Boolean(action?.startsWith('assign-session-')) ||
-                    action === 'create-session'
+                    action === 'create-session' ||
+                    detailLoading
                   }
                   loading={sessionsLoading}
                   open={openPropertyMenu === 'session'}
@@ -1561,7 +1565,7 @@ export function IssueDetailPage({
                 {linkedSessionLinks.length === 0 && (
                   <button
                     type="button"
-                    disabled={action === 'create-session'}
+                    disabled={action === 'create-session' || detailLoading}
                     className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-full bg-[var(--primary)] px-2.5 text-[12px] font-bold leading-none text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
                     onClick={() => void handleCreateSession()}
                   >

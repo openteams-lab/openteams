@@ -41,7 +41,8 @@ import {
 } from "@/lib/api";
 import {
   CHAT_INPUT_PREFILL_EVENT,
-  consumeChatInputPrefill,
+  clearChatInputPrefill,
+  readChatInputPrefill,
   type ChatInputPrefillDetail,
 } from "@/lib/chatInputPrefill";
 import {
@@ -1100,6 +1101,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     (detail: ChatInputPrefillDetail) => {
       if (!detail || detail.sessionId !== activeSessionId) return false;
 
+      sessionDraftCache.set(detail.sessionId, detail.text);
       setInputText(detail.text);
       setQuotedMessage(null);
       setAttachedFiles([]);
@@ -1116,6 +1118,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
           detail.text.length,
         );
         resizeChatTextarea(inputRef.current);
+        clearChatInputPrefill(detail.sessionId);
       };
 
       if (typeof window.requestAnimationFrame === "function") {
@@ -1130,7 +1133,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   );
 
   useEffect(() => {
-    const pending = consumeChatInputPrefill(activeSessionId);
+    const pending = readChatInputPrefill(activeSessionId);
     if (pending) {
       applyChatInputPrefill(pending);
     }

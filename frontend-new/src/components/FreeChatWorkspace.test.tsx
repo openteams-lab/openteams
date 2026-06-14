@@ -115,7 +115,9 @@ check(
 check(
   "consumes pending chat input prefill events for newly opened sessions",
   source.includes("CHAT_INPUT_PREFILL_EVENT") &&
-    source.includes("consumeChatInputPrefill(activeSessionId)") &&
+    source.includes("readChatInputPrefill(activeSessionId)") &&
+    source.includes("clearChatInputPrefill(detail.sessionId)") &&
+    source.includes("sessionDraftCache.set(detail.sessionId, detail.text)") &&
     source.includes("applyChatInputPrefill") &&
     source.includes("setChatInputMode(detail.mode)") &&
     source.includes("setInputText(detail.text)") &&

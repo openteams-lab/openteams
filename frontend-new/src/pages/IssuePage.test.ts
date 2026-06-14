@@ -132,6 +132,8 @@ check(
     issueDetailSource.includes('projectApi.createSession(projectId') &&
     issueDetailSource.includes('linkSession(createdSession.id)') &&
     issueDetailSource.includes('buildIssueSessionPrompt') &&
+    issueDetailSource.includes('const descriptionForPrompt = descriptionEditing') &&
+    issueDetailSource.includes('description: descriptionForPrompt') &&
     issueDetailSource.includes('shouldUseWorkflowModeForIssue') &&
     issueDetailSource.includes('workspace_path: projectWorkspacePath') &&
     issueDetailSource.includes('notifyChatInputPrefill') &&

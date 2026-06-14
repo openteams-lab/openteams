@@ -44,7 +44,7 @@ export function notifyChatInputPrefill(detail: ChatInputPrefillDetail): void {
   );
 }
 
-export function consumeChatInputPrefill(
+export function readChatInputPrefill(
   sessionId: string,
 ): ChatInputPrefillDetail | null {
   if (typeof window === "undefined" || !sessionId) return null;
@@ -58,9 +58,24 @@ export function consumeChatInputPrefill(
       return null;
     }
 
-    window.sessionStorage.removeItem(CHAT_INPUT_PREFILL_STORAGE_KEY);
     return parsed;
   } catch {
     return null;
+  }
+}
+
+export function clearChatInputPrefill(sessionId: string): void {
+  if (typeof window === "undefined" || !sessionId) return;
+
+  try {
+    const raw = window.sessionStorage.getItem(CHAT_INPUT_PREFILL_STORAGE_KEY);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    if (isChatInputPrefillDetail(parsed) && parsed.sessionId === sessionId) {
+      window.sessionStorage.removeItem(CHAT_INPUT_PREFILL_STORAGE_KEY);
+    }
+  } catch {
+    // A malformed pending value should not block the composer.
   }
 }
