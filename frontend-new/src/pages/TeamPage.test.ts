@@ -44,6 +44,13 @@ check(
 );
 
 check(
+  "loads and creates agents within the selected project scope",
+  source.includes("chatAgentsApi.list({ projectId })") &&
+    source.includes("owner_project_id: selectedProjectId"),
+  { source },
+);
+
+check(
   "add member menu includes every runtime option by default",
   source.includes("const addableRuntimeOptions = useMemo(") &&
     source.includes("runners.map((runner) => ({") &&

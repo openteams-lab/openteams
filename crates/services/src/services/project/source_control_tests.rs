@@ -115,6 +115,7 @@ async fn seed_session_with_paths(
             system_prompt: None,
             tools_enabled: None,
             model_name: None,
+            owner_project_id: None,
         },
         Uuid::new_v4(),
     )

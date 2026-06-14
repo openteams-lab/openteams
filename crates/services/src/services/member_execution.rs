@@ -151,6 +151,7 @@ mod tests {
                 "executor_profile_variant": "HIGH_REASONING"
             })),
             model_name: Some("legacy-model".to_string()),
+            owner_project_id: None,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         }

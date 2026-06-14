@@ -1360,6 +1360,7 @@ mod tests {
                 system_prompt: Some(String::new()),
                 tools_enabled: Some(serde_json::json!({})),
                 model_name: None,
+                owner_project_id: None,
             },
             Uuid::new_v4(),
         )
@@ -1706,6 +1707,7 @@ mod tests {
                 system_prompt: Some(String::new()),
                 tools_enabled: Some(serde_json::json!({})),
                 model_name: None,
+                owner_project_id: None,
             },
             Uuid::new_v4(),
         )
@@ -2168,6 +2170,7 @@ mod tests {
                 system_prompt: Some(String::new()),
                 tools_enabled: Some(serde_json::json!({})),
                 model_name: None,
+                owner_project_id: None,
             },
             Uuid::new_v4(),
         )

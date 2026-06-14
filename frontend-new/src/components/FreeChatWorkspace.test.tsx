@@ -345,6 +345,16 @@ check(
   { composerQuoteIndex, composerAttachmentIndex, composerInputIndex },
 );
 check(
+  "composer textarea auto-grows up to 2.5x the current input shell height",
+  source.includes("const CHAT_INPUT_SHELL_MIN_HEIGHT = 95") &&
+    source.includes("CHAT_INPUT_SHELL_MIN_HEIGHT * 2.5") &&
+    source.includes("const resizeChatTextarea = (") &&
+    source.includes("resizeChatTextarea(inputRef.current)") &&
+    source.includes("resizeChatTextarea(event.target)") &&
+    source.includes("maxHeight: CHAT_INPUT_MAX_HEIGHT"),
+  source,
+);
+check(
   "free-chat mention picker opens on @ and captures keyboard selection",
   source.includes("activeMemberPickerIndex") &&
     source.includes("const handleInputChange = (") &&

@@ -502,7 +502,7 @@ export function TeamPage() {
         activeSessionAgents,
       ] = await Promise.all([
         projectApi.listMembers(projectId),
-        chatAgentsApi.list(),
+        chatAgentsApi.list({ projectId }),
         agentRuntimeApi.list(),
         skillsApi.list(),
         sessionAgentPromise,
@@ -942,6 +942,7 @@ export function TeamPage() {
         system_prompt: null,
         tools_enabled: {},
         model_name: modelName,
+        owner_project_id: selectedProjectId,
       });
       setAgents((current) =>
         current.some((item) => item.id === agent.id)

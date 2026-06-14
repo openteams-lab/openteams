@@ -533,8 +533,10 @@ export const chatRunsApi = {
 // -----------------------------------------------------------------------------
 
 export const chatAgentsApi = {
-  list: async (): Promise<BackendChatAgent[]> => {
-    const r = await makeRequest("/api/chat/agents");
+  list: async (opts?: { projectId?: string }): Promise<BackendChatAgent[]> => {
+    const r = await makeRequest(
+      `/api/chat/agents${qs({ project_id: opts?.projectId })}`,
+    );
     return handleApiResponse<BackendChatAgent[]>(r);
   },
   get: async (agentId: string): Promise<BackendChatAgent> => {

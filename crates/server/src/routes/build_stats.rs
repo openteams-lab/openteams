@@ -424,6 +424,79 @@ struct ActivityTrendRow {
     features_delivered: i64,
 }
 
+#[derive(Debug, sqlx::FromRow)]
+struct IssueActivityRow {
+    date: String,
+    labels_json: Option<String>,
+    github_metadata_json: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IssueActivityCategory {
+    Bugfix,
+    Feature,
+}
+
+fn labels_from_json_array(value: Option<&str>) -> Vec<String> {
+    let Some(value) = value else {
+        return Vec::new();
+    };
+    serde_json::from_str::<Vec<String>>(value).unwrap_or_default()
+}
+
+fn github_issue_labels_from_metadata(value: Option<&str>) -> Vec<String> {
+    let Some(value) = value else {
+        return Vec::new();
+    };
+    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(value) else {
+        return Vec::new();
+    };
+    parsed
+        .get("summary")
+        .and_then(|summary| summary.get("labels"))
+        .and_then(|labels| labels.as_array())
+        .map(|labels| {
+            labels
+                .iter()
+                .filter_map(|label| label.as_str())
+                .map(str::trim)
+                .filter(|label| !label.is_empty())
+                .map(ToString::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn issue_labels_contain(labels: &[String], candidates: &[&str]) -> bool {
+    labels.iter().any(|label| {
+        let normalized = label.to_ascii_lowercase().replace(['_', '-', '/'], " ");
+        candidates.iter().any(|candidate| {
+            normalized == *candidate
+                || normalized.ends_with(&format!(" {candidate}"))
+                || normalized.ends_with(&format!(":{candidate}"))
+        })
+    })
+}
+
+fn issue_activity_category(labels: &[String]) -> Option<IssueActivityCategory> {
+    if issue_labels_contain(labels, &["bug"]) {
+        Some(IssueActivityCategory::Bugfix)
+    } else if issue_labels_contain(
+        labels,
+        &[
+            "feature",
+            "enhancement",
+            "improvement",
+            "feature request",
+            "new feature",
+        ],
+    ) {
+        Some(IssueActivityCategory::Feature)
+    } else {
+        None
+    }
+}
+
 async fn get_activity(
     State(deployment): State<DeploymentImpl>,
     Query(params): Query<ActivityQuery>,
@@ -457,14 +530,97 @@ async fn get_activity(
     .fetch_all(pool)
     .await?;
 
-    let sparse_data = rows
-        .into_iter()
-        .map(|row| ActivityDataPoint {
-            date: row.date,
-            bugs_fixed: row.bugs_fixed,
-            features_delivered: row.features_delivered,
-        })
-        .collect();
+    let issue_rows = sqlx::query_as::<_, IssueActivityRow>(
+        r#"
+        WITH completed_issues AS (
+            SELECT
+                pwi.id,
+                CASE
+                    WHEN pwi.status = 'done' THEN pwi.updated_at
+                    ELSE (
+                        SELECT MAX(link.updated_at)
+                        FROM project_work_item_external_links link
+                        WHERE link.project_work_item_id = pwi.id
+                          AND link.external_type = 'github_issue'
+                          AND lower(COALESCE(link.state, '')) = 'closed'
+                    )
+                END AS completed_at,
+                pwi.labels_json,
+                (
+                    SELECT link.metadata_json
+                    FROM project_work_item_external_links link
+                    WHERE link.project_work_item_id = pwi.id
+                      AND link.provider = 'github'
+                      AND link.external_type = 'github_issue'
+                      AND link.metadata_json IS NOT NULL
+                    ORDER BY link.updated_at DESC
+                    LIMIT 1
+                ) AS github_metadata_json
+            FROM project_work_items pwi
+            WHERE (
+                pwi.project_id = ?1
+                OR replace(lower(CAST(pwi.project_id AS TEXT)), '-', '') = lower(hex(?1))
+              )
+              AND (
+                pwi.status = 'done'
+                OR EXISTS (
+                    SELECT 1
+                    FROM project_work_item_external_links link
+                    WHERE link.project_work_item_id = pwi.id
+                      AND link.external_type = 'github_issue'
+                      AND lower(COALESCE(link.state, '')) = 'closed'
+                )
+              )
+        )
+        SELECT
+            date(completed_at) AS date,
+            labels_json,
+            github_metadata_json
+        FROM completed_issues
+        WHERE completed_at IS NOT NULL
+          AND completed_at >= ?2
+        ORDER BY date ASC
+        "#,
+    )
+    .bind(params.project_id)
+    .bind(&start_timestamp)
+    .fetch_all(pool)
+    .await?;
+
+    let mut activity_by_date = std::collections::HashMap::<String, ActivityDataPoint>::new();
+    for row in rows {
+        activity_by_date.insert(
+            row.date.clone(),
+            ActivityDataPoint {
+                date: row.date,
+                bugs_fixed: row.bugs_fixed,
+                features_delivered: row.features_delivered,
+            },
+        );
+    }
+    for row in issue_rows {
+        let mut labels = labels_from_json_array(row.labels_json.as_deref());
+        labels.extend(github_issue_labels_from_metadata(
+            row.github_metadata_json.as_deref(),
+        ));
+        let Some(category) = issue_activity_category(&labels) else {
+            continue;
+        };
+        let entry = activity_by_date
+            .entry(row.date.clone())
+            .or_insert(ActivityDataPoint {
+                date: row.date,
+                bugs_fixed: 0,
+                features_delivered: 0,
+            });
+        match category {
+            IssueActivityCategory::Bugfix => entry.bugs_fixed += 1,
+            IssueActivityCategory::Feature => entry.features_delivered += 1,
+        }
+    }
+
+    let mut sparse_data = activity_by_date.into_values().collect::<Vec<_>>();
+    sparse_data.sort_by(|a, b| a.date.cmp(&b.date));
     let days = fill_zero_activity_days(sparse_data, start_date, num_days);
 
     Ok(ResponseJson(ApiResponse::success(ActivityResponse {
@@ -837,6 +993,48 @@ mod tests {
         assert!(parse_filter_date("2026/06/03").is_err());
         assert!(parse_filter_date("2026-6-3").is_err());
         assert!(parse_filter_date("").is_err());
+    }
+
+    #[test]
+    fn test_issue_activity_category_prefers_bug_labels() {
+        let labels = vec!["enhancement".to_string(), "bug".to_string()];
+        assert_eq!(
+            issue_activity_category(&labels),
+            Some(IssueActivityCategory::Bugfix)
+        );
+    }
+
+    #[test]
+    fn test_issue_activity_category_matches_feature_synonyms() {
+        for label in [
+            "feature",
+            "enhancement",
+            "type:feature",
+            "kind/enhancement",
+            "feature request",
+            "new feature",
+        ] {
+            let labels = vec![label.to_string()];
+            assert_eq!(
+                issue_activity_category(&labels),
+                Some(IssueActivityCategory::Feature),
+                "label {label} should count as feature activity"
+            );
+        }
+    }
+
+    #[test]
+    fn test_github_issue_labels_from_metadata() {
+        let metadata = serde_json::json!({
+            "summary": {
+                "labels": ["bug", "needs triage"]
+            }
+        })
+        .to_string();
+        assert_eq!(
+            github_issue_labels_from_metadata(Some(&metadata)),
+            vec!["bug".to_string(), "needs triage".to_string()]
+        );
     }
 
     // 鈹€鈹€鈹€ Price Validation Tests 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€

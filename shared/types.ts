@@ -282,9 +282,9 @@ export type CreateChatSession = { title: string | null, workspace_path: string |
 
 export type UpdateChatSession = { title: string | null, status: ChatSessionStatus | null, lead_agent_id?: string | null, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, team_protocol: string | null, team_protocol_enabled: boolean | null, default_workspace_path: string | null, chat_input_mode?: string | null, };
 
-export type ChatAgent = { id: string, name: string, runner_type: string, system_prompt: string, tools_enabled: JsonValue, model_name: string | null, created_at: string, updated_at: string, };
+export type ChatAgent = { id: string, name: string, runner_type: string, system_prompt: string, tools_enabled: JsonValue, model_name: string | null, owner_project_id: string | null, created_at: string, updated_at: string, };
 
-export type CreateChatAgent = { name: string, runner_type: string, system_prompt: string | null, tools_enabled: JsonValue | null, model_name: string | null, };
+export type CreateChatAgent = { name: string, runner_type: string, system_prompt: string | null, tools_enabled: JsonValue | null, model_name: string | null, owner_project_id?: string, };
 
 export type UpdateChatAgent = { name: string | null, runner_type: string | null, system_prompt: string | null, tools_enabled: JsonValue | null, model_name: string | null, };
 

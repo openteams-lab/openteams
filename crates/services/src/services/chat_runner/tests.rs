@@ -60,6 +60,7 @@ fn test_agent(name: &str, system_prompt: &str) -> ChatAgent {
         runner_type: "codex".to_string(),
         system_prompt: system_prompt.to_string(),
         model_name: None,
+        owner_project_id: None,
         tools_enabled: sqlx::types::Json(json!({})),
         created_at: Utc::now(),
         updated_at: Utc::now(),
@@ -210,6 +211,7 @@ async fn insert_test_chat_agent(db: &DBService, name: &str) -> ChatAgent {
             system_prompt: Some(format!("You are {name}.")),
             tools_enabled: Some(json!({})),
             model_name: None,
+            owner_project_id: None,
         },
         Uuid::new_v4(),
     )
@@ -1392,6 +1394,7 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
             runner_type: "codex".to_string(),
             system_prompt: "You are the team \"Full-stack Engineer\". Your goal is to ship complete user-facing capabilities by aligning backend contracts, frontend behavior, and operational reliability.\n\n\n".to_string(),
             model_name: None,
+            owner_project_id: None,
             tools_enabled: sqlx::types::Json(json!({})),
             created_at,
             updated_at: created_at,

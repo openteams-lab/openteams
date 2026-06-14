@@ -254,6 +254,26 @@ const RELATED_FILES_SEPARATOR_WIDTH = 6;
 const SIDEBAR_MEMBER_AVATAR_WIDTH = 28;
 const SIDEBAR_MEMBER_GAP = 6;
 
+const CHAT_INPUT_SHELL_MIN_HEIGHT = 95;
+const CHAT_INPUT_MIN_HEIGHT = 30;
+const CHAT_INPUT_SHELL_MAX_HEIGHT = Math.round(
+  CHAT_INPUT_SHELL_MIN_HEIGHT * 2.5,
+);
+const CHAT_INPUT_STATIC_CHROME_HEIGHT =
+  CHAT_INPUT_SHELL_MIN_HEIGHT - CHAT_INPUT_MIN_HEIGHT;
+const CHAT_INPUT_MAX_HEIGHT =
+  CHAT_INPUT_SHELL_MAX_HEIGHT - CHAT_INPUT_STATIC_CHROME_HEIGHT;
+
+const resizeChatTextarea = (textarea: HTMLTextAreaElement | null) => {
+  if (!textarea) return;
+  textarea.style.height = `${CHAT_INPUT_MIN_HEIGHT}px`;
+  const target = Math.min(
+    Math.max(textarea.scrollHeight, CHAT_INPUT_MIN_HEIGHT),
+    CHAT_INPUT_MAX_HEIGHT,
+  );
+  textarea.style.height = `${target}px`;
+};
+
 const getVisibleSidebarMemberCount = (
   memberCount: number,
   railWidth: number,
@@ -1049,6 +1069,10 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   }, [reloadLinkedWorkItems]);
 
   useEffect(() => {
+    resizeChatTextarea(inputRef.current);
+  }, [inputText]);
+
+  useEffect(() => {
     if (!activeSessionId || !selectedProjectId) return;
 
     const handleLinkedWorkItemsChanged = (event: Event) => {
@@ -1320,6 +1344,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     const nextValue = event.target.value;
     const cursor = event.target.selectionStart ?? nextValue.length;
     setInputText(nextValue);
+    resizeChatTextarea(event.target);
 
     if (!isPlanMode && cursor > 0 && nextValue[cursor - 1] === "@") {
       setIsMemberPickerOpen(true);
@@ -1956,7 +1981,11 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
               <textarea
                 ref={inputRef}
                 rows={1}
-                className="w-full bg-transparent resize-none border-none text-[13px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-tertiary)] select-text flex-1 min-h-[30px]"
+                className="w-full bg-transparent resize-none border-none text-[13px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-tertiary)] select-text overflow-y-auto"
+                style={{
+                  minHeight: CHAT_INPUT_MIN_HEIGHT,
+                  maxHeight: CHAT_INPUT_MAX_HEIGHT,
+                }}
                 value={inputText}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}

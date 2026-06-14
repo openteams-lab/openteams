@@ -1057,7 +1057,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       ] =
         await Promise.all([
           chatMessagesApi.list(sid),
-          chatAgentsApi.list().catch(() => []),
+          chatAgentsApi
+            .list(projectId ? { projectId } : undefined)
+            .catch(() => []),
           sessionAgentsApi.list(sid).catch(() => []),
           chatRunsApi.listSessionRetention(sid, { limit: 100 }).catch(() => ({
             runs: [],
@@ -1133,7 +1135,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const projectId = selectedProjectIdRef.current;
       const [agents, sessionAgents, projectMembers] = await Promise.all([
-        chatAgentsApi.list(),
+        chatAgentsApi.list(projectId ? { projectId } : undefined),
         sessionAgentsApi.list(sid).catch(() => []),
         projectId ? projectApi.listMembers(projectId).catch(() => []) : [],
       ]);

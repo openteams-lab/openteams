@@ -1570,15 +1570,14 @@ const emptyIssueCopy: Record<
   all: {
     title: 'All issues',
     titleKey: 'issue.empty.all.title',
-    description:
-      'There are no issues in this project yet. Create a new issue or link an external repository to start tracking work.',
+    description: 'There are no issues in this project yet.',
     descriptionKey: 'issue.empty.all.description',
   },
   active: {
     title: 'Active issues',
     titleKey: 'issue.empty.active.title',
     description:
-      'There are no active issues right now. Todo and In Progress issues will appear here when work starts.',
+      'There are no active issues right now. Active issues will appear here.',
     descriptionKey: 'issue.empty.active.description',
   },
   backlog: {
@@ -1616,19 +1615,14 @@ function IssueEmptyState({
       <section className="w-[486px] max-w-full">
         <IssueEmptyIllustration filter={filter} />
 
-        <h2
-          className={cn(
-            filter === 'backlog' ? 'mt-[22px]' : 'mt-[28px]',
-            'text-[19px] font-bold leading-none text-[#f7f7f8]',
-          )}
-        >
+        <h2 className="mt-[28px] text-[19px] font-bold leading-none text-[#f7f7f8]">
           {tr(copy.titleKey, copy.title)}
         </h2>
-        <p className="mt-[22px] text-[15px] font-medium leading-[1.45] text-[#a6a8ad]">
+        <p className="mt-[22px] min-h-[22px] text-[15px] font-medium leading-[1.45] text-[#a6a8ad]">
           {tr(copy.descriptionKey, copy.description)}
         </p>
 
-        <div className="mt-[28px] flex items-center gap-[13px]">
+        <div className="mt-[22px] flex items-center gap-[13px]">
           <button
             type="button"
             className="inline-flex h-[37px] items-center gap-2 rounded-full bg-[#5e6ad2] px-4 text-[15px] font-bold leading-none text-white transition hover:bg-[#6f78e2] active:scale-[0.99]"
@@ -1669,7 +1663,7 @@ function IssueEmptyState({
 }
 
 function IssueEmptyIllustration({ filter }: { filter: IssueFilter }) {
-  if (filter === 'backlog') {
+  if (filter === 'backlog' || filter === 'all') {
     return (
       <div className="flex h-[112px] w-[112px] -translate-x-[8px] items-center justify-center">
         <svg
@@ -1760,6 +1754,31 @@ function IssueEmptyIllustration({ filter }: { filter: IssueFilter }) {
             stroke="#7f8490"
             strokeWidth={0.78}
           />
+        </svg>
+      </div>
+    );
+  }
+
+  if (filter === 'active') {
+    return (
+      <div className="flex h-[112px] w-[112px] -translate-x-[8px] items-center justify-center">
+        <svg
+          aria-hidden="true"
+          className="h-[80px] w-[80px] text-[#d5d8df]"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+          <path d="M10 20.777a8.942 8.942 0 0 1 -2.48 -.969" />
+          <path d="M14 3.223a9.003 9.003 0 0 1 0 17.554" />
+          <path d="M4.579 17.093a8.961 8.961 0 0 1 -1.227 -2.592" />
+          <path d="M3.124 10.5c.16 -.95 .468 -1.85 .9 -2.675l.169 -.305" />
+          <path d="M6.907 4.579a8.954 8.954 0 0 1 3.093 -1.356" />
         </svg>
       </div>
     );

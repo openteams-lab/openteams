@@ -844,6 +844,7 @@ export interface BackendChatAgent {
   system_prompt: string;
   tools_enabled: JsonValue;
   model_name: string | null;
+  owner_project_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -854,6 +855,7 @@ export interface CreateChatAgent {
   system_prompt: string | null;
   tools_enabled: JsonValue | null;
   model_name: string | null;
+  owner_project_id?: string | null;
 }
 
 export interface UpdateChatAgent {

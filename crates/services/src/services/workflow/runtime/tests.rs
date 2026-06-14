@@ -219,6 +219,7 @@ mod tests {
             system_prompt: String::new(),
             tools_enabled: Json(serde_json::json!({})),
             model_name: None,
+            owner_project_id: None,
             created_at: now,
             updated_at: now,
         };

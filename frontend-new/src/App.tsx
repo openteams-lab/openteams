@@ -318,7 +318,7 @@ function WorkspaceLayout() {
       if (!projectId) return null;
       const [projectMembers, agents] = await Promise.all([
         projectApi.listMembers(projectId),
-        chatAgentsApi.list().catch(() => []),
+        chatAgentsApi.list({ projectId }).catch(() => []),
       ]);
       const workflowProjectAgent = findWorkflowProjectAgent(projectMembers);
       if (!workflowProjectAgent) {

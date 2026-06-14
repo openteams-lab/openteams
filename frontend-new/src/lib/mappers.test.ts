@@ -176,6 +176,7 @@ const agentB: BackendChatAgent = {
   system_prompt: '',
   tools_enabled: null,
   model_name: 'Claude 3.5 Sonnet',
+  owner_project_id: null,
   created_at: '',
   updated_at: '',
 };

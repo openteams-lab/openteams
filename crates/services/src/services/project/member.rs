@@ -317,17 +317,48 @@ impl ProjectMemberService {
 }
 
 async fn default_chat_agent_rows(pool: &SqlitePool) -> Result<Vec<sqlx::sqlite::SqliteRow>> {
-    if chat_agents_has_is_default(pool).await? {
-        return Ok(sqlx::query(
-            r#"
-            SELECT id
-            FROM chat_agents
-            WHERE is_default = 1
-            ORDER BY name ASC
-            "#,
-        )
-        .fetch_all(pool)
-        .await?);
+    match (
+        chat_agents_has_column(pool, "is_default").await?,
+        chat_agents_has_column(pool, "owner_project_id").await?,
+    ) {
+        (true, true) => {
+            return Ok(sqlx::query(
+                r#"
+                SELECT id
+                FROM chat_agents
+                WHERE is_default = 1
+                  AND owner_project_id IS NULL
+                ORDER BY name ASC
+                "#,
+            )
+            .fetch_all(pool)
+            .await?);
+        }
+        (true, false) => {
+            return Ok(sqlx::query(
+                r#"
+                SELECT id
+                FROM chat_agents
+                WHERE is_default = 1
+                ORDER BY name ASC
+                "#,
+            )
+            .fetch_all(pool)
+            .await?);
+        }
+        (false, true) => {
+            return Ok(sqlx::query(
+                r#"
+                SELECT id
+                FROM chat_agents
+                WHERE owner_project_id IS NULL
+                ORDER BY name ASC
+                "#,
+            )
+            .fetch_all(pool)
+            .await?);
+        }
+        (false, false) => {}
     }
 
     Ok(sqlx::query(
@@ -341,14 +372,14 @@ async fn default_chat_agent_rows(pool: &SqlitePool) -> Result<Vec<sqlx::sqlite::
     .await?)
 }
 
-async fn chat_agents_has_is_default(pool: &SqlitePool) -> Result<bool> {
+async fn chat_agents_has_column(pool: &SqlitePool, column_name: &str) -> Result<bool> {
     let rows = sqlx::query("PRAGMA table_info(chat_agents)")
         .fetch_all(pool)
         .await?;
     Ok(rows
         .iter()
         .filter_map(|row| row.try_get::<String, _>("name").ok())
-        .any(|name| name == "is_default"))
+        .any(|name| name == column_name))
 }
 
 #[cfg(test)]
@@ -479,6 +510,14 @@ mod tests {
     }
 
     async fn create_named_agent(pool: &SqlitePool, name: &str) -> ChatAgent {
+        create_named_agent_with_owner(pool, name, None).await
+    }
+
+    async fn create_named_agent_with_owner(
+        pool: &SqlitePool,
+        name: &str,
+        owner_project_id: Option<Uuid>,
+    ) -> ChatAgent {
         ChatAgent::create(
             pool,
             &CreateChatAgent {
@@ -487,6 +526,7 @@ mod tests {
                 system_prompt: None,
                 tools_enabled: None,
                 model_name: None,
+                owner_project_id,
             },
             Uuid::new_v4(),
         )
@@ -1108,5 +1148,32 @@ mod tests {
         assert_eq!(agent_members.len(), 1);
         assert_eq!(agent_members[0].agent_id, Some(default_agent.id));
         assert_ne!(agent_members[0].agent_id, Some(non_default_agent.id));
+    }
+
+    #[tokio::test]
+    async fn initialize_default_members_excludes_project_owned_agents() {
+        let pool = setup_pool().await;
+        sqlx::query("ALTER TABLE chat_agents ADD COLUMN owner_project_id BLOB")
+            .execute(&pool)
+            .await
+            .expect("add owner_project_id column");
+        let source_project_id = Uuid::new_v4();
+        let target_project_id = Uuid::new_v4();
+        let global_agent = create_named_agent(&pool, "global-agent").await;
+        let owned_agent =
+            create_named_agent_with_owner(&pool, "owned-agent", Some(source_project_id)).await;
+
+        let members = ProjectMemberService::new()
+            .initialize_default_members(&pool, target_project_id, "user-1")
+            .await
+            .expect("initialize project members");
+        let agent_members = members
+            .iter()
+            .filter(|member| member.member_type == ProjectMemberType::Agent)
+            .collect::<Vec<_>>();
+
+        assert_eq!(agent_members.len(), 1);
+        assert_eq!(agent_members[0].agent_id, Some(global_agent.id));
+        assert_ne!(agent_members[0].agent_id, Some(owned_agent.id));
     }
 }
