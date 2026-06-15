@@ -200,6 +200,12 @@ const isOptimisticUserMessage = (message: Message): boolean =>
     message.id.startsWith(OPTIMISTIC_USER_MESSAGE_PREFIX),
   );
 
+const isOptimisticPendingAgentPlaceholder = (message: Message): boolean =>
+  isPendingAgentPlaceholder(message) &&
+  message.id.startsWith(
+    `${PENDING_AGENT_MESSAGE_PREFIX}${OPTIMISTIC_USER_MESSAGE_PREFIX}`,
+  );
+
 const userMessageClientId = (message: Message): string | undefined =>
   message.clientMessageId ??
   (isOptimisticUserMessage(message) ? message.id : undefined);
@@ -453,7 +459,8 @@ const mergePersistedWithRunningPlaceholders = (
       message.isAgentRunning &&
       message.sessionAgentId &&
       activeSessionAgentIds &&
-      !activeSessionAgentIds.has(message.sessionAgentId)
+      !activeSessionAgentIds.has(message.sessionAgentId) &&
+      !isOptimisticPendingAgentPlaceholder(message)
     ) {
       continue;
     }

@@ -98,7 +98,8 @@ check(
 check(
   'stream token usage messages notify build stats refresh',
   source.includes('notifyBuildStatsUsageUpdated(projectId)') &&
-    source.includes('hasRealCompleteTokenUsage(parsed.message)') &&
+    /tokenUsageNotificationSignature\(\s*parsed\.message/.test(source) &&
+    source.includes('notifiedTokenUsageSignaturesRef.current[parsed.message.id]') &&
     source.includes("tokenUsage.is_estimated === true"),
   source,
 );
@@ -201,6 +202,13 @@ check(
     source.includes('activeSessionAgentIds') &&
     source.includes('isActiveAgentState(sessionAgent.state)') &&
     source.includes('!isActiveAgentState(parsed.state)'),
+  source,
+);
+check(
+  'message refresh does not drop the immediate pending placeholder before agent state catches up',
+  source.includes('isOptimisticPendingAgentPlaceholder') &&
+    source.includes('PENDING_AGENT_MESSAGE_PREFIX}${OPTIMISTIC_USER_MESSAGE_PREFIX}') &&
+    source.includes('!isOptimisticPendingAgentPlaceholder(message)'),
   source,
 );
 check(
