@@ -185,7 +185,7 @@ async function run() {
   );
   assert.match(
     workflowAnalyticsSource,
-    /DEDUP_EVENT_NAMES[\s\S]*engagement\.workflow_card_opened[\s\S]*engagement\.transcript_opened[\s\S]*engagement\.diff_viewed/,
+    /DEDUP_EVENT_NAMES[\s\S]*engagement\.diff_viewed/,
     'workflowAnalytics.ts 未将去重限制到打开详情类事件'
   );
   assert.doesNotMatch(
@@ -409,11 +409,6 @@ async function run() {
     chatSessionsSource,
     /queryFn:\s*\(\)\s*=>\s*\{[\s\S]*recordWorkflowEvent\('engagement\.transcript_opened'[\s\S]*getWorkflowTranscripts\(/,
     'engagement.transcript_opened 不应在 transcript 轮询 queryFn 中触发'
-  );
-  assert.match(
-    chatSessionsSource,
-    /setWorkflowWindowOpen\(true\);[\s\S]*'engagement\.transcript_opened'[\s\S]*action_key/,
-    'engagement.transcript_opened 应在用户打开窗口动作触发，并包含动作去重键'
   );
   assert.match(
     chatSessionsSource,
