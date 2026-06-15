@@ -286,6 +286,53 @@ const hasRealCompleteTokenUsage = (message: BackendChatMessage): boolean => {
   );
 };
 
+const firstNumberField = (
+  value: Record<string, unknown>,
+  fieldNames: string[],
+): number | null => {
+  for (const fieldName of fieldNames) {
+    const raw = value[fieldName];
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  }
+  return null;
+};
+
+const tokenUsageBreakdownSignature = (value: unknown) => {
+  if (!isRecord(value)) return null;
+  return {
+    input: firstNumberField(value, ['input_tokens', 'snapshot_input_tokens']),
+    output: firstNumberField(value, [
+      'output_tokens',
+      'snapshot_output_tokens',
+    ]),
+    cacheRead: firstNumberField(value, [
+      'cache_read_tokens',
+      'snapshot_cache_read_tokens',
+    ]),
+    reasoningOutput: firstNumberField(value, [
+      'reasoning_output_tokens',
+      'snapshot_reasoning_output_tokens',
+    ]),
+    total: firstNumberField(value, ['total_tokens', 'snapshot_total_tokens']),
+  };
+};
+
+const tokenUsageNotificationSignature = (
+  message: BackendChatMessage,
+): string | null => {
+  if (!hasRealCompleteTokenUsage(message) || !isRecord(message.meta)) {
+    return null;
+  }
+  const tokenUsage = message.meta.token_usage;
+  if (!isRecord(tokenUsage)) return null;
+
+  return JSON.stringify({
+    direct: tokenUsageBreakdownSignature(tokenUsage),
+    last: tokenUsageBreakdownSignature(tokenUsage.last_token_usage),
+    total: tokenUsageBreakdownSignature(tokenUsage.total_token_usage),
+  });
+};
+
 const extractAgentMentions = (text: string): string[] =>
   Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
     match[1].toLowerCase(),
@@ -765,6 +812,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const workflowRouteAgentIdRef = useRef<string | null>(null);
   const agentNamesByIdRef = useRef<Record<string, string>>({});
   const agentModelsByIdRef = useRef<Record<string, string | null>>({});
+  const notifiedTokenUsageSignaturesRef = useRef<Record<string, string>>({});
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
   }, [activeSessionId]);
@@ -1615,7 +1663,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         (parsed.type === 'message_new' || parsed.type === 'message_updated') &&
         parsed.message.session_id === sid
       ) {
-        if (hasRealCompleteTokenUsage(parsed.message)) {
+        const tokenUsageSignature = tokenUsageNotificationSignature(
+          parsed.message,
+        );
+        if (
+          tokenUsageSignature &&
+          notifiedTokenUsageSignaturesRef.current[parsed.message.id] !==
+            tokenUsageSignature
+        ) {
+          notifiedTokenUsageSignaturesRef.current[parsed.message.id] =
+            tokenUsageSignature;
           const projectId = selectedProjectIdRef.current;
           if (projectId) {
             notifyBuildStatsUsageUpdated(projectId);
@@ -1674,19 +1731,19 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   // i18n
   // ---------------------------------------------------------------------------
 
-  const t = (
-    key: string,
-    replacements?: Record<string, string | number>,
-  ): string => {
-    const dict = i18nDict[locale] || i18nDict['en'];
-    let val = dict[key] || i18nDict['en'][key] || key;
-    if (replacements) {
-      Object.entries(replacements).forEach(([k, v]) => {
-        val = val.replace(`{${k}}`, String(v));
-      });
-    }
-    return val;
-  };
+  const t = useCallback(
+    (key: string, replacements?: Record<string, string | number>): string => {
+      const dict = i18nDict[locale] || i18nDict['en'];
+      let val = dict[key] || i18nDict['en'][key] || key;
+      if (replacements) {
+        Object.entries(replacements).forEach(([k, v]) => {
+          val = val.replace(`{${k}}`, String(v));
+        });
+      }
+      return val;
+    },
+    [locale],
+  );
 
   const sessions = sessionsAsync.data;
   const projects = projectsAsync.data;
