@@ -229,7 +229,7 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
       : AGENT_EMPTY_OUTPUT_FALLBACK;
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 max-w-full space-y-2">
       {isRunning && <AgentRunStatusPill label={t("agentActivity.running")} />}
 
       {hasWorkflowCard && message.workflowCard && message.sessionId && (

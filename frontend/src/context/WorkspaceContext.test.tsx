@@ -104,7 +104,7 @@ check(
   source,
 );
 check(
-  'real sends insert an immediate pending agent placeholder only when routed',
+  'real sends insert an immediate pending agent placeholder for every message',
   pendingPlaceholderIndex >= 0 &&
     source.includes('PENDING_AGENT_MESSAGE_PREFIX') &&
     source.includes('OPTIMISTIC_USER_MESSAGE_PREFIX') &&

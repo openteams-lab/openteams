@@ -125,21 +125,21 @@ const markdownComponents: Components = {
   },
   code({ children }) {
     return (
-      <code className="rounded border border-[var(--mono-border)] bg-[var(--mono-bg)] px-1 py-0.5 font-mono text-[0.95em] font-medium text-[var(--ink)]">
+      <code className="break-words rounded border border-[var(--mono-border)] bg-[var(--mono-bg)] px-1 py-0.5 font-mono text-[0.95em] font-medium text-[var(--ink)] [overflow-wrap:anywhere]">
         {children}
       </code>
     );
   },
   pre({ children }) {
     return (
-      <pre className="my-2 overflow-x-auto rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] p-3 font-mono text-[0.92em] leading-relaxed text-[var(--ink-muted)] [&_code]:border-0 [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-inherit">
+      <pre className="my-2 max-w-full overflow-x-auto rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] p-3 font-mono text-[0.92em] leading-relaxed text-[var(--ink-muted)] [&_code]:border-0 [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-inherit">
         {children}
       </pre>
     );
   },
   table({ children }) {
     return (
-      <div className="my-2 overflow-x-auto rounded-md border border-[var(--hairline)]">
+      <div className="my-2 max-w-full overflow-x-auto rounded-md border border-[var(--hairline)]">
         <table className="w-full border-collapse text-left text-[0.95em]">
           {children}
         </table>
@@ -179,7 +179,7 @@ export const AgentMarkdown: React.FC<AgentMarkdownProps> = ({
 
   return (
     <div
-      className="leading-relaxed text-[var(--ink-muted)] select-text"
+      className="min-w-0 max-w-full break-words leading-relaxed text-[var(--ink-muted)] select-text"
       style={markdownStyle}
     >
       {parts.mentions.length > 0 && (

@@ -31,6 +31,10 @@ const activityPanelSource = readFileSync(
   new URL("./AgentActivityPanel.tsx", import.meta.url),
   "utf8",
 );
+const activityPanelCssSource = readFileSync(
+  new URL("./workflow/WorkflowAgentLogPanel.css", import.meta.url),
+  "utf8",
+);
 const messageContentSource = readFileSync(
   new URL("./AgentMessageContent.tsx", import.meta.url),
   "utf8",
@@ -236,6 +240,17 @@ check(
   { messageContentSource, activityPanelSource },
 );
 check(
+  "wraps long agent thinking lines inside the message column",
+  source.includes("group/message relative flex w-full min-w-0") &&
+    markdownSource.includes("min-w-0 max-w-full break-words") &&
+    markdownSource.includes("[overflow-wrap:anywhere]") &&
+    messageContentSource.includes("min-w-0 max-w-full space-y-2") &&
+    activityPanelCssSource.includes("white-space: normal") &&
+    activityPanelCssSource.includes("overflow-wrap: anywhere") &&
+    activityPanelCssSource.includes("white-space: pre-wrap"),
+  { source, markdownSource, activityPanelCssSource },
+);
+check(
   "reloads historical activity when live stream lines are only partial",
   messageContentSource.includes('loadState === "loaded"') &&
     messageContentSource.includes("activityRequestIdRef") &&
@@ -275,7 +290,7 @@ check(
   source.includes("chatMessageFontSize") &&
     source.includes("style={{ fontSize: `${chatMessageFontSize}px` }}") &&
     source.includes("messageFontSize={chatMessageFontSize}") &&
-    source.includes("text-[0.95em]") &&
+    markdownSource.includes("text-[0.95em]") &&
     messageContentSource.includes("messageFontSize?: number") &&
     messageContentSource.includes("fontSize={messageFontSize}") &&
     settingsSource.includes("CHAT_MESSAGE_FONT_SIZE_OPTIONS") &&
@@ -333,7 +348,7 @@ check(
     source.includes("message.dismissQuote") &&
     source.includes("summarizeMessage") &&
     source.includes("content: text") &&
-    source.includes("sendMessage(trimmedInput, {") &&
+    source.includes("sendMessage(messageText, {") &&
     source.includes("chatInputMode,") &&
     source.includes("...(quotedMessage ? { quotedMessage } : {})") &&
     source.includes("msg.quotedMessage") &&
@@ -389,11 +404,23 @@ check(
 );
 check(
   "user message rendering shows the main agent mention without mutating text",
-  source.includes("sendMessage(trimmedInput, {") &&
+  source.includes("sendMessage(messageText, {") &&
     source.includes("implicitMainAgentMentionForUserMessage(msg.text)") &&
     source.includes("renderMentionText(") &&
     source.includes("{formatMsgText(msg.text)}") &&
     !source.includes("`${planModeMainAgentName} ${trimmedInput}`"),
+  source,
+);
+check(
+  "user message rendering preserves input whitespace and markdown symbols",
+  source.includes("const messageText = inputText") &&
+    source.includes("content: trimmedInput ? messageText : undefined") &&
+    source.includes("whitespace-pre-wrap break-words") &&
+    source.includes(
+      "Highlight @mentions while keeping user-entered markdown characters literal",
+    ) &&
+    source.includes("text.split(/(@[a-zA-Z0-9_-]+)/g)") &&
+    !source.includes("el.substring(1, el.length - 1)"),
   source,
 );
 check(
@@ -405,7 +432,7 @@ check(
     source.includes("ensureWorkflowRouteToMainAgent") &&
     source.includes('if (chatInputMode === "workflow")') &&
     source.includes("await ensureWorkflowRouteToMainAgent()") &&
-    source.includes("content: trimmedInput || undefined") &&
+    source.includes("content: trimmedInput ? messageText : undefined") &&
     source.includes("referenceMessageId: quotedMessage?.id") &&
     source.includes("await refreshMessages()") &&
     apiSource.includes('form.append("file", file, file.name)') &&

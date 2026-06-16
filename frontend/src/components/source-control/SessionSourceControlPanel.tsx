@@ -511,7 +511,6 @@ export const SessionSourceControlPanel: React.FC<
     externalStagedCount > 0
       ? `${tr("sourceControl.externalStagedFiles", "External staged files:")}\n${viewModel.externalStagedPaths.join("\n")}`
       : "";
-
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col">

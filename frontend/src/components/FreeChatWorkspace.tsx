@@ -1403,7 +1403,8 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   };
 
   const handleSend = async () => {
-    const trimmedInput = inputText.trim();
+    const messageText = inputText;
+    const trimmedInput = messageText.trim();
     if (!trimmedInput && attachedFiles.length === 0) return;
     if (isUploadingAttachments) return;
 
@@ -1422,7 +1423,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
         }
         await chatMessagesApi.uploadAttachment(activeSessionId, attachedFiles, {
           chatInputMode,
-          content: trimmedInput || undefined,
+          content: trimmedInput ? messageText : undefined,
           appLanguage: locale,
           referenceMessageId: quotedMessage?.id,
         });
@@ -1438,7 +1439,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
       return;
     }
 
-    sendMessage(trimmedInput, {
+    sendMessage(messageText, {
       chatInputMode,
       ...(quotedMessage ? { quotedMessage } : {}),
     });
@@ -1678,22 +1679,12 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   const implicitMainAgentMentionForUserMessage = (text: string) =>
     extractMentionHandles(text).length === 0 ? mainAgentHandle : null;
 
-  // Parse @mentions or `code` formatted blocks inside messages for beautiful styling
+  // Highlight @mentions while keeping user-entered markdown characters literal.
   const formatMsgText = (text: string) => {
     if (!text) return "";
-    const elements = text.split(/(`[^`]+`|@[a-zA-Z0-9_-]+)/g);
+    const elements = text.split(/(@[a-zA-Z0-9_-]+)/g);
 
     return elements.map((el, idx) => {
-      if (el.startsWith("`") && el.endsWith("`")) {
-        return (
-          <code
-            key={idx}
-            className="bg-[var(--mono-bg)] border border-[var(--mono-border)] px-1.5 py-0.5 rounded text-[0.95em] font-mono font-medium text-[var(--ink)] mx-1 select-all"
-          >
-            {el.substring(1, el.length - 1)}
-          </code>
-        );
-      }
       if (el.startsWith("@")) {
         return renderMentionText(el, idx);
       }
@@ -1866,7 +1857,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
             {displayedMessages.map((msg) => (
               <div
                 key={msg.clientMessageId ?? msg.id}
-                className={`group/message relative flex gap-3 items-start rounded-md ${
+                className={`group/message relative flex w-full min-w-0 gap-3 items-start rounded-md ${
                   msg.isUser
                     ? "border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2.5"
                     : "px-1 py-2 pb-8"
@@ -1918,7 +1909,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
 
                   {msg.isUser ? (
                     <div
-                      className="leading-relaxed text-[var(--ink)] select-text"
+                      className="whitespace-pre-wrap break-words leading-relaxed text-[var(--ink)] select-text"
                       style={{ fontSize: `${chatMessageFontSize}px` }}
                     >
                       {implicitMainAgentMentionForUserMessage(msg.text) && (
@@ -2287,8 +2278,8 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                               }}
                               className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left cursor-pointer ${
                                 index === activeMemberPickerIndex
-                                  ? "bg-[var(--surface-2)]"
-                                  : "hover:bg-[var(--surface-2)]"
+                                  ? "bg-[color-mix(in_srgb,var(--primary)_24%,var(--surface-3))] ring-1 ring-inset ring-[color-mix(in_srgb,var(--primary)_48%,transparent)]"
+                                  : "hover:bg-[color-mix(in_srgb,var(--primary)_12%,var(--surface-3))]"
                               }`}
                             >
                               <span className="h-5 w-5 rounded-full bg-[var(--mono-bg)] border border-[var(--mono-border)] flex items-center justify-center text-[8px] font-mono font-semibold text-[var(--ink-muted)]">

@@ -105,6 +105,8 @@ body[data-mode="light"] .workflow-window-root .wf-log-group + .wf-log-group {
   padding: 2px 0;
   gap: 12px;
   align-items: flex-start;
+  overflow: visible;
+  white-space: normal;
 }
 
 /* Status column (fixed width for vertical alignment) */
@@ -288,7 +290,9 @@ body[data-mode="light"] .workflow-window-root .wf-log-markdown pre {
   font-size: 12px;
   line-height: 1.8;
   margin-top: 4px;
+  max-width: 100%;
   max-height: 480px;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -300,6 +304,9 @@ body[data-mode="light"] .workflow-window-root .wf-log-markdown pre {
   font-size: 12px;
   line-height: 1.7;
   color: var(--ink, #f7f8f8);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .wf-log-task-content-text--error {

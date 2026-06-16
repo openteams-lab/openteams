@@ -187,6 +187,14 @@ const OPTIMISTIC_USER_MESSAGE_PREFIX = 'msg-user-';
 const CHAT_MESSAGE_FONT_SIZE_STORAGE_KEY = 'openteams-chat-message-font-size';
 const LEGACY_AGENT_MARKDOWN_FONT_SIZE_STORAGE_KEY =
   'openteams-agent-markdown-font-size';
+// Persist the user's last-viewed project/session so a page refresh restores the
+// same context (and therefore reconnects the WS stream to the same session)
+// instead of always falling back to the first session in the list.
+const ACTIVE_SESSION_ID_STORAGE_KEY = 'openteams-active-session-id';
+const SELECTED_PROJECT_ID_STORAGE_KEY = 'openteams-selected-project-id';
+// WebSocket auto-reconnect backoff bounds (ms).
+const CHAT_STREAM_RECONNECT_BASE_DELAY_MS = 1000;
+const CHAT_STREAM_RECONNECT_MAX_DELAY_MS = 30000;
 const CHAT_MESSAGE_FONT_SIZE_DEFAULT = 14;
 export const CHAT_MESSAGE_FONT_SIZE_OPTIONS = [13, 14, 15, 16] as const;
 
@@ -405,9 +413,6 @@ const makePendingAgentPlaceholder = (
       : fallbackMention
         ? [fallbackMention.replace(/^@/, '').toLowerCase()]
         : [];
-  if (effectiveMentions.length === 0) {
-    return null;
-  }
   const mentionedMember = members.find((member) =>
     effectiveMentions.includes(member.name.replace(/^@/, '').toLowerCase()),
   );
@@ -765,7 +770,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     });
   const [tasks, setTasks] = useState<TaskNode[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string>('');
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
+    try {
+      return localStorage.getItem(ACTIVE_SESSION_ID_STORAGE_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
   const mockBootstrapRef = useRef<WorkspaceBootstrapMock | null>(null);
   const toastDurationMsRef = useRef(3000);
 
@@ -778,7 +789,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const [projectsAsync, setProjectsAsync] = useState<
     AsyncResourceState<Project[]>
   >(() => initialAsync([]));
-  const [selectedProjectId, setSelectedProjectIdState] = useState<string>('');
+  const [selectedProjectId, setSelectedProjectIdState] = useState<string>(() => {
+    try {
+      return localStorage.getItem(SELECTED_PROJECT_ID_STORAGE_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
   const [allMessages, setAllMessages] = useState<Record<string, Message[]>>({});
   const [workflowRuntimeLinesByExecution, setWorkflowRuntimeLinesByExecution] =
     useState<Record<string, WorkflowRuntimeLine[]>>({});
@@ -869,6 +886,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   );
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
+    try {
+      if (activeSessionId) {
+        localStorage.setItem(ACTIVE_SESSION_ID_STORAGE_KEY, activeSessionId);
+      } else {
+        localStorage.removeItem(ACTIVE_SESSION_ID_STORAGE_KEY);
+      }
+    } catch {}
   }, [activeSessionId]);
 
   // Keep the cached workspace path in sync with the active session so the
@@ -967,6 +991,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       const previousProjectId = selectedProjectIdRef.current;
       selectedProjectIdRef.current = id;
       setSelectedProjectIdState(id);
+      try {
+        if (id) {
+          localStorage.setItem(SELECTED_PROJECT_ID_STORAGE_KEY, id);
+        } else {
+          localStorage.removeItem(SELECTED_PROJECT_ID_STORAGE_KEY);
+        }
+      } catch {}
 
       if (previousProjectId !== id) {
         setSessionsAsync(succeed([]));
@@ -1759,11 +1790,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!activeSessionId || sessionsAsync.source !== 'api') return;
 
     const sid = activeSessionId;
-    const socket = new WebSocket(
-      chatStreamWebSocketUrl(chatSessionsApi.streamUrl(sid)),
-    );
+    let socket: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectAttempt = 0;
+    let hasConnectedOnce = false;
+    let disposed = false;
 
-    socket.onmessage = (event) => {
+    const handleMessage = (event: MessageEvent) => {
       let parsed: ChatStreamEvent;
       try {
         parsed = JSON.parse(event.data) as ChatStreamEvent;
@@ -1852,12 +1885,53 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
 
-    socket.onerror = () => {
-      socket.close();
+    // Open the stream and keep it alive across transient drops. The stream has
+    // no server-side replay, so on every *re*connect we re-hydrate the session
+    // via REST to recover any persisted messages emitted while we were down.
+    const connect = () => {
+      if (disposed) return;
+      const ws = new WebSocket(
+        chatStreamWebSocketUrl(chatSessionsApi.streamUrl(sid)),
+      );
+      socket = ws;
+      ws.onmessage = handleMessage;
+      ws.onopen = () => {
+        reconnectAttempt = 0;
+        if (hasConnectedOnce) {
+          void refreshMessages();
+          void refreshMembers();
+          const workspacePath = activeWorkspacePathRef.current;
+          if (workspacePath) {
+            void refreshWorkspaceChanges(sid, workspacePath, true);
+          }
+        }
+        hasConnectedOnce = true;
+      };
+      ws.onclose = () => {
+        // Ignore the close of a superseded socket or one closed by cleanup.
+        if (disposed || socket !== ws) return;
+        const delay = Math.min(
+          CHAT_STREAM_RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt,
+          CHAT_STREAM_RECONNECT_MAX_DELAY_MS,
+        );
+        reconnectAttempt += 1;
+        reconnectTimer = setTimeout(connect, delay);
+      };
+      // Let onclose drive the reconnect; just tear the socket down on error.
+      ws.onerror = () => {
+        ws.close();
+      };
     };
 
+    connect();
+
     return () => {
-      socket.close();
+      disposed = true;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      socket?.close();
     };
   }, [
     activeSessionId,
@@ -1865,6 +1939,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     handleWorkflowRuntimeLine,
     insertRunningPlaceholder,
     mapBackendChatMessage,
+    refreshMessages,
     refreshWorkspaceChanges,
     refreshMembers,
     sessionsAsync.source,
