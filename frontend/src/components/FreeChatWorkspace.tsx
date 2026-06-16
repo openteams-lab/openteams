@@ -707,6 +707,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     refreshSessions,
     messagesAsync,
     refreshMessages,
+    markSessionAgentStopped,
     membersAsync,
     refreshMembers,
     chatMessageFontSize,
@@ -1326,6 +1327,9 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
 
     try {
       await sessionAgentsApi.stop(activeSessionId, sessionAgentId);
+      // Optimistically drop the stopped run's "executing" placeholder so a
+      // newly sent message cannot appear next to a stale running placeholder.
+      markSessionAgentStopped(sessionAgentId);
       showToast(t("agent.stopRequested"));
       void refreshMembers();
     } catch {

@@ -684,6 +684,12 @@ interface WorkspaceContextProps {
   refreshSessions: () => Promise<void>;
   messagesAsync: AsyncResourceState<Message[]>;
   refreshMessages: () => Promise<void>;
+  /**
+   * Optimistically drop the running placeholder of a stopped session agent and
+   * suppress its re-hydration until a new run starts or it reaches a terminal
+   * state. Call right when the user requests a stop.
+   */
+  markSessionAgentStopped: (sessionAgentId: string) => void;
   membersAsync: AsyncResourceState<Member[]>;
   refreshMembers: () => Promise<void>;
   providersAsync: AsyncResourceState<Provider[]>;
@@ -837,6 +843,14 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const agentNamesByIdRef = useRef<Record<string, string>>({});
   const agentModelsByIdRef = useRef<Record<string, string | null>>({});
   const notifiedTokenUsageSignaturesRef = useRef<Record<string, string>>({});
+  // Session agents the user has just requested to stop. While an agent is in
+  // this set its (stopping) run must not be re-hydrated as a running
+  // placeholder, so a freshly sent message cannot end up beside a stale
+  // "executing" placeholder. Cleared when a new run starts or a terminal
+  // agent_state arrives.
+  const optimisticallyStoppedSessionAgentIdsRef = useRef<Set<string>>(
+    new Set(),
+  );
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
   }, [activeSessionId]);
@@ -1191,15 +1205,39 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         agentNamesById,
         agentModelsById,
       });
-      const runningPlaceholders = await hydrateRunningAgentPlaceholders(
-        sessionAgents,
-        backendAgents,
-        retention.runs,
-        projectMembers,
+      // Drop the optimistic-stop suppression for any agent that has already
+      // moved out of the `stopping` state (terminal, or a new run is active).
+      const suppressedStoppedIds =
+        optimisticallyStoppedSessionAgentIdsRef.current;
+      if (suppressedStoppedIds.size > 0) {
+        for (const sessionAgent of sessionAgents) {
+          if (
+            suppressedStoppedIds.has(sessionAgent.id) &&
+            sessionAgent.state !== 'stopping'
+          ) {
+            suppressedStoppedIds.delete(sessionAgent.id);
+          }
+        }
+      }
+      const runningPlaceholders = (
+        await hydrateRunningAgentPlaceholders(
+          sessionAgents,
+          backendAgents,
+          retention.runs,
+          projectMembers,
+        )
+      ).filter(
+        (placeholder) =>
+          !placeholder.sessionAgentId ||
+          !suppressedStoppedIds.has(placeholder.sessionAgentId),
       );
       const activeSessionAgentIds = new Set(
         sessionAgents
-          .filter((sessionAgent) => isActiveAgentState(sessionAgent.state))
+          .filter(
+            (sessionAgent) =>
+              isActiveAgentState(sessionAgent.state) &&
+              !suppressedStoppedIds.has(sessionAgent.id),
+          )
           .map((sessionAgent) => sessionAgent.id),
       );
       setAllMessages((prev) => {
@@ -1217,6 +1255,34 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       const mock = mockBootstrapRef.current?.messagesBySession[sid] ?? [];
       setMessagesAsync((prev) => fail(prev, err, mock));
     }
+  }, []);
+
+  // Optimistically clear the running placeholder of a session agent the user
+  // just stopped. The stopped run keeps the agent in the `stopping` state for a
+  // while, during which both refreshMessages and a freshly sent message would
+  // otherwise leave a stale "executing" placeholder on screen alongside the new
+  // one. We drop it immediately and suppress re-hydration until the agent
+  // either starts a new run or reaches a terminal state.
+  const markSessionAgentStopped = useCallback((sessionAgentId: string) => {
+    if (!sessionAgentId) return;
+    optimisticallyStoppedSessionAgentIdsRef.current.add(sessionAgentId);
+    const sid = activeSessionIdRef.current;
+    if (!sid) return;
+    setAllMessages((prev) => {
+      const current = prev[sid];
+      if (!current) return prev;
+      const updated = current.filter(
+        (message) =>
+          !(
+            message.isAgentRunning &&
+            message.sessionAgentId === sessionAgentId
+          ),
+      );
+      if (updated.length === current.length) return prev;
+      const next = { ...prev, [sid]: updated };
+      setMessagesAsync(succeed(updated));
+      return next;
+    });
   }, []);
 
   const refreshMembers = useCallback(async (): Promise<void> => {
@@ -1522,6 +1588,18 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         return { ...prev, [line.session_id]: next };
       }
 
+      // Ignore trailing activity from a run the user just stopped: do not
+      // resurrect a running placeholder for an optimistically-stopped agent.
+      // A genuinely new run always emits agent_run_started first, which clears
+      // the suppression before its first activity line arrives.
+      if (
+        optimisticallyStoppedSessionAgentIdsRef.current.has(
+          line.session_agent_id,
+        )
+      ) {
+        return prev;
+      }
+
       const agentName = line.agent_name.startsWith('@')
         ? line.agent_name
         : `@${line.agent_name}`;
@@ -1562,6 +1640,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const insertRunningPlaceholder = useCallback(
     (event: Extract<ChatStreamEvent, { type: 'agent_run_started' }>) => {
+      // A new run for this agent supersedes any optimistic-stop suppression.
+      optimisticallyStoppedSessionAgentIdsRef.current.delete(
+        event.session_agent_id,
+      );
       setAllMessages((prev) => {
         const current = prev[event.session_id] || [];
         if (current.some((message) => message.runId === event.run_id)) {
@@ -1720,6 +1802,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         // When an agent leaves an active run state,
         // clear any lingering running/thinking placeholder messages for it.
         if (!isActiveAgentState(parsed.state)) {
+          optimisticallyStoppedSessionAgentIdsRef.current.delete(
+            parsed.session_agent_id,
+          );
           setAllMessages((prev) => {
             const current = prev[sid];
             if (!current) return prev;
@@ -2176,6 +2261,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         refreshSessions,
         messagesAsync,
         refreshMessages,
+        markSessionAgentStopped,
         membersAsync,
         refreshMembers,
         providersAsync,
