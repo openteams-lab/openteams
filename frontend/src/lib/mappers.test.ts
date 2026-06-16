@@ -161,6 +161,37 @@ eq(
 );
 eq('relative time 30s', a.time, '30s ago');
 
+const emptyAgentWithError = mapMessage(
+  {
+    ...agentMsg,
+    id: 'm3',
+    content: '',
+    meta: {
+      error: {
+        content: 'CLI exited before producing output',
+        summary: 'CLI exited before producing output',
+      },
+    },
+  },
+  { now },
+);
+eq(
+  'empty agent content uses error meta',
+  emptyAgentWithError.text,
+  'CLI exited before producing output',
+);
+
+const emptyAgentNoError = mapMessage(
+  {
+    ...agentMsg,
+    id: 'm4',
+    content: '',
+    meta: {},
+  },
+  { now },
+);
+eq('empty agent content uses fallback', emptyAgentNoError.text, 'Agent运行失败');
+
 eq(
   'mapMessages length matches',
   mapMessages([userMsg, agentMsg], { now }).length,

@@ -32,7 +32,7 @@ const workflowCardSource = readFileSync(
 const refreshProjectsIndex = source.indexOf('await refreshProjects();');
 const refreshSessionsIndex = source.indexOf('refreshSessions(),');
 const pendingPlaceholderIndex = source.indexOf(
-  'makePendingAgentPlaceholder(text, userMsgId',
+  'makePendingAgentPlaceholder(',
 );
 const sendApiIndex = source.indexOf('.send(sid,');
 
@@ -104,11 +104,14 @@ check(
   source,
 );
 check(
-  'real sends insert an immediate pending agent placeholder',
+  'real sends insert an immediate pending agent placeholder only when routed',
   pendingPlaceholderIndex >= 0 &&
     source.includes('PENDING_AGENT_MESSAGE_PREFIX') &&
     source.includes('OPTIMISTIC_USER_MESSAGE_PREFIX') &&
     source.includes('clientMessageId: userMsgId') &&
+    source.includes('fallbackMention?: string | null') &&
+    source.includes('const effectiveMentions =') &&
+    source.includes('explicitMentions.length === 0 ? mainAgentMention : null') &&
     source.includes('meta.client_message_id = userMsgId') &&
     pendingPlaceholderIndex < sendApiIndex,
   { pendingPlaceholderIndex, sendApiIndex },
@@ -167,7 +170,9 @@ check(
     source.includes('chatSessionsApi') &&
     source.includes('chat_input_mode: toSessionChatInputMode(nextMode)') &&
     source.includes("meta.chat_input_mode = 'workflow'") &&
-    source.includes("effectiveChatInputMode !== 'workflow' && mentions.length > 0"),
+    source.includes('const routeMentions =') &&
+    source.includes("effectiveChatInputMode !== 'workflow' && routeMentions.length > 0") &&
+    source.includes('meta.mentions = routeMentions'),
   source,
 );
 check(

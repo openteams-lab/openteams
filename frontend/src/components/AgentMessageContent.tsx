@@ -2,22 +2,33 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { AgentActivityPanel } from "@/components/AgentActivityPanel";
 import { AgentArtifactFileList } from "@/components/AgentArtifactFileList";
-import type { ArtifactDiffStat } from "@/components/AgentArtifactFileList";
 import { AgentMarkdown } from "@/components/AgentMarkdown";
 import { AgentRunStatusPill } from "@/components/AgentRunStatusPill";
 import { WorkflowCard } from "@/components/workflow/WorkflowCard";
 import { ApiError, chatRunsApi } from "@/lib/api";
+import {
+  flattenRunFileChanges,
+  mergeArtifactPaths,
+  type AgentFileRow,
+} from "@/lib/agentFileRows";
+import { extractArtifactPaths } from "@/lib/parseStructuredReply";
 import type { ActivityLoadState, ChatRunActivityLine, Message } from "@/types";
 
 const ACTIVITY_LOAD_TIMEOUT_MS = 15000;
+const AGENT_EMPTY_OUTPUT_FALLBACK = "Agent运行失败";
+
+/**
+ * Module-level cache of per-run changed-file rows keyed by run id. A run's
+ * captured diff is immutable once the run completes, so the rows are safe to
+ * reuse across message re-renders and avoid refetching on every scroll.
+ */
+const runFileRowsCache = new Map<string, AgentFileRow[]>();
 
 interface AgentMessageContentProps {
   message: Message;
   t: (key: string, replacements?: Record<string, string | number>) => string;
   messageFontSize?: number;
-  /** Optional per-path diff stats for artifact rows. */
-  diffStats?: Map<string, ArtifactDiffStat>;
-  /** Open an artifact file (e.g. into a diff tab). */
+  /** Open a file row (e.g. into a diff tab). */
   onOpenArtifact?: (path: string) => void;
 }
 
@@ -35,7 +46,6 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
   message,
   t,
   messageFontSize,
-  diffStats,
   onOpenArtifact,
 }) => {
   const isRunning = Boolean(message.isAgentRunning || message.isThinking);
@@ -138,12 +148,62 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
 
   const visibleActivityLines = useMemo(
     () =>
-      (activityLines ?? []).filter((line) => line.line_type !== "assistant"),
-    [activityLines],
+      isRunning
+        ? (activityLines ?? [])
+        : (activityLines ?? []).filter((line) => line.line_type !== "assistant"),
+    [activityLines, isRunning],
   );
   const hasVisibleActivityLines = visibleActivityLines.length > 0;
   const hasActivityPanelState =
     loadState === "loading" || loadState === "pruned" || loadState === "error";
+
+  // ---- Per-run changed files ------------------------------------------------
+  // The file list pinned to the message bottom is sourced from the run's own
+  // diff (GET /chat/runs/{run_id}/files). Results are cached per run id.
+  const [runFileRows, setRunFileRows] = useState<AgentFileRow[]>(() =>
+    message.runId ? (runFileRowsCache.get(message.runId) ?? []) : [],
+  );
+
+  useEffect(() => {
+    if (isRunning || !message.runId) return;
+    const runId = message.runId;
+    const cached = runFileRowsCache.get(runId);
+    if (cached) {
+      setRunFileRows(cached);
+      return;
+    }
+    let cancelled = false;
+    runFileRowsCache.set(runId, []);
+    chatRunsApi
+      .getFiles(runId, { includeDiff: false })
+      .then((response) => {
+        if (cancelled) return;
+        const rows = flattenRunFileChanges(response);
+        runFileRowsCache.set(runId, rows);
+        setRunFileRows(rows);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        runFileRowsCache.set(runId, []);
+        setRunFileRows([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [message.runId, isRunning]);
+
+  const artifactPaths = useMemo(
+    () =>
+      (message.artifacts ?? []).flatMap((artifact) =>
+        extractArtifactPaths(artifact.raw ?? artifact.path),
+      ),
+    [message.artifacts],
+  );
+
+  const fileRows = useMemo(
+    () => mergeArtifactPaths(runFileRows, artifactPaths),
+    [runFileRows, artifactPaths],
+  );
 
   const panelLabels = {
     loading: t("agentActivity.loading"),
@@ -160,14 +220,19 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
   // conclusion when there is no send). Plain replies leave `replyText`
   // undefined and we fall back to the raw `text`.
   const replyText = message.replyText ?? message.text;
+  const hasFileRows = !isRunning && fileRows.length > 0;
+  const hasWorkflowCard = Boolean(message.workflowCard && message.sessionId);
   const hasReplyText = replyText.trim().length > 0;
-  const hasArtifacts = !isRunning && (message.artifacts?.length ?? 0) > 0;
+  const displayReplyText =
+    hasReplyText || isRunning || hasFileRows || hasWorkflowCard
+      ? replyText
+      : AGENT_EMPTY_OUTPUT_FALLBACK;
 
   return (
     <div className="space-y-2">
       {isRunning && <AgentRunStatusPill label={t("agentActivity.running")} />}
 
-      {message.workflowCard && message.sessionId && (
+      {hasWorkflowCard && message.workflowCard && message.sessionId && (
         <WorkflowCard
           sessionId={message.sessionId}
           messageId={message.workflowCard.messageId}
@@ -201,14 +266,13 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
         />
       )}
 
-      {hasReplyText && (
-        <AgentMarkdown content={replyText} fontSize={messageFontSize} />
+      {displayReplyText.trim().length > 0 && (
+        <AgentMarkdown content={displayReplyText} fontSize={messageFontSize} />
       )}
 
-      {hasArtifacts && message.artifacts && (
+      {hasFileRows && (
         <AgentArtifactFileList
-          artifacts={message.artifacts}
-          diffStats={diffStats}
+          files={fileRows}
           onOpen={onOpenArtifact ?? (() => undefined)}
           title={t("agentArtifacts.title")}
           moreLabel={(count) => t("agentArtifacts.more", { count })}

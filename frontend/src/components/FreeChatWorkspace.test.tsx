@@ -164,11 +164,10 @@ check(
     source.includes("const memberMentionHandles = new Set(") &&
     source.includes("const matchedMemberMentions = extractMentionHandles(") &&
     source.includes("memberMentionHandles.has(mention)") &&
+    source.includes("const mainAgentHandle =") &&
+    source.includes("normalizedMainAgentHandle") &&
     source.includes(
-      "return selectedSidebarMember.id === sidebarMembers[0]?.id",
-    ) &&
-    source.includes(
-      "selectedSidebarMember.name.toLowerCase()",
+      "normalizeMentionHandle(selectedSidebarMember.name)",
     ) &&
     source.includes("{displayedMessages.map((msg) => (") &&
     source.includes("key={msg.clientMessageId ?? msg.id}") &&
@@ -228,8 +227,9 @@ check(
   messageContentSource,
 );
 check(
-  "hides empty thinking panel and filters final assistant activity lines",
-  messageContentSource.includes('line.line_type !== "assistant"') &&
+  "hides empty thinking panel and filters final assistant activity lines after completion",
+  messageContentSource.includes("isRunning") &&
+    messageContentSource.includes('line.line_type !== "assistant"') &&
     messageContentSource.includes("hasVisibleActivityLines") &&
     messageContentSource.includes("hasActivityPanelState") &&
     activityPanelSource.includes("if (showEmpty) return null"),
@@ -388,6 +388,15 @@ check(
   source,
 );
 check(
+  "user message rendering shows the main agent mention without mutating text",
+  source.includes("sendMessage(trimmedInput, {") &&
+    source.includes("implicitMainAgentMentionForUserMessage(msg.text)") &&
+    source.includes("renderMentionText(") &&
+    source.includes("{formatMsgText(msg.text)}") &&
+    !source.includes("`${planModeMainAgentName} ${trimmedInput}`"),
+  source,
+);
+check(
   "attachment send uses backend multipart upload with quote reference id",
   source.includes(
     "chatMessagesApi.uploadAttachment(activeSessionId, attachedFiles",
@@ -412,7 +421,7 @@ check(
   source.includes("handleTogglePlanMode") &&
     source.includes("setChatInputMode") &&
     source.includes("mainAgentName,") &&
-    source.includes('const planModeMainAgentName = mainAgentName ?? members[0]?.name ?? "@agent"') &&
+    source.includes("const planModeMainAgentName = mainAgentHandle") &&
     source.includes("rounded-full border px-2 py-1 text-[10px]") &&
     source.includes('<GitBranch className="h-3 w-3" />') &&
     source.includes("planModePlaceholder") &&

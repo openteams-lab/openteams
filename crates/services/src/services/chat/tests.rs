@@ -20,8 +20,8 @@ mod tests {
         compress_messages_if_needed, create_message, create_session_with_project_members,
         effective_agent_name, is_protocol_notice_history_message, is_workflow_chat_input_mode,
         limit_summary_input_messages, member_name_overrides_for_session, parse_agent_send_mentions,
-        parse_mentions, prioritize_summary_agents, select_messages_to_compress_by_token,
-        should_include_message_in_history,
+        parse_mentions, parse_user_message_mentions, prioritize_summary_agents,
+        select_messages_to_compress_by_token, should_include_message_in_history,
     };
 
     #[test]
@@ -40,6 +40,24 @@ mod tests {
     fn de_dupes_mentions_in_order() {
         let mentions = parse_mentions("@a @a @b");
         assert_eq!(mentions, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn parse_user_message_mentions_uses_meta_when_content_has_no_at_tokens() {
+        let mentions = parse_user_message_mentions(
+            "please handle this",
+            &serde_json::json!({ "mentions": ["@lead", "lead", "bad name"] }),
+        );
+        assert_eq!(mentions, vec!["lead"]);
+    }
+
+    #[test]
+    fn parse_user_message_mentions_prefers_content_at_tokens() {
+        let mentions = parse_user_message_mentions(
+            "@backend please handle this",
+            &serde_json::json!({ "mentions": ["lead"] }),
+        );
+        assert_eq!(mentions, vec!["backend"]);
     }
 
     #[test]
@@ -349,6 +367,25 @@ mod tests {
         .expect("create user message");
 
         assert_eq!(message.mentions.0, vec!["backend"]);
+    }
+
+    #[tokio::test]
+    async fn create_message_routes_user_mentions_from_meta_when_content_has_none() {
+        let pool = setup_chat_message_pool().await;
+        let session = create_active_session(&pool).await;
+
+        let message = create_message(
+            &pool,
+            session.id,
+            ChatSenderType::User,
+            None,
+            "please handle this".to_string(),
+            Some(serde_json::json!({ "mentions": ["lead"] })),
+        )
+        .await
+        .expect("create user message");
+
+        assert_eq!(message.mentions.0, vec!["lead"]);
     }
 
     #[tokio::test]

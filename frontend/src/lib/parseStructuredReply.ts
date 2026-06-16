@@ -5,7 +5,7 @@
 // chat-output protocol, where each item has the shape:
 //   { type: "send" | "artifact" | "conclusion" | "record", content: string, ... }
 // When the whole `backend.content` string is such an array, we split it into:
-//   - replyText : joined `send` contents (falls back to `conclusion`)
+//   - replyText : joined `send` contents (falls back to `conclusion`, then `record`)
 //   - artifacts : `artifact` entries (file paths)
 //   - conclusion: the `conclusion` content (used when there is no `send`)
 // Anything that is not a strict match for this shape is treated as plain
@@ -20,7 +20,7 @@ import type { ArtifactItem } from '@/types';
 export type StructuredReply =
   | {
       kind: 'structured';
-      /** Visible reply body: joined sends, or the conclusion when no send. */
+      /** Visible reply body: joined sends, or conclusion/record fallback. */
       replyText: string;
       artifacts: ArtifactItem[];
       conclusion: string | null;
@@ -81,6 +81,7 @@ export const parseStructuredAgentReply = (text: string): StructuredReply => {
   const sends: string[] = [];
   const artifacts: ArtifactItem[] = [];
   let conclusion: string | null = null;
+  const records: string[] = [];
 
   for (const item of items) {
     if (item.type === 'send') {
@@ -90,17 +91,25 @@ export const parseStructuredAgentReply = (text: string): StructuredReply => {
       if (path) artifacts.push({ path, raw: item.content });
     } else if (item.type === 'conclusion') {
       conclusion = item.content;
+    } else if (item.type === 'record') {
+      if (item.content.trim()) records.push(item.content);
     }
-    // "record" items are not user-facing and are ignored for rendering.
   }
 
   // If nothing renderable was produced, keep the raw text visible.
-  if (sends.length === 0 && artifacts.length === 0 && !conclusion) {
+  if (
+    sends.length === 0 &&
+    artifacts.length === 0 &&
+    !conclusion &&
+    records.length === 0
+  ) {
     return { kind: 'plain' };
   }
 
   const replyText =
-    sends.length > 0 ? sends.join('\n\n') : conclusion ?? '';
+    sends.length > 0
+      ? sends.join('\n\n')
+      : (conclusion ?? records.join('\n\n'));
 
   return { kind: 'structured', replyText, artifacts, conclusion };
 };
@@ -112,3 +121,74 @@ export const parseStructuredAgentReply = (text: string): StructuredReply => {
  */
 export const normalizeArtifactPath = (path: string): string =>
   path.trim().replace(/^\.?\//, '').toLowerCase();
+
+const FILE_EXTENSION_RE = /\.[a-z0-9]{1,8}$/i;
+
+/**
+ * Whether a token looks like a real workspace-relative file path: it must not
+ * be a URL, must not contain whitespace, and must either contain a path
+ * separator or end with a recognizable file extension.
+ */
+export const looksLikeFilePath = (token: string): boolean => {
+  const trimmed = token.trim();
+  if (!trimmed || trimmed.includes('://') || /\s/.test(trimmed)) {
+    return false;
+  }
+  return (
+    trimmed.includes('/') ||
+    trimmed.includes('\\') ||
+    FILE_EXTENSION_RE.test(trimmed)
+  );
+};
+
+const BACKTICK_PATH_RE = /`([^`\r\n]+)`/g;
+
+/**
+ * Extract real, valid file paths from an artifact entry's free-text content.
+ *
+ * Artifact content is not guaranteed to be a clean path — it may be a sentence
+ * such as `Saved \`a.ts\`, \`b.rs\`, and \`c.json\`.` or a bare path. This
+ * extracts backtick-wrapped tokens first; when there are none, it falls back to
+ * splitting the content on commas / whitespace. Only tokens that look like file
+ * paths (see {@link looksLikeFilePath}) are kept, so non-path artifact content
+ * yields no rows.
+ *
+ * Returned paths are workspace-relative (leading `./` / `/` stripped) and
+ * deduplicated by normalized (lowercased) form; original casing is preserved.
+ */
+export const extractArtifactPaths = (content: string): string[] => {
+  const result: string[] = [];
+  const seen = new Set<string>();
+
+  const push = (raw: string): void => {
+    const trimmed = raw.trim().replace(/^\.?\//, '').trim();
+    if (!trimmed || !looksLikeFilePath(trimmed)) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(trimmed);
+  };
+
+  const backtickMatches: string[] = [];
+  let match: RegExpExecArray | null;
+  BACKTICK_PATH_RE.lastIndex = 0;
+  while ((match = BACKTICK_PATH_RE.exec(content)) !== null) {
+    backtickMatches.push(match[1]);
+  }
+
+  if (backtickMatches.length > 0) {
+    backtickMatches.forEach(push);
+    return result;
+  }
+
+  const trimmedContent = content.trim();
+  if (looksLikeFilePath(trimmedContent)) {
+    push(trimmedContent);
+    return result;
+  }
+
+  trimmedContent
+    .split(/[,;]|\s+/)
+    .forEach((segment) => push(segment));
+  return result;
+};

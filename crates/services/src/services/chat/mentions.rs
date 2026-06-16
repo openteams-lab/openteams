@@ -35,17 +35,11 @@ pub fn parse_mentions(content: &str) -> Vec<String> {
     mentions
 }
 
-fn normalize_protocol_send_target(target: &str) -> Option<String> {
-    let normalized = target.trim().trim_start_matches('@').trim();
+fn normalize_mention(value: &str) -> Option<String> {
+    let normalized = value.trim().trim_start_matches('@').trim();
     if normalized.is_empty() {
         return None;
     }
-
-    let normalized = if normalized.eq_ignore_ascii_case("user") {
-        "you"
-    } else {
-        normalized
-    };
 
     if normalized
         .chars()
@@ -55,6 +49,34 @@ fn normalize_protocol_send_target(target: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+pub fn parse_user_message_mentions(content: &str, meta: &Value) -> Vec<String> {
+    let content_mentions = parse_mentions(content);
+    if !content_mentions.is_empty() {
+        return content_mentions;
+    }
+
+    let mut seen = HashSet::new();
+    meta.get("mentions")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter_map(normalize_mention)
+        .filter(|mention| seen.insert(mention.to_ascii_lowercase()))
+        .collect()
+}
+
+fn normalize_protocol_send_target(target: &str) -> Option<String> {
+    let normalized = normalize_mention(target)?;
+
+    let normalized = if normalized.eq_ignore_ascii_case("user") {
+        "you"
+    } else {
+        normalized.as_str()
+    };
+    Some(normalized.to_string())
 }
 
 fn is_routable_agent_send_intent(intent: Option<&str>) -> bool {

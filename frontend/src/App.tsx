@@ -110,6 +110,15 @@ type RenderedWorkspaceTab = {
   Icon: LucideIcon;
 };
 
+const extractAgentMentions = (text: string): string[] =>
+  Array.from(
+    new Set(
+      Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
+        match[1].toLowerCase(),
+      ),
+    ),
+  );
+
 const pageTabConfig: Record<
   SidebarNavigationTarget,
   { label: string; icon: LucideIcon }
@@ -981,10 +990,12 @@ function WorkspaceLayout() {
     try {
       let workspacePath: string | null = null;
       let workflowLeadAgentId: string | null = null;
+      let freeChatMainAgentName: string | null = null;
       try {
         const projectMembers = await projectApi.listMembers(selectedProjectId);
+        const workflowProjectAgent = findWorkflowProjectAgent(projectMembers);
+        freeChatMainAgentName = workflowProjectAgent?.member_name ?? null;
         if (options.taskMode === 'workflow') {
-          const workflowProjectAgent = findWorkflowProjectAgent(projectMembers);
           workspacePath = workflowProjectAgent?.default_workspace_path ?? null;
           workflowLeadAgentId = workflowProjectAgent?.agent_id ?? null;
         } else {
@@ -1022,7 +1033,7 @@ function WorkspaceLayout() {
 
       if (prompt.trim()) {
         try {
-          let content = prompt;
+          const content = prompt;
           const meta: { [key: string]: JsonValue } = {};
 
           if (options.taskMode === 'workflow') {
@@ -1045,15 +1056,17 @@ function WorkspaceLayout() {
             }
           }
 
-          if (options.taskMode === 'freeChat' && options.memberName) {
-            const handle = options.memberName.startsWith('@')
-              ? options.memberName
-              : `@${options.memberName}`;
-            if (!content.toLowerCase().includes(handle.toLowerCase())) {
-              content = `${handle} ${content}`;
+          const mentions = extractAgentMentions(content);
+          if (options.taskMode === 'freeChat') {
+            const routeMentions =
+              mentions.length > 0
+                ? mentions
+                : freeChatMainAgentName
+                  ? [freeChatMainAgentName.replace(/^@/, '').toLowerCase()]
+                  : [];
+            if (routeMentions.length > 0) {
+              meta.mentions = routeMentions;
             }
-            const mentionName = options.memberName.replace(/^@/, '');
-            meta.mentions = [mentionName.toLowerCase()];
           }
 
           await chatMessagesApi.send(backendSession.id, {

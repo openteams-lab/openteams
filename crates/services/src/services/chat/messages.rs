@@ -48,6 +48,7 @@ pub async fn create_message_with_id(
     let mentions = match sender_type {
         ChatSenderType::Agent => parse_agent_send_mentions(&meta),
         ChatSenderType::User if is_workflow_chat_input_mode(&meta) => Vec::new(),
+        ChatSenderType::User => parse_user_message_mentions(&content, &meta),
         _ => parse_mentions(&content),
     };
     if content.trim().is_empty() && !has_attachments(&meta) {

@@ -551,6 +551,16 @@ impl ChatRunner {
             return Ok(None);
         }
 
+        let is_workflow_mode = message
+            .meta
+            .get("chat_input_mode")
+            .and_then(|v| v.as_str())
+            .map(|v| v == "workflow")
+            .unwrap_or(false);
+        if !is_workflow_mode {
+            return Ok(None);
+        }
+
         let session_agents =
             ChatSessionAgent::find_all_for_session(&self.db.pool, session.id).await?;
         if session_agents.is_empty() {
@@ -560,51 +570,20 @@ impl ChatRunner {
         let agents = ChatAgent::find_all(&self.db.pool).await?;
         let member_names = chat::member_name_overrides_for_session(&self.db.pool, session.id).await?;
 
-        // In workflow mode, route to the designated lead agent (falls back to first if none set).
-        // In free mode, route to the first session agent (original behaviour).
-        let is_workflow_mode = message
-            .meta
-            .get("chat_input_mode")
-            .and_then(|v| v.as_str())
-            .map(|v| v == "workflow")
-            .unwrap_or(false);
-
-        if is_workflow_mode {
-            tracing::debug!(
-                session_id = %session.id,
-                message_id = %message.id,
-                "attempting to resolve lead agent for workflow mode message"
-            );
-            match resolve_lead_agent(session, &session_agents, &agents) {
-                Ok((lead_agent, _)) => {
-                    return Ok(Some(chat::effective_agent_name(
-                        lead_agent,
-                        member_names.get(&lead_agent.id).map(String::as_str),
-                    )));
-                }
-                Err(_) => return Ok(None),
-            }
-        }
-
-        // Free mode: first available agent
-        let agent_map: std::collections::HashMap<Uuid, &ChatAgent> =
-            agents.iter().map(|a| (a.id, a)).collect();
-        for session_agent in &session_agents {
-            if let Some(agent) = agent_map.get(&session_agent.agent_id) {
+        tracing::debug!(
+            session_id = %session.id,
+            message_id = %message.id,
+            "attempting to resolve lead agent for workflow mode message"
+        );
+        match resolve_lead_agent(session, &session_agents, &agents) {
+            Ok((lead_agent, _)) => {
                 return Ok(Some(chat::effective_agent_name(
-                    agent,
-                    member_names.get(&agent.id).map(String::as_str),
+                    lead_agent,
+                    member_names.get(&lead_agent.id).map(String::as_str),
                 )));
             }
-            tracing::warn!(
-                session_id = %session.id,
-                session_agent_id = %session_agent.id,
-                agent_id = %session_agent.agent_id,
-                "default route skipped session agent with missing backing agent"
-            );
+            Err(_) => Ok(None),
         }
-
-        Ok(None)
     }
 
     fn extract_chain_depth(&self, meta: &sqlx::types::Json<serde_json::Value>) -> u32 {

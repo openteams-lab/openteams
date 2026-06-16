@@ -227,6 +227,16 @@ check(
   source,
 );
 check(
+  "new free-chat session routes to main agent without prefixing content",
+  source.includes("const extractAgentMentions = (text: string): string[]") &&
+    source.includes("const mentions = extractAgentMentions(content)") &&
+    source.includes("let freeChatMainAgentName: string | null = null") &&
+    source.includes("const routeMentions =") &&
+    source.includes("meta.mentions = routeMentions") &&
+    !source.includes("content = `${handle} ${content}`"),
+  source,
+);
+check(
   "workflow session creation routes the first prompt through the main agent",
   source.includes("chatSessionsApi") &&
     source.includes("let workflowLeadAgentId: string | null = null") &&

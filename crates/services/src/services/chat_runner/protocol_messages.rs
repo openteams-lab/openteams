@@ -38,7 +38,7 @@ struct AgentProtocolError {
 #[derive(Debug)]
 pub(super) enum ProtocolProcessResult {
     /// Messages were parsed and dispatched successfully. Contains the number of
-    /// `send` messages created.
+    /// visible chat messages created.
     Success(usize),
     /// The agent output could not be converted into protocol messages and the
     /// failure was reported to the chat as a protocol error.
@@ -53,7 +53,7 @@ pub(super) enum ProtocolProcessResult {
     /// The caller should trigger the plan generation pipeline after processing
     /// any co-occurring `send`/`artifact`/`record`/`conclusion` messages.
     WorkflowGenerateDetected {
-        /// Number of `send` messages created alongside the workflow_generate.
+        /// Number of visible chat messages created alongside the workflow_generate.
         send_count: usize,
         /// Whether a finalized plan exists and plan generation should proceed.
         plan_check: bool,

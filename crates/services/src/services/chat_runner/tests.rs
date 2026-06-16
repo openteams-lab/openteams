@@ -256,7 +256,7 @@ fn empty_log_forwarders() -> RunLogForwarders {
 }
 
 #[tokio::test]
-async fn default_route_for_unmentioned_user_message_uses_first_session_agent() {
+async fn default_route_ignores_unmentioned_free_mode_user_messages() {
     let db = setup_chat_runner_db().await;
     let runner = ChatRunner::new(db.clone());
     let session_id = Uuid::new_v4();
@@ -267,6 +267,27 @@ async fn default_route_for_unmentioned_user_message_uses_first_session_agent() {
     tokio::time::sleep(std::time::Duration::from_millis(2)).await;
     insert_test_session_agent(&db, session_id, second_agent.id).await;
     let message = test_message("please handle this", json!({}));
+
+    let default_mention = runner
+        .resolve_default_mention_for_unmentioned_user_message(&session, &message)
+        .await
+        .expect("resolve default mention");
+
+    assert_eq!(default_mention, None);
+}
+
+#[tokio::test]
+async fn default_route_for_unmentioned_workflow_message_uses_lead_agent() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    let session = insert_test_chat_session(&db, session_id).await;
+    let first_agent = insert_test_chat_agent(&db, "first").await;
+    let second_agent = insert_test_chat_agent(&db, "second").await;
+    insert_test_session_agent(&db, session_id, first_agent.id).await;
+    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+    insert_test_session_agent(&db, session_id, second_agent.id).await;
+    let message = test_message("please plan this", json!({ "chat_input_mode": "workflow" }));
 
     let default_mention = runner
         .resolve_default_mention_for_unmentioned_user_message(&session, &message)
@@ -1035,7 +1056,7 @@ async fn process_agent_protocol_output_requests_retry_for_first_json_shape_failu
 }
 
 #[tokio::test]
-async fn process_agent_protocol_output_reports_error_after_retry_exhaustion() {
+async fn process_agent_protocol_output_uses_raw_output_after_retry_exhaustion() {
     let db = setup_chat_runner_db().await;
     let runner = ChatRunner::new(db.clone());
     let session_id = Uuid::new_v4();
@@ -1065,26 +1086,180 @@ async fn process_agent_protocol_output_reports_error_after_retry_exhaustion() {
         .await
         .expect("process protocol output");
 
-    assert!(matches!(
-        result,
-        super::ProtocolProcessResult::ProtocolFailure
-    ));
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
 
     let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
         .await
         .expect("list messages");
     assert_eq!(messages.len(), 1);
-    assert_eq!(messages[0].sender_type, ChatSenderType::System);
-    assert!(messages[0].content.contains("could not be processed"));
-    assert_eq!(
-        messages[0].meta["protocol_error"]["code"],
-        json!("invalid_json")
-    );
-    assert_eq!(
-        messages[0].meta["protocol_error"]["raw_output"],
-        json!("still not json")
-    );
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].content, "still not json");
+    assert_eq!(messages[0].meta["protocol"]["mode"], json!("raw_fallback"));
     assert_eq!(messages[0].meta["run_id"], json!(run_id));
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_uses_conclusion_when_no_send() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            0,
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            r#"[{"type":"record","content":"shared fact"},{"type":"conclusion","content":"done"}]"#,
+            None,
+            None,
+            None,
+            0,
+        )
+        .await
+        .expect("process protocol output");
+
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].content, "done");
+    assert_eq!(messages[0].meta["protocol"]["type"], json!("conclusion"));
+    assert_eq!(
+        messages[0].meta["protocol"]["mode"],
+        json!("display_fallback")
+    );
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_uses_record_when_no_send_or_conclusion() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            0,
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            r#"[{"type":"record","content":"shared fact"}]"#,
+            None,
+            None,
+            None,
+            0,
+        )
+        .await
+        .expect("process protocol output");
+
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].content, "shared fact");
+    assert_eq!(messages[0].meta["protocol"]["type"], json!("record"));
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_persists_error_when_output_empty() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            0,
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            "",
+            Some("CLI failed before writing output"),
+            None,
+            None,
+            0,
+        )
+        .await
+        .expect("process protocol output");
+
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].content, "CLI failed before writing output");
+    assert_eq!(messages[0].meta["protocol"]["output_is_empty"], json!(true));
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_persists_failure_hint_when_output_empty() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            0,
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            "",
+            None,
+            None,
+            None,
+            0,
+        )
+        .await
+        .expect("process protocol output");
+
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].content, "Agent运行失败");
+    assert_eq!(messages[0].meta["protocol"]["output_is_empty"], json!(true));
 }
 
 #[test]

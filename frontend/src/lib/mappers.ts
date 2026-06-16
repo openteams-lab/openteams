@@ -30,6 +30,8 @@ import type {
 import type { ProjectMemberWithRuntime } from '../../../shared/types';
 import { parseStructuredAgentReply } from './parseStructuredReply';
 
+const AGENT_EMPTY_OUTPUT_FALLBACK = 'Agent运行失败';
+
 // -----------------------------------------------------------------------------
 // Avatar / monogram derivation
 // -----------------------------------------------------------------------------
@@ -162,6 +164,13 @@ const clientMessageIdFromMeta = (
   return typeof clientMessageId === 'string' ? clientMessageId : undefined;
 };
 
+const errorContentFromMeta = (meta: JsonValue | undefined): string | null => {
+  const obj = jsonObject(meta);
+  const error = jsonObject(obj?.error);
+  const content = error?.content;
+  return typeof content === 'string' && content.trim() ? content : null;
+};
+
 const attachmentsFromMeta = (
   meta: JsonValue | undefined,
 ): ChatAttachment[] | undefined => {
@@ -239,6 +248,10 @@ export const mapMessage = (
   }
 
   const workflowCardType = workflowCardTypeFromMeta(backend.meta);
+  const visibleContent =
+    !isUser && backend.sender_type === 'agent' && !backend.content.trim()
+      ? (errorContentFromMeta(backend.meta) ?? AGENT_EMPTY_OUTPUT_FALLBACK)
+      : backend.content;
 
   // Agent/system replies may use the structured {send|artifact|conclusion|
   // record} wire format. When they do, derive a display body (send text, or
@@ -247,7 +260,7 @@ export const mapMessage = (
   // back to the raw `text`.
   const structured =
     !isUser && backend.sender_type !== 'system'
-      ? parseStructuredAgentReply(backend.content)
+      ? parseStructuredAgentReply(visibleContent)
       : null;
   const replyText =
     structured?.kind === 'structured' ? structured.replyText : undefined;
@@ -264,7 +277,7 @@ export const mapMessage = (
     avatar,
     sender,
     time: formatRelativeTime(backend.created_at, opts.now),
-    text: backend.content,
+    text: visibleContent,
     isUser: isUser || undefined,
     model,
     clientMessageId: clientMessageIdFromMeta(backend.meta),

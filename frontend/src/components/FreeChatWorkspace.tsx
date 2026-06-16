@@ -62,7 +62,6 @@ import {
 } from "@/lib/sessionWorkspaceChanges";
 import { openFileInVSCode } from "@/vscode/bridge";
 import { normalizeArtifactPath } from "@/lib/parseStructuredReply";
-import type { ArtifactDiffStat } from "@/components/AgentArtifactFileList";
 import { PriorityMenuIcon } from "@/pages/IssueDetailPage";
 import type {
   ChatAttachment,
@@ -313,6 +312,14 @@ const extractMentionHandles = (text: string): string[] =>
   (text.match(/@[a-zA-Z0-9_-]+/g) ?? []).map((mention) =>
     mention.toLowerCase(),
   );
+
+const normalizeMentionHandle = (name: string): string => {
+  const trimmed = name.trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith("@")
+    ? trimmed.toLowerCase()
+    : `@${trimmed.toLowerCase()}`;
+};
 
 function SessionMemberAvatar({ member }: { member: Member }) {
   return (
@@ -698,6 +705,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     messages,
     sendMessage,
     members,
+    locale,
     chatInputMode,
     setChatInputMode,
     ensureWorkflowRouteToMainAgent,
@@ -765,23 +773,6 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     () => flattenWorkspaceChanges(workspaceChangesAsync.data),
     [workspaceChangesAsync.data],
   );
-  // Per-path additions/deletions for artifact rows (option C: counts are shown
-  // only when workspace diff data is already available for that path).
-  const artifactDiffStats = useMemo(() => {
-    const stats = new Map<string, ArtifactDiffStat>();
-    for (const file of relatedFileChanges) {
-      if (
-        typeof file.additions === "number" ||
-        typeof file.deletions === "number"
-      ) {
-        stats.set(normalizeArtifactPath(file.path), {
-          add: file.additions ?? 0,
-          del: file.deletions ?? 0,
-        });
-      }
-    }
-    return stats;
-  }, [relatedFileChanges]);
   const currentProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId),
     [projects, selectedProjectId],
@@ -800,8 +791,11 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     ? sidebarMembers
     : sidebarMembers.slice(0, visibleSidebarMemberCount);
   const memberMentionHandles = new Set(
-    sidebarMembers.map((member) => member.name.toLowerCase()),
+    sidebarMembers.map((member) => normalizeMentionHandle(member.name)),
   );
+  const mainAgentHandle =
+    mainAgentName ?? sidebarMembers[0]?.name ?? "@agent";
+  const normalizedMainAgentHandle = normalizeMentionHandle(mainAgentHandle);
   const displayedMessages = selectedSidebarMember
     ? messages.filter((message) => {
         if (!message.isUser) {
@@ -812,11 +806,14 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
           message.text,
         ).filter((mention) => memberMentionHandles.has(mention));
         if (matchedMemberMentions.length === 0) {
-          return selectedSidebarMember.id === sidebarMembers[0]?.id;
+          return (
+            normalizeMentionHandle(selectedSidebarMember.name) ===
+            normalizedMainAgentHandle
+          );
         }
 
         return matchedMemberMentions.includes(
-          selectedSidebarMember.name.toLowerCase(),
+          normalizeMentionHandle(selectedSidebarMember.name),
         );
       })
     : messages;
@@ -1426,6 +1423,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
         await chatMessagesApi.uploadAttachment(activeSessionId, attachedFiles, {
           chatInputMode,
           content: trimmedInput || undefined,
+          appLanguage: locale,
           referenceMessageId: quotedMessage?.id,
         });
         setInputText("");
@@ -1644,10 +1642,10 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     ),
   );
   const mentionedMembers = members.filter((member) =>
-    mentionedMemberNames.has(member.name.toLowerCase()),
+    mentionedMemberNames.has(normalizeMentionHandle(member.name)),
   );
   const isPlanMode = chatInputMode === "workflow";
-  const planModeMainAgentName = mainAgentName ?? members[0]?.name ?? "@agent";
+  const planModeMainAgentName = mainAgentHandle;
   const canSend =
     (Boolean(inputText.trim()) || attachedFiles.length > 0) &&
     !isUploadingAttachments;
@@ -1668,6 +1666,18 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     return time;
   };
 
+  const renderMentionText = (mention: string, key: React.Key) => (
+    <span
+      key={key}
+      className="text-[var(--primary)] hover:text-[var(--primary-hover)] font-semibold font-mono mx-0.5"
+    >
+      {mention}
+    </span>
+  );
+
+  const implicitMainAgentMentionForUserMessage = (text: string) =>
+    extractMentionHandles(text).length === 0 ? mainAgentHandle : null;
+
   // Parse @mentions or `code` formatted blocks inside messages for beautiful styling
   const formatMsgText = (text: string) => {
     if (!text) return "";
@@ -1685,14 +1695,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
         );
       }
       if (el.startsWith("@")) {
-        return (
-          <span
-            key={idx}
-            className="text-[var(--primary)] hover:text-[var(--primary-hover)] font-semibold font-mono mx-0.5"
-          >
-            {el}
-          </span>
-        );
+        return renderMentionText(el, idx);
       }
       return <span key={idx}>{el}</span>;
     });
@@ -1918,6 +1921,15 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                       className="leading-relaxed text-[var(--ink)] select-text"
                       style={{ fontSize: `${chatMessageFontSize}px` }}
                     >
+                      {implicitMainAgentMentionForUserMessage(msg.text) && (
+                        <>
+                          {renderMentionText(
+                            implicitMainAgentMentionForUserMessage(msg.text) ?? "",
+                            "implicit-main-agent",
+                          )}
+                          {" "}
+                        </>
+                      )}
                       {formatMsgText(msg.text)}
                     </div>
                   ) : (
@@ -1925,7 +1937,6 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                       message={msg}
                       t={t}
                       messageFontSize={chatMessageFontSize}
-                      diffStats={artifactDiffStats}
                       onOpenArtifact={handleOpenArtifact}
                     />
                   )}

@@ -5,6 +5,7 @@
 // Exits non-zero if any assertion fails.
 
 import {
+  extractArtifactPaths,
   normalizeArtifactPath,
   parseStructuredAgentReply,
 } from './parseStructuredReply';
@@ -61,9 +62,13 @@ ok(
   ).kind === 'plain',
 );
 ok(
-  'array with only ignored records stays plain',
-  parseStructuredAgentReply('[{"type":"record","content":"x"}]').kind ===
-    'plain',
+  'array with only records uses record fallback',
+  (() => {
+    const parsed = parseStructuredAgentReply(
+      '[{"type":"record","content":"x"}]',
+    );
+    return parsed.kind === 'structured' && parsed.replyText === 'x';
+  })(),
 );
 
 // ---- valid structured replies ----------------------------------------------
@@ -102,6 +107,15 @@ ok(
   conclusionFallback.kind === 'structured' &&
     conclusionFallback.artifacts.length === 1 &&
     conclusionFallback.artifacts[0].path === 'frontend/src/a.tsx',
+);
+
+const recordFallback = parseStructuredAgentReply(
+  '[{"type":"artifact","content":"frontend/src/a.tsx"},{"type":"record","content":"remember this"}]',
+);
+ok(
+  'record becomes replyText when no send or conclusion',
+  recordFallback.kind === 'structured' &&
+    recordFallback.replyText === 'remember this',
 );
 
 const whitespacePath = parseStructuredAgentReply(
@@ -155,6 +169,55 @@ ok(
 );
 ok('normalize lowercases', normalizeArtifactPath('SRC/F.tsx') === 'src/f.tsx');
 ok('normalize trims', normalizeArtifactPath('  x.ts  ') === 'x.ts');
+
+// ---- extractArtifactPaths ---------------------------------------------------
+const arraysEqual = <T>(a: T[], b: T[]): boolean =>
+  a.length === b.length && a.every((value, index) => value === b[index]);
+ok(
+  'extract: bare single path',
+  arraysEqual(extractArtifactPaths('frontend/src/a.tsx'), [
+    'frontend/src/a.tsx',
+  ]),
+);
+ok(
+  'extract: backtick paths in a sentence',
+  arraysEqual(
+    extractArtifactPaths('Saved `binaries/x.txt`, `src/y.rs`, and `z.json`.'),
+    ['binaries/x.txt', 'src/y.rs', 'z.json'],
+  ),
+);
+ok(
+  'extract: strips leading ./ from backtick tokens',
+  arraysEqual(extractArtifactPaths('touched `./src/b.ts`'), ['src/b.ts']),
+);
+ok(
+  'extract: dedupes by normalized path',
+  arraysEqual(
+    extractArtifactPaths('`src/A.ts` and `./src/a.ts`'),
+    ['src/A.ts'],
+  ),
+);
+ok(
+  'extract: ignores non-path backtick tokens',
+  arraysEqual(extractArtifactPaths('set `latency_p95` metric'), []),
+);
+ok(
+  'extract: comma-split fallback yields path-like tokens',
+  arraysEqual(
+    extractArtifactPaths('src/a.ts, src/b.rs'),
+    ['src/a.ts', 'src/b.rs'],
+  ),
+);
+ok(
+  'extract: plain sentence yields nothing',
+  arraysEqual(extractArtifactPaths('The metrics are X and Y.'), []),
+);
+ok(
+  'extract: top-level file with extension',
+  arraysEqual(extractArtifactPaths('README.md'), ['README.md']),
+);
+ok('extract: empty content', extractArtifactPaths('').length === 0);
+
 
 // ---- Result ----------------------------------------------------------------
 if (failures > 0) {

@@ -396,16 +396,28 @@ const makePendingAgentPlaceholder = (
   text: string,
   userMsgId: string,
   members: Member[],
-): Message => {
+  fallbackMention?: string | null,
+): Message | null => {
   const mentions = extractAgentMentions(text);
+  const effectiveMentions =
+    mentions.length > 0
+      ? mentions
+      : fallbackMention
+        ? [fallbackMention.replace(/^@/, '').toLowerCase()]
+        : [];
+  if (effectiveMentions.length === 0) {
+    return null;
+  }
   const mentionedMember = members.find((member) =>
-    mentions.includes(member.name.replace(/^@/, '').toLowerCase()),
+    effectiveMentions.includes(member.name.replace(/^@/, '').toLowerCase()),
   );
   const fallbackMember =
     mentionedMember ??
     members.find((member) => member.status === 'run') ??
     members[0];
-  const fallbackName = mentions[0] ? asAgentHandle(mentions[0]) : '@agent';
+  const fallbackName = effectiveMentions[0]
+    ? asAgentHandle(effectiveMentions[0])
+    : '@agent';
   const sender = asAgentHandle(fallbackMember?.name ?? fallbackName);
 
   return {
@@ -1987,6 +1999,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!text.trim()) return;
 
     const sid = activeSessionIdRef.current;
+    const effectiveChatInputMode = options.chatInputMode ?? chatInputMode;
+    const explicitMentions = extractAgentMentions(text);
+    const mainAgentMention = mainAgentName
+      ? mainAgentName.replace(/^@/, '').toLowerCase()
+      : null;
     const userMsgId = `msg-user-${Date.now()}`;
     const userMsg: Message = {
       id: userMsgId,
@@ -2001,7 +2018,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     };
     const pendingAgentMsg =
       sessionsAsync.source === 'api'
-        ? makePendingAgentPlaceholder(text, userMsgId, membersAsync.data)
+        ? makePendingAgentPlaceholder(
+            text,
+            userMsgId,
+            membersAsync.data,
+            explicitMentions.length === 0 ? mainAgentMention : null,
+          )
         : null;
     setAllMessages((prev) => {
       const cur = prev[sid] || [];
@@ -2013,7 +2035,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
                 message.sessionAgentId === pendingAgentMsg.sessionAgentId
               ),
           )
-        : cur.filter((message) => !isPendingAgentPlaceholder(message));
+        : pendingAgentMsg
+          ? cur.filter((message) => !isPendingAgentPlaceholder(message))
+          : cur;
       return {
         ...prev,
         [sid]: pendingAgentMsg
@@ -2030,17 +2054,20 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Real backend: keep the local running placeholder visible while the
     // persisted message list and websocket stream catch up.
-    const mentions = text
-      .split(/\s+/)
-      .filter((w) => w.startsWith('@'))
-      .map((m) => m.slice(1).toLowerCase());
-    const effectiveChatInputMode = options.chatInputMode ?? chatInputMode;
-    const meta: { [key: string]: JsonValue } = {};
+    const meta: { [key: string]: JsonValue } = {
+      app_language: locale,
+    };
     if (effectiveChatInputMode === 'workflow') {
       meta.chat_input_mode = 'workflow';
     }
-    if (effectiveChatInputMode !== 'workflow' && mentions.length > 0) {
-      meta.mentions = mentions;
+    const routeMentions =
+      explicitMentions.length > 0
+        ? explicitMentions
+        : mainAgentMention
+          ? [mainAgentMention]
+          : [];
+    if (effectiveChatInputMode !== 'workflow' && routeMentions.length > 0) {
+      meta.mentions = routeMentions;
     }
     meta.client_message_id = userMsgId;
     if (options.quotedMessage) {
@@ -2057,7 +2084,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         sender_type: 'user',
         sender_id: null,
         content: text,
-        meta: Object.keys(meta).length > 0 ? meta : null,
+        meta,
       });
     };
 

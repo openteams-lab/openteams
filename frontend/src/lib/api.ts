@@ -471,6 +471,7 @@ export const chatMessagesApi = {
     options?: {
       chatInputMode?: "free" | "workflow";
       content?: string;
+      appLanguage?: string;
       referenceMessageId?: string;
     },
   ): Promise<BackendChatMessage> => {
@@ -480,6 +481,9 @@ export const chatMessagesApi = {
     }
     if (options?.content) {
       form.append("content", options.content);
+    }
+    if (options?.appLanguage) {
+      form.append("app_language", options.appLanguage);
     }
     if (options?.referenceMessageId) {
       form.append("reference_message_id", options.referenceMessageId);
