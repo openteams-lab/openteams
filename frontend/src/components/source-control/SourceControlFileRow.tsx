@@ -260,7 +260,7 @@ const getFallbackFileIcon = (
   return FileText;
 };
 
-function SourceControlFileTypeIcon({ path }: { path: string }) {
+export function SourceControlFileTypeIcon({ path }: { path: string }) {
   const fileName = getFileName(path);
   const extension = getFileExtension(fileName);
   const simpleIcon =

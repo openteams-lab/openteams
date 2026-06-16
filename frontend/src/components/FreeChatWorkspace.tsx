@@ -61,6 +61,8 @@ import {
   type RelatedFileStatus,
 } from "@/lib/sessionWorkspaceChanges";
 import { openFileInVSCode } from "@/vscode/bridge";
+import { normalizeArtifactPath } from "@/lib/parseStructuredReply";
+import type { ArtifactDiffStat } from "@/components/AgentArtifactFileList";
 import { PriorityMenuIcon } from "@/pages/IssueDetailPage";
 import type {
   ChatAttachment,
@@ -762,6 +764,23 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     () => flattenWorkspaceChanges(workspaceChangesAsync.data),
     [workspaceChangesAsync.data],
   );
+  // Per-path additions/deletions for artifact rows (option C: counts are shown
+  // only when workspace diff data is already available for that path).
+  const artifactDiffStats = useMemo(() => {
+    const stats = new Map<string, ArtifactDiffStat>();
+    for (const file of relatedFileChanges) {
+      if (
+        typeof file.additions === "number" ||
+        typeof file.deletions === "number"
+      ) {
+        stats.set(normalizeArtifactPath(file.path), {
+          add: file.additions ?? 0,
+          del: file.deletions ?? 0,
+        });
+      }
+    }
+    return stats;
+  }, [relatedFileChanges]);
   const currentProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId),
     [projects, selectedProjectId],
@@ -1543,6 +1562,43 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     showToast(t("relatedFiles.noDiffOpenFile"));
   };
 
+  // Open an artifact file from an agent message. Prefers the inline diff when
+  // the workspace changes already carry one for that path, otherwise opens the
+  // source-control diff tab (lazy-loaded), falling back to opening the file.
+  const handleOpenArtifact = useCallback(
+    (path: string) => {
+      const match = relatedFileChanges.find(
+        (file) => normalizeArtifactPath(file.path) === normalizeArtifactPath(path),
+      );
+      if (match && hasRelatedFileDiff(match) && onOpenDiffTab) {
+        onOpenDiffTab(
+          activeSessionId,
+          match.path,
+          match.status,
+          match.unified_diff ?? "",
+        );
+        return;
+      }
+      if (selectedProjectId && onOpenSourceControlDiffTab) {
+        onOpenSourceControlDiffTab(
+          selectedProjectId,
+          activeSessionId,
+          path,
+          "changes",
+        );
+        return;
+      }
+      openFileInVSCode(path, { openAsDiff: false });
+    },
+    [
+      relatedFileChanges,
+      onOpenDiffTab,
+      onOpenSourceControlDiffTab,
+      activeSessionId,
+      selectedProjectId,
+    ],
+  );
+
   const handleRelatedFilesResizeStart = (
     event: React.MouseEvent<HTMLDivElement>,
   ) => {
@@ -1865,6 +1921,8 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                       message={msg}
                       t={t}
                       messageFontSize={chatMessageFontSize}
+                      diffStats={artifactDiffStats}
+                      onOpenArtifact={handleOpenArtifact}
                     />
                   )}
 

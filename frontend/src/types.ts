@@ -35,6 +35,13 @@ export interface Session {
   active: boolean;
 }
 
+export interface ArtifactItem {
+  /** Trimmed file path (or artifact content) used for display + matching. */
+  path: string;
+  /** Original, untrimmed artifact content. */
+  raw: string;
+}
+
 export interface Message {
   id: string;
   sessionId?: string;
@@ -56,6 +63,17 @@ export interface Message {
   activityLines?: ChatRunActivityLine[];
   activityLoadState?: ActivityLoadState;
   workflowCard?: WorkflowCardMessageReference;
+  /**
+   * Derived display text for an agent reply parsed from the structured
+   * `{send|artifact|conclusion|record}` wire format. Undefined for user
+   * messages and plain (non-structured) agent replies, in which case
+   * renderers fall back to `text`.
+   */
+  replyText?: string;
+  /** Artifacts extracted from a structured agent reply. */
+  artifacts?: ArtifactItem[];
+  /** Conclusion extracted from a structured agent reply. */
+  conclusion?: string | null;
 }
 
 export type WorkflowCardMessageType =

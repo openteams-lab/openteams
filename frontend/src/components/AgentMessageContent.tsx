@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { AgentActivityPanel } from "@/components/AgentActivityPanel";
+import { AgentArtifactFileList } from "@/components/AgentArtifactFileList";
+import type { ArtifactDiffStat } from "@/components/AgentArtifactFileList";
 import { AgentMarkdown } from "@/components/AgentMarkdown";
 import { AgentRunStatusPill } from "@/components/AgentRunStatusPill";
 import { WorkflowCard } from "@/components/workflow/WorkflowCard";
@@ -13,6 +15,10 @@ interface AgentMessageContentProps {
   message: Message;
   t: (key: string, replacements?: Record<string, string | number>) => string;
   messageFontSize?: number;
+  /** Optional per-path diff stats for artifact rows. */
+  diffStats?: Map<string, ArtifactDiffStat>;
+  /** Open an artifact file (e.g. into a diff tab). */
+  onOpenArtifact?: (path: string) => void;
 }
 
 const sortActivityLines = (
@@ -29,6 +35,8 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
   message,
   t,
   messageFontSize,
+  diffStats,
+  onOpenArtifact,
 }) => {
   const isRunning = Boolean(message.isAgentRunning || message.isThinking);
   const initialLines = useMemo(
@@ -147,7 +155,13 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
   const showActivityPanel =
     (isRunning || expanded) &&
     (hasVisibleActivityLines || hasActivityPanelState);
-  const hasReplyText = message.text.trim().length > 0;
+
+  // Structured agent replies carry a derived body (send text, or the
+  // conclusion when there is no send). Plain replies leave `replyText`
+  // undefined and we fall back to the raw `text`.
+  const replyText = message.replyText ?? message.text;
+  const hasReplyText = replyText.trim().length > 0;
+  const hasArtifacts = !isRunning && (message.artifacts?.length ?? 0) > 0;
 
   return (
     <div className="space-y-2">
@@ -188,7 +202,17 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
       )}
 
       {hasReplyText && (
-        <AgentMarkdown content={message.text} fontSize={messageFontSize} />
+        <AgentMarkdown content={replyText} fontSize={messageFontSize} />
+      )}
+
+      {hasArtifacts && message.artifacts && (
+        <AgentArtifactFileList
+          artifacts={message.artifacts}
+          diffStats={diffStats}
+          onOpen={onOpenArtifact ?? (() => undefined)}
+          title={t("agentArtifacts.title")}
+          moreLabel={(count) => t("agentArtifacts.more", { count })}
+        />
       )}
     </div>
   );

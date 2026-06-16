@@ -5,6 +5,8 @@
   "agentActivity.loading": "Loading thinking details...",
   "agentActivity.running": "Agent is working on the task",
   "agentActivity.toggle": "Thinking details",
+  "agentArtifacts.more": "+{count} more",
+  "agentArtifacts.title": "Files",
   "agentActivity.tool.activity.completed": "Activity completed",
   "agentActivity.tool.activity.denied": "Activity denied",
   "agentActivity.tool.activity.failed": "Activity failed",

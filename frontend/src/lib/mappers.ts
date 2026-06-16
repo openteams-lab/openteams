@@ -28,6 +28,7 @@ import type {
   WorkflowPlanGenerationMeta,
 } from '@/types';
 import type { ProjectMemberWithRuntime } from '../../../shared/types';
+import { parseStructuredAgentReply } from './parseStructuredReply';
 
 // -----------------------------------------------------------------------------
 // Avatar / monogram derivation
@@ -239,6 +240,24 @@ export const mapMessage = (
 
   const workflowCardType = workflowCardTypeFromMeta(backend.meta);
 
+  // Agent/system replies may use the structured {send|artifact|conclusion|
+  // record} wire format. When they do, derive a display body (send text, or
+  // the conclusion when there is no send) and the artifact file list. Plain
+  // replies (and all user messages) leave these undefined so renderers fall
+  // back to the raw `text`.
+  const structured =
+    !isUser && backend.sender_type !== 'system'
+      ? parseStructuredAgentReply(backend.content)
+      : null;
+  const replyText =
+    structured?.kind === 'structured' ? structured.replyText : undefined;
+  const artifacts =
+    structured?.kind === 'structured' && structured.artifacts.length > 0
+      ? structured.artifacts
+      : undefined;
+  const conclusion =
+    structured?.kind === 'structured' ? structured.conclusion : undefined;
+
   return {
     id: backend.id,
     sessionId: backend.session_id,
@@ -260,6 +279,9 @@ export const mapMessage = (
           planGeneration: workflowPlanGenerationFromMeta(backend.meta),
         }
       : undefined,
+    replyText,
+    artifacts,
+    conclusion,
   };
 };
 

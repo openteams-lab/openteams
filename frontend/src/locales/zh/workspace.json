@@ -5,6 +5,8 @@
   "agentActivity.loading": "正在加载思考过程...",
   "agentActivity.running": "正在执行",
   "agentActivity.toggle": "思考过程",
+  "agentArtifacts.more": "还有 {count} 个",
+  "agentArtifacts.title": "文件",
   "agentActivity.tool.activity.completed": "操作已完成",
   "agentActivity.tool.activity.denied": "操作已被拒绝",
   "agentActivity.tool.activity.failed": "操作失败",
