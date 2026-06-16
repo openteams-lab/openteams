@@ -1128,6 +1128,34 @@ impl ChatRunner {
         observed.into_values().collect()
     }
 
+    /// Derive the `FileChangeRefresh` payload from the workspace paths observed
+    /// during a run. A path absent after the run is `Deleted`; a newly tracked
+    /// (untracked) path is `Created`; everything else is `Modified`.
+    fn file_change_entries_from_observed(
+        observed: &[WorkspaceObservedPathEntry],
+    ) -> Vec<FileChangeEntry> {
+        observed
+            .iter()
+            .map(|entry| {
+                let change_type = if !entry.existed_after_run {
+                    FileChangeType::Deleted
+                } else if entry
+                    .source
+                    .split(',')
+                    .any(|source| source.trim() == "git_untracked")
+                {
+                    FileChangeType::Created
+                } else {
+                    FileChangeType::Modified
+                };
+                FileChangeEntry {
+                    path: entry.path.clone(),
+                    change_type,
+                }
+            })
+            .collect()
+    }
+
     #[allow(clippy::too_many_arguments)]
     async fn persist_and_emit_activity_line(
         activity_path: &Path,
@@ -2144,6 +2172,27 @@ impl ChatRunner {
                                 "workspace retention janitor failed"
                             );
                         }
+
+                        // Agent has finished processing this message and all run
+                        // records are persisted; signal the frontend exactly once
+                        // to refresh its view of workspace file changes.
+                        let changed_files =
+                            Self::file_change_entries_from_observed(&workspace_observed_paths);
+                        tracing::debug!(
+                            session_id = %session_id,
+                            run_id = %run_id,
+                            message_id = %source_message_id,
+                            changed_file_count = changed_files.len(),
+                            "[chat_runner] Emitting file_change_refresh after agent message completion"
+                        );
+                        runner.emit_file_change_refresh(
+                            session_id,
+                            session_agent_id,
+                            agent_id,
+                            run_id,
+                            source_message_id,
+                            changed_files,
+                        );
 
                         if final_state == ChatSessionAgentState::Idle {
                             if let Some((retry_agent_name, retry_message, retry_track_source)) =

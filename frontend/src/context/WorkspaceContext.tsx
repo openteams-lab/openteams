@@ -117,6 +117,13 @@ export type WorkflowRuntimeLine = {
   createdAt: string;
 };
 
+type FileChangeType = 'created' | 'modified' | 'deleted';
+
+type FileChangeEntry = {
+  path: string;
+  change_type: FileChangeType;
+};
+
 type ChatStreamEvent =
   | {
       type: 'agent_run_started';
@@ -155,6 +162,16 @@ type ChatStreamEvent =
       stream_type: 'assistant' | 'thinking' | 'error';
       content: string;
       created_at: string;
+    }
+  | {
+      type: 'file_change_refresh';
+      session_id: string;
+      session_agent_id: string;
+      agent_id: string;
+      run_id: string;
+      message_id: string;
+      changed_files: FileChangeEntry[];
+      ts: string;
     };
 
 const chatStreamWebSocketUrl = (path: string): string => {
@@ -1667,6 +1684,14 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       if (
+        parsed.type === 'file_change_refresh' &&
+        parsed.session_id === sid
+      ) {
+        void refreshWorkspaceChanges();
+        return;
+      }
+
+      if (
         (parsed.type === 'message_new' || parsed.type === 'message_updated') &&
         parsed.message.session_id === sid
       ) {
@@ -1725,6 +1750,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     handleWorkflowRuntimeLine,
     insertRunningPlaceholder,
     mapBackendChatMessage,
+    refreshWorkspaceChanges,
     refreshMembers,
     sessionsAsync.source,
     upsertStreamedMessage,
