@@ -2276,8 +2276,8 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                               }}
                               className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left cursor-pointer ${
                                 index === activeMemberPickerIndex
-                                  ? "bg-[var(--surface-2)]"
-                                  : "hover:bg-[var(--surface-2)]"
+                                  ? "bg-[color-mix(in_srgb,var(--primary)_24%,var(--surface-3))] ring-1 ring-inset ring-[color-mix(in_srgb,var(--primary)_48%,transparent)]"
+                                  : "hover:bg-[color-mix(in_srgb,var(--primary)_12%,var(--surface-3))]"
                               }`}
                             >
                               <span className="h-5 w-5 rounded-full bg-[var(--mono-bg)] border border-[var(--mono-border)] flex items-center justify-center text-[8px] font-mono font-semibold text-[var(--ink-muted)]">
