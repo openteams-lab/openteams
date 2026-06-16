@@ -528,15 +528,6 @@ export const SessionSourceControlPanel: React.FC<
               {viewModel.branch}
             </span>
           )}
-          {externalStagedCount > 0 && (
-            <span
-              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600"
-              title={externalStagedTooltip}
-            >
-              <Info className="h-3 w-3 shrink-0" />
-              <span>{externalStagedHint}</span>
-            </span>
-          )}
         </div>
         <button
           type="button"
@@ -620,6 +611,17 @@ export const SessionSourceControlPanel: React.FC<
                       onDiscard={(target) => handleDiscardFiles([target])}
                     />
                   ))}
+                </div>
+              )}
+              {section.id === "staged" && externalStagedCount > 0 && (
+                <div className="rounded-md bg-amber-500/10 px-3 py-2 text-[12px] text-amber-600">
+                  <div className="flex items-center gap-1.5">
+                    <Info className="h-3.5 w-3.5 shrink-0" />
+                    <span>{externalStagedHint}</span>
+                  </div>
+                  <div className="mt-1 pl-4.5 whitespace-pre-wrap text-[11px] text-amber-700/90">
+                    {externalStagedTooltip}
+                  </div>
                 </div>
               )}
             </section>
