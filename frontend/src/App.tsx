@@ -345,6 +345,7 @@ function WorkspaceLayout() {
     sendMessageToSession,
     weeklyCost,
     showToast,
+    setActiveSettingsTab,
   } = useWorkspace();
   const appScale = React.useContext(AppScaleContext);
 
@@ -907,6 +908,10 @@ function WorkspaceLayout() {
       }
       closeMobileSidebar();
       return;
+    }
+
+    if (item.targetPage === "providers") {
+      setActiveSettingsTab("appearance");
     }
 
     openPageTab(item.targetPage, item.label);

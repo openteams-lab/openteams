@@ -371,7 +371,7 @@ export const mockWorkspaceBootstrap: WorkspaceBootstrapMock = {
     weeklyCost: 8.42,
     weeklySaved: 4.2,
     earlyBirdLeft: 37,
-    activeSettingsTab: 'providers',
+    activeSettingsTab: 'appearance',
     toastDurationMs: 3000,
   },
 };
