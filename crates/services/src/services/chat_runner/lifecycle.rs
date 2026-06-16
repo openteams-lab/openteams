@@ -192,6 +192,32 @@ impl ChatRunner {
         self.emit(session_id, ChatStreamEvent::WorkItemNew { work_item });
     }
 
+    /// Emit a one-shot file-change refresh signal after an agent message
+    /// completes. Fired exactly once per run (at the terminal completion point),
+    /// so a single agent message triggers a single refresh.
+    pub fn emit_file_change_refresh(
+        &self,
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        run_id: Uuid,
+        message_id: Uuid,
+        changed_files: Vec<FileChangeEntry>,
+    ) {
+        self.emit(
+            session_id,
+            ChatStreamEvent::FileChangeRefresh {
+                session_id,
+                session_agent_id,
+                agent_id,
+                run_id,
+                message_id,
+                changed_files,
+                ts: Utc::now(),
+            },
+        );
+    }
+
     pub fn emit_workflow_execution_updated(&self, session_id: Uuid, execution_id: Uuid) {
         self.emit(
             session_id,

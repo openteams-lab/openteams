@@ -91,6 +91,25 @@ pub struct ChatRunActivityLine {
     pub created_at: String,
 }
 
+/// How a workspace file changed during an agent run.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum FileChangeType {
+    Created,
+    Modified,
+    Deleted,
+}
+
+/// A single workspace file changed by an agent run, sent with `FileChangeRefresh`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FileChangeEntry {
+    /// Workspace-relative path (forward slashes).
+    pub path: String,
+    pub change_type: FileChangeType,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[ts(export)]
@@ -195,6 +214,19 @@ pub enum ChatStreamEvent {
         stream_type: ChatStreamDeltaType,
         content: String,
         created_at: String,
+    },
+    /// Emitted once after an agent finishes processing a message (all run
+    /// records persisted), signalling the frontend to refresh its view of
+    /// workspace file changes. `changed_files` lists the files the run touched.
+    FileChangeRefresh {
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        run_id: Uuid,
+        /// Source message whose processing triggered this run.
+        message_id: Uuid,
+        changed_files: Vec<FileChangeEntry>,
+        ts: chrono::DateTime<Utc>,
     },
 }
 
