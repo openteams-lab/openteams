@@ -340,7 +340,7 @@ export function IssueCreateDialog({
           </div>
         </header>
 
-        <main className="flex min-h-0 flex-1 flex-col px-6 pb-5 pt-5">
+        <main className="flex min-h-0 flex-1 flex-col px-6 pb-4 pt-4">
           <label className="sr-only" htmlFor="issue-create-title">
             Issue title
           </label>
@@ -359,9 +359,7 @@ export function IssueCreateDialog({
           </label>
           <textarea
             id="issue-create-description"
-            className={`issue-create-description mt-2 resize-none border-0 bg-transparent p-0 text-[16px] font-medium leading-[1.45] text-[var(--ink)] outline-none transition-[height] duration-200 ${
-              expanded ? 'h-[170px]' : 'h-[64px]'
-            }`}
+            className="issue-create-description mt-2 min-h-[96px] flex-1 resize-none border-0 bg-transparent p-0 text-[16px] font-medium leading-[1.45] text-[var(--ink)] outline-none"
             placeholder="Add description..."
             value={description}
             onChange={(event) => setDescription(event.target.value)}
@@ -369,7 +367,7 @@ export function IssueCreateDialog({
 
           <div
             ref={propertyMenuRef}
-            className="mt-auto flex flex-wrap items-center gap-2 pt-8"
+            className="mt-3 flex shrink-0 flex-wrap items-center gap-2"
           >
             <PropertyDropdown
               open={openMenu === 'status'}
