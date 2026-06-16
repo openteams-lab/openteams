@@ -237,6 +237,13 @@ check(
   source,
 );
 check(
+  "new session first prompt sends the current app language",
+  source.includes("locale,") &&
+    source.includes("app_language: locale") &&
+    source.includes("chatMessagesApi.send(backendSession.id"),
+  source,
+);
+check(
   "workflow session creation routes the first prompt through the main agent",
   source.includes("chatSessionsApi") &&
     source.includes("let workflowLeadAgentId: string | null = null") &&

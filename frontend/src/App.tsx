@@ -344,6 +344,7 @@ function WorkspaceLayout() {
     setActiveSessionId,
     weeklyCost,
     showToast,
+    locale,
   } = useWorkspace();
   const appScale = React.useContext(AppScaleContext);
 
@@ -1034,7 +1035,9 @@ function WorkspaceLayout() {
       if (prompt.trim()) {
         try {
           const content = prompt;
-          const meta: { [key: string]: JsonValue } = {};
+          const meta: { [key: string]: JsonValue } = {
+            app_language: locale,
+          };
 
           if (options.taskMode === 'workflow') {
             meta.chat_input_mode = 'workflow';
