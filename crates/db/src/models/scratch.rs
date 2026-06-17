@@ -112,6 +112,9 @@ pub struct DraftWorkspaceRepo {
 pub enum ScratchPayload {
     DraftTask(String),
     DraftFollowUp(DraftFollowUpData),
+    /// A follow-up that has been submitted and is waiting for the active run to finish.
+    /// Persisted (instead of held in memory) so the queue survives a restart/refresh.
+    QueuedFollowUp(DraftFollowUpData),
     DraftWorkspace(DraftWorkspaceData),
     PreviewSettings(PreviewSettingsData),
     WorkspaceNotes(WorkspaceNotesData),

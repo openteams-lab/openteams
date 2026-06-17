@@ -10,7 +10,7 @@ export type CreateProject = { name: string, repositories: Array<CreateProjectRep
 
 export type UpdateProject = { name: string | null, description: string | null, status: string | null, default_workspace_path: string | null, active_repo_id: string | null, };
 
-export type SearchResult = { path: string, is_file: boolean, match_type: SearchMatchType, 
+export type SearchResult = { path: string, is_file: boolean, match_type: SearchMatchType,
 /**
  * Ranking score based on git history (higher = more recently/frequently edited)
  */
@@ -57,6 +57,10 @@ export enum ProjectWorkItemStatus { open = "open", in_progress = "in_progress", 
 export enum ProjectWorkItemPriority { low = "low", medium = "medium", high = "high", urgent = "urgent" }
 
 export enum ProjectWorkItemSource { manual = "manual", github_issue = "github_issue", workflow = "workflow", session = "session" }
+
+export type ProjectWorkItemComment = { id: string, project_work_item_id: string, body: string, author: string | null, created_at: Date, updated_at: Date, };
+
+export type CreateProjectWorkItemComment = { body: string, author: string | null, };
 
 export type ProjectWorkItemExternalLink = { id: string, project_work_item_id: string, provider: string, repo_id: string | null, external_type: ProjectExternalType, external_id: string, number: bigint | null, url: string | null, state: string | null, metadata_json: string | null, last_synced_at: Date | null, stale: boolean, created_at: Date, updated_at: Date, };
 
@@ -118,7 +122,7 @@ export enum GitHubPendingOperationStatus { pending_approval = "pending_approval"
 
 export type ProjectDetail = { project: Project, paths: Array<ProjectPath>, members: Array<ProjectMember>, sessions: Array<ChatSession>, repos: Array<Repo>, stats: Array<ProjectStats>, };
 
-export type ProjectWorkItemDetail = { work_item: ProjectWorkItem, external_links: Array<ProjectWorkItemExternalLink>, execution_links: Array<ProjectWorkItemExecutionLink>, delivery_records: Array<ProjectDeliveryRecord>, github_audits: Array<GitHubOperationAudit>, github_issue_detail: GitHubIssueDetail | null, };
+export type ProjectWorkItemDetail = { work_item: ProjectWorkItem, external_links: Array<ProjectWorkItemExternalLink>, comments: Array<ProjectWorkItemComment>, execution_links: Array<ProjectWorkItemExecutionLink>, delivery_records: Array<ProjectDeliveryRecord>, github_audits: Array<GitHubOperationAudit>, github_issue_detail: GitHubIssueDetail | null, };
 
 export type SourceControlFileStatus = "modified" | "added" | "deleted" | "untracked" | "renamed" | "copied" | "type_changed";
 
@@ -226,47 +230,47 @@ export type WorkspaceNotesData = { content: string, };
 
 export type WorkspacePanelStateData = { right_main_panel_mode: string | null, is_left_main_panel_visible: boolean, };
 
-export type UiPreferencesData = { 
+export type UiPreferencesData = {
 /**
  * Preferred repo actions per repo
  */
-repo_actions: { [key in string]?: string }, 
+repo_actions: { [key in string]?: string },
 /**
  * Expanded/collapsed state for UI sections
  */
-expanded: { [key in string]?: boolean }, 
+expanded: { [key in string]?: boolean },
 /**
  * Context bar position
  */
-context_bar_position: string | null, 
+context_bar_position: string | null,
 /**
  * Pane sizes
  */
-pane_sizes: { [key in string]?: JsonValue }, 
+pane_sizes: { [key in string]?: JsonValue },
 /**
  * Collapsed paths per workspace in file tree
  */
-collapsed_paths: { [key in string]?: Array<string> }, 
+collapsed_paths: { [key in string]?: Array<string> },
 /**
  * Global left sidebar visibility
  */
-is_left_sidebar_visible: boolean | null, 
+is_left_sidebar_visible: boolean | null,
 /**
  * Global right sidebar visibility
  */
-is_right_sidebar_visible: boolean | null, 
+is_right_sidebar_visible: boolean | null,
 /**
  * Global terminal visibility
  */
-is_terminal_visible: boolean | null, 
+is_terminal_visible: boolean | null,
 /**
  * Workspace-specific panel states
  */
 workspace_panel_states: { [key in string]?: WorkspacePanelStateData }, };
 
-export type ScratchPayload = { "type": "DRAFT_TASK", "data": string } | { "type": "DRAFT_FOLLOW_UP", "data": DraftFollowUpData } | { "type": "DRAFT_WORKSPACE", "data": DraftWorkspaceData } | { "type": "PREVIEW_SETTINGS", "data": PreviewSettingsData } | { "type": "WORKSPACE_NOTES", "data": WorkspaceNotesData } | { "type": "UI_PREFERENCES", "data": UiPreferencesData };
+export type ScratchPayload = { "type": "DRAFT_TASK", "data": string } | { "type": "DRAFT_FOLLOW_UP", "data": DraftFollowUpData } | { "type": "QUEUED_FOLLOW_UP", "data": DraftFollowUpData } | { "type": "DRAFT_WORKSPACE", "data": DraftWorkspaceData } | { "type": "PREVIEW_SETTINGS", "data": PreviewSettingsData } | { "type": "WORKSPACE_NOTES", "data": WorkspaceNotesData } | { "type": "UI_PREFERENCES", "data": UiPreferencesData };
 
-export enum ScratchType { DRAFT_TASK = "DRAFT_TASK", DRAFT_FOLLOW_UP = "DRAFT_FOLLOW_UP", DRAFT_WORKSPACE = "DRAFT_WORKSPACE", PREVIEW_SETTINGS = "PREVIEW_SETTINGS", WORKSPACE_NOTES = "WORKSPACE_NOTES", UI_PREFERENCES = "UI_PREFERENCES" }
+export enum ScratchType { DRAFT_TASK = "DRAFT_TASK", DRAFT_FOLLOW_UP = "DRAFT_FOLLOW_UP", QUEUED_FOLLOW_UP = "QUEUED_FOLLOW_UP", DRAFT_WORKSPACE = "DRAFT_WORKSPACE", PREVIEW_SETTINGS = "PREVIEW_SETTINGS", WORKSPACE_NOTES = "WORKSPACE_NOTES", UI_PREFERENCES = "UI_PREFERENCES" }
 
 export type Scratch = { id: string, payload: ScratchPayload, created_at: string, updated_at: string, };
 
@@ -322,7 +326,7 @@ export type ChatWorkItem = { id: string, session_id: string, run_id: string, ses
 
 export enum ChatWorkItemType { artifact = "artifact", conclusion = "conclusion" }
 
-export type ChatSkill = { id: string, name: string, description: string, content: string, trigger_type: string, trigger_keywords: string[], enabled: boolean, source: string, source_url: string | null, version: string, author: string | null, tags: string[], category: string | null, compatible_agents: string[], 
+export type ChatSkill = { id: string, name: string, description: string, content: string, trigger_type: string, trigger_keywords: string[], enabled: boolean, source: string, source_url: string | null, version: string, author: string | null, tags: string[], category: string | null, compatible_agents: string[],
 /**
  * Download count from skills.sh registry
  */
@@ -330,13 +334,13 @@ download_count: bigint, created_at: string, updated_at: string, };
 
 export type ChatSkillTriggerType = "always" | "keyword" | "manual";
 
-export type CreateChatSkill = { name: string, description: string | null, content: string, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, source: string | null, source_url: string | null, version: string | null, author: string | null, tags: Array<string> | null, category: string | null, compatible_agents: Array<string> | null, 
+export type CreateChatSkill = { name: string, description: string | null, content: string, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, source: string | null, source_url: string | null, version: string | null, author: string | null, tags: Array<string> | null, category: string | null, compatible_agents: Array<string> | null,
 /**
  * Download count from skills.sh registry
  */
 download_count: bigint | null, };
 
-export type UpdateChatSkill = { name: string | null, description: string | null, content: string | null, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, source: string | null, source_url: string | null, version: string | null, author: string | null, tags: Array<string> | null, category: string | null, compatible_agents: Array<string> | null, 
+export type UpdateChatSkill = { name: string | null, description: string | null, content: string | null, trigger_type: string | null, trigger_keywords: Array<string> | null, enabled: boolean | null, source: string | null, source_url: string | null, version: string | null, author: string | null, tags: Array<string> | null, category: string | null, compatible_agents: Array<string> | null,
 /**
  * Download count from skills.sh registry
  */
@@ -418,13 +422,13 @@ export type WorkflowIterationFeedback = { id: string, execution_id: string, from
 
 export type CreateWorkflowIterationFeedback = { execution_id: string, from_round_id: string, to_round_id: string | null, user_feedback_json: string, current_status_summary: string, new_plan_diff: string | null, };
 
-export type RemoteSkillMeta = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: string[], compatible_agents: string[], source_url: string | null, 
+export type RemoteSkillMeta = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: string[], compatible_agents: string[], source_url: string | null,
 /**
  * Download count from skills.sh registry
  */
 download_count: bigint | null, };
 
-export type RemoteSkillPackage = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: Array<string>, compatible_agents: Array<string>, source_url: string | null, content: string, 
+export type RemoteSkillPackage = { id: string, name: string, description: string, category: string | null, version: string, author: string | null, tags: Array<string>, compatible_agents: Array<string>, source_url: string | null, content: string,
 /**
  * Download count from skills.sh registry
  */
@@ -456,23 +460,23 @@ export type AgentRuntimeRefreshResponse = { runners: Array<AgentRuntimeStatus>, 
 
 export type AgentRuntimeDiagnostics = { runner_type: BaseCodingAgent, installed: boolean, executable: boolean, availability: AvailabilityInfo, config_path: string, install_indicator_path: string | null, discovered_models: Array<string>, model_source: AgentRuntimeModelSource, version: string | null, last_checked_at: string | null, last_error: string | null, run_mode: AgentRunMode, env_summary: Array<AgentRuntimeEnvSummary>, executor_options: JsonValue, };
 
-export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "message_updated", message: ChatMessage, } | { "type": "work_item_new", work_item: ChatWorkItem, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_run_started", session_id: string, session_agent_id: string, agent_id: string, agent_name: string, run_id: string, 
+export type ChatStreamEvent = { "type": "message_new", message: ChatMessage, } | { "type": "message_updated", message: ChatMessage, } | { "type": "work_item_new", work_item: ChatWorkItem, } | { "type": "agent_delta", session_id: string, session_agent_id: string, agent_id: string, run_id: string, stream_type: ChatStreamDeltaType, content: string, delta: boolean, is_final: boolean, } | { "type": "agent_run_started", session_id: string, session_agent_id: string, agent_id: string, agent_name: string, run_id: string,
 /**
  * User (or upstream) message whose processing triggered this run.
  */
-source_message_id: string, 
+source_message_id: string,
 /**
  * Frontend-supplied id from the source message meta (`client_message_id`).
  * Lets the frontend correlate this run with its pending placeholder.
  */
-client_message_id: string | null, started_at: string | null, } | { "type": "agent_activity_line", line: ChatRunActivityLine, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState, 
+client_message_id: string | null, started_at: string | null, } | { "type": "agent_activity_line", line: ChatRunActivityLine, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState,
 /**
  * Run that triggered this state change. Run-scoped transitions
  * (running/idle/dead/stopping driven by a concrete run) carry the
  * active run id; states with no associated run (e.g. orphan
  * recovery) leave this `None`.
  */
-run_id: string | null, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, } | { "type": "protocol_notice", session_id: string, session_agent_id: string, agent_id: string, run_id: string, agent_name: string, code: ChatProtocolNoticeCode, target: string | null, detail: string | null, output_is_empty: boolean, } | { "type": "mention_error", session_id: string, message_id: string, agent_name: string, agent_id: string | null, reason: string, } | { "type": "workflow_generate_detected", session_id: string, session_agent_id: string, run_id: string, } | { "type": "workflow_plan_preview_ready", session_id: string, plan_id: string, workflow_card_message: ChatMessage, } | { "type": "workflow_execution_updated", session_id: string, execution_id: string, } | { "type": "workflow_graph_updated", session_id: string, execution_id: string, graph_version: string, reason: string, nodes: Array<WorkflowPlanNode>, edges: Array<WorkflowPlanEdge>, changed_step_ids: Array<string>, } | { "type": "workflow_runtime_line", line_id: string, session_id: string, execution_id: string, workflow_agent_session_id: string | null, step_id: string, step_key: string, agent_id: string, agent_name: string, stream_type: ChatStreamDeltaType, content: string, created_at: string, } | { "type": "file_change_refresh", session_id: string, session_agent_id: string, agent_id: string, run_id: string, 
+run_id: string | null, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "queue_updated", session_id: string, session_agent_id: string, queue: MemberQueueSnapshot, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, } | { "type": "protocol_notice", session_id: string, session_agent_id: string, agent_id: string, run_id: string, agent_name: string, code: ChatProtocolNoticeCode, target: string | null, detail: string | null, output_is_empty: boolean, } | { "type": "mention_error", session_id: string, message_id: string, agent_name: string, agent_id: string | null, reason: string, } | { "type": "workflow_generate_detected", session_id: string, session_agent_id: string, run_id: string, } | { "type": "workflow_plan_preview_ready", session_id: string, plan_id: string, workflow_card_message: ChatMessage, } | { "type": "workflow_execution_updated", session_id: string, execution_id: string, } | { "type": "workflow_graph_updated", session_id: string, execution_id: string, graph_version: string, reason: string, nodes: Array<WorkflowPlanNode>, edges: Array<WorkflowPlanEdge>, changed_step_ids: Array<string>, } | { "type": "workflow_runtime_line", line_id: string, session_id: string, execution_id: string, workflow_agent_session_id: string | null, step_id: string, step_key: string, agent_id: string, agent_name: string, stream_type: ChatStreamDeltaType, content: string, created_at: string, } | { "type": "file_change_refresh", session_id: string, session_agent_id: string, agent_id: string, run_id: string,
 /**
  * Source message whose processing triggered this run.
  */
@@ -492,7 +496,7 @@ export type CompressionWarning = { code: string, message: string, split_file_pat
 
 export type FileChangeType = "created" | "modified" | "deleted";
 
-export type FileChangeEntry = { 
+export type FileChangeEntry = {
 /**
  * Workspace-relative path (forward slashes).
  */
@@ -506,7 +510,7 @@ export type Workspace = { id: string, task_id: string, container_ref: string | n
 
 export type Session = { id: string, workspace_id: string, executor: string | null, created_at: string, updated_at: string, };
 
-export type ExecutionProcess = { id: string, session_id: string, run_reason: ExecutionProcessRunReason, executor_action: ExecutorAction, status: ExecutionProcessStatus, exit_code: bigint | null, 
+export type ExecutionProcess = { id: string, session_id: string, run_reason: ExecutionProcessRunReason, executor_action: ExecutorAction, status: ExecutionProcessStatus, exit_code: bigint | null,
 /**
  * dropped: true if this process is excluded from the current
  * history view (due to restore/trimming). Hidden from logs/timeline;
@@ -536,11 +540,11 @@ export type CreateApprovalRequest = { tool_name: string, tool_input: JsonValue, 
 
 export type ApprovalResponse = { execution_process_id: string, status: ApprovalStatus, };
 
-export type Diff = { change: DiffChangeKind, oldPath: string | null, newPath: string | null, oldContent: string | null, newContent: string | null, 
+export type Diff = { change: DiffChangeKind, oldPath: string | null, newPath: string | null, oldContent: string | null, newContent: string | null,
 /**
  * True when file contents are intentionally omitted (e.g., too large)
  */
-contentOmitted: boolean, 
+contentOmitted: boolean,
 /**
  * Optional precomputed stats for omitted content
  */
@@ -558,7 +562,7 @@ export type ProviderProfile = { provider: string, username: string | null, displ
 
 export type TagSearchParams = { search: string | null, };
 
-export type UserSystemInfo = { config: Config, analytics_user_id: string, deploy_mode: string, login_status: LoginStatus, home_directory: string, environment: Environment, 
+export type UserSystemInfo = { config: Config, analytics_user_id: string, deploy_mode: string, login_status: LoginStatus, home_directory: string, environment: Environment,
 /**
  * Capabilities supported per executor (e.g., { "CLAUDE_CODE": ["SESSION_FORK"] })
  */
@@ -598,7 +602,7 @@ export type SessionWorkspacesResponse = { workspaces: Array<SessionWorkspace>, }
 
 export type SessionWorkspaceChangesQuery = { path: string, include_diff: boolean | null, };
 
-export type WorkspaceChangedFile = { path: string, additions: number, deletions: number, unified_diff: string | null, 
+export type WorkspaceChangedFile = { path: string, additions: number, deletions: number, unified_diff: string | null,
 /**
  * Whether a diff can be generated for this file (false for files in .gitignore'd directories).
  */
@@ -616,7 +620,7 @@ export type ChatRunRetentionListResponse = { runs: Array<ChatRunRetentionInfo>, 
 
 export type ChatRunActivityResponse = { run_id: string, lines: Array<ChatRunActivityLine>, next_offset: bigint | null, is_pruned: boolean, };
 
-export type ChatRunFilesQuery = { 
+export type ChatRunFilesQuery = {
 /**
  * When true, include the per-file unified diff text for each changed file.
  * Defaults to false (paths + counts only) to keep the response light.
@@ -697,6 +701,8 @@ export type DeliveryRecordsQuery = { work_item_id: string | null, repo_id: strin
 
 export type DeliveryStatsQuery = { period_start: string, period_end: string, };
 
+export type WorkItemCommentRequest = { body: string, };
+
 export type IssueCommentRequest = { body: string, operation_source: GitHubOperationSource, };
 
 export type IssueBodyRequest = { body: string, operation_source: GitHubOperationSource, };
@@ -761,15 +767,15 @@ export type UserIterationFeedbackDetail = { what_wrong: string, expected: string
 
 export type UserIterationFeedback = { execution_id: string, round_id: string, action: string, feedback: UserIterationFeedbackDetail | null, };
 
-export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, commit_reminder_enabled: boolean, commit_reminder_prompt: string | null, send_message_shortcut: SendMessageShortcut, 
+export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, commit_reminder_enabled: boolean, commit_reminder_prompt: string | null, send_message_shortcut: SendMessageShortcut,
 /**
  * Chat presets configuration (member and team templates)
  */
-chat_presets: ChatPresetsConfig, 
+chat_presets: ChatPresetsConfig,
 /**
  * Global chat bubble font size preference
  */
-chat_bubble_font_size: ChatBubbleFontSize, 
+chat_bubble_font_size: ChatBubbleFontSize,
 /**
  * Chat compression configuration
  */
@@ -797,105 +803,105 @@ export type SendMessageShortcut = "ModifierEnter" | "Enter";
 
 export enum ChatBubbleFontSize { px12 = "px12", px13 = "px13", px14 = "px14", px15 = "px15", px16 = "px16", px18 = "px18" }
 
-export type ChatCompressionConfig = { 
+export type ChatCompressionConfig = {
 /**
  * Token threshold before compression kicks in (default: 5000000)
  */
-token_threshold: number, 
+token_threshold: number,
 /**
  * Percentage of messages to compress (default: 25)
  */
 compression_percentage: number, };
 
-export type ChatPresetsConfig = { 
+export type ChatPresetsConfig = {
 /**
  * List of member preset templates
  */
-members: Array<ChatMemberPreset>, 
+members: Array<ChatMemberPreset>,
 /**
  * List of team preset templates
  */
-teams: Array<ChatTeamPreset>, 
+teams: Array<ChatTeamPreset>,
 /**
  * Team collaboration protocol content; empty string disables injection
  */
 team_protocol: string | null, };
 
-export type ChatMemberPreset = { 
+export type ChatMemberPreset = {
 /**
  * Unique identifier for the preset
  */
-id: string, 
+id: string,
 /**
  * Display name (also used as @mention handle)
  */
-name: string, 
+name: string,
 /**
  * Description of the preset's purpose
  */
-description: string, 
+description: string,
 /**
  * Optional runner type (null means use default)
  */
-runner_type: string | null, 
+runner_type: string | null,
 /**
  * Optional recommended model identifier for the selected runner
  */
-recommended_model: string | null, 
+recommended_model: string | null,
 /**
  * System prompt defining the agent's behavior
  */
-system_prompt: string, 
+system_prompt: string,
 /**
  * Optional default workspace path
  */
-default_workspace_path: string | null, 
+default_workspace_path: string | null,
 /**
  * Skills preselected for members created from this preset
  */
-selected_skill_ids: Array<string>, 
+selected_skill_ids: Array<string>,
 /**
  * Tools enabled for this preset
  */
-tools_enabled: JsonValue, 
+tools_enabled: JsonValue,
 /**
  * Whether this is a built-in preset (cannot be deleted)
  */
-is_builtin: boolean, 
+is_builtin: boolean,
 /**
  * Whether this preset is enabled (visible for import)
  */
 enabled: boolean, };
 
-export type ChatTeamPreset = { 
+export type ChatTeamPreset = {
 /**
  * Unique identifier for the preset
  */
-id: string, 
+id: string,
 /**
  * Display name of the team
  */
-name: string, 
+name: string,
 /**
  * Description of the team's purpose
  */
-description: string, 
+description: string,
 /**
  * List of member preset IDs to include in this team
  */
-member_ids: Array<string>, 
+member_ids: Array<string>,
 /**
  * Optional ID of the lead member preset (references a member in member_ids)
  */
-lead_member_id?: string | null, 
+lead_member_id?: string | null,
 /**
  * Optional team protocol injected when importing this team preset
  */
-team_protocol: string, 
+team_protocol: string,
 /**
  * Whether this is a built-in preset (cannot be deleted)
  */
-is_builtin: boolean, 
+is_builtin: boolean,
 /**
  * Whether this preset is enabled (visible for import)
  */
@@ -903,11 +909,11 @@ enabled: boolean, };
 
 export type CliConfig = { provider: ProviderConfig, model: ModelConfig, behavior: BehaviorConfig, };
 
-export type ProviderConfig = { 
+export type ProviderConfig = {
 /**
  * Default provider name: anthropic, openai, google, openrouter, minimax, ollama, custom
  */
-default: string, anthropic: ProviderCredentials | null, openai: ProviderCredentials | null, google: ProviderCredentials | null, openrouter: ProviderCredentials | null, minimax: ProviderCredentials | null, ollama: OllamaConfig | null, custom: CustomProviderConfig | null, 
+default: string, anthropic: ProviderCredentials | null, openai: ProviderCredentials | null, google: ProviderCredentials | null, openrouter: ProviderCredentials | null, minimax: ProviderCredentials | null, ollama: OllamaConfig | null, custom: CustomProviderConfig | null,
 /**
  * 多自定义 Provider 配置
  */
@@ -919,23 +925,23 @@ export type OllamaConfig = { endpoint: string | null, };
 
 export type CustomProviderConfig = { name: string | null, endpoint: string | null, api_key: string | null, };
 
-export type CustomProviderEntry = { 
+export type CustomProviderEntry = {
 /**
  * 唯一标识，如 "bailian-coding-plan"
  */
-id: string, 
+id: string,
 /**
  * 显示名称
  */
-name: string | null, 
+name: string | null,
 /**
  * NPM 包名，默认 "@ai-sdk/anthropic"
  */
-npm: string | null, 
+npm: string | null,
 /**
  * Provider 连接选项
  */
-options: CustomProviderOptions, 
+options: CustomProviderOptions,
 /**
  * 模型配置
  */
@@ -945,7 +951,7 @@ export type CustomProviderOptions = { baseURL: string | null, api_key: string | 
 
 export type CustomModelConfig = { name: string | null, modalities: ModelModalities | null, options: JsonValue | null, limit: ModelLimits | null, };
 
-export type ModelConfig = { 
+export type ModelConfig = {
 /**
  * Default model name
  */
@@ -955,125 +961,125 @@ export type ProviderModelConfig = { default: string | null, };
 
 export type BehaviorConfig = { auto_approve: boolean, auto_compact: boolean, };
 
-export type OpenTeamsCliConfig = { 
+export type OpenTeamsCliConfig = {
 /**
  * Provider configurations
  */
-provider: { [key in string]?: OpenTeamsCliProviderConfig } | null, 
+provider: { [key in string]?: OpenTeamsCliProviderConfig } | null,
 /**
  * Default model in provider/model format
  */
-model: string | null, 
+model: string | null,
 /**
  * Small model for tasks like title generation
  */
-small_model: string | null, 
+small_model: string | null,
 /**
  * Agent configurations
  */
-agent: JsonValue | null, 
+agent: JsonValue | null,
 /**
  * Custom commands
  */
-command: JsonValue | null, 
+command: JsonValue | null,
 /**
  * MCP server configurations
  */
-mcp: JsonValue | null, 
+mcp: JsonValue | null,
 /**
  * Permission settings
  */
-permission: JsonValue | null, 
+permission: JsonValue | null,
 /**
  * LSP server configurations
  */
-lsp: JsonValue | null, 
+lsp: JsonValue | null,
 /**
  * Formatter configurations
  */
-formatter: JsonValue | null, 
+formatter: JsonValue | null,
 /**
  * Experimental features
  */
-experimental: JsonValue | null, 
+experimental: JsonValue | null,
 /**
  * Username to display
  */
-username: string | null, 
+username: string | null,
 /**
  * Log level
  */
 log_level: string | null, };
 
-export type OpenTeamsCliProviderConfig = { 
+export type OpenTeamsCliProviderConfig = {
 /**
  * NPM package for the provider (e.g., "@ai-sdk/anthropic")
  */
-npm: string | null, 
+npm: string | null,
 /**
  * Display name for the provider
  */
-name: string | null, 
+name: string | null,
 /**
  * Provider options (apiKey, baseURL, etc.)
  */
-options: OpenTeamsCliProviderOptions | null, 
+options: OpenTeamsCliProviderOptions | null,
 /**
  * Model configurations
  */
-models: { [key in string]?: OpenTeamsCliModelConfig } | null, 
+models: { [key in string]?: OpenTeamsCliModelConfig } | null,
 /**
  * Whitelist of model IDs
  */
-whitelist: Array<string> | null, 
+whitelist: Array<string> | null,
 /**
  * Blacklist of model IDs
  */
 blacklist: Array<string> | null, };
 
-export type OpenTeamsCliProviderOptions = { 
+export type OpenTeamsCliProviderOptions = {
 /**
  * API key for the provider
  */
-apiKey: string | null, 
+apiKey: string | null,
 /**
  * Base URL for the provider API
  */
-baseURL: string | null, 
+baseURL: string | null,
 /**
  * Request timeout in milliseconds
  */
-timeout: bigint | null, 
+timeout: bigint | null,
 /**
  * Chunk timeout in milliseconds
  */
-chunkTimeout: bigint | null, 
+chunkTimeout: bigint | null,
 /**
  * GitHub Enterprise URL for copilot authentication
  */
-enterpriseUrl: string | null, 
+enterpriseUrl: string | null,
 /**
  * Enable promptCacheKey for this provider
  */
 setCacheKey: boolean | null, };
 
-export type OpenTeamsCliModelConfig = { 
+export type OpenTeamsCliModelConfig = {
 /**
  * Display name for the model
  */
-name: string | null, 
+name: string | null,
 /**
  * Model modalities (input/output capabilities)
  */
-modalities: ModelModalities | null, 
+modalities: ModelModalities | null,
 /**
  * Model-specific options
  */
-options: JsonValue | null, 
+options: JsonValue | null,
 /**
  * Model limits (context window, output tokens)
  */
-limit: ModelLimits | null, 
+limit: ModelLimits | null,
 /**
  * Variant-specific configuration
  */
@@ -1107,21 +1113,25 @@ export type CreatePresetSnapshotResponse = { team: ChatTeamPreset, members: Arra
 
 export type GitBranch = { name: string, is_current: boolean, is_remote: boolean, last_commit_date: Date, };
 
-export type QueuedMessage = { 
-/**
- * The session this message is queued for
- */
-session_id: string, 
-/**
- * The follow-up data (message + variant)
- */
-data: DraftFollowUpData, 
-/**
- * Timestamp when the message was queued
- */
-queued_at: string, };
+export enum QueuedMessageStatus { queued = "queued", processing = "processing", running = "running", failed = "failed", skipped = "skipped", completed = "completed" }
 
-export type QueueStatus = { "status": "empty" } | { "status": "queued", message: QueuedMessage, };
+export type QueuedMessage = { id: string, session_id: string, session_agent_id: string, agent_id: string, chat_message_id: string, status: QueuedMessageStatus, created_at: string, updated_at: string, processing_started_at: string | null, run_id: string | null, failure_reason: string | null, };
+
+export type QueuedMessageListItem = { message: QueuedMessage, can_delete: boolean, };
+
+export type MemberQueueStatus = "empty" | "queued" | "processing" | "running" | "blocked" | "paused";
+
+export type MemberQueueSnapshot = { session_id: string, session_agent_id: string, agent_id: string, status: MemberQueueStatus, blocked: boolean, paused: boolean, can_continue: boolean, queued_count: bigint, items: Array<QueuedMessageListItem>, };
+
+export type QueueStatus = { "status": "empty" } | { "status": "queued", messages: Array<QueuedMessage>, } | { "status": "processing", message: QueuedMessage, queued_count: bigint, } | { "status": "running", message: QueuedMessage, queued_count: bigint, } | { "status": "blocked", message: QueuedMessage, queued_count: bigint, } | { "status": "paused", message: QueuedMessage, queued_count: bigint, };
+
+export type ChatQueueListResponse = { session_id: string, members: Array<MemberQueueSnapshot>, };
+
+export type ChatMemberQueueResponse = { queue: MemberQueueSnapshot, };
+
+export type DeleteQueuedMessageResponse = { deleted_id: string, queue: MemberQueueSnapshot, };
+
+export type ContinueQueuedMessageResponse = { skipped_failed_count: bigint, queue: MemberQueueSnapshot, };
 
 export type ConflictOp = "rebase" | "merge" | "cherry_pick" | "revert";
 
@@ -1141,7 +1151,7 @@ export enum BaseCodingAgent { CLAUDE_CODE = "CLAUDE_CODE", AMP = "AMP", GEMINI =
 
 export type CodingAgent = { "CLAUDE_CODE": ClaudeCode } | { "AMP": Amp } | { "GEMINI": Gemini } | { "CODEX": Codex } | { "OPENCODE": Opencode } | { "OPEN_TEAMS_CLI": OpenTeamsCli } | { "CURSOR_AGENT": CursorAgent } | { "QWEN_CODE": QwenCode } | { "COPILOT": Copilot } | { "DROID": Droid } | { "KIMI_CODE": KimiCode };
 
-export type SlashCommandDescription = { 
+export type SlashCommandDescription = {
 /**
  * Command name without the leading slash, e.g. `help` for `/help`.
  */
@@ -1149,21 +1159,21 @@ name: string, description?: string | null, };
 
 export type AvailabilityInfo = { "type": "LOGIN_DETECTED", last_auth_timestamp: bigint, } | { "type": "INSTALLATION_FOUND" } | { "type": "NOT_FOUND" };
 
-export type CommandBuilder = { 
+export type CommandBuilder = {
 /**
  * Base executable command (e.g., "npx -y @anthropic-ai/claude-code@2.1.161")
  */
-base: string, 
+base: string,
 /**
  * Optional parameters to append to the base command
  */
 params: Array<string> | null, };
 
-export type ExecutorProfileId = { 
+export type ExecutorProfileId = {
 /**
  * The executor type (e.g., "CLAUDE_CODE", "AMP")
  */
-executor: BaseCodingAgent, 
+executor: BaseCodingAgent,
 /**
  * Optional variant name (e.g., "PLAN", "ROUTER")
  */
@@ -1197,21 +1207,21 @@ export type CursorAgent = { append_prompt: AppendPrompt, force?: boolean | null,
 
 export type Copilot = { append_prompt: AppendPrompt, model?: string | null, allow_all_tools?: boolean | null, allow_tool?: string | null, deny_tool?: string | null, add_dir?: Array<string> | null, disable_mcp_server?: Array<string> | null, base_command_override?: string | null, additional_params?: Array<string> | null, env?: { [key in string]?: string } | null, };
 
-export type Opencode = { append_prompt: AppendPrompt, model?: string | null, variant?: string | null, agent?: string | null, 
+export type Opencode = { append_prompt: AppendPrompt, model?: string | null, variant?: string | null, agent?: string | null,
 /**
  * Auto-approve agent actions
  */
-auto_approve: boolean, 
+auto_approve: boolean,
 /**
  * Enable auto-compaction when the context length approaches the model's context window limit
  */
 auto_compact: boolean, base_command_override?: string | null, additional_params?: Array<string> | null, env?: { [key in string]?: string } | null, };
 
-export type OpenTeamsCli = { append_prompt: AppendPrompt, model?: string | null, variant?: string | null, agent?: string | null, 
+export type OpenTeamsCli = { append_prompt: AppendPrompt, model?: string | null, variant?: string | null, agent?: string | null,
 /**
  * Auto-approve agent actions
  */
-auto_approve: boolean, 
+auto_approve: boolean,
 /**
  * Enable auto-compaction when the context length approaches the model's context window limit
  */
@@ -1229,33 +1239,33 @@ export type DroidReasoningEffort = "none" | "dynamic" | "off" | "low" | "medium"
 
 export type AppendPrompt = string | null;
 
-export type CodingAgentInitialRequest = { prompt: string, 
+export type CodingAgentInitialRequest = { prompt: string,
 /**
  * Executor profile specification
  */
-executor_profile_id: ExecutorProfileId, 
+executor_profile_id: ExecutorProfileId,
 /**
  * Optional relative path to execute the agent in (relative to container_ref).
  * If None, uses the container_ref directory directly.
  */
 working_dir: string | null, };
 
-export type CodingAgentFollowUpRequest = { prompt: string, session_id: string, reset_to_message_id: string | null, 
+export type CodingAgentFollowUpRequest = { prompt: string, session_id: string, reset_to_message_id: string | null,
 /**
  * Executor profile specification
  */
-executor_profile_id: ExecutorProfileId, 
+executor_profile_id: ExecutorProfileId,
 /**
  * Optional relative path to execute the agent in (relative to container_ref).
  * If None, uses the container_ref directory directly.
  */
 working_dir: string | null, };
 
-export type ReviewRequest = { executor_profile_id: ExecutorProfileId, context: Array<RepoReviewContext> | null, prompt: string, 
+export type ReviewRequest = { executor_profile_id: ExecutorProfileId, context: Array<RepoReviewContext> | null, prompt: string,
 /**
  * Optional session ID to resume an existing session
  */
-session_id: string | null, 
+session_id: string | null,
 /**
  * Optional relative path to execute the agent in (relative to container_ref).
  */
@@ -1271,21 +1281,21 @@ export type NormalizedEntry = { timestamp: string | null, entry_type: Normalized
 
 export type NormalizedEntryType = { "type": "user_message" } | { "type": "user_feedback", denied_tool: string, } | { "type": "assistant_message" } | { "type": "tool_use", tool_name: string, action_type: ActionType, status: ToolStatus, } | { "type": "system_message" } | { "type": "error_message", error_type: NormalizedEntryError, } | { "type": "thinking" } | { "type": "loading" } | { "type": "next_action", failed: boolean, execution_processes: number, needs_setup: boolean, } | { "type": "token_usage_info" } & TokenUsageInfo;
 
-export type TokenUsageInfo = { 
+export type TokenUsageInfo = {
 /**
  * Billable tokens: input + output (cache_read excluded, it's billed at ~1/10 rate)
  */
-total_tokens: number, model_context_window: number, input_tokens: number | null, output_tokens: number | null, reasoning_output_tokens: number | null, 
+total_tokens: number, model_context_window: number, input_tokens: number | null, output_tokens: number | null, reasoning_output_tokens: number | null,
 /**
  * Tokens served from cache (Claude: cache_read_input_tokens, Codex: cached_input_tokens)
  */
 cache_read_tokens: number | null, runtime_agent: string | null, runtime_model_id: string | null, provider_id: string | null, runtime_thread_id: string | null, usage_scope: string | null, snapshot_total_tokens: number | null, snapshot_input_tokens: number | null, snapshot_output_tokens: number | null, snapshot_reasoning_output_tokens: number | null, snapshot_cache_read_tokens: number | null, is_estimated: boolean, };
 
-export type FileChange = { "action": "write", content: string, } | { "action": "delete" } | { "action": "rename", new_path: string, } | { "action": "edit", 
+export type FileChange = { "action": "write", content: string, } | { "action": "delete" } | { "action": "rename", new_path: string, } | { "action": "edit",
 /**
  * Unified diff containing file header and hunks.
  */
-unified_diff: string, 
+unified_diff: string,
 /**
  * Whether line number in the hunks are reliable.
  */
@@ -1297,7 +1307,7 @@ export type TodoItem = { content: string, status: string, priority: string | nul
 
 export type NormalizedEntryError = { "type": "setup_required" } | { "type": "quota_exceeded", provider: string | null, } | { "type": "rate_limit_exceeded", provider: string | null, } | { "type": "server_overloaded", provider: string | null, } | { "type": "authentication_failed", provider: string | null, } | { "type": "context_limit_exceeded", provider: string | null, } | { "type": "other" };
 
-export type ToolResult = { type: ToolResultValueType, 
+export type ToolResult = { type: ToolResultValueType,
 /**
  * For Markdown, this will be a JSON string; for JSON, a structured value
  */

@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet},
     path::{Component, Path, PathBuf},
     str::FromStr,
     sync::{
@@ -58,7 +58,12 @@ use utils::{
 };
 use uuid::Uuid;
 
-use crate::services::member_execution::build_effective_member_executor;
+use crate::services::{
+    member_execution::build_effective_member_executor,
+    queued_message::{
+        CreateQueuedMessage, MemberQueueSnapshot, QueuedMessage, QueuedMessageService,
+    },
+};
 
 include!("dependencies.rs");
 include!("types.rs");

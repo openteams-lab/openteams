@@ -802,15 +802,14 @@ pub(crate) fn collect_run_files(run: &ChatRun, include_diff: bool) -> WorkspaceC
             continue;
         }
 
-        let (additions, has_diff, unified_diff) =
-            match read_run_untracked_content(run, &path) {
-                Some(content) => {
-                    let additions = content.lines().count().max(1);
-                    let unified = include_diff.then_some(content);
-                    (additions, true, unified)
-                }
-                None => (0, false, None),
-            };
+        let (additions, has_diff, unified_diff) = match read_run_untracked_content(run, &path) {
+            Some(content) => {
+                let additions = content.lines().count().max(1);
+                let unified = include_diff.then_some(content);
+                (additions, true, unified)
+            }
+            None => (0, false, None),
+        };
         covered.insert(path.clone());
         changes.untracked.push(WorkspaceChangedFile {
             path,
@@ -2241,8 +2240,7 @@ diff --git a/x b/x
         let tempdir = tempfile::tempdir().expect("create tempdir");
         let run_dir = tempdir.path().join("run-record");
         let workspace = tempdir.path().join("workspace");
-        let session_agent_id =
-            Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap();
+        let session_agent_id = Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap();
         let prefix = format!("session_agent_{session_agent_id}_run_0002");
         fs::create_dir_all(run_dir.join(format!("{prefix}_untracked/src/new")))
             .expect("create untracked snapshot dir");
@@ -2266,8 +2264,7 @@ new file mode 100644
 +b
 +c
 ";
-        fs::write(run_dir.join(format!("{prefix}_diff.patch")), patch)
-            .expect("write patch");
+        fs::write(run_dir.join(format!("{prefix}_diff.patch")), patch).expect("write patch");
 
         // Untracked snapshot for a brand-new file not present in the patch.
         fs::write(

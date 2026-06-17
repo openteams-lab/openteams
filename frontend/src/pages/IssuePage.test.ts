@@ -505,6 +505,16 @@ check(
   ]) === 'Please review\n\nAttachments:\n- trace.log (1.5 KB)',
 );
 check(
+  'manual issue comments use local work item comment endpoint',
+  apiSource.includes('projectWorkItemsApi = {') &&
+    apiSource.includes('comment: async (') &&
+    apiSource.includes('/comments') &&
+    issueDetailSource.includes('const canComment = hasGitHubIssue') &&
+    issueDetailSource.includes('projectWorkItemsApi.comment(') &&
+    issueDetailSource.includes('comments: [...existing.comments, comment]') &&
+    issueDetailSource.includes('!commentBody || !canComment'),
+);
+check(
   'label draft trims and dedupes case-insensitively',
   labelDraftToList('bug, feature, Bug, enhancement').join(',') ===
     'bug,feature,enhancement',

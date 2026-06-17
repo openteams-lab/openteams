@@ -24,15 +24,19 @@ import type {
   AgentRuntimeStatus,
   BaseCodingAgent,
   ChatAgentSkillAssignment,
+  ChatMemberQueueResponse,
+  ChatQueueListResponse,
   ChatRunActivityResponse,
   ChatRunRetentionListResponse,
   ChatSessionStatus,
   Config,
+  ContinueQueuedMessageResponse,
   CreateChatAgent,
   CreateChatMessageRequest,
   CreateChatSession,
   CreateChatSessionAgentRequest,
   CreateChatSkill,
+  DeleteQueuedMessageResponse,
   DirectoryEntry,
   DirectoryListResponse,
   ExecutePlanRequest,
@@ -63,6 +67,7 @@ import type {
   ProjectIssueIntegrationsResponse,
   ProjectRepoIntegration,
   ProjectWorkItem,
+  ProjectWorkItemComment,
   ProjectWorkItemDetailResponse,
   ProjectWorkItemExecutionLink,
   ProfilesContent,
@@ -405,6 +410,52 @@ export const chatSessionsApi = {
    */
   streamUrl: (sessionId: string): string =>
     `/api/chat/sessions/${encodeURIComponent(sessionId)}/stream`,
+};
+
+export const chatQueuesApi = {
+  listSession: async (sessionId: string): Promise<ChatQueueListResponse> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/queue`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<ChatQueueListResponse>(r);
+  },
+  listMember: async (
+    sessionId: string,
+    sessionAgentId: string,
+  ): Promise<ChatMemberQueueResponse> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/agents/${encodeURIComponent(
+        sessionAgentId,
+      )}/queue`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<ChatMemberQueueResponse>(r);
+  },
+  deleteQueued: async (
+    sessionId: string,
+    queueId: string,
+  ): Promise<DeleteQueuedMessageResponse> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/queue/${encodeURIComponent(
+        queueId,
+      )}`,
+      { method: "DELETE" },
+    );
+    return handleApiResponse<DeleteQueuedMessageResponse>(r);
+  },
+  continueMember: async (
+    sessionId: string,
+    sessionAgentId: string,
+  ): Promise<ContinueQueuedMessageResponse> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/agents/${encodeURIComponent(
+        sessionAgentId,
+      )}/queue/continue`,
+      { method: "POST" },
+    );
+    return handleApiResponse<ContinueQueuedMessageResponse>(r);
+  },
 };
 
 // -----------------------------------------------------------------------------
@@ -1732,6 +1783,19 @@ export const projectWorkItemsApi = {
     );
     return handleApiResponse<ProjectWorkItem, GitHubErrorData>(r);
   },
+  comment: async (
+    projectId: string,
+    workItemId: string,
+    body: string,
+  ): Promise<ProjectWorkItemComment> => {
+    const r = await makeRequest(
+      `/api/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(
+        workItemId,
+      )}/comments`,
+      { method: "POST", body: jsonBody({ body }) },
+    );
+    return handleApiResponse<ProjectWorkItemComment, GitHubErrorData>(r);
+  },
   delete: async (projectId: string, workItemId: string): Promise<void> => {
     const r = await makeRequest(
       `/api/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(
@@ -1814,6 +1878,7 @@ export const api = {
   mcpServers: mcpServersApi,
   filesystem: filesystemApi,
   chatSessions: chatSessionsApi,
+  chatQueues: chatQueuesApi,
   chatMessages: chatMessagesApi,
   chatRuns: chatRunsApi,
   chatAgents: chatAgentsApi,

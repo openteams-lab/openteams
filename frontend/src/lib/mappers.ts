@@ -285,6 +285,7 @@ export const mapMessage = (
     avatar,
     sender,
     time: formatRelativeTime(backend.created_at, opts.now),
+    createdAt: backend.created_at,
     text: visibleContent,
     isUser: isUser || undefined,
     model,

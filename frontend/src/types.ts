@@ -6,6 +6,22 @@
 // below; mapping is performed in `src/lib/mappers.ts`.
 // =============================================================================
 
+import type { MemberQueueSnapshot } from '../../shared/types';
+
+export type {
+  ChatMemberQueueResponse,
+  ChatQueueListResponse,
+  ContinueQueuedMessageResponse,
+  DeleteQueuedMessageResponse,
+  MemberQueueSnapshot,
+  MemberQueueStatus,
+  QueuedMessage,
+  QueuedMessageListItem,
+  QueuedMessageStatus,
+} from '../../shared/types';
+
+export type MemberQueuesBySessionAgentId = Record<string, MemberQueueSnapshot>;
+
 export type Theme = 'dark' | 'light';
 
 export type Locale = 'en' | 'zh' | 'ja' | 'ko' | 'fr' | 'es';
@@ -48,6 +64,7 @@ export interface Message {
   avatar: string;
   sender: string;
   time: string;
+  createdAt?: string;
   text: string;
   cost?: string;
   model?: string;
@@ -423,6 +440,15 @@ export interface ProjectWorkItem {
   updated_at: string;
 }
 
+export interface ProjectWorkItemComment {
+  id: string;
+  project_work_item_id: string;
+  body: string;
+  author: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProjectWorkItemExternalLink {
   id: string;
   project_work_item_id: string;
@@ -586,6 +612,7 @@ export interface GitHubCreatePrResponse {
 export interface ProjectWorkItemDetailResponse {
   work_item: ProjectWorkItem;
   external_links: ProjectWorkItemExternalLink[];
+  comments: ProjectWorkItemComment[];
   execution_links: ProjectWorkItemExecutionLink[];
   delivery_records: ProjectDeliveryRecord[];
   github_audits?: GitHubOperationAudit[];

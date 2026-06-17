@@ -167,6 +167,11 @@ pub enum ChatStreamEvent {
         agent_id: Uuid,
         status: MentionStatus,
     },
+    QueueUpdated {
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        queue: MemberQueueSnapshot,
+    },
     CompressionWarning {
         session_id: Uuid,
         warning: CompressionWarning,

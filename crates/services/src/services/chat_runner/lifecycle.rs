@@ -1,13 +1,3 @@
-/// Pending message to be processed by an agent
-#[derive(Clone, Debug)]
-struct PendingMessage {
-    session_id: Uuid,
-    agent_id: Uuid,
-    agent_name: String,
-    message: ChatMessage,
-    track_source_message: bool,
-}
-
 #[derive(Clone)]
 struct RunLifecycleControl {
     run_id: Uuid,
@@ -57,9 +47,6 @@ pub struct ChatRunner {
     streams: Arc<DashMap<Uuid, broadcast::Sender<ChatStreamEvent>>>,
     // Store per-run lifecycle controls, key = session_agent_id
     run_controls: Arc<DashMap<Uuid, RunLifecycleControl>>,
-    // Message queue for each session_agent, keyed by session_agent_id
-    // When an agent is running, new messages are queued here and processed after completion
-    pending_messages: Arc<DashMap<Uuid, VecDeque<PendingMessage>>>,
     // Session-level background context compaction dedupe.
     // At most one compaction task per session is allowed at a time.
     background_compaction_inflight: Arc<DashMap<Uuid, ()>>,
@@ -83,7 +70,6 @@ impl ChatRunner {
             analytics_enabled,
             streams: Arc::new(DashMap::new()),
             run_controls: Arc::new(DashMap::new()),
-            pending_messages: Arc::new(DashMap::new()),
             background_compaction_inflight: Arc::new(DashMap::new()),
             workspace_live_log_bytes: Arc::new(DashMap::new()),
             workspace_janitor_locks: Arc::new(DashMap::new()),
@@ -164,6 +150,27 @@ impl ChatRunner {
             )
             .await?;
             self.run_controls.remove(&session_agent.id);
+
+            // A run that was in flight when the backend died left its queue row stranded in
+            // `processing`/`running`; reset it to `queued` so the persisted queue can resume.
+            match QueuedMessageService::new()
+                .requeue_stale_inflight(&self.db.pool, recovered.id)
+                .await
+            {
+                Ok(rows) if rows > 0 => {
+                    self.emit_member_queue_update(recovered.session_id, recovered.id)
+                        .await;
+                }
+                Ok(_) => {}
+                Err(err) => {
+                    tracing::warn!(
+                        session_agent_id = %recovered.id,
+                        error = %err,
+                        "failed to requeue stale in-flight queue rows during recovery"
+                    );
+                }
+            }
+
             tracing::warn!(
                 session_id = %recovered.session_id,
                 session_agent_id = %recovered.id,
@@ -171,6 +178,16 @@ impl ChatRunner {
                 previous_state = ?session_agent.state,
                 "Recovered orphaned chat session agent left active after backend interruption"
             );
+
+            // Resume the persisted member queue from the database.
+            let runner = self.clone();
+            let session_id = recovered.session_id;
+            let session_agent_id = recovered.id;
+            tokio::spawn(async move {
+                runner
+                    .dispatch_next_queued_message(session_id, session_agent_id)
+                    .await;
+            });
         }
 
         Ok(active_agents.len())
@@ -190,6 +207,56 @@ impl ChatRunner {
 
     pub fn emit_work_item_new(&self, session_id: Uuid, work_item: ChatWorkItem) {
         self.emit(session_id, ChatStreamEvent::WorkItemNew { work_item });
+    }
+
+    pub fn emit_queue_update(&self, session_id: Uuid, queue: MemberQueueSnapshot) {
+        self.emit(
+            session_id,
+            ChatStreamEvent::QueueUpdated {
+                session_id,
+                session_agent_id: queue.session_agent_id,
+                queue,
+            },
+        );
+    }
+
+    async fn emit_member_queue_update(&self, session_id: Uuid, session_agent_id: Uuid) {
+        let Some(session_agent) =
+            (match ChatSessionAgent::find_by_id(&self.db.pool, session_agent_id).await {
+                Ok(agent) => agent,
+                Err(err) => {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        session_agent_id = %session_agent_id,
+                        error = %err,
+                        "failed to load member before queue update event"
+                    );
+                    return;
+                }
+            })
+        else {
+            return;
+        };
+
+        match QueuedMessageService::new()
+            .snapshot_for_member(
+                &self.db.pool,
+                session_id,
+                session_agent.id,
+                session_agent.agent_id,
+            )
+            .await
+        {
+            Ok(snapshot) => self.emit_queue_update(session_id, snapshot),
+            Err(err) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    session_agent_id = %session_agent_id,
+                    error = %err,
+                    "failed to build queue update event"
+                );
+            }
+        }
     }
 
     /// Emit a one-shot file-change refresh signal after an agent message
@@ -629,84 +696,180 @@ impl ChatRunner {
         sender
     }
 
-    /// Process the next pending message for a session agent after it becomes idle
-    async fn process_pending_queue(&self, session_id: Uuid, session_agent_id: Uuid) {
-        // Get the next pending message from the queue
-        let pending = self
-            .pending_messages
-            .get_mut(&session_agent_id)
-            .and_then(|mut queue| queue.pop_front());
-
-        if let Some(pending_msg) = pending {
-            tracing::info!(
-                session_agent_id = %session_agent_id,
-                message_id = %pending_msg.message.id,
-                agent_name = %pending_msg.agent_name,
-                "processing queued message for agent"
-            );
-
-            // Process the queued message by calling run_agent_for_mention
-            // Use the stored agent_name to find the agent (handles rename gracefully)
-            if let Err(err) = self
-                .run_agent_for_mention_internal(
-                    pending_msg.session_id,
-                    &pending_msg.agent_name,
-                    &pending_msg.message,
-                    pending_msg.track_source_message,
-                )
-                .await
-            {
+    /// Claim and dispatch the next queued message for a member after it becomes idle.
+    ///
+    /// The queue is the persistent `chat_message_queue` table, so this resumes correctly after a
+    /// restart. `QueuedMessageService::claim_next` atomically picks the oldest `queued` entry and
+    /// is a no-op when the member is busy or blocked by a failed entry (stop-on-failure).
+    pub async fn dispatch_next_queued_message(&self, session_id: Uuid, session_agent_id: Uuid) {
+        let entry = match QueuedMessageService::new()
+            .claim_next(&self.db.pool, session_agent_id)
+            .await
+        {
+            Ok(Some(entry)) => entry,
+            Ok(None) => return,
+            Err(err) => {
                 tracing::warn!(
-                    error = %err,
-                    agent_name = %pending_msg.agent_name,
                     session_agent_id = %session_agent_id,
-                    "failed to process queued message"
+                    error = %err,
+                    "failed to claim next queued message"
                 );
-                // Continue processing the rest of the queue
-                Box::pin(self.process_pending_queue(session_id, session_agent_id)).await;
+                return;
             }
-        } else {
-            // Clean up empty queue entry
-            self.pending_messages.remove(&session_agent_id);
+        };
+        self.emit_member_queue_update(session_id, session_agent_id).await;
+
+        self.dispatch_queued_entry(session_id, session_agent_id, entry)
+            .await;
+    }
+
+    async fn dispatch_queued_entry(
+        &self,
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        entry: QueuedMessage,
+    ) {
+        // Resolve the persisted references back into the data the runner needs.
+        let message = match ChatMessage::find_by_id(&self.db.pool, entry.chat_message_id).await {
+            Ok(Some(message)) => message,
+            other => {
+                if let Err(err) = other {
+                    tracing::warn!(error = %err, "failed to load queued chat message");
+                }
+                let _ = QueuedMessageService::new()
+                    .mark_failed(
+                        &self.db.pool,
+                        entry.id,
+                        Some("queued chat message no longer exists".to_string()),
+                    )
+                    .await;
+                self.emit_member_queue_update(session_id, session_agent_id).await;
+                return;
+            }
+        };
+        let agent_name = match ChatAgent::find_by_id(&self.db.pool, entry.agent_id).await {
+            Ok(Some(agent)) => agent.name,
+            other => {
+                if let Err(err) = other {
+                    tracing::warn!(error = %err, "failed to load agent for queued message");
+                }
+                let _ = QueuedMessageService::new()
+                    .mark_failed(
+                        &self.db.pool,
+                        entry.id,
+                        Some("queued message agent no longer exists".to_string()),
+                    )
+                    .await;
+                self.emit_member_queue_update(session_id, session_agent_id).await;
+                return;
+            }
+        };
+
+        tracing::info!(
+            session_agent_id = %session_agent_id,
+            message_id = %message.id,
+            agent_name = %agent_name,
+            "processing queued message for agent"
+        );
+
+        // `run_agent_for_mention_internal` binds this entry to its run (advancing it to
+        // `running`); the completion handler then finalizes it via `find_by_run_id`.
+        if let Err(err) = self
+            .run_agent_for_mention_internal(session_id, &agent_name, &message, true)
+            .await
+        {
+            tracing::warn!(
+                error = %err,
+                agent_name = %agent_name,
+                session_agent_id = %session_agent_id,
+                "failed to dispatch queued message"
+            );
+            // The run never started, so finalize the claimed entry as failed. It will block the
+            // queue until the user continues, matching the stop-on-failure semantics.
+            let _ = QueuedMessageService::new()
+                .mark_failed(
+                    &self.db.pool,
+                    entry.id,
+                    Some(format!("failed to dispatch queued message: {err}")),
+                )
+                .await;
+            self.emit_member_queue_update(session_id, session_agent_id).await;
         }
     }
 
-    /// Clear all pending messages for a session agent and mark them as failed
-    /// Called when an agent fails/dies to prevent messages from being stuck
-    async fn clear_pending_queue_on_failure(&self, _session_id: Uuid, session_agent_id: Uuid) {
-        // Remove and get all pending messages for this agent
-        let pending_messages = self.pending_messages.remove(&session_agent_id);
-
-        if let Some((_, messages)) = pending_messages {
-            for pending_msg in messages {
-                tracing::info!(
-                    session_agent_id = %session_agent_id,
-                    message_id = %pending_msg.message.id,
-                    agent_name = %pending_msg.agent_name,
-                    "marking queued message as failed due to agent failure"
-                );
-
-                if pending_msg.track_source_message {
-                    // Update message meta to show failed status
-                    self.update_mention_status(
-                        pending_msg.message.id,
-                        &pending_msg.agent_name,
-                        "failed",
-                    )
-                    .await;
-
-                    // Emit failed event
-                    self.emit(
-                        pending_msg.session_id,
-                        ChatStreamEvent::MentionAcknowledged {
-                            session_id: pending_msg.session_id,
-                            message_id: pending_msg.message.id,
-                            mentioned_agent: pending_msg.agent_name.clone(),
-                            agent_id: pending_msg.agent_id,
-                            status: MentionStatus::Failed,
-                        },
-                    );
+    /// Mark the queue entry bound to a run as `completed` (success / normal stop).
+    async fn mark_run_queue_completed(&self, run_id: Uuid) {
+        match QueuedMessageService::new()
+            .find_by_run_id(&self.db.pool, run_id)
+            .await
+        {
+            Ok(Some(entry)) => {
+                if let Err(err) = QueuedMessageService::new()
+                    .mark_completed(&self.db.pool, entry.id)
+                    .await
+                {
+                    tracing::warn!(run_id = %run_id, error = %err, "failed to complete queue entry");
+                } else {
+                    self.emit_member_queue_update(entry.session_id, entry.session_agent_id)
+                        .await;
                 }
+            }
+            Ok(None) => {}
+            Err(err) => {
+                tracing::warn!(run_id = %run_id, error = %err, "failed to find queue entry for run");
+            }
+        }
+    }
+
+    /// Complete the run's queue row and claim the next queued item in one transaction.
+    async fn complete_run_and_claim_next(
+        &self,
+        run_id: Uuid,
+        session_id: Uuid,
+        session_agent_id: Uuid,
+    ) -> Option<QueuedMessage> {
+        match QueuedMessageService::new()
+            .complete_run_and_claim_next(&self.db.pool, run_id, session_agent_id)
+            .await
+        {
+            Ok(claimed) => {
+                self.emit_member_queue_update(session_id, session_agent_id).await;
+                claimed
+            }
+            Err(err) => {
+                tracing::warn!(
+                    run_id = %run_id,
+                    session_agent_id = %session_agent_id,
+                    error = %err,
+                    "failed to complete queue entry and claim next"
+                );
+                None
+            }
+        }
+    }
+
+    /// Mark the queue entry bound to a run as `failed`. Remaining `queued` entries are preserved so
+    /// the member queue is blocked until the user chooses to continue.
+    async fn mark_run_queue_failed(&self, run_id: Uuid, failure_reason: Option<String>) {
+        match QueuedMessageService::new()
+            .find_by_run_id(&self.db.pool, run_id)
+            .await
+        {
+            Ok(Some(entry)) => {
+                if let Err(err) =
+                    QueuedMessageService::new()
+                        .mark_failed(&self.db.pool, entry.id, failure_reason)
+                        .await
+                {
+                    tracing::warn!(run_id = %run_id, error = %err, "failed to fail queue entry");
+                } else {
+                    self.emit_member_queue_update(entry.session_id, entry.session_agent_id)
+                        .await;
+                }
+            }
+            Ok(None) => {}
+            Err(err) => {
+                tracing::warn!(run_id = %run_id, error = %err, "failed to find queue entry for run");
             }
         }
     }
@@ -899,31 +1062,72 @@ impl ChatRunner {
             return Ok(());
         }
 
-        if matches!(
+        let member_is_active = matches!(
             session_agent.state,
             ChatSessionAgentState::Running | ChatSessionAgentState::Stopping
-        ) {
-            // Queue the message for later processing instead of skipping
+        );
+        let member_queue_blocked = if member_is_active {
+            false
+        } else {
+            match QueuedMessageService::new()
+                .has_blocking_failure(&self.db.pool, session_agent.id)
+                .await
+            {
+                Ok(blocked) => blocked,
+                Err(err) => {
+                    tracing::warn!(
+                        session_agent_id = %session_agent.id,
+                        error = %err,
+                        "failed to check member queue blocking state"
+                    );
+                    false
+                }
+            }
+        };
+
+        if member_is_active || member_queue_blocked {
+            // Queue the message for later processing instead of skipping or bypassing a failure.
             tracing::debug!(
                 session_agent_id = %session_agent.id,
                 agent_id = %agent.id,
                 message_id = %source_message.id,
                 state = ?session_agent.state,
-                "chat session agent already active; queueing message for later"
+                "chat session agent active or blocked; queueing message for later"
             );
 
-            let pending = PendingMessage {
-                session_id,
-                agent_id: agent.id,
-                agent_name: agent.name.clone(),
-                message: source_message.clone(),
-                track_source_message,
-            };
-
-            self.pending_messages
-                .entry(session_agent.id)
-                .or_default()
-                .push_back(pending);
+            // Persist the wait as a durable, member-scoped queue row referencing the existing
+            // chat message, so the queue survives restarts and frontend refreshes.
+            if let Err(err) = QueuedMessageService::new()
+                .create_queued(
+                    &self.db.pool,
+                    &CreateQueuedMessage {
+                        session_id,
+                        session_agent_id: session_agent.id,
+                        agent_id: agent.id,
+                        chat_message_id: source_message.id,
+                    },
+                )
+                .await
+            {
+                tracing::warn!(
+                    session_agent_id = %session_agent.id,
+                    message_id = %source_message.id,
+                    error = %err,
+                    "failed to persist queued message"
+                );
+                self.report_mention_failure(
+                    session_id,
+                    source_message.id,
+                    &agent.name,
+                    Some(agent.id),
+                    format!("Failed to queue message for agent: {err}"),
+                )
+                .await;
+                return Err(ChatRunnerError::Database(err));
+            } else {
+                self.emit_member_queue_update(session_id, session_agent.id)
+                    .await;
+            }
 
             if track_source_message {
                 // Emit a "received" status to indicate the message is queued
@@ -1145,6 +1349,24 @@ impl ChatRunner {
             )
             .await?;
 
+            // Track this dispatch only after the chat_run row exists. `chat_message_queue.run_id`
+            // has a real FK to `chat_runs(id)`, so binding earlier fails under foreign_keys=ON.
+            QueuedMessageService::new()
+                .start_or_create_running(
+                    &self.db.pool,
+                    &CreateQueuedMessage {
+                        session_id,
+                        session_agent_id,
+                        agent_id,
+                        chat_message_id: source_message.id,
+                    },
+                    Uuid::new_v4(),
+                    run_id,
+                )
+                .await?;
+            self.emit_member_queue_update(session_id, session_agent_id)
+                .await;
+
             let repo_context = RepoContext::new(PathBuf::from(&workspace_path), Vec::new());
             let mut env = ExecutionEnv::new(repo_context, false, String::new());
             env.insert("VK_CHAT_SESSION_ID", session_id.to_string());
@@ -1266,6 +1488,16 @@ impl ChatRunner {
 
         if result.is_err() {
             self.run_controls.remove(&session_agent_id);
+            // The run failed to start; fail its queue row so the member queue blocks instead of
+            // leaving the row stranded in `running`.
+            self.mark_run_queue_failed(
+                run_id,
+                result
+                    .as_ref()
+                    .err()
+                    .map(|err| format!("failed to start agent run: {err}")),
+            )
+            .await;
             if let Err(err) = &result {
                 self.analytics_projector()
                     .project_or_warn(DomainEvent::AgentRunErrored {

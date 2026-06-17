@@ -36,6 +36,8 @@ fn generate_types_content() -> String {
         db::models::project_work_item::ProjectWorkItemStatus::decl(),
         db::models::project_work_item::ProjectWorkItemPriority::decl(),
         db::models::project_work_item::ProjectWorkItemSource::decl(),
+        db::models::project_work_item_comment::ProjectWorkItemComment::decl(),
+        db::models::project_work_item_comment::CreateProjectWorkItemComment::decl(),
         db::models::project_work_item_external_link::ProjectWorkItemExternalLink::decl(),
         db::models::project_work_item_external_link::CreateProjectWorkItemExternalLink::decl(),
         db::models::project_work_item_external_link::ProjectExternalType::decl(),
@@ -302,6 +304,7 @@ fn generate_types_content() -> String {
         server::routes::project_github::ImportGitHubIssueRequest::decl(),
         server::routes::project_github::DeliveryRecordsQuery::decl(),
         server::routes::project_github::DeliveryStatsQuery::decl(),
+        server::routes::project_github::WorkItemCommentRequest::decl(),
         server::routes::project_github::IssueCommentRequest::decl(),
         server::routes::project_github::IssueBodyRequest::decl(),
         server::routes::project_github::IssueStateRequest::decl(),
@@ -379,8 +382,16 @@ fn generate_types_content() -> String {
         server::routes::chat::presets::PresetSnapshotOverwriteStrategy::decl(),
         server::routes::chat::presets::CreatePresetSnapshotResponse::decl(),
         git::GitBranch::decl(),
+        db::models::chat_message_queue::QueuedMessageStatus::decl(),
         services::services::queued_message::QueuedMessage::decl(),
+        services::services::queued_message::QueuedMessageListItem::decl(),
+        services::services::queued_message::MemberQueueStatus::decl(),
+        services::services::queued_message::MemberQueueSnapshot::decl(),
         services::services::queued_message::QueueStatus::decl(),
+        server::routes::chat::queues::ChatQueueListResponse::decl(),
+        server::routes::chat::queues::ChatMemberQueueResponse::decl(),
+        server::routes::chat::queues::DeleteQueuedMessageResponse::decl(),
+        server::routes::chat::queues::ContinueQueuedMessageResponse::decl(),
         git::ConflictOp::decl(),
         executors::actions::ExecutorAction::decl(),
         executors::mcp_config::McpConfig::decl(),
@@ -456,7 +467,15 @@ fn generate_types_content() -> String {
         serde_json::to_string(DEFAULT_COMMIT_REMINDER_PROMPT).unwrap()
     );
 
-    format!("{HEADER}\n\n{body}\n\n{constants}")
+    strip_trailing_line_whitespace(format!("{HEADER}\n\n{body}\n\n{constants}"))
+}
+
+fn strip_trailing_line_whitespace(content: String) -> String {
+    content
+        .lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn generate_json_schema<T: JsonSchema>() -> Result<String, serde_json::Error> {

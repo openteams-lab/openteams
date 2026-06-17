@@ -2205,6 +2205,9 @@ impl ChatRunner {
                             if let Some((retry_agent_name, retry_message, retry_track_source)) =
                                 protocol_retry_request
                             {
+                                // Protocol retries are part of the same logical turn; keep them
+                                // ahead of later queued user messages.
+                                runner.mark_run_queue_completed(run_id).await;
                                 tracing::info!(
                                     session_id = %session_id,
                                     session_agent_id = %session_agent_id,
@@ -2232,16 +2235,25 @@ impl ChatRunner {
                                 break;
                             }
 
-                            // Process any pending messages in the queue for this agent after
-                            // protocol retries so the corrective run is not starved behind later
-                            // user messages.
-                            runner
-                                .process_pending_queue(session_id, session_agent_id)
-                                .await;
+                            // Success / normal stop: finalize this run's queue row and claim the
+                            // next queued user message before dispatching it.
+                            if let Some(entry) = runner
+                                .complete_run_and_claim_next(run_id, session_id, session_agent_id)
+                                .await
+                            {
+                                runner
+                                    .dispatch_queued_entry(session_id, session_agent_id, entry)
+                                    .await;
+                            }
                         } else {
-                            // Agent failed/died - clear pending queue and mark all as failed
+                            // Agent failed/died: fail this run's queue row. Remaining queued rows
+                            // are preserved so the member queue is blocked until the user
+                            // continues (which skips the failed row and advances).
                             runner
-                                .clear_pending_queue_on_failure(session_id, session_agent_id)
+                                .mark_run_queue_failed(
+                                    run_id,
+                                    Some(format!("agent run ended in state {final_state:?}")),
+                                )
                                 .await;
                         }
 
@@ -2955,8 +2967,25 @@ impl ChatRunner {
         .await?;
 
         self.run_controls.remove(&session_agent.id);
-        self.clear_pending_queue_on_failure(session_agent.session_id, session_agent.id)
-            .await;
+        // The interrupted run left its queue row stranded in-flight; reset it to `queued` so the
+        // persisted queue can resume rather than being silently dropped.
+        match QueuedMessageService::new()
+            .requeue_stale_inflight(&self.db.pool, session_agent.id)
+            .await
+        {
+            Ok(rows) if rows > 0 => {
+                self.emit_member_queue_update(session_agent.session_id, session_agent.id)
+                    .await;
+            }
+            Ok(_) => {}
+            Err(err) => {
+                tracing::warn!(
+                    session_agent_id = %session_agent.id,
+                    error = %err,
+                    "failed to requeue stale in-flight queue rows during run-control recovery"
+                );
+            }
+        }
         self.emit(
             session_agent.session_id,
             ChatStreamEvent::AgentState {

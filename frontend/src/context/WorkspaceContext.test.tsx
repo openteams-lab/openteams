@@ -80,9 +80,8 @@ check(
   'stream events create placeholders, append lines, and replace final messages',
   source.includes('insertRunningPlaceholder(parsed)') &&
     source.includes('appendStreamActivityLine(parsed.line)') &&
-    source.includes(
-      'upsertStreamedMessage(sid, mapBackendChatMessage(parsed.message))',
-    ),
+    source.includes('const incomingMessage = mapBackendChatMessage(parsed.message)') &&
+    source.includes('upsertStreamedMessage(sid, incomingMessage)'),
   source,
 );
 check(
@@ -104,11 +103,16 @@ check(
   source,
 );
 check(
-  'real sends insert an immediate pending agent placeholder for every message',
+  'real sends skip immediate pending placeholders for queued messages',
   pendingPlaceholderIndex >= 0 &&
     source.includes('PENDING_AGENT_MESSAGE_PREFIX') &&
     source.includes('OPTIMISTIC_USER_MESSAGE_PREFIX') &&
     source.includes('clientMessageId: userMsgId') &&
+    source.includes('const shouldQueueForMember = Boolean(') &&
+    source.includes('rememberDeferredQueuedUserMessage(userMsg)') &&
+    source.includes('!shouldQueueForMember && pendingAgentMsg') &&
+    source.includes('const messagesToAppend =') &&
+    /shouldQueueForMember\s*\?\s*\[\]/.test(source) &&
     source.includes('fallbackMention?: string | null') &&
     source.includes('sendMessageToSession') &&
     source.includes('stagePendingAgentPlaceholder') &&
@@ -127,6 +131,8 @@ check(
     source.includes('pendingPlaceholderMatches') &&
     source.includes('message.clientMessageId === match.clientMessageId') &&
     source.includes('message.sourceMessageId === match.sourceMessageId') &&
+    source.includes('const hasCorrelationId = Boolean(') &&
+    /!hasCorrelationId\s*&&\s*match\.sessionAgentId/.test(source) &&
     source.includes('message.sessionAgentId === match.sessionAgentId') &&
     source.includes('clientMessageId: incoming.clientMessageId') &&
     source.includes('clientMessageId: event.client_message_id') &&
@@ -134,11 +140,11 @@ check(
   source,
 );
 check(
-  'new sends prune stale pending placeholders for the same agent session',
+  'new sends prune stale pending placeholders only for immediate execution',
   source.includes('withoutStalePending') &&
-    source.includes('pendingAgentMsg?.sessionAgentId') &&
+    source.includes('!shouldQueueForMember && pendingAgentMsg?.sessionAgentId') &&
     source.includes('message.sessionAgentId === pendingAgentMsg.sessionAgentId') &&
-    source.includes('[...withoutStalePending, userMsg, pendingAgentMsg]'),
+    source.includes('[...withoutStalePending, ...messagesToAppend]'),
   source,
 );
 check(
@@ -147,13 +153,13 @@ check(
     source.includes('message.runId !== runId') &&
     source.includes('Boolean(message.runId)') &&
     source.includes('message.sessionAgentId === sessionAgentId') &&
-    /evictStaleRunPlaceholders\(\s*current,\s*event\.session_agent_id/.test(
-      source,
-    ) &&
+    /evictStaleRunPlaceholders\(\s*currentWithoutReleasedUser,\s*event\.session_agent_id/.test(source) &&
     /evictStaleRunPlaceholders\(\s*current,\s*line\.session_agent_id/.test(
       source,
     ) &&
-    source.includes('[...pruned, placeholder]'),
+    source.includes('orderMessagesForConversation([') &&
+    source.includes('...pruned,') &&
+    source.includes('placeholder,'),
   source,
 );
 check(
@@ -217,6 +223,64 @@ check(
   source,
 );
 check(
+  'agent run placeholders and final replies stay anchored to their source message',
+  source.includes('orderMessagesForConversation') &&
+    source.includes('firstMessageSourceKey') &&
+    source.includes('message.sourceMessageId && sourceKeys.has(message.sourceMessageId)') &&
+    source.includes('message.clientMessageId && sourceKeys.has(message.clientMessageId)') &&
+    source.includes('replacementIndex') &&
+    source.includes('orderMessagesForConversation(correlatedNext)') &&
+    source.includes('insertMessageByCreatedAt') &&
+    source.includes('createdAt: event.started_at ?? new Date().toISOString()') &&
+    source.includes('createdAt: run?.created_at ?? sessionAgent.updated_at'),
+  source,
+);
+check(
+  'hydrated run placeholders keep the optimistic pending placeholder anchor',
+  source.includes('correlateRunningPlaceholdersWithPending') &&
+    source.includes('pendingBySessionAgentId') &&
+    source.includes('consumedPendingPlaceholderIds') &&
+    source.includes('sourceMessageId: pending.sourceMessageId') &&
+    source.includes('clientMessageId: pending.clientMessageId') &&
+    source.includes('createdAt: pending.createdAt ?? placeholder.createdAt') &&
+    source.includes('...correlated.current') &&
+    source.includes('...correlated.runningPlaceholders'),
+  source,
+);
+check(
+  'hydrated activity does not drop source-message anchors from live placeholders',
+  source.includes('mergeCarriedRunPlaceholder') &&
+    source.includes('incomingLineCount > existingLineCount') &&
+    source.includes('primary.sourceMessageId ?? secondary.sourceMessageId') &&
+    source.includes('primary.clientMessageId ?? secondary.clientMessageId') &&
+    source.includes('secondaryHasAnchor') &&
+    source.includes('mergeCarriedRunPlaceholder(existing, message)'),
+  source,
+);
+check(
+  'visible messages are scoped to the active session cache',
+  source.includes('const allMessagesRef = useRef<Record<string, Message[]>>({})') &&
+    source.includes('withSessionIdsBySession') &&
+    source.includes('filterMessagesForSession') &&
+    source.includes('userIndexByClientId') &&
+    source.includes('isOptimisticUserMessage(existing)') &&
+    source.includes('messagesRequestIdRef') &&
+    source.includes('shouldUpdateActiveMessages') &&
+    /filterMessagesForSession\(\s*activeSessionId/.test(source) &&
+    source.includes('filterMessagesForSession(sid, prev[sid] ?? [])') &&
+    source.includes('activeSessionIdRef.current === sid'),
+  source,
+);
+check(
+  'optimistic user messages carry their owning session id',
+  source.includes('sessionId?: string') &&
+    source.includes('sessionId: sid') &&
+    source.includes('sessionId,') &&
+    source.includes('sessionId: line.session_id') &&
+    source.includes('sessionId: event.session_id'),
+  source,
+);
+check(
   'message refresh does not drop the immediate pending placeholder before agent state catches up',
   source.includes('isOptimisticPendingAgentPlaceholder') &&
     source.includes('PENDING_AGENT_MESSAGE_PREFIX}${OPTIMISTIC_USER_MESSAGE_PREFIX}') &&
@@ -266,6 +330,61 @@ check(
     source.includes('chatMessageFontSize') &&
     source.includes('setChatMessageFontSize') &&
     source.includes('normalizeChatMessageFontSize'),
+  source,
+);
+
+check(
+  'syncs member queue snapshots from REST and websocket updates',
+  source.includes('memberQueuesBySessionAgentId') &&
+    source.includes('chatQueuesApi.listSession(sid)') &&
+    source.includes("parsed.type === 'queue_updated'") &&
+    source.includes('mergeMemberQueueSnapshot(parsed.queue)') &&
+    source.includes('void refreshMemberQueues()') &&
+    source.includes('chatQueuesApi.deleteQueued(sessionId, queueId)') &&
+    source.includes('chatQueuesApi.continueMember('),
+  source,
+);
+
+check(
+  'stages optimistic queued state for sends that target busy or blocked members',
+  source.includes('stageOptimisticQueuedMessage') &&
+    source.includes('shouldQueueForMember && pendingAgentMsg?.sessionAgentId') &&
+    source.includes('current?.session_id === sessionId') &&
+    source.includes('session_id: sessionId') &&
+    source.includes("targetMember?.status === 'run'") &&
+    source.includes('existingQueue?.blocked') &&
+    source.includes('existingQueue?.paused') &&
+    source.includes('queued_count: BigInt(') &&
+    source.includes('void refreshMemberQueues()'),
+  source,
+);
+
+check(
+  'defers queued user messages until their queued run starts',
+    source.includes('deferredQueuedMessageIdsRef') &&
+    source.includes('deferredQueuedClientMessageIdsRef') &&
+    source.includes('deferredQueuedUserMessagesRef') &&
+    source.includes('deferredQueuedMessagesById') &&
+    source.includes('setDeferredQueuedMessagesById') &&
+    source.includes('setDeferredQueuedMessagesById({})') &&
+    source.includes('isDeferredQueuedUserMessage') &&
+    source.includes('filterDeferredQueuedUserMessages') &&
+    source.includes('hasDeferredQueuedUserMessage') &&
+    source.includes('releaseDeferredQueuedUserMessage') &&
+    source.includes('revealDeferredQueuedBackendMessage') &&
+    source.includes('insertDeferredQueuedUserMessage') &&
+    source.includes('const visibleCurrent = shouldQueueForMember') &&
+    source.includes('filterDeferredQueuedUserMessages(cur)') &&
+    source.includes('const current = filterDeferredQueuedUserMessages(') &&
+    source.includes('matchesUserMessageIdentity') &&
+    source.includes('currentWithoutReleasedUser') &&
+    source.includes('if (shouldQueueForMember) {') &&
+    source.includes('rememberDeferredQueuedUserMessage(incomingMessage)') &&
+    source.includes('return;') &&
+    /chatMessagesApi\.get\(\s*event\.source_message_id/.test(source) &&
+    source.includes('deferredQueuedMessagesById,') &&
+    source.includes('...withReleasedUser,') &&
+    source.includes('placeholder,'),
   source,
 );
 

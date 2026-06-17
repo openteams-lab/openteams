@@ -29,6 +29,8 @@ import {
   Image as ImageIcon,
   FileText,
   RefreshCw,
+  Play,
+  Trash2,
 } from "lucide-react";
 import { ResourceStateNotice } from "@/components/ResourceState";
 import { ScrollArea } from "@/components/ScrollArea";
@@ -69,6 +71,7 @@ import type {
   Message,
   ProjectWorkItem,
   QuotedMessageReference,
+  QueuedMessageListItem,
   SourceControlDiffArea,
 } from "@/types";
 
@@ -694,6 +697,19 @@ function titleCaseStatus(status: string) {
     .join(" ");
 }
 
+const queuedMessageStatusLabel = (status: string) => {
+  switch (status) {
+    case "processing":
+      return "准备执行";
+    case "running":
+      return "正在执行";
+    case "failed":
+      return "已阻塞";
+    default:
+      return "排队中";
+  }
+};
+
 export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   embedded = false,
   onOpenDiffTab,
@@ -704,6 +720,8 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     t,
     activeSessionId,
     messages,
+    memberQueuesBySessionAgentId,
+    deferredQueuedMessagesById,
     sendMessage,
     stagePendingAgentPlaceholder,
     members,
@@ -725,6 +743,8 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     sourceControlRefreshKey,
     refreshWorkspaceChanges,
     resetWorkspaceChanges,
+    deleteQueuedMessage,
+    continueMemberQueue,
     projects,
     selectedProjectId,
   } = useWorkspace();
@@ -762,6 +782,9 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   const [updatingLinkedWorkItemIds, setUpdatingLinkedWorkItemIds] = useState<
     Set<string>
   >(() => new Set());
+  const [queueActionIds, setQueueActionIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const workspaceGridRef = useRef<HTMLDivElement>(null);
   const chatMessagesScrollRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -822,6 +845,65 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
         );
       })
     : messages;
+  const messagesById = useMemo(
+    () =>
+      new Map([
+        ...messages.map((message) => [message.id, message] as const),
+        ...Object.entries(deferredQueuedMessagesById),
+      ]),
+    [deferredQueuedMessagesById, messages],
+  );
+  const visibleQueueGroups = useMemo(
+    () =>
+      Object.values(memberQueuesBySessionAgentId)
+        .filter((queue) => queue.session_id === activeSessionId)
+        .map((queue) => {
+          const queuedQueueItems = queue.items.filter(
+            (item) =>
+              item.message.session_id === activeSessionId &&
+              String(item.message.status) === "queued",
+          );
+          return {
+            queue,
+            items: queuedQueueItems,
+          };
+        })
+        .filter((group) => group.items.length > 0),
+    [activeSessionId, memberQueuesBySessionAgentId],
+  );
+  const queueGroupsBySessionAgentId = useMemo(
+    () =>
+      new Map(
+        visibleQueueGroups.map((group) => [
+          group.queue.session_agent_id,
+          group,
+        ]),
+      ),
+    [visibleQueueGroups],
+  );
+  const queueAnchorMessageIds = useMemo(() => {
+    const anchors = new Map<string, string>();
+    const runningAnchors = new Set<string>();
+    for (const message of displayedMessages) {
+      const sessionAgentId = message.sessionAgentId;
+      if (
+        message.isUser ||
+        !sessionAgentId ||
+        !queueGroupsBySessionAgentId.has(sessionAgentId)
+      ) {
+        continue;
+      }
+      if (message.isAgentRunning) {
+        anchors.set(sessionAgentId, message.id);
+        runningAnchors.add(sessionAgentId);
+        continue;
+      }
+      if (!runningAnchors.has(sessionAgentId)) {
+        anchors.set(sessionAgentId, message.id);
+      }
+    }
+    return anchors;
+  }, [displayedMessages, queueGroupsBySessionAgentId]);
   const canFitRelatedFiles =
     workspaceWidth === 0 ||
     workspaceWidth >=
@@ -1278,6 +1360,126 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     return normalized.length > 140
       ? `${normalized.slice(0, 137)}...`
       : normalized;
+  };
+
+  const summarizeQueuedMessage = (item: QueuedMessageListItem) => {
+    const source =
+      messagesById.get(item.message.chat_message_id) ??
+      messagesById.get(item.message.id);
+    return summarizeMessage(source?.text ?? "");
+  };
+
+  const setQueueActionPending = (id: string, pending: boolean) => {
+    setQueueActionIds((current) => {
+      const next = new Set(current);
+      if (pending) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteQueuedMessage = async (
+    sessionId: string,
+    queueId: string,
+  ) => {
+    if (queueActionIds.has(queueId)) return;
+    setQueueActionPending(queueId, true);
+    try {
+      await deleteQueuedMessage(sessionId, queueId);
+    } catch {
+      showToast("删除排队消息失败");
+    } finally {
+      setQueueActionPending(queueId, false);
+    }
+  };
+
+  const handleContinueMemberQueue = async (
+    sessionId: string,
+    sessionAgentId: string,
+  ) => {
+    const actionId = `continue-${sessionAgentId}`;
+    if (queueActionIds.has(actionId)) return;
+    setQueueActionPending(actionId, true);
+    try {
+      await continueMemberQueue(sessionId, sessionAgentId);
+    } catch {
+      showToast("继续执行队列失败");
+    } finally {
+      setQueueActionPending(actionId, false);
+    }
+  };
+
+  const renderInlineQueueGroup = (
+    group: (typeof visibleQueueGroups)[number] | undefined,
+  ) => {
+    if (!group) return null;
+    const { queue, items } = group;
+    const continueActionId = `continue-${queue.session_agent_id}`;
+    return (
+      <div className="mt-2 max-w-md rounded-md border border-[var(--hairline)] bg-[var(--surface-1)]/70 p-1 shadow-none">
+        <div className="flex max-h-24 flex-col gap-0.5 overflow-y-auto pr-0.5">
+          {items.map((item) => {
+            const status = String(item.message.status);
+            const canDelete = item.can_delete && status === "queued";
+            return (
+              <div
+                key={item.message.id}
+                className="flex min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-[10px] text-[var(--ink-tertiary)] hover:bg-[var(--surface-2)]"
+              >
+                <span
+                  className="min-w-0 flex-1 truncate"
+                  title={summarizeQueuedMessage(item)}
+                >
+                  {summarizeQueuedMessage(item)}
+                </span>
+                <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[8px] text-[var(--ink-tertiary)]">
+                  {queuedMessageStatusLabel(status)}
+                </span>
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleDeleteQueuedMessage(
+                        queue.session_id,
+                        item.message.id,
+                      )
+                    }
+                    disabled={queueActionIds.has(item.message.id)}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-rose-500 disabled:cursor-wait disabled:opacity-60"
+                    title="删除排队消息"
+                    aria-label="删除排队消息"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {queue.can_continue && (
+          <div className="mt-1 flex justify-end border-t border-[var(--hairline)] pt-1">
+            <button
+              type="button"
+              onClick={() =>
+                void handleContinueMemberQueue(
+                  queue.session_id,
+                  queue.session_agent_id,
+                )
+              }
+              disabled={queueActionIds.has(continueActionId)}
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-2)] hover:text-[var(--primary)] disabled:cursor-wait disabled:opacity-60"
+              title="继续执行队列"
+              aria-label="继续执行队列"
+            >
+              <Play className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const handleCopyAgentMessage = async (messageId: string, text: string) => {
@@ -1878,7 +2080,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
             )}
             {displayedMessages.map((msg) => (
               <div
-                key={msg.clientMessageId ?? msg.id}
+                key={msg.id}
                 className={`group/message relative flex w-full min-w-0 gap-3 items-start rounded-md ${
                   msg.isUser
                     ? "border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2.5"
@@ -2009,6 +2211,12 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                       {msg.cost}
                     </div>
                   )}
+                  {!msg.isUser &&
+                    msg.sessionAgentId &&
+                    queueAnchorMessageIds.get(msg.sessionAgentId) === msg.id &&
+                    renderInlineQueueGroup(
+                      queueGroupsBySessionAgentId.get(msg.sessionAgentId),
+                    )}
                 </div>
 
                 {!msg.isUser &&
