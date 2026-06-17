@@ -378,26 +378,32 @@ check(
   { composerQuoteIndex, composerAttachmentIndex, composerInputIndex },
 );
 check(
-  "renders a compact waiting queue outside the composer with queued items only",
-    source.includes("visibleQueueGroups") &&
+  "renders queued messages inline after the active agent message",
+  source.includes("visibleQueueGroups") &&
     source.includes("const queuedQueueItems =") &&
     source.includes("deferredQueuedMessagesById") &&
     source.includes("...Object.entries(deferredQueuedMessagesById)") &&
     source.includes("messagesById.get(item.message.chat_message_id)") &&
-    source.includes("消息正在等待执行") &&
+    source.includes("queueGroupsBySessionAgentId") &&
+    source.includes("queueAnchorMessageIds") &&
+    source.includes("renderInlineQueueGroup") &&
+    source.includes("queueAnchorMessageIds.get(msg.sessionAgentId) === msg.id") &&
+    source.includes("queueGroupsBySessionAgentId.get(msg.sessionAgentId)") &&
     source.includes("<Trash2") &&
     source.includes("<Play") &&
     source.includes("queue.can_continue") &&
     source.includes("item.message.session_id === activeSessionId") &&
     source.includes('status === "queued"') &&
     !source.includes("visibleQueueItemStatuses") &&
-    source.includes("max-w-sm") &&
+    !source.includes("消息正在等待执行") &&
+    !source.includes("member: members.find") &&
+    source.includes("max-w-md") &&
     source.includes("max-h-24") &&
-    source.includes("text-[10px] font-medium text-[var(--ink-muted)]") &&
     source.includes("handleDeleteQueuedMessage") &&
     source.includes("handleContinueMemberQueue") &&
-    source.indexOf("{visibleQueueGroups.length > 0") < composerInputIndex &&
-    source.indexOf("消息正在等待执行") < composerInputIndex,
+    source.indexOf("renderInlineQueueGroup(") < composerInputIndex &&
+    !source.includes("{visibleQueueGroups.length > 0") &&
+    !source.includes("false && visibleQueueGroups.length > 0"),
   { composerInputIndex, source },
 );
 check(

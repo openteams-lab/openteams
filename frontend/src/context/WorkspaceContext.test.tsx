@@ -236,6 +236,28 @@ check(
   source,
 );
 check(
+  'hydrated run placeholders keep the optimistic pending placeholder anchor',
+  source.includes('correlateRunningPlaceholdersWithPending') &&
+    source.includes('pendingBySessionAgentId') &&
+    source.includes('consumedPendingPlaceholderIds') &&
+    source.includes('sourceMessageId: pending.sourceMessageId') &&
+    source.includes('clientMessageId: pending.clientMessageId') &&
+    source.includes('createdAt: pending.createdAt ?? placeholder.createdAt') &&
+    source.includes('...correlated.current') &&
+    source.includes('...correlated.runningPlaceholders'),
+  source,
+);
+check(
+  'hydrated activity does not drop source-message anchors from live placeholders',
+  source.includes('mergeCarriedRunPlaceholder') &&
+    source.includes('incomingLineCount > existingLineCount') &&
+    source.includes('primary.sourceMessageId ?? secondary.sourceMessageId') &&
+    source.includes('primary.clientMessageId ?? secondary.clientMessageId') &&
+    source.includes('secondaryHasAnchor') &&
+    source.includes('mergeCarriedRunPlaceholder(existing, message)'),
+  source,
+);
+check(
   'visible messages are scoped to the active session cache',
   source.includes('const allMessagesRef = useRef<Record<string, Message[]>>({})') &&
     source.includes('withSessionIdsBySession') &&

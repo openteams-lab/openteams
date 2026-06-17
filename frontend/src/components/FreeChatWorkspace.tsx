@@ -864,15 +864,45 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
           );
           return {
             queue,
-            member: members.find(
-              (member) => member.id === queue.session_agent_id,
-            ),
             items: queuedQueueItems,
           };
         })
         .filter((group) => group.items.length > 0),
-    [activeSessionId, memberQueuesBySessionAgentId, members],
+    [activeSessionId, memberQueuesBySessionAgentId],
   );
+  const queueGroupsBySessionAgentId = useMemo(
+    () =>
+      new Map(
+        visibleQueueGroups.map((group) => [
+          group.queue.session_agent_id,
+          group,
+        ]),
+      ),
+    [visibleQueueGroups],
+  );
+  const queueAnchorMessageIds = useMemo(() => {
+    const anchors = new Map<string, string>();
+    const runningAnchors = new Set<string>();
+    for (const message of displayedMessages) {
+      const sessionAgentId = message.sessionAgentId;
+      if (
+        message.isUser ||
+        !sessionAgentId ||
+        !queueGroupsBySessionAgentId.has(sessionAgentId)
+      ) {
+        continue;
+      }
+      if (message.isAgentRunning) {
+        anchors.set(sessionAgentId, message.id);
+        runningAnchors.add(sessionAgentId);
+        continue;
+      }
+      if (!runningAnchors.has(sessionAgentId)) {
+        anchors.set(sessionAgentId, message.id);
+      }
+    }
+    return anchors;
+  }, [displayedMessages, queueGroupsBySessionAgentId]);
   const canFitRelatedFiles =
     workspaceWidth === 0 ||
     workspaceWidth >=
@@ -1379,6 +1409,76 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     } finally {
       setQueueActionPending(actionId, false);
     }
+  };
+
+  const renderInlineQueueGroup = (
+    group: (typeof visibleQueueGroups)[number] | undefined,
+  ) => {
+    if (!group) return null;
+    const { queue, items } = group;
+    const continueActionId = `continue-${queue.session_agent_id}`;
+    return (
+      <div className="mt-2 max-w-md rounded-md border border-[var(--hairline)] bg-[var(--surface-1)]/70 p-1 shadow-none">
+        <div className="flex max-h-24 flex-col gap-0.5 overflow-y-auto pr-0.5">
+          {items.map((item) => {
+            const status = String(item.message.status);
+            const canDelete = item.can_delete && status === "queued";
+            return (
+              <div
+                key={item.message.id}
+                className="flex min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-[10px] text-[var(--ink-tertiary)] hover:bg-[var(--surface-2)]"
+              >
+                <span
+                  className="min-w-0 flex-1 truncate"
+                  title={summarizeQueuedMessage(item)}
+                >
+                  {summarizeQueuedMessage(item)}
+                </span>
+                <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[8px] text-[var(--ink-tertiary)]">
+                  {queuedMessageStatusLabel(status)}
+                </span>
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleDeleteQueuedMessage(
+                        queue.session_id,
+                        item.message.id,
+                      )
+                    }
+                    disabled={queueActionIds.has(item.message.id)}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-rose-500 disabled:cursor-wait disabled:opacity-60"
+                    title="删除排队消息"
+                    aria-label="删除排队消息"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {queue.can_continue && (
+          <div className="mt-1 flex justify-end border-t border-[var(--hairline)] pt-1">
+            <button
+              type="button"
+              onClick={() =>
+                void handleContinueMemberQueue(
+                  queue.session_id,
+                  queue.session_agent_id,
+                )
+              }
+              disabled={queueActionIds.has(continueActionId)}
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-2)] hover:text-[var(--primary)] disabled:cursor-wait disabled:opacity-60"
+              title="继续执行队列"
+              aria-label="继续执行队列"
+            >
+              <Play className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const handleCopyAgentMessage = async (messageId: string, text: string) => {
@@ -2110,6 +2210,12 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                       {msg.cost}
                     </div>
                   )}
+                  {!msg.isUser &&
+                    msg.sessionAgentId &&
+                    queueAnchorMessageIds.get(msg.sessionAgentId) === msg.id &&
+                    renderInlineQueueGroup(
+                      queueGroupsBySessionAgentId.get(msg.sessionAgentId),
+                    )}
                 </div>
 
                 {!msg.isUser &&
@@ -2235,91 +2341,6 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                     </div>
                   );
                 })}
-              </div>
-            )}
-            {visibleQueueGroups.length > 0 && (
-              <div className="mb-1.5 flex justify-end">
-                <div className="flex w-full max-w-sm flex-col gap-1.5 sm:w-[min(22rem,88vw)]">
-                  {visibleQueueGroups.map(({ queue, member, items }) => {
-                    const continueActionId = `continue-${queue.session_agent_id}`;
-                    return (
-                      <div
-                        key={queue.session_agent_id}
-                        className="rounded-md border border-[var(--hairline)] bg-[var(--surface-1)]/95 shadow-[0_8px_20px_rgba(15,23,42,0.06)]"
-                      >
-                        <div className="flex min-w-0 items-center justify-between gap-1.5 border-b border-[var(--hairline)] px-2 py-1">
-                          <div className="min-w-0">
-                            <div className="truncate text-[10px] font-medium text-[var(--ink-muted)]">
-                              消息正在等待执行
-                            </div>
-                            {member && (
-                              <div className="truncate font-mono text-[9px] text-[var(--ink-tertiary)]">
-                                {member.name}
-                              </div>
-                            )}
-                          </div>
-                          {queue.can_continue && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void handleContinueMemberQueue(
-                                  queue.session_id,
-                                  queue.session_agent_id,
-                                )
-                              }
-                              disabled={queueActionIds.has(continueActionId)}
-                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--primary)] disabled:cursor-wait disabled:opacity-60"
-                              title="继续执行队列"
-                              aria-label="继续执行队列"
-                            >
-                              <Play className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                        <div className="max-h-24 overflow-y-auto p-1">
-                          {items.map((item) => {
-                            const status = String(item.message.status);
-                            const canDelete =
-                              item.can_delete && status === "queued";
-                            return (
-                              <div
-                                key={item.message.id}
-                                className="flex min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-[10px] text-[var(--ink-tertiary)] hover:bg-[var(--surface-2)]"
-                              >
-                                <span
-                                  className="min-w-0 flex-1 truncate"
-                                  title={summarizeQueuedMessage(item)}
-                                >
-                                  {summarizeQueuedMessage(item)}
-                                </span>
-                                <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[8px] text-[var(--ink-tertiary)]">
-                                  {queuedMessageStatusLabel(status)}
-                                </span>
-                                {canDelete && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      void handleDeleteQueuedMessage(
-                                        queue.session_id,
-                                        item.message.id,
-                                      )
-                                    }
-                                    disabled={queueActionIds.has(item.message.id)}
-                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-rose-500 disabled:cursor-wait disabled:opacity-60"
-                                    title="删除排队消息"
-                                    aria-label="删除排队消息"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
             )}
             <div

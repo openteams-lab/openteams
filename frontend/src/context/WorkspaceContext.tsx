@@ -452,6 +452,105 @@ const evictStaleRunPlaceholders = (
   );
 };
 
+const mergeCarriedRunPlaceholder = (
+  existing: Message | undefined,
+  incoming: Message,
+): Message => {
+  if (!existing) return incoming;
+
+  const existingLineCount = existing.activityLines?.length ?? 0;
+  const incomingLineCount = incoming.activityLines?.length ?? 0;
+  const primary =
+    incomingLineCount > existingLineCount ? incoming : existing;
+  const secondary = primary === incoming ? existing : incoming;
+  const sourceMessageId =
+    primary.sourceMessageId ?? secondary.sourceMessageId;
+  const clientMessageId =
+    primary.clientMessageId ?? secondary.clientMessageId;
+  const secondaryHasAnchor = Boolean(
+    secondary.sourceMessageId || secondary.clientMessageId,
+  );
+
+  return {
+    ...primary,
+    sourceMessageId,
+    clientMessageId,
+    createdAt:
+      secondaryHasAnchor && (sourceMessageId || clientMessageId)
+        ? (secondary.createdAt ?? primary.createdAt)
+        : (primary.createdAt ?? secondary.createdAt),
+    activityLines: primary.activityLines ?? secondary.activityLines,
+    activityLoadState:
+      primary.activityLoadState ?? secondary.activityLoadState,
+  };
+};
+
+const correlateRunningPlaceholdersWithPending = (
+  current: Message[],
+  runningPlaceholders: Message[],
+): { current: Message[]; runningPlaceholders: Message[] } => {
+  if (runningPlaceholders.length === 0) {
+    return { current, runningPlaceholders };
+  }
+
+  const pendingBySessionAgentId = new Map<string, Message>();
+  for (const message of current) {
+    if (
+      isPendingAgentPlaceholder(message) &&
+      !message.runId &&
+      message.sessionAgentId
+    ) {
+      pendingBySessionAgentId.set(message.sessionAgentId, message);
+    }
+  }
+
+  if (pendingBySessionAgentId.size === 0) {
+    return { current, runningPlaceholders };
+  }
+
+  const consumedPendingPlaceholderIds = new Set<string>();
+  const correlatedRunningPlaceholders = runningPlaceholders.map(
+    (placeholder) => {
+      if (
+        !placeholder.runId ||
+        placeholder.sourceMessageId ||
+        placeholder.clientMessageId ||
+        !placeholder.sessionAgentId
+      ) {
+        return placeholder;
+      }
+
+      const pending = pendingBySessionAgentId.get(placeholder.sessionAgentId);
+      if (!pending) return placeholder;
+      consumedPendingPlaceholderIds.add(pending.id);
+
+      return {
+        ...placeholder,
+        sourceMessageId: pending.sourceMessageId,
+        clientMessageId: pending.clientMessageId,
+        createdAt: pending.createdAt ?? placeholder.createdAt,
+        activityLines:
+          placeholder.activityLines && placeholder.activityLines.length > 0
+            ? placeholder.activityLines
+            : pending.activityLines,
+        activityLoadState:
+          placeholder.activityLoadState ?? pending.activityLoadState,
+      };
+    },
+  );
+
+  if (consumedPendingPlaceholderIds.size === 0) {
+    return { current, runningPlaceholders };
+  }
+
+  return {
+    current: current.filter(
+      (message) => !consumedPendingPlaceholderIds.has(message.id),
+    ),
+    runningPlaceholders: correlatedRunningPlaceholders,
+  };
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -693,7 +792,16 @@ const mergePersistedWithRunningPlaceholders = (
   persisted: Message[],
   current: Message[],
   activeSessionAgentIds?: Set<string>,
+  runningPlaceholders: Message[] = [],
 ): Message[] => {
+  const correlated = correlateRunningPlaceholdersWithPending(
+    current,
+    runningPlaceholders,
+  );
+  const combinedCurrent = [
+    ...correlated.current,
+    ...correlated.runningPlaceholders,
+  ];
   const persistedIds = new Set(persisted.map((message) => message.id));
   const persistedClientMessageIds = new Set(
     persisted
@@ -707,7 +815,7 @@ const mergePersistedWithRunningPlaceholders = (
   );
   const carriedMessagesByKey = new Map<string, Message>();
   let hasRunIdPlaceholder = false;
-  for (const message of current) {
+  for (const message of combinedCurrent) {
     if (
       message.isAgentRunning &&
       message.sessionAgentId &&
@@ -735,11 +843,10 @@ const mergePersistedWithRunningPlaceholders = (
     const key = `agent:${message.runId ?? message.clientMessageId ?? message.id}`;
     if (message.runId) hasRunIdPlaceholder = true;
     const existing = carriedMessagesByKey.get(key);
-    const existingLineCount = existing?.activityLines?.length ?? 0;
-    const nextLineCount = message.activityLines?.length ?? 0;
-    if (!existing || nextLineCount > existingLineCount) {
-      carriedMessagesByKey.set(key, message);
-    }
+    carriedMessagesByKey.set(
+      key,
+      mergeCarriedRunPlaceholder(existing, message),
+    );
   }
 
   // If a real run placeholder exists, discard only hydrated pending placeholders
@@ -1691,8 +1798,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         const next = resolveQuotedMessageReferences(
           mergePersistedWithRunningPlaceholders(
             mapped,
-            [...current, ...runningPlaceholders],
+            current,
             activeSessionAgentIds,
+            runningPlaceholders,
           ),
         );
         if (shouldUpdateActiveMessages()) {
